@@ -22,16 +22,31 @@ import {
   RefreshCw,
   Eye,
   FileText,
-  X,
   UserPlus
 } from "lucide-react";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import Button from "../../../components/Button/Button";
+import Modal from "../../../components/ui/Modal";
+import FormInput from "../../../components/forms/FormInput";
+import { createCampaign } from "../service/campaignservice";
+
+const DEFAULT_CAMPAIGN_FORM = {
+  name: "",
+  max_candidates: 1,
+  deadline: "",
+  weight_deterministic: 30,
+  weight_semantic: 40,
+  weight_ai: 30,
+  semantic_threshold: 0.65,
+  ai_threshold: 50,
+  hiring_manager_id: "",
+};
 
 export default function JdDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { jds, campaigns, updateJd, restoreJdVersion, linkCampaignToJd, addCampaign } = useAirsStore();
+  const { jds, campaigns, updateJd, restoreJdVersion, addCampaign } = useAirsStore();
 
   const jd = jds.find((j) => j.id === id);
 
@@ -69,11 +84,10 @@ export default function JdDetails() {
   const [compareMode, setCompareMode] = useState(false);
   const [restoreConfirmVersion, setRestoreConfirmVersion] = useState(null);
 
-  // Campaign Linking state
+  // Campaign Initiation state
   const [linkCampaignModalOpen, setLinkCampaignModalOpen] = useState(false);
-  const [campaignLinkStep, setCampaignLinkStep] = useState(1); // 1 = Name/Select, 2 = Review, 3 = Complete
-  const [newCampaignName, setNewCampaignName] = useState("");
-  const [selectedExistingCampaignId, setSelectedExistingCampaignId] = useState("");
+  const [isSubmittingCampaign, setIsSubmittingCampaign] = useState(false);
+  const [campaignForm, setCampaignForm] = useState(DEFAULT_CAMPAIGN_FORM);
 
   if (isLoading) {
     return (
@@ -188,30 +202,72 @@ export default function JdDetails() {
   };
 
   // --- Campaign Handlers ---
-  const handleCampaignSubmit = () => {
-    if (campaignLinkStep === 1) {
-      if (!newCampaignName && !selectedExistingCampaignId) {
-        toast.error("Please enter a new campaign name or select an existing one.");
+  const handleCampaignFormChange = (e) => {
+    const { name, value } = e.target;
+    setCampaignForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleInitiateCampaign = async () => {
+    const trimmedName = campaignForm.name.trim();
+    if (!trimmedName) {
+      toast.error("Campaign name cannot be empty.");
+      return;
+    }
+    if (trimmedName.length > 255) {
+      toast.error("Campaign name must be 255 characters or fewer.");
+      return;
+    }
+    if (!campaignForm.hiring_manager_id.trim()) {
+      toast.error("Please enter a hiring manager ID.");
+      return;
+    }
+    if (campaignForm.max_candidates !== "" && campaignForm.max_candidates !== null && Number(campaignForm.max_candidates) <= 0) {
+      toast.error("Max candidates must be greater than 0.");
+      return;
+    }
+    const weightsSum = Number(campaignForm.weight_deterministic) + Number(campaignForm.weight_semantic) + Number(campaignForm.weight_ai);
+    if (Math.abs(weightsSum - 100) > 0.01) {
+      toast.error("Scoring weights must sum to 100.00");
+      return;
+    }
+
+    const payload = {
+      name: trimmedName,
+      jd_id: id,
+      max_candidates: campaignForm.max_candidates === "" || campaignForm.max_candidates === null ? null : Number(campaignForm.max_candidates),
+      deadline: campaignForm.deadline ? new Date(campaignForm.deadline).toISOString() : null,
+      weight_deterministic: Number(campaignForm.weight_deterministic),
+      weight_semantic: Number(campaignForm.weight_semantic),
+      weight_ai: Number(campaignForm.weight_ai),
+      semantic_threshold: Number(campaignForm.semantic_threshold),
+      ai_threshold: Number(campaignForm.ai_threshold),
+      hiring_manager_id: campaignForm.hiring_manager_id.trim(),
+    };
+
+    setIsSubmittingCampaign(true);
+    try {
+      const response = await createCampaign(payload);
+      if (response?.success === false) {
+        toast.error(response.message || "Failed to initiate campaign.");
         return;
       }
-      setCampaignLinkStep(2);
-    } else if (campaignLinkStep === 2) {
+      const created = response?.data || response;
       const nextCount = campaignCount + 1;
       setJdDetail(prev => ({ ...prev, campaignCount: nextCount }));
-      if (newCampaignName) {
-        const newCmpId = `CMP-${String(campaigns.length + 1).padStart(3, "0")}`;
-        addCampaign({
-          id: newCmpId,
-          name: newCampaignName,
-          status: "Active",
-          candidates: 0,
-          createdDate: new Date().toISOString().split("T")[0]
-        });
-        linkCampaignToJd(id, newCmpId);
-      } else {
-        linkCampaignToJd(id, selectedExistingCampaignId);
-      }
-      setCampaignLinkStep(3);
+      addCampaign({
+        id: created?.id || created?.campaign_id || `CMP-${String(campaigns.length + 1).padStart(3, "0")}`,
+        name: payload.name,
+        status: "Active",
+        candidates: 0,
+        createdDate: new Date().toISOString().split("T")[0]
+      });
+      toast.success(response?.message || "Campaign initiated successfully.");
+      setLinkCampaignModalOpen(false);
+      setCampaignForm(DEFAULT_CAMPAIGN_FORM);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to initiate campaign.");
+    } finally {
+      setIsSubmittingCampaign(false);
     }
   };
 
@@ -525,17 +581,16 @@ export default function JdDetails() {
               <h3 className="text-sm font-bold text-slate-900">Linked Campaigns</h3>
               <p className="text-[11px] text-slate-500 mt-0.5">Active hiring pipelines tied directly to the skill taxonomy of this JD.</p>
             </div>
-            <button
+            <Button
+              size="small"
+              variant="primary"
               onClick={() => {
+                setCampaignForm(DEFAULT_CAMPAIGN_FORM);
                 setLinkCampaignModalOpen(true);
-                setCampaignLinkStep(1);
-                setNewCampaignName("");
-                setSelectedExistingCampaignId("");
               }}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded px-3 py-1.5 text-xs font-bold transition shadow-sm"
             >
               <UserPlus className="h-3.5 w-3.5" /> Initiate Campaign
-            </button>
+            </Button>
           </div>
 
           <table className="w-full text-left text-xs border-collapse">
@@ -705,135 +760,123 @@ export default function JdDetails() {
 
       {/* dialog overlays */}
 
-      {/* Link Campaign Modal */}
-      {linkCampaignModalOpen && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white border border-slate-200 rounded-xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-bold text-slate-900">Recruitment Campaign Linker</h3>
-              <button onClick={() => setLinkCampaignModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Stepper indicators */}
-            <div className="flex justify-center items-center gap-3 mb-6">
-              <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold ${campaignLinkStep >= 1 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"}`}>1</span>
-              <span className="h-0.5 w-6 bg-slate-200" />
-              <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold ${campaignLinkStep >= 2 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"}`}>2</span>
-              <span className="h-0.5 w-6 bg-slate-200" />
-              <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold ${campaignLinkStep >= 3 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"}`}>3</span>
-            </div>
-
-            {/* Step 1: Selection */}
-            {campaignLinkStep === 1 && (
-              <div className="space-y-4">
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Link to Existing Campaign</label>
-                  <select
-                    value={selectedExistingCampaignId}
-                    onChange={(e) => {
-                      setSelectedExistingCampaignId(e.target.value);
-                      setNewCampaignName(""); // Clear other input
-                    }}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                  >
-                    <option value="">-- Choose active campaign --</option>
-                    {campaigns.map(c => (
-                      <option key={c.id} value={c.id}>{c.name} ({c.id})</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="relative flex py-2 items-center">
-                  <div className="flex-grow border-t border-slate-200"></div>
-                  <span className="flex-shrink mx-4 text-[9px] uppercase font-bold text-slate-400">Or Create New Campaign</span>
-                  <div className="flex-grow border-t border-slate-200"></div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">New Campaign Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Q3 React Platform Lead Hiring"
-                    value={newCampaignName}
-                    onChange={(e) => {
-                      setNewCampaignName(e.target.value);
-                      setSelectedExistingCampaignId(""); // Clear other selection
-                    }}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Review Mapping */}
-            {campaignLinkStep === 2 && (
-              <div className="space-y-4">
-                <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-400 font-medium">Link Target:</span>
-                    <span className="font-bold text-slate-800">{newCampaignName || campaigns.find(c => c.id === selectedExistingCampaignId)?.name}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-400 font-medium">Linked JD:</span>
-                    <span className="font-bold text-slate-800">{title}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-400 font-medium">Mandatory Skill Nodes:</span>
-                    <span className="font-bold text-slate-850">{skillsList.filter(s => s.mandatory).map(s => s.name).join(", ")}</span>
-                  </div>
-                </div>
-                <p className="text-[10px] text-slate-400 italic leading-snug">
-                  recruitment filters will be applied based on matching mandatory skills. Candidates not matching these tags will be locked out of screening scores.
-                </p>
-              </div>
-            )}
-
-            {/* Step 3: Complete */}
-            {campaignLinkStep === 3 && (
-              <div className="text-center py-4 space-y-3">
-                <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
-                  <Check className="h-6 w-6" />
-                </div>
-                <h4 className="text-sm font-bold text-slate-850">Recruitment Campaign Linked!</h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Candidate parsing and skill vector scores are now synced with this job taxonomy structure.
-                </p>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-3 mt-6 border-t pt-4">
-              {campaignLinkStep < 3 ? (
-                <>
-                  <button
-                    onClick={() => {
-                      if (campaignLinkStep === 2) setCampaignLinkStep(1);
-                      else setLinkCampaignModalOpen(false);
-                    }}
-                    className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-semibold hover:bg-slate-50 text-slate-700 transition"
-                  >
-                    {campaignLinkStep === 2 ? "Back" : "Cancel"}
-                  </button>
-                  <button
-                    onClick={handleCampaignSubmit}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition shadow-sm"
-                  >
-                    {campaignLinkStep === 2 ? "Link & Sync" : "Continue"}
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setLinkCampaignModalOpen(false)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition"
-                >
-                  Close Dialog
-                </button>
-              )}
+      {/* Initiate Campaign Modal */}
+      <Modal
+        isOpen={linkCampaignModalOpen}
+        onClose={() => setLinkCampaignModalOpen(false)}
+        title="Initiate Recruitment Campaign"
+        width="520px"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Job Description</label>
+            <div className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-xs font-bold text-slate-700">
+              {title}
             </div>
           </div>
+
+          <FormInput
+            label="Campaign Name"
+            name="name"
+            value={campaignForm.name}
+            onChange={handleCampaignFormChange}
+            placeholder="e.g. Q3 React Platform Lead Hiring"
+            maxLength={255}
+            requiredMark
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormInput
+              label="Max Candidates"
+              name="max_candidates"
+              type="number"
+              min="1"
+              value={campaignForm.max_candidates}
+              onChange={handleCampaignFormChange}
+            />
+            <FormInput
+              label="Deadline"
+              name="deadline"
+              type="datetime-local"
+              value={campaignForm.deadline}
+              onChange={handleCampaignFormChange}
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <FormInput
+              label="Deterministic Weight"
+              name="weight_deterministic"
+              type="number"
+              value={campaignForm.weight_deterministic}
+              onChange={handleCampaignFormChange}
+            />
+            <FormInput
+              label="Semantic Weight"
+              name="weight_semantic"
+              type="number"
+              value={campaignForm.weight_semantic}
+              onChange={handleCampaignFormChange}
+            />
+            <FormInput
+              label="AI Weight"
+              name="weight_ai"
+              type="number"
+              value={campaignForm.weight_ai}
+              onChange={handleCampaignFormChange}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormInput
+              label="Semantic Threshold"
+              name="semantic_threshold"
+              type="number"
+              step="0.01"
+              min="0"
+              max="1"
+              value={campaignForm.semantic_threshold}
+              onChange={handleCampaignFormChange}
+            />
+            <FormInput
+              label="AI Threshold"
+              name="ai_threshold"
+              type="number"
+              value={campaignForm.ai_threshold}
+              onChange={handleCampaignFormChange}
+            />
+          </div>
+
+          <FormInput
+            label="Hiring Manager ID"
+            name="hiring_manager_id"
+            value={campaignForm.hiring_manager_id}
+            onChange={handleCampaignFormChange}
+            placeholder="Hiring manager identifier"
+            requiredMark
+          />
         </div>
-      )}
+
+        <div className="flex justify-end gap-3 mt-6 border-t pt-4">
+          <Button
+            variant="outline"
+            size="small"
+            onClick={() => setLinkCampaignModalOpen(false)}
+            disabled={isSubmittingCampaign}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            size="small"
+            onClick={handleInitiateCampaign}
+            loading={isSubmittingCampaign}
+            loadingText="Initiating..."
+          >
+            Initiate Campaign
+          </Button>
+        </div>
+      </Modal>
 
       {/* Restore Confirmation Dialog */}
       {restoreConfirmVersion && (
