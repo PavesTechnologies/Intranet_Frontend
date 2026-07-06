@@ -45,11 +45,12 @@ export default function JdCreate() {
     if (editId) {
       const fetchJd = async () => {
         try {
-          const data = await getJDById(editId);
+          const res = await getJDById(editId);
+          const data = res.data;
           if (data) {
             setTitle(data.title || "");
             setJurisdiction(data.jurisdiction || "India");
-            
+
             // Experience mapping
             let exp = data.experience;
             if (!exp && data.min_experience_years !== null && data.min_experience_years !== undefined) {
@@ -111,7 +112,7 @@ export default function JdCreate() {
   // Upload Fields State
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
-  
+
   // Parsing Simulator State
   const [isParsing, setIsParsing] = useState(false);
   const [parseProgress, setParseProgress] = useState(0);
@@ -159,7 +160,7 @@ export default function JdCreate() {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFileSelected(e.dataTransfer.files[0]);
     }
@@ -174,12 +175,12 @@ export default function JdCreate() {
   const handleFileSelected = (file) => {
     const validExtensions = ["pdf", "docx"];
     const ext = file.name.split(".").pop().toLowerCase();
-    
+
     if (!validExtensions.includes(ext)) {
       toast.error("Invalid file format. Please upload a PDF or DOCX file.");
       return;
     }
-    
+
     setUploadedFile(file);
     startMockParsing(file.name);
   };
@@ -189,7 +190,7 @@ export default function JdCreate() {
     setIsParsing(true);
     setParseFailed(false);
     setParseProgress(0);
-    
+
     const steps = [
       { p: 15, text: "Scanning document layers..." },
       { p: 40, text: "Extracting metadata via NLP parser..." },
@@ -199,7 +200,7 @@ export default function JdCreate() {
     ];
 
     let currentStepIdx = 0;
-    
+
     const interval = setInterval(() => {
       setParseProgress((prev) => {
         if (prev >= 100) {
@@ -215,21 +216,21 @@ export default function JdCreate() {
               const isJava = fileName.toLowerCase().includes("java") || title.toLowerCase().includes("java");
               setDetectedExp(experience || "3-5 years");
               setDetectedEdu(education || "Bachelor's Degree");
-              
-              const defaultSkills = isJava 
+
+              const defaultSkills = isJava
                 ? [
-                    { name: "Java", mandatory: true, verified: true, weight: 35, confidence: 98, mappedTo: "Java Language", mappingType: "Alias" },
-                    { name: "Spring Boot", mandatory: true, verified: true, weight: 30, confidence: 95, mappedTo: "Spring Framework", mappingType: "Fuzzy" },
-                    { name: "PostgreSQL", mandatory: true, verified: false, weight: 15, confidence: 91, mappedTo: "Postgres Database", mappingType: "Alias" },
-                    { name: "AWS", mandatory: false, verified: false, weight: 10, confidence: 85, mappedTo: "Amazon Web Services", mappingType: "Vector" }
-                  ]
+                  { name: "Java", mandatory: true, verified: true, weight: 35, confidence: 98, mappedTo: "Java Language", mappingType: "Alias" },
+                  { name: "Spring Boot", mandatory: true, verified: true, weight: 30, confidence: 95, mappedTo: "Spring Framework", mappingType: "Fuzzy" },
+                  { name: "PostgreSQL", mandatory: true, verified: false, weight: 15, confidence: 91, mappedTo: "Postgres Database", mappingType: "Alias" },
+                  { name: "AWS", mandatory: false, verified: false, weight: 10, confidence: 85, mappedTo: "Amazon Web Services", mappingType: "Vector" }
+                ]
                 : [
-                    { name: "React", mandatory: true, verified: true, weight: 40, confidence: 97, mappedTo: "ReactJS Library", mappingType: "Alias" },
-                    { name: "TypeScript", mandatory: true, verified: true, weight: 25, confidence: 92, mappedTo: "TypeScript", mappingType: "Alias" },
-                    { name: "NodeJS", mandatory: true, verified: false, weight: 20, confidence: 89, mappedTo: "Node Runtime", mappingType: "Fuzzy" },
-                    { name: "CSS3", mandatory: false, verified: false, weight: 15, confidence: 80, mappedTo: "CSS Style", mappingType: "Vector" }
-                  ];
-              
+                  { name: "React", mandatory: true, verified: true, weight: 40, confidence: 97, mappedTo: "ReactJS Library", mappingType: "Alias" },
+                  { name: "TypeScript", mandatory: true, verified: true, weight: 25, confidence: 92, mappedTo: "TypeScript", mappingType: "Alias" },
+                  { name: "NodeJS", mandatory: true, verified: false, weight: 20, confidence: 89, mappedTo: "Node Runtime", mappingType: "Fuzzy" },
+                  { name: "CSS3", mandatory: false, verified: false, weight: 15, confidence: 80, mappedTo: "CSS Style", mappingType: "Vector" }
+                ];
+
               setExtractedSkills(defaultSkills);
               toast.success("Job description parsed successfully!");
               setStep(2);
@@ -243,7 +244,7 @@ export default function JdCreate() {
         if (matchingStep) {
           setParseStepText(matchingStep.text);
         }
-        
+
         return Math.min(nextVal, 100);
       });
     }, 400);
@@ -257,20 +258,20 @@ export default function JdCreate() {
         toast.error("Please enter a job title and description text.");
         return;
       }
-      
+
       if (!isEditMode) {
         // Perform duplicate check
         const duplicate = jds.find(
           (j) => j.title.toLowerCase().trim() === title.toLowerCase().trim() && j.status !== "Closed"
         );
-        
+
         if (duplicate) {
           setDuplicateJd(duplicate);
           setDuplicateModalOpen(true);
           return;
         }
       }
-      
+
       // Run parser animation on text
       startMockParsing("manual_paste.txt");
     }
@@ -285,7 +286,7 @@ export default function JdCreate() {
 
   const handleCreateNewVersion = () => {
     setDuplicateModalOpen(false);
-    
+
     // Add version via store
     const newFields = {
       title,
@@ -294,7 +295,7 @@ export default function JdCreate() {
       education,
       rawText
     };
-    
+
     addJdVersion(duplicateJd.id, newFields, "Incremented version via creator wizard");
     toast.success(`New version created under existing JD: ${duplicateJd.id}`);
     navigate(`/airs/jds/${duplicateJd.id}`);
@@ -400,7 +401,7 @@ export default function JdCreate() {
         { event: "Parsed", date: new Date().toISOString().split("T")[0], user: "AIRS Parser Engine", description: "Skills and constraints verified." }
       ]
     };
-    
+
     addJd(newJdObj);
     toast.success(`Job Description ${newJdId} created successfully!`);
     navigate("/airs/jds");
@@ -419,32 +420,29 @@ export default function JdCreate() {
       {/* Stepper Header */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mb-6 flex justify-between items-center">
         <h1 className="text-lg font-bold">{isEditMode ? "Edit Job Description" : "Create Job Description"}</h1>
-        
+
         {/* Stepper indicators */}
         <div className="flex items-center gap-2">
           {/* Step 1 */}
           <div className="flex items-center gap-1.5">
-            <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${
-              step >= 1 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"
-            }`}>1</span>
+            <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${step >= 1 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"
+              }`}>1</span>
             <span className="text-xs font-semibold text-slate-700 hidden sm:inline">Input</span>
           </div>
           <div className="w-8 h-0.5 bg-slate-200"></div>
 
           {/* Step 2 */}
           <div className="flex items-center gap-1.5">
-            <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${
-              step >= 2 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"
-            }`}>2</span>
+            <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${step >= 2 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"
+              }`}>2</span>
             <span className="text-xs font-semibold text-slate-700 hidden sm:inline">Review Taxonomy</span>
           </div>
           <div className="w-8 h-0.5 bg-slate-200"></div>
 
           {/* Step 3 */}
           <div className="flex items-center gap-1.5">
-            <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${
-              step >= 3 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"
-            }`}>3</span>
+            <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${step >= 3 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"
+              }`}>3</span>
             <span className="text-xs font-semibold text-slate-700 hidden sm:inline">Checklist</span>
           </div>
         </div>
@@ -457,21 +455,19 @@ export default function JdCreate() {
           <div className="flex gap-4 border-b border-slate-150 pb-4 mb-6">
             <button
               onClick={() => setInputMode("paste")}
-              className={`flex items-center gap-2 pb-3.5 px-2 text-xs font-bold transition border-b-2 -mb-4.5 ${
-                inputMode === "paste"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-slate-400 hover:text-slate-600"
-              }`}
+              className={`flex items-center gap-2 pb-3.5 px-2 text-xs font-bold transition border-b-2 -mb-4.5 ${inputMode === "paste"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-slate-400 hover:text-slate-600"
+                }`}
             >
               <FileText className="h-4.5 w-4.5" /> Paste Raw Text
             </button>
             <button
               onClick={() => setInputMode("upload")}
-              className={`flex items-center gap-2 pb-3.5 px-2 text-xs font-bold transition border-b-2 -mb-4.5 ${
-                inputMode === "upload"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-slate-400 hover:text-slate-600"
-              }`}
+              className={`flex items-center gap-2 pb-3.5 px-2 text-xs font-bold transition border-b-2 -mb-4.5 ${inputMode === "upload"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-slate-400 hover:text-slate-600"
+                }`}
             >
               <FileUp className="h-4.5 w-4.5" /> Upload File (PDF/DOCX)
             </button>
@@ -611,11 +607,10 @@ export default function JdCreate() {
                 onDragLeave={handleDrag}
                 onDragOver={handleDrag}
                 onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-xl p-10 text-center transition ${
-                  dragActive
-                    ? "border-blue-500 bg-blue-50/50"
-                    : "border-slate-300 hover:border-blue-400 bg-slate-50/50"
-                }`}
+                className={`border-2 border-dashed rounded-xl p-10 text-center transition ${dragActive
+                  ? "border-blue-500 bg-blue-50/50"
+                  : "border-slate-300 hover:border-blue-400 bg-slate-50/50"
+                  }`}
               >
                 <div className="max-w-xs mx-auto">
                   <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-4">
@@ -623,7 +618,7 @@ export default function JdCreate() {
                   </div>
                   <h3 className="text-sm font-bold text-slate-800">Drag & drop your file here</h3>
                   <p className="text-[11px] text-slate-400 mt-1">Supports PDF, DOCX formats up to 10MB</p>
-                  
+
                   <div className="relative mt-4">
                     <input
                       type="file"
@@ -696,12 +691,12 @@ export default function JdCreate() {
             <p className="text-xs text-slate-500 font-semibold">{parseStepText}</p>
             <p className="text-[10px] text-slate-400">Estimated time remaining: {Math.max(1, Math.ceil((100 - parseProgress) / 25))}s</p>
           </div>
-          
+
           {/* Progress bar container */}
           <div className="max-w-md mx-auto">
             <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-              <div 
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out" 
+              <div
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
                 style={{ width: `${parseProgress}%` }}
               />
             </div>
@@ -801,7 +796,7 @@ export default function JdCreate() {
             <h3 className="text-xs font-bold text-slate-900 flex items-center gap-2">
               <Tag className="h-4 w-4 text-blue-600" /> Extracted Skills Taxonomy
             </h3>
-            
+
             <div className="border border-slate-200 rounded-xl overflow-hidden">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
@@ -945,7 +940,7 @@ export default function JdCreate() {
             {/* Overall Score */}
             <div className="border border-slate-200 rounded-xl p-5 bg-slate-50 flex flex-col justify-center items-center text-center">
               <span className="text-[10px] uppercase font-bold text-slate-400 mb-2">Overall JD Status</span>
-              
+
               {extractedSkills.length > 0 && extractedSkills.some(s => !s.verified) ? (
                 <>
                   <div className="w-16 h-16 rounded-full border-4 border-amber-500 flex items-center justify-center bg-amber-50 text-amber-600 text-lg font-black mb-3">
@@ -991,7 +986,7 @@ export default function JdCreate() {
               <div className="p-2 bg-amber-50 rounded-full"><AlertTriangle className="h-6 w-6" /></div>
               <h3 className="text-base font-bold text-slate-900">Duplicate Role Detected</h3>
             </div>
-            
+
             <p className="text-xs text-slate-500 mb-6 leading-relaxed">
               A Job Description with title <span className="font-bold text-slate-800">"{duplicateJd.title}"</span> already exists in the system.
             </p>

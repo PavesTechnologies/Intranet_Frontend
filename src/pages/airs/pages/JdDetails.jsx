@@ -42,7 +42,8 @@ export default function JdDetails() {
     const fetchJd = async () => {
       setIsLoading(true);
       try {
-        const data = await getJDById(id);
+        const res = await getJDById(id);
+        const data = res.data
         if (data) {
           setJdDetail(data);
         }
