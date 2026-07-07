@@ -1,4 +1,4 @@
-// public/config.js
+/// public/config.js
 window.__APP_CONFIG__ = {
     TIMESHEET_API_ENDPOINT: "https://d15j2ej3bear0q.cloudfront.net/tms",
     //USER_MANAGEMENT_URL: "https://d15j2ej3bear0q.cloudfront.net/ums",
@@ -9,6 +9,6 @@ window.__APP_CONFIG__ = {
     // EMPLOYEE_ONBOARDING_URL: "http://localhost:8001/ems",
     EMPLOYEE_ONBOARDING_URL: "https://d15j2ej3bear0q.cloudfront.net/ems",
     RMS_BASE_URL: "https://d15j2ej3bear0q.cloudfront.net/rms",
-    AIRS_BASE_URL: "http://localhost:8001/airs",
+    AIRS_BASE_URL: "http://127.0.0.1:8000/airs",
     //RMS_BASE_URL: "http://localhost:8080/rms"
 };

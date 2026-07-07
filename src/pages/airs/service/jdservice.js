@@ -58,16 +58,37 @@ export const updateJDById = async (jdId, updatedData) => {
     }
 };
 
-export const downloadJD = async (jdId) => {
+export const exportSingleJD = async (jdId) => {
     try {
-        const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}/download`, {
+        const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}/export`, {
+            responseType: "blob",
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
         });
-        return response.data;
+        return response;
     } catch (error) {
-        console.error("Error downloading JD:", error);
+        console.error("Error exporting JD:", error);
+        throw error;
+    }
+};
+
+export const exportJDs = async (params) => {
+    try {
+        const response = await api.get(
+            `${BASE_URL}/job-descriptions/export`,
+            {
+                params,
+                responseType: "blob",
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+            }
+        );
+
+        return response;
+    } catch (error) {
+        console.error("Error exporting JDs:", error);
         throw error;
     }
 };
