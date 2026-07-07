@@ -16,12 +16,12 @@ const MS_LOGO = () => (
 );
 
 const SERVICES = [
-  { label: "Dashboard",   d: "M3 3h5v5H3zM9 3h5v5H9zM3 9h5v5H3zM9 9h5v5H9z" },
-  { label: "Leave",       d: "M3 6h10M3 10h10M8 3v10M5 3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V3z" },
-  { label: "Timesheets",  d: "M12 7a5 5 0 1 1-10 0 5 5 0 0 1 10 0zM7 5v3l2 1" },
-  { label: "Projects",    d: "M3 5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5zM9 5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V5zM3 11a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-3z" },
-  { label: "Resources",   d: "M5 7a3 3 0 1 1 6 0 3 3 0 0 1-6 0zM2 14a5 5 0 0 1 10 0M13 5a2 2 0 0 1 0 4M16 14a4 4 0 0 0-4-4" },
-  { label: "Onboarding",  d: "M4 5h1v2H4V5zM4 9h1v2H4V9zM7 5h6M7 9h6M2 3a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3z" },
+  { label: "Dashboard", d: "M3 3h5v5H3zM9 3h5v5H9zM3 9h5v5H3zM9 9h5v5H9z" },
+  { label: "Leave", d: "M3 6h10M3 10h10M8 3v10M5 3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V3z" },
+  { label: "Timesheets", d: "M12 7a5 5 0 1 1-10 0 5 5 0 0 1 10 0zM7 5v3l2 1" },
+  { label: "Projects", d: "M3 5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5zM9 5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V5zM3 11a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-3z" },
+  { label: "Resources", d: "M5 7a3 3 0 1 1 6 0 3 3 0 0 1-6 0zM2 14a5 5 0 0 1 10 0M13 5a2 2 0 0 1 0 4M16 14a4 4 0 0 0-4-4" },
+  { label: "Onboarding", d: "M4 5h1v2H4V5zM4 9h1v2H4V9zM7 5h6M7 9h6M2 3a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3z" },
 ];
 
 function SvcIcon({ d }) {
@@ -35,8 +35,8 @@ function SvcIcon({ d }) {
 // ─── Floating label input ─────────────────────────────────────────
 function FloatingInput({ id, label, type = "text", value, onChange, onKeyDown, error, autoComplete, hasSuffix, children }) {
   const [focused, setFocused] = useState(false);
-  const wrapClass  = ["field-wrap",  error ? "errored" : focused ? "focused" : "default"].join(" ");
-  const labelClass = ["field-label", error ? "err"     : focused ? "fc"      : "nfc"    ].join(" ");
+  const wrapClass = ["field-wrap", error ? "errored" : focused ? "focused" : "default"].join(" ");
+  const labelClass = ["field-label", error ? "err" : focused ? "fc" : "nfc"].join(" ");
   const inputClass = ["field-input", hasSuffix ? "has-suffix" : ""].join(" ");
 
   return (
@@ -158,21 +158,21 @@ const customCSS = `
 // ─── Interactive dot grid ─────────────────────────────────────────
 const InteractiveGrid = () => {
   const canvasRef = useRef(null);
-  const mouseRef  = useRef({ x: -1000, y: -1000 });
+  const mouseRef = useRef({ x: -1000, y: -1000 });
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx  = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d");
     let frameId;
     const spacing = 25;
-    const radius  = 1.5;
-    const dots    = [];
+    const radius = 1.5;
+    const dots = [];
 
     const resize = () => {
-      canvas.width  = canvas.offsetWidth;
+      canvas.width = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
-      dots.length   = 0;
+      dots.length = 0;
       for (let x = 0; x < canvas.width; x += spacing)
         for (let y = 0; y < canvas.height; y += spacing)
           dots.push({ ox: x, oy: y, x, y });
@@ -180,9 +180,9 @@ const InteractiveGrid = () => {
     window.addEventListener("resize", resize);
     resize();
 
-    const parent  = canvas.parentElement;
-    const onMove  = (e) => { const r = parent.getBoundingClientRect(); mouseRef.current = { x: e.clientX - r.left, y: e.clientY - r.top }; };
-    const onLeave = ()  => { mouseRef.current = { x: -1000, y: -1000 }; };
+    const parent = canvas.parentElement;
+    const onMove = (e) => { const r = parent.getBoundingClientRect(); mouseRef.current = { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    const onLeave = () => { mouseRef.current = { x: -1000, y: -1000 }; };
     parent.addEventListener("mousemove", onMove);
     parent.addEventListener("mouseleave", onLeave);
 
@@ -195,16 +195,16 @@ const InteractiveGrid = () => {
         const maxD = 140;
         if (dist < maxD) {
           const f = (maxD - dist) / maxD;
-          ctx.fillStyle = `rgb(${Math.round(231-(231-120)*f)},${Math.round(229-(229-113)*f)},${Math.round(228-(228-108)*f)})`;
+          ctx.fillStyle = `rgb(${Math.round(231 - (231 - 120) * f)},${Math.round(229 - (229 - 113) * f)},${Math.round(228 - (228 - 108) * f)})`;
           const angle = Math.atan2(dy, dx);
-          dot.x += (dot.ox + Math.cos(angle)*f*15 - dot.x) * 0.2;
-          dot.y += (dot.oy + Math.sin(angle)*f*15 - dot.y) * 0.2;
+          dot.x += (dot.ox + Math.cos(angle) * f * 15 - dot.x) * 0.2;
+          dot.y += (dot.oy + Math.sin(angle) * f * 15 - dot.y) * 0.2;
         } else {
           ctx.fillStyle = "#E7E5E4";
           dot.x += (dot.ox - dot.x) * 0.1;
           dot.y += (dot.oy - dot.y) * 0.1;
         }
-        ctx.beginPath(); ctx.arc(dot.x, dot.y, radius, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(dot.x, dot.y, radius, 0, Math.PI * 2); ctx.fill();
       }
       frameId = requestAnimationFrame(draw);
     };
@@ -223,33 +223,33 @@ const InteractiveGrid = () => {
 
 // ─── Main component ───────────────────────────────────────────────
 export default function LoginPage() {
-  const [email,          setEmail]          = useState("");
-  const [pw,             setPw]             = useState("");
-  const [showPw,         setShowPw]         = useState(false);
-  const [loading,        setLoading]        = useState(false);
-  const [errors,         setErrors]         = useState({});
-  const [shake,          setShake]          = useState(null);
-  const [currentView,    setCurrentView]    = useState("login");
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [shake, setShake] = useState(null);
+  const [currentView, setCurrentView] = useState("login");
 
   // forgot password
-  const [forgotEmail,    setForgotEmail]    = useState("");
-  const [otp,            setOtp]            = useState("");
-  const [newPassword,    setNewPassword]    = useState("");
-  const [showNewPw,      setShowNewPw]      = useState(false);
-  const [sendingOtp,     setSendingOtp]     = useState(false);
-  const [resetting,      setResetting]      = useState(false);
-  const [otpSent,        setOtpSent]        = useState(false);
-  const [forgotErrors,   setForgotErrors]   = useState({});
-  const [forgotShake,    setForgotShake]    = useState(null);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [forgotErrors, setForgotErrors] = useState({});
+  const [forgotShake, setForgotShake] = useState(null);
 
-  const { login }  = useAuth();
-  const navigate   = useNavigate();
-  const location   = useLocation();
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const calledOnce = useRef(false);
 
   // load DM Sans font
   useEffect(() => {
-    ["400","500","600","700"].forEach((w) => {
+    ["400", "500", "600", "700"].forEach((w) => {
       if (!document.getElementById(`font-dm-sans-${w}`)) {
         const l = document.createElement("link");
         l.id = `font-dm-sans-${w}`; l.rel = "stylesheet";
@@ -271,8 +271,8 @@ export default function LoginPage() {
   useEffect(() => {
     if (calledOnce.current) return;
     const params = new URLSearchParams(location.search);
-    const code   = params.get("code");
-    const error  = params.get("error");
+    const code = params.get("code");
+    const error = params.get("error");
 
     if (error) {
       showStatusToast(`Login error: ${error}`, "error");
@@ -334,58 +334,58 @@ export default function LoginPage() {
   // ── Normal login ────────────────────────────────────────────────
   const handleSubmit = async () => {
 
-  const v = validate();
+    const v = validate();
 
-  if (Object.keys(v).length) {
-    setErrors(v);
-    setShake(v.email ? "email" : "pw");
-    setTimeout(() => setShake(null), 450);
-    return;
-  }
-
-  setErrors({});
-  setLoading(true);
-
-  try {
-
-    const res = await axios.post(
-      `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/login`,
-      { email, password: pw },
-      {
-        withCredentials: true,
-      }
-    );
-
-    const { access_token, redirect } = res.data;
-
-    const redirectPath =
-      redirect || "/dashboard";
-
-    login(
-      access_token,
-      redirectPath === "/change-password"
-    );
-
-    if (document.startViewTransition) {
-      document.startViewTransition(() => {
-        navigate(redirectPath, { replace: true });
-      });
-    } else {
-      navigate(redirectPath, { replace: true });
+    if (Object.keys(v).length) {
+      setErrors(v);
+      setShake(v.email ? "email" : "pw");
+      setTimeout(() => setShake(null), 450);
+      return;
     }
 
-  } catch (err) {
+    setErrors({});
+    setLoading(true);
 
-    showStatusToast(
-      "Login failed: " +
-      (err.response?.data?.detail || err.message),
-      "error"
-    );
+    try {
 
-  } finally {
-    setLoading(false);
-  }
-};
+      const res = await axios.post(
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/login`,
+        { email, password: pw },
+        {
+          withCredentials: true,
+        }
+      );
+
+      const { access_token, redirect } = res.data;
+
+      const redirectPath =
+        redirect || "/dashboard";
+
+      login(
+        access_token,
+        redirectPath === "/change-password"
+      );
+
+      if (document.startViewTransition) {
+        document.startViewTransition(() => {
+          navigate(redirectPath, { replace: true });
+        });
+      } else {
+        navigate(redirectPath, { replace: true });
+      }
+
+    } catch (err) {
+
+      showStatusToast(
+        "Login failed: " +
+        (err.response?.data?.detail || err.message),
+        "error"
+      );
+
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ── Forgot password ─────────────────────────────────────────────
   const handleSendOtp = async () => {
@@ -410,8 +410,8 @@ export default function LoginPage() {
     const e = {};
     if (!forgotEmail.trim()) e.email = "Email address is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail.trim())) e.email = "Enter a valid email address";
-    if (!otp.trim())      e.otp         = "OTP is required";
-    if (!newPassword)     e.newPassword = "New password is required";
+    if (!otp.trim()) e.otp = "OTP is required";
+    if (!newPassword) e.newPassword = "New password is required";
     if (Object.keys(e).length) {
       setForgotErrors(e);
       setForgotShake(e.email ? "email" : e.otp ? "otp" : "newPassword");
@@ -434,12 +434,12 @@ export default function LoginPage() {
     }
   };
 
-  const onKey       = (e) => { if (e.key === "Enter") handleSubmit(); };
+  const onKey = (e) => { if (e.key === "Enter") handleSubmit(); };
   const onForgotKey = (e) => { if (e.key === "Enter") otpSent ? handleReset() : handleSendOtp(); };
-  const clrErr      = (f) => setErrors((p) => ({ ...p, [f]: "" }));
+  const clrErr = (f) => setErrors((p) => ({ ...p, [f]: "" }));
   const clrForgotErr = (f) => setForgotErrors((p) => ({ ...p, [f]: "" }));
 
-  const EYE_OPEN   = "M13.5 7s-2 3.5-5.5 3.5S2.5 7 2.5 7 4.5 3.5 8 3.5 13.5 7 13.5 7zM8 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4z";
+  const EYE_OPEN = "M13.5 7s-2 3.5-5.5 3.5S2.5 7 2.5 7 4.5 3.5 8 3.5 13.5 7 13.5 7zM8 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4z";
   const EYE_CLOSED = "M13.5 7s-2 3.5-5.5 3.5S2.5 7 2.5 7 4.5 3.5 8 3.5 13.5 7 13.5 7zM8 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM2 2l12 12";
   const EyeIcon = ({ show }) => (
     <svg width={17} height={17} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
@@ -458,7 +458,7 @@ export default function LoginPage() {
         <div style={{ position: "relative", zIndex: 1, flex: 1, display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "40px" }}>
             <img src="/logo.png" alt="Logo" style={{ width: "48px", height: "48px", objectFit: "contain", borderRadius: "10px", flexShrink: 0 }} />
-            <span style={{ fontSize: "20px", fontWeight: 600, color: "var(--neutral-800)", letterSpacing: "-0.01em" }}>Paves Intranet Portal</span>
+            <span style={{ fontSize: "20px", fontWeight: 600, color: "var(--neutral-800)", letterSpacing: "-0.01em" }}>Paves Enterprise App</span>
           </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ fontSize: "84px", fontWeight: 700, lineHeight: 0.88, color: "#d8d3c8ff", letterSpacing: "-0.05em", marginBottom: "40px", userSelect: "none", pointerEvents: "none" }}>Work<br />Space</div>
