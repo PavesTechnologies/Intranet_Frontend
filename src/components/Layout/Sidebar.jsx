@@ -297,7 +297,7 @@ const Sidebar = ({ isCollapsed }) => {
           {!isCollapsed && (
             <div>
               <h1 className="text-base font-bold leading-none">Paves Tech</h1>
-              <p className="text-xs text-gray-400 mt-1">intranet</p>
+              <p className="text-xs text-gray-400 mt-1">Enterprise App</p>
             </div>
           )}
         </div>

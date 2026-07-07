@@ -598,9 +598,9 @@ const UtilizationPerformanceDashboard = () => {
          <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
                <div>
-                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight leading-none capitalize">Utilization Intelligence Hub</h1>
-                  <p className="mt-2 text-xs sm:text-sm font-medium text-slate-500 flex items-center gap-2">
-                     <ActivityIcon size={14} className="text-indigo-500" /> Real-time resource performance & portfolio health
+                  <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Utilization Intelligence Hub</h1>
+                  <p className="mt-1 text-sm text-gray-500 flex items-center gap-2">
+                     <ActivityIcon size={14} className="text-indigo-500" /> Real-time resource performance and portfolio health.
                   </p>
                </div>
             </div>

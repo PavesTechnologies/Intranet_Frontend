@@ -335,9 +335,9 @@ const BenchPage = () => {
       <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <div className="flex-1">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-slate-900 leading-none capitalize">Bench Management Workspace</h1>
-            <p className="mt-2 text-xs sm:text-sm font-medium text-slate-500">
-              Strategic Tracking Of Available Resource Supply And Internal Pool Movements
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Bench Management Workspace</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Strategic tracking of available resource supply and internal pool movements.
             </p>
           </div>
         </div>
