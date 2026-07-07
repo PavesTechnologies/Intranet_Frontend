@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAirsStore } from "./airsStore";
-import { getAllJDs } from "../service/jdservice";
+import { getAllJDs, exportJDs, deleteJDById } from "../service/jdservice";
 import {
   Search,
   PencilIcon,
@@ -28,8 +28,10 @@ import Modal from "../../../components/ui/Modal";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import { Badge } from "../../../components/ui/badge";
 import GenericTable from "../../../components/Table/table";
-import { deleteJDById } from "../service/jdservice";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+
+
+const [isExporting, setIsExporting] = useState(false);
 
 const statusOptions = [
   { label: "All Statuses", value: "All" },
@@ -84,10 +86,6 @@ export default function JdLibrary() {
   const [deleteJdId, setDeleteJdId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [closeJdId, setCloseJdId] = useState(null);
-  const [exportModalOpen, setExportModalOpen] = useState(false);
-  const [exportJdId, setExportJdId] = useState(null); // Null means export current list
-  const [exportFormat, setExportFormat] = useState("CSV");
-  const [isExporting, setIsExporting] = useState(false);
   const [isJdDelete, setIsJdDelete] = useState(false);
 
   // Debounce search term to avoid spamming calls
@@ -337,23 +335,74 @@ export default function JdLibrary() {
     }
   };
 
-  const handleExportTrigger = (id = null) => {
-    setExportJdId(id);
-    setExportModalOpen(true);
-  };
+const handleExportLibrary = async () => {
+  if (isExporting) return;
 
-  const handleExportConfirm = () => {
-    setIsExporting(true);
-    setTimeout(() => {
-      setIsExporting(false);
-      setExportModalOpen(false);
-      const targetName = exportJdId ? `Job Description (${exportJdId})` : "Job Descriptions List";
-      toast.success(`${targetName} exported successfully to ${exportFormat}! Check downloads.`, {
-        icon: '⬇️',
-      });
-    }, 1500);
-  };
+  setIsExporting(true);
 
+  try {
+    const params = {
+      search: debouncedSearch || undefined,
+      jurisdiction:
+        jurisdictionFilter === "All"
+          ? undefined
+          : jurisdictionFilter,
+      active:
+        statusFilter === "Closed"
+          ? false
+          : statusFilter === "All"
+          ? undefined
+          : true,
+      source_format: getSourceFormatParam(sourceFilter),
+      sort_by: getSortByParam(sortField),
+      order: sortOrder,
+    };
+
+    const response = await exportJDs(params);
+
+    const blob = new Blob([response.data], {
+      type: response.headers["content-type"],
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    let filename = "JD_List.xlsx";
+
+    const disposition = response.headers["content-disposition"];
+
+    if (disposition) {
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      if (match) {
+        filename = match[1];
+      }
+    }
+
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = filename;
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+
+    toast.success("Job Descriptions exported successfully.");
+
+  } catch (error) {
+    console.error(error);
+
+    toast.error(
+      error?.response?.data?.message ||
+      "Failed to export Job Descriptions."
+    );
+  } finally {
+    setIsExporting(false);
+  }
+};
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
       {/* Header */}
@@ -366,10 +415,12 @@ export default function JdLibrary() {
           <Button
             variant="outline"
             size="small"
-            onClick={() => handleExportTrigger(null)}
+            onClick={handleExportLibrary}
+            disabled={isExporting}
             className="flex-1 sm:flex-none font-semibold"
           >
-            <Download className="h-4 w-4 mr-1.5" /> Export Library
+            <Download className="h-4 w-4 mr-1.5" />
+            {isExporting ? "Exporting..." : "Export Library"}
           </Button>
           <Button
             variant="primary"
@@ -511,66 +562,6 @@ export default function JdLibrary() {
         cancelText="Cancel"
         variant="danger"
       />
-
-      {/* Export Dialog */}
-      <Modal
-        isOpen={exportModalOpen}
-        onClose={() => setExportModalOpen(false)}
-        title="Export Parameters"
-        width="400px"
-      >
-        <p className="text-xs text-slate-500 mb-6">
-          {exportJdId ? `Exporting job data for record ${exportJdId}` : `Exporting ${totalItems} records matching current view filters`}
-        </p>
-
-        {/* Choose Format */}
-        <div className="mb-6 space-y-2.5">
-          <label className="text-[10px] uppercase font-bold text-slate-400 block">Choose Format</label>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setExportFormat("Excel")}
-              className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 text-xs font-bold transition ${exportFormat === "Excel"
-                ? "border-blue-600 bg-blue-50 text-blue-700"
-                : "border-slate-200 hover:bg-slate-50 text-slate-700"
-                }`}
-            >
-              <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Excel Spreadsheet
-            </button>
-            <button
-              type="button"
-              onClick={() => setExportFormat("CSV")}
-              className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 text-xs font-bold transition ${exportFormat === "CSV"
-                ? "border-blue-600 bg-blue-50 text-blue-700"
-                : "border-slate-200 hover:bg-slate-50 text-slate-700"
-                }`}
-            >
-              <FileText className="h-4 w-4 text-blue-600" /> CSV Flatfile
-            </button>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3">
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => setExportModalOpen(false)}
-            disabled={isExporting}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            size="small"
-            onClick={handleExportConfirm}
-            loading={isExporting}
-            loadingText="Exporting..."
-            className="flex items-center justify-center gap-2"
-          >
-            <Download className="h-3.5 w-3.5" /> Download
-          </Button>
-        </div>
-      </Modal>
     </div>
   );
 }
