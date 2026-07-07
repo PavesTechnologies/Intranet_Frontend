@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAirsStore } from "./airsStore";
-import { getJDById, downloadJD } from "../service/jdservice";
+import { getJDById, exportSingleJD } from "../service/jdservice";
 import {
   ArrowLeft,
   Briefcase,
@@ -74,56 +74,56 @@ export default function JdDetails() {
     fetchJd();
   }, [id]);
 
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
-  const handleDownloadJD = async () => {
-    setIsDownloading(true);
+  const handleExportJD = async () => {
     try {
-      const data = await downloadJD(id);
+        setIsExporting(true);
 
-      // Preserve backend response as is (already a Blob with correct type from Axios responseType: 'blob')
-      const blob = data instanceof Blob ? data : new Blob([data]);
+        const response = await exportSingleJD(currentJd.id);
 
-      const targetJd = jdDetail || jd;
-      const downloadTitle = targetJd?.title || "job_description";
+        const blob = new Blob([response.data], {
+            type:
+                response.headers["content-type"] ||
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
 
-      // Determine extension from source_format or fallback to blob MIME type
-      let extension = "pdf"; // default fallback
-      const sourceFormat = (targetJd?.source_format || "").toLowerCase();
-      if (sourceFormat === "docx") {
-        extension = "docx";
-      } else if (sourceFormat === "pdf") {
-        extension = "pdf";
-      } else if (sourceFormat === "text" || sourceFormat === "txt" || sourceFormat === "manual") {
-        extension = "txt";
-      } else {
-        const mimeType = blob.type || "";
-        if (mimeType.includes("officedocument") || mimeType.includes("word") || mimeType.includes("msword")) {
-          extension = "docx";
-        } else if (mimeType.includes("pdf")) {
-          extension = "pdf";
-        } else if (mimeType.includes("text") || mimeType.includes("plain")) {
-          extension = "txt";
+        const url = window.URL.createObjectURL(blob);
+
+        let filename = "Job_Description.xlsx";
+
+        const disposition =
+            response.headers["content-disposition"];
+
+        if (disposition) {
+            const match = disposition.match(/filename="?([^"]+)"?/);
+
+            if (match) {
+                filename = match[1];
+            }
         }
-      }
 
-      const fileName = `${downloadTitle.trim().replace(/[^a-z0-9]/gi, "_").toLowerCase()}_jd.${extension}`;
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      toast.success("Job Description downloaded successfully.");
-    } catch (err) {
-      console.error("Failed to download JD:", err);
-      toast.error("Failed to download Job Description.");
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download = filename;
+
+        document.body.appendChild(link);
+
+        link.click();
+
+        link.remove();
+
+        window.URL.revokeObjectURL(url);
+
+        toast.success("Job Description exported successfully.");
+    } catch (error) {
+        console.error(error);
+        toast.error("Failed to export Job Description.");
     } finally {
-      setIsDownloading(false);
+        setIsExporting(false);
     }
-  };
+};
 
   // Tabs: overview, skills, campaigns, versions, audit
   const [activeTab, setActiveTab] = useState("overview");
@@ -478,13 +478,13 @@ export default function JdDetails() {
           <Button
             variant="secondary"
             size="medium"
-            onClick={handleDownloadJD}
-            title="Download JD"
-            disabled={isDownloading}
-            loading={isDownloading}
-            loadingText="Downloading..."
+            onClick={handleExportJD}
+            title="Export JD"
+            disabled={isExporting}
+            loading={isExporting}
+            loadingText="Exporting..."
           >
-            <Download className="h-4 w-4" /> Download JD
+            <Download className="h-4 w-4" /> Export JD
           </Button>
         </div>
       </div>
