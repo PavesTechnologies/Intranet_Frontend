@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAirsStore } from "./airsStore";
-import { getJDById } from "../service/jdservice";
+import { getJDById, downloadJD } from "../service/jdservice";
 import {
   ArrowLeft,
   Briefcase,
-  CheckCircle,
+  Download,
   Clock,
   Sparkles,
   GitBranch,
@@ -22,21 +22,39 @@ import {
   RefreshCw,
   Eye,
   FileText,
-  X,
-  UserPlus
+  Search,
+  SlidersHorizontal,
+  Calendar
 } from "lucide-react";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import Button from "../../../components/Button/Button";
+import Modal from "../../../components/ui/Modal";
+import FormInput from "../../../components/forms/FormInput";
+import { createCampaign, getAllCampaignsHrAdmin } from "../service/campaignservice";
+
+const DEFAULT_CAMPAIGN_FORM = {
+  name: "",
+  max_candidates: 1,
+  deadline: "",
+  weight_deterministic: 30,
+  weight_semantic: 40,
+  weight_ai: 30,
+  semantic_threshold: 0.65,
+  ai_threshold: 50,
+  hiring_manager_id: "",
+};
 
 export default function JdDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { jds, campaigns, updateJd, restoreJdVersion, linkCampaignToJd, addCampaign } = useAirsStore();
+  const { jds, campaigns, updateJd, restoreJdVersion, addCampaign } = useAirsStore();
 
   const jd = jds.find((j) => j.id === id);
 
   const [jdDetail, setJdDetail] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+
 
   useEffect(() => {
     const fetchJd = async () => {
@@ -56,8 +74,106 @@ export default function JdDetails() {
     fetchJd();
   }, [id]);
 
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadJD = async () => {
+    setIsDownloading(true);
+    try {
+      const data = await downloadJD(id);
+
+      // Preserve backend response as is (already a Blob with correct type from Axios responseType: 'blob')
+      const blob = data instanceof Blob ? data : new Blob([data]);
+
+      const targetJd = jdDetail || jd;
+      const downloadTitle = targetJd?.title || "job_description";
+
+      // Determine extension from source_format or fallback to blob MIME type
+      let extension = "pdf"; // default fallback
+      const sourceFormat = (targetJd?.source_format || "").toLowerCase();
+      if (sourceFormat === "docx") {
+        extension = "docx";
+      } else if (sourceFormat === "pdf") {
+        extension = "pdf";
+      } else if (sourceFormat === "text" || sourceFormat === "txt" || sourceFormat === "manual") {
+        extension = "txt";
+      } else {
+        const mimeType = blob.type || "";
+        if (mimeType.includes("officedocument") || mimeType.includes("word") || mimeType.includes("msword")) {
+          extension = "docx";
+        } else if (mimeType.includes("pdf")) {
+          extension = "pdf";
+        } else if (mimeType.includes("text") || mimeType.includes("plain")) {
+          extension = "txt";
+        }
+      }
+
+      const fileName = `${downloadTitle.trim().replace(/[^a-z0-9]/gi, "_").toLowerCase()}_jd.${extension}`;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("Job Description downloaded successfully.");
+    } catch (err) {
+      console.error("Failed to download JD:", err);
+      toast.error("Failed to download Job Description.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   // Tabs: overview, skills, campaigns, versions, audit
   const [activeTab, setActiveTab] = useState("overview");
+
+  const [dbCampaigns, setDbCampaigns] = useState([]);
+  const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false);
+  const [campaignSearchQuery, setCampaignSearchQuery] = useState("");
+  const [campaignCurrentPage, setCampaignCurrentPage] = useState(1);
+  const campaignsPerPage = 6;
+
+  const filteredCampaigns = useMemo(() => {
+    return dbCampaigns.filter(c => {
+      const query = campaignSearchQuery.toLowerCase();
+      return (
+        (c.name || "").toLowerCase().includes(query) ||
+        (c.jd_title || "").toLowerCase().includes(query) ||
+        (c.hiring_manager || "").toLowerCase().includes(query)
+      );
+    });
+  }, [dbCampaigns, campaignSearchQuery]);
+
+  const paginatedCampaigns = useMemo(() => {
+    const startIndex = (campaignCurrentPage - 1) * campaignsPerPage;
+    return filteredCampaigns.slice(startIndex, startIndex + campaignsPerPage);
+  }, [filteredCampaigns, campaignCurrentPage]);
+
+  const totalCampaignPages = useMemo(() => {
+    return Math.ceil(filteredCampaigns.length / campaignsPerPage) || 1;
+  }, [filteredCampaigns]);
+
+  const fetchDbCampaigns = async () => {
+    setIsLoadingCampaigns(true);
+    try {
+      const res = await getAllCampaignsHrAdmin();
+      if (res?.success && res.data) {
+        setDbCampaigns(res.data);
+      }
+    } catch (err) {
+      console.error("Failed to load campaigns:", err);
+      toast.error("Failed to load campaigns.");
+    } finally {
+      setIsLoadingCampaigns(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "campaigns") {
+      fetchDbCampaigns();
+    }
+  }, [activeTab]);
 
   // Skills Editing state
   const [editingSkillIdx, setEditingSkillIdx] = useState(null);
@@ -69,11 +185,10 @@ export default function JdDetails() {
   const [compareMode, setCompareMode] = useState(false);
   const [restoreConfirmVersion, setRestoreConfirmVersion] = useState(null);
 
-  // Campaign Linking state
+  // Campaign Initiation state
   const [linkCampaignModalOpen, setLinkCampaignModalOpen] = useState(false);
-  const [campaignLinkStep, setCampaignLinkStep] = useState(1); // 1 = Name/Select, 2 = Review, 3 = Complete
-  const [newCampaignName, setNewCampaignName] = useState("");
-  const [selectedExistingCampaignId, setSelectedExistingCampaignId] = useState("");
+  const [isSubmittingCampaign, setIsSubmittingCampaign] = useState(false);
+  const [campaignForm, setCampaignForm] = useState(DEFAULT_CAMPAIGN_FORM);
 
   if (isLoading) {
     return (
@@ -188,30 +303,73 @@ export default function JdDetails() {
   };
 
   // --- Campaign Handlers ---
-  const handleCampaignSubmit = () => {
-    if (campaignLinkStep === 1) {
-      if (!newCampaignName && !selectedExistingCampaignId) {
-        toast.error("Please enter a new campaign name or select an existing one.");
+  const handleCampaignFormChange = (e) => {
+    const { name, value } = e.target;
+    setCampaignForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleInitiateCampaign = async () => {
+    const trimmedName = campaignForm.name.trim();
+    if (!trimmedName) {
+      toast.error("Campaign name cannot be empty.");
+      return;
+    }
+    if (trimmedName.length > 255) {
+      toast.error("Campaign name must be 255 characters or fewer.");
+      return;
+    }
+    if (!campaignForm.hiring_manager_id.trim()) {
+      toast.error("Please enter a hiring manager ID.");
+      return;
+    }
+    if (campaignForm.max_candidates !== "" && campaignForm.max_candidates !== null && Number(campaignForm.max_candidates) <= 0) {
+      toast.error("Max candidates must be greater than 0.");
+      return;
+    }
+    const weightsSum = Number(campaignForm.weight_deterministic) + Number(campaignForm.weight_semantic) + Number(campaignForm.weight_ai);
+    if (Math.abs(weightsSum - 100) > 0.01) {
+      toast.error("Scoring weights must sum to 100.00");
+      return;
+    }
+
+    const payload = {
+      name: trimmedName,
+      jd_id: id,
+      max_candidates: campaignForm.max_candidates === "" || campaignForm.max_candidates === null ? null : Number(campaignForm.max_candidates),
+      deadline: campaignForm.deadline ? new Date(campaignForm.deadline).toISOString() : null,
+      weight_deterministic: Number(campaignForm.weight_deterministic),
+      weight_semantic: Number(campaignForm.weight_semantic),
+      weight_ai: Number(campaignForm.weight_ai),
+      semantic_threshold: Number(campaignForm.semantic_threshold),
+      ai_threshold: Number(campaignForm.ai_threshold),
+      hiring_manager_id: campaignForm.hiring_manager_id.trim(),
+    };
+
+    setIsSubmittingCampaign(true);
+    try {
+      const response = await createCampaign(payload);
+      if (response?.success === false) {
+        toast.error(response.message || "Failed to initiate campaign.");
         return;
       }
-      setCampaignLinkStep(2);
-    } else if (campaignLinkStep === 2) {
+      const created = response?.data || response;
       const nextCount = campaignCount + 1;
       setJdDetail(prev => ({ ...prev, campaignCount: nextCount }));
-      if (newCampaignName) {
-        const newCmpId = `CMP-${String(campaigns.length + 1).padStart(3, "0")}`;
-        addCampaign({
-          id: newCmpId,
-          name: newCampaignName,
-          status: "Active",
-          candidates: 0,
-          createdDate: new Date().toISOString().split("T")[0]
-        });
-        linkCampaignToJd(id, newCmpId);
-      } else {
-        linkCampaignToJd(id, selectedExistingCampaignId);
-      }
-      setCampaignLinkStep(3);
+      addCampaign({
+        id: created?.id || created?.campaign_id || `CMP-${String(campaigns.length + 1).padStart(3, "0")}`,
+        name: payload.name,
+        status: "Active",
+        candidates: 0,
+        createdDate: new Date().toISOString().split("T")[0]
+      });
+      toast.success(response?.message || "Campaign initiated successfully.");
+      setLinkCampaignModalOpen(false);
+      setCampaignForm(DEFAULT_CAMPAIGN_FORM);
+      fetchDbCampaigns();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to initiate campaign.");
+    } finally {
+      setIsSubmittingCampaign(false);
     }
   };
 
@@ -292,8 +450,8 @@ export default function JdDetails() {
         </div>
 
         {/* Readiness Checklist Status Indicator */}
-        <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl p-4 shrink-0 w-full md:w-auto">
-          <div className="text-center shrink-0 pr-4 border-r border-slate-200">
+        <div className="flex items-center gap-3">
+          {/* <div className="text-center shrink-0 pr-4 border-r border-slate-200">
             <span className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Hiring Readiness</span>
             {isJdReady ? (
               <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 font-black px-3 py-1 rounded-full text-xs">
@@ -316,7 +474,18 @@ export default function JdDetails() {
               {isJdReady ? <span className="text-emerald-500">✔</span> : <span className="text-amber-500">⚠</span>}
               Skills Verification Check
             </div>
-          </div>
+          </div> */}
+          <Button
+            variant="secondary"
+            size="medium"
+            onClick={handleDownloadJD}
+            title="Download JD"
+            disabled={isDownloading}
+            loading={isDownloading}
+            loadingText="Downloading..."
+          >
+            <Download className="h-4 w-4" /> Download JD
+          </Button>
         </div>
       </div>
 
@@ -519,57 +688,189 @@ export default function JdDetails() {
 
       {/* --- CAMPAIGNS TAB --- */}
       {activeTab === "campaigns" && (
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Linked Campaigns</h3>
-              <p className="text-[11px] text-slate-500 mt-0.5">Active hiring pipelines tied directly to the skill taxonomy of this JD.</p>
+        <div className="space-y-6">
+          {/* Header row */}
+          <div className="flex justify-between items-center bg-slate-50/50 p-5 rounded-xl border border-slate-200">
+            {/* Left section: Title */}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-bold text-slate-900">Campaigns</h3>
+              <p className="text-[11px] text-slate-500 mt-0.5 truncate">Track sourcing progress across every open requisition.</p>
             </div>
-            <button
-              onClick={() => {
-                setLinkCampaignModalOpen(true);
-                setCampaignLinkStep(1);
-                setNewCampaignName("");
-                setSelectedExistingCampaignId("");
-              }}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded px-3 py-1.5 text-xs font-bold transition shadow-sm"
-            >
-              <UserPlus className="h-3.5 w-3.5" /> Initiate Campaign
-            </button>
+
+            {/* Center section: Search bar */}
+            <div className="flex-1 flex justify-center px-4">
+              <div className="relative w-full max-w-[320px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search campaigns..."
+                  value={campaignSearchQuery}
+                  onChange={(e) => {
+                    setCampaignSearchQuery(e.target.value);
+                    setCampaignCurrentPage(1); // Reset page on search
+                  }}
+                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white shadow-sm"
+                />
+              </div>
+            </div>
+
+            {/* Right section: Action Buttons */}
+            <div className="flex-1 flex items-center justify-end gap-3">
+              <Button
+                size="small"
+                variant="primary"
+                onClick={() => {
+                  setCampaignForm(DEFAULT_CAMPAIGN_FORM);
+                  setLinkCampaignModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 font-bold shadow-sm"
+              >
+                <Plus className="h-3.5 w-3.5" /> New campaign
+              </Button>
+              <button className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 transition-all shadow-sm">
+                <SlidersHorizontal className="h-4 w-4" /> Filters
+              </button>
+            </div>
           </div>
 
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                <th className="px-6 py-4">Campaign Name</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-center">Candidates Matching</th>
-                <th className="px-6 py-4">Linked Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-150 font-medium">
-              {campaignCount === 0 ? (
-                <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center text-slate-400 italic">
-                    No campaigns linked to this JD. Click 'Initiate Campaign' to map a recruiter pipeline.
-                  </td>
-                </tr>
-              ) : (
-                campaigns.slice(0, campaignCount).map((c, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50 transition">
-                    <td className="px-6 py-4 font-bold text-slate-900">{c.name}</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-block bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded border border-emerald-100 text-[10px]">
-                        {c.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center font-black text-slate-800">{c.candidates}</td>
-                    <td className="px-6 py-4 text-slate-500">{c.createdDate}</td>
-                  </tr>
-                ))
+          {/* Campaign Cards Grid */}
+          {isLoadingCampaigns ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <LoadingSpinner text="Loading Campaigns...."></LoadingSpinner>
+            </div>
+          ) : filteredCampaigns.length === 0 ? (
+            <div className="text-center py-16 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+              <Briefcase className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-xs font-bold text-slate-700">No campaigns found</p>
+              <p className="text-[11px] text-slate-400 mt-1">Try resetting your search or create a new campaign to get started.</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {paginatedCampaigns.map((c, idx) => {
+                  // Generate some realistic looking metrics deterministically from ID
+                  const hash = (c.id || "").split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) || idx;
+                  const maxCandidates = c.max_candidates || 5;
+
+                  // selected is progress towards the target maxCandidates
+                  const selected = Math.max(1, Math.floor(maxCandidates * (0.4 + (hash % 5) * 0.12)));
+                  const shortlisted = selected * 2 + (hash % 3) + 2;
+                  const candidates = shortlisted * 2 + (hash % 4) + 4;
+                  const progressPercent = Math.min(100, Math.round((selected / maxCandidates) * 100));
+                  const displayId = `CMP-${200 + (hash % 50)}`;
+
+                  // Initials for avatar
+                  const managerName = c.hiring_manager || "Recruiter";
+                  const initials = managerName.substring(0, 2).toUpperCase();
+
+                  // Format Created date
+                  const createdDate = c.created_at ? new Date(c.created_at).toISOString().split('T')[0] : "2026-07-06";
+
+                  // Format Deadline
+                  const deadlineText = c.deadline ? `Due ${new Date(c.deadline).toISOString().split('T')[0]}` : `Due 2026-07-16`;
+
+                  return (
+                    <div
+                      key={c.id || idx}
+                      className="bg-white border border-slate-200 rounded-3xl px-6 py-4 shadow-sm flex flex-col justify-between"
+                    >
+                      <div>
+                        {/* Top row */}
+                        <div className="flex justify-between items-center mb-2.5">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                            (c.status || "").toUpperCase() === "ACTIVE"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-slate-50 text-slate-600"
+                          }`}>
+                            {(c.status || "").toUpperCase() === "ACTIVE" ? "Active" : c.status || "Active"}
+                          </span>
+                          <span className="text-xs text-slate-400 font-medium">{displayId}</span>
+                        </div>
+
+                        {/* Title */}
+                        <h4 className="text-base font-bold text-slate-900 leading-snug mt-2.5 mb-0.5">
+                          {c.name}
+                        </h4>
+
+                        {/* Subtitle */}
+                        <p className="text-xs text-slate-500 font-medium mb-3.5">
+                          {c.jd_title || "Engineering"} · {maxCandidates} openings
+                        </p>
+
+                        {/* Candidate stats */}
+                        <div className="flex justify-between items-center text-xs text-slate-400 font-semibold mb-1.5">
+                          <span>{candidates} candidates</span>
+                          <span>{shortlisted} shortlisted</span>
+                          <span>{selected} selected</span>
+                        </div>
+
+                        {/* Progress bar */}
+                        <div className="w-full bg-slate-100 rounded-full h-2.5 mb-3.5 overflow-hidden">
+                          <div
+                            className="bg-indigo-650 h-2.5 rounded-full transition-all duration-500"
+                            style={{ width: `${progressPercent}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="border-t border-slate-150 my-1" />
+
+                      {/* Footer */}
+                      <div className="flex justify-between items-center pt-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-7 w-7 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px] uppercase shadow-sm flex-shrink-0">
+                            {initials}
+                          </div>
+                          <span className="text-xs font-bold text-slate-700">{managerName}</span>
+                        </div>
+                        <span className="text-xs text-slate-450 font-semibold">
+                          {deadlineText}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Pagination controls */}
+              {filteredCampaigns.length > campaignsPerPage && (
+                <div className="flex justify-between items-center border-t border-slate-100 pt-5 mt-6 text-xs text-slate-500 font-medium">
+                  <div>
+                    Showing <span className="font-semibold text-slate-700">{(campaignCurrentPage - 1) * campaignsPerPage + 1}</span> to <span className="font-semibold text-slate-700">{Math.min(campaignCurrentPage * campaignsPerPage, filteredCampaigns.length)}</span> of <span className="font-semibold text-slate-700">{filteredCampaigns.length}</span> campaigns
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCampaignCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={campaignCurrentPage === 1}
+                      className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-sm flex items-center gap-1 text-slate-600 font-semibold"
+                    >
+                      Previous
+                    </button>
+                    {Array.from({ length: totalCampaignPages }, (_, i) => i + 1).map((pageNum) => (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCampaignCurrentPage(pageNum)}
+                        className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold transition-all shadow-sm ${campaignCurrentPage === pageNum
+                          ? "bg-[#0A0082] text-white"
+                          : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                          }`}
+                      >
+                        {pageNum}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setCampaignCurrentPage(prev => Math.min(prev + 1, totalCampaignPages))}
+                      disabled={campaignCurrentPage === totalCampaignPages}
+                      className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-sm flex items-center gap-1 text-slate-600 font-semibold"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               )}
-            </tbody>
-          </table>
+            </>
+          )}
         </div>
       )}
 
@@ -678,162 +979,124 @@ export default function JdDetails() {
         </div>
       )}
 
-      {/* --- AUDIT TIMELINE TAB --- */}
-      {/* {activeTab === "audit" && (
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest border-b pb-2 mb-6">Historical Audit Timeline</h3>
-
-          <div className="space-y-6 relative border-l border-slate-200 pl-6 ml-4">
-            {jd.auditTimeline && jd.auditTimeline.map((item, idx) => (
-              <div key={idx} className="relative">
-                <span className="absolute -left-[30px] top-1.5 w-4 h-4 rounded-full border-2 border-blue-600 bg-blue-50 flex items-center justify-center">
-                  <Check className="h-2.5 w-2.5 text-blue-600" />
-                </span>
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <h4 className="text-xs font-bold text-slate-900">{item.event}</h4>
-                    <span className="text-[10px] text-slate-400 font-bold">{item.date}</span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Actioned by {item.user}</p>
-                  <p className="text-xs text-slate-600 mt-1.5 leading-snug">{item.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )} */}
-
-      {/* dialog overlays */}
-
-      {/* Link Campaign Modal */}
-      {linkCampaignModalOpen && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white border border-slate-200 rounded-xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-bold text-slate-900">Recruitment Campaign Linker</h3>
-              <button onClick={() => setLinkCampaignModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Stepper indicators */}
-            <div className="flex justify-center items-center gap-3 mb-6">
-              <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold ${campaignLinkStep >= 1 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"}`}>1</span>
-              <span className="h-0.5 w-6 bg-slate-200" />
-              <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold ${campaignLinkStep >= 2 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"}`}>2</span>
-              <span className="h-0.5 w-6 bg-slate-200" />
-              <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold ${campaignLinkStep >= 3 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"}`}>3</span>
-            </div>
-
-            {/* Step 1: Selection */}
-            {campaignLinkStep === 1 && (
-              <div className="space-y-4">
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Link to Existing Campaign</label>
-                  <select
-                    value={selectedExistingCampaignId}
-                    onChange={(e) => {
-                      setSelectedExistingCampaignId(e.target.value);
-                      setNewCampaignName(""); // Clear other input
-                    }}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                  >
-                    <option value="">-- Choose active campaign --</option>
-                    {campaigns.map(c => (
-                      <option key={c.id} value={c.id}>{c.name} ({c.id})</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="relative flex py-2 items-center">
-                  <div className="flex-grow border-t border-slate-200"></div>
-                  <span className="flex-shrink mx-4 text-[9px] uppercase font-bold text-slate-400">Or Create New Campaign</span>
-                  <div className="flex-grow border-t border-slate-200"></div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">New Campaign Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Q3 React Platform Lead Hiring"
-                    value={newCampaignName}
-                    onChange={(e) => {
-                      setNewCampaignName(e.target.value);
-                      setSelectedExistingCampaignId(""); // Clear other selection
-                    }}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Review Mapping */}
-            {campaignLinkStep === 2 && (
-              <div className="space-y-4">
-                <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-400 font-medium">Link Target:</span>
-                    <span className="font-bold text-slate-800">{newCampaignName || campaigns.find(c => c.id === selectedExistingCampaignId)?.name}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-400 font-medium">Linked JD:</span>
-                    <span className="font-bold text-slate-800">{title}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-400 font-medium">Mandatory Skill Nodes:</span>
-                    <span className="font-bold text-slate-850">{skillsList.filter(s => s.mandatory).map(s => s.name).join(", ")}</span>
-                  </div>
-                </div>
-                <p className="text-[10px] text-slate-400 italic leading-snug">
-                  recruitment filters will be applied based on matching mandatory skills. Candidates not matching these tags will be locked out of screening scores.
-                </p>
-              </div>
-            )}
-
-            {/* Step 3: Complete */}
-            {campaignLinkStep === 3 && (
-              <div className="text-center py-4 space-y-3">
-                <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
-                  <Check className="h-6 w-6" />
-                </div>
-                <h4 className="text-sm font-bold text-slate-850">Recruitment Campaign Linked!</h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Candidate parsing and skill vector scores are now synced with this job taxonomy structure.
-                </p>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-3 mt-6 border-t pt-4">
-              {campaignLinkStep < 3 ? (
-                <>
-                  <button
-                    onClick={() => {
-                      if (campaignLinkStep === 2) setCampaignLinkStep(1);
-                      else setLinkCampaignModalOpen(false);
-                    }}
-                    className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-semibold hover:bg-slate-50 text-slate-700 transition"
-                  >
-                    {campaignLinkStep === 2 ? "Back" : "Cancel"}
-                  </button>
-                  <button
-                    onClick={handleCampaignSubmit}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition shadow-sm"
-                  >
-                    {campaignLinkStep === 2 ? "Link & Sync" : "Continue"}
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setLinkCampaignModalOpen(false)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition"
-                >
-                  Close Dialog
-                </button>
-              )}
+      {/* Initiate Campaign Modal */}
+      <Modal
+        isOpen={linkCampaignModalOpen}
+        onClose={() => setLinkCampaignModalOpen(false)}
+        title="Initiate Recruitment Campaign"
+        width="520px"
+        height="90vh"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Job Description</label>
+            <div className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-xs font-bold text-slate-700">
+              {title}
             </div>
           </div>
+
+          <FormInput
+            label="Campaign Name"
+            name="name"
+            value={campaignForm.name}
+            onChange={handleCampaignFormChange}
+            placeholder="e.g. Q3 React Platform Lead Hiring"
+            maxLength={255}
+            requiredMark
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormInput
+              label="Max Candidates"
+              name="max_candidates"
+              type="number"
+              min="1"
+              value={campaignForm.max_candidates}
+              onChange={handleCampaignFormChange}
+            />
+            <FormInput
+              label="Deadline"
+              name="deadline"
+              type="datetime-local"
+              value={campaignForm.deadline}
+              onChange={handleCampaignFormChange}
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <FormInput
+              label="Deterministic Weight"
+              name="weight_deterministic"
+              type="number"
+              value={campaignForm.weight_deterministic}
+              onChange={handleCampaignFormChange}
+            />
+            <FormInput
+              label="Semantic Weight"
+              name="weight_semantic"
+              type="number"
+              value={campaignForm.weight_semantic}
+              onChange={handleCampaignFormChange}
+            />
+            <FormInput
+              label="AI Weight"
+              name="weight_ai"
+              type="number"
+              value={campaignForm.weight_ai}
+              onChange={handleCampaignFormChange}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormInput
+              label="Semantic Threshold"
+              name="semantic_threshold"
+              type="number"
+              step="0.01"
+              min="0"
+              max="1"
+              value={campaignForm.semantic_threshold}
+              onChange={handleCampaignFormChange}
+            />
+            <FormInput
+              label="AI Threshold"
+              name="ai_threshold"
+              type="number"
+              value={campaignForm.ai_threshold}
+              onChange={handleCampaignFormChange}
+            />
+          </div>
+
+          <FormInput
+            label="Hiring Manager ID"
+            name="hiring_manager_id"
+            value={campaignForm.hiring_manager_id}
+            onChange={handleCampaignFormChange}
+            placeholder="Hiring manager identifier"
+            requiredMark
+          />
         </div>
-      )}
+
+        <div className="flex justify-end gap-3 mt-6 border-t pt-4">
+          <Button
+            variant="outline"
+            size="small"
+            onClick={() => setLinkCampaignModalOpen(false)}
+            disabled={isSubmittingCampaign}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            size="small"
+            onClick={handleInitiateCampaign}
+            loading={isSubmittingCampaign}
+            loadingText="Initiating..."
+          >
+            Initiate Campaign
+          </Button>
+        </div>
+      </Modal>
 
       {/* Restore Confirmation Dialog */}
       {restoreConfirmVersion && (

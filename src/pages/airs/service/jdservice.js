@@ -4,7 +4,7 @@ const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 
 export const getAllJDs = async (params) => {
     try {
-        const response = await api.get(`${BASE_URL}/airs/job-descriptions`, {
+        const response = await api.get(`${BASE_URL}/job-descriptions`, {
             params, headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
@@ -18,7 +18,7 @@ export const getAllJDs = async (params) => {
 
 export const getJDById = async (jdId) => {
     try {
-        const response = await api.get(`${BASE_URL}/airs/job-descriptions/${jdId}`, {
+        const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}`, {
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
@@ -32,7 +32,7 @@ export const getJDById = async (jdId) => {
 
 export const deleteJDById = async (jdId) => {
     try {
-        const response = await api.delete(`${BASE_URL}/airs/job-descriptions/${jdId}`, {
+        const response = await api.delete(`${BASE_URL}/job-descriptions/${jdId}`, {
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
@@ -46,7 +46,7 @@ export const deleteJDById = async (jdId) => {
 
 export const updateJDById = async (jdId, updatedData) => {
     try {
-        const response = await api.put(`${BASE_URL}/airs/job-descriptions/${jdId}`, updatedData, {
+        const response = await api.put(`${BASE_URL}/job-descriptions/${jdId}`, updatedData, {
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
@@ -54,6 +54,20 @@ export const updateJDById = async (jdId, updatedData) => {
         return response.data;
     } catch (error) {
         console.error("Error updating JD:", error);
+        throw error;
+    }
+};
+
+export const downloadJD = async (jdId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}/download`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error downloading JD:", error);
         throw error;
     }
 };

@@ -277,15 +277,6 @@ export default function JdLibrary() {
             >
               <Eye className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => handleExportTrigger(jd.id)}
-              title="Export Single JD"
-              className="h-8 w-8 text-green-500 hover:text-green-600"
-            >
-              <Download className="h-4 w-4" />
-            </Button>
             {status !== "Closed" && (
               <Button
                 variant="ghost"
@@ -453,22 +444,22 @@ export default function JdLibrary() {
 
       {/* Table Card */}
       <div className="overflow-x-auto mb-6">
-        {isLoading ? 
+        {isLoading ?
           <div className="h-40 flex items-center justify-center">
             <LoadingSpinner text="Loading JDs..."></LoadingSpinner>
           </div> : paginatedJds.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400">
-            <Archive className="h-10 w-10 mx-auto stroke-1 mb-2" />
-            No Job Descriptions found matching the criteria.
-          </div>
-        ) : (
-          <GenericTable
-            headers={headers}
-            columns={columns}
-            rows={tableRows}
-            loading={isLoading}
-          />
-        )}
+            <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400">
+              <Archive className="h-10 w-10 mx-auto stroke-1 mb-2" />
+              No Job Descriptions found matching the criteria.
+            </div>
+          ) : (
+            <GenericTable
+              headers={headers}
+              columns={columns}
+              rows={tableRows}
+              loading={isLoading}
+            />
+          )}
       </div>
 
       {/* Pagination bar */}

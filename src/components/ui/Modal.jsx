@@ -1,17 +1,17 @@
 import React from "react";
 import { X } from "lucide-react";
 
-const Modal = ({ isOpen, onClose, title, children, width = "500px" }) => {
+const Modal = ({ isOpen, onClose, title, children, width = "500px", height }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-center items-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex justify-center items-center bg-black/40 backdrop-blur-sm p-4">
       <div
-        className="bg-white rounded-2xl shadow-xl p-6 relative"
-        style={{ width }}
+        className="bg-white rounded-2xl shadow-xl p-6 relative flex flex-col max-h-full"
+        style={{ width, height }}
       >
         {/* Header */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-4 flex-shrink-0">
           <h2 className="text-lg font-semibold">{title}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-black">
             <X size={20} />
@@ -19,7 +19,7 @@ const Modal = ({ isOpen, onClose, title, children, width = "500px" }) => {
         </div>
 
         {/* Body */}
-        <div>{children}</div>
+        <div className="flex-1 overflow-y-auto min-h-0 pr-1">{children}</div>
       </div>
     </div>
   );
