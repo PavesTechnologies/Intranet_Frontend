@@ -345,10 +345,10 @@ const AssetCategoryManagement = () => {
               <span>/</span>
               <span>Company Asset Management</span>
             </div>
-            <h1 className="text-2xl font-semibold text-gray-900">
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
               Asset Categories
             </h1>
-            <p className="text-sm text-gray-500">
+            <p className="mt-1 text-sm text-gray-500">
               Manage category codes, names, display order, and active status.
             </p>
           </div>
