@@ -57,3 +57,17 @@ export const updateJDById = async (jdId, updatedData) => {
         throw error;
     }
 };
+
+export const downloadJD = async (jdId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}/download`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error downloading JD:", error);
+        throw error;
+    }
+};

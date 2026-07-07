@@ -277,15 +277,6 @@ export default function JdLibrary() {
             >
               <Eye className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => handleExportTrigger(jd.id)}
-              title="Export Single JD"
-              className="h-8 w-8 text-green-500 hover:text-green-600"
-            >
-              <Download className="h-4 w-4" />
-            </Button>
             {status !== "Closed" && (
               <Button
                 variant="ghost"

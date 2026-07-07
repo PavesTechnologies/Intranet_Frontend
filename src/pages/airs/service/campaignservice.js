@@ -15,3 +15,17 @@ export const createCampaign = async (campaignData) => {
         throw error;
     }
 };
+
+export const getAllCampaignsHrAdmin = async () => {
+    try {
+        const response = await api.get(`${BASE_URL}/campaigns/hr_admin`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching campaigns:", error);
+        throw error;
+    }
+};
