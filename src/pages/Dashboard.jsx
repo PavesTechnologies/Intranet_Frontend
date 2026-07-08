@@ -1,16 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import AppCard from "../components/Cards/AppCard";
 import DynamicCardGrid from "../components/Cards/DynamicCardGrid";
-import UpcomingHolidays from "../pages/leave_management/charts/UpcomingHolidays";
+import UpcomingHolidays from "./leave_management/charts/UpcomingHolidays";
 import BirthdayAnniversaryPanel from "../components/Cards/BirthdayAnniversaryPanel";
 import TodayOnLeavePanel from "../components/Cards/TodayOnLeavePanel";
-import RequestLeaveModal from "../pages/leave_management/models/RequestLeaveModal";
+import RequestLeaveModal from "./leave_management/models/RequestLeaveModal";
 import { KPICard } from "../components/kpi/KPI";
 import { timesheet, pmsSummary, leaveBalance } from "../services/dashboard";
 import { useAuth } from "../contexts/AuthContext";
 import { CalendarPlus, Clock, ArrowRight } from "lucide-react";
 import Button from "../components/Button/Button";
+import { useLeaveWebSocket } from "../pages/leave_management/websockets/useLeaveWebSocket";
+
 
 // ── Data ────────────────────────────────────────────────────────────────────
 
@@ -121,6 +123,9 @@ const ACTIVITY = [
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 
+
+
+
 function DonutChart({ label, used, remaining, color }) {
   const u = parseFloat(used) || 0;
   const r = parseFloat(remaining) || 0;
@@ -203,6 +208,18 @@ function ActivityFeed() {
 }
 
 
+
+const BALANCE_AFFECTING_EVENTS = [
+  "LEAVE_APPLIED",
+  "LEAVE_REJECTED",
+  "LEAVE_CANCELLED",
+  "LEAVE_UPDATED",
+  "LEAVE_APPROVED",
+  "REVOKE_APPROVED",
+  "REVOKE_REJECTED",
+  "COMPOFF_APPROVED",
+  "COMPOFF_REJECTED"
+];
 // ── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -235,20 +252,27 @@ export default function Dashboard() {
     }
   };
 
-  const fetchLeaveBalanceData = async () => {
+  const fetchLeaveBalanceData = useCallback(async () => {
     try {
       const res = await leaveBalance(userId, year);
       setLeaveBalanceData(res.data);
     } catch (err) {
       console.error("Failed to fetch leave balance data", err);
     }
-  };
+  }, [userId, year]);
 
   useEffect(() => {
     fetchTimesheetData();
     fetchPMSData();
     fetchLeaveBalanceData();
-  }, [userId]);
+  }, [userId, fetchLeaveBalanceData]);
+
+  useLeaveWebSocket(
+    "employee-update",
+    BALANCE_AFFECTING_EVENTS,
+    fetchLeaveBalanceData
+  );
+
 
   const STATS = [
     {
@@ -484,7 +508,10 @@ export default function Dashboard() {
         isOpen={isRequestLeaveModalOpen}
         onClose={() => setIsRequestLeaveModalOpen(false)}
         year={year}
-        onSuccess={() => setIsRequestLeaveModalOpen(false)}
+        onSuccess={() => {
+          setIsRequestLeaveModalOpen(false);
+          fetchLeaveBalanceData();
+        }}
       />
 
       {/* Active module toast */}
