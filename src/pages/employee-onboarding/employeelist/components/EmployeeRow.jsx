@@ -23,7 +23,9 @@ export default function EmployeeRow({ emp , index}) {
       </td>
       <td>
         <div>{emp.email}</div>
-        <StatusBadge text={emp.emailStatus} />
+      </td>
+      <td>
+        <StatusBadge text={emp.employmentStatus} />
       </td>
       <td>{emp.designation}</td>
       <td>{emp.reporting_manager_uuid}</td>
