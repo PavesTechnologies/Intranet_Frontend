@@ -202,10 +202,10 @@ const RMSProjectList = () => {
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#081534]">
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
             Resource Project Management
           </h1>
-          <p className="text-sm text-gray-500">Live PMS Integration</p>
+          <p className="mt-1 text-sm text-gray-500">Live PMS Integration</p>
         </div>
 
         {/* <div className="flex items-center gap-3">

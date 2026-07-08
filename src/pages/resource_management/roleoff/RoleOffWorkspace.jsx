@@ -1898,14 +1898,14 @@ const RoleOffWorkspace = ({ mode: requestedMode, embedded = false, projectId: pr
           {!embedded ? (
             mode !== "pm" ? (
               <div>
-                <h1 className="text-2xl font-bold text-[#081534]">{pageCopy.title}</h1>
+                <h1 className="text-2xl font-semibold tracking-tight text-gray-900">{pageCopy.title}</h1>
                 <p className="mt-1 text-sm text-gray-500">{pageCopy.subtitle}</p>
               </div>
             ) : null
           ) : (
             mode !== "pm" ? (
               <div className="rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm">
-                <h2 className="text-xl font-bold text-[#081534]">{pageCopy.title}</h2>
+                <h2 className="text-2xl font-semibold tracking-tight text-gray-900">{pageCopy.title}</h2>
                 <p className="mt-1 text-sm text-gray-500">
                   {projectName
                     ? `${pageCopy.subtitle} Current project: ${projectName}.`
