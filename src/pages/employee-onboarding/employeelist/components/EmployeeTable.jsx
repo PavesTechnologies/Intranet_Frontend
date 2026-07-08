@@ -14,7 +14,6 @@ export default function EmployeeTable({ data }) {
 
       {/* 🔹 Column Width Control */}
       <colgroup>
-        <col style={{ width: "40px" }} />     {/* checkbox / avatar */}
         <col style={{ width: "200px" }} />    {/* Employee */}
         <col style={{ width: "200px" }} />    {/* Dept & Loc */}
         <col style={{ width: "120px" }} />    {/* workMode */}
@@ -28,7 +27,6 @@ export default function EmployeeTable({ data }) {
 
       <thead style={{ background: "#f6f7fb", textAlign: "left" }}>
         <tr>
-          <th></th>
           <th>Employee</th>
           <th>Dept & Loc</th>
           <th>workMode</th>
