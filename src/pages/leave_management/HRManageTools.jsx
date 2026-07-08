@@ -93,17 +93,17 @@ const HRManageTools = ({ employeeId }) => {
     {
       id: "leaveTypes",
       label: "Leave Configuration",
-      icon: <Settings size={18} />,
+      icon: <Settings size={16} />,
     },
     {
       id: "employeeActions",
       label: "Employee Management",
-      icon: <Users size={18} />,
+      icon: <Users size={16} />,
     },
     {
       id: "holidaySettings",
       label: "Holiday Management",
-      icon: <CalendarDays size={18} />,
+      icon: <CalendarDays size={16} />,
     },
   ];
 

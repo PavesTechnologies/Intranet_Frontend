@@ -620,11 +620,11 @@ const DemandWorkspacePage = () => {
                 <header className="mb-4 md:mb-5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                         <div>
-                            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
                                 Demand Pipeline Management
                             </h1>
-                            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                                A Real-Time Snapshot Of Resource Mandates, Sla Compliance, And Fulfillment Status Across The Enterprise.
+                            <p className="mt-1 text-sm text-gray-500">
+                                A real-time snapshot of resource mandates, SLA compliance, and fulfillment status across the enterprise.
                             </p>
                         </div>
                         {showRoleDropdown && (

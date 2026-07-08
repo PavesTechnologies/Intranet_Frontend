@@ -42,6 +42,8 @@ import BenchPoolDashboard from "./pages/resource_management/bench/pages/BenchPoo
 import UtilizationPerformanceDashboard from "./pages/resource_management/bench/pages/UtilizationPerformanceDashboard.jsx";
 import OperationalProjectDetailPage from "./pages/resource_management/bench/pages/OperationalProjectDetailPage.jsx";
 import UtilizationReportingDashboard from "./pages/resource_management/bench/pages/UtilizationReportingDashboard.jsx";
+import AssetCategoryManagement from "./pages/resource_management/company_assets/AssetCategoryManagement.jsx";
+import AssetTypeManagement from "./pages/resource_management/company_assets/AssetTypeManagement.jsx";
 
 // Timesheets
 
@@ -866,6 +868,22 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path="/resource-management/asset-categories"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager", "Super_Admin"]}>
+                <AssetCategoryManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resource-management/asset-types"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager", "Super_Admin"]}>
+                <AssetTypeManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/resource-management/projects"
             element={<RMSProjectList />}
           />
@@ -1068,3 +1086,5 @@ function App() {
 }
 
 export default App;
+
+
