@@ -26,6 +26,7 @@ import {
 
 import { generateHtml } from "./TemplateGenerator";
 import { Fonts } from "../../../components/Fonts/Fonts";
+import PageHeader from "../../../components/ui/PageHeader";
 
 const inputClassName =
   "h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20";
@@ -405,28 +406,21 @@ export default function DocumentTemplates() {
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header Section */}
-        <PageCard className="p-6">
-          <div>
-            <h1 className={`${Fonts.heading2} mb-2`}>
-              Document Templates
-            </h1>
-            <p className={`flex max-w-2xl items-start gap-2 ${Fonts.paragraphMuted}`}>
-              <FileSignature className="mt-1 h-4 w-4 shrink-0 text-[#0A0082]" />
-              Manage and automatically generate personalized PDF documents for candidates using Paves Technologies templates.
-            </p>
-          </div>
+        <PageHeader
+          title="Document Templates"
+          subtitle="Manage and automatically generate personalized PDF documents for candidates using Paves Technologies templates."
+        />
 
-          {/* <div className="relative w-full md:max-w-md">
-            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search templates (e.g., NDA, Policy)..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 pl-12 pr-4 text-sm shadow-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
-            />
-          </div> */}
-        </PageCard>
+        {/* <div className="relative w-full md:max-w-md">
+          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search templates (e.g., NDA, Policy)..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 pl-12 pr-4 text-sm shadow-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+          />
+        </div> */}
 
         {/* Templates Grid */}
         {/* {filteredTemplates.length > 0 ? (

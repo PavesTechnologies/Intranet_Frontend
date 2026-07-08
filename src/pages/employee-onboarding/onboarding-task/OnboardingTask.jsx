@@ -7,22 +7,8 @@ import useApiConfig from "./hooks/useApiConfig";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
-import { Fonts } from "../../../components/Fonts/Fonts";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
-
-function SectionHeaderCard({ title, description, className = "" }) {
-  return (
-    <div className={`rounded-2xl border border-slate-200 bg-white px-5 py-6 shadow-sm ${className}`}>
-      <div className="flex items-start gap-4">
-        <span className="mt-0.5 h-14 w-1.5 shrink-0 rounded-full bg-indigo-600" />
-        <div className="min-w-0">
-          <h1 className={Fonts.heading3}>{title}</h1>
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
+import PageHeader from "../../../components/ui/PageHeader";
 
 const normalizeStatus = (status) => {
   if (!status) return "todo";
@@ -209,29 +195,25 @@ export default function OnboardingTask() {
 
   return (
     <div className="p-6">
+      <PageHeader
+        title="Task Management"
+        subtitle="Configure and track onboarding tasks across each workflow stage."
+        actions={
+          <Button
+            onClick={() => {
+              setSelectedTask(null);
+              setShowModal(true);
+            }}
+            variant="primary"
+            size="medium"
+          >
+            + Add Task
+          </Button>
+        }
+      />
+
       <PageCard className="border-slate-200">
         <PageCardContent className="p-6 md:p-8">
-          <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex-1">
-              <SectionHeaderCard
-                title="Task Management"
-                description="Configure and track onboarding tasks across each workflow stage."
-              />
-            </div>
-
-            <Button
-              onClick={() => {
-                setSelectedTask(null);
-                setShowModal(true);
-              }}
-              variant="primary"
-              size="medium"
-              className="self-start xl:self-center"
-            >
-              + Add Task
-            </Button>
-          </div>
-
           <TaskBoard
             tasks={groupedTasks}
             loading={loading}
