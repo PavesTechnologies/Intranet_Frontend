@@ -47,8 +47,8 @@ const userManagementSubmenu = [
 const resourceManagementSubmenu = [
   { label: "Client Management", to: "/resource-management" },
   { label: "Resource Project Management", to: "/resource-management/projects" },
-  { label: "Asset Categories", to: "/resource-management/asset-categories" },
-  { label: "Asset Types", to: "/resource-management/asset-types" },
+  // { label: "Asset Categories", to: "/resource-management/asset-categories" },
+  // { label: "Asset Types", to: "/resource-management/asset-types" },
   {
     label: "Workforce Availability",
     to: "/resource-management/workforce-availability",
