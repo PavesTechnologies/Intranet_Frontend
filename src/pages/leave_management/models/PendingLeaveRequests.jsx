@@ -45,6 +45,8 @@ const PendingLeaveRequests = ({ refresh, year, onLeaveCancel }) => {
       const allLeaves = Array.isArray(leaveReqRes.data?.data)
         ? leaveReqRes.data.data : [];
 
+        console.log("allleave pending requests", allLeaves);
+
       setPendingLeaves(
         allLeaves.filter((l) => String(l.status).toUpperCase() === "PENDING")
       );
