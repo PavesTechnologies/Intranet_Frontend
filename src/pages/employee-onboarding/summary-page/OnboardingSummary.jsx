@@ -5,6 +5,7 @@ import { showStatusToast } from "../../../components/toastfy/toast.jsx";
 import Button from "../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import { KPICard } from "../../../components/kpi/KPI";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 import {
   Users,
@@ -95,7 +96,7 @@ const MetricRateCard = ({ label, value, description, icon: Icon, goodWhenHigh, a
       </div>
       <p className="text-3xl font-extrabold text-slate-900 tabular-nums leading-none">{formatRate(value)}</p>
       <p className="text-sm font-semibold text-slate-700 mt-2">{label}</p>
-      <p className="text-xs text-slate-400 mt-1 mb-4 flex-1">{description}</p>
+      <p className={`${Fonts.smallText} mt-1 mb-4 flex-1`}>{description}</p>
       <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${numVal}%`, backgroundColor: barColor }} />
       </div>
@@ -189,8 +190,8 @@ export default function OnboardingSummary() {
           <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <ShieldCheck className="w-8 h-8 text-rose-600" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">Access Denied</h2>
-          <p className="text-slate-500 mb-6">Only Admin or HR roles can access this dashboard.</p>
+          <h2 className={`${Fonts.heading3} mb-2`}>Access Denied</h2>
+          <p className={`${Fonts.paragraphMuted} mb-6`}>Only Admin or HR roles can access this dashboard.</p>
           <Button size="medium">Return to Home</Button>
         </div>
       </div>
@@ -350,7 +351,7 @@ export default function OnboardingSummary() {
       {/* ── Header ── */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className={`${Fonts.heading3} md:text-3xl`}>
             Onboarding Dashboard
           </h1>
           <p className="text-sm text-slate-500 mt-1">HR &amp; Admin · Workforce Management Overview</p>
@@ -416,7 +417,7 @@ export default function OnboardingSummary() {
                 style={{ width: offerTotal > 0 ? `${(offerAccepted / offerTotal) * 100}%` : "0%" }}
               />
             </div>
-            <p className="text-xs text-slate-400 mt-1.5 text-right">
+            <p className={`${Fonts.smallText} mt-1.5 text-right`}>
               {offerTotal > 0 ? `${fmtPct(offerAccepted, offerTotal)} acceptance` : "No offers yet"}
             </p>
           </PageCardContent>
@@ -450,7 +451,7 @@ export default function OnboardingSummary() {
                 }}
               />
             </div>
-            <p className="text-xs text-slate-400 mt-1.5 text-right">
+            <p className={`${Fonts.smallText} mt-1.5 text-right`}>
               {onboardingStats[0].count > 0
                 ? `${fmtPct(onboardingStats[2].count, onboardingStats[0].count)} completed`
                 : "No submissions yet"}
@@ -486,7 +487,7 @@ export default function OnboardingSummary() {
                 }}
               />
             </div>
-            <p className="text-xs text-slate-400 mt-1.5 text-right">
+            <p className={`${Fonts.smallText} mt-1.5 text-right`}>
               {joiningStats[2].count > 0 ? `${joiningStats[2].count} rescheduled` : "No reschedules"}
             </p>
           </PageCardContent>
@@ -505,11 +506,11 @@ export default function OnboardingSummary() {
         <PageCardContent className="p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+              <h3 className={`${Fonts.subheading} flex items-center gap-2`}>
                 <Activity className="w-5 h-5 text-indigo-500" />
                 Onboarding Pipeline
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">All 6 stages — shows 0 when no candidates are present</p>
+              <p className={`${Fonts.smallText} mt-0.5`}>All 6 stages — shows 0 when no candidates are present</p>
             </div>
           </div>
 
@@ -566,7 +567,7 @@ export default function OnboardingSummary() {
       {/* ══ Section 5: Action Required ══════════════════════════════════════ */}
       <PageCard className="rounded-2xl border-slate-200 mb-6">
         <PageCardContent className="p-6">
-          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 mb-5">
+          <h3 className={`${Fonts.subheading} flex items-center gap-2 mb-5`}>
             <AlertCircle className="w-5 h-5 text-rose-500" />
             Action Required
             <span className="ml-1 text-xs font-semibold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full">
@@ -584,7 +585,7 @@ export default function OnboardingSummary() {
       {/* ══ Section 7: Department Distribution (full width, unchanged) ════════ */}
       <PageCard className="rounded-2xl border-slate-200 mb-6">
         <PageCardContent className="p-6">
-          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 mb-5">
+          <h3 className={`${Fonts.subheading} flex items-center gap-2 mb-5`}>
             <Building2 className="w-5 h-5 text-indigo-500" />
             Department-wise Candidate Distribution
           </h3>
@@ -657,7 +658,7 @@ export default function OnboardingSummary() {
         {/* Document Completion — 2/5 */}
         <PageCard className="col-span-2 rounded-2xl border-slate-200">
           <PageCardContent className="p-6">
-            <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 mb-5">
+            <h3 className={`${Fonts.subheading} flex items-center gap-2 mb-5`}>
               <ShieldCheck className="w-5 h-5 text-emerald-500" />
               Document Completion
             </h3>
@@ -667,7 +668,7 @@ export default function OnboardingSummary() {
                   <div className="flex items-center justify-between mb-1.5">
                     <div>
                       <p className="text-sm font-semibold text-slate-700">{row.label}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <p className={`${Fonts.smallText} mt-0.5`}>
                         {row.verified} of {row.total} verified
                       </p>
                     </div>
@@ -691,7 +692,7 @@ export default function OnboardingSummary() {
         <PageCard className="col-span-3 rounded-2xl border-slate-200">
           <PageCardContent className="p-6">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+              <h3 className={`${Fonts.subheading} flex items-center gap-2`}>
                 <Activity className="w-5 h-5 text-indigo-500" />
                 Recent Activity
               </h3>

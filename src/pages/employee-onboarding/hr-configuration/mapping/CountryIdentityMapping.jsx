@@ -6,6 +6,7 @@ import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
 import Modal from "../../../../components/Modal/modal";
 import { PageCard } from "../../../../components/Cards/PageCard";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 export default function CountryIdentityMapping() {
   const [countries, setCountries] = useState([]);
@@ -267,8 +268,8 @@ export default function CountryIdentityMapping() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <h1 className="text-2xl font-semibold mb-2">Country Identity Mapping</h1>
-      <p className="text-gray-600 mb-6">
+      <h1 className={`${Fonts.heading3} mb-2`}>Country Identity Mapping</h1>
+      <p className={`${Fonts.paragraph} mb-6`}>
         Configure required identity documents per country
       </p>
 
@@ -345,7 +346,7 @@ export default function CountryIdentityMapping() {
             </div>
           }
         >
-          <p className="text-gray-600">
+          <p className={Fonts.paragraph}>
             Remove <strong>{confirmDelete.identity_type_name}</strong>?
           </p>
         </Modal>

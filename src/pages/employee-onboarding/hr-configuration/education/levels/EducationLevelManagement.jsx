@@ -6,6 +6,7 @@ import GenericTable from "../../../../../components/Table/table";
 import Modal from "../../../../../components/Modal/modal";
 import StatusBadge from "../../../../../components/status/statusbadge";
 import { PageCard } from "../../../../../components/Cards/PageCard";
+import { Fonts } from "../../../../../components/Fonts/Fonts";
 
 export default function EducationLevelManagement() {
   const { user } = useAuth();
@@ -102,10 +103,10 @@ export default function EducationLevelManagement() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className={Fonts.heading3}>
             Education Level Management
           </h1>
-          <p className="text-gray-600">
+          <p className={Fonts.paragraph}>
             Manage education levels used in onboarding
           </p>
         </div>
@@ -241,7 +242,7 @@ function LevelModal({ editData, onClose, onSuccess }) {
     >
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Education Name</label>
+          <label className={`block ${Fonts.label} mb-1`}>Education Name</label>
           <input
             className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
             value={name}
@@ -250,7 +251,7 @@ function LevelModal({ editData, onClose, onSuccess }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Description</label>
+          <label className={`block ${Fonts.label} mb-1`}>Description</label>
           <textarea
             className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
             value={desc}
@@ -266,7 +267,7 @@ function LevelModal({ editData, onClose, onSuccess }) {
             onChange={(e) => setIsActive(e.target.checked)}
             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
-          <span className="text-sm font-medium text-gray-700">Active</span>
+          <span className={Fonts.label}>Active</span>
         </label>
       </div>
     </Modal>

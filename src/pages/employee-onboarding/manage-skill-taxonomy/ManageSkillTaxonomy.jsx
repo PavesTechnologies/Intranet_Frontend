@@ -11,6 +11,7 @@ import {
 } from "../../../components/icons";
 import { useLocation } from "react-router-dom";
 import Button from "../../../components/Button/Button";
+import { Fonts } from "../../../components/Fonts/Fonts";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Modal from "../../../components/Modal/modal";
 import Pagination from "../../../components/Pagination/pagination";
@@ -259,7 +260,7 @@ const EmployeeGroupCard = ({
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-gray-900">{group.name}</p>
-              <p className="text-xs text-gray-400">
+              <p className={Fonts.smallText}>
                 {group.requests.length} request{group.requests.length !== 1 ? "s" : ""}
               </p>
             </div>
@@ -1596,7 +1597,7 @@ const ManageSkillTaxonomy = () => {
 
             {/* Left Content */}
             <div className="min-w-0">
-              <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
+              <h1 className={`${Fonts.heading3} tracking-tight`}>
                 Manage Skill Taxonomy
               </h1>
             </div>

@@ -23,6 +23,7 @@ import { skillService } from "../../../services/skillService";
 import GlobalStatusBadge from "../../../components/status/statusbadge";
 import api from "../../../api/axiosInstance";
 import ProfilePhotoModal from "./ProfilePhotoModal";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 /* ═══════════════════════════════════════════════════════════════════
    DESIGN SYSTEM  v3  —  Brand palette
@@ -1130,7 +1131,7 @@ const coreData = coreRes.data;
           </div>
           <div className="text-center">
             <p className="epv3-display text-sm font-bold" style={{ color: "#081534" }}>Loading Profile</p>
-            <p className="text-xs text-slate-400 mt-1">Fetching employee information…</p>
+            <p className={`${Fonts.smallText} mt-1`}>Fetching employee information…</p>
           </div>
         </div>
       </div>
@@ -1689,7 +1690,7 @@ value: (hrData?.education_documents || []).length,                             b
                     <p className="epv3-display text-sm font-bold" style={{ color: "#0c1b45" }}>
                       No skills recorded yet
                     </p>
-                    <p className="text-xs text-slate-400 mt-1 max-w-[220px]">
+                    <p className={`${Fonts.smallText} mt-1 max-w-[220px]`}>
                       Build this employee's professional profile by adding their key skills.
                     </p>
                     <button

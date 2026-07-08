@@ -8,6 +8,9 @@ import {
   Info,
 } from "lucide-react";
 import StatusBadge from "../../../components/status/statusbadge";
+import Button from "../../../components/Button/Button";
+import { PageCard } from "../../../components/Cards/PageCard";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 import {
   formatOfferStatusLabel,
   getNormalizedStatus,
@@ -23,6 +26,7 @@ import {
   Legend,
 } from "recharts";
 import api from "../../../api/axiosInstance";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 const STATUS = {
   JOINING: "JOINING",
@@ -195,16 +199,16 @@ function KpiCard({ title, value, subtitle }) {
 
 function Section({ title, subtitle, action, children }) {
   return (
-    <section className="rounded-xl border border-white/40 bg-white shadow-md p-5 transition hover:shadow-lg">
+    <PageCard className="p-5 transition hover:shadow-md">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-[16px] font-semibold text-[#0f172a]">{title}</h2>
-          <p className="text-[10px] text-[#94a3b8]">{subtitle}</p>
+          <h2 className={Fonts.subheading}>{title}</h2>
+          <p className={`${Fonts.smallText} mt-0.5`}>{subtitle}</p>
         </div>
         {action}
       </div>
       {children}
-    </section>
+    </PageCard>
   );
 }
 
@@ -454,96 +458,105 @@ export default function WeeklyDashboard() {
     }) || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#eef4ff] to-[#f1f5f9] p-4 sm:p-6">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="mx-auto max-w-[1180px] space-y-4">
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">
-              Joining Report Dashboard
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Overview of weekly joining and completion trends for new hires
-            </p>
-          </div>
-
-          {/* FILTER RIGHT */}
-          <div className="relative" ref={filterRef}>
-            <button
-              onClick={() => setShowFilterDropdown((v) => !v)}
-              className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm hover:shadow-md transition"
-            >
-              <Calendar size={16} />
-              {dateRange.start.toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              })}{" "}
-              -{" "}
-              {dateRange.end.toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              })}
-              <ChevronDown size={16} />
-            </button>
-
-            {showFilterDropdown && (
-              <div className="absolute right-0 mt-2 w-[320px] rounded-xl border border-slate-200 bg-white shadow-xl z-20 p-4">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
-                  Select Date Range
-                </p>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex flex-col gap-1 w-full">
-                    <label className="text-[10px] text-slate-400 font-medium">
-                      Start Date
-                    </label>
-                    <input
-                      type="date"
-                      value={formatDateSafe(dateRange.start)}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value) {
-                          setDateRange((prev) => ({
-                            ...prev,
-                            start: new Date(value),
-                          }));
-                        }
-                      }}
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                    />
+        <PageCard className="mb-6 overflow-visible p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h1 className={Fonts.heading2}>
+                Joining Report Dashboard
+              </h1>
+              <p className={`${Fonts.paragraphMuted} mt-1 text-sm`}>
+                Overview of weekly joining and completion trends for new hires
+              </p>
+            </div>
+ 
+            {/* FILTER RIGHT */}
+            <div className="relative w-full sm:w-auto" ref={filterRef}>
+              <Button
+                onClick={() => setShowFilterDropdown((v) => !v)}
+                variant="outline"
+                className="w-full rounded-full bg-white px-4 py-2 sm:w-auto"
+              >
+                <Calendar size={16} />
+                {dateRange.start.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })}{" "}
+                -{" "}
+                {dateRange.end.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })}
+                <ChevronDown size={16} />
+              </Button>
+ 
+              {showFilterDropdown && (
+                <PageCard className="absolute right-0 z-20 mt-2 w-[calc(100vw-3rem)] max-w-[480px] p-4 shadow-xl">
+                  <p className={`${Fonts.label} mb-3 uppercase tracking-wider`}>
+                    Select Date Range
+                  </p>
+                  <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-end">
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <label className={Fonts.smallText}>
+                        Start Date
+                      </label>
+                      <input
+                        type="date"
+                        value={formatDateSafe(dateRange.start)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value) {
+                            setDateRange((prev) => ({
+                              ...prev,
+                              start: new Date(value),
+                            }));
+                          }
+                        }}
+                        className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
+                      />
+                    </div>
+ 
+                    <div className="hidden pb-3 text-gray-300 sm:block">-</div>
+ 
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <label className={Fonts.smallText}>
+                        End Date
+                      </label>
+                      <input
+                        type="date"
+                        value={formatDateSafe(dateRange.end)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value) {
+                            setDateRange((prev) => ({
+                              ...prev,
+                              end: new Date(value),
+                            }));
+                          }
+                        }}
+                        className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
+                      />
+                    </div>
                   </div>
-
-                  <div className="mt-5 text-slate-300 font-medium">-</div>
-
-                  <div className="flex flex-col gap-1 w-full">
-                    <label className="text-[10px] text-slate-400 font-medium">
-                      End Date
-                    </label>
-                    <input
-                      type="date"
-                      value={formatDateSafe(dateRange.end)}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value) {
-                          setDateRange((prev) => ({
-                            ...prev,
-                            end: new Date(value),
-                          }));
-                        }
-                      }}
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
+                </PageCard>
+              )}
+            </div>
           </div>
-        </div>
+        </PageCard>
+        {loading && (
+          <div className="flex min-h-[360px] items-center justify-center">
+            <LoadingSpinner text="Loading report..." size="lg" />
+          </div>
+        )}
+
         {!loading && isNoData && (
-          <div className="flex items-center justify-center h-[60vh]">
+          <div className="flex h-[60vh] items-center justify-center">
             <div className="text-center">
-              <h2 className="text-2xl font-semibold text-slate-700">
+              <h2 className={Fonts.heading3}>
                 No data available for the selected week
               </h2>
-              <p className="text-sm text-slate-400 mt-2">
+              <p className={`${Fonts.paragraphMuted} mt-2 text-sm`}>
                 Try selecting a different date range
               </p>
             </div>
@@ -555,14 +568,14 @@ export default function WeeklyDashboard() {
         <>
         <div className="grid gap-5 md:grid-cols-2">
           {/* COMPLETED */}
-          <div className="relative rounded-2xl bg-white shadow-md border border-slate-200 p-6 hover:shadow-lg transition">
+          <PageCard className="relative overflow-hidden p-6 transition hover:shadow-md">
             {/* Accent */}
-            <div className="absolute top-0 left-6 h-1 w-[480px] bg-green-500 rounded-full"></div>
+            <div className="absolute left-6 right-6 top-0 h-1 rounded-full bg-green-500"></div>
 
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-sm font-medium text-slate-600">Completed</p>
-                <h2 className="text-4xl font-bold mt-3 text-slate-900">
+                <p className={Fonts.label}>Completed</p>
+                <h2 className="mt-3 text-4xl font-bold text-gray-900">
                   {summary.completed}
                 </h2>
               </div>
@@ -573,23 +586,23 @@ export default function WeeklyDashboard() {
               </div>
             </div>
 
-            <p className="text-sm text-slate-500 mt-4">
+            <p className={`${Fonts.paragraphMuted} mt-4 text-sm`}>
               Candidates already crossed the joining day inside the selected
               period
             </p>
-          </div>
+          </PageCard>
 
           {/* JOINING */}
-          <div className="relative rounded-2xl bg-white shadow-md border border-slate-200 p-6 hover:shadow-lg transition">
+          <PageCard className="relative overflow-hidden p-6 transition hover:shadow-md">
             {/* Accent */}
-            <div className="absolute top-0 left-6 h-1 w-[480px] bg-orange-400 rounded-full"></div>
+            <div className="absolute left-6 right-6 top-0 h-1 rounded-full bg-orange-400"></div>
 
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-sm font-medium text-slate-600">
+                <p className={Fonts.label}>
                   Pending Joinings
                 </p>
-                <h2 className="text-4xl font-bold mt-3 text-slate-900">
+                <h2 className="mt-3 text-4xl font-bold text-gray-900">
                   {summary.pending}
                 </h2>
               </div>
@@ -600,11 +613,11 @@ export default function WeeklyDashboard() {
               </div>
             </div>
 
-            <p className="text-sm text-slate-500 mt-4">
+            <p className={`${Fonts.paragraphMuted} mt-4 text-sm`}>
               Candidates still pending in the selected period, including overdue
               joinings
             </p>
-          </div>
+          </PageCard>
         </div>
         <Section
           title="Monthly Flow"
@@ -614,7 +627,7 @@ export default function WeeklyDashboard() {
             {monthlyData.length > 0 ? (
               <MonthlyGraph data={monthlyData} />
             ) : (
-              <div className="flex h-full items-center justify-center text-slate-500 text-base font-medium">
+              <div className={`flex h-full items-center justify-center ${Fonts.paragraphMuted}`}>
                 No available data
               </div>
             )}
@@ -633,7 +646,7 @@ export default function WeeklyDashboard() {
             {weeklyData.length > 0 ? (
               <WeeklyGraph data={weeklyData} />
             ) : (
-              <div className="flex items-center justify-center h-full text-slate-500 text-lg font-medium">
+              <div className={`flex items-center justify-center h-full ${Fonts.subheading}`}>
                 No available data
               </div>
             )}
@@ -703,22 +716,22 @@ export default function WeeklyDashboard() {
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {activities.map((activity) => (
-              <div
+              <PageCard
                 key={activity.id}
-                className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition hover:-translate-y-1"
+                className="p-5 transition hover:-translate-y-1 hover:shadow-md"
               >
                 {/* NAME */}
-                <p className="text-sm font-semibold text-slate-900">
+                <p className={Fonts.label}>
                   {activity.title}
                 </p>
 
                 {/* DEPARTMENT */}
-                <p className="text-xs text-slate-500 mt-1">
+                <p className={`${Fonts.smallText} mt-1`}>
                   {activity.subtitle}
                 </p>
 
                 {/* DATE + LOCATION */}
-                <p className="text-xs text-slate-400 mt-3">{activity.meta}</p>
+                <p className={`${Fonts.smallText} mt-3`}>{activity.meta}</p>
 
                 {/* STATUS */}
                 <div className="mt-4">
@@ -727,7 +740,7 @@ export default function WeeklyDashboard() {
                     size="sm"
                   />
                 </div>
-              </div>
+              </PageCard>
             ))}
           </div>
         </Section>
