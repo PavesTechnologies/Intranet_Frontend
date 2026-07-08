@@ -5,6 +5,7 @@ import api from "../../../../api/axiosInstance";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import Modal from "../../../../components/Modal/modal";
 import Button from "../../../../components/Button/Button";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 export default function AddCountryModal({ onClose, onSuccess, BASE_URL }) {
   const [callingCode, setCallingCode] = useState("");
@@ -71,7 +72,7 @@ export default function AddCountryModal({ onClose, onSuccess, BASE_URL }) {
         </div>
       }
     >
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label className={`block ${Fonts.label} mb-1`}>
         Country Calling Code
       </label>
       <input
@@ -81,7 +82,7 @@ export default function AddCountryModal({ onClose, onSuccess, BASE_URL }) {
         className="w-full border rounded-lg px-3 py-2"
       />
 
-      <p className="text-xs text-gray-500 mt-1">
+      <p className={`${Fonts.smallText} mt-1`}>
         Enter international calling code without +
       </p>
 

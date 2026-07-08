@@ -1,4 +1,5 @@
 import React from "react";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 export default function FormSelect({
   label,
@@ -10,7 +11,7 @@ export default function FormSelect({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-gray-700">{label}</label>
+      <label className={Fonts.label}>{label}</label>
 
       <select
         name={name}
