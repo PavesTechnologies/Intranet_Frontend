@@ -307,6 +307,7 @@ export default function EmployeeDocumentsPage() {
   const viewDocument = async (filePath, docId) => {
     try {
       setLoadingDoc(docId);
+ 
 
       const response = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/hr/view_documents?file_path=${filePath}`,
@@ -316,17 +317,9 @@ export default function EmployeeDocumentsPage() {
           },
         },
       );
-
-      const textResult = await response.text();
-      let signedUrl;
-
-      try {
-        const parsed = JSON.parse(textResult);
-        signedUrl = parsed.url || parsed;
-      } catch {
-        signedUrl = textResult;
-      }
-
+ 
+      let signedUrl = response.data?.url || response.data;
+ 
       if (typeof signedUrl !== "string") {
         signedUrl = String(signedUrl);
       }
@@ -662,6 +655,42 @@ export default function EmployeeDocumentsPage() {
                                               <span className="font-semibold text-gray-900">
                                                 {doc.docName}
                                               </span>
+                                            </td>
+                                            <td className="py-4 pl-4 pr-2 text-right">
+                                              <div className="flex items-center justify-end gap-2">
+                                                <button
+                                                  onClick={() =>
+                                                    viewDocument(
+                                                      doc.fileUrl,
+                                                      doc.id,
+                                                    )
+                                                  }
+                                                  disabled={
+                                                    loadingDoc === doc.id
+                                                  }
+                                                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-white px-3 text-sm font-medium text-zinc-700 shadow-sm ring-1 ring-inset ring-zinc-300 transition-all hover:bg-violet-50 hover:text-violet-700 hover:ring-violet-300 disabled:opacity-50"
+                                                >
+                                                  {loadingDoc === doc.id ? (
+                                                    <>
+                                                      <div className="h-4 w-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+                                                      Loading...
+                                                    </>
+                                                  ) : (
+                                                    <>
+                                                      <Eye className="h-4 w-4" />
+                                                      <span className="hidden lg:inline">
+                                                        View
+                                                      </span>
+                                                    </>
+                                                  )}
+                                                </button>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
                                             </div>
                                           </td>
                                           <td className="px-4 py-4 font-medium text-gray-600">
