@@ -12,6 +12,7 @@ import ExcelPreviewModal from "./components/ExcelPreviewModal";
 import * as XLSX from "xlsx";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { KPICard } from "../../../components/kpi/KPI";
+import { Fonts } from "../../../components/Fonts/Fonts";
 import api from "../../../api/axiosInstance";
 
 const PAGE_SIZE = 5;
@@ -639,9 +640,9 @@ console.log(
 
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">Employee Dashboard</h1>
+          <h1 className={Fonts.heading3}>Employee Dashboard</h1>
 
-        <p className="text-gray-500">
+        <p className={Fonts.paragraphMuted}>
           Manage employee records
         </p>
       </div>

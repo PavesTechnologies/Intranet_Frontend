@@ -4,6 +4,7 @@ import Button from "../../../../../components/Button/Button";
 import GenericTable from "../../../../../components/Table/table";
 import Modal from "../../../../../components/Modal/modal";
 import { PageCard } from "../../../../../components/Cards/PageCard";
+import { Fonts } from "../../../../../components/Fonts/Fonts";
 
 export default function DepartmentManagement() {
   const [departments, setDepartments] = useState([]);
@@ -88,11 +89,11 @@ export default function DepartmentManagement() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className={Fonts.heading3}>
             Department Management
           </h1>
 
-          <p className="text-gray-600">
+          <p className={Fonts.paragraph}>
             Manage company departments used in onboarding
           </p>
         </div>
@@ -232,7 +233,7 @@ function DepartmentModal({ editData, onClose, onSuccess }) {
         </div>
       }
     >
-      <label className="block text-sm font-medium mb-1">
+      <label className={`block ${Fonts.label} mb-1`}>
         Department Name
       </label>
 
@@ -242,7 +243,7 @@ function DepartmentModal({ editData, onClose, onSuccess }) {
         onChange={(e) => setName(e.target.value)}
       />
 
-      <label className="block text-sm font-medium mb-1">Description</label>
+      <label className={`block ${Fonts.label} mb-1`}>Description</label>
 
       <textarea
         className="w-full border rounded-lg px-3 py-2"

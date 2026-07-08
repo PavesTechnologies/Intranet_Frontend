@@ -1,12 +1,13 @@
 import { useNavigate } from "react-router-dom";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 export default function DepartmentsMappingDashboard() {
   const navigate = useNavigate();
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <h1 className="text-2xl font-semibold mb-6 text-gray-900">Departments Configuration</h1>
+      <h1 className={`${Fonts.heading3} mb-6`}>Departments Configuration</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <PageCard className="cursor-pointer hover:shadow-lg transition">

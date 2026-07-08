@@ -1,4 +1,5 @@
 import React from "react";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 export default function FormInput({
   label,
@@ -12,7 +13,7 @@ export default function FormInput({
   return (
     <div>
       {label && (
-        <label className="text-sm font-medium text-gray-700">
+        <label className={Fonts.label}>
           {label} {required && "*"}
         </label>
       )}

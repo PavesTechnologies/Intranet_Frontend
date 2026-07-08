@@ -7,6 +7,7 @@ import GenericTable from "../../../../components/Table/table";
 import Modal from "../../../../components/Modal/modal";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { PageCard } from "../../../../components/Cards/PageCard";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 export default function IdentityTypeManagement() {
   const [identities, setIdentities] = useState([]);
@@ -114,10 +115,10 @@ export default function IdentityTypeManagement() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className={Fonts.heading3}>
             Identity Type Management
           </h1>
-          <p className="text-gray-600">
+          <p className={Fonts.paragraph}>
             Manage identity documents used in onboarding
           </p>
         </div>

@@ -5,6 +5,7 @@ import FilterListbox from "../../../../../components/filter/FilterListbox";
 import Button from "../../../../../components/Button/Button";
 import GenericTable from "../../../../../components/Table/table";
 import { PageCard } from "../../../../../components/Cards/PageCard";
+import { Fonts } from "../../../../../components/Fonts/Fonts";
 
 export default function CountryEducationMapping() {
   const BASE = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
@@ -156,8 +157,8 @@ export default function CountryEducationMapping() {
   /* ================= UI ================= */
   return (
     <div className="max-w-6xl mx-auto mt-8">
-      <h1 className="text-2xl font-semibold mb-1">Education Country Mapping</h1>
-      <p className="text-sm text-gray-500 mb-6">
+      <h1 className={`${Fonts.heading3} mb-1`}>Education Country Mapping</h1>
+      <p className={`${Fonts.caption} mb-6`}>
         Configure education document requirements per country
       </p>
 
@@ -166,7 +167,7 @@ export default function CountryEducationMapping() {
 
         {/* Country Selection */}
         <div className="mb-6">
-          <label className="block text-sm font-medium mb-1">
+          <label className={`block ${Fonts.label} mb-1`}>
             Select Country
           </label>
           <FilterListbox
@@ -180,7 +181,7 @@ export default function CountryEducationMapping() {
         {selectedCountry && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-medium text-gray-900">
+              <h2 className={Fonts.subheading}>
                 Existing Mappings
               </h2>
               {canView && (
@@ -206,11 +207,11 @@ export default function CountryEducationMapping() {
         {/* Add Mapping Form */}
         {showAddForm && (
           <div className="mt-6 border-t pt-6">
-            <h3 className="text-lg font-medium mb-4">Add New Mapping</h3>
+            <h3 className={`${Fonts.subheading} mb-4`}>Add New Mapping</h3>
 
             <div className="flex items-end gap-6 flex-wrap">
               <div>
-                <label className="block text-sm font-medium mb-1">Education Level</label>
+                <label className={`block ${Fonts.label} mb-1`}>Education Level</label>
                 <FilterListbox
                   options={[{value:"",label:"Select Level"}, ...levels.map((l) => ({value: l.education_uuid, label: l.education_name}))]}
                   value={selectedLevel}
@@ -219,7 +220,7 @@ export default function CountryEducationMapping() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Document</label>
+                <label className={`block ${Fonts.label} mb-1`}>Document</label>
                 <FilterListbox
                   options={[{value:"",label:"Select Document"}, ...documents.map((d) => ({value: d.education_document_uuid, label: d.document_name}))]}
                   value={selectedDocument}
@@ -234,7 +235,7 @@ export default function CountryEducationMapping() {
                   onChange={() => setMandatory(!mandatory)}
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <span className="text-sm font-medium text-gray-700">Mandatory</span>
+                <span className={Fonts.label}>Mandatory</span>
               </label>
 
               <Button

@@ -3,6 +3,7 @@ import api from "../../../../api/axiosInstance" ;
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 export default function AddCountryIdentityMappingModal({
   countryUuid,
@@ -101,7 +102,7 @@ export default function AddCountryIdentityMappingModal({
     >
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Identity Type</label>
+          <label className={`block ${Fonts.label} mb-1`}>Identity Type</label>
           <FilterListbox
             options={[{value:"",label:"Select Identity"}, ...identities.map((i) => ({value: i.identity_type_uuid, label: i.identity_type_name}))]}
             value={identityUuid}
@@ -116,7 +117,7 @@ export default function AddCountryIdentityMappingModal({
             onChange={() => setMandatory(!mandatory)}
             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
-          <span className="text-sm font-medium text-gray-700">Mandatory</span>
+          <span className={Fonts.label}>Mandatory</span>
         </label>
       </div>
     </Modal>

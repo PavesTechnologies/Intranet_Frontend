@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import Button from "../../../components/Button/Button";
+import { Fonts } from "../../../components/Fonts/Fonts";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import Pagination from "../../../components/Pagination/pagination";
 import { skillService } from "../../../services/skillService";
@@ -288,7 +289,7 @@ const FieldError = ({ message }) =>
 
 const TextField = ({ label, required, error, className = "", ...props }) => (
   <div className={className}>
-    <label className="mb-1.5 block text-sm font-semibold text-gray-800">
+    <label className={`${Fonts.label} mb-1.5 block`}>
       {label}
       {required ? <span className="ml-1 text-rose-500">*</span> : null}
     </label>
@@ -313,7 +314,7 @@ const SelectField = ({
   onFocus,
 }) => (
   <div>
-    <label className="mb-1.5 block text-sm font-semibold text-gray-800">
+    <label className={`${Fonts.label} mb-1.5 block`}>
       {label}
     </label>
     <div className="relative">
@@ -360,7 +361,7 @@ const SearchableSkillSelect = ({
 
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-semibold text-gray-800">
+      <label className={`${Fonts.label} mb-1.5 block`}>
         Skill<span className="ml-1 text-rose-500">*</span>
       </label>
       <Combobox
@@ -488,7 +489,7 @@ const SearchableCategorySelect = ({
 
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-semibold text-gray-800">
+      <label className={`${Fonts.label} mb-1.5 block`}>
         Skill Category
       </label>
       <Combobox
@@ -583,7 +584,7 @@ const SearchableCategorySelect = ({
 
 const ValidityToggle = ({ value, onChange }) => (
   <div>
-    <label className="mb-1.5 block text-sm font-semibold text-gray-800">
+    <label className={`${Fonts.label} mb-1.5 block`}>
       Validity Type
     </label>
     <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 shadow-sm sm:w-auto">
@@ -877,7 +878,7 @@ const CertificateForm = ({
           <Award className="h-3.5 w-3.5" />
           Certificate Administration
         </div>
-        <h2 className="mt-3 text-xl font-bold text-gray-950 sm:text-2xl">
+        <h2 className={`${Fonts.heading4} mt-3 sm:text-2xl`}>
           {isGeneralCertificate
             ? "Add General Certification"
             : "Add Skill Certification"}
@@ -1320,7 +1321,7 @@ const CertificateLanding = () => {
                   )}
                   Employee Skill Management
                 </div> */}
-                <h1 className="mt-3 text-2xl font-bold text-gray-950 sm:text-3xl">
+                <h1 className={`${Fonts.heading3} mt-3 sm:text-3xl`}>
                   {title}
                 </h1>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500">

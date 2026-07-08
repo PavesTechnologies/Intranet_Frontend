@@ -7,6 +7,7 @@ import Button from "../../../../../components/Button/Button";
 import GenericTable from "../../../../../components/Table/table";
 import Modal from "../../../../../components/Modal/modal";
 import { PageCard } from "../../../../../components/Cards/PageCard";
+import { Fonts } from "../../../../../components/Fonts/Fonts";
 
 export default function DesignationManagement() {
   const [departments, setDepartments] = useState([]);
@@ -143,11 +144,11 @@ export default function DesignationManagement() {
 
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className={Fonts.heading3}>
             Designation Management
           </h1>
 
-          <p className="text-gray-600">
+          <p className={Fonts.paragraph}>
             Manage designations grouped by departments
           </p>
         </div>
@@ -308,7 +309,7 @@ function DesignationModal({ editData, departments, onClose, onSuccess }) {
     >
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Department</label>
+          <label className={`block ${Fonts.label} mb-1`}>Department</label>
           <FilterListbox
             options={[{value:"",label:"Select Department"}, ...departments.map((d) => ({value: d.department_uuid, label: d.department_name}))]}
             value={department}
@@ -317,7 +318,7 @@ function DesignationModal({ editData, departments, onClose, onSuccess }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Designation Name</label>
+          <label className={`block ${Fonts.label} mb-1`}>Designation Name</label>
           <input
             className="w-full border px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
             value={name}
@@ -326,7 +327,7 @@ function DesignationModal({ editData, departments, onClose, onSuccess }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Description</label>
+          <label className={`block ${Fonts.label} mb-1`}>Description</label>
           <textarea
             className="w-full border px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
             value={description}

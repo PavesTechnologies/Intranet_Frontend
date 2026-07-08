@@ -1,7 +1,9 @@
+import { Fonts } from "../../../../../components/Fonts/Fonts";
+
 export function Header({ title, onAdd }) {
   return (
     <div className="flex justify-between items-center mb-6">
-      <h1 className="text-xl font-semibold">{title}</h1>
+      <h1 className={Fonts.heading4}>{title}</h1>
       {onAdd && (
         <button
           onClick={onAdd}
@@ -50,7 +52,7 @@ export function Modal({ title, children, onClose, onSave }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl w-full max-w-md p-6">
-        <h2 className="text-lg font-semibold mb-4">{title}</h2>
+        <h2 className={`${Fonts.subheading} mb-4`}>{title}</h2>
         {children}
         <div className="flex justify-end gap-3 mt-6">
           <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded-lg">
