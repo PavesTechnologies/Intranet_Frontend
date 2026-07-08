@@ -25,6 +25,7 @@ import Select from "react-select";
 import CreatableSelect from "react-select/creatable";
 import api from "../../../api/axiosInstance";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 
 /* ─── Employment-type → relevant path keys ───────────────────────────── */
@@ -2175,7 +2176,7 @@ else if (category === "identity") {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold text-gray-900">My Documents</h2>
+      <h2 className={Fonts.subheading}>My Documents</h2>
 
       <div className="flex flex-col md:flex-row gap-6 min-h-[400px]">
         {/* ---- LEFT SIDEBAR ---- */}
@@ -2633,7 +2634,7 @@ else if (category === "identity") {
               {previewModal.type === "other" && (
                 <div className="text-center space-y-4">
                   <FileText size={48} className="text-gray-300 mx-auto" />
-                  <p className="text-sm text-gray-500">
+                  <p className={Fonts.caption}>
                     Preview is not available for this file type.
                   </p>
                   <button
@@ -2682,7 +2683,7 @@ else if (category === "identity") {
                   <p className="text-base font-semibold text-gray-900">
                     Upload Successful!
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className={Fonts.caption}>
                     Your document has been uploaded.
                   </p>
                 </div>
@@ -2696,7 +2697,7 @@ else if (category === "identity") {
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+  <label className={`block ${Fonts.label} mb-1.5`}>
     Education Level
   </label>
 
@@ -2737,7 +2738,7 @@ else if (category === "identity") {
   />
 </div>
 <div>
-  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+  <label className={`block ${Fonts.label} mb-1.5`}>
     Degree
   </label>
 
@@ -2780,7 +2781,7 @@ else if (category === "identity") {
                           }
                         />
                         <div>
-  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+  <label className={`block ${Fonts.label} mb-1.5`}>
     Education Mode
   </label>
 
@@ -2902,7 +2903,7 @@ else if (category === "identity") {
                           }
                         />
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                          <label className={`block ${Fonts.label} mb-1.5`}>
                             Employment Type
                           </label>
                           <FilterListbox
@@ -3012,7 +3013,7 @@ else if (category === "identity") {
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                          <label className={`block ${Fonts.label} mb-1.5`}>
                             Document Type
                           </label>
                           <FilterListbox
@@ -3074,7 +3075,7 @@ else if (category === "identity") {
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="sm:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <label className={`block ${Fonts.label} mb-2`}>
                             Certificate Type
                           </label>
                           <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1">
@@ -3098,7 +3099,7 @@ else if (category === "identity") {
                                     expiry_date: mode.value === "general" ? "" : d.expiry_date,
                                   }));
                                 }}
-                                className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+                                className={`px-4 py-2 ${Fonts.button} rounded-lg transition-all ${
                                   certificateMode === mode.value
                                     ? "bg-white text-[#263383] shadow-sm"
                                     : "text-gray-500 hover:text-gray-700"
@@ -3113,7 +3114,7 @@ else if (category === "identity") {
                         {/* 🔥 Skill Dropdown */}
                         {certificateMode === "skill" && (
                           <div className="sm:col-span-2">
-                            <label className="text-sm font-medium text-gray-700">Skill</label>
+                            <label className={Fonts.label}>Skill</label>
                             <Select
                               options={skills}
                               value={selectedSkill}
@@ -3145,7 +3146,7 @@ else if (category === "identity") {
 
                         {/* 🔥 Certificate Dropdown */}
                         <div className="sm:col-span-2">
-                          <label className="text-sm font-medium text-gray-700">Certificate</label>
+                          <label className={Fonts.label}>Certificate</label>
                           <Select
                             options={filteredCertificates}
                             value={selectedCertificate}
@@ -3179,7 +3180,7 @@ else if (category === "identity") {
                         )}
                         {/* 🔥 Provider Dropdown */}
                         <div className="sm:col-span-2">
-                          <label className="text-sm font-medium text-gray-700">
+                          <label className={Fonts.label}>
                             Issuing Organization
                           </label>
                           <CreatableSelect
@@ -3316,7 +3317,7 @@ else if (category === "identity") {
                           <p className="text-sm font-medium text-gray-800">
                             {uploadFile.name}
                           </p>
-                          <p className="text-xs text-gray-400">
+                          <p className={Fonts.smallText}>
                             {(uploadFile.size / 1024 / 1024).toFixed(2)} MB
                           </p>
                           <button
@@ -3335,7 +3336,7 @@ else if (category === "identity") {
                           <p className="text-sm text-gray-600 font-medium">
                             Click to browse or drag and drop
                           </p>
-                          <p className="text-xs text-gray-400">
+                          <p className={Fonts.smallText}>
                             PDF, JPG, PNG, DOC up to 10MB
                           </p>
                         </div>
@@ -3418,8 +3419,8 @@ const FolderContent = ({
     {/* Header */}
     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
       <div className="min-w-0">
-        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-        <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
+        <h3 className={Fonts.subheading}>{title}</h3>
+        <div className={`flex items-center gap-3 mt-1 ${Fonts.caption}`}>
           <span>
             {count} {count === 1 ? "document" : "documents"}
           </span>
@@ -3430,7 +3431,7 @@ const FolderContent = ({
           </span>
         </div>
         {description && (
-          <p className="text-sm text-gray-500 mt-2 hidden sm:block">
+          <p className={`${Fonts.caption} mt-2 hidden sm:block`}>
             {description}
           </p>
         )}
@@ -3603,7 +3604,7 @@ const EmptyState = ({ message, onUpload }) => (
       <FileText size={24} className="text-gray-300" />
     </div>
     <p className="text-sm font-semibold text-gray-500 mb-1">{message}</p>
-    <p className="text-xs text-gray-400 mb-4">Upload your documents to get started</p>
+    <p className={`${Fonts.smallText} mb-4`}>Upload your documents to get started</p>
     {onUpload && (
       <button
         onClick={onUpload}
@@ -3626,7 +3627,7 @@ const UploadField = ({
   disabled = false,
 }) => (
   <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+    <label className={`block ${Fonts.label} mb-1.5`}>
       {label}
     </label>
     <input
@@ -3651,7 +3652,7 @@ const ExperienceFileField = ({ label, file, existingPath, onChange, onView }) =>
   const inputRef = React.useRef(null);
   return (
     <div className="sm:col-span-2">
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+      <label className={`block ${Fonts.label} mb-1.5`}>{label}</label>
       <div
         onClick={() => inputRef.current?.click()}
         className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
@@ -3672,7 +3673,7 @@ const ExperienceFileField = ({ label, file, existingPath, onChange, onView }) =>
             <div className="flex items-center gap-2 min-w-0">
               <FileText size={14} className="text-[#263383] flex-shrink-0" />
               <span className="text-sm font-medium text-gray-800 truncate">{file.name}</span>
-              <span className="text-xs text-gray-400 flex-shrink-0">
+              <span className={`${Fonts.smallText} flex-shrink-0`}>
                 {(file.size / 1024 / 1024).toFixed(2)} MB
               </span>
             </div>
@@ -3698,14 +3699,14 @@ const ExperienceFileField = ({ label, file, existingPath, onChange, onView }) =>
               >
                 View
               </button>
-              <span className="text-xs text-gray-400">|</span>
-              <span className="text-xs text-gray-500">Click to replace</span>
+              <span className={Fonts.smallText}>|</span>
+              <span className={Fonts.smallText}>Click to replace</span>
             </div>
           </div>
         ) : (
           <div className="space-y-1">
             <Upload size={20} className="text-gray-300 mx-auto" />
-            <p className="text-xs text-gray-500">Click to upload {label}</p>
+            <p className={Fonts.smallText}>Click to upload {label}</p>
           </div>
         )}
       </div>

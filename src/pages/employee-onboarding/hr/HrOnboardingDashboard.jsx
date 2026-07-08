@@ -24,6 +24,7 @@ import OfferStatusCell from "./components/OfferStatusCell";
 import ReassignJoiningModal from "./components/ReassignJoiningModal";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import GroupedKPISection from "../components/GroupedKPISection";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 const HR_CATEGORY_GROUPS = [
   {
@@ -812,7 +813,7 @@ export default function HrOnboardingDashboard() {
     <div className="min-h-screen bg-slate-50/50 p-6 space-y-8 font-sans">
       {/* Header */}
       <div className="px-1">
-        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+        <h1 className={`${Fonts.heading2} tracking-tight`}>
           HR Onboarding Dashboard
         </h1>
         <p className="text-sm font-medium text-slate-500 mt-1">

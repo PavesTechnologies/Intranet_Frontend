@@ -80,7 +80,7 @@ export default function HrConfiguration() {
             className="transition h-full cursor-pointer hover:shadow-lg border-gray-200"
           >
             {card.disabled && (
-              <p className="text-xs text-gray-500 mt-2 font-medium">
+              <p className={`${Fonts.smallText} mt-2 font-medium`}>
                 Coming soon
               </p>
             )}

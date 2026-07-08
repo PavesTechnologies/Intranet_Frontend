@@ -9,6 +9,7 @@ import DynamicCardGrid from "../../../components/Cards/DynamicCardGrid";
 import { PageCard } from "../../../components/Cards/PageCard";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import api from "../../../api/axiosInstance";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 export default function ProfilePage({
   activeTab,
@@ -512,7 +513,7 @@ const Row = ({ label, value, isLink = false }) => (
         href={value}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-sm text-blue-600 hover:underline text-right"
+        className={`${Fonts.link} text-right`}
       >
         {value}
       </a>
@@ -535,13 +536,13 @@ const EmptyState = ({
       className="text-gray-300 mb-3"
     />
 
-    <p className="text-sm text-gray-500 mb-4">
+    <p className={`${Fonts.caption} mb-4`}>
       {title}
     </p>
 
     <button
       onClick={onClick}
-      className="px-4 py-2 rounded-lg bg-[#263383] text-white text-sm hover:bg-[#081534]"
+      className={`px-4 py-2 rounded-lg bg-[#263383] text-white hover:bg-[#081534] ${Fonts.button}`}
     >
       {buttonText}
     </button>
@@ -660,7 +661,7 @@ const Input = ({
   required = false,
 }) => (
   <div>
-    <label className="block text-sm font-semibold text-gray-700 mb-1.5 flex items-center">
+    <label className={`${Fonts.label} mb-1.5 flex items-center`}>
       {label}{" "}
       {required && (
         <span className="text-red-500 ml-1 mt-1 text-lg leading-none">*</span>
@@ -781,14 +782,14 @@ const ModalWrapper = ({
         <button
           type="button"
           onClick={onClose}
-          className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#263383] transition-all"
+          className={`px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#263383] transition-all ${Fonts.button}`}
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={saving}
-          className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-[#263383] shadow-sm transition-all focus:ring-offset-1 ${
+          className={`px-6 py-2.5 ${Fonts.button} text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-[#263383] shadow-sm transition-all focus:ring-offset-1 ${
             saving
               ? "bg-[#263383]/50 cursor-not-allowed"
               : "bg-[#263383] hover:bg-[#081534]"
@@ -1345,14 +1346,14 @@ const permanentAddressRow =
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#263383] transition-all"
+            className={`px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#263383] transition-all ${Fonts.button}`}
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-[#263383] shadow-sm transition-all focus:ring-offset-1 ${
+            className={`px-6 py-2.5 ${Fonts.button} text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-[#263383] shadow-sm transition-all focus:ring-offset-1 ${
               saving
                 ? "bg-[#263383]/50 cursor-not-allowed"
                 : "bg-[#263383] hover:bg-[#081534]"
@@ -1553,7 +1554,7 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
         className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-gray-100"
       >
         <div className="flex justify-between items-center px-8 py-5 border-b border-gray-100 bg-white shrink-0">
-          <h3 className="text-xl font-medium text-gray-800">
+          <h3 className={Fonts.heading4}>
             Edit Social Media Links
           </h3>
           <button
@@ -1618,7 +1619,7 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
           <button
             type="button"
             onClick={handleAdd}
-            className="flex items-center gap-2 text-[#263383] text-sm font-semibold hover:bg-[#263383]/5 px-4 py-2.5 rounded-xl transition-all"
+            className={`flex items-center gap-2 text-[#263383] hover:bg-[#263383]/5 px-4 py-2.5 rounded-xl transition-all ${Fonts.button}`}
           >
             + Add Another Platform
           </button>
@@ -1628,14 +1629,14 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+            className={`px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors ${Fonts.button}`}
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className={`px-8 py-2.5 text-sm font-semibold text-white rounded-xl shadow-md transition-all ${
+            className={`px-8 py-2.5 ${Fonts.button} text-white rounded-xl shadow-md transition-all ${
               saving
                 ? "bg-[#263383]/50 cursor-not-allowed"
                 : "bg-[#263383] hover:bg-[#081534] hover:scale-[1.02]"
@@ -1655,10 +1656,10 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
                 <AlertTriangle size={32} className="text-red-500" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                <h3 className={`${Fonts.heading4} mb-2`}>
                   Delete Link?
                 </h3>
-                <p className="text-sm text-gray-500 leading-relaxed px-2">
+                <p className={`${Fonts.caption} px-2`}>
                   Are you sure you want to remove this social media link? This
                   action will take effect once you save your changes.
                 </p>
@@ -1667,13 +1668,13 @@ const SocialModal = ({ data, setData, onClose, refreshData, user_uuid }) => {
             <div className="flex gap-3 px-6 py-5 border-t border-gray-100 bg-gray-50/50">
               <button
                 onClick={() => setConfirmModal({ open: false, index: null })}
-                className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-all focus:outline-none focus:ring-2 focus:ring-gray-200"
+                className={`flex-1 px-4 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-all focus:outline-none focus:ring-2 focus:ring-gray-200 ${Fonts.button}`}
               >
                 No, Keep it
               </button>
               <button
                 onClick={confirmDelete}
-                className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-red-600 rounded-xl hover:bg-red-700 shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-red-200"
+                className={`flex-1 px-4 py-2.5 text-white bg-red-600 rounded-xl hover:bg-red-700 shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-red-200 ${Fonts.button}`}
               >
                 Yes, Delete
               </button>

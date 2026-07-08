@@ -5,6 +5,7 @@ import SearchBar from "./components/SearchBar";
 import FiltersBar from "./components/FiltersBar";
 import { fetchEmployees } from "./api/employeelist";
 import Pagination from "../../../components/Pagination/pagination";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 export default function EmployeeListPage() {
   const [search, setSearch] = useState("");
@@ -136,6 +137,7 @@ export default function EmployeeListPage() {
 
       email: emp.work_email,
       emailStatus: emp.employment_status === "Active" ? "Active" : "Inactive",
+      employmentStatus: emp.employment_status,
 
       designation: designationMap[emp.designation_uuid] || "N/A",
 
@@ -178,7 +180,15 @@ export default function EmployeeListPage() {
 
   return (
     <div style={{ padding: 20 }}>
-      <h2 style={{ marginBottom: 12 }}>Employees</h2>
+      <div className="rounded-2xl border border-slate-200 bg-white px-5 py-6 shadow-sm mb-6">
+        <div className="flex items-start gap-4">
+          <span className="mt-0.5 h-14 w-1.5 shrink-0 rounded-full bg-indigo-600" />
+          <div className="min-w-0">
+            <h1 className={Fonts.heading3}>Member Records</h1>
+            <p className="mt-1 text-sm text-slate-500">Manage and browse member records across the onboarding workflow.</p>
+          </div>
+        </div>
+      </div>
 
       {/* 🔎 Search + Filters */}
       <div
