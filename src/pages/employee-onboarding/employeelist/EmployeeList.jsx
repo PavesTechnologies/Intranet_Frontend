@@ -21,7 +21,7 @@ export default function EmployeeListPage() {
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("");
   const [status, setStatus] = useState("");
-  const [locations, setLocations] = useState([]);
+  const [locationSearch, setLocationSearch] = useState("");
   const [employees, setEmployees] = useState([]);
   const [deptMap, setDeptMap] = useState({});
   const [designationMap, setDesignationMap] = useState({});
@@ -44,24 +44,13 @@ export default function EmployeeListPage() {
 
       const matchStatus = status ? emp.emailStatus === status : true;
 
-      const matchLocation = locations.length
-        ? locations.includes(emp.location)
+      const matchLocation = locationSearch
+        ? emp.location?.toLowerCase().includes(locationSearch.toLowerCase())
         : true;
 
       return matchSearch && matchDept && matchStatus && matchLocation;
     });
-  }, [employees, search, department, status, locations]);
-  const locationOptions = useMemo(() => {
-    const unique = new Set();
-
-    employees.forEach((emp) => {
-      if (emp.location) {
-        unique.add(emp.location.trim());
-      }
-    });
-
-    return Array.from(unique);
-  }, [employees]);
+  }, [employees, search, department, status, locationSearch]);
   const loadDepartments = async () => {
 
     const res = await api.get(
@@ -122,7 +111,7 @@ export default function EmployeeListPage() {
   /* Reset page when filters/search change */
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, department, status, locations]);
+  }, [search, department, status, locationSearch]);
 
   /* Pagination logic */
   const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
@@ -215,20 +204,20 @@ export default function EmployeeListPage() {
           <div className="w-full sm:w-56">
             <FilterListbox
               buttonClassName={filterButtonClassName}
-              options={buildFilterOptions("All Departments", [
-                "Engineering",
-                "Human Resources",
-              ])}
+              options={buildFilterOptions(
+                "All Departments",
+                Object.values(deptMap).sort((a, b) => a.localeCompare(b))
+              )}
               value={department}
               onChange={setDepartment}
             />
           </div>
           <div className="w-full sm:w-48">
-            <FilterListbox
-              buttonClassName={filterButtonClassName}
-              options={buildFilterOptions("All Locations", locationOptions)}
-              value={locations[0] || ""}
-              onChange={(val) => setLocations([val])}
+            <SearchInput
+              value={locationSearch}
+              onChange={(e) => setLocationSearch(e.target.value)}
+              placeholder="Search location..."
+              className="h-[42px]"
             />
           </div>
         </div>
