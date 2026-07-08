@@ -655,42 +655,6 @@ export default function EmployeeDocumentsPage() {
                                               <span className="font-semibold text-gray-900">
                                                 {doc.docName}
                                               </span>
-                                            </td>
-                                            <td className="py-4 pl-4 pr-2 text-right">
-                                              <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                  onClick={() =>
-                                                    viewDocument(
-                                                      doc.fileUrl,
-                                                      doc.id,
-                                                    )
-                                                  }
-                                                  disabled={
-                                                    loadingDoc === doc.id
-                                                  }
-                                                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-white px-3 text-sm font-medium text-zinc-700 shadow-sm ring-1 ring-inset ring-zinc-300 transition-all hover:bg-violet-50 hover:text-violet-700 hover:ring-violet-300 disabled:opacity-50"
-                                                >
-                                                  {loadingDoc === doc.id ? (
-                                                    <>
-                                                      <div className="h-4 w-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
-                                                      Loading...
-                                                    </>
-                                                  ) : (
-                                                    <>
-                                                      <Eye className="h-4 w-4" />
-                                                      <span className="hidden lg:inline">
-                                                        View
-                                                      </span>
-                                                    </>
-                                                  )}
-                                                </button>
-                                              </div>
-                                            </td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
                                             </div>
                                           </td>
                                           <td className="px-4 py-4 font-medium text-gray-600">
@@ -726,18 +690,6 @@ export default function EmployeeDocumentsPage() {
                                                 <span className="hidden lg:inline">
                                                   View
                                                 </span>
-                                              </Button>
-                                              <Button
-                                                aria-label="Delete Document"
-                                                size="icon"
-                                                title="Delete Document"
-                                                variant="outline"
-                                                className="text-gray-400 hover:border-red-300 hover:bg-red-50 hover:text-red-600"
-                                                onClick={() =>
-                                                  deleteDocument(emp.id, doc.id)
-                                                }
-                                              >
-                                                <Trash2 className="h-4 w-4" />
                                               </Button>
                                             </div>
                                           </td>
