@@ -291,8 +291,6 @@ export default function EmployeeDocumentsPage() {
     try {
       setLoadingDoc(docId);
  
-      const token = localStorage.getItem("token");
- 
       const response = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/hr/view_documents?file_path=${filePath}`,
         {
@@ -302,16 +300,7 @@ export default function EmployeeDocumentsPage() {
         },
       );
  
-      const textResult = await response.text();
- 
-      let signedUrl;
- 
-      try {
-        const parsed = JSON.parse(textResult);
-        signedUrl = parsed.url || parsed;
-      } catch {
-        signedUrl = textResult;
-      }
+      let signedUrl = response.data?.url || response.data;
  
       if (typeof signedUrl !== "string") {
         signedUrl = String(signedUrl);
@@ -756,18 +745,6 @@ export default function EmployeeDocumentsPage() {
                                                       </span>
                                                     </>
                                                   )}
-                                                </button>
-                                                <button
-                                                  onClick={() =>
-                                                    deleteDocument(
-                                                      emp.id,
-                                                      doc.id,
-                                                    )
-                                                  }
-                                                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-zinc-400 shadow-sm ring-1 ring-inset ring-zinc-300 transition-all hover:bg-red-50 hover:text-red-600 hover:ring-red-300 focus:outline-none focus:ring-2 focus:ring-red-500"
-                                                  title="Delete Document"
-                                                >
-                                                  <Trash2 className="h-4 w-4" />
                                                 </button>
                                               </div>
                                             </td>
