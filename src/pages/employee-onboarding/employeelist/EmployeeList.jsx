@@ -1,11 +1,21 @@
 import { useState, useMemo, useEffect } from "react";
 import api from "../../../api/axiosInstance";
 import EmployeeTable from "./components/EmployeeTable";
-import SearchBar from "./components/SearchBar";
-import FiltersBar from "./components/FiltersBar";
 import { fetchEmployees } from "./api/employeelist";
 import Pagination from "../../../components/Pagination/pagination";
 import { Fonts } from "../../../components/Fonts/Fonts";
+import SearchInput from "../../../components/filter/Searchbar";
+import FilterListbox from "../../../components/filter/FilterListbox";
+
+const filterButtonClassName =
+  "w-full cursor-default rounded-lg border border-gray-300 bg-white py-2.5 pl-4 pr-10 text-left text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-[#0A0082]/20 focus:border-[#0A0082]";
+
+function buildFilterOptions(defaultLabel, options) {
+  return [
+    { value: "", label: defaultLabel },
+    ...options.map((option) => ({ value: option, label: option })),
+  ];
+}
 
 export default function EmployeeListPage() {
   const [search, setSearch] = useState("");
@@ -191,24 +201,37 @@ export default function EmployeeListPage() {
       </div>
 
       {/* 🔎 Search + Filters */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginBottom: 14,
-        }}
-      >
-        <SearchBar value={search} onChange={setSearch} />
+      <div className="mb-6 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+        <div className="w-full md:w-80">
+          <SearchInput
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by name, email, id, username..."
+            className="h-[42px]"
+          />
+        </div>
 
-        <FiltersBar
-          department={department}
-          setDepartment={setDepartment}
-          status={status}
-          setStatus={setStatus}
-          locations={locations}
-          setLocations={setLocations}
-          locationOptions={locationOptions}
-        />
+        <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
+          <div className="w-full sm:w-56">
+            <FilterListbox
+              buttonClassName={filterButtonClassName}
+              options={buildFilterOptions("All Departments", [
+                "Engineering",
+                "Human Resources",
+              ])}
+              value={department}
+              onChange={setDepartment}
+            />
+          </div>
+          <div className="w-full sm:w-48">
+            <FilterListbox
+              buttonClassName={filterButtonClassName}
+              options={buildFilterOptions("All Locations", locationOptions)}
+              value={locations[0] || ""}
+              onChange={(val) => setLocations([val])}
+            />
+          </div>
+        </div>
       </div>
 
       {/* 📋 Table */}
