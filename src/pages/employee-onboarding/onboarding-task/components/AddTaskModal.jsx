@@ -5,20 +5,6 @@ import FormInput from "../../../../components/forms/FormInput";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 import Modal from "../../../../components/Modal/modal";
 
-function ModalHeaderCard({ title, description }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
-      <div className="flex items-start gap-4">
-        <span className="mt-0.5 h-12 w-1.5 shrink-0 rounded-full bg-indigo-600" />
-        <div className="min-w-0">
-          <h2 className={Fonts.heading4}>{title}</h2>
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 const normalizeStatusValue = (status) => {
   if (!status) return "todo";
   const normalized = status.toLowerCase();
@@ -176,11 +162,10 @@ export default function AddTaskModal({
     <Modal
       isOpen={isOpen}
       onClose={saving ? () => {} : onClose}
-      size="4xl"
+      title={mode === "edit" ? "Edit Task" : "Create Task"}
+      subtitle="Configure the employee, owner, priority, and dates for this task."
+      size="2xl"
       maxHeight="max-h-[90vh]"
-      showHeader={false}
-      bodyClassName="p-0"
-      panelClassName="overflow-hidden"
       footerClassName="px-6 py-4"
       footer={
         <div className="flex justify-end gap-3">
@@ -201,14 +186,7 @@ export default function AddTaskModal({
         </div>
       }
     >
-      <div className="px-6 py-5">
-        <ModalHeaderCard
-          title={mode === "edit" ? "Edit Task" : "Create Task"}
-          description="Configure the employee, owner, priority, and dates for this task."
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 px-6 pb-6 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
           <FormInput name="title" label="Task Title" value={formData.title} onChange={handleChange} />
         </div>
