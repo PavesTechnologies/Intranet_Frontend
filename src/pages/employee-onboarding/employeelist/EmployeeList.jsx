@@ -136,6 +136,7 @@ export default function EmployeeListPage() {
 
       email: emp.work_email,
       emailStatus: emp.employment_status === "Active" ? "Active" : "Inactive",
+      employmentStatus: emp.employment_status,
 
       designation: designationMap[emp.designation_uuid] || "N/A",
 
