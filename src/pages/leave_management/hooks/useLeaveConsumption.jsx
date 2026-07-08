@@ -1,10 +1,17 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
-import SockJS from "sockjs-client";
-import { over } from "stompjs";
+import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 
-let stompClient = null;
+// ✅ Outside component — stable, never recreated
+const BALANCE_AFFECTING_EVENTS = [
+  "COMPOFF_APPROVED",
+  "COMPOFF_REJECTED",
+  "LEAVE_APPROVED",
+  "LEAVE_REJECTED",
+  "REVOKE_APPROVED",
+  "REVOKE_REJECTED",
+];
 
 const useLeaveConsumption = (employeeId, refreshKey, year) => {
   const [leaveData, setLeaveData] = useState({
@@ -80,6 +87,18 @@ const useLeaveConsumption = (employeeId, refreshKey, year) => {
   //     }
   //   };
   // }, []);
+
+  // ---------------------------
+  // WEBSOCKET REAL-TIME LISTENER
+  // ---------------------------
+  // Balances change when a manager approves/rejects a leave or comp-off
+  // request, or approves/rejects a revoke — refresh in real time.
+  // Channel: "employee-update" (manager sends personal notification to employee)
+  useLeaveWebSocket(
+    "employee-update",
+    BALANCE_AFFECTING_EVENTS,
+    fetchLeaveData,
+  );
 
   return { leaveData, loading };
 };
