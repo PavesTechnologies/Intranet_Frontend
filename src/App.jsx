@@ -97,8 +97,15 @@ import CountryEducationMapping from "./pages/employee-onboarding/hr-configuratio
 import DegreeMasterManagement from "./pages/employee-onboarding/hr-configuration/education/degrees/DegreeMasterManagement.jsx";
 
 // import AdminApprovalActions from "./pages/employee-onboarding/admin/AdminApprovalActions.jsx";
-import AdminApprovalDashboard from "./pages/employee-onboarding/admin/AdminApprovalDashboard.jsx";
-import AdminOfferView from "./pages/employee-onboarding/admin/AdminOfferView.jsx";
+import AdminApprovalDashboard from "./pages/employee-onboarding/admin/AdminApprovalDashboard.jsx"; import AdminOfferView from "./pages/employee-onboarding/admin/AdminOfferView.jsx";
+
+// AI Screening (AIRS)
+import AirsDashboard from "./pages/airs/pages/AirsDashboard.jsx";
+import JdLibrary from "./pages/airs/pages/JdLibrary.jsx";
+import JdCreate from "./pages/airs/pages/JdCreate.jsx";
+import JdDetails from "./pages/airs/pages/JdDetails.jsx";
+import AirsPlaceholder from "./pages/airs/pages/AirsPlaceholder.jsx";
+
 import AdminOfferLettersDashboard from "./pages/employee-onboarding/admin/AdminOfferLettersDashboard.jsx";
 import HrOnboardingDashboard from "./pages/employee-onboarding/hr/HrOnboardingDashboard.jsx";
 import HrProfileView from "./pages/employee-onboarding/hr/HrProfileView.jsx";
@@ -354,20 +361,20 @@ const AppRoutes = () => {
           <Route path="/profile/edit" element={<EditProfile />} />
           {/* Projects */}
           {/* <Route path="/projects/dashboard" element={<AdminDashboard />} /> */}
-          
+
           <Route
             path="/projects"
             element={
-             
+
               <ProjectDashboard />
-            
+
             }
           />
 
           <Route path="/projects" element={<ProjectManager />} />
           <Route path="/projects/:projectId" element={<ProjectTabs />} />
           <Route path="/projects/list" element={<ProjectList />} />
-          
+
           <Route
             path="/projects/:projectId/issuetracker"
             element={<IssueTracker />}
@@ -376,16 +383,16 @@ const AppRoutes = () => {
             path="/projects/:projectId/cycles/runs/:runId/test-runs"
             element={<AddCasesFromProjectModal />}
           />
-          
+
           <Route
             path="/projects/:projectId/cycles/:cycleId/runs"
             element={<CycleRunsPage />}
           />
-         
-          
+
+
           <Route path="/projects/admin" element={<ProjectManager />} />
-          
-          
+
+
           <Route
             path="/projects/:projectId/issues/:type/:id/view"
             element={<ViewSheet />}
@@ -464,7 +471,7 @@ const AppRoutes = () => {
             <Route path="hr-configuration/departments/departmentsList" element={<ProtectedRoute roles={["HR", "ADMIN"]}><DepartmentsList /></ProtectedRoute>} />
             <Route path="hr-configuration/departments/designationsList" element={<ProtectedRoute roles={["HR", "ADMIN"]}><DesignationsList /></ProtectedRoute>} />
             <Route path="hr-configuration/education/degrees" element={<ProtectedRoute roles={["HR", "ADMIN"]}><DegreeMasterManagement /></ProtectedRoute>} />
-            
+
 
             <Route path="hr" element={<ProtectedRoute roles={["HR"]}><HrOnboardingDashboard /></ProtectedRoute>} />
             <Route path="hr/profile/:user_uuid" element={<ProtectedRoute roles={["HR"]}><HrProfileView /></ProtectedRoute>} />
@@ -930,8 +937,90 @@ const AppRoutes = () => {
                 <RoleOffDashboard />
               </ProtectedRoute>
             }
+          />          {/* AI Screening (AIRS) Routes */}
+          <Route
+            path="/airs/dashboard"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <AirsDashboard />
+              </ProtectedRoute>
+            }
           />
+          <Route
+            path="/airs/jds"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <JdLibrary />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/jds/create"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <JdCreate />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/jds/:id"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <JdDetails />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/campaigns"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <AirsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/resume-intake"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <AirsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/candidates"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <AirsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/talent-pool"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <AirsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/analytics"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <AirsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/settings"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <AirsPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+
           {/* employee exit routes*/}
+
           <Route element={<EmployeeOnboardingLayout />}>
             <Route path="/employee-exit" element={<EmployeeExitDashboard />} />
             <Route path="/employee-exit/:exit_uuid" element={<ExitDetailsPage />} />
@@ -961,15 +1050,15 @@ const AppJobProgress = () => {
 function App() {
   return (
     <>
-      <ToastContainer position="top-right" autoClose={3000} style={{ zIndex: 999999 }}  />
+      <ToastContainer position="top-right" autoClose={3000} style={{ zIndex: 999999 }} />
       <Router basename={window.__APP_CONFIG__.basePath}>
         <></>
         <AuthProvider>
           <NotificationProvider>
             <JobProgressProvider>
-            <div className="min-h-screen bg-gray-50">
-              <AppRoutes />
-            </div>
+              <div className="min-h-screen bg-gray-50">
+                <AppRoutes />
+              </div>
             </JobProgressProvider>
           </NotificationProvider>
         </AuthProvider>
