@@ -72,9 +72,6 @@ export default function JdLibrary() {
   const [sortField, setSortField] = useState("createdDate");
   const [sortOrder, setSortOrder] = useState("desc");
 
-  // Export State
-  const [isExporting, setIsExporting] = useState(false);
-
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
