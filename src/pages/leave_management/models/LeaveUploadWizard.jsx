@@ -9,6 +9,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import ConfirmationModal from "./ConfirmationModal";
+import { toast } from "react-toastify";
 
 const CONFIGS = {
   accrual: {
@@ -49,7 +50,7 @@ const LeaveUploadWizard = ({ onClose }) => {
       link.click();
       link.remove();
     } catch {
-      alert("Failed to download template.");
+      toast.error("Failed to download template.");
     }
   };
 
@@ -69,14 +70,14 @@ const LeaveUploadWizard = ({ onClose }) => {
         `${window.__APP_CONFIG__.BASE_URL}${config.uploadUrl}`,
         formData,
       );
-      alert(res.data.message);
+      toast.success(res.data.message);
       onClose();
     } catch (err) {
       const errorData = err.response?.data;
       const errorMsg = errorData?.errors
         ?.map((e) => `Row ${e.rowNumber}: ${e.message}`)
         .join("\n");
-      alert(`Upload failed!\n${errorMsg || errorData?.message}`);
+      toast.error(`Upload failed!\n${errorMsg || errorData?.message}`);
     } finally {
       setIsUploading(false);
       setShowConfirm(false);

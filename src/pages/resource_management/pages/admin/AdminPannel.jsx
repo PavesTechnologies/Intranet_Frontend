@@ -301,10 +301,10 @@ const AdminPannel = () => {
     <div className="p-6 space-y-8">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
             Client Overview
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-500">
             Monitor clients, priorities, and engagement status
           </p>
         </div>

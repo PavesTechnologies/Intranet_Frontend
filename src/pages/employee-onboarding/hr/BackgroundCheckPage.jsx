@@ -14,6 +14,8 @@ import StatusBadge from "../../../components/status/statusbadge";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { KPICard } from "../../../components/kpi/KPI";
 import Modal from "../../../components/Modal/modal";
+import { Fonts } from "../../../components/Fonts/Fonts";
+import PageHeader from "../../../components/ui/PageHeader";
 
  
 /* ── Static BG Checks (not document-linked) ── */
@@ -906,15 +908,15 @@ export default function BackgroundCheckPage() {
     <div className="min-h-screen bg-[#f4f6fb] p-6 space-y-5">
  
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-[#081534]">Background Check Tracker</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Select a candidate to view and manage their verification status</p>
-        </div>
-        <button onClick={loadEmployees} className="flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 bg-white px-3 py-1.5 rounded-lg hover:shadow-sm transition-all">
-          <RefreshCw className="w-3.5 h-3.5" /> Refresh
-        </button>
-      </div>
+      <PageHeader
+        title="Background Check Tracker"
+        subtitle="Select a candidate to view and manage their verification status"
+        actions={
+          <Button onClick={loadEmployees} variant="outline" size="small" className="border-gray-200">
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </Button>
+        }
+      />
  
       {/* Global stats / KPI Filters */}
       <div className="grid grid-cols-3 gap-3">
@@ -2050,7 +2052,7 @@ export default function BackgroundCheckPage() {
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 mb-6">
                 <Plus className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
+              <h3 className={`${Fonts.heading4} mb-2`}>
                 {addCheckModal.isNewSession ? "New Verification Session" : "New Verification Task"}
               </h3>
               <p className="text-sm text-gray-500 mb-6">
@@ -2105,7 +2107,7 @@ export default function BackgroundCheckPage() {
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 mb-6">
                 <Upload className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Upload Details</h3>
+              <h3 className={`${Fonts.heading4} mb-2`}>Upload Details</h3>
               <p className="text-sm text-gray-500 mb-6">Please provide details for the uploaded document in the <span className="font-bold text-indigo-600">{uploadModal.cat}</span> category.</p>
              
               <div className="space-y-4">

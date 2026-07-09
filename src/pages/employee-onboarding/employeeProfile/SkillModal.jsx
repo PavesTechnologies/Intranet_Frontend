@@ -3,6 +3,7 @@ import { X, Plus, Trash2, ChevronDown, Search, Check, Loader2, AlertCircle, Brie
 import { Combobox, Transition } from "@headlessui/react";
 import { skillService } from "../../../services/skillService";
 import { showStatusToast } from "../../../components/toastfy/toast";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 /* ===================== SEARCHABLE SELECT COMPONENT ===================== */
 
@@ -1056,14 +1057,14 @@ export default function SkillModal({ employeeId, selectedSkill, onClose, onSaveS
             <button
               disabled={saving}
               onClick={onClose}
-              className="rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed"
+              className={`rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed ${Fonts.button}`}
             >
               Cancel
             </button>
             <button
               disabled={saving || draftSkills.length === 0}
               onClick={handleSave}
-              className="inline-flex min-w-[92px] items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+              className={`inline-flex min-w-[92px] items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300 ${Fonts.button}`}
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {saving ? "Saving..." : "Save Changes"}

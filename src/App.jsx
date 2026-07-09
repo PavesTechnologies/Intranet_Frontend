@@ -745,7 +745,7 @@ const AppRoutes = () => {
           <Route
             path="/leave-policy"
             element={
-              <ProtectedRoute allowedRoles={["HR", "Super_Admin", "Admin"]}>
+              <ProtectedRoute allowedRoles={["HR", "Super_Admin", "Admin", "Manager", "Hr-Manager", "General", "Reporting_manager"]}>
                 <LeavePolicy />
               </ProtectedRoute>
             }
@@ -865,6 +865,8 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+          
+          
           <Route
             path="/resource-management/projects"
             element={<RMSProjectList />}
@@ -1068,3 +1070,5 @@ function App() {
 }
 
 export default App;
+
+

@@ -18,18 +18,20 @@ export default function RawDataModal({ title, data, onClose }) {
     }, {}),
   );
 
+  const maxWidth = keys.length <= 2 ? "340px" : "720px";
+
   return (
     <Modal
       isOpen={Boolean(data)}
       onClose={onClose}
       title={`${title} - Raw Data`}
-      width="min(900px, calc(100vw - 2rem))"
+      width={`min(${maxWidth}, calc(100vw - 2rem))`}
     >
       <div className="max-h-[70vh] overflow-y-auto">
         <GenericTable headers={headers} columns={keys} rows={rows} />
       </div>
-      <div className="mt-6 flex justify-end">
-        <Button onClick={onClose} variant="outline" className="border-slate-200">
+      <div className="mt-4 flex justify-end">
+        <Button onClick={onClose} variant="outline" size="small" className="border-slate-200">
           Close
         </Button>
       </div>

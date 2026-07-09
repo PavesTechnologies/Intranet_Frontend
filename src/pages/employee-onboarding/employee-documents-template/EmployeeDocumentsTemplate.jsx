@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import api from "../../../api/axiosInstance";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 const EmployeeDocumentsTemplate = () => {
 
@@ -48,17 +49,17 @@ const EmployeeDocumentsTemplate = () => {
   return (
     <div className="p-6">
 
-      <h2 className="text-2xl font-semibold mb-6">
+      <h2 className={`${Fonts.heading2} mb-6`}>
         Employee Document Templates
       </h2>
 
       <div className="border rounded-lg p-6 w-[350px] shadow-sm bg-white">
 
-        <h3 className="text-lg font-medium mb-2">
+        <h3 className={`${Fonts.subheading} mb-2`}>
           Bulk Employee Upload Template
         </h3>
 
-        <p className="text-gray-500 mb-4">
+        <p className={`${Fonts.paragraphMuted} mb-4`}>
           Download Excel template to upload employees in bulk
         </p>
 

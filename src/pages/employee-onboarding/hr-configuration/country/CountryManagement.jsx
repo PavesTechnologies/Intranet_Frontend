@@ -7,6 +7,7 @@ import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { PageCard } from "../../../../components/Cards/PageCard";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 export default function CountryManagement() {
   const [countries, setCountries] = useState([]);
@@ -99,10 +100,10 @@ export default function CountryManagement() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className={Fonts.heading3}>
             Country Management
           </h1>
-          <p className="text-gray-600">
+          <p className={Fonts.paragraph}>
             Manage countries used in onboarding & compliance
           </p>
         </div>

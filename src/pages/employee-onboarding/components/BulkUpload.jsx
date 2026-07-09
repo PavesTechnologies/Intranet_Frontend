@@ -272,7 +272,7 @@ export default function BulkUpload() {
         {result && (
           <PageCard className="border-slate-200 bg-slate-50/70">
             <PageCardContent className="p-6">
-              <h2 className="text-xl font-semibold text-slate-900">Upload Summary</h2>
+              <h2 className={Fonts.heading4}>Upload Summary</h2>
 
               <div className="mt-4 grid grid-cols-1 gap-4 text-sm text-slate-700 md:grid-cols-2">
                 <p>

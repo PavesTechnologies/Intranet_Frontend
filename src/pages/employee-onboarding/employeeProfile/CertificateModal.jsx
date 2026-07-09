@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Plus, Trash2, Loader2 } from "lucide-react";
 import { skillService } from "../../../services/skillService";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 const CustomSelect = ({ label, value, onChange, options, disabled, placeholder }) => (
   <div className="flex-1 min-w-[130px]">
@@ -198,7 +199,7 @@ export default function CertificateModal({ employeeId, onClose, onSaveSuccess })
           )}
 
           {rows.length === 0 ? (
-            <div className="text-center py-10 text-gray-500 text-sm border-2 border-dashed rounded-xl">
+            <div className={`text-center py-10 border-2 border-dashed rounded-xl ${Fonts.caption}`}>
               No certs added yet. Click &quot;Add Certificate&quot; to begin.
             </div>
           ) : (
@@ -267,14 +268,14 @@ export default function CertificateModal({ employeeId, onClose, onSaveSuccess })
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-6 py-2 border border-gray-300 rounded-md text-sm bg-white hover:bg-gray-50 transition"
+            className={`px-6 py-2 border border-gray-300 rounded-md bg-white hover:bg-gray-50 transition ${Fonts.button}`}
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving || rows.length === 0}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700 transition flex items-center gap-2 disabled:bg-indigo-400 disabled:cursor-not-allowed"
+            className={`px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition flex items-center gap-2 disabled:bg-indigo-400 disabled:cursor-not-allowed ${Fonts.button}`}
           >
             {saving && <Loader2 size={16} className="animate-spin" />}
             Save Certifications
