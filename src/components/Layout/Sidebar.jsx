@@ -334,7 +334,7 @@ const Sidebar = ({ isCollapsed }) => {
           }
 
           {/* AI Screening (AIRS) Menu */}
-          {airsRBACAccess && (
+          {/* {airsRBACAccess && (
             <li
               ref={airsRef}
               className="relative"
@@ -387,7 +387,7 @@ const Sidebar = ({ isCollapsed }) => {
                 </ul>
               )}
             </li>
-          )}
+          )} */}
 
           {/* Employee Onboarding (Non-General, Non-DM) */}
           {
@@ -461,7 +461,7 @@ const Sidebar = ({ isCollapsed }) => {
               )}
               {childMenu && (
                 <ul
-                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[300px]" : "left-[520px]"
+                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[305px]" : "left-[480px]"
                     }`}
                   style={{ top: `${childTop - 4}px` }}
                   onMouseEnter={() => {

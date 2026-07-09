@@ -659,7 +659,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
             )}
             <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-sm">
               <th
-                className="px-4 py-3 text-center text-xs uppercase sticky left-1 z-20 bg-blue-900"
+                className="px-4 py-3 text-center text-xs sticky left-1 z-20 bg-blue-900 whitespace-nowrap"
                 style={{ width: "4%" }}
               >
                 <input
@@ -675,67 +675,67 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                 />
               </th>
               <th
-                className="px-4 py-3 text-center text-xs uppercase sticky left-[4.5%] z-20 bg-blue-900"
+                className="px-4 py-3 text-center text-xs sticky left-[4.5%] z-20 bg-blue-900 whitespace-nowrap"
                 style={{ width: "12%" }}
               >
                 Employee
               </th>
               <th
-                className="px-4 py-3 text-center text-xs uppercase"
+                className="px-4 py-3 text-center text-xs whitespace-nowrap"
                 style={{ width: "12%" }}
               >
                 From
               </th>
               <th
-                className="px-4 py-3 text-center text-xs uppercase"
+                className="px-4 py-3 text-center text-xs whitespace-nowrap"
                 style={{ width: "12%" }}
               >
                 To
               </th>
               <th
-                className="px-4 py-3 text-center text-xs uppercase"
+                className="px-4 py-3 text-center text-xs whitespace-nowrap"
                 style={{ width: "5%" }}
               >
                 Days
               </th>
               <th
-                className="px-4 py-3 text-center text-xs uppercase"
+                className="px-4 py-3 text-center text-xs whitespace-nowrap"
                 style={{ width: "8%" }}
               >
                 Requested On
               </th>
               <th
-                className="px-4 py-3 text-center text-xs uppercase"
+                className="px-4 py-3 text-center text-xs whitespace-nowrap"
                 style={{ width: "10%" }}
               >
                 Leave Type
               </th>
               <th
-                className="px-4 py-3 text-center text-xs uppercase"
+                className="px-4 py-3 text-center text-xs whitespace-nowrap"
                 style={{ width: "16%" }}
               >
                 Reason
               </th>
               <th
-                className="px-4 py-3 text-center text-xs uppercase"
+                className="px-4 py-3 text-center text-xs whitespace-nowrap"
                 style={{ width: "8%" }}
               >
                 Status
               </th>
               <th
-                className="px-4 py-3 text-center text-xs uppercase"
+                className="px-4 py-3 text-center text-xs whitespace-nowrap"
                 style={{ width: "15%" }}
               >
                 Last Action By
               </th>
               <th
-                className="px-4 py-3 text-center text-xs uppercase"
+                className="px-4 py-3 text-center text-xs whitespace-nowrap"
                 style={{ width: "8%" }}
               >
                 Documents
               </th>
               <th
-                className="px-4 py-3 text-center text-xs uppercase sticky right-0 z-20 bg-indigo-900"
+                className="px-4 py-3 text-center text-xs sticky right-0 z-20 bg-indigo-900 whitespace-nowrap"
                 style={{ width: "8%" }}
               >
                 Actions
@@ -818,13 +818,13 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                       <div className="font-medium text-gray-900 whitespace-nowrap">
                         {request.startDate
                           ? new Date(request.startDate).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              },
-                            )
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            },
+                          )
                           : "-"}
                         <div className="text-gray-500">
                           {request.startSession &&
@@ -838,13 +838,13 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                       <div className="font-medium text-gray-900 whitespace-nowrap">
                         {request.endDate
                           ? new Date(request.endDate).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              },
-                            )
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            },
+                          )
                           : "-"}
                         <div className="text-gray-500">
                           {request.endSession &&
@@ -865,13 +865,13 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                       <div className="font-medium text-gray-900 whitespace-nowrap">
                         {request.requestDate
                           ? new Date(request.requestDate).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              },
-                            )
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            },
+                          )
                           : "-"}
                       </div>
                     </td>
@@ -1085,11 +1085,10 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
             <div className="bg-white p-8 rounded-xl shadow-2xl w-[90vw] max-w-[360px] border border-gray-200 animate-fade-in">
               <div className="flex flex-col items-center">
                 <div
-                  className={`flex items-center justify-center w-16 h-16 rounded-full mb-4 ${
-                    confirmation.action === "approve"
+                  className={`flex items-center justify-center w-16 h-16 rounded-full mb-4 ${confirmation.action === "approve"
                       ? "bg-green-100 text-green-600"
                       : "bg-red-100 text-red-600"
-                  }`}
+                    }`}
                 >
                   {confirmation.action === "approve" ? (
                     <Check className="w-10 h-10" />
@@ -1104,22 +1103,22 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                 </h3>
                 {(confirmation.action === "reject" ||
                   confirmation.action === "cancel") && (
-                  <input
-                    placeholder={
-                      confirmation.action === "reject"
-                        ? "Manager comment"
-                        : "Reason for cancellation"
-                    }
-                    className="border rounded px-2 py-1 mb-3 text-sm w-full"
-                    value={comments[confirmation.leaveId] || ""}
-                    onChange={(e) =>
-                      setComments((prev) => ({
-                        ...prev,
-                        [confirmation.leaveId]: e.target.value,
-                      }))
-                    }
-                  />
-                )}
+                    <input
+                      placeholder={
+                        confirmation.action === "reject"
+                          ? "Manager comment"
+                          : "Reason for cancellation"
+                      }
+                      className="border rounded px-2 py-1 mb-3 text-sm w-full"
+                      value={comments[confirmation.leaveId] || ""}
+                      onChange={(e) =>
+                        setComments((prev) => ({
+                          ...prev,
+                          [confirmation.leaveId]: e.target.value,
+                        }))
+                      }
+                    />
+                  )}
 
                 <div className="flex gap-3 w-full">
                   <Button
