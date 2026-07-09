@@ -624,8 +624,62 @@ export default function EmployeeDocumentsPage() {
                             <div className="overflow-hidden">
                               <div className="border-t border-gray-200 bg-gray-50">
                                 <div className="overflow-x-auto px-5 py-4">
-                                  <table className="w-full whitespace-nowrap text-left text-sm">
+                                  {/* <table className="w-full whitespace-nowrap text-left text-sm"> */}
+                                  <table className="w-full table-fixed text-sm">
                                     <thead>
+                                      <tr className="border-b border-gray-200 bg-gray-100 text-xs font-semibold uppercase text-gray-600">
+                                        <th className="w-[42%] py-3 pl-4 text-left">Document Details</th>
+                                        <th className="w-[14%] py-3 text-center">Type</th>
+                                        <th className="w-[16%] py-3 text-center">Category</th>
+                                        <th className="w-[16%] py-3 text-center">Last Updated</th>
+                                        <th className="w-[12%] py-3 pr-4 text-center">Actions</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                      {documentsToShow.map((doc) => (
+                                        <tr key={doc.id} className="hover:bg-white">
+
+                                          <td className="py-5 pl-4">
+                                            <div className="flex items-center gap-4">
+                                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-gray-200">
+                                                {getCategoryIcon(doc.category)}
+                                              </div>
+
+                                              <span className="truncate font-semibold text-gray-900">
+                                                {doc.docName}
+                                              </span>
+                                            </div>
+                                          </td>
+
+                                          <td className="py-5 text-center font-medium text-gray-600">
+                                            {doc.type}
+                                          </td>
+
+                                          <td className="py-5 text-center text-gray-600">
+                                            {doc.category}
+                                          </td>
+
+                                          <td className="py-5 text-center text-gray-500">
+                                            {doc.updated}
+                                          </td>
+
+                                          <td className="py-5 text-center">
+                                            <Button
+                                              size="small"
+                                              variant="outline"
+                                              loading={loadingDoc === doc.id}
+                                              loadingText="Loading..."
+                                              onClick={() => viewDocument(doc.fileUrl, doc.id)}
+                                            >
+                                              <Eye className="h-4 w-4" />
+                                              <span className="hidden lg:inline">View</span>
+                                            </Button>
+                                          </td>
+
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                    {/* <thead>
                                       <tr className="border-b border-gray-200 text-xs font-semibold uppercase text-gray-500">
                                         <th className="pb-3 pl-2 pr-4">
                                           Document Details
@@ -635,13 +689,12 @@ export default function EmployeeDocumentsPage() {
                                         <th className="px-4 pb-3">
                                           Last Updated
                                         </th>
-                                        <th className="px-4 pb-3">Status</th>
-                                        <th className="pb-3 pl-4 pr-2 text-right">
+                                        <th className="pb-3 pl-4 pr-4 text-right">
                                           Actions
                                         </th>
                                       </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200">
+                                    </thead> */}
+                                    {/* <tbody className="divide-y divide-gray-200">
                                       {documentsToShow.map((doc) => (
                                         <tr
                                           key={doc.id}
@@ -666,12 +719,7 @@ export default function EmployeeDocumentsPage() {
                                           <td className="px-4 py-4 text-gray-500">
                                             {doc.updated}
                                           </td>
-                                          <td className="px-4 py-4">
-                                            <StatusBadge
-                                              label={doc.status}
-                                              size="sm"
-                                            />
-                                          </td>
+                                    
                                           <td className="py-4 pl-4 pr-2 text-right">
                                             <div className="flex items-center justify-end gap-2">
                                               <Button
@@ -695,7 +743,7 @@ export default function EmployeeDocumentsPage() {
                                           </td>
                                         </tr>
                                       ))}
-                                    </tbody>
+                                    </tbody> */}
                                   </table>
                                 </div>
                               </div>
