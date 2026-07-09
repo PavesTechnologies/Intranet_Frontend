@@ -4,6 +4,14 @@ import api from "../../../../api/axiosInstance";
 import Button from "../../../../components/Button/Button";
 import CommentBox from "../CommentBox";
 import { useAuth } from "../../../../contexts/AuthContext";
+import {
+  ChevronDown,
+  ChevronRight,
+  ArrowLeft,
+  LayoutList,
+  Search,
+  RotateCcw,
+} from "lucide-react";
 
 const ViewSheet = () => {
   const { projectId, type, id } = useParams();
@@ -136,7 +144,7 @@ const ViewSheet = () => {
     issue.status?.name || issue.statusName || issue.status || "Unknown";
 
   return (
-    <div className="max-w-5xl mx-auto mt-8 px-4 sm:px-6 space-y-8 pb-12">
+    <div className="w-full mt-8 px-4 sm:px-6 space-y-8 pb-12">
       {/* HEADER */}
       <div className="flex items-center justify-between pb-4 border-b border-gray-200">
         <div>
@@ -151,17 +159,10 @@ const ViewSheet = () => {
         </div>
       <button
   onClick={() => navigate(-1)}
-  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 transition-colors rounded-lg hover:bg-gray-100 hover:text-gray-900"
+            className="flex items-center justify-center w-5 h-5 bg-white border border-gray-200 text-gray-600 rounded-full shadow-sm hover:bg-gray-50 hover:text-gray-900 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 shrink-0"
 >
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width="18" height="18" 
-    viewBox="0 0 24 24" fill="none" 
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-  >
-    <path d="m15 18-6-6 6-6"/>
-  </svg>
-  Back
+ 
+ <ArrowLeft size={15} />
 </button>
       </div>
 
