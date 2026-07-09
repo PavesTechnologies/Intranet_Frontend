@@ -377,9 +377,9 @@ const UtilizationReportingDashboard = () => {
             <PrevIcon size={18} />
           </button>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 leading-none">Utilization Reporting & Dashboards</h1>
-            <p className="mt-1 text-xs sm:text-sm font-medium text-slate-500 capitalize tracking-normal flex items-center gap-2">
-              <ActivityIcon size={14} className="text-emerald-600" /> Comprehensive utilization analytics by dimension
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Utilization Reporting And Dashboards</h1>
+            <p className="mt-1 text-sm text-gray-500 flex items-center gap-2">
+              <ActivityIcon size={14} className="text-emerald-600" /> Comprehensive utilization analytics by dimension.
             </p>
           </div>
         </div>

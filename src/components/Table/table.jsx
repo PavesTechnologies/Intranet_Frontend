@@ -11,7 +11,7 @@ const GenericTable = ({
 
   return (
     <div
-      className={`relative overflow-visible ${
+      className={`inline-block min-w-full align-middle relative overflow-visible ${
         hasData ? "border border-gray-200" : ""
       }`}
       style={{

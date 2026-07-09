@@ -1,51 +1,68 @@
-import EmployeeRow from "./EmployeeRow";
+import GenericTable from "../../../../components/Table/table";
+import AvatarCircle from "./AvatarCircle";
+import StatusBadge from "./StatusBadge";
 
-export default function EmployeeTable({ data }) {
+const headers = [
+  "Employee",
+  "Dept & Loc",
+  "Work Mode",
+  "Email",
+  "Employment Status",
+  "Designation",
+  "Manager",
+  "DOJ",
+  "Employee Type",
+  "Experience",
+];
+
+const columns = [
+  "employee",
+  "deptLoc",
+  "workmode",
+  "email",
+  "status",
+  "designation",
+  "manager",
+  "doj",
+  "employeeType",
+  "experience",
+];
+
+export default function EmployeeTable({ data, loading = false }) {
+  const rows = (data || []).map((emp, index) => ({
+    employee: (
+      <div className="flex items-center gap-2 text-left">
+        <AvatarCircle name={emp.name} index={index} />
+        <div>
+          <div className="font-semibold text-gray-900">{emp.name}</div>
+          <div className="text-xs text-gray-500">{emp.id}</div>
+        </div>
+      </div>
+    ),
+    deptLoc: (
+      <div>
+        <div className="font-semibold">{emp.department || ""}</div>
+        <div className="text-sm text-gray-500">{emp.location}</div>
+      </div>
+    ),
+    workmode: emp.workmode,
+    email: emp.email,
+    status: <StatusBadge text={emp.employmentStatus} />,
+    designation: emp.designation,
+    manager: emp.reporting_manager_uuid,
+    doj: emp.doj,
+    employeeType: emp.employeeType,
+    experience: emp.experience,
+  }));
+
   return (
-    <table
-      style={{
-        width: "100%",
-        borderCollapse: "collapse",
-        fontSize: 14,
-        background: "white",
-        tableLayout: "fixed", // important for fixed column width
-      }}
-    >
-
-      {/* 🔹 Column Width Control */}
-      <colgroup>
-        <col style={{ width: "40px" }} />     {/* checkbox / avatar */}
-        <col style={{ width: "200px" }} />    {/* Employee */}
-        <col style={{ width: "200px" }} />    {/* Dept & Loc */}
-        <col style={{ width: "120px" }} />    {/* workMode */}
-        <col style={{ width: "220px" }} />    {/* Email & Status */}
-        <col style={{ width: "260px" }} />    {/* ⭐ Designation (extended) */}
-        <col style={{ width: "180px" }} />    {/* Manager */}
-        <col style={{ width: "140px" }} />    {/* DOJ */}
-        <col style={{ width: "120px" }} />    {/* EmployeeType*/}
-        <col style={{ width: "120px" }} />    {/* Experience */}
-      </colgroup>
-
-      <thead style={{ background: "#f6f7fb", textAlign: "left" }}>
-        <tr>
-          <th></th>
-          <th>Employee</th>
-          <th>Dept & Loc</th>
-          <th>workMode</th>
-          <th>Email & Status</th>
-          <th>Designation</th>
-          <th>Manager</th>
-          <th>DOJ</th>
-          <th>EmployeeType</th>
-          <th>Experience</th>
-        </tr>
-      </thead>
-
-      <tbody>
-        {(data || []).map((emp, i) => (
-          <EmployeeRow key={i} emp={emp} index={i} />
-        ))}
-      </tbody>
-    </table>
+    <div className="min-w-[1300px] [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10">
+      <GenericTable
+        headers={headers}
+        rows={rows}
+        columns={columns}
+        loading={loading}
+      />
+    </div>
   );
 }

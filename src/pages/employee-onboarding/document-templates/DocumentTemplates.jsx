@@ -1,6 +1,8 @@
 import React, { useState, useRef } from "react";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import api from "../../../api/axiosInstance";
+import Button from "../../../components/Button/Button";
+import { PageCard } from "../../../components/Cards/PageCard";
 import {
   FileText,
   FileSignature,
@@ -23,6 +25,14 @@ import {
 } from "lucide-react";
 
 import { generateHtml } from "./TemplateGenerator";
+import { Fonts } from "../../../components/Fonts/Fonts";
+import PageHeader from "../../../components/ui/PageHeader";
+
+const inputClassName =
+  "h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20";
+
+const filterButtonClassName =
+  "w-full cursor-default rounded-lg border border-gray-300 bg-white py-2.5 pl-4 pr-10 text-left text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-[#0A0082]/20 focus:border-[#0A0082]";
 
 const TEMPLATES = [
   {
@@ -177,6 +187,146 @@ export default function DocumentTemplates() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const renderInputField = (field) => {
+    const value = formData[field] || "";
+
+    switch (field) {
+      case "employeeType":
+        return (
+          <FilterListbox
+            buttonClassName={filterButtonClassName}
+            options={[
+              { value: "", label: "Select Employment Type" },
+              { value: "Full-Time", label: "Full-Time" },
+              { value: "Part-Time", label: "Part-Time" },
+              { value: "Contract", label: "Contract" },
+              { value: "Internship", label: "Internship" },
+            ]}
+            value={value}
+            onChange={(val) => handleInputChange(field, val)}
+          />
+        );
+      case "date":
+      case "joiningDate":
+      case "relievingDate":
+        return (
+          <div className="relative">
+            <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              required
+              type="date"
+              className={`${inputClassName} pl-10`}
+              value={value}
+              onChange={(event) => handleInputChange(field, event.target.value)}
+            />
+          </div>
+        );
+      case "email":
+        return (
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              required
+              type="email"
+              placeholder="john.doe@example.com"
+              className={`${inputClassName} pl-10`}
+              value={value}
+              onChange={(event) => handleInputChange(field, event.target.value)}
+            />
+          </div>
+        );
+      case "designation":
+        return (
+          <div className="relative">
+            <Briefcase className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              required
+              type="text"
+              placeholder="e.g. Senior Software Engineer"
+              className={`${inputClassName} pl-10`}
+              value={value}
+              onChange={(event) => handleInputChange(field, event.target.value)}
+            />
+          </div>
+        );
+      case "firstName":
+      case "lastName":
+        return (
+          <div className="relative">
+            <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              required
+              type="text"
+              placeholder="e.g. John"
+              className={`${inputClassName} pl-10`}
+              value={value}
+              onChange={(event) => handleInputChange(field, event.target.value)}
+            />
+          </div>
+        );
+      case "contactNumber":
+        return (
+          <div className="relative">
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">
+              +
+            </span>
+            <input
+              required
+              type="text"
+              placeholder="91 XXXXX XXXXX"
+              className={`${inputClassName} pl-8`}
+              value={value}
+              onChange={(event) => handleInputChange(field, event.target.value)}
+            />
+          </div>
+        );
+      case "totalCtc":
+      case "grossSalary":
+      case "taxDeducted":
+        return (
+          <div className="relative">
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">
+              Rs
+            </span>
+            <input
+              required
+              type="text"
+              placeholder="12,00,000"
+              className={`${inputClassName} pl-10`}
+              value={value}
+              onChange={(event) => handleInputChange(field, event.target.value)}
+            />
+          </div>
+        );
+      case "financialYear":
+        return (
+          <div className="relative">
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">
+              #
+            </span>
+            <input
+              required
+              type="text"
+              placeholder="e.g. 2025-2026"
+              className={`${inputClassName} pl-8`}
+              value={value}
+              onChange={(event) => handleInputChange(field, event.target.value)}
+            />
+          </div>
+        );
+      default:
+        return (
+          <input
+            required
+            type="text"
+            className={inputClassName}
+            value={value}
+            onChange={(event) => handleInputChange(field, event.target.value)}
+          />
+        );
+    }
+  };
+
   // const renderInputField = (field) => {
   //   const commonClasses = "w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all";
     
@@ -253,35 +403,24 @@ export default function DocumentTemplates() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-8 font-sans">
-      <div className="mx-auto max-w-[1280px]">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
         {/* Header Section */}
-        <div className="mb-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 shadow-inner">
-                <FileSignature size={20} />
-              </span>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
-                Document Templates
-              </h1>
-            </div>
-            <p className="max-w-2xl text-base leading-relaxed text-slate-500">
-              Manage and automatically generate personalized PDF documents for candidates using Paves Technologies templates.
-            </p>
-          </div>
+        <PageHeader
+          title="Document Templates"
+          subtitle="Manage and automatically generate personalized PDF documents for candidates using Paves Technologies templates."
+        />
 
-          {/* <div className="relative w-full md:max-w-md">
-            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search templates (e.g., NDA, Policy)..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 pl-12 pr-4 text-sm shadow-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
-            />
-          </div> */}
-        </div>
+        {/* <div className="relative w-full md:max-w-md">
+          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search templates (e.g., NDA, Policy)..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 pl-12 pr-4 text-sm shadow-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+          />
+        </div> */}
 
         {/* Templates Grid */}
         {/* {filteredTemplates.length > 0 ? (
@@ -330,7 +469,7 @@ export default function DocumentTemplates() {
         )} */}
 
         {/* Bulk Employee Upload Template Section */}
-        <div className="mt-10">
+        <div>
           {/* <div className="mb-4 flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
               <Download size={16} />
@@ -338,37 +477,30 @@ export default function DocumentTemplates() {
             <h2 className="text-lg font-bold text-slate-900">Employee Document Templates</h2>
           </div> */}
 
-          <div className="inline-flex flex-col gap-4 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm w-[340px] hover:shadow-md transition-shadow">
+          <PageCard className="flex w-full max-w-sm flex-col gap-4 p-6 transition hover:shadow-md">
             <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-[#0A0082]">
                 <FileText size={22} />
               </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-900">Bulk Employee Upload Template</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Download Excel template to upload employees in bulk</p>
+              <div className="min-w-0">
+                <h3 className={Fonts.subheading}>
+                  Bulk Employee Upload Template
+                </h3>
+                <p className={`${Fonts.paragraphMuted} mt-0.5 text-sm`}>
+                  Download Excel template to upload employees in bulk
+                </p>
               </div>
             </div>
-            <button
+            <Button
               onClick={downloadBulkTemplate}
-              disabled={bulkLoading}
-              className="flex items-center justify-center gap-2 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all disabled:opacity-70 disabled:cursor-wait"
+              loading={bulkLoading}
+              loadingText="Downloading..."
+              className="w-full"
             >
-              {bulkLoading ? (
-                <>
-                  <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  <span>Downloading...</span>
-                </>
-              ) : (
-                <>
-                  <Download size={16} />
-                  <span>Download Template</span>
-                </>
-              )}
-            </button>
-          </div>
+              <Download size={16} />
+              <span>Download Template</span>
+            </Button>
+          </PageCard>
         </div>
 
         {/* Dynamic Modals / Overlays */}
@@ -378,20 +510,24 @@ export default function DocumentTemplates() {
             
             {/* 1. Preview State */}
             {viewState === "preview" && (
-              <div className="animate-in fade-in zoom-in-95 relative flex flex-col w-full max-w-5xl h-[90vh] overflow-hidden rounded-[2rem] bg-slate-100 shadow-2xl transition-all duration-300">
+              <PageCard className="animate-in fade-in zoom-in-95 relative flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden bg-gray-50 shadow-2xl transition-all duration-300">
                 <div className="flex items-center justify-between bg-white px-6 py-4 border-b border-slate-200 shrink-0">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-[#0A0082]">
                       <Eye size={20} />
                     </span>
                     <div>
-                      <h2 className="text-lg font-bold text-slate-900">Template Preview: {selectedTemplate.title}</h2>
-                      <p className="text-xs text-slate-500">Review the mock layout before filling dynamic fields.</p>
+                      <h2 className={Fonts.subheading}>Template Preview: {selectedTemplate.title}</h2>
+                      <p className={Fonts.smallText}>Review the mock layout before filling dynamic fields.</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <button onClick={handleClose} className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
-                    <button onClick={handleApplyFromPreview} className="rounded-xl bg-indigo-600 px-6 py-2 text-sm font-semibold text-white shadow-md hover:bg-indigo-700">Apply & Fill Data</button>
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <Button onClick={handleClose} variant="outline">
+                      Cancel
+                    </Button>
+                    <Button onClick={handleApplyFromPreview}>
+                      Apply & Fill Data
+                    </Button>
                   </div>
                 </div>
                 <div className="flex-1 overflow-hidden p-6 relative">
@@ -418,31 +554,39 @@ export default function DocumentTemplates() {
                     className="w-full h-full bg-white rounded-xl shadow-sm border border-slate-200"
                   />
                 </div>
-              </div>
+              </PageCard>
             )}
 
             {/* 2. Form State */}
             {viewState === "form" && (
-              <div className="animate-in fade-in zoom-in-95 relative w-full max-w-xl overflow-hidden rounded-[2rem] bg-white shadow-2xl transition-all duration-300">
-                <div className={`relative px-8 py-8 overflow-hidden bg-gradient-to-br ${selectedTemplate.color}`}>
-                  <button onClick={handleClose} className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-black/5 text-slate-600 hover:bg-black/10"><X size={18} /></button>
+              <PageCard className="animate-in fade-in zoom-in-95 relative max-h-[90vh] w-full max-w-xl overflow-hidden shadow-2xl transition-all duration-300">
+                <div className="relative overflow-hidden border-b border-gray-200 bg-white px-6 py-6 sm:px-8">
+                  <Button
+                    aria-label="Close"
+                    className="absolute right-4 top-4"
+                    onClick={handleClose}
+                    size="icon"
+                    variant="ghost"
+                  >
+                    <X size={18} />
+                  </Button>
                   <div className="relative z-10 flex items-center gap-5">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm border border-white/50">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-blue-50 text-[#0A0082]">
                       {selectedTemplate.icon}
                     </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-slate-900 mb-1">{selectedTemplate.title}</h2>
-                      <p className="text-sm font-medium text-slate-600">Fill dynamic fields to insert into PDF</p>
+                    <div className="min-w-0">
+                      <h2 className={`${Fonts.heading3} mb-1`}>{selectedTemplate.title}</h2>
+                      <p className={`${Fonts.paragraphMuted} text-sm`}>Fill dynamic fields to insert into PDF</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-8">
+                <div className="max-h-[calc(90vh-120px)] overflow-y-auto p-6 sm:p-8">
                   <form onSubmit={handleGenerate} className="space-y-6">
                     <div className="grid gap-6 sm:grid-cols-2">
                        {selectedTemplate.fields.map((field) => (
                         <div key={field} className={field === 'description' || field === 'firstName' || field === 'lastName' ? "col-span-1 sm:col-span-2" : "col-span-1"}>
-                          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500 ml-1">
+                          <label className={`${Fonts.label} mb-2 ml-1 block`}>
                             {formatFieldLabel(field)}
                           </label>
                           {renderInputField(field)}
@@ -450,37 +594,40 @@ export default function DocumentTemplates() {
                       ))}
                     </div>
 
-                    <div className="mt-8 flex items-center justify-end gap-3 border-t border-slate-100 pt-6">
-                      <button type="button" onClick={() => setViewState("preview")} className="rounded-xl px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100" disabled={isGenerating}>Back to Preview</button>
-                      <button type="submit" disabled={isGenerating} className={`inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 hover:shadow-indigo-600/40 ${isGenerating ? "cursor-wait opacity-80" : ""}`}>
-                        {isGenerating ? (
-                          <><svg className="h-5 w-5 animate-spin text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Generating...</span></>
-                        ) : (
-                          <><UploadCloud size={18} /><span>Generate Document</span></>
-                        )}
-                      </button>
+                    <div className="mt-8 flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:items-center sm:justify-end">
+                      <Button type="button" onClick={() => setViewState("preview")} variant="outline" disabled={isGenerating}>
+                        Back to Preview
+                      </Button>
+                      <Button type="submit" loading={isGenerating} loadingText="Generating...">
+                        <UploadCloud size={18} />
+                        <span>Generate Document</span>
+                      </Button>
                     </div>
                   </form>
                 </div>
-              </div>
+              </PageCard>
             )}
 
             {/* 3. Result State */}
             {viewState === "result" && (
-              <div className="animate-in fade-in zoom-in-95 relative flex flex-col w-full max-w-5xl h-[90vh] overflow-hidden rounded-[2rem] bg-slate-100 shadow-2xl transition-all duration-300">
+              <PageCard className="animate-in fade-in zoom-in-95 relative flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden bg-gray-50 shadow-2xl transition-all duration-300">
                 <div className="flex items-center justify-between bg-white px-6 py-4 border-b border-slate-200 shrink-0">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
                       <CheckCircle size={20} />
                     </span>
                     <div>
-                      <h2 className="text-lg font-bold text-slate-900">Document Generated!</h2>
-                      <p className="text-xs text-slate-500">The personalized {selectedTemplate.title} has been successfully populated.</p>
+                      <h2 className={Fonts.subheading}>Document Generated!</h2>
+                      <p className={Fonts.smallText}>The personalized {selectedTemplate.title} has been successfully populated.</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <button onClick={handleClose} className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">Close</button>
-                    <button onClick={handlePrint} className="rounded-xl bg-slate-900 px-6 py-2 text-sm font-semibold text-white shadow-md hover:bg-slate-800 flex items-center gap-2"><Printer size={16}/> Print / Save PDF</button>
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <Button onClick={handleClose} variant="outline">
+                      Close
+                    </Button>
+                    <Button onClick={handlePrint}>
+                      <Printer size={16}/> Print / Save PDF
+                    </Button>
                   </div>
                 </div>
                 <div className="flex-1 overflow-hidden p-6 relative flex justify-center">
@@ -491,7 +638,7 @@ export default function DocumentTemplates() {
                     className="w-full max-w-[210mm] h-full bg-white shadow-xl shadow-slate-300/50"
                   />
                 </div>
-              </div>
+              </PageCard>
             )}
           </div>
         )}

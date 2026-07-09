@@ -22,16 +22,18 @@ export const approvalService = {
       { comment },
       { headers: getAuthHeader() },
     );
-      {
-          startJob(response.data.data.jobId);
-        }
+    {
+      startJob(response.data.data.jobId);
+    }
+    return response.data;
   },
 
   rejectRequest: async (requestId, reason) => {
-    await api.post(
+    const response = await api.post(
       `${BASE_URL}/api/approvals/${requestId}/reject`,
       { reason },
       { headers: getAuthHeader() },
     );
+    return response.data;
   },
 };

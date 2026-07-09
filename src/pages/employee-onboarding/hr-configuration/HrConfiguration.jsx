@@ -7,20 +7,7 @@ import {
 } from "lucide-react";
 import AppCard from "../../../components/Cards/AppCard";
 import { Fonts } from "../../../components/Fonts/Fonts";
-
-function SectionHeaderCard({ title, description }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
-      <div className="flex items-start gap-4">
-        <span className="mt-0.5 h-14 w-1.5 shrink-0 rounded-full bg-indigo-600" />
-        <div className="min-w-0">
-          <h1 className={Fonts.heading3}>{title}</h1>
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
+import PageHeader from "../../../components/ui/PageHeader";
 
 export default function HrConfiguration() {
   const navigate = useNavigate();
@@ -60,9 +47,9 @@ export default function HrConfiguration() {
 
   return (
     <div className="max-w-6xl mx-auto p-6 font-sans space-y-6">
-      <SectionHeaderCard
+      <PageHeader
         title="HR Configuration"
-        description="Manage onboarding masters and compliance rules"
+        subtitle="Manage onboarding masters and compliance rules"
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -80,7 +67,7 @@ export default function HrConfiguration() {
             className="transition h-full cursor-pointer hover:shadow-lg border-gray-200"
           >
             {card.disabled && (
-              <p className="text-xs text-gray-500 mt-2 font-medium">
+              <p className={`${Fonts.smallText} mt-2 font-medium`}>
                 Coming soon
               </p>
             )}

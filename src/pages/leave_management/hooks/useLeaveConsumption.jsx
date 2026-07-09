@@ -1,10 +1,22 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
-import SockJS from "sockjs-client";
-import { over } from "stompjs";
+import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 
-let stompClient = null;
+// ✅ Outside component — stable, never recreated
+const BALANCE_AFFECTING_EVENTS = [
+  "COMPOFF_APPROVED",
+  "COMPOFF_REJECTED",
+  "LEAVE_APPROVED",
+  "LEAVE_REJECTED",
+  "REVOKE_APPROVED",
+  "REVOKE_REJECTED",
+  "LEAVE_CANCELLED",
+  "COMPOFF_CANCELLED",
+  "REVOKE_CANCELLED",
+  "LEAVE_UPDATED",
+  "COMPOFF_UPDATED",
+];
 
 const useLeaveConsumption = (employeeId, refreshKey, year) => {
   const [leaveData, setLeaveData] = useState({
@@ -18,7 +30,8 @@ const useLeaveConsumption = (employeeId, refreshKey, year) => {
   // ---------------------------
   // FUNCTION TO FETCH LEAVE DATA
   // ---------------------------
-  const fetchLeaveData = () => {
+  // ✅ Wrapped in useCallback — stable reference for useLeaveWebSocket
+  const fetchLeaveData = useCallback(() => {
     if (!employeeId) return;
 
     setLoading(true);
@@ -35,51 +48,27 @@ const useLeaveConsumption = (employeeId, refreshKey, year) => {
         toast.error("Failed to fetch leave data");
         setLoading(false);
       });
-  };
+  }, [BASE_URL, employeeId, year]);
+  // ↑ stable — only changes if employeeId/year/BASE_URL change
 
   // ---------------------------
   // FETCH DATA ON MOUNT & WHEN REFRESH KEY CHANGES
   // ---------------------------
   useEffect(() => {
     fetchLeaveData();
-  }, [employeeId, refreshKey, year]);
+  }, [fetchLeaveData, refreshKey]);
 
   // ---------------------------
   // WEBSOCKET REAL-TIME LISTENER
   // ---------------------------
-  // useEffect(() => {
-  //   let isMounted = true;
-
-  //   const socket = new SockJS(`${BASE_URL}/ws`);
-  //   stompClient = over(socket);
-
-  //   stompClient.connect(
-  //     {},
-  //     () => {
-  //       console.log("Connected to WebSocket from Leave Consumption Hook");
-
-  //       if (!isMounted) return;
-
-  //       stompClient.subscribe("/topic/data-updated", () => {
-  //         console.log("Real-time update received → refreshing leave data");
-  //         fetchLeaveData();
-  //       });
-  //     },
-  //     (error) => {
-  //       console.error("WebSocket Connection Error:", error);
-  //     }
-  //   );
-
-  //   return () => {
-  //     isMounted = false;
-
-  //     if (stompClient && stompClient.connected) {
-  //       stompClient.disconnect(() =>
-  //         console.log("WebSocket Disconnected (safe cleanup)")
-  //       );
-  //     }
-  //   };
-  // }, []);
+  // Balances change when a manager approves/rejects a leave or comp-off
+  // request, or approves/rejects a revoke — refresh in real time.
+  // Channel: "employee-update" (manager sends personal notification to employee)
+  useLeaveWebSocket(
+    "employee-update",
+    BALANCE_AFFECTING_EVENTS,
+    fetchLeaveData,
+  );
 
   return { leaveData, loading };
 };

@@ -1,5 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Fonts } from "../../../../components/Fonts/Fonts";
+import FilterCard from "../../../../components/ui/FilterCard";
 
 const FILTERS = [
   { key: "dept", label: "Department" },
@@ -46,26 +48,14 @@ export default function FiltersBar({ filters, setFilters, departments = [] }) {
   };
 
   return (
-    <div
-      ref={containerRef}
-      className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-    >
-      <div className="mb-3 flex items-start gap-3">
-        <span className="mt-0.5 h-10 w-1.5 rounded-full bg-indigo-600" />
-        <div>
-          <h3 className="text-sm font-semibold text-slate-900">Filters</h3>
-          <p className="text-xs text-slate-500">
-            Narrow the analytics view by department, period, or worker type.
-          </p>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-3">
+    <div ref={containerRef} className="mt-5">
+      <FilterCard description="Narrow the analytics view by department, period, or worker type.">
         {FILTERS.map((filter) => (
           <div key={filter.key} className="relative">
             <button
               type="button"
               onClick={() => setOpenKey(openKey === filter.key ? null : filter.key)}
-              className="flex min-w-[190px] items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-white"
+              className={`flex min-w-[190px] items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition-colors hover:bg-white ${Fonts.button}`}
             >
               <span className="truncate">{getLabel(filter)}</span>
               <ChevronDown className="h-4 w-4 text-slate-400" />
@@ -78,7 +68,7 @@ export default function FiltersBar({ filters, setFilters, departments = [] }) {
                     key={option}
                     type="button"
                     onClick={() => handleSelect(filter.key, option)}
-                    className={`block w-full px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 ${
+                    className={`block w-full px-3 py-2.5 text-left hover:bg-slate-50 ${Fonts.button} ${
                       index !== filterOptions[filter.key].length - 1
                         ? "border-b border-slate-100"
                         : ""
@@ -91,7 +81,7 @@ export default function FiltersBar({ filters, setFilters, departments = [] }) {
             )}
           </div>
         ))}
-      </div>
+      </FilterCard>
     </div>
   );
 }

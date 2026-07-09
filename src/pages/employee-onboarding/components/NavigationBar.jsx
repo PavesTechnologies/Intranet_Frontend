@@ -155,18 +155,18 @@ export default function OnboardingNavBar() {
       redirect: "/employee-onboarding/manage-skill-taxonomy",
     }] : []),
 
-    ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{
-      label: "Offboarding",
-      match: ["/employee-exit"],
-      redirect: "/employee-exit",
-    }] : []),
+    // ...(hasRole(["HR", "REPORTING_MANAGER"]) ? [{
+    //   label: "Offboarding",
+    //   match: ["/employee-exit"],
+    //   redirect: "/employee-exit",
+    // }] : []),
   ];
 
   /* ================= SUB-NAV DEFINITIONS ================= */
 
   const managementNav = [
     ...(!isOnlyGeneral
-      ? [{ label: "Workflow Overview", path: "/employee-onboarding" }]
+      ? [{ label: "Pending Approvals", path: "/employee-onboarding" }]
       : []),
     ...(isAdmin ? [
       { label: "Admin Dashboard", path: "/employee-onboarding/admin/offer-letters" }
@@ -181,9 +181,6 @@ export default function OnboardingNavBar() {
     ...(hasRole(["HR", "ADMIN"]) ? [
       { label: "System Settings", path: "/employee-onboarding/hr-configuration" }
     ] : []),
-    ...(isManager && !isAdmin ? [
-      { label: "Pending Approvals", path: "/employee-onboarding/admin/approval-dashboard" }
-    ] : []),
   ];
 
   const insightsNav = [
@@ -194,7 +191,7 @@ export default function OnboardingNavBar() {
   const directoryNav = [
     { label: "Employee Directory", path: "/employee-onboarding/employee-directory" },
     ...(isHR || isManager ? [{ label: "Member Records", path: "/employee-onboarding/employeelist" }] : []),
-    { label: "Org Chart", path: "/employee-onboarding/organization-tree" },
+    // { label: "Org Chart", path: "/employee-onboarding/organization-tree" },
   ];
 
   const documentsNav = [
@@ -238,9 +235,9 @@ export default function OnboardingNavBar() {
     },
   ];
 
-  const offboardingNav = [
-    { label: "Offboarding Overview", path: "/employee-exit" },
-  ];
+  // const offboardingNav = [
+  //   { label: "Offboarding Overview", path: "/employee-exit" },
+  // ];
 
   /* ================= NAV SWITCH LOGIC ================= */
 
@@ -251,7 +248,7 @@ export default function OnboardingNavBar() {
   if (path.startsWith("/employee-onboarding/onboarding-summary") || path.startsWith("/employee-onboarding/analytics")) {
     navToRender = insightsNav;
   } 
-  else if (path.startsWith("/employee-onboarding/employee-directory") || path.startsWith("/employee-onboarding/employeelist") || path.startsWith("/employee-onboarding/organization-tree")) {
+  else if (path.startsWith("/employee-onboarding/employee-directory")) {
     navToRender = directoryNav;
   } 
   else if (path.startsWith("/employee-onboarding/employeedocuments") || path.startsWith("/employee-onboarding/document-templates") || path.startsWith("/employee-onboarding/organization-documents")) {
@@ -272,9 +269,9 @@ export default function OnboardingNavBar() {
   else if (path.startsWith("/employee-onboarding/manage-skill-taxonomy")) {
     navToRender = skillTaxonomyNav;
   }
-  else if (path.startsWith("/employee-exit")) {
-    navToRender = offboardingNav;
-  } 
+  // else if (path.startsWith("/employee-exit")) {
+  //   navToRender = offboardingNav;
+  // } 
   else if (path.startsWith("/employee-onboarding")) {
     navToRender = managementNav;
   }

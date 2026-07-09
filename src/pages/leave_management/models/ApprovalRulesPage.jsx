@@ -1,7 +1,7 @@
 import React, { useEffect, useState, Fragment } from "react";
 import api from "../../../api/axiosInstance";
 import { Listbox, Transition } from "@headlessui/react";
-import { Check, Plus, ChevronDown, Pencil, Trash2 } from "lucide-react";
+import { Check, Plus, ChevronDown, Pencil, Trash2, X } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { toast } from "react-toastify";
 import ConfirmationModal from "./ConfirmationModal";
@@ -225,9 +225,17 @@ export default function ApprovalRulesPage() {
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
           <div className="bg-white rounded-xl w-full max-w-md max-h-[85vh] overflow-y-auto shadow-xl border p-6 space-y-5">
-            <h2 className="text-lg font-semibold text-gray-800">
-              {editingRule ? "Edit Rule" : "Add New Rule"}
-            </h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-gray-800">
+                {editingRule ? "Edit Rule" : "Add New Rule"}
+              </h2>
+              <button
+                onClick={closeModal}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={20} width={20} />
+              </button>
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <Dropdown

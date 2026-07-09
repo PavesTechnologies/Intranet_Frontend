@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../../../../api/axiosInstance" ;
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
   const [name, setName] = useState("");
@@ -101,7 +102,7 @@ export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
     >
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Identity Name</label>
+          <label className={`block ${Fonts.label} mb-1`}>Identity Name</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -110,7 +111,7 @@ export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Description</label>
+          <label className={`block ${Fonts.label} mb-1`}>Description</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -126,7 +127,7 @@ export default function AddEditIdentityModal({ onClose, onSuccess, editData }) {
             onChange={() => setIsActive(!isActive)}
             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
-          <span className="text-sm font-medium text-gray-700">Active</span>
+          <span className={Fonts.label}>Active</span>
         </label>
       </div>
     </Modal>

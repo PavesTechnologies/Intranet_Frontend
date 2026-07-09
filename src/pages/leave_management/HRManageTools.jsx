@@ -23,6 +23,7 @@ import CarryForwardTrigger from "./models/CarryForwardTrigger";
 import ApplyLeaveOnBehalf from "./models/ApplyLeaveOnBehalf";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { useAuth } from "../../contexts/AuthContext";
+import GenericTable from "../../components/Table/table";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -44,6 +45,8 @@ const HRManageTools = ({ employeeId }) => {
   const [isCarryModalOpen, setIsCarryModalOpen] = useState(false);
   const [OnBehalfOpen, setOnBehalfOpen] = useState(false);
   const user = useAuth().user;
+
+  const permissions = user.roles?.includes("Admin") || user.roles?.includes("Super_Admin");
 
 
   const navigate = useNavigate();
@@ -70,17 +73,17 @@ const HRManageTools = ({ employeeId }) => {
   const executeDelete = async () => {
     setIsDeleting(true);
     try {
-      await api.delete(
+      const res = await api.delete(
         `${BASE_URL}/api/leave/delete-leave-type/${selectedLeaveTypeIdToDelete}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           data: { deactivationEffectiveDate: effectiveDeactivationDate },
         },
       );
-      toast.success("Leave type deleted successfully");
+      toast.success(res.data?.message || "Leave type deleted successfully");
       fetchLeaveTypes();
     } catch (error) {
-      toast.error("Failed to delete leave type");
+      toast.error(error.response?.data?.message || "Failed to delete leave type");
     } finally {
       setIsDeleting(false);
       setIsEffectiveModalOpen(false);
@@ -92,17 +95,17 @@ const HRManageTools = ({ employeeId }) => {
     {
       id: "leaveTypes",
       label: "Leave Configuration",
-      icon: <Settings size={18} />,
+      // icon: <Settings size={16} />,
     },
-    {
+    !permissions && {
       id: "employeeActions",
       label: "Employee Management",
-      icon: <Users size={18} />,
+      // icon: <Users size={16} />,
     },
     {
       id: "holidaySettings",
       label: "Holiday Management",
-      icon: <CalendarDays size={18} />,
+      // icon: <CalendarDays size={16} />,
     },
   ];
 
@@ -186,8 +189,7 @@ const HRManageTools = ({ employeeId }) => {
                   >
                     Leave Policies
                   </Button>
-                  {(user?.roles?.includes("Admin") ||
-                    user?.roles?.includes("Super_Admin")) && (
+                  {permissions && (
                     <Button
                       onClick={() => navigate("/approval-rules")}
                       variant="primary"
@@ -243,12 +245,12 @@ const HRManageTools = ({ employeeId }) => {
               exit={{ opacity: 0, y: -10 }}
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
             >
-              <AdminCard
+              {/* <AdminCard
                 title="Onboard Employee"
                 desc="Create new system credentials and profiles."
                 icon={<Users className="text-blue-500" />}
                 onClick={() => setIsAddEmployeeModalOpen(true)}
-              />
+              /> */}
               <AdminCard
                 title="Leave Balances"
                 desc="Manually adjust or review employee quotas."
@@ -285,12 +287,14 @@ const HRManageTools = ({ employeeId }) => {
                 icon={<CalendarDays className="text-red-500" />}
                 onClick={() => setIsAddHolidaysModalOpen(true)}
               />
-              <AdminCard
-                title="Modify Calendar"
-                desc="Edit or remove existing holiday dates."
-                icon={<Pencil className="text-gray-500" />}
-                onClick={() => navigate(`/edit-holidays`)}
-              />
+              {!permissions && (
+                <AdminCard
+                  title="Modify Calendar"
+                  desc="Edit or remove existing holiday dates."
+                  icon={<Pencil className="text-gray-500" />}
+                  onClick={() => navigate(`/edit-holidays`)}
+                />
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -350,19 +354,61 @@ const AdminCard = ({ title, desc, icon, onClick }) => (
 const LeaveTable = ({ title, data, onEdit, onDelete }) => {
   if (data.length === 0) return null;
 
-  const headers = Object.keys(data[0]);
+  const rawHeaders = Object.keys(data[0]);
 
-  // ✅ Smart value renderer
+  // Reorder headers to put leaveName first for better alignment
+  let headers = [...rawHeaders];
+  const nameIndex = headers.indexOf("leaveName");
+  if (nameIndex > -1) {
+    headers.splice(nameIndex, 1);
+    headers.unshift("leaveName");
+  }
+
+  const formatHeader = (h) => {
+    const customMappings = {
+      leaveTypeId: "ID",
+      leaveName: "Leave Name",
+      description: "Description",
+      maxDaysPerYear: "Max Days / Year",
+      maxCarryForwardPerYear: "Max Carry Forward / Year",
+      maxCarryForward: "Max Carry Forward",
+      accrualFrequency: "Accrual Frequency",
+      requiresDocumentation: "Requires Doc",
+      expiryDays: "Expiry Days",
+      waitingPeriodDays: "Waiting Period",
+      advanceNoticeDays: "Advance Notice",
+      pastDateLimitDays: "Past Date Limit",
+      allowHalfDay: "Half Day Allowed",
+      allowNegativeBalance: "Negative Balance",
+      noticePeriodRestriction: "Notice Restriction",
+      weekendsAndHolidaysAllowed: "Holidays Allowed",
+      active: "Active",
+      effectiveStartDate: "Effective Start",
+      maxLeaveDays: "Max Days",
+      minLeaveDays: "Min Days",
+      coolDownPeriod: "Cool Down",
+      gender: "Gender",
+      maxNoOfTimes: "Max No. of Times"
+    };
+
+    if (customMappings[h]) return customMappings[h];
+
+    return h
+      .replace(/([A-Z])/g, " $1")
+      .replace(/^./, (str) => str.toUpperCase())
+      .trim();
+  };
+
   const renderCellValue = (value) => {
-    if (value === null || value === undefined) return "-";
+    if (value === null || value === undefined || value === "") return "-";
 
-    // 🔥 Boolean handling
     if (typeof value === "boolean") {
       return (
         <span
-          className={`px-2 py-1 rounded-full text-xs font-semibold ${
-            value ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
-          }`}
+          className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${value
+            ? "bg-emerald-50 text-emerald-700 border-emerald-150"
+            : "bg-red-50 text-red-650 border-red-150"
+            }`}
         >
           {value ? "True" : "False"}
         </span>
@@ -379,59 +425,69 @@ const LeaveTable = ({ title, data, onEdit, onDelete }) => {
       </h4>
 
       <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm bg-white">
-        <table className="w-full text-sm text-left">
-          <thead className="bg-gray-50 text-gray-600 border-b">
-            <tr>
+        <table className="w-full text-sm text-left border-collapse">
+          <thead>
+            <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-xs font-semibold tracking-wider">
               {headers.map((h, i) => (
                 <th
                   key={h}
-                  className={`px-4 py-3 font-semibold capitalize ${
-                    i === 0 ? "sticky left-0 bg-gray-50 z-10" : ""
-                  }`}
+                  className={`px-4 py-3.5 whitespace-nowrap ${i === 0
+                    ? "sticky left-0 bg-blue-900 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] text-left"
+                    : "text-center"
+                    }`}
                 >
-                  {h.replace(/([A-Z])/g, " $1")}
+                  {formatHeader(h)}
                 </th>
               ))}
-              <th className="px-4 py-3 text-center sticky right-0 bg-gray-50 z-10 border-l">
+              <th className="px-4 py-3.5 text-center sticky right-0 bg-indigo-900 z-10 border-l border-indigo-800 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.15)]">
                 Actions
               </th>
             </tr>
           </thead>
 
           <tbody className="divide-y divide-gray-100">
-            {data.map((row, idx) => (
-              <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                {headers.map((key, i) => (
-                  <td
-                    key={key}
-                    className={`px-4 py-3 text-gray-600 whitespace-nowrap ${
-                      i === 0
-                        ? "sticky left-0 bg-white group-hover:bg-gray-50 font-medium z-10"
-                        : ""
-                    }`}
-                  >
-                    {renderCellValue(row[key])}
-                  </td>
-                ))}
+            {data.map((row, idx) => {
+              const bgClass = idx % 2 === 0 ? "bg-white" : "bg-[#f9fafb]";
+              const stickyBgClass = idx % 2 === 0 ? "bg-white" : "bg-[#f9fafb]";
 
-                <td className="px-4 py-3 sticky right-0 bg-white z-10 border-l">
-                  <div className="flex justify-center gap-3">
-                    <button
-                      onClick={() => onEdit(row)}
-                      className="text-indigo-600 hover:text-indigo-900"
+              return (
+                <tr
+                  key={idx}
+                  className={`transition-colors ${bgClass} hover:bg-[#eff6ff] group`}
+                >
+                  {headers.map((key, i) => (
+                    <td
+                      key={key}
+                      className={`px-4 py-3 text-gray-700 whitespace-nowrap ${i === 0
+                        ? `sticky left-0 ${stickyBgClass} group-hover:bg-[#eff6ff] font-semibold z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] text-left`
+                        : "text-center"
+                        }`}
                     >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      onClick={() => onDelete(row.leaveTypeId)}
-                      className="text-red-500 hover:text-red-800"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                      {renderCellValue(row[key])}
+                    </td>
+                  ))}
+
+                  <td className={`px-4 py-3 sticky right-0 ${stickyBgClass} group-hover:bg-[#eff6ff] z-10 border-l border-gray-100 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]`}>
+                    <div className="flex justify-center gap-3">
+                      <button
+                        onClick={() => onEdit(row)}
+                        className="text-indigo-700 hover:text-indigo-900 transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        onClick={() => onDelete(row.leaveTypeId)}
+                        className="text-red-700 hover:text-red-800 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

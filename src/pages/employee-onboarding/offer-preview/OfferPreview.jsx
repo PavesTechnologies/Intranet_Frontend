@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import api from "../../../api/axiosInstance" ;
 import { useParams } from "react-router-dom";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 export default function OfferPreview() {
   const { offerId } = useParams();
@@ -35,7 +36,7 @@ export default function OfferPreview() {
   return (
     <div className="h-screen w-full bg-gray-100 flex flex-col">
       <div className="p-4 bg-white shadow flex justify-between">
-        <h2 className="text-lg font-semibold">DocuSign Preview</h2>
+        <h2 className={Fonts.subheading}>DocuSign Preview</h2>
 
         <button
           onClick={() => window.history.back()}
