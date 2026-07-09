@@ -624,7 +624,7 @@ export default function EmployeeDocumentsPage() {
                             <div className="overflow-hidden">
                               <div className="border-t border-gray-200 bg-gray-50">
                                 <div className="overflow-x-auto px-5 py-4">
-                                  {/* <table className="w-full whitespace-nowrap text-left text-sm"> */}
+                                  
                                   <table className="w-full table-fixed text-sm">
                                     <thead>
                                       <tr className="border-b border-gray-200 bg-gray-100 text-xs font-semibold uppercase text-gray-600">
@@ -679,71 +679,6 @@ export default function EmployeeDocumentsPage() {
                                         </tr>
                                       ))}
                                     </tbody>
-                                    {/* <thead>
-                                      <tr className="border-b border-gray-200 text-xs font-semibold uppercase text-gray-500">
-                                        <th className="pb-3 pl-2 pr-4">
-                                          Document Details
-                                        </th>
-                                        <th className="px-4 pb-3">Type</th>
-                                        <th className="px-4 pb-3">Category</th>
-                                        <th className="px-4 pb-3">
-                                          Last Updated
-                                        </th>
-                                        <th className="pb-3 pl-4 pr-4 text-right">
-                                          Actions
-                                        </th>
-                                      </tr>
-                                    </thead> */}
-                                    {/* <tbody className="divide-y divide-gray-200">
-                                      {documentsToShow.map((doc) => (
-                                        <tr
-                                          key={doc.id}
-                                          className="transition hover:bg-white"
-                                        >
-                                          <td className="py-4 pl-2 pr-4">
-                                            <div className="flex items-center gap-3">
-                                              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white ring-1 ring-gray-200">
-                                                {getCategoryIcon(doc.category)}
-                                              </div>
-                                              <span className="font-semibold text-gray-900">
-                                                {doc.docName}
-                                              </span>
-                                            </div>
-                                          </td>
-                                          <td className="px-4 py-4 font-medium text-gray-600">
-                                            {doc.type}
-                                          </td>
-                                          <td className="px-4 py-4 text-gray-600">
-                                            {doc.category}
-                                          </td>
-                                          <td className="px-4 py-4 text-gray-500">
-                                            {doc.updated}
-                                          </td>
-                                    
-                                          <td className="py-4 pl-4 pr-2 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                              <Button
-                                                size="small"
-                                                variant="outline"
-                                                loading={loadingDoc === doc.id}
-                                                loadingText="Loading..."
-                                                onClick={() =>
-                                                  viewDocument(
-                                                    doc.fileUrl,
-                                                    doc.id,
-                                                  )
-                                                }
-                                              >
-                                                <Eye className="h-4 w-4" />
-                                                <span className="hidden lg:inline">
-                                                  View
-                                                </span>
-                                              </Button>
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody> */}
                                   </table>
                                 </div>
                               </div>
