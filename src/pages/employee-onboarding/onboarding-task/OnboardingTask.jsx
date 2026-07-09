@@ -159,7 +159,13 @@ export default function OnboardingTask() {
   const handleUpdateTask = async (task) => {
     try {
       setSaving(true);
-      await api.put(`${TASKS_API}/update/${selectedTask.task_uuid}`, buildTaskPayload(task), {
+      // Use the payload directly from AddTaskModal — it already maps status correctly
+      // Do NOT re-map through buildTaskPayload, which would double-map status strings
+      const payload = {
+        ...task,
+        updated_by: "Admin",
+      };
+      await api.put(`${TASKS_API}/update/${selectedTask.task_uuid}`, payload, {
         headers,
       });
       await fetchTasks();
