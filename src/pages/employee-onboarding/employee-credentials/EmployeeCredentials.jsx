@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import FilterListbox from "../../../components/filter/FilterListbox";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 export default function EmployeeCredentialsPage() {
   const roles = ["EMPLOYEE", "REPORTING_MANAGER", "HR", "ADMIN"];
@@ -86,7 +87,7 @@ export default function EmployeeCredentialsPage() {
       {/* HEADER */}
       <div className="flex justify-between items-center mb-2">
         <div>
-          <h2 className="text-4xl font-semibold text-gray-900">
+          <h2 className={Fonts.heading1}>
             Employee Directory
           </h2>
           <p className="text-gray-500 text-sm">
@@ -97,7 +98,7 @@ export default function EmployeeCredentialsPage() {
 
       {/* GENERATOR */}
       <div style={styles.card}>
-        <h3 className="text-3xl font-semibold text-gray-700">Credentials Generator</h3>
+        <h3 className={Fonts.heading2}>Credentials Generator</h3>
 
         <div style={styles.grid}>
           <input
@@ -165,7 +166,7 @@ export default function EmployeeCredentialsPage() {
 
       {/* HISTORY TABLE */}
       <div style={styles.card}>
-        <h3 className="text-3xl font-semibold text-gray-700">Credentials History</h3>
+        <h3 className={Fonts.heading2}>Credentials History</h3>
 
         {history.length === 0 ? (
           <p style={{ color: "#777" }}>No records yet</p>

@@ -1,4 +1,5 @@
 import Button from "../../../../components/Button/Button";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 export default function SectionTabs() {
   return (
@@ -13,7 +14,7 @@ export default function SectionTabs() {
           >
             Headcount by Demographics
           </Button>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className={`mt-1 ${Fonts.caption}`}>
             Review workforce distribution across key demographic dimensions.
           </p>
         </div>

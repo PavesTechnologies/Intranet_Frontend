@@ -1,4 +1,5 @@
 import React from "react";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 export default function ExcelPreviewModal({
   showPreview,
@@ -16,7 +17,7 @@ export default function ExcelPreviewModal({
 
         {/* HEADER */}
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Excel Preview</h2>
+          <h2 className={Fonts.heading4}>Excel Preview</h2>
 
           <button
             onClick={onClose}

@@ -1,16 +1,27 @@
 import { useState, useMemo, useEffect } from "react";
 import api from "../../../api/axiosInstance";
 import EmployeeTable from "./components/EmployeeTable";
-import SearchBar from "./components/SearchBar";
-import FiltersBar from "./components/FiltersBar";
 import { fetchEmployees } from "./api/employeelist";
 import Pagination from "../../../components/Pagination/pagination";
+import { Fonts } from "../../../components/Fonts/Fonts";
+import SearchInput from "../../../components/filter/Searchbar";
+import FilterListbox from "../../../components/filter/FilterListbox";
+
+const filterButtonClassName =
+  "w-full cursor-default rounded-lg border border-gray-300 bg-white py-2.5 pl-4 pr-10 text-left text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-[#0A0082]/20 focus:border-[#0A0082]";
+
+function buildFilterOptions(defaultLabel, options) {
+  return [
+    { value: "", label: defaultLabel },
+    ...options.map((option) => ({ value: option, label: option })),
+  ];
+}
 
 export default function EmployeeListPage() {
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("");
   const [status, setStatus] = useState("");
-  const [locations, setLocations] = useState([]);
+  const [locationSearch, setLocationSearch] = useState("");
   const [employees, setEmployees] = useState([]);
   const [deptMap, setDeptMap] = useState({});
   const [designationMap, setDesignationMap] = useState({});
@@ -33,24 +44,13 @@ export default function EmployeeListPage() {
 
       const matchStatus = status ? emp.emailStatus === status : true;
 
-      const matchLocation = locations.length
-        ? locations.includes(emp.location)
+      const matchLocation = locationSearch
+        ? emp.location?.toLowerCase().includes(locationSearch.toLowerCase())
         : true;
 
       return matchSearch && matchDept && matchStatus && matchLocation;
     });
-  }, [employees, search, department, status, locations]);
-  const locationOptions = useMemo(() => {
-    const unique = new Set();
-
-    employees.forEach((emp) => {
-      if (emp.location) {
-        unique.add(emp.location.trim());
-      }
-    });
-
-    return Array.from(unique);
-  }, [employees]);
+  }, [employees, search, department, status, locationSearch]);
   const loadDepartments = async () => {
 
     const res = await api.get(
@@ -111,7 +111,7 @@ export default function EmployeeListPage() {
   /* Reset page when filters/search change */
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, department, status, locations]);
+  }, [search, department, status, locationSearch]);
 
   /* Pagination logic */
   const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
@@ -136,6 +136,7 @@ export default function EmployeeListPage() {
 
       email: emp.work_email,
       emailStatus: emp.employment_status === "Active" ? "Active" : "Inactive",
+      employmentStatus: emp.employment_status,
 
       designation: designationMap[emp.designation_uuid] || "N/A",
 
@@ -178,27 +179,48 @@ export default function EmployeeListPage() {
 
   return (
     <div style={{ padding: 20 }}>
-      <h2 style={{ marginBottom: 12 }}>Employees</h2>
+      <div className="rounded-2xl border border-slate-200 bg-white px-5 py-6 shadow-sm mb-6">
+        <div className="flex items-start gap-4">
+          <span className="mt-0.5 h-14 w-1.5 shrink-0 rounded-full bg-indigo-600" />
+          <div className="min-w-0">
+            <h1 className={Fonts.heading3}>Member Records</h1>
+            <p className="mt-1 text-sm text-slate-500">Manage and browse member records across the onboarding workflow.</p>
+          </div>
+        </div>
+      </div>
 
       {/* 🔎 Search + Filters */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginBottom: 14,
-        }}
-      >
-        <SearchBar value={search} onChange={setSearch} />
+      <div className="mb-6 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+        <div className="w-full md:w-80">
+          <SearchInput
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by name, email, id, username..."
+            className="h-[42px]"
+          />
+        </div>
 
-        <FiltersBar
-          department={department}
-          setDepartment={setDepartment}
-          status={status}
-          setStatus={setStatus}
-          locations={locations}
-          setLocations={setLocations}
-          locationOptions={locationOptions}
-        />
+        <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
+          <div className="w-full sm:w-56">
+            <FilterListbox
+              buttonClassName={filterButtonClassName}
+              options={buildFilterOptions(
+                "All Departments",
+                Object.values(deptMap).sort((a, b) => a.localeCompare(b))
+              )}
+              value={department}
+              onChange={setDepartment}
+            />
+          </div>
+          <div className="w-full sm:w-48">
+            <SearchInput
+              value={locationSearch}
+              onChange={(e) => setLocationSearch(e.target.value)}
+              placeholder="Search location..."
+              className="h-[42px]"
+            />
+          </div>
+        </div>
       </div>
 
       {/* 📋 Table */}

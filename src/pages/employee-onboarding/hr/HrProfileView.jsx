@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../../api/axiosInstance";
+import { Fonts } from "../../../components/Fonts/Fonts";
 import { showStatusToast } from "../../../components/toastfy/toast.jsx";
 import StatusBadge from "../../../components/status/statusbadge";
 import {
@@ -553,7 +554,7 @@ export default function HrProfileView() {
             <button
               key={t}
               onClick={() => setActiveTab(t)}
-              className={`pb-4 text-sm font-semibold capitalize whitespace-nowrap transition-all relative
+              className={`pb-4 ${Fonts.button} capitalize whitespace-nowrap transition-all relative
             ${activeTab === t ? "text-indigo-600" : "text-gray-500 hover:text-gray-700"}`}
             >
               {t}
@@ -831,7 +832,7 @@ export default function HrProfileView() {
             <button
               disabled={activeTab === "overview"}
               onClick={() => setActiveTab(tabs[tabs.indexOf(activeTab) - 1])}
-              className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+              className={`flex items-center gap-2 px-6 py-2.5 ${Fonts.button} text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all`}
             >
               <ArrowLeft size={16} /> Previous
             </button>
@@ -842,7 +843,7 @@ export default function HrProfileView() {
   !(activeTab === "experience" && !hasExperienceRecords) && (
     <button
       onClick={verifySection}
-      className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all transform active:scale-95"
+      className={`flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white ${Fonts.button} rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all transform active:scale-95`}
     >
       <Check size={18} strokeWidth={3} />
       Verify{" "}
@@ -857,7 +858,7 @@ export default function HrProfileView() {
                   onClick={() =>
                     setActiveTab(tabs[tabs.indexOf(activeTab) + 1])
                   }
-                  className="px-10 py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all transform active:scale-95"
+                  className={`px-10 py-3 bg-indigo-600 text-white ${Fonts.button} rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all transform active:scale-95`}
                 >
                   Continue Next
                 </button>
@@ -865,7 +866,7 @@ export default function HrProfileView() {
                 <button
                   onClick={() => setShowConfirm(true)}
                   disabled={isVerificationFinalized}
-                  className="px-10 py-3 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-gray-800 shadow-lg shadow-gray-300 disabled:opacity-30 transition-all transform active:scale-95"
+                  className={`px-10 py-3 bg-gray-900 text-white ${Fonts.button} rounded-xl hover:bg-gray-800 shadow-lg shadow-gray-300 disabled:opacity-30 transition-all transform active:scale-95`}
                 >
                   Final Verification
                 </button>
@@ -885,7 +886,7 @@ export default function HrProfileView() {
               <Check size={32} strokeWidth={2.5} />
             </div>
             <div className="text-center">
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className={Fonts.heading4}>
                 Final Verification
               </h2>
               <p className="text-sm text-gray-500 mt-1">
@@ -896,13 +897,13 @@ export default function HrProfileView() {
             <div className="flex gap-3 w-full">
               <button
                 onClick={() => setShowConfirm(false)}
-                className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-50 transition-all font-semibold"
+                className={`flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 ${Fonts.button} rounded-xl hover:bg-gray-50 transition-all`}
               >
                 Cancel
               </button>
               <button
                 onClick={finalVerifyProfile}
-                className="flex-1 px-4 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all font-semibold"
+                className={`flex-1 px-4 py-2.5 bg-indigo-600 text-white ${Fonts.button} rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all`}
               >
                 {finalLoading ? "Verifying..." : "Confirm Verify"}
               </button>
@@ -918,7 +919,7 @@ export default function HrProfileView() {
               <Check size={40} strokeWidth={3} />
             </div>
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className={Fonts.heading3}>
                 Profile Verified!
               </h2>
               <p className="text-sm text-gray-500 mt-2">
@@ -928,7 +929,7 @@ export default function HrProfileView() {
             </div>
             <button
               onClick={() => navigate(-1)}
-              className="w-full px-6 py-3 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-all"
+              className={`w-full px-6 py-3 bg-gray-900 text-white ${Fonts.button} rounded-xl hover:bg-gray-800 transition-all`}
             >
               Return to Dashboard
             </button>
@@ -940,7 +941,7 @@ export default function HrProfileView() {
         <Modal>
           <div className="flex flex-col gap-5">
             <div className="text-center">
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className={Fonts.heading4}>
                 Reject Document
               </h2>
               <p className="text-sm text-gray-500 mt-1">
@@ -958,13 +959,13 @@ export default function HrProfileView() {
             <div className="flex gap-3">
               <button
                 onClick={() => setRejectModal(false)}
-                className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-50"
+                className={`flex-1 px-4 py-3 border border-gray-200 text-gray-700 ${Fonts.button} rounded-xl hover:bg-gray-50`}
               >
                 Cancel
               </button>
               <button
                 onClick={handleRejectDocument}
-                className="flex-1 px-4 py-3 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 shadow-lg shadow-red-200"
+                className={`flex-1 px-4 py-3 bg-red-600 text-white ${Fonts.button} rounded-xl hover:bg-red-700 shadow-lg shadow-red-200`}
               >
                 Reject
               </button>
@@ -1171,7 +1172,7 @@ const Modal = ({ children }) => (
 const Section = ({ title, children, verified }) => (
   <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-4 transition-all hover:shadow-md">
     <div className="flex justify-between items-center pb-2 border-b border-gray-50">
-      <h3 className="font-bold text-xl text-gray-900 tracking-tight">
+      <h3 className={`${Fonts.heading4} tracking-tight`}>
         {title}
       </h3>
       {verified && (

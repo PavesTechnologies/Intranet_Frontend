@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 export function InputField({ label, type, value, onChange }) {
   return (
     <div>
-      <label className="text-sm font-medium">
+      <label className={Fonts.label}>
         {label}
       </label>
       <input
@@ -19,7 +20,7 @@ export function InputField({ label, type, value, onChange }) {
 export function TextAreaField({ label, value, onChange }) {
   return (
     <div>
-      <label className="text-sm font-medium">
+      <label className={Fonts.label}>
         {label}
       </label>
       <textarea
@@ -42,7 +43,7 @@ export function SelectField({
 }) {
   return (
     <div>
-      <label className="text-sm font-medium">
+      <label className={Fonts.label}>
         {label}
       </label>
 
@@ -104,7 +105,7 @@ export function SearchableSelect({
 
   return (
     <div className="relative">
-      <label className="text-sm font-medium">
+      <label className={Fonts.label}>
         {label}
       </label>
 

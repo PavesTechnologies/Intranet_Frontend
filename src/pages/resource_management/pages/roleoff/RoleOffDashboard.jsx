@@ -392,8 +392,8 @@ const RoleOffDashboard = () => {
             <PrevIcon size={18} />
           </button>
           <div className="flex-1">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Roll-Off Reporting Dashboard</h1>
-            <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium">Strategic tracking and predictive analysis of resource roll-off events</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Roll-Off Reporting Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-500">Strategic tracking and predictive analysis of resource roll-off events</p>
           </div>
         </div>
         <div>

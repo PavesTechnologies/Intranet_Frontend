@@ -4,9 +4,6 @@ import StatusBadge from "./StatusBadge";
 export default function EmployeeRow({ emp , index}) {
   return (
     <tr style={{ borderBottom: "1px solid #eee" }}>
-      <td>
-        <input type="checkbox" />
-      </td>
 
       {/* Employee */}
       <td style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -26,7 +23,9 @@ export default function EmployeeRow({ emp , index}) {
       </td>
       <td>
         <div>{emp.email}</div>
-        <StatusBadge text={emp.emailStatus} />
+      </td>
+      <td>
+        <StatusBadge text={emp.employmentStatus} />
       </td>
       <td>{emp.designation}</td>
       <td>{emp.reporting_manager_uuid}</td>

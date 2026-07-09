@@ -5,6 +5,7 @@ import Button from "../../../../../components/Button/Button";
 import GenericTable from "../../../../../components/Table/table";
 import Modal from "../../../../../components/Modal/modal";
 import { PageCard } from "../../../../../components/Cards/PageCard";
+import { Fonts } from "../../../../../components/Fonts/Fonts";
 
 export default function DegreeMasterManagement() {
   const { user } = useAuth();
@@ -84,10 +85,10 @@ export default function DegreeMasterManagement() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className={Fonts.heading3}>
             Degree Master
           </h1>
-          <p className="text-gray-600">
+          <p className={Fonts.paragraph}>
             Manage degree types mapped to education levels
           </p>
         </div>
@@ -100,7 +101,7 @@ export default function DegreeMasterManagement() {
 
       {/* Filter */}
       <div className="mb-4 flex items-center gap-3">
-        <label className="text-sm font-medium text-gray-700 shrink-0">
+        <label className={`${Fonts.label} shrink-0`}>
           Filter by Education Level:
         </label>
         <select
@@ -226,7 +227,7 @@ function AddDegreeModal({ educationLevels, onClose, onSuccess }) {
     >
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className={`block ${Fonts.label} mb-1`}>
             Degree Name <span className="text-red-500">*</span>
           </label>
           <input
@@ -239,7 +240,7 @@ function AddDegreeModal({ educationLevels, onClose, onSuccess }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className={`block ${Fonts.label} mb-1`}>
             Education Level <span className="text-red-500">*</span>
           </label>
           <select

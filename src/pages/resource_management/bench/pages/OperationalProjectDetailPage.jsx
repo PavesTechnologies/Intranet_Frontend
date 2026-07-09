@@ -277,7 +277,7 @@ const OperationalProjectDetailPage = () => {
             <PrevIcon size={18} />
           </button>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-none">{project?.name}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">{project?.name}</h1>
             <p className="mt-1.5 text-xs font-semibold text-slate-400 capitalize tracking-widest">{project?.clientName}</p>
           </div>
         </div>
