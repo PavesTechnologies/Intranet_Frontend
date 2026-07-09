@@ -219,34 +219,21 @@ export default function EmployeeListPage() {
       </FilterCard>
 
       {/* 📋 Table */}
-      <div
-        style={{
-          background: "white",
-          borderRadius: 8,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-        }}
-      >
-        {/* Horizontal Scroll Wrapper */}
-        <div
-          style={{
-            overflowX: "auto",
-            overflowY: "hidden",
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
-          }}
-          className="hide-scrollbar"
-        >
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="h-[560px] w-full overflow-x-auto overflow-y-auto">
           <EmployeeTable data={paginatedData} />
         </div>
       </div>
 
       {/* Pagination */}
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-        onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-      />
+      <div className="pt-4">
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+          onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+        />
+      </div>
     </div>
   );
 }
