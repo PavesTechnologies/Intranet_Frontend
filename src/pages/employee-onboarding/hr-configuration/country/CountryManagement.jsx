@@ -20,9 +20,7 @@ export default function CountryManagement() {
   const fetchCountries = async () => {
     try {
       setLoading(true);
-      const res = await api.get(`${BASE_URL}/masters/country`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
+      const res = await api.get(`${BASE_URL}/masters/country`);
       setCountries(res.data);
     } catch (error) {
       console.error("Failed to fetch countries", error);
@@ -48,12 +46,7 @@ export default function CountryManagement() {
     try {
       await api.put(
         `${BASE_URL}/masters/country/deactivateoractivate/${country.country_uuid}`,
-        null,
-        {
-          params: { is_active: country.is_active ? "false" : "true" },
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-          validateStatus: (status) => status >= 200 && status < 300,
-        },
+        { is_active: !country.is_active },
       );
 
       if (window.showSuccess) window.showSuccess(
