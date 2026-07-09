@@ -31,8 +31,6 @@ import GenericTable from "../../../components/Table/table";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
 
-const [isExporting, setIsExporting] = useState(false);
-
 const statusOptions = [
   { label: "All Statuses", value: "All" },
   { label: "Ready", value: "Ready" },
@@ -67,7 +65,7 @@ export default function JdLibrary() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [jurisdictionFilter, setJurisdictionFilter] = useState("All");
   const [sourceFilter, setSourceFilter] = useState("All");
-
+  const [isExporting, setIsExporting] = useState(false);
   // Sorting State
   const [sortField, setSortField] = useState("createdDate");
   const [sortOrder, setSortOrder] = useState("desc");
