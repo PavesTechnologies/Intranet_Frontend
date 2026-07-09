@@ -745,7 +745,7 @@ const AppRoutes = () => {
           <Route
             path="/leave-policy"
             element={
-              <ProtectedRoute allowedRoles={["HR", "General", "Super_Admin", "Admin"]}>
+              <ProtectedRoute allowedRoles={["HR", "Super_Admin", "Admin", "Manager", "Hr-Manager", "General", "Reporting_manager"]}>
                 <LeavePolicy />
               </ProtectedRoute>
             }
