@@ -17,6 +17,8 @@ import SearchInput from "../../../components/filter/Searchbar";
 import { Fonts } from "../../../components/Fonts/Fonts";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import StatusBadge from "../../../components/status/statusbadge";
+import PageHeader from "../../../components/ui/PageHeader";
+import FilterCard from "../../../components/ui/FilterCard";
 
 const categoryOptions = ["Identity", "Education", "Work", "HR Document"];
 
@@ -444,50 +446,40 @@ export default function EmployeeDocumentsPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6">
-      <PageCard>
-        <div className="grid gap-6 p-6 xl:grid-cols-[minmax(320px,1fr)_minmax(0,760px)] xl:items-end">
-          <div className="min-w-0">
-            <h1 className={`${Fonts.heading2} whitespace-nowrap`}>
-              Employee Documents
-            </h1>
-            <p className="mt-2 flex max-w-xl items-start gap-2 text-sm text-gray-500">
-              <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[#0A0082]" />
-              Manage, verify, and seamlessly organize essential documents across
-              your entire workforce.
-            </p>
-          </div>
+      <PageHeader
+        title="Employee Documents"
+        subtitle="Manage, verify, and seamlessly organize essential documents across your entire workforce."
+      />
 
-          <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]">
-            <div className="min-w-0">
-              <SearchInput
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search name or ID..."
-                className="h-[42px]"
-              />
-            </div>
-            <div className="min-w-0">
-              <FilterListbox
-                buttonClassName={filterButtonClassName}
-                options={buildFilterOptions("All Categories", categoryOptions)}
-                value={categoryFilter}
-                onChange={setCategoryFilter}
-              />
-            </div>
-            <div className="min-w-0">
-              <FilterListbox
-                buttonClassName={filterButtonClassName}
-                options={buildFilterOptions(
-                  "All Departments",
-                  departmentOptions,
-                )}
-                value={departmentFilter}
-                onChange={setDepartmentFilter}
-              />
-            </div>
-          </div>
+      <FilterCard description="Narrow the document list by name, ID, category, or department.">
+        <div className="w-full min-w-0 sm:w-64">
+          <SearchInput
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search name or ID..."
+            className="h-[42px]"
+          />
         </div>
-      </PageCard>
+        <div className="w-full min-w-0 sm:w-52">
+          <FilterListbox
+            buttonClassName={filterButtonClassName}
+            options={buildFilterOptions("All Categories", categoryOptions)}
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+          />
+        </div>
+        <div className="w-full min-w-0 sm:w-52">
+          <FilterListbox
+            buttonClassName={filterButtonClassName}
+            options={buildFilterOptions(
+              "All Departments",
+              departmentOptions,
+            )}
+            value={departmentFilter}
+            onChange={setDepartmentFilter}
+          />
+        </div>
+      </FilterCard>
 
       {visibleDepartmentGroups.length === 0 ? (
         <PageCard className="border-dashed border-gray-300">

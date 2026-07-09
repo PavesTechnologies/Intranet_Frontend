@@ -3,9 +3,10 @@ import api from "../../../api/axiosInstance";
 import EmployeeTable from "./components/EmployeeTable";
 import { fetchEmployees } from "./api/employeelist";
 import Pagination from "../../../components/Pagination/pagination";
-import { Fonts } from "../../../components/Fonts/Fonts";
 import SearchInput from "../../../components/filter/Searchbar";
 import FilterListbox from "../../../components/filter/FilterListbox";
+import PageHeader from "../../../components/ui/PageHeader";
+import FilterCard from "../../../components/ui/FilterCard";
 
 const filterButtonClassName =
   "w-full cursor-default rounded-lg border border-gray-300 bg-white py-2.5 pl-4 pr-10 text-left text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-[#0A0082]/20 focus:border-[#0A0082]";
@@ -179,18 +180,15 @@ export default function EmployeeListPage() {
 
   return (
     <div style={{ padding: 20 }}>
-      <div className="rounded-2xl border border-slate-200 bg-white px-5 py-6 shadow-sm mb-6">
-        <div className="flex items-start gap-4">
-          <span className="mt-0.5 h-14 w-1.5 shrink-0 rounded-full bg-indigo-600" />
-          <div className="min-w-0">
-            <h1 className={Fonts.heading3}>Member Records</h1>
-            <p className="mt-1 text-sm text-slate-500">Manage and browse member records across the onboarding workflow.</p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Member Records"
+        subtitle="Manage and browse member records across the onboarding workflow."
+      />
 
-      {/* 🔎 Search + Filters */}
-      <div className="mb-6 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+      <FilterCard
+        description="Narrow the member records by name, department, or location."
+        className="mb-6"
+      >
         <div className="w-full md:w-80">
           <SearchInput
             value={search}
@@ -199,29 +197,26 @@ export default function EmployeeListPage() {
             className="h-[42px]"
           />
         </div>
-
-        <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
-          <div className="w-full sm:w-56">
-            <FilterListbox
-              buttonClassName={filterButtonClassName}
-              options={buildFilterOptions(
-                "All Departments",
-                Object.values(deptMap).sort((a, b) => a.localeCompare(b))
-              )}
-              value={department}
-              onChange={setDepartment}
-            />
-          </div>
-          <div className="w-full sm:w-48">
-            <SearchInput
-              value={locationSearch}
-              onChange={(e) => setLocationSearch(e.target.value)}
-              placeholder="Search location..."
-              className="h-[42px]"
-            />
-          </div>
+        <div className="w-full sm:w-56">
+          <FilterListbox
+            buttonClassName={filterButtonClassName}
+            options={buildFilterOptions(
+              "All Departments",
+              Object.values(deptMap).sort((a, b) => a.localeCompare(b))
+            )}
+            value={department}
+            onChange={setDepartment}
+          />
         </div>
-      </div>
+        <div className="w-full sm:w-48">
+          <SearchInput
+            value={locationSearch}
+            onChange={(e) => setLocationSearch(e.target.value)}
+            placeholder="Search location..."
+            className="h-[42px]"
+          />
+        </div>
+      </FilterCard>
 
       {/* 📋 Table */}
       <div
