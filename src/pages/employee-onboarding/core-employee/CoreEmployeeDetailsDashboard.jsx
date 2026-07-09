@@ -1,5 +1,5 @@
 "use client";
-
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { useEffect, useState, useMemo, useRef } from "react";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import { Users, Clock, CheckCircle, AlertCircle } from "lucide-react";
@@ -70,6 +70,9 @@ export default function EmployeeOnboardingPage() {
 
   const fileInputRef = useRef(null);
   const [uploadLoading, setUploadLoading] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+const [selectedEmployeeUuid, setSelectedEmployeeUuid] = useState(null);
+const [isDeleting, setIsDeleting] = useState(false);
   
  const failedCount = useMemo(() => {
 
@@ -285,6 +288,10 @@ export default function EmployeeOnboardingPage() {
     setEditEmployee(null);
     fetchEmployees();
   };
+  const handleDelete = (employeeUuid) => {
+  setSelectedEmployeeUuid(employeeUuid);
+  setIsDeleteModalOpen(true);
+};
 
   /* ============================
      SUMMARY CARDS
@@ -333,7 +340,38 @@ export default function EmployeeOnboardingPage() {
       return matchesSearch && statusMatch && departmentMatch;
     });
   }, [employees, searchTerm, statusFilter, departmentFilter]);
+const confirmDelete = async () => {
+  if (!selectedEmployeeUuid) return;
 
+  try {
+    setIsDeleting(true);
+
+    await api.delete(
+      `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${selectedEmployeeUuid}`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+
+    showStatusToast("Employee deleted successfully", "success");
+
+    setIsDeleteModalOpen(false);
+    setSelectedEmployeeUuid(null);
+
+    fetchEmployees();
+  } catch (error) {
+    console.error(error);
+
+    showStatusToast(
+      error?.response?.data?.message || "Failed to delete employee",
+      "error"
+    );
+  } finally {
+    setIsDeleting(false);
+  }
+};
 
 const handleExportPreview = async () => {
 
@@ -741,6 +779,20 @@ console.log(
             }
           />
         )}
+        <ConfirmationModal
+  isOpen={isDeleteModalOpen}
+  onClose={() => {
+    setIsDeleteModalOpen(false);
+    setSelectedEmployeeUuid(null);
+  }}
+  onConfirm={confirmDelete}
+  title="Delete Employee"
+  message="Are you sure you want to delete this employee?"
+  confirmText="Delete"
+  cancelText="Cancel"
+  confirmVariant="danger"
+  loading={isDeleting}
+/>
       </div>
 
       {/* ============================
