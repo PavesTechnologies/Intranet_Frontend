@@ -60,12 +60,14 @@ export default function JdLibrary() {
   const { jds, deleteJd, closeJd } = useAirsStore();
   const navigate = useNavigate();
 
+  // Export State
+  const [isExporting, setIsExporting] = useState(false);
+
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [jurisdictionFilter, setJurisdictionFilter] = useState("All");
   const [sourceFilter, setSourceFilter] = useState("All");
-
   // Sorting State
   const [sortField, setSortField] = useState("createdDate");
   const [sortOrder, setSortOrder] = useState("desc");
@@ -336,74 +338,74 @@ export default function JdLibrary() {
     }
   };
 
-const handleExportLibrary = async () => {
-  if (isExporting) return;
+  const handleExportLibrary = async () => {
+    if (isExporting) return;
 
-  setIsExporting(true);
+    setIsExporting(true);
 
-  try {
-    const params = {
-      search: debouncedSearch || undefined,
-      jurisdiction:
-        jurisdictionFilter === "All"
-          ? undefined
-          : jurisdictionFilter,
-      active:
-        statusFilter === "Closed"
-          ? false
-          : statusFilter === "All"
-          ? undefined
-          : true,
-      source_format: getSourceFormatParam(sourceFilter),
-      sort_by: getSortByParam(sortField),
-      order: sortOrder,
-    };
+    try {
+      const params = {
+        search: debouncedSearch || undefined,
+        jurisdiction:
+          jurisdictionFilter === "All"
+            ? undefined
+            : jurisdictionFilter,
+        active:
+          statusFilter === "Closed"
+            ? false
+            : statusFilter === "All"
+              ? undefined
+              : true,
+        source_format: getSourceFormatParam(sourceFilter),
+        sort_by: getSortByParam(sortField),
+        order: sortOrder,
+      };
 
-    const response = await exportJDs(params);
+      const response = await exportJDs(params);
 
-    const blob = new Blob([response.data], {
-      type: response.headers["content-type"],
-    });
+      const blob = new Blob([response.data], {
+        type: response.headers["content-type"],
+      });
 
-    const url = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
 
-    let filename = "JD_List.xlsx";
+      let filename = "JD_List.xlsx";
 
-    const disposition = response.headers["content-disposition"];
+      const disposition = response.headers["content-disposition"];
 
-    if (disposition) {
-      const match = disposition.match(/filename="?([^"]+)"?/);
-      if (match) {
-        filename = match[1];
+      if (disposition) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        if (match) {
+          filename = match[1];
+        }
       }
+
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = filename;
+
+      document.body.appendChild(link);
+
+      link.click();
+
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(url);
+
+      toast.success("Job Descriptions exported successfully.");
+
+    } catch (error) {
+      console.error(error);
+
+      toast.error(
+        error?.response?.data?.message ||
+        "Failed to export Job Descriptions."
+      );
+    } finally {
+      setIsExporting(false);
     }
-
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = filename;
-
-    document.body.appendChild(link);
-
-    link.click();
-
-    document.body.removeChild(link);
-
-    URL.revokeObjectURL(url);
-
-    toast.success("Job Descriptions exported successfully.");
-
-  } catch (error) {
-    console.error(error);
-
-    toast.error(
-      error?.response?.data?.message ||
-      "Failed to export Job Descriptions."
-    );
-  } finally {
-    setIsExporting(false);
-  }
-};
+  };
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
       {/* Header */}

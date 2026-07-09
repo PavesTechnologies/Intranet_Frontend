@@ -2,6 +2,7 @@
 
 import React from "react";
 import { X } from "lucide-react";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 
 export default function LargeModal({
   isOpen,
@@ -23,7 +24,7 @@ export default function LargeModal({
         </button>
 
         <div className="mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+          <h2 className={Fonts.heading4}>{title}</h2>
 
           {subtitle && (
             <p className="text-sm text-gray-500 mt-1">{subtitle}</p>

@@ -5,26 +5,12 @@ import { Search } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import FilterListbox from "../../../components/filter/FilterListbox";
-import { Fonts } from "../../../components/Fonts/Fonts";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import EmployeeCard from "../components/EmployeeCard";
 import Pagination from "../../../components/Pagination/pagination";
+import PageHeader from "../../../components/ui/PageHeader";
 
 const PAGE_SIZE = 12;
-
-function SectionHeaderCard({ title, description }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
-      <div className="flex items-start gap-4">
-        <span className="mt-0.5 h-14 w-1.5 shrink-0 rounded-full bg-indigo-600" />
-        <div className="min-w-0">
-          <h1 className={Fonts.heading3}>{title}</h1>
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const EmployeeDirectory = () => {
   const [employees, setEmployees] = useState([]);
@@ -179,19 +165,16 @@ const mappedEmployees = employeeData.map((emp) => {
 
   return (
     <div className="p-6">
+      <PageHeader
+        title="Employee Directory"
+        subtitle="Manage and browse organizational talent across the onboarding workflow."
+      />
+
       <PageCard className="border-slate-200">
         <PageCardContent className="space-y-6 p-6 md:p-8">
-          <SectionHeaderCard
-            title="Employee Directory"
-            description="Manage and browse organizational talent across the onboarding workflow."
-          />
-
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-end">
             <div className="relative w-full">
-              <label htmlFor="employeeDirectorySearch" className={`${Fonts.label} mb-1 block`}>
-                Search
-              </label>
-              <Search className="pointer-events-none absolute left-5 top-[calc(50%+12px)] h-5 w-5 -translate-y-1/2 text-gray-400" />
+              <Search className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
               <input
                 id="employeeDirectorySearch"
                 type="text"
@@ -203,7 +186,6 @@ const mappedEmployees = employeeData.map((emp) => {
             </div>
 
             <div className="w-full">
-              <label className={`${Fonts.label} mb-1 block`}>Department</label>
               <FilterListbox
                 options={departments.map((dept) => ({
                   value: dept,

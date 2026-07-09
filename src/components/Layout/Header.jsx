@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, LogOut, User, Menu, X, Eye,EyeOff, KeyRound, ChevronDown, } from "lucide-react";
+import { Bell, LogOut, User, Menu, X, Eye, EyeOff, KeyRound, ChevronDown, } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -75,18 +75,18 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
 
   /* ── Dropdown actions ── */
   const handleViewProfile = () => {
-  console.log("USER:", user);
-  console.log("EMPLOYEE PROFILE:", employeeProfile);
+    console.log("USER:", user);
+    console.log("EMPLOYEE PROFILE:", employeeProfile);
 
-  setDropdownOpen(false);
+    setDropdownOpen(false);
 
-  if (!employeeProfile?.employee_uuid) {
-    console.log("No employee UUID found");
-    return;
-  }
+    if (!employeeProfile?.employee_uuid) {
+      console.log("No employee UUID found");
+      return;
+    }
 
-  navigate(`/employee-onboarding/employeeProfile/${employeeProfile.employee_uuid}`);
-};
+    navigate(`/employee-onboarding/employeeProfile/${employeeProfile.employee_uuid}`);
+  };
 
   const handleOpenPasswordModal = () => {
     setDropdownOpen(false);
@@ -141,10 +141,9 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
   };
 
   const inputClass = (hasError) =>
-    `w-full rounded-lg border px-3 py-2.5 pr-10 text-sm text-[#081534] outline-none transition-all ${
-      hasError
-        ? "border-red-400 bg-red-50 focus:border-red-500 focus:ring-2 focus:ring-red-100"
-        : "border-[#e4e8f2] bg-[#fafbfd] focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10"
+    `w-full rounded-lg border px-3 py-2.5 pr-10 text-sm text-[#081534] outline-none transition-all ${hasError
+      ? "border-red-400 bg-red-50 focus:border-red-500 focus:ring-2 focus:ring-red-100"
+      : "border-[#e4e8f2] bg-[#fafbfd] focus:border-[#263383] focus:ring-2 focus:ring-[#263383]/10"
     }`;
 
   return (
@@ -182,10 +181,10 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
 
           {/* ── Right: notifications + profile ── */}
           <div className="flex items-center space-x-4">
-            <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+            {/* <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
               <Bell className="h-5 w-5" />
               <span className="absolute top-1 right-1 h-2 w-2 bg-[#ff3d72] rounded-full" />
-            </button>
+            </button> */}
 
             {/* Profile dropdown */}
             <div className="relative pl-4 border-l border-gray-200" ref={dropdownRef}>
@@ -200,9 +199,8 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
                   {name}
                 </span>
                 <ChevronDown
-                  className={`h-4 w-4 text-gray-400 hidden md:block transition-transform duration-200 ${
-                    dropdownOpen ? "rotate-180" : ""
-                  }`}
+                  className={`h-4 w-4 text-gray-400 hidden md:block transition-transform duration-200 ${dropdownOpen ? "rotate-180" : ""
+                    }`}
                 />
               </button>
 
@@ -296,10 +294,10 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
       >
         <div className="space-y-4">
 
-              <div className="hidden md:block text-left max-w-[180px]">
-                <p className="text-sm font-medium text-gray-900 leading-tight truncate">{name}</p>
-                {/* <p className="text-xs text-gray-500 line-clamp-1">{role}</p> */}
-              </div>
+          <div className="hidden md:block text-left max-w-[180px]">
+            <p className="text-sm font-medium text-gray-900 leading-tight truncate">{name}</p>
+            {/* <p className="text-xs text-gray-500 line-clamp-1">{role}</p> */}
+          </div>
 
           {/* New Password */}
           <div>

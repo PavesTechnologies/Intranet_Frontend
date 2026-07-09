@@ -84,10 +84,10 @@ export default function WorkforceAvailability() {
     <div className="min-h-screen bg-background">
       <main className="p-3 sm:p-4 md:p-6">
         <div className="mb-4 md:mb-6">
-          <h1 className="text-xl sm:text-2xl font-heading font-bold text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
             Workforce Availability Overview
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          <p className="mt-1 text-sm text-gray-500">
             A real-time snapshot of team capacity, utilization, and resource
             allocation across roles and locations.
           </p>

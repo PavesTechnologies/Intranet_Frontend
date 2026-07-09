@@ -256,10 +256,10 @@ const AssetList = () => {
               <ArrowLeft size={18} />
             </button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+              <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
                 Asset Management
               </h1>
-              <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+              <div className="mt-1 flex items-center gap-2 text-sm text-gray-500">
                 <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs font-medium">
                   {/* Client */} {clientName}
                 </span>

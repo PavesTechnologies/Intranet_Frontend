@@ -14,11 +14,11 @@ export default function EmployeeTable({ data }) {
 
       {/* 🔹 Column Width Control */}
       <colgroup>
-        <col style={{ width: "40px" }} />     {/* checkbox / avatar */}
         <col style={{ width: "200px" }} />    {/* Employee */}
         <col style={{ width: "200px" }} />    {/* Dept & Loc */}
         <col style={{ width: "120px" }} />    {/* workMode */}
-        <col style={{ width: "220px" }} />    {/* Email & Status */}
+        <col style={{ width: "260px" }} />    {/* Email */}
+        <col style={{ width: "160px" }} />    {/* Employment Status */}
         <col style={{ width: "260px" }} />    {/* ⭐ Designation (extended) */}
         <col style={{ width: "180px" }} />    {/* Manager */}
         <col style={{ width: "140px" }} />    {/* DOJ */}
@@ -28,11 +28,11 @@ export default function EmployeeTable({ data }) {
 
       <thead style={{ background: "#f6f7fb", textAlign: "left" }}>
         <tr>
-          <th></th>
           <th>Employee</th>
           <th>Dept & Loc</th>
           <th>workMode</th>
-          <th>Email & Status</th>
+          <th>Email</th>
+          <th>Employment Status</th>
           <th>Designation</th>
           <th>Manager</th>
           <th>DOJ</th>

@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import Button from "../../../../components/Button/Button";
+import { Fonts } from "../../../../components/Fonts/Fonts";
 import { DEPARTMENTS } from "../constants";
 import {
   InputField,
@@ -31,7 +32,7 @@ export default function ReassignJoiningModal({
           <X size={20} />
         </button>
 
-        <h2 className="text-xl font-semibold mb-4">
+        <h2 className={`${Fonts.heading4} mb-4`}>
           Reassign Joining Date
         </h2>
 

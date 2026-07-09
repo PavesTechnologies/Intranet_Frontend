@@ -251,8 +251,8 @@ const BenchPoolDashboard = () => {
             <PrevIcon size={18} />
           </button>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Bench Intelligence Hub</h1>
-            <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium tracking-normal">Real-time cost & risk analytics for active bench resources</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Bench Intelligence Hub</h1>
+            <p className="mt-1 text-sm text-gray-500">Real-time cost and risk analytics for active bench resources.</p>
           </div>
         </div>
         
