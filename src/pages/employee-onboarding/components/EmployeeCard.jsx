@@ -1,12 +1,9 @@
-import React, { useState } from "react";
+import React from "react";
+import { useNavigate } from "react-router-dom";
 import { Mail } from "lucide-react";
-
-import EmployeeProfileModal from "./EmployeeProfileModal";
-
 import { ViewIcon } from "../../../components/icons/ActionIcons";
 import Button from "../../../components/Button/Button";
 import { Fonts } from "../../../components/Fonts/Fonts";
-
 const colors = [
   "bg-teal-400",
   "bg-orange-500",
@@ -16,39 +13,28 @@ const colors = [
   "bg-pink-500",
   "bg-purple-400",
 ];
-
 const getSafeColor = (index) => {
   if (index === 0) return colors[0];
-
   const previousColor = colors[(index - 1) % colors.length];
   let currentColor = colors[index % colors.length];
-
   if (currentColor === previousColor) {
     currentColor = colors[(index + 1) % colors.length];
   }
-
   return currentColor;
 };
-
 const getInitials = (name) => {
   if (!name) return "";
-
   const parts = name.trim().split(" ");
-
   if (parts.length === 1) {
     return parts[0][0].toUpperCase();
   }
-
   return (
     parts[0][0] + parts[parts.length - 1][0]
   ).toUpperCase();
 };
-
 const EmployeeCard = ({ employee, index }) => {
-  const [open, setOpen] = useState(false);
-
+  const navigate = useNavigate();
   const bgColor = getSafeColor(index);
-
   return (
     <>
       <div
@@ -64,7 +50,9 @@ const EmployeeCard = ({ employee, index }) => {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setOpen(true);
+            if (employee.employee_uuid) {
+              navigate(`/employee-onboarding/employeeProfile/${employee.employee_uuid}`);
+            }
           }}
           className="
             absolute top-3 right-3
@@ -75,7 +63,6 @@ const EmployeeCard = ({ employee, index }) => {
         >
           <ViewIcon className="w-5 h-5 text-gray-700" />
         </button>
-
         {/* Avatar */}
         <div className="flex justify-center">
           <div className="relative">
@@ -89,7 +76,6 @@ const EmployeeCard = ({ employee, index }) => {
             >
               {getInitials(employee.name)}
             </div>
-
             <span
               className="
                 absolute bottom-1 right-1
@@ -101,20 +87,16 @@ const EmployeeCard = ({ employee, index }) => {
             />
           </div>
         </div>
-
         {/* Name & Role */}
         <div className="mt-4 text-center">
           <h3 className={Fonts.heading4}>
             {employee.name}
           </h3>
-
           <p className="mt-1 font-medium text-indigo-800">
             {employee.role}
           </p>
         </div>
-
         <hr className="my-4" />
-
         {/* Details */}
         <div className="space-y-2 text-sm text-gray-800">
           <p>
@@ -123,20 +105,17 @@ const EmployeeCard = ({ employee, index }) => {
             </span>{" "}
             {employee.department}
           </p>
-
           <p>
             <span className="text-gray-600">
               Location :
             </span>{" "}
             {employee.location}
           </p>
-
           {/* Email */}
           <div className="flex items-start gap-1">
             <span className="text-gray-600 shrink-0">
               Email :
             </span>
-
             <p
               title={employee.email}
               className="
@@ -148,18 +127,20 @@ const EmployeeCard = ({ employee, index }) => {
             </p>
           </div>
         </div>
-
         {/* Actions */}
         <div className="mt-5 flex items-center gap-2 w-full">
           <Button
-            onClick={() => setOpen(true)}
+            onClick={() => {
+              if (employee.employee_uuid) {
+                navigate(`/employee-onboarding/employeeProfile/${employee.employee_uuid}`);
+              }
+            }}
             variant="primary"
             size="medium"
             className="flex-1 py-2"
           >
             View Profile
           </Button>
-
           <a
             href={`mailto:${employee.email}`}
             className="
@@ -172,16 +153,7 @@ const EmployeeCard = ({ employee, index }) => {
           </a>
         </div>
       </div>
-
-      {/* Profile Modal */}
-      {open && (
-        <EmployeeProfileModal
-          employee={employee}
-          onClose={() => setOpen(false)}
-        />
-      )}
     </>
   );
 };
-
 export default EmployeeCard;
