@@ -31,8 +31,6 @@ import GenericTable from "../../../components/Table/table";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
 
-const [isExporting, setIsExporting] = useState(false);
-
 const statusOptions = [
   { label: "All Statuses", value: "All" },
   { label: "Ready", value: "Ready" },
@@ -71,6 +69,9 @@ export default function JdLibrary() {
   // Sorting State
   const [sortField, setSortField] = useState("createdDate");
   const [sortOrder, setSortOrder] = useState("desc");
+
+  // Export State
+  const [isExporting, setIsExporting] = useState(false);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);

@@ -1082,13 +1082,13 @@ const Board = ({ projectId, sprintId, projectName }) => {
           ))}
 
           {/* Blocked */}
-          <div className="w-px h-4 bg-gray-200" />
+          {/* <div className="w-px h-4 bg-gray-200" />
           <div className="flex items-center gap-1.5">
             <span className={`font-bold ${statusSummary.blocked > 0 ? "text-red-500" : "text-gray-400"}`}>
               {statusSummary.blocked}
             </span>
             <span className="text-gray-500">Blocked</span>
-          </div>
+          </div> */}
         </div>
       </div>
 

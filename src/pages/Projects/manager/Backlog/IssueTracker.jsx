@@ -37,6 +37,7 @@ const IssueTracker = () => {
     tasksData: [],
   });
   const [riskMap, setRiskMap] = useState({});
+  const [boardStatuses, setBoardStatuses] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
@@ -147,6 +148,21 @@ const IssueTracker = () => {
     }
   };
 
+  const fetchStatuses = async () => {
+    try {
+      const res = await api.get(
+        `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
+        { headers },
+      );
+      const data = Array.isArray(res.data) ? res.data : res.data?.content ?? [];
+      setBoardStatuses(
+        data.slice().sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+      );
+    } catch (err) {
+      showStatusToast("Failed to load statuses", "error");
+    }
+  };
+
   const fetchRiskMap = async () => {
     const numId = Number(projectId);
     if (!numId || isNaN(numId)) return;
@@ -172,6 +188,7 @@ const IssueTracker = () => {
     if (projectId) {
       fetchIssues();
       fetchProjects();
+      fetchStatuses();
       fetchRiskMap();
     }
   }, [projectId]);
@@ -245,6 +262,9 @@ const IssueTracker = () => {
     TO_DO: "bg-slate-100 text-slate-700 border border-slate-200",
   };
 
+  const normalizeStatus = (s) =>
+    String(s || "").toUpperCase().replace(/\s+/g, "_");
+
   const toggleEpic = (id) =>
     setOpenEpics((p) =>
       p.includes(id) ? p.filter((x) => x !== id) : [...p, id],
@@ -284,8 +304,7 @@ const IssueTracker = () => {
       if (filters.type     !== "ALL" && issue.type     !== filters.type)     return false;
       if (filters.priority !== "ALL" && issue.priority !== filters.priority) return false;
       if (filters.status   !== "ALL") {
-        const st = String(issue.status || "").toUpperCase().replace(/\s+/g, "_");
-        if (st !== filters.status) return false;
+        if (normalizeStatus(issue.status) !== filters.status) return false;
       }
       if (filters.assignee !== "ALL" && issue.assigneeName !== filters.assignee) return false;
       return true;
@@ -334,10 +353,7 @@ const IssueTracker = () => {
 
     // Status
     if (filters.status !== "ALL") {
-      const st = String(issue.status || "")
-        .toUpperCase()
-        .replace(/\s+/g, "_");
-      if (st !== filters.status) return false;
+      if (normalizeStatus(issue.status) !== filters.status) return false;
     }
 
     // Assignee
@@ -591,12 +607,12 @@ const IssueTracker = () => {
   );
 
   const TYPE_OPTIONS = ["Epic", "Story", "Task"];
-  const STATUS_OPTIONS = [
-    { label: "Backlog", value: "BACKLOG" },
-    { label: "In Progress", value: "IN_PROGRESS" },
-    { label: "Review", value: "REVIEW" },
-    { label: "Done", value: "DONE" },
-    { label: "To Do", value: "TO_DO" },
+  const STATUS_FILTER_OPTIONS = [
+    { label: "All", value: "ALL" },
+    ...boardStatuses.map((s) => ({
+      label: s.name,
+      value: normalizeStatus(s.name),
+    })),
   ];
   const PRIORITY_OPTIONS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
@@ -615,7 +631,7 @@ const IssueTracker = () => {
   //   setFilters({ types: [], statuses: [], priorities: [] });
 
   return (
-    <div className="max-w-7xl mx-auto mt-8 px-6 pb-12 space-y-6">
+    <div className="w-full mt-8 px-6 pb-12 space-y-6">
 
       {/* HEADER */}
       <div className="flex flex-col gap-4 pb-6 border-b border-gray-200">
@@ -632,10 +648,10 @@ const IssueTracker = () => {
           </div>
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center justify-center p-2.5 text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-800 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="flex items-center justify-center w-5 h-5 bg-white border border-gray-200 text-gray-600 rounded-full shadow-sm hover:bg-gray-50 hover:text-gray-900 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 shrink-0"
             title="Go Back"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={15} />
           </button>
         </div>
 
@@ -675,14 +691,7 @@ const IssueTracker = () => {
           <InlineFilter
             label="Status"
             value={filters.status}
-            options={[
-              { label: "All", value: "ALL" },
-              { label: "Backlog", value: "BACKLOG" },
-              { label: "In Progress", value: "IN_PROGRESS" },
-              { label: "Review", value: "REVIEW" },
-              { label: "Done", value: "DONE" },
-              { label: "To Do", value: "TO_DO" },
-            ]}
+            options={STATUS_FILTER_OPTIONS}
             onChange={(v) => setFilters((f) => ({ ...f, status: v }))}
           />
 
