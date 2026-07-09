@@ -68,7 +68,6 @@ export default function JdLibrary() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [jurisdictionFilter, setJurisdictionFilter] = useState("All");
   const [sourceFilter, setSourceFilter] = useState("All");
-
   // Sorting State
   const [sortField, setSortField] = useState("createdDate");
   const [sortOrder, setSortOrder] = useState("desc");

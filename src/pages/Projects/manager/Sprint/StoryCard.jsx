@@ -6,7 +6,8 @@ import {
   AddIcon,
   BookmarkIcon,
   ChevronDownIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  ViewIcon
 } from "../../../../components/icons";
 import RiskBadge from "../RiskBadge";
 
@@ -93,7 +94,7 @@ const StoryCard = ({
     <div
       ref={readOnly ? undefined : dragRef}
       onClick={() => !readOnly && onClick?.()}
-      className={`group relative bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm flex items-center gap-3 transition-all ${
+      className={`group relative bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm flex items-start gap-3 transition-all w-full shrink-0 ${
         readOnly ? "cursor-default opacity-80" : "hover:border-indigo-300 cursor-pointer"
       } ${isDragging ? "opacity-50 scale-95 ring-2 ring-indigo-400" : ""}`}
     >
@@ -104,13 +105,13 @@ const StoryCard = ({
       </div>
      
       {/* Title */}
-      <p className="flex-1 text-sm text-gray-800 truncate group-hover:text-indigo-700">
+      <p className="flex-1 min-w-0 text-sm text-gray-800 break-words group-hover:text-indigo-700">
         {story.title}
       </p>
       <RiskBadge count={riskCount} issueType="Story" issueId={story.id} projectId={projectId} navigate={navigate} />
 
-      
-     <p className="flex-0 text-sm text-gray-500 truncate group-hover:text-indigo-600">
+
+     <p className="min-w-0 max-w-[160px] text-sm text-gray-500 break-words group-hover:text-indigo-600">
   <span className="font-medium">Epic:</span> {story.epicTitle|| story.epicName || "None"}
 </p>
       {/* Status */}
@@ -128,6 +129,20 @@ const StoryCard = ({
           <AddIcon size={13} /> Epic
         </button>
       )}
+
+      {/* View */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          navigate?.(`/projects/${projectId}/issues/story/${story.id}/view`, {
+            state: { issue: story },
+          });
+        }}
+        className="p-1 text-gray-400 hover:text-indigo-600 rounded shrink-0"
+        title="View"
+      >
+        <ViewIcon size={16} />
+      </button>
 
       {/* Menu */}
       <div
