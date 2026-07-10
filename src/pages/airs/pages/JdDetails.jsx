@@ -31,6 +31,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/ui/Modal";
 import FormInput from "../../../components/forms/FormInput";
+import NewCampaignForm from "../modals/NewCampaignForm";
 import { createCampaign, getAllCampaignsHrAdmin } from "../service/campaignservice";
 
 const DEFAULT_CAMPAIGN_FORM = {
@@ -43,6 +44,7 @@ const DEFAULT_CAMPAIGN_FORM = {
   semantic_threshold: 0.65,
   ai_threshold: 50,
   hiring_manager_id: "",
+  recruiter_id: "",
 };
 
 export default function JdDetails() {
@@ -78,52 +80,52 @@ export default function JdDetails() {
 
   const handleExportJD = async () => {
     try {
-        setIsExporting(true);
+      setIsExporting(true);
 
-        const response = await exportSingleJD(currentJd.id);
+      const response = await exportSingleJD(currentJd.id);
 
-        const blob = new Blob([response.data], {
-            type:
-                response.headers["content-type"] ||
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
+      const blob = new Blob([response.data], {
+        type:
+          response.headers["content-type"] ||
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
 
-        const url = window.URL.createObjectURL(blob);
+      const url = window.URL.createObjectURL(blob);
 
-        let filename = "Job_Description.xlsx";
+      let filename = "Job_Description.xlsx";
 
-        const disposition =
-            response.headers["content-disposition"];
+      const disposition =
+        response.headers["content-disposition"];
 
-        if (disposition) {
-            const match = disposition.match(/filename="?([^"]+)"?/);
+      if (disposition) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
 
-            if (match) {
-                filename = match[1];
-            }
+        if (match) {
+          filename = match[1];
         }
+      }
 
-        const link = document.createElement("a");
+      const link = document.createElement("a");
 
-        link.href = url;
-        link.download = filename;
+      link.href = url;
+      link.download = filename;
 
-        document.body.appendChild(link);
+      document.body.appendChild(link);
 
-        link.click();
+      link.click();
 
-        link.remove();
+      link.remove();
 
-        window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(url);
 
-        toast.success("Job Description exported successfully.");
+      toast.success("Job Description exported successfully.");
     } catch (error) {
-        console.error(error);
-        toast.error("Failed to export Job Description.");
+      console.error(error);
+      toast.error("Failed to export Job Description.");
     } finally {
-        setIsExporting(false);
+      setIsExporting(false);
     }
-};
+  };
 
   // Tabs: overview, skills, campaigns, versions, audit
   const [activeTab, setActiveTab] = useState("overview");
@@ -226,6 +228,7 @@ export default function JdDetails() {
   const updatedDate = currentJd.updatedDate || (currentJd.updated_at ? currentJd.updated_at.split('T')[0] : createdDate);
   const confidence = currentJd.confidence !== undefined ? currentJd.confidence : 95;
   const campaignCount = currentJd.campaignCount !== undefined ? currentJd.campaignCount : 0;
+  const historyList = currentJd.history || [];
 
   // Skills mapper
   const skillsList = (() => {
@@ -322,6 +325,10 @@ export default function JdDetails() {
       toast.error("Please enter a hiring manager ID.");
       return;
     }
+    if (!campaignForm.recruiter_id.trim()) {
+      toast.error("Please enter a recruiter ID.");
+      return;
+    }
     if (campaignForm.max_candidates !== "" && campaignForm.max_candidates !== null && Number(campaignForm.max_candidates) <= 0) {
       toast.error("Max candidates must be greater than 0.");
       return;
@@ -343,6 +350,7 @@ export default function JdDetails() {
       semantic_threshold: Number(campaignForm.semantic_threshold),
       ai_threshold: Number(campaignForm.ai_threshold),
       hiring_manager_id: campaignForm.hiring_manager_id.trim(),
+      recruiter_id: campaignForm.recruiter_id.trim()
     };
 
     setIsSubmittingCampaign(true);
@@ -777,11 +785,10 @@ export default function JdDetails() {
                       <div>
                         {/* Top row */}
                         <div className="flex justify-between items-center mb-2.5">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                            (c.status || "").toUpperCase() === "ACTIVE"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-slate-50 text-slate-600"
-                          }`}>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${(c.status || "").toUpperCase() === "ACTIVE"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-slate-50 text-slate-600"
+                            }`}>
                             {(c.status || "").toUpperCase() === "ACTIVE" ? "Active" : c.status || "Active"}
                           </span>
                           <span className="text-xs text-slate-400 font-medium">{displayId}</span>
@@ -987,115 +994,14 @@ export default function JdDetails() {
         width="520px"
         height="90vh"
       >
-        <div className="space-y-4">
-          <div>
-            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Job Description</label>
-            <div className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-xs font-bold text-slate-700">
-              {title}
-            </div>
-          </div>
-
-          <FormInput
-            label="Campaign Name"
-            name="name"
-            value={campaignForm.name}
-            onChange={handleCampaignFormChange}
-            placeholder="e.g. Q3 React Platform Lead Hiring"
-            maxLength={255}
-            requiredMark
-          />
-
-          <div className="grid grid-cols-2 gap-4">
-            <FormInput
-              label="Max Candidates"
-              name="max_candidates"
-              type="number"
-              min="1"
-              value={campaignForm.max_candidates}
-              onChange={handleCampaignFormChange}
-            />
-            <FormInput
-              label="Deadline"
-              name="deadline"
-              type="datetime-local"
-              value={campaignForm.deadline}
-              onChange={handleCampaignFormChange}
-            />
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <FormInput
-              label="Deterministic Weight"
-              name="weight_deterministic"
-              type="number"
-              value={campaignForm.weight_deterministic}
-              onChange={handleCampaignFormChange}
-            />
-            <FormInput
-              label="Semantic Weight"
-              name="weight_semantic"
-              type="number"
-              value={campaignForm.weight_semantic}
-              onChange={handleCampaignFormChange}
-            />
-            <FormInput
-              label="AI Weight"
-              name="weight_ai"
-              type="number"
-              value={campaignForm.weight_ai}
-              onChange={handleCampaignFormChange}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <FormInput
-              label="Semantic Threshold"
-              name="semantic_threshold"
-              type="number"
-              step="0.01"
-              min="0"
-              max="1"
-              value={campaignForm.semantic_threshold}
-              onChange={handleCampaignFormChange}
-            />
-            <FormInput
-              label="AI Threshold"
-              name="ai_threshold"
-              type="number"
-              value={campaignForm.ai_threshold}
-              onChange={handleCampaignFormChange}
-            />
-          </div>
-
-          <FormInput
-            label="Hiring Manager ID"
-            name="hiring_manager_id"
-            value={campaignForm.hiring_manager_id}
-            onChange={handleCampaignFormChange}
-            placeholder="Hiring manager identifier"
-            requiredMark
-          />
-        </div>
-
-        <div className="flex justify-end gap-3 mt-6 border-t pt-4">
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => setLinkCampaignModalOpen(false)}
-            disabled={isSubmittingCampaign}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            size="small"
-            onClick={handleInitiateCampaign}
-            loading={isSubmittingCampaign}
-            loadingText="Initiating..."
-          >
-            Initiate Campaign
-          </Button>
-        </div>
+        <NewCampaignForm
+          title={title}
+          campaignForm={campaignForm}
+          handleCampaignFormChange={handleCampaignFormChange}
+          setLinkCampaignModalOpen={setLinkCampaignModalOpen}
+          isSubmittingCampaign={isSubmittingCampaign}
+          handleInitiateCampaign={handleInitiateCampaign}
+        />
       </Modal>
 
       {/* Restore Confirmation Dialog */}
