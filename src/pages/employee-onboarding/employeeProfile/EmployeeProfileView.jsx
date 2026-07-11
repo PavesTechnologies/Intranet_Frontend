@@ -12,7 +12,7 @@ import {
   Layers, X, Heart, Zap,
 } from "lucide-react";
 import { showStatusToast } from "../../../components/toastfy/toast";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import ProfilePage from "./ProfilePage";
 import JobPage from "./JobPage";
 import DocumentsPage from "./DocumentsPage";
@@ -24,7 +24,7 @@ import GlobalStatusBadge from "../../../components/status/statusbadge";
 import api from "../../../api/axiosInstance";
 import ProfilePhotoModal from "./ProfilePhotoModal";
 import { Fonts } from "../../../components/Fonts/Fonts";
-
+import LoadingSpinner from "../../../components/LoadingSpinner";
 /* ═══════════════════════════════════════════════════════════════════
    DESIGN SYSTEM  v3  —  Brand palette
      Navy  #081534   Blue  #263383   Pink  #ff3d72
@@ -623,6 +623,9 @@ export default function EmployeeProfileView() {
   const [expandedSkills, setExpandedSkills] = useState(new Set());
   const [selectedSkill, setSelectedSkill] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, resourceSkillId: null, isDeleting: false });
+  const [isDeleteEmployeeModalOpen, setIsDeleteEmployeeModalOpen] = useState(false);
+  const [isDeletingEmployee, setIsDeletingEmployee] = useState(false);
+  const navigate = useNavigate();
 
   const toggleExpand = (skillId) => {
     setExpandedSkills(prev => {
@@ -632,41 +635,41 @@ export default function EmployeeProfileView() {
       return next;
     });
   };
-const fetchProfilePhoto = async (userUuid) => {
-  try {
-    const response = await api.get(
-      `${BASE_URL}/employee-details/profile-photo/${userUuid}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      }
-    );
+  const fetchProfilePhoto = async (userUuid) => {
+    try {
+      const response = await api.get(
+        `${BASE_URL}/employee-details/profile-photo/${userUuid}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
 
-    setProfileImg(
-      response.data.profile_photo_url
-    );
-  } catch (error) {
-    console.error(
-      "Error fetching profile photo",
-      error
-    );
-  }
-};
+      setProfileImg(
+        response.data.profile_photo_url
+      );
+    } catch (error) {
+      console.error(
+        "Error fetching profile photo",
+        error
+      );
+    }
+  };
   /* ── FETCH ALL DATA ── */
   const fetchAllData = async () => {
     try {
       const token = localStorage.getItem("token");
       const coreRes = await api.get(
-  `${BASE_URL}/permanent-employee/core-employee-details/${employee_uuid}`,
-  {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  }
-);
+        `${BASE_URL}/permanent-employee/core-employee-details/${employee_uuid}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-const coreData = coreRes.data;
+      const coreData = coreRes.data;
 
       if (coreData.employee_id) {
         fetchEmployeeSkills(coreData.employee_id);
@@ -677,20 +680,20 @@ const coreData = coreRes.data;
 
       const deptPromise = coreData.department_uuid
         ? api.get(`${BASE_URL}/masters/departments/${coreData.department_uuid}`, { headers: { Authorization: `Bearer ${token}` } })
-            .then(r => r.data || {}).catch(() => ({}))
+          .then(r => r.data || {}).catch(() => ({}))
         : Promise.resolve({});
       parallelPromises.push(deptPromise);
 
       const desigPromise = coreData.designation_uuid
         ? api.get(`${BASE_URL}/masters/designations/${coreData.designation_uuid}`, { headers: { Authorization: `Bearer ${token}` } })
-            .then(r => r.data || {}).catch(() => ({}))
+          .then(r => r.data || {}).catch(() => ({}))
         : Promise.resolve({});
       parallelPromises.push(desigPromise);
 
       const targetUserUuid = coreData.user_uuid;
       const hrPromise = targetUserUuid
         ? api.get(`${BASE_URL}/hr/hr/${targetUserUuid}`, { headers: { Authorization: `Bearer ${token}` } })
-            .then(r => r.data || {}).catch(() => ({}))
+          .then(r => r.data || {}).catch(() => ({}))
         : Promise.resolve({});
       parallelPromises.push(hrPromise);
 
@@ -707,8 +710,8 @@ const coreData = coreRes.data;
       setHrData(hrResult);
 
       const addresses = Array.isArray(hrResult?.addresses)
-  ? hrResult.addresses
-  : [];
+        ? hrResult.addresses
+        : [];
       const countryUuid = addresses[0]?.country_uuid || null;
       if (countryUuid) {
         try {
@@ -926,18 +929,18 @@ const coreData = coreRes.data;
         work_enjoyment: updatedAbout.work_enjoyment,
         interests_hobbies: updatedAbout.interests_hobbies,
       };
-     const res = aboutUuid
-  ? await api.put(url, payload, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    })
-  : await api.post(url, payload, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
-    if (!res.data) {
+      const res = aboutUuid
+        ? await api.put(url, payload, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        })
+        : await api.post(url, payload, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+      if (!res.data) {
         throw new Error("Failed to save data");
       }
       const serverData = res.data;
@@ -1090,6 +1093,30 @@ const coreData = coreRes.data;
     }
   };
 
+  /* ── DELETE EMPLOYEE ── */
+  const handleDeleteEmployee = async () => {
+    setIsDeletingEmployee(true);
+    try {
+      await api.delete(
+        `${BASE_URL}/permanent-employee/core-employee-details/${employee_uuid}`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+      );
+      showStatusToast("Employee deleted successfully", "success");
+      setIsDeleteEmployeeModalOpen(false);
+      navigate(-1);
+    } catch (error) {
+      console.error("Delete employee failed:", error);
+      showStatusToast(
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        "Failed to delete employee",
+        "error"
+      );
+    } finally {
+      setIsDeletingEmployee(false);
+    }
+  };
+
   const filteredMySkillRequests = useMemo(() => {
     const search = mySkillRequestsSearch.trim().toLowerCase();
     const status = mySkillRequestsStatus;
@@ -1120,7 +1147,7 @@ const coreData = coreRes.data;
     return (
       <div className="epv3 flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-5">
-          <div className="relative w-16 h-16">
+          {/* <div className="relative w-16 h-16">
             <div className="w-16 h-16 rounded-full" style={{ border: "3px solid #e4e8f2" }} />
             <div className="absolute inset-0 w-16 h-16 rounded-full animate-spin"
               style={{ border: "3px solid transparent", borderTopColor: "#263383" }} />
@@ -1132,7 +1159,8 @@ const coreData = coreRes.data;
           <div className="text-center">
             <p className="epv3-display text-sm font-bold" style={{ color: "#081534" }}>Loading Profile</p>
             <p className={`${Fonts.smallText} mt-1`}>Fetching employee information…</p>
-          </div>
+          </div> */}
+          <LoadingSpinner text="Loading Employee Profile..." />
         </div>
       </div>
     );
@@ -1167,9 +1195,9 @@ const coreData = coreRes.data;
     .map(n => n[0].toUpperCase()).join("");
 
   const TABS = [
-    { key: "about",     label: "About",     icon: <User size={13} /> },
-    { key: "profile",   label: "Profile",   icon: <FileText size={13} /> },
-    { key: "job",       label: "Job",       icon: <Briefcase size={13} /> },
+    { key: "about", label: "About", icon: <User size={13} /> },
+    { key: "profile", label: "Profile", icon: <FileText size={13} /> },
+    { key: "job", label: "Job", icon: <Briefcase size={13} /> },
     { key: "documents", label: "Documents", icon: <Layers size={13} /> },
   ];
 
@@ -1217,12 +1245,12 @@ const coreData = coreRes.data;
             <div className="rounded-xl overflow-hidden" style={{ border: "1.5px solid #263383" }}>
               <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-slate-100" style={{ background: "#f5f6fa" }}>
                 {[
-                  { cmd: "bold",                icon: <Bold size={12} /> },
-                  { cmd: "italic",              icon: <Italic size={12} /> },
-                  { cmd: "underline",           icon: <Underline size={12} /> },
+                  { cmd: "bold", icon: <Bold size={12} /> },
+                  { cmd: "italic", icon: <Italic size={12} /> },
+                  { cmd: "underline", icon: <Underline size={12} /> },
                   { cmd: "insertUnorderedList", icon: <List size={12} /> },
-                  { cmd: "insertOrderedList",   icon: <ListOrdered size={12} /> },
-                  { cmd: "createLink",          icon: <Link size={12} /> },
+                  { cmd: "insertOrderedList", icon: <ListOrdered size={12} /> },
+                  { cmd: "createLink", icon: <Link size={12} /> },
                 ].map(({ cmd, icon }) => (
                   <button key={cmd} onClick={() => formatText(cmd)}
                     className="w-7 h-7 flex items-center justify-center rounded-md text-slate-500 hover:bg-white hover:text-[#263383] transition-colors">
@@ -1293,12 +1321,12 @@ const coreData = coreRes.data;
                 <div className="epv3-av" onClick={() => setIsProfilePhotoModalOpen(true)}>
                   {profileImg
                     ? <img
-                        key={profileImg}
-                        src={profileImg}
-                        alt="Profile"
-                        className="w-full h-full object-cover"
-                        onError={() => setProfileImg(hrData?.personal_details?.profile_photo_url || null)}
-                      />
+                      key={profileImg}
+                      src={profileImg}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                      onError={() => setProfileImg(hrData?.personal_details?.profile_photo_url || null)}
+                    />
                     : <span className="epv3-display font-bold text-white select-none" style={{ fontSize: 38 }}>{initials || "?"}</span>
                   }
                   <div className="epv3-av-ov">
@@ -1350,13 +1378,38 @@ const coreData = coreRes.data;
                     </span>
                   )}
                   {Array.isArray(groupedEmployeeSkills) &&
- groupedEmployeeSkills.length > 0 && (
-                    <span className="epv3-float-chip green">
-                      <Award size={14} />
-                      {groupedEmployeeSkills.length} Skill{groupedEmployeeSkills.length !== 1 ? "s" : ""}
-                    </span>
-                  )}
+                    groupedEmployeeSkills.length > 0 && (
+                      <span className="epv3-float-chip green">
+                        <Award size={14} />
+                        {groupedEmployeeSkills.length} Skill{groupedEmployeeSkills.length !== 1 ? "s" : ""}
+                      </span>
+                    )}
                 </div>
+              </div>
+
+              {/* Delete Employee Button */}
+              <div style={{ position: "absolute", top: 12, right: 16, zIndex: 10 }}>
+                <button
+                  onClick={() => setIsDeleteEmployeeModalOpen(true)}
+                  title="Delete Employee"
+                  aria-label="Delete Employee"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-110"
+                  style={{
+                    background: "rgba(239,68,68,0.08)",
+                    border: "1px solid rgba(239,68,68,0.18)",
+                    color: "#ef4444",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(239,68,68,0.15)";
+                    e.currentTarget.style.borderColor = "rgba(239,68,68,0.35)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(239,68,68,0.08)";
+                    e.currentTarget.style.borderColor = "rgba(239,68,68,0.18)";
+                  }}
+                >
+                  <Trash2 size={15} />
+                </button>
               </div>
             </div>
           </div>
@@ -1374,11 +1427,10 @@ const coreData = coreRes.data;
           <div className="flex min-w-max sm:min-w-0 px-4">
             {TABS.map(({ key, label, icon }) => (
               <button key={key} onClick={() => handleTabChange(key)}
-                className={`flex items-center gap-1.5 px-4 py-3.5 text-sm font-semibold border-b-2 transition-all whitespace-nowrap ${
-                  activeTab === key
-                    ? "border-[#263383] text-[#263383]"
-                    : "border-transparent text-gray-500 hover:text-[#263383] hover:border-[#263383]/30"
-                }`}>
+                className={`flex items-center gap-1.5 px-4 py-3.5 text-sm font-semibold border-b-2 transition-all whitespace-nowrap ${activeTab === key
+                  ? "border-[#263383] text-[#263383]"
+                  : "border-transparent text-gray-500 hover:text-[#263383] hover:border-[#263383]/30"
+                  }`}>
                 {icon}{label}
               </button>
             ))}
@@ -1404,11 +1456,11 @@ const coreData = coreRes.data;
                   <span className="text-sm font-bold text-white">Personal Information</span>
                 </div>
                 {[
-                  { label: "Employee ID",   value: mappedEmployee.empId },
+                  { label: "Employee ID", value: mappedEmployee.empId },
                   { label: "Date of Birth", value: employee.date_of_birth || "--" },
-                  { label: "Gender",        value: employee.gender || "--" },
-                  { label: "Marital Status",value: employee.marital_status || "--" },
-                  { label: "Nationality",   value: getDisplayValue(employee.nationality, hrData?.personal_details?.nationality, hrData?.offer?.nationality, hrData?.offer?.nationality_name) },
+                  { label: "Gender", value: employee.gender || "--" },
+                  { label: "Marital Status", value: employee.marital_status || "--" },
+                  { label: "Nationality", value: getDisplayValue(employee.nationality, hrData?.personal_details?.nationality, hrData?.offer?.nationality, hrData?.offer?.nationality_name) },
                 ].map(({ label, value }) => (
                   <div key={label} className="epv3-row">
                     <span className="text-xs text-slate-500 flex-shrink-0" style={{ minWidth: 108 }}>{label}</span>
@@ -1428,9 +1480,9 @@ const coreData = coreRes.data;
                 </div>
                 <div className="p-2">
                   {[
-                    { icon: Mail,   label: "Work Email", value: mappedEmployee.email,                                              bg: "#ede9fe", color: "#7c3aed" },
-                    { icon: Phone,  label: "Phone",      value: mappedEmployee.phone,                                              bg: "#d1fae5", color: "#059669" },
-                    { icon: MapPin, label: "Location",   value: mappedEmployee.office, bg: "#fce7f3", color: "#db2777" },
+                    { icon: Mail, label: "Work Email", value: mappedEmployee.email, bg: "#ede9fe", color: "#7c3aed" },
+                    { icon: Phone, label: "Phone", value: mappedEmployee.phone, bg: "#d1fae5", color: "#059669" },
+                    { icon: MapPin, label: "Location", value: mappedEmployee.office, bg: "#fce7f3", color: "#db2777" },
                   ].map(({ icon: Icon, label, value, bg, color }) => (
                     <div key={label} className="flex items-center gap-3 px-3 py-3 border-b border-slate-50 last:border-0">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -1457,9 +1509,9 @@ const coreData = coreRes.data;
                 </div>
                 <div className="p-2">
                   {[
-                    { icon: Building2, label: "Department",       value: mappedEmployee.department,    bg: "#dbeafe", color: "#2563eb" },
-                    { icon: Briefcase, label: "Employment Type",  value: mappedEmployee.employmentType, bg: "#d1fae5", color: "#059669" },
-                    { icon: Calendar,  label: "Joined On",        value: mappedEmployee.joiningDate,   bg: "#ffedd5", color: "#ea580c" },
+                    { icon: Building2, label: "Department", value: mappedEmployee.department, bg: "#dbeafe", color: "#2563eb" },
+                    { icon: Briefcase, label: "Employment Type", value: mappedEmployee.employmentType, bg: "#d1fae5", color: "#059669" },
+                    { icon: Calendar, label: "Joined On", value: mappedEmployee.joiningDate, bg: "#ffedd5", color: "#ea580c" },
                   ].map(({ icon: Icon, label, value, bg, color }) => (
                     <div key={label} className="flex items-center gap-3 px-3 py-3 border-b border-slate-50 last:border-0">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -1480,15 +1532,19 @@ const coreData = coreRes.data;
             {/* Row 2: Quick-nav cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 epv3-anim" style={{ animationDelay: "150ms" }}>
               {[
-                { icon: Users,    title: "Reporting Manager", label: "Reports To",     value: mappedEmployee.reportingManager, bg: "#ede9fe", color: "#7c3aed", tab: "profile",   config: null },
-                { icon: FileText, title: "Documents",         label: "Total Documents",value:
-  (hrData?.education_documents || []).length +
-  (hrData?.experience || []).length +
-  (hrData?.identity_documents || []).length,                             bg: "#ffedd5", color: "#ea580c", tab: "documents", config: null },
-                { icon: Sparkles, title: "Education",
-label: "Total Education",
-value: (hrData?.education_documents || []).length,                             bg: "#d1fae5", color: "#059669", tab: "documents", config: { folder: "education", search: "" } },
-                { icon: Award,    title: "Skills Overview",   label: "Total Skills",   value: groupedEmployeeSkills.length,           bg: "#fce7f3", color: "#db2777", tab: "about",     config: null },
+                { icon: Users, title: "Reporting Manager", label: "Reports To", value: mappedEmployee.reportingManager, bg: "#ede9fe", color: "#7c3aed", tab: "profile", config: null },
+                {
+                  icon: FileText, title: "Documents", label: "Total Documents", value:
+                    (hrData?.education_documents || []).length +
+                    (hrData?.experience || []).length +
+                    (hrData?.identity_documents || []).length, bg: "#ffedd5", color: "#ea580c", tab: "documents", config: null
+                },
+                {
+                  icon: Sparkles, title: "Education",
+                  label: "Total Education",
+                  value: (hrData?.education_documents || []).length, bg: "#d1fae5", color: "#059669", tab: "documents", config: { folder: "education", search: "" }
+                },
+                { icon: Award, title: "Skills Overview", label: "Total Skills", value: groupedEmployeeSkills.length, bg: "#fce7f3", color: "#db2777", tab: "about", config: null },
               ].map(({ icon: Icon, title, label, value, bg, color, tab, config }) => (
                 <div key={title} className="epv3-nav-card"
                   onClick={() => handleTabChange(tab, config)}>
@@ -1510,9 +1566,9 @@ value: (hrData?.education_documents || []).length,                             b
 
             {/* Row 3: About blocks */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 epv3-anim" style={{ animationDelay: "200ms" }}>
-              <AboutBlock title="About Me"                    fieldKey="about_me"         accentClass="epv3-about-blue" Icon={User} />
-              <AboutBlock title="What I Enjoy About My Work"  fieldKey="work_enjoyment"   accentClass="epv3-about-pink" Icon={Zap} />
-              <AboutBlock title="Interests & Hobbies"         fieldKey="interests_hobbies" accentClass="epv3-about-navy" Icon={Heart} />
+              <AboutBlock title="About Me" fieldKey="about_me" accentClass="epv3-about-blue" Icon={User} />
+              <AboutBlock title="What I Enjoy About My Work" fieldKey="work_enjoyment" accentClass="epv3-about-pink" Icon={Zap} />
+              <AboutBlock title="Interests & Hobbies" fieldKey="interests_hobbies" accentClass="epv3-about-navy" Icon={Heart} />
             </div>
 
             {/* Row 4: Skills */}
@@ -1544,11 +1600,10 @@ value: (hrData?.education_documents || []).length,                             b
                           key={tab.key}
                           type="button"
                           onClick={() => setSkillPanelTab(tab.key)}
-                          className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                            isSelected
-                              ? "bg-white text-[#081534] shadow-sm"
-                              : "text-white/70 hover:text-white"
-                          }`}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${isSelected
+                            ? "bg-white text-[#081534] shadow-sm"
+                            : "text-white/70 hover:text-white"
+                            }`}
                         >
                           {tab.label}
                         </button>
@@ -1567,139 +1622,139 @@ value: (hrData?.education_documents || []).length,                             b
               {/* Skills content */}
               <div className="p-5">
                 {skillPanelTab === "skills" ? (
-                employeeSkillsLoading ? (
-                  <div className="flex items-center justify-center gap-2 py-12 text-sm font-semibold text-slate-500">
-                    <Loader2 size={18} className="animate-spin" />
-                    Loading employee skills...
-                  </div>
-                ) : employeeSkillsError ? (
-                  <div className="flex flex-col items-center justify-center gap-3 py-10 rounded-2xl text-center"
-                    style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}>
-                    <AlertCircle size={22} className="text-orange-500" />
-                    <p className="text-sm font-bold text-orange-700">{employeeSkillsError}</p>
-                    <button onClick={() => fetchEmployeeSkills()} className="epv3-btn">
-                      Retry
-                    </button>
-                  </div>
-                ) : groupedEmployeeSkills.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {groupedEmployeeSkills.map((record, idx) => {
-                      const skillId = record.id || `skill-${idx}`;
-                      const isExp = expandedSkills.has(skillId);
-                      const pfClass = pf(record.proficiencyName);
-
-                      return (
-                        <div key={skillId} className={`epv3-skill-tile ${isExp ? "expanded" : ""}`}>
-                          <div onClick={() => toggleExpand(skillId)}
-                            className="flex items-center gap-3 px-4 py-3.5 cursor-pointer select-none">
-                            <div className="w-1 h-10 rounded-full flex-shrink-0"
-                              style={{ background: "linear-gradient(180deg, #263383 0%, #ff3d72 100%)" }} />
-
-                            <div className="flex-1 min-w-0">
-                              <span className="text-[9px] font-black uppercase tracking-[0.12em]"
-                                style={{ color: "#9ca3af" }}>
-                                {record.categoryName || "General"}
-                              </span>
-                              <p className="text-sm font-bold truncate" style={{ color: "#0c1b45" }}>
-                                {record.skillName || "Unnamed Skill"}
-                              </p>
-                            </div>
-
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className={`hidden xs:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border text-[10px] font-bold uppercase ${pfClass}`}>
-                                <Check size={9} strokeWidth={3} />
-                                {record.proficiencyName || "Not Set"}
-                              </span>
-                              <span className="hidden md:inline-flex px-2 py-0.5 rounded-lg border border-emerald-100 bg-emerald-50 text-[9px] font-black uppercase text-emerald-700">
-                                {record.status || "ACTIVE"}
-                              </span>
-                              <div className="flex items-center gap-0.5 border-l border-slate-100 pl-2">
-                                <button
-                                  onClick={e => { e.stopPropagation(); setSelectedSkill(record); setIsSkillModalOpen(true); }}
-                                  className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#263383] hover:bg-blue-50 transition-all"
-                                  title="Edit">
-                                  <Edit2 size={11} />
-                                </button>
-                                <button
-                                  onClick={e => { e.stopPropagation(); handleDeleteSkill(record.resourceSkillId || record.id); }}
-                                  className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
-                                  title="Delete">
-                                  <Trash2 size={11} />
-                                </button>
-                              </div>
-                              <motion.div
-                                animate={{ rotate: isExp ? 180 : 0 }}
-                                transition={{ duration: 0.22, ease: "easeInOut" }}
-                                className="text-slate-400">
-                                <ChevronDown size={14} />
-                              </motion.div>
-                            </div>
-                          </div>
-
-                          <AnimatePresence>
-                            {isExp && (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: "auto", opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.24, ease: [0.4, 0, 0.2, 1] }}>
-                                <div className="px-4 pb-4 pt-1 border-t border-slate-100"
-                                  style={{ background: "#fafbfd" }}>
-                                  <p className="text-[9px] font-black uppercase tracking-[0.14em] mb-2.5"
-                                    style={{ color: "#9ca3af" }}>
-                                    Sub-Skill Specializations
-                                  </p>
-                                  <div className="mb-3 grid grid-cols-2 gap-2 text-[10px] text-slate-500 sm:grid-cols-4">
-                                    <span><b>Category:</b> {record.categoryName || "General"}</span>
-                                    <span><b>Skill:</b> {record.skillName || "Unnamed Skill"}</span>
-                                    <span><b>Proficiency:</b> {record.proficiencyName || "Not Set"}</span>
-                                    <span><b>Status:</b> {record.status || "ACTIVE"}</span>
-                                  </div>
-                                  <div className="flex flex-wrap gap-2">
-                                    {(record.subSkills || []).length > 0
-                                      ? record.subSkills.map((ss, i) => (
-                                        <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-white"
-                                          style={{ borderColor: "#e4e8f4" }}>
-                                          <span className="text-xs font-semibold" style={{ color: "#1e2a4a" }}>{ss.name}</span>
-                                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase ${pf(ss.proficiencyName)}`}>
-                                            {ss.proficiencyName}
-                                          </span>
-                                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 uppercase text-slate-500">
-                                            {ss.status || "ACTIVE"}
-                                          </span>
-                                        </div>
-                                      ))
-                                      : <p className="text-xs text-slate-400 italic">No sub-skills mapped.</p>
-                                    }
-                                  </div>
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12 rounded-2xl text-center"
-                    style={{ background: "linear-gradient(135deg, #f8f9fe 0%, #eef1f9 100%)", border: "2px dashed #d8ddf0" }}>
-                    <div className="w-14 h-14 rounded-2xl mb-3 flex items-center justify-center"
-                      style={{ background: "linear-gradient(145deg, #081534, #263383)" }}>
-                      <Award size={22} className="text-white" />
+                  employeeSkillsLoading ? (
+                    <div className="flex items-center justify-center gap-2 py-12 text-sm font-semibold text-slate-500">
+                      <Loader2 size={18} className="animate-spin" />
+                      Loading employee skills...
                     </div>
-                    <p className="epv3-display text-sm font-bold" style={{ color: "#0c1b45" }}>
-                      No skills recorded yet
-                    </p>
-                    <p className={`${Fonts.smallText} mt-1 max-w-[220px]`}>
-                      Build this employee's professional profile by adding their key skills.
-                    </p>
-                    <button
-                      onClick={() => { setSelectedSkill(null); setIsSkillModalOpen(true); }}
-                      className="epv3-btn mt-4">
-                      <Plus size={13} />Add First Skill
-                    </button>
-                  </div>
-                )) : (
+                  ) : employeeSkillsError ? (
+                    <div className="flex flex-col items-center justify-center gap-3 py-10 rounded-2xl text-center"
+                      style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}>
+                      <AlertCircle size={22} className="text-orange-500" />
+                      <p className="text-sm font-bold text-orange-700">{employeeSkillsError}</p>
+                      <button onClick={() => fetchEmployeeSkills()} className="epv3-btn">
+                        Retry
+                      </button>
+                    </div>
+                  ) : groupedEmployeeSkills.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {groupedEmployeeSkills.map((record, idx) => {
+                        const skillId = record.id || `skill-${idx}`;
+                        const isExp = expandedSkills.has(skillId);
+                        const pfClass = pf(record.proficiencyName);
+
+                        return (
+                          <div key={skillId} className={`epv3-skill-tile ${isExp ? "expanded" : ""}`}>
+                            <div onClick={() => toggleExpand(skillId)}
+                              className="flex items-center gap-3 px-4 py-3.5 cursor-pointer select-none">
+                              <div className="w-1 h-10 rounded-full flex-shrink-0"
+                                style={{ background: "linear-gradient(180deg, #263383 0%, #ff3d72 100%)" }} />
+
+                              <div className="flex-1 min-w-0">
+                                <span className="text-[9px] font-black uppercase tracking-[0.12em]"
+                                  style={{ color: "#9ca3af" }}>
+                                  {record.categoryName || "General"}
+                                </span>
+                                <p className="text-sm font-bold truncate" style={{ color: "#0c1b45" }}>
+                                  {record.skillName || "Unnamed Skill"}
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className={`hidden xs:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border text-[10px] font-bold uppercase ${pfClass}`}>
+                                  <Check size={9} strokeWidth={3} />
+                                  {record.proficiencyName || "Not Set"}
+                                </span>
+                                <span className="hidden md:inline-flex px-2 py-0.5 rounded-lg border border-emerald-100 bg-emerald-50 text-[9px] font-black uppercase text-emerald-700">
+                                  {record.status || "ACTIVE"}
+                                </span>
+                                <div className="flex items-center gap-0.5 border-l border-slate-100 pl-2">
+                                  <button
+                                    onClick={e => { e.stopPropagation(); setSelectedSkill(record); setIsSkillModalOpen(true); }}
+                                    className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#263383] hover:bg-blue-50 transition-all"
+                                    title="Edit">
+                                    <Edit2 size={11} />
+                                  </button>
+                                  <button
+                                    onClick={e => { e.stopPropagation(); handleDeleteSkill(record.resourceSkillId || record.id); }}
+                                    className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                                    title="Delete">
+                                    <Trash2 size={11} />
+                                  </button>
+                                </div>
+                                <motion.div
+                                  animate={{ rotate: isExp ? 180 : 0 }}
+                                  transition={{ duration: 0.22, ease: "easeInOut" }}
+                                  className="text-slate-400">
+                                  <ChevronDown size={14} />
+                                </motion.div>
+                              </div>
+                            </div>
+
+                            <AnimatePresence>
+                              {isExp && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.24, ease: [0.4, 0, 0.2, 1] }}>
+                                  <div className="px-4 pb-4 pt-1 border-t border-slate-100"
+                                    style={{ background: "#fafbfd" }}>
+                                    <p className="text-[9px] font-black uppercase tracking-[0.14em] mb-2.5"
+                                      style={{ color: "#9ca3af" }}>
+                                      Sub-Skill Specializations
+                                    </p>
+                                    <div className="mb-3 grid grid-cols-2 gap-2 text-[10px] text-slate-500 sm:grid-cols-4">
+                                      <span><b>Category:</b> {record.categoryName || "General"}</span>
+                                      <span><b>Skill:</b> {record.skillName || "Unnamed Skill"}</span>
+                                      <span><b>Proficiency:</b> {record.proficiencyName || "Not Set"}</span>
+                                      <span><b>Status:</b> {record.status || "ACTIVE"}</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                      {(record.subSkills || []).length > 0
+                                        ? record.subSkills.map((ss, i) => (
+                                          <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-white"
+                                            style={{ borderColor: "#e4e8f4" }}>
+                                            <span className="text-xs font-semibold" style={{ color: "#1e2a4a" }}>{ss.name}</span>
+                                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase ${pf(ss.proficiencyName)}`}>
+                                              {ss.proficiencyName}
+                                            </span>
+                                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 uppercase text-slate-500">
+                                              {ss.status || "ACTIVE"}
+                                            </span>
+                                          </div>
+                                        ))
+                                        : <p className="text-xs text-slate-400 italic">No sub-skills mapped.</p>
+                                      }
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 rounded-2xl text-center"
+                      style={{ background: "linear-gradient(135deg, #f8f9fe 0%, #eef1f9 100%)", border: "2px dashed #d8ddf0" }}>
+                      <div className="w-14 h-14 rounded-2xl mb-3 flex items-center justify-center"
+                        style={{ background: "linear-gradient(145deg, #081534, #263383)" }}>
+                        <Award size={22} className="text-white" />
+                      </div>
+                      <p className="epv3-display text-sm font-bold" style={{ color: "#0c1b45" }}>
+                        No skills recorded yet
+                      </p>
+                      <p className={`${Fonts.smallText} mt-1 max-w-[220px]`}>
+                        Build this employee's professional profile by adding their key skills.
+                      </p>
+                      <button
+                        onClick={() => { setSelectedSkill(null); setIsSkillModalOpen(true); }}
+                        className="epv3-btn mt-4">
+                        <Plus size={13} />Add First Skill
+                      </button>
+                    </div>
+                  )) : (
                   <div className="space-y-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="relative w-full sm:max-w-xs">
@@ -1850,6 +1905,19 @@ value: (hrData?.education_documents || []).length,                             b
         onConfirm={confirmDeleteSkill}
         onCancel={() => setDeleteConfirm({ isOpen: false, resourceSkillId: null, isDeleting: false })}
       />
+      <ConfirmationModal
+        isOpen={isDeleteEmployeeModalOpen}
+        title="Delete Employee"
+        message="Are you sure you want to permanently delete this employee? This action cannot be undone and all associated data will be removed."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isDeletingEmployee}
+        onConfirm={handleDeleteEmployee}
+        onCancel={() => {
+          if (!isDeletingEmployee) setIsDeleteEmployeeModalOpen(false);
+        }}
+      />
     </div>
   );
 }
@@ -1888,9 +1956,8 @@ const Info = ({ icon, text }) => (
 );
 const Tab = ({ children, active, onClick }) => (
   <button onClick={onClick}
-    className={`pb-3 px-3 sm:px-1 whitespace-nowrap transition shrink-0 ${
-      active ? "border-b-2 border-indigo-600 text-indigo-700 font-semibold" : "text-gray-500 hover:text-indigo-600"
-    }`}>
+    className={`pb-3 px-3 sm:px-1 whitespace-nowrap transition shrink-0 ${active ? "border-b-2 border-indigo-600 text-indigo-700 font-semibold" : "text-gray-500 hover:text-indigo-600"
+      }`}>
     {children}
   </button>
 );

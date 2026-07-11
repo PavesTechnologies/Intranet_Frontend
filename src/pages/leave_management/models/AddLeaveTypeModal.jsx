@@ -467,7 +467,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
             <div className="grid gap-2 sm:grid-cols-2">
               {[
                 "requiresDocumentation",
-                "allowNegativeBalance",
+                // "allowNegativeBalance",
                 "noticePeriodRestriction",
                 "weekendsAndHolidaysAllowed",
                 "active",
@@ -495,7 +495,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
               {[
                 "requiresDocumentation",
                 "allowHalfDay",
-                "allowNegativeBalance",
+                // "allowNegativeBalance",
                 "noticePeriodRestriction",
                 "weekendsAndHolidaysAllowed",
                 "active",

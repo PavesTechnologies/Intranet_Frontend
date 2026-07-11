@@ -4,7 +4,8 @@ import { useDrag } from "react-dnd";
 import {
   MoreHorizontalIcon,
   AddIcon,
-  ApprovedIcon
+  ApprovedIcon,
+  ViewIcon
 } from "../../../../components/icons";
 import RiskBadge from "../RiskBadge";
 
@@ -91,7 +92,7 @@ const TaskCard = ({
     <div
       ref={readOnly ? undefined : dragRef}
       onClick={() => !readOnly && onClick?.()}
-      className={`group relative bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm flex items-center gap-3 ${
+      className={`group relative bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm flex items-start gap-3 w-full shrink-0 ${
         readOnly ? "cursor-default opacity-80" : "hover:border-indigo-300 cursor-pointer"
       } ${isDragging ? "opacity-50 scale-95 ring-2 ring-indigo-400" : ""}`}
     >
@@ -102,7 +103,7 @@ const TaskCard = ({
       </div>
 
       {/* Title */}
-      <p className="flex-1 text-sm text-gray-800 truncate">
+      <p className="flex-1 min-w-0 text-sm text-gray-800 break-words">
         {task.title}
       </p>
       <RiskBadge count={riskCount} issueType="Task" issueId={task.id} projectId={projectId} navigate={navigate} />
@@ -122,6 +123,20 @@ const TaskCard = ({
           <AddIcon size={13} /> Story
         </button>
       )}
+
+      {/* View */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          navigate?.(`/projects/${projectId}/issues/task/${task.id}/view`, {
+            state: { issue: task },
+          });
+        }}
+        className="p-1 text-gray-400 hover:text-indigo-600 rounded shrink-0"
+        title="View"
+      >
+        <ViewIcon size={16} />
+      </button>
 
       {/* Three Dot Menu */}
       <div

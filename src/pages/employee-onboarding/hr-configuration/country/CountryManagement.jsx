@@ -8,11 +8,15 @@ import GenericTable from "../../../../components/Table/table";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { PageCard } from "../../../../components/Cards/PageCard";
 import { Fonts } from "../../../../components/Fonts/Fonts";
+import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 
 export default function CountryManagement() {
   const [countries, setCountries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+const [selectedCountry, setSelectedCountry] = useState(null);
+const [isUpdating, setIsUpdating] = useState(false);
 
   const BASE_URL = window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL;
 
@@ -20,9 +24,7 @@ export default function CountryManagement() {
   const fetchCountries = async () => {
     try {
       setLoading(true);
-      const res = await api.get(`${BASE_URL}/masters/country`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
+      const res = await api.get(`${BASE_URL}/masters/country`);
       setCountries(res.data);
     } catch (error) {
       console.error("Failed to fetch countries", error);
@@ -37,47 +39,43 @@ export default function CountryManagement() {
   }, []);
 
   /* -------------------- ACTIVATE / DEACTIVATE -------------------- */
-  const handleToggleStatus = async (country) => {
-    if (
-      country.is_active &&
-      !window.confirm("Are you sure you want to deactivate this country?")
-    ) {
-      return;
-    }
+  const confirmToggleStatus = async () => {
+  if (!selectedCountry) return;
 
-    try {
-      await api.put(
-        `${BASE_URL}/masters/country/deactivateoractivate/${country.country_uuid}`,
-        null,
-        {
-          params: { is_active: country.is_active ? "false" : "true" },
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-          validateStatus: (status) => status >= 200 && status < 300,
+  try {
+    setIsUpdating(true);
+
+    await api.put(
+      `${BASE_URL}/masters/country/deactivateoractivate/${selectedCountry.country_uuid}`,
+      null,
+      {
+        params: {
+          is_active: !selectedCountry.is_active,
         },
-      );
+      }
+    );
 
-      if (window.showSuccess) window.showSuccess(
-        `Country ${country.is_active ? "deactivated" : "activated"} successfully`,
-      );
+    setCountries((prev) =>
+      prev.map((c) =>
+        c.country_uuid === selectedCountry.country_uuid
+          ? { ...c, is_active: !c.is_active }
+          : c
+      )
+    );
 
-      // Update table instantly
-      setCountries((prev) =>
-        prev.map((c) =>
-          c.country_uuid === country.country_uuid
-            ? { ...c, is_active: !c.is_active }
-            : c,
-        ),
-      );
-    } catch (error) {
-      console.error(
-        "Toggle failed",
-        error.response?.status,
-        error.response?.data,
-      );
-      if (window.showError) window.showError("Failed to update country status");
-    }
-  };
+    window.showSuccess?.(
+      `Country ${selectedCountry.is_active ? "deactivated" : "activated"} successfully`
+    );
 
+    setIsConfirmOpen(false);
+    setSelectedCountry(null);
+  } catch (error) {
+    console.error(error);
+    window.showError?.("Failed to update country status");
+  } finally {
+    setIsUpdating(false);
+  }
+};
   const tableHeaders = ["Country Name", "Calling Code", "Status", "Action"];
   const tableColumns = ["country_name", "calling_code", "status_badge", "action_button"];
   const tableRows = countries.map(country => ({
@@ -86,7 +84,10 @@ export default function CountryManagement() {
     status_badge: <StatusBadge label={country.is_active ? "Active" : "Inactive"} size="sm" />,
     action_button: (
       <Button
-        onClick={() => handleToggleStatus(country)}
+        onClick={() => {
+  setSelectedCountry(country);
+  setIsConfirmOpen(true);
+}}
         variant={country.is_active ? "danger" : "success"}
         size="small"
       >
@@ -133,6 +134,22 @@ export default function CountryManagement() {
           BASE_URL={BASE_URL}
         />
       )}
+      <ConfirmationModal
+  isOpen={isConfirmOpen}
+  onClose={() => {
+    setIsConfirmOpen(false);
+    setSelectedCountry(null);
+  }}
+  onConfirm={confirmToggleStatus}
+  title={`${selectedCountry?.is_active ? "Deactivate" : "Activate"} Country`}
+  message={`Are you sure you want to ${
+    selectedCountry?.is_active ? "deactivate" : "activate"
+  } this country?`}
+  confirmText={selectedCountry?.is_active ? "Deactivate" : "Activate"}
+  cancelText="Cancel"
+  confirmVariant={selectedCountry?.is_active ? "danger" : "success"}
+  loading={isUpdating}
+/>
     </div>
   );
 }

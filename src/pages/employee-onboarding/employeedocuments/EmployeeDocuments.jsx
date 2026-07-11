@@ -17,6 +17,8 @@ import SearchInput from "../../../components/filter/Searchbar";
 import { Fonts } from "../../../components/Fonts/Fonts";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import StatusBadge from "../../../components/status/statusbadge";
+import PageHeader from "../../../components/ui/PageHeader";
+import FilterCard from "../../../components/ui/FilterCard";
 
 const categoryOptions = ["Identity", "Education", "Work", "HR Document"];
 
@@ -444,50 +446,40 @@ export default function EmployeeDocumentsPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6">
-      <PageCard>
-        <div className="grid gap-6 p-6 xl:grid-cols-[minmax(320px,1fr)_minmax(0,760px)] xl:items-end">
-          <div className="min-w-0">
-            <h1 className={`${Fonts.heading2} whitespace-nowrap`}>
-              Employee Documents
-            </h1>
-            <p className="mt-2 flex max-w-xl items-start gap-2 text-sm text-gray-500">
-              <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[#0A0082]" />
-              Manage, verify, and seamlessly organize essential documents across
-              your entire workforce.
-            </p>
-          </div>
+      <PageHeader
+        title="Employee Documents"
+        subtitle="Manage, verify, and seamlessly organize essential documents across your entire workforce."
+      />
 
-          <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]">
-            <div className="min-w-0">
-              <SearchInput
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search name or ID..."
-                className="h-[42px]"
-              />
-            </div>
-            <div className="min-w-0">
-              <FilterListbox
-                buttonClassName={filterButtonClassName}
-                options={buildFilterOptions("All Categories", categoryOptions)}
-                value={categoryFilter}
-                onChange={setCategoryFilter}
-              />
-            </div>
-            <div className="min-w-0">
-              <FilterListbox
-                buttonClassName={filterButtonClassName}
-                options={buildFilterOptions(
-                  "All Departments",
-                  departmentOptions,
-                )}
-                value={departmentFilter}
-                onChange={setDepartmentFilter}
-              />
-            </div>
-          </div>
+      <FilterCard description="Narrow the document list by name, ID, category, or department.">
+        <div className="w-full min-w-0 sm:w-64">
+          <SearchInput
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search name or ID..."
+            className="h-[42px]"
+          />
         </div>
-      </PageCard>
+        <div className="w-full min-w-0 sm:w-52">
+          <FilterListbox
+            buttonClassName={filterButtonClassName}
+            options={buildFilterOptions("All Categories", categoryOptions)}
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+          />
+        </div>
+        <div className="w-full min-w-0 sm:w-52">
+          <FilterListbox
+            buttonClassName={filterButtonClassName}
+            options={buildFilterOptions(
+              "All Departments",
+              departmentOptions,
+            )}
+            value={departmentFilter}
+            onChange={setDepartmentFilter}
+          />
+        </div>
+      </FilterCard>
 
       {visibleDepartmentGroups.length === 0 ? (
         <PageCard className="border-dashed border-gray-300">
@@ -624,75 +616,58 @@ export default function EmployeeDocumentsPage() {
                             <div className="overflow-hidden">
                               <div className="border-t border-gray-200 bg-gray-50">
                                 <div className="overflow-x-auto px-5 py-4">
-                                  <table className="w-full whitespace-nowrap text-left text-sm">
+                                  
+                                  <table className="w-full table-fixed text-sm">
                                     <thead>
-                                      <tr className="border-b border-gray-200 text-xs font-semibold uppercase text-gray-500">
-                                        <th className="pb-3 pl-2 pr-4">
-                                          Document Details
-                                        </th>
-                                        <th className="px-4 pb-3">Type</th>
-                                        <th className="px-4 pb-3">Category</th>
-                                        <th className="px-4 pb-3">
-                                          Last Updated
-                                        </th>
-                                        <th className="px-4 pb-3">Status</th>
-                                        <th className="pb-3 pl-4 pr-2 text-right">
-                                          Actions
-                                        </th>
+                                      <tr className="border-b border-gray-200 bg-gray-100 text-xs font-semibold uppercase text-gray-600">
+                                        <th className="w-[42%] py-3 pl-4 text-left">Document Details</th>
+                                        <th className="w-[14%] py-3 text-center">Type</th>
+                                        <th className="w-[16%] py-3 text-center">Category</th>
+                                        <th className="w-[16%] py-3 text-center">Last Updated</th>
+                                        <th className="w-[12%] py-3 pr-4 text-center">Actions</th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-200">
                                       {documentsToShow.map((doc) => (
-                                        <tr
-                                          key={doc.id}
-                                          className="transition hover:bg-white"
-                                        >
-                                          <td className="py-4 pl-2 pr-4">
-                                            <div className="flex items-center gap-3">
-                                              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white ring-1 ring-gray-200">
+                                        <tr key={doc.id} className="hover:bg-white">
+
+                                          <td className="py-5 pl-4">
+                                            <div className="flex items-center gap-4">
+                                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-gray-200">
                                                 {getCategoryIcon(doc.category)}
                                               </div>
-                                              <span className="font-semibold text-gray-900">
+
+                                              <span className="truncate font-semibold text-gray-900">
                                                 {doc.docName}
                                               </span>
                                             </div>
                                           </td>
-                                          <td className="px-4 py-4 font-medium text-gray-600">
+
+                                          <td className="py-5 text-center font-medium text-gray-600">
                                             {doc.type}
                                           </td>
-                                          <td className="px-4 py-4 text-gray-600">
+
+                                          <td className="py-5 text-center text-gray-600">
                                             {doc.category}
                                           </td>
-                                          <td className="px-4 py-4 text-gray-500">
+
+                                          <td className="py-5 text-center text-gray-500">
                                             {doc.updated}
                                           </td>
-                                          <td className="px-4 py-4">
-                                            <StatusBadge
-                                              label={doc.status}
-                                              size="sm"
-                                            />
+
+                                          <td className="py-5 text-center">
+                                            <Button
+                                              size="small"
+                                              variant="outline"
+                                              loading={loadingDoc === doc.id}
+                                              loadingText="Loading..."
+                                              onClick={() => viewDocument(doc.fileUrl, doc.id)}
+                                            >
+                                              <Eye className="h-4 w-4" />
+                                              <span className="hidden lg:inline">View</span>
+                                            </Button>
                                           </td>
-                                          <td className="py-4 pl-4 pr-2 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                              <Button
-                                                size="small"
-                                                variant="outline"
-                                                loading={loadingDoc === doc.id}
-                                                loadingText="Loading..."
-                                                onClick={() =>
-                                                  viewDocument(
-                                                    doc.fileUrl,
-                                                    doc.id,
-                                                  )
-                                                }
-                                              >
-                                                <Eye className="h-4 w-4" />
-                                                <span className="hidden lg:inline">
-                                                  View
-                                                </span>
-                                              </Button>
-                                            </div>
-                                          </td>
+
                                         </tr>
                                       ))}
                                     </tbody>

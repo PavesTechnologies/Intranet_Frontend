@@ -8,11 +8,12 @@ import { ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { Listbox } from "@headlessui/react";
 import { ChevronUpDownIcon, CheckIcon } from "@heroicons/react/20/solid";
-import { Plus } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import LeaveUploadWizard from "./LeaveUploadWizard";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Button from "../../../components/Button/Button";
 import FilterListbox from "../../../components/filter/FilterListbox";
+import GenericTable from "../../../components/Table/table";
 
 export const YearDropdown = ({ value, onChange }) => {
   const currentYear = new Date().getFullYear();
@@ -35,8 +36,7 @@ export const YearDropdown = ({ value, onChange }) => {
                 key={year}
                 value={year}
                 className={({ active }) =>
-                  `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                    active ? "bg-blue-100 text-blue-900" : "text-gray-900"
+                  `relative cursor-pointer select-none py-2 pl-10 pr-4 ${active ? "bg-blue-100 text-blue-900" : "text-gray-900"
                   }`
                 }
               >
@@ -163,6 +163,17 @@ const fetchLeaveBalances = async ({ query, year, page, rowsPerPage }) => {
     leaveTypes: Object.values(leaveTypeCollection),
     totalPages: Math.ceil(result.length / rowsPerPage) || 1,
   };
+};
+
+// Helper to convert snake_case/camelCase to Pascal Case with spaces
+const formatLeaveTypeName = (name) => {
+  if (!name) return "";
+  return name
+    .replace(/_/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 };
 
 // ─────────────────────────────────────────────
@@ -455,61 +466,41 @@ const EmployeeLeaveBalances = () => {
             No leave balances found.
           </p>
         ) : (
-          <div className="overflow-x-auto border rounded-md">
-            <table className="min-w-max text-sm text-left border-collapse relative">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="border px-6 py-3 sticky left-0 bg-gray-100 z-10 min-w-[200px]">
-                    Employee Id
-                  </th>
-                  <th className="border px-6 py-3 sticky left-[200px] bg-gray-100 z-10 min-w-[250px]">
-                    Employee Name
-                  </th>
-                  {leaveTypes.map(({ leaveTypeName, leaveTypeId }) => (
-                    <th
-                      key={leaveTypeId || leaveTypeName}
-                      className="border px-6 py-3 text-center min-w-[160px] whitespace-nowrap"
-                    >
-                      {leaveTypeName}
-                    </th>
-                  ))}
-                  <th className="border px-4 py-2 sticky right-0 bg-gray-100 z-10">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="text-xs">
-                {data.map((emp) => (
-                  <tr key={emp.employeeId}>
-                    <td className="border px-6 py-2 sticky left-0 bg-white z-10 font-medium min-w-[200px]">
-                      {emp.employeeId}
-                    </td>
-                    <td className="border px-6 py-2 sticky left-[200px] bg-white z-10 font-medium min-w-[250px]">
-                      {emp.employeeName}
-                    </td>
-                    {leaveTypes.map(({ leaveTypeName, leaveTypeId }) => (
-                      <td
-                        key={leaveTypeId || leaveTypeName}
-                        className="border px-6 py-2 text-center min-w-[160px] whitespace-nowrap"
-                      >
-                        {emp.balances[leaveTypeName]?.remainingLeaves ?? "-"}
-                      </td>
-                    ))}
-                    <td className="border px-4 py-2 text-center sticky right-0 bg-white z-10">
-                      <Button
-                        onClick={() => handleEdit(emp)}
-                        variant="ghost"
-                        size="small" 
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        Edit
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <GenericTable
+            headers={[
+              "Employee Id",
+              "Employee Name",
+              ...leaveTypes.map((lt) => formatLeaveTypeName(lt.leaveTypeName)),
+              "Actions",
+            ]}
+            columns={[
+              "employeeId",
+              "employeeName",
+              ...leaveTypes.map((lt) => lt.leaveTypeId || lt.leaveTypeName),
+              "actions",
+            ]}
+            rows={data.map((emp) => {
+              const row = {
+                employeeId: emp.employeeId,
+                employeeName: emp.employeeName,
+                actions: (
+                  <button
+                    onClick={() => handleEdit(emp)}
+                    className="text-blue-600 hover:text-blue-800"
+                    title="Edit"
+                  >
+                    <Pencil size={16}></Pencil>
+                  </button>
+                ),
+              };
+              leaveTypes.forEach(({ leaveTypeName, leaveTypeId }) => {
+                const colKey = leaveTypeId || leaveTypeName;
+                row[colKey] = emp.balances[leaveTypeName]?.remainingLeaves ?? "-";
+              });
+              return row;
+            })}
+            loading={isLoading}
+          />
         )}
 
         {showUploadWizard && (
@@ -592,11 +583,10 @@ const EmployeeLeaveBalances = () => {
                       <input
                         type="number"
                         disabled={isDisabled}
-                        className={`border px-3 py-2 w-full rounded shadow-sm ${
-                          isDisabled
-                            ? "bg-gray-100 text-gray-500 cursor-not-allowed"
-                            : ""
-                        }`}
+                        className={`border px-3 py-2 w-full rounded shadow-sm ${isDisabled
+                          ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                          : ""
+                          }`}
                         value={isDisabled ? 0 : currentValue}
                         onChange={(e) => {
                           if (isDisabled) return;

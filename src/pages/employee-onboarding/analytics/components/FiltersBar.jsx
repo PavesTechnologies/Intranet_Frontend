@@ -1,6 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Fonts } from "../../../../components/Fonts/Fonts";
+import FilterCard from "../../../../components/ui/FilterCard";
 
 const FILTERS = [
   { key: "dept", label: "Department" },
@@ -47,20 +48,8 @@ export default function FiltersBar({ filters, setFilters, departments = [] }) {
   };
 
   return (
-    <div
-      ref={containerRef}
-      className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-    >
-      <div className="mb-3 flex items-start gap-3">
-        <span className="mt-0.5 h-10 w-1.5 rounded-full bg-indigo-600" />
-        <div>
-          <h3 className="text-sm font-semibold text-slate-900">Filters</h3>
-          <p className={Fonts.smallText}>
-            Narrow the analytics view by department, period, or worker type.
-          </p>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-3">
+    <div ref={containerRef} className="mt-5">
+      <FilterCard description="Narrow the analytics view by department, period, or worker type.">
         {FILTERS.map((filter) => (
           <div key={filter.key} className="relative">
             <button
@@ -92,7 +81,7 @@ export default function FiltersBar({ filters, setFilters, departments = [] }) {
             )}
           </div>
         ))}
-      </div>
+      </FilterCard>
     </div>
   );
 }

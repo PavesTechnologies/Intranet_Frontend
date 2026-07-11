@@ -59,6 +59,46 @@ const CreateIssueForm = ({
   const [loading, setLoading] = useState(false);
   const [selectedStorySprint, setSelectedStorySprint] = useState(null);
 
+  // ------------ Measure the live sidebar & header so the modal sits between them -----------
+  const [sidebarWidth, setSidebarWidth] = useState(0);
+  const [headerHeight, setHeaderHeight] = useState(0);
+
+  useEffect(() => {
+    const measureChrome = () => {
+      const asides = document.querySelectorAll("aside");
+      let sidebarEl = null;
+      asides.forEach((el) => {
+        const rect = el.getBoundingClientRect();
+        if (rect.left <= 0 && rect.top <= 0 && rect.height >= window.innerHeight * 0.9) {
+          sidebarEl = el;
+        }
+      });
+      setSidebarWidth(sidebarEl ? sidebarEl.getBoundingClientRect().width : 0);
+
+      const headers = document.querySelectorAll("header");
+      let headerEl = null;
+      headers.forEach((el) => {
+        const position = window.getComputedStyle(el).position;
+        const rect = el.getBoundingClientRect();
+        if ((position === "sticky" || position === "fixed") && rect.top <= 5) {
+          headerEl = el;
+        }
+      });
+      setHeaderHeight(headerEl ? headerEl.getBoundingClientRect().height : 0);
+    };
+
+    measureChrome();
+
+    const observer = new ResizeObserver(measureChrome);
+    document.querySelectorAll("aside, header").forEach((el) => observer.observe(el));
+    window.addEventListener("resize", measureChrome);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measureChrome);
+    };
+  }, []);
+
   const token = localStorage.getItem("token");
   const axiosConfig = {
     headers: {
@@ -300,7 +340,10 @@ const CreateIssueForm = ({
   //                UI  (Jira-Like Wide Modal)
   // -----------------------------------------------------------
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+    <div
+      className="fixed right-0 bottom-0 bg-black bg-opacity-40 flex justify-center items-center z-40 transition-[left,top] duration-300"
+      style={{ left: sidebarWidth, top: headerHeight }}
+    >
       <div className="bg-white w-[85%] h-[85%] rounded-xl shadow-xl flex flex-col overflow-hidden">
         {/* ------ HEADER ------ */}
         <div className="border-b px-6 py-4 flex justify-between items-center bg-gray-50">

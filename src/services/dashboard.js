@@ -5,6 +5,7 @@ const TMS_BASE_URL = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;
 const PMS_BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
 const LMS_BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
+
 export const celebrations = async () => {
     try {
         const response = await api.get(`${EOS_BASE_URL}/dashboard/celebrations`, {
