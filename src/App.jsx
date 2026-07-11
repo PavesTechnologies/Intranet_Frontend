@@ -104,7 +104,6 @@ import AirsDashboard from "./pages/airs/pages/AirsDashboard.jsx";
 import JdLibrary from "./pages/airs/pages/JdLibrary.jsx";
 import JdCreate from "./pages/airs/pages/JdCreate.jsx";
 import JdDetails from "./pages/airs/pages/JdDetails.jsx";
-import CampaignLibraryPage from "./pages/airs/campaigns/CampaignLibraryPage.jsx";
 import ResumeIntakePage from "./pages/airs/resume-intake/ResumeIntakePage.jsx";
 import CandidateRankingPage from "./pages/airs/candidates/CandidateRankingPage.jsx";
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
@@ -978,14 +977,7 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/airs/campaigns"
-            element={
-              <ProtectedRoute roles={["General"]}>
-                <CampaignLibraryPage />
-              </ProtectedRoute>
-            }
-          />
+          
           <Route
             path="/airs/resume-intake"
             element={
