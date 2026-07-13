@@ -780,7 +780,8 @@ export default function JdDetails() {
                   return (
                     <div
                       key={c.id || idx}
-                      className="bg-white border border-slate-200 rounded-3xl px-6 py-4 shadow-sm flex flex-col justify-between"
+                      onClick={() => c.id && navigate(`/airs/campaigns/${c.id}`)}
+                      className="bg-white border border-slate-200 rounded-3xl px-6 py-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:border-indigo-200 transition"
                     >
                       <div>
                         {/* Top row */}
