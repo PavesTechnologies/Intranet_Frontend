@@ -979,9 +979,8 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
-          
           <Route
-            path="/airs/resume-intake"
+            path="/airs/campaigns"
             element={
               <ProtectedRoute roles={["General"]}>
                 <Campaigns />

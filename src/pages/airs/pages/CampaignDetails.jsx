@@ -4,7 +4,7 @@ import { toast } from "react-toastify";
 import {
   ArrowLeft, Users, Activity, AlertTriangle, Lock, Target,
   UserCog, FileText, ArrowRight, Filter, ChevronDown, Clock, Edit2,
-  ExternalLink
+  ExternalLink, ListChecks, MapPin
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import FilterListbox from "../../../components/filter/FilterListbox";
@@ -13,6 +13,7 @@ import EditCampaignModal from "../modals/EditCampaignModal";
 import { useAuth } from "../../../contexts/AuthContext";
 import {
   getCampaignDetails, getPipelineSummary, getCampaignTimeline,
+  getCampaignCandidates,
 } from "../service/campaignservice";
 
 // Colour per pipeline stage (used for the funnel bars)
@@ -23,6 +24,39 @@ const STAGE_COLORS = {
 };
 const stageLabel = (s) =>
   s.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+
+// Tailwind badge styles per pipeline stage (candidate list chips)
+const STAGE_BADGE = {
+  UPLOADED: "bg-slate-100 text-slate-600",
+  SCREENING: "bg-amber-50 text-amber-700",
+  SHORTLISTED: "bg-sky-50 text-sky-700",
+  HM_REVIEW: "bg-teal-50 text-teal-700",
+  INTERVIEW: "bg-indigo-50 text-indigo-700",
+  SELECTED: "bg-emerald-50 text-emerald-700",
+  HOLD: "bg-slate-100 text-slate-500",
+  REJECTED: "bg-rose-50 text-rose-700",
+  FRAUD_REVIEW: "bg-orange-50 text-orange-700",
+};
+
+// Composite-score colour tone
+const scoreTone = (s) =>
+  s >= 70 ? "bg-emerald-50 text-emerald-700"
+    : s >= 50 ? "bg-amber-50 text-amber-700"
+      : "bg-rose-50 text-rose-700";
+
+const initialsOf = (name) =>
+  (name || "?").trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+
+// The candidate list endpoint's payload field names aren't nailed down in the
+// frontend yet, so read the most likely keys defensively and normalise to a
+// stable shape the row renderer can rely on.
+const normalizeCandidate = (cd, idx) => ({
+  id: cd.id ?? cd.campaign_candidate_id ?? cd.candidate_id ?? idx,
+  name: cd.candidate_name ?? cd.full_name ?? cd.name ?? "Unknown Candidate",
+  location: cd.location ?? cd.city ?? cd.current_location ?? "",
+  stage: (cd.current_stage ?? cd.stage ?? cd.candidate_stage ?? cd.status ?? "").toUpperCase(),
+  score: cd.composite_score ?? cd.composite ?? cd.overall_score ?? cd.score ?? null,
+});
 
 const TIMELINE_EVENT_TYPES = [
   { value: "", label: "All Events" },
@@ -102,6 +136,7 @@ export default function CampaignDetails() {
 
   const tabs = [
     { id: "details", label: "Details", icon: FileText, show: true },
+    { id: "candidates", label: "Candidates", icon: ListChecks, show: true },
     { id: "pipeline", label: "Pipeline", icon: Users, show: canSeePipeline },
     { id: "timeline", label: "Timeline", icon: Activity, show: canSeeTimeline },
   ].filter((t) => t.show);
@@ -170,6 +205,7 @@ export default function CampaignDetails() {
       {activeTab === "details" && (
         <DetailsTab info={info} jd={jd} scoring={scoring} limits={limits} hm={hm} />
       )}
+      {activeTab === "candidates" && <CandidatesTab campaignId={id} />}
       {activeTab === "pipeline" && (
         <PipelineTab
           campaignId={id}
@@ -269,6 +305,134 @@ function DetailsTab({ info, jd, scoring, limits, hm }) {
           <Field label="Email" value={hm.email} />
         </Section>
       )}
+    </div>
+  );
+}
+
+/* ---------------- Candidates Tab ---------------- */
+// Small stat tile for the candidate KPI row
+function StatTile({ label, value, suffix = "", tone = "text-slate-900", dot = "bg-slate-300" }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex items-center gap-1.5 mb-1">
+        <span className={`h-2 w-2 rounded-full ${dot}`} />
+        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 truncate">{label}</p>
+      </div>
+      <p className={`text-xl font-black tabular-nums ${tone}`}>{value}{suffix}</p>
+    </div>
+  );
+}
+
+function CandidatesTab({ campaignId }) {
+  const [candidates, setCandidates] = useState(null);
+  const [summary, setSummary] = useState(null);   // pipeline-summary → KPI numbers
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Candidate list and the pipeline summary come from two endpoints — fetch
+      // in parallel and don't let a missing summary (e.g. no pipeline access)
+      // block the list from rendering.
+      const [candRes, sumRes] = await Promise.allSettled([
+        getCampaignCandidates(campaignId),
+        getPipelineSummary(campaignId),
+      ]);
+      if (cancelled) return;
+      if (candRes.status === "fulfilled") {
+        setCandidates(unwrap(candRes.value) || []);
+      } else {
+        toast.error("Failed to load campaign candidates.");
+        setCandidates([]);
+      }
+      if (sumRes.status === "fulfilled") setSummary(unwrap(sumRes.value));
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [campaignId]);
+
+  if (loading) {
+    return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading candidates..." /></div>;
+  }
+
+  const list = (candidates || []).map(normalizeCandidate);
+
+  // KPI numbers from the pipeline summary (falls back to list length for total)
+  const stageCount = (key) => (summary?.stages || []).find((s) => s.stage === key)?.count ?? 0;
+  const total = summary?.total_candidates ?? list.length;
+  const shortlisted = stageCount("SHORTLISTED");
+  const selected = stageCount("SELECTED");
+  const rejected = stageCount("REJECTED");
+  const inReview = stageCount("SCREENING") + stageCount("HM_REVIEW") + stageCount("INTERVIEW");
+  const selectionRate = total ? Math.round((selected / total) * 100) : 0;
+
+  const kpis = [
+    { label: "Candidates", value: total, dot: "bg-indigo-500", tone: "text-slate-900" },
+    ...(summary
+      ? [
+        { label: "In Review", value: inReview, dot: "bg-amber-500", tone: "text-amber-600" },
+        { label: "Shortlisted", value: shortlisted, dot: "bg-sky-500", tone: "text-sky-600" },
+        { label: "Selected", value: selected, dot: "bg-emerald-500", tone: "text-emerald-600" },
+        { label: "Rejected", value: rejected, dot: "bg-rose-500", tone: "text-rose-600" },
+        { label: "Selection Rate", value: selectionRate, suffix: "%", dot: "bg-violet-500", tone: "text-violet-600" },
+      ]
+      : []),
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-sm font-bold text-slate-900">Candidates</h3>
+        <p className="text-[11px] text-slate-500">
+          {list.length} candidate{list.length === 1 ? "" : "s"} sourced for this campaign
+        </p>
+      </div>
+
+      {/* KPI row — numbers sourced from the pipeline-summary endpoint */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {kpis.map((k) => (
+          <StatTile key={k.label} {...k} />
+        ))}
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        {list.length === 0 ? (
+          <p className="text-xs text-slate-400 text-center py-10">
+            No candidates sourced yet for this campaign.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {list.map((cd) => (
+              <div
+                key={cd.id}
+                className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100"
+              >
+                <div className="h-8 w-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold uppercase shrink-0">
+                  {initialsOf(cd.name)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-bold text-slate-900 truncate">{cd.name}</div>
+                  {cd.location && (
+                    <div className="text-[11px] text-slate-400 truncate flex items-center gap-1">
+                      <MapPin className="h-3 w-3" /> {cd.location}
+                    </div>
+                  )}
+                </div>
+                {cd.stage && (
+                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase ${STAGE_BADGE[cd.stage] || "bg-slate-100 text-slate-600"}`}>
+                    {stageLabel(cd.stage)}
+                  </span>
+                )}
+                {cd.score != null && (
+                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full tabular-nums ${scoreTone(cd.score)}`}>
+                    {Math.round(cd.score)}%
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
