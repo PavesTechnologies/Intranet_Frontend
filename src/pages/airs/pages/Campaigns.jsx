@@ -19,6 +19,8 @@ import {
   getAllCampaignsHrAdmin,
   getCampaignsByHiringManager,
   getCampaignDetails,
+  getPipelineSummary,
+  getNameByRoles,
 } from "../service/campaignservice";
 
 const DEFAULT_CAMPAIGN_FORM = {
@@ -46,9 +48,27 @@ const STATUS_BADGE = {
   ACTIVE: "bg-emerald-50 text-emerald-700",
   PAUSED: "bg-amber-50 text-amber-700",
   CLOSED: "bg-slate-100 text-slate-600",
+  DRAFT: "bg-slate-100 text-slate-700",
 };
 
 const CAMPAIGNS_PER_PAGE = 9;
+
+// Title-case a status enum for display, e.g. "ACTIVE" -> "Active"
+const statusLabel = (s) =>
+  s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "—";
+
+// Reduce a pipeline-summary payload into the three headline counts the card shows.
+// Funnel stage counts are cumulative (candidates that reached that stage), so
+// they map directly onto "candidates / shortlisted / selected".
+const deriveStats = (summary) => {
+  const stageCount = (key) =>
+    (summary?.stages || []).find((s) => s.stage === key)?.count ?? 0;
+  return {
+    candidates: summary?.total_candidates ?? 0,
+    shortlisted: stageCount("SHORTLISTED"),
+    selected: stageCount("SELECTED"),
+  };
+};
 
 export default function Campaigns() {
   const navigate = useNavigate();
@@ -110,6 +130,33 @@ export default function Campaigns() {
 
   useEffect(() => { fetchCampaigns(); }, [fetchCampaigns]);
 
+  // Resolve hiring-manager / recruiter user IDs to display names.
+  // The campaign list returns these people as bare user IDs (e.g. "5100022"),
+  // so we build an id -> name map from the role directory once on mount.
+  // Best-effort: this UMS endpoint may be admin-only, so we degrade to the raw
+  // ID when it isn't available for the current role.
+  const [userMap, setUserMap] = useState({});
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.allSettled([
+        getNameByRoles("HIRING_MANAGER"),
+        getNameByRoles("RECRUITER"),
+      ]);
+      if (cancelled) return;
+      const map = {};
+      results.forEach((r) => {
+        if (r.status !== "fulfilled") return;
+        const list = Array.isArray(r.value) ? r.value : (r.value?.data || []);
+        list.forEach((u) => {
+          if (u?.user_id != null) map[String(u.user_id)] = u.employee_name || String(u.user_id);
+        });
+      });
+      setUserMap(map);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // JDs for the create modal's JD selector — loaded once, lazily, when the modal first opens
   useEffect(() => {
     if (!createModalOpen || jdList.length > 0) return;
@@ -158,6 +205,39 @@ export default function Campaigns() {
     const start = (currentPage - 1) * CAMPAIGNS_PER_PAGE;
     return filteredCampaigns.slice(start, start + CAMPAIGNS_PER_PAGE);
   }, [filteredCampaigns, currentPage]);
+
+  // Real candidate metrics per card come from the pipeline-summary endpoint.
+  // We only fetch the campaigns visible on the current page, in parallel, and
+  // cache by id so paging back and forth doesn't re-hit the API.
+  //   value === undefined -> not fetched yet (loading placeholder)
+  //   value === null       -> unavailable (e.g. role can't see the pipeline)
+  //   value === object     -> real { candidates, shortlisted, selected }
+  const [pipelineStats, setPipelineStats] = useState({});
+  useEffect(() => {
+    const missing = paginatedCampaigns
+      .map((c) => c.id)
+      .filter((id) => id && !(id in pipelineStats));
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        missing.map(async (id) => {
+          try {
+            const res = await getPipelineSummary(id);
+            return [id, deriveStats(res?.data ?? res)];
+          } catch {
+            return [id, null]; // no pipeline access / not found — degrade gracefully
+          }
+        })
+      );
+      if (!cancelled) {
+        setPipelineStats((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [paginatedCampaigns, pipelineStats]);
 
   // ---- Create campaign ----
   const handleCampaignFormChange = (e) => {
@@ -286,8 +366,26 @@ export default function Campaigns() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {paginatedCampaigns.map((c) => {
               const status = (c.status || "").toUpperCase();
-              const managerName = c.hiring_manager || "Unassigned";
-              const initials = managerName.substring(0, 2).toUpperCase();
+              // Prefer a name field if the backend sends one, else resolve the
+              // ID via the role directory, else show whatever we have.
+              const managerName =
+                c.hiring_manager_name ||
+                userMap[String(c.hiring_manager)] ||
+                c.hiring_manager ||
+                "Unassigned";
+              const initials = String(managerName).substring(0, 2).toUpperCase();
+
+              // Real pipeline metrics (undefined = loading, null = unavailable)
+              const stats = pipelineStats[c.id];
+              const hasStats = stats != null;
+              const progressPct = hasStats
+                ? c.max_candidates
+                  ? Math.min(100, Math.round((stats.selected / c.max_candidates) * 100))
+                  : stats.candidates
+                    ? Math.min(100, Math.round((stats.selected / stats.candidates) * 100))
+                    : 0
+                : 0;
+
               return (
                 <div
                   key={c.id}
@@ -295,39 +393,63 @@ export default function Campaigns() {
                   className="bg-white border border-slate-200 rounded-2xl px-6 py-5 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:border-indigo-200 transition"
                 >
                   <div>
-                    <div className="flex justify-between items-center mb-3">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${STATUS_BADGE[status] || "bg-slate-50 text-slate-600"}`}>
-                        {status || "—"}
+                    {/* Top row: status + edit shortcut */}
+                    <div className="flex justify-between items-center mb-2.5">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_BADGE[status] || "bg-slate-50 text-slate-600"}`}>
+                        {statusLabel(status)}
                       </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          {c.created_at ? new Date(c.created_at).toLocaleDateString() : ""}
-                        </span>
-                        {/* Edit shortcut — HR_ADMIN only, closed campaigns are read-only (S07-T03) */}
-                        {isHRAdmin && status !== "CLOSED" && (
-                          <button
-                            onClick={(e) => handleEditClick(e, c)}
-                            disabled={editLoadingId === c.id}
-                            title="Edit campaign"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition disabled:opacity-50"
-                          >
-                            {editLoadingId === c.id ? (
-                              <span className="block h-3.5 w-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <Edit2 className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                        )}
-                      </div>
+                      {/* Edit shortcut — HR_ADMIN only, closed campaigns are read-only (S07-T03) */}
+                      {isHRAdmin && status !== "CLOSED" && (
+                        <button
+                          onClick={(e) => handleEditClick(e, c)}
+                          disabled={editLoadingId === c.id}
+                          title="Edit campaign"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition disabled:opacity-50"
+                        >
+                          {editLoadingId === c.id ? (
+                            <span className="block h-3.5 w-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Edit2 className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      )}
                     </div>
 
+                    {/* Title + subtitle */}
                     <h4 className="text-base font-bold text-slate-900 leading-snug">{c.name}</h4>
                     <p className="text-xs text-slate-500 font-medium mt-1 mb-4">
                       {c.jd_title || "—"}
-                      {c.max_candidates != null && ` · ${c.max_candidates} max candidates`}
+                      {c.max_candidates != null && ` · ${c.max_candidates} opening${c.max_candidates === 1 ? "" : "s"}`}
                     </p>
+
+                    {/* Candidate stats + progress — real pipeline data */}
+                    {stats === undefined ? (
+                      <div className="mb-4">
+                        <div className="h-3 w-full bg-slate-100 rounded animate-pulse mb-2.5" />
+                        <div className="h-2.5 w-full bg-slate-100 rounded-full animate-pulse" />
+                      </div>
+                    ) : hasStats ? (
+                      <>
+                        <div className="flex justify-between items-center text-xs text-slate-500 font-semibold mb-1.5">
+                          <span>{stats.candidates} candidates</span>
+                          <span>{stats.shortlisted} shortlisted</span>
+                          <span>{stats.selected} selected</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-2.5 mb-4 overflow-hidden">
+                          <div
+                            className="h-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-violet-500 transition-all duration-500"
+                            style={{ width: `${progressPct}%` }}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 font-medium mb-4">
+                        Pipeline metrics unavailable
+                      </p>
+                    )}
                   </div>
 
+                  {/* Footer: manager + deadline */}
                   <div className="border-t border-slate-100 pt-3 flex justify-between items-center">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="h-7 w-7 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px] uppercase shrink-0">
@@ -337,7 +459,9 @@ export default function Campaigns() {
                     </div>
                     <span className="text-[11px] text-slate-400 font-semibold flex items-center gap-1 shrink-0">
                       <Calendar className="h-3 w-3" />
-                      {c.deadline ? new Date(c.deadline).toLocaleDateString() : "No deadline"}
+                      {c.deadline
+                        ? `Due ${new Date(c.deadline).toLocaleDateString(undefined, { month: "short", day: "2-digit", year: "numeric" })}`
+                        : "No deadline"}
                     </span>
                   </div>
                 </div>
