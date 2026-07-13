@@ -3,7 +3,6 @@ import { Check, X } from "lucide-react";
 import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
@@ -95,13 +94,9 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
   //   if (managerId) fetchCompOffs();
   // }, [managerId]);
 
-  // ✅ When employee submits a new revoke → manager's list refreshes
-    useLeaveWebSocket(
-        "manager-update",
-        ["REVOKE_REQUESTED"],   // employee filed a revoke → show it in manager's list
-        onActionSuccess         // this already calls fetchRevokeRequests in AdminPanel
-    );
-
+  // Note: the "REVOKE_REQUESTED" WebSocket subscription now lives in
+  // AdminPanel.jsx, since this component only mounts when
+  // revokeRequests.length > 0 and would miss the very first request.
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500 mb-6">
