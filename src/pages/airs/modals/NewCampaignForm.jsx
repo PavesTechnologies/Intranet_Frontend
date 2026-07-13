@@ -6,6 +6,7 @@ import { getNameByRoles } from "../service/campaignservice";
 
 export default function NewCampaignForm({
     title,
+    jdOptions,          // optional: when provided, render a JD dropdown instead of the static title
     campaignForm,
     handleCampaignFormChange,
     setLinkCampaignModalOpen,
@@ -53,10 +54,20 @@ export default function NewCampaignForm({
         <>
             <div className="space-y-4">
                 <div>
-                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Job Description</label>
-                    <div className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-xs font-bold text-slate-700">
-                        {title}
-                    </div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
+                        Job Description {jdOptions && <span className="text-red-500">*</span>}
+                    </label>
+                    {jdOptions ? (
+                        <FilterListbox
+                            options={jdOptions}
+                            value={campaignForm.jd_id}
+                            onChange={(value) => handleCampaignFormChange({ target: { name: "jd_id", value } })}
+                        />
+                    ) : (
+                        <div className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-xs font-bold text-slate-700">
+                            {title}
+                        </div>
+                    )}
                 </div>
 
                 <FormInput
