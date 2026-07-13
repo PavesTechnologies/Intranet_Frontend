@@ -3,6 +3,7 @@ import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import SockJS from "sockjs-client";
 import { over } from "stompjs";
+import {useLeaveWebSocket} from "../websockets/useLeaveWebSocket";
 
 let stompClient = null;
 
@@ -52,6 +53,12 @@ const useLeaveData = (employeeId, refreshKey, year) => {
       fetchLeaveData();
     }
   }, [employeeId, refreshKey, year]);
+
+  useLeaveWebSocket(
+    "employee-update",
+    ["LEAVE_UPDATED", "LEAVE_CANCELLED", "LEAVE_APPROVED", "LEAVE_REJECTED"],
+    fetchLeaveData
+  )
 
   // ---------------------------
   // WEBSOCKET REAL-TIME LISTENER

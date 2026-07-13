@@ -107,6 +107,11 @@ import JdDetails from "./pages/airs/pages/JdDetails.jsx";
 import Campaigns from "./pages/airs/pages/Campaigns.jsx";
 import CampaignDetails from "./pages/airs/pages/CampaignDetails.jsx";
 import AirsPlaceholder from "./pages/airs/pages/AirsPlaceholder.jsx";
+import CandidateRankingPage from "./pages/airs/candidates/CandidateRankingPage.jsx";
+import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
+import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
+import AnalyticsPage from "./pages/airs/analytics/AnalyticsPage.jsx";
+import SettingsPage from "./pages/airs/settings/SettingsPage.jsx";
 
 import AdminOfferLettersDashboard from "./pages/employee-onboarding/admin/AdminOfferLettersDashboard.jsx";
 import HrOnboardingDashboard from "./pages/employee-onboarding/hr/HrOnboardingDashboard.jsx";
@@ -990,6 +995,7 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/airs/resume-intake"
             element={
@@ -1002,7 +1008,15 @@ const AppRoutes = () => {
             path="/airs/candidates"
             element={
               <ProtectedRoute roles={["General"]}>
-                <AirsPlaceholder />
+                <CandidateRankingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/pipeline"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <PipelineBoardPage />
               </ProtectedRoute>
             }
           />
@@ -1010,7 +1024,7 @@ const AppRoutes = () => {
             path="/airs/talent-pool"
             element={
               <ProtectedRoute roles={["General"]}>
-                <AirsPlaceholder />
+                <TalentPoolPage />
               </ProtectedRoute>
             }
           />
@@ -1018,7 +1032,7 @@ const AppRoutes = () => {
             path="/airs/analytics"
             element={
               <ProtectedRoute roles={["General"]}>
-                <AirsPlaceholder />
+                <AnalyticsPage />
               </ProtectedRoute>
             }
           />
@@ -1026,7 +1040,7 @@ const AppRoutes = () => {
             path="/airs/settings"
             element={
               <ProtectedRoute roles={["General"]}>
-                <AirsPlaceholder />
+                <SettingsPage />
               </ProtectedRoute>
             }
           />
