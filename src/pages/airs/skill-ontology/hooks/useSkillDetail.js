@@ -1,0 +1,96 @@
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "react-toastify";
+import { getSkill, addAlias, removeAlias, getSkillActivity } from "../services/skillOntologyService";
+
+// Aliases may come back from the backend either as plain strings (form-local,
+// unsaved) or as { id, name } objects (persisted, removable by id) — this
+// hook normalizes to display strings for AliasEditor and resolves the id
+// internally when a removal is requested.
+const aliasName = (a) => (typeof a === "object" ? a.name : a);
+
+export default function useSkillDetail(skillId) {
+  const [skill, setSkill] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const [activity, setActivity] = useState([]);
+  const [isLoadingActivity, setIsLoadingActivity] = useState(false);
+
+  const [isMutatingAlias, setIsMutatingAlias] = useState(false);
+
+  const fetchSkill = useCallback(async () => {
+    if (!skillId) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await getSkill(skillId);
+      setSkill(res?.data || res);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [skillId]);
+
+  const fetchActivity = useCallback(async () => {
+    if (!skillId) return;
+    setIsLoadingActivity(true);
+    try {
+      const res = await getSkillActivity(skillId);
+      setActivity(res?.data?.events || res?.events || res?.data || []);
+    } catch {
+      setActivity([]);
+    } finally {
+      setIsLoadingActivity(false);
+    }
+  }, [skillId]);
+
+  useEffect(() => {
+    fetchSkill();
+  }, [fetchSkill]);
+
+  useEffect(() => {
+    fetchActivity();
+  }, [fetchActivity]);
+
+  const handleAddAlias = async (alias) => {
+    setIsMutatingAlias(true);
+    try {
+      await addAlias(skillId, alias);
+      toast.success(`Alias "${alias}" added.`);
+      await fetchSkill();
+    } catch {
+      toast.error("Failed to add alias.");
+    } finally {
+      setIsMutatingAlias(false);
+    }
+  };
+
+  const handleRemoveAlias = async (alias) => {
+    const match = (skill?.aliases || []).find((a) => aliasName(a) === alias);
+    const aliasId = typeof match === "object" ? match.id : alias;
+    setIsMutatingAlias(true);
+    try {
+      await removeAlias(skillId, aliasId);
+      toast.success("Alias removed.");
+      await fetchSkill();
+    } catch {
+      toast.error("Failed to remove alias.");
+    } finally {
+      setIsMutatingAlias(false);
+    }
+  };
+
+  return {
+    skill,
+    isLoading,
+    error,
+    refresh: fetchSkill,
+    activity,
+    isLoadingActivity,
+    aliasNames: (skill?.aliases || []).map(aliasName),
+    addAlias: handleAddAlias,
+    removeAlias: handleRemoveAlias,
+    isMutatingAlias,
+  };
+}

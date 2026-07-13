@@ -69,6 +69,7 @@ const airsSubmenu = [
   { label: "Resume Intake", to: "/airs/resume-intake" },
   { label: "Pipeline", to: "/airs/pipeline" },
   { label: "Candidates", to: "/airs/candidates" },
+  { label: "Skill Ontology", to: "/airs/skill-ontology" },
   { label: "Talent Pool", to: "/airs/talent-pool" },
   { label: "Analytics", to: "/airs/analytics" },
   { label: "Settings", to: "/airs/settings" },
