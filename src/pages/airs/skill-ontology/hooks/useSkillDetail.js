@@ -81,11 +81,19 @@ export default function useSkillDetail(skillId) {
     }
   };
 
+  // Instant feedback right after a successful PATCH — applied ahead of the
+  // authoritative refresh() (fetchSkill) below.
+  const applyUpdate = (updatedSkill) => {
+    if (!updatedSkill) return;
+    setSkill((prev) => ({ ...prev, ...updatedSkill }));
+  };
+
   return {
     skill,
     isLoading,
     error,
     refresh: fetchSkill,
+    applyUpdate,
     activity,
     isLoadingActivity,
     aliasNames: (skill?.aliases || []).map(aliasName),

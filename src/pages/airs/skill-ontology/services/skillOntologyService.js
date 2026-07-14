@@ -103,7 +103,7 @@ export const createSkill = async (payload) => {
         category: payload.category,
         aliases: payload.aliases,
         parent_skill_id: payload.parent_skill_id || null,
-        confidence: payload.confidence,
+        confidence: payload.confidence?.toLowerCase(),
         is_active: payload.status ? payload.status === "ACTIVE" : true,
       },
       { headers: authHeaders() }
@@ -124,7 +124,7 @@ export const updateSkill = async (skillId, payload) => {
         category: payload.category,
         aliases: payload.aliases,
         parent_skill_id: payload.parent_skill_id || null,
-        confidence: payload.confidence,
+        confidence: payload.confidence?.toLowerCase(),
         is_active: payload.status ? payload.status === "ACTIVE" : undefined,
       },
       { headers: authHeaders() }

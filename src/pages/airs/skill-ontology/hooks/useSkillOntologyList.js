@@ -38,8 +38,10 @@ export default function useSkillOntologyList() {
       const res = await getSkills({
         search: debouncedSearch || undefined,
         category: category === "All" ? undefined : category,
-        confidence: confidenceFilter === "All" ? undefined : confidenceFilter,
-        is_active: showInactive ? false : true,
+        confidence: confidenceFilter === "All" ? undefined : confidenceFilter.toLowerCase(),
+        // Default (toggle off): active only. Toggle on: omit is_active entirely
+        // so the backend returns both active and inactive records.
+        is_active: showInactive ? undefined : true,
         page: currentPage,
         page_size: SKILL_ONTOLOGY_PAGE_SIZE,
       });
@@ -80,6 +82,14 @@ export default function useSkillOntologyList() {
     fetchSkills();
   }, [fetchCategories, fetchSkills]);
 
+  // Instant feedback for the row just edited/patched — applied immediately
+  // from the PATCH response, ahead of the authoritative refresh() above (which
+  // re-validates the row still belongs on the current page/filters).
+  const updateSkillInPlace = useCallback((updatedSkill) => {
+    if (!updatedSkill?.id) return;
+    setSkills((prev) => prev.map((s) => (s.id === updatedSkill.id ? { ...s, ...updatedSkill } : s)));
+  }, []);
+
   const totalPages = Math.max(1, Math.ceil(totalCount / SKILL_ONTOLOGY_PAGE_SIZE));
 
   return {
@@ -91,6 +101,7 @@ export default function useSkillOntologyList() {
     isLoading,
     error,
     refresh,
+    updateSkillInPlace,
 
     search,
     setSearch,

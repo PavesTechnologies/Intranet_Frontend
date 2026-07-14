@@ -2,12 +2,18 @@ import React from "react";
 import { Eye, PencilIcon, Ban, RotateCcw } from "lucide-react";
 import GenericTable from "../../../../components/Table/table";
 import Button from "../../../../components/Button/Button";
-import { SkillTableSkeleton } from "./LoadingSkeleton";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
 import EmptyState from "./EmptyState";
 import { renderStatusPill, renderVerificationBadge, formatDate, getSourceLabel } from "../utils/skillOntologyUtils.jsx";
 
 export default function SkillTable({ skills, isLoading, onView, onEdit, onDeactivate, onReactivate, onSeedOntology, seeding }) {
-  if (isLoading) return <SkillTableSkeleton />;
+  if (isLoading) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl py-16 flex items-center justify-center">
+        <LoadingSpinner text="Loading skills..." />
+      </div>
+    );
+  }
 
   if (skills.length === 0) return <EmptyState onSeedOntology={onSeedOntology} seeding={seeding} />;
 

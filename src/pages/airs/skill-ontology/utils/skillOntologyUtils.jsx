@@ -20,18 +20,21 @@ export function renderStatusPill(status) {
   );
 }
 
-// "confidence" holds the skill's verification status (VERIFIED/UNVERIFIED),
-// not a numeric score — rendered via the shared Badge component per spec.
+// "confidence" holds the skill's verification status (verified/unverified,
+// lowercase per backend convention), not a numeric score — rendered via the
+// shared Badge component per spec. Normalized before comparison since data
+// may arrive with inconsistent casing.
 const VERIFICATION_BADGE_TONE = {
-  VERIFIED: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  UNVERIFIED: "bg-amber-50 text-amber-700 border-amber-100",
+  verified: "bg-emerald-50 text-emerald-700 border-emerald-100",
+  unverified: "bg-amber-50 text-amber-700 border-amber-100",
 };
 
 export function renderVerificationBadge(confidence) {
-  const tone = VERIFICATION_BADGE_TONE[confidence] || VERIFICATION_BADGE_TONE.UNVERIFIED;
+  const normalized = confidence?.toLowerCase();
+  const tone = VERIFICATION_BADGE_TONE[normalized] || VERIFICATION_BADGE_TONE.unverified;
   return (
     <Badge className={`${tone} font-semibold px-2.5 py-0.5 text-[11px]`}>
-      {confidence === "VERIFIED" ? "Verified" : "Unverified"}
+      {normalized === "verified" ? "Verified" : "Unverified"}
     </Badge>
   );
 }
@@ -95,7 +98,8 @@ export function validateSkillForm(values, existingSkills = [], excludeSkillId) {
     errors.canonicalName = "A skill with this canonical name already exists.";
   }
   if (!values.category) errors.category = "Please select a category.";
-  if (values.confidence !== "VERIFIED" && values.confidence !== "UNVERIFIED") {
+  const confidenceNormalized = values.confidence?.toLowerCase();
+  if (confidenceNormalized !== "verified" && confidenceNormalized !== "unverified") {
     errors.confidence = "Please select a verification status.";
   }
   if (values.status !== "ACTIVE" && values.status !== "INACTIVE") {

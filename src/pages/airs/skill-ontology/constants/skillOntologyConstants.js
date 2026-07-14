@@ -6,9 +6,11 @@
 // components/SkillForm.jsx).
 
 // "confidence" is the skill's verification status, not a numeric score.
+// Values are lowercase to match the backend's query-param/storage convention
+// exactly (?confidence=verified / ?confidence=unverified).
 export const SKILL_CONFIDENCE = {
-  VERIFIED: "VERIFIED",
-  UNVERIFIED: "UNVERIFIED",
+  VERIFIED: "verified",
+  UNVERIFIED: "unverified",
 };
 
 export const CONFIDENCE_FILTER_OPTIONS = [

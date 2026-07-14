@@ -100,7 +100,7 @@ export default function SkillDetailPage() {
   const handleUpdate = async (values) => {
     setIsSubmitting(true);
     try {
-      await updateSkillApi(skill.id, {
+      const res = await updateSkillApi(skill.id, {
         canonical_name: values.canonicalName,
         category: values.category,
         aliases: values.aliases,
@@ -108,9 +108,11 @@ export default function SkillDetailPage() {
         confidence: values.confidence,
         status: values.status,
       });
+      const updated = res?.data || res;
       toast.success("Skill updated successfully.");
       setEditOpen(false);
-      detail.refresh();
+      detail.applyUpdate(updated); // instant feedback, no manual refresh needed
+      detail.refresh(); // authoritative refetch
     } catch {
       toast.error("Failed to update skill.");
     } finally {

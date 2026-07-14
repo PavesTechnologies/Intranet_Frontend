@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "react-toastify";
+import Pagination from "../../../components/Pagination/pagination";
 import useSkillOntologyList from "./hooks/useSkillOntologyList";
 import SkillToolbar from "./components/SkillToolbar";
 import SkillFilters from "./components/SkillFilters";
@@ -78,7 +78,7 @@ export default function SkillOntologyPage() {
   const handleUpdate = async (values) => {
     setIsSubmitting(true);
     try {
-      await updateSkill(editSkill.id, {
+      const res = await updateSkill(editSkill.id, {
         canonical_name: values.canonicalName,
         category: values.category,
         aliases: values.aliases,
@@ -86,9 +86,11 @@ export default function SkillOntologyPage() {
         confidence: values.confidence,
         status: values.status,
       });
+      const updated = res?.data || res;
       toast.success("Skill updated successfully.");
       setEditSkill(null);
-      list.refresh();
+      list.updateSkillInPlace(updated); // instant feedback, no manual refresh needed
+      list.refresh(); // authoritative refetch — keeps page/filters/sorting correct
     } catch {
       toast.error("Failed to update skill.");
     } finally {
@@ -161,8 +163,8 @@ export default function SkillOntologyPage() {
       const response = await exportSkills({
         search: list.search || undefined,
         category: list.category === "All" ? undefined : list.category,
-        confidence: list.confidenceFilter === "All" ? undefined : list.confidenceFilter,
-        is_active: list.showInactive ? false : true,
+        confidence: list.confidenceFilter === "All" ? undefined : list.confidenceFilter.toLowerCase(),
+        is_active: list.showInactive ? undefined : true,
       });
       const blob = new Blob([response.data], { type: response.headers["content-type"] });
       const url = URL.createObjectURL(blob);
@@ -236,25 +238,13 @@ export default function SkillOntologyPage() {
 
       {!list.isLoading && !list.error && list.totalCount > 0 && (
         <div className="flex items-center justify-between mt-4">
-          <span className="text-[12px] text-slate-400">
-            Page {list.currentPage} of {list.totalPages} · {list.totalCount} skills
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              disabled={list.currentPage === 1}
-              onClick={() => list.setCurrentPage(list.currentPage - 1)}
-              className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <button
-              disabled={list.currentPage >= list.totalPages}
-              onClick={() => list.setCurrentPage(list.currentPage + 1)}
-              className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30"
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
+          <span className="text-[12px] text-slate-400">{list.totalCount} skills</span>
+          <Pagination
+            currentPage={list.currentPage}
+            totalPages={list.totalPages}
+            onPrevious={() => list.setCurrentPage(list.currentPage - 1)}
+            onNext={() => list.setCurrentPage(list.currentPage + 1)}
+          />
         </div>
       )}
 
