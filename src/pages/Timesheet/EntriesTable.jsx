@@ -69,8 +69,8 @@ const EntriesTable = ({
   selectedEntryIds,
   setSelectedEntryIds,
   selectionMode,
-  pendingEntries,
-  setPendingEntries,
+  pendingEntries = [],
+  setPendingEntries = () => {},
 }) => {
   const [editIndex, setEditIndex] = useState(null);
   const [editData, setEditData] = useState({});
