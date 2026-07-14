@@ -112,6 +112,9 @@ import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
 import AnalyticsPage from "./pages/airs/analytics/AnalyticsPage.jsx";
 import SettingsPage from "./pages/airs/settings/SettingsPage.jsx";
+import SkillOntologyPage from "./pages/airs/skill-ontology/SkillOntologyPage.jsx";
+import SkillDetailPage from "./pages/airs/skill-ontology/SkillDetailPage.jsx";
+import HierarchyPage from "./pages/airs/skill-ontology/HierarchyPage.jsx";
 
 import AdminOfferLettersDashboard from "./pages/employee-onboarding/admin/AdminOfferLettersDashboard.jsx";
 import HrOnboardingDashboard from "./pages/employee-onboarding/hr/HrOnboardingDashboard.jsx";
@@ -1040,6 +1043,30 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute roles={["General"]}>
                 <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/skill-ontology"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <SkillOntologyPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/skill-ontology/hierarchy"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <HierarchyPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/skill-ontology/:skillId"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <SkillDetailPage />
               </ProtectedRoute>
             }
           />
