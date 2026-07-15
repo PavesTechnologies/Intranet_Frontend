@@ -12,12 +12,9 @@ import ErrorState from "./components/ErrorState";
 import EditSkillModal from "./components/EditSkillModal";
 import DeactivateDialog from "./components/DeactivateDialog";
 import ReactivateDialog from "./components/ReactivateDialog";
+import ChildHandlingDialog from "./components/ChildHandlingDialog";
 import { renderStatusPill, renderVerificationBadge, formatDate, findAliasConflict, getSourceLabel } from "./utils/skillOntologyUtils.jsx";
-import {
-  getSkillUsage as fetchSkillUsage,
-  updateSkill as updateSkillApi,
-  updateSkillStatus,
-} from "./services/skillOntologyService";
+import { updateSkill as updateSkillApi, updateSkillStatus } from "./services/skillOntologyService";
 
 const TABS = [
   { id: "aliases", label: "Aliases" },
@@ -33,8 +30,8 @@ export default function SkillDetailPage() {
   const [tab, setTab] = useState("aliases");
   const [editOpen, setEditOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
-  const [deactivateUsage, setDeactivateUsage] = useState(null);
   const [reactivateOpen, setReactivateOpen] = useState(false);
+  const [childHandling, setChildHandling] = useState(null); // { children }
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (detail.isLoading) {
@@ -59,14 +56,17 @@ export default function SkillDetailPage() {
 
   const skill = detail.skill;
 
-  const openDeactivate = async () => {
-    setDeactivateOpen(true);
-    try {
-      const res = await fetchSkillUsage(skill.id);
-      setDeactivateUsage(res?.data || res);
-    } catch {
-      setDeactivateUsage(null);
-    }
+  const openDeactivate = () => setDeactivateOpen(true);
+
+  const statusErrorMessage = (err, fallback) =>
+    err?.response?.data?.message || err?.response?.data?.detail || fallback;
+
+  // Case 3: backend rejects deactivation of a skill with child skills and
+  // returns the affected children so the user can choose PROMOTE vs ROOT.
+  const extractChildren = (err) => {
+    const data = err?.response?.data;
+    const children = data?.data?.children || data?.children;
+    return Array.isArray(children) && children.length > 0 ? children : null;
   };
 
   const confirmDeactivate = async () => {
@@ -75,9 +75,29 @@ export default function SkillDetailPage() {
       await updateSkillStatus(skill.id, false);
       toast.success(`"${skill.canonicalName}" deactivated.`);
       setDeactivateOpen(false);
+      detail.refresh(); // also refreshes the Hierarchy tab's parent/children
+    } catch (err) {
+      const children = extractChildren(err);
+      if (children) {
+        setChildHandling({ children });
+        setDeactivateOpen(false);
+      } else {
+        toast.error(statusErrorMessage(err, "Failed to deactivate skill."));
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const submitChildHandling = async (mode) => {
+    setIsSubmitting(true);
+    try {
+      await updateSkillStatus(skill.id, false, mode);
+      toast.success(`"${skill.canonicalName}" deactivated.`);
+      setChildHandling(null);
       detail.refresh();
-    } catch {
-      toast.error("Failed to deactivate skill.");
+    } catch (err) {
+      toast.error(statusErrorMessage(err, "Failed to deactivate skill."));
     } finally {
       setIsSubmitting(false);
     }
@@ -90,8 +110,8 @@ export default function SkillDetailPage() {
       toast.success(`"${skill.canonicalName}" reactivated.`);
       setReactivateOpen(false);
       detail.refresh();
-    } catch {
-      toast.error("Failed to reactivate skill.");
+    } catch (err) {
+      toast.error(statusErrorMessage(err, "Failed to reactivate skill."));
     } finally {
       setIsSubmitting(false);
     }
@@ -112,9 +132,11 @@ export default function SkillDetailPage() {
       toast.success("Skill updated successfully.");
       setEditOpen(false);
       detail.applyUpdate(updated); // instant feedback, no manual refresh needed
-      detail.refresh(); // authoritative refetch
-    } catch {
-      toast.error("Failed to update skill.");
+      detail.refresh(); // authoritative refetch — also refreshes the Hierarchy tab's parent/children
+    } catch (err) {
+      // Surfaces backend validation messages (e.g. circular hierarchy, cannot
+      // assign itself, parent skill inactive) instead of a generic string.
+      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to update skill.");
     } finally {
       setIsSubmitting(false);
     }
@@ -288,7 +310,6 @@ export default function SkillDetailPage() {
       <DeactivateDialog
         open={deactivateOpen}
         skill={skill}
-        usage={deactivateUsage}
         onClose={() => setDeactivateOpen(false)}
         onConfirm={confirmDeactivate}
         isSubmitting={isSubmitting}
@@ -299,6 +320,15 @@ export default function SkillDetailPage() {
         skill={skill}
         onClose={() => setReactivateOpen(false)}
         onConfirm={confirmReactivate}
+        isSubmitting={isSubmitting}
+      />
+
+      <ChildHandlingDialog
+        open={!!childHandling}
+        skill={skill}
+        childSkills={childHandling?.children}
+        onClose={() => setChildHandling(null)}
+        onConfirm={submitChildHandling}
         isSubmitting={isSubmitting}
       />
     </div>

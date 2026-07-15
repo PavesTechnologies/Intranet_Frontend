@@ -77,7 +77,19 @@ export default function useSkillOntologyList() {
     fetchCategories();
   }, [fetchCategories]);
 
+  // Skills-only refresh — used after create/update/deactivate/reactivate/merge.
+  // The category field is a closed dropdown (see SkillForm.jsx), so none of
+  // those actions can ever introduce a category that isn't already loaded;
+  // refetching categories on every one of them was an unnecessary duplicate
+  // request racing the list fetch for no reason.
   const refresh = useCallback(() => {
+    fetchSkills();
+  }, [fetchSkills]);
+
+  // Skills + categories — only Bulk Import can genuinely introduce a brand
+  // new category value (from the uploaded file), so only its onImported
+  // handler should invalidate both.
+  const refreshAll = useCallback(() => {
     fetchCategories();
     fetchSkills();
   }, [fetchCategories, fetchSkills]);
@@ -101,6 +113,7 @@ export default function useSkillOntologyList() {
     isLoading,
     error,
     refresh,
+    refreshAll,
     updateSkillInPlace,
 
     search,

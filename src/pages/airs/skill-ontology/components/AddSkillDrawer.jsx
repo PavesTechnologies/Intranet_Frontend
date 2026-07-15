@@ -5,7 +5,7 @@ import SkillForm from "./SkillForm";
 import { EMPTY_SKILL_FORM } from "../constants/skillOntologyConstants";
 import { validateSkillForm } from "../utils/skillOntologyUtils.jsx";
 
-export default function AddSkillDrawer({ open, existingSkills = [], onClose, onSubmit, isSubmitting }) {
+export default function AddSkillDrawer({ open, existingSkills = [], categoryOptions, onClose, onSubmit, isSubmitting }) {
   const [values, setValues] = useState(EMPTY_SKILL_FORM);
   const [errors, setErrors] = useState({});
 
@@ -41,7 +41,9 @@ export default function AddSkillDrawer({ open, existingSkills = [], onClose, onS
         </>
       }
     >
-      {open && <SkillForm values={values} errors={errors} onFieldChange={setField} />}
+      {open && (
+        <SkillForm values={values} errors={errors} onFieldChange={setField} categoryOptions={categoryOptions} />
+      )}
     </SkillDrawer>
   );
 }

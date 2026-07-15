@@ -1,12 +1,12 @@
 import React from "react";
-import { ChevronRight, ChevronDown, Loader2 } from "lucide-react";
+import { ChevronRight, ChevronDown, Loader2, Circle } from "lucide-react";
 import { renderStatusPill, renderVerificationBadge } from "../utils/skillOntologyUtils.jsx";
-import { TreeSkeleton } from "./LoadingSkeleton";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
 
 function TreeNode({ node, depth, expandedIds, loadingIds, childrenById, onToggle, onSelect }) {
   const isExpanded = expandedIds.has(node.id);
   const isLoading = loadingIds.has(node.id);
-  const hasChildren = (node.childCount ?? 0) > 0;
+  const hasChildren = node.hasChildren ?? (node.childCount ?? 0) > 0;
   const children = childrenById[node.id] || [];
 
   return (
@@ -16,21 +16,27 @@ function TreeNode({ node, depth, expandedIds, loadingIds, childrenById, onToggle
         style={{ paddingLeft: depth * 20 + 8 }}
         onClick={() => onSelect(node)}
       >
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            if (hasChildren) onToggle(node.id);
-          }}
-          className={`shrink-0 ${hasChildren ? "text-slate-500" : "text-transparent"}`}
-        >
-          {isLoading ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : isExpanded ? (
-            <ChevronDown size={14} />
-          ) : (
-            <ChevronRight size={14} />
-          )}
-        </button>
+        {hasChildren ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(node.id);
+            }}
+            className="shrink-0 text-slate-500"
+          >
+            {isLoading ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : isExpanded ? (
+              <ChevronDown size={14} />
+            ) : (
+              <ChevronRight size={14} />
+            )}
+          </button>
+        ) : (
+          <span className="shrink-0 flex items-center justify-center w-3.5" title="Leaf skill — no children">
+            <Circle size={6} className="fill-slate-300 text-slate-300" />
+          </span>
+        )}
         <span className="text-[13px] font-semibold text-slate-900 truncate">{node.canonicalName}</span>
         {renderVerificationBadge(node.confidence)}
         {renderStatusPill(node.status)}
@@ -60,7 +66,13 @@ function TreeNode({ node, depth, expandedIds, loadingIds, childrenById, onToggle
 }
 
 export default function HierarchyTree({ rootNodes, isLoadingRoot, expandedIds, loadingIds, childrenById, onToggle, onSelect }) {
-  if (isLoadingRoot) return <TreeSkeleton />;
+  if (isLoadingRoot) {
+    return (
+      <div className="py-16 flex items-center justify-center">
+        <LoadingSpinner text="Loading hierarchy..." />
+      </div>
+    );
+  }
 
   if (rootNodes.length === 0) {
     return <p className="text-[12px] text-slate-400 py-8 text-center">No top-level skills in the hierarchy yet.</p>;
