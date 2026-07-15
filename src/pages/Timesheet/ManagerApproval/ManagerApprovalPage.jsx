@@ -65,79 +65,87 @@ const ManagerApprovalPage = () => {
 
   // ✅ Apply filters for deeply nested structureimport { useMemo } from "react";
 
+  // ✅ Shared predicate: does a user pass the active filters?
+  //    `applyUserFilter` is skipped when building the user dropdown, so the
+  //    dropdown lists every user visible in the table (not the full user list).
+  const passesFilters = (user, applyUserFilter) => {
+    // 🔹 0️⃣ Hide users with no actionable weeks — every week is APPROVED
+    const hasActionableWeek = user.weeklySummary?.some(
+      (w) => w.weeklyStatus?.toUpperCase() !== "APPROVED",
+    );
+    if (!hasActionableWeek) return false;
+
+    // 🔹 1️⃣ User Filter — show all users if "All Users" selected
+    if (
+      applyUserFilter &&
+      userFilter &&
+      userFilter !== "All Users" &&
+      user.userName.trim().toLowerCase() !== userFilter.trim().toLowerCase()
+    ) {
+      return false;
+    }
+
+    // 🔹 2️⃣ Search Filter — search across username and nested entries
+    if (searchTerm.trim()) {
+      const lowerSearch = searchTerm.toLowerCase();
+
+      const userMatch = user.userName.toLowerCase().includes(lowerSearch);
+
+      const nestedMatch = user.weeklySummary?.some((week) =>
+        week.timesheets?.some((ts) =>
+          ts.entries?.some(
+            (entry) =>
+              entry.description?.toLowerCase().includes(lowerSearch) ||
+              entry.otherDescription?.toLowerCase().includes(lowerSearch) ||
+              entry.workLocation?.toLowerCase().includes(lowerSearch) ||
+              entry.projectName?.toLowerCase().includes(lowerSearch) ||
+              entry.taskName?.toLowerCase().includes(lowerSearch),
+          ),
+        ),
+      );
+
+      if (!userMatch && !nestedMatch) return false;
+    }
+
+    // 🔹 3️⃣ Date Filter — match selected date exactly
+    if (selectedDate) {
+      const hasDate = user.weeklySummary?.some((week) =>
+        week.timesheets?.some((ts) => ts.workDate === selectedDate),
+      );
+      if (!hasDate) return false;
+    }
+
+    // 🔹 4️⃣ Status Filter — match weekly or timesheet statuses
+    if (statusFilter !== "All") {
+      const hasStatus = user.weeklySummary?.some(
+        (week) =>
+          week.weeklyStatus?.toLowerCase() === statusFilter.toLowerCase() ||
+          week.timesheets?.some(
+            (ts) =>
+              ts.status?.toLowerCase() === statusFilter.toLowerCase() ||
+              ts.actionStatus?.some(
+                (a) => a.status?.toLowerCase() === statusFilter.toLowerCase(),
+              ),
+          ),
+      );
+      if (!hasStatus) return false;
+    }
+
+    return true; // ✅ include this user
+  };
+
   const filteredTimesheets = useMemo(() => {
     if (!groupedTimesheets.length) return [];
-
-    // Start with all users' timesheets
-    let filtered = [...groupedTimesheets];
-
-    filtered = filtered.filter((user) => {
-      // 🔹 0️⃣ Hide users with no actionable weeks — every week is APPROVED
-      const hasActionableWeek = user.weeklySummary?.some(
-        (w) => w.weeklyStatus?.toUpperCase() !== "APPROVED",
-      );
-      if (!hasActionableWeek) return false;
-
-      // 🔹 1️⃣ User Filter — show all users if "All Users" selected
-      if (
-        userFilter &&
-        userFilter !== "All Users" &&
-        user.userName.trim().toLowerCase() !== userFilter.trim().toLowerCase()
-      ) {
-        return false;
-      }
-
-      // 🔹 2️⃣ Search Filter — search across username and nested entries
-      if (searchTerm.trim()) {
-        const lowerSearch = searchTerm.toLowerCase();
-
-        const userMatch = user.userName.toLowerCase().includes(lowerSearch);
-
-        const nestedMatch = user.weeklySummary?.some((week) =>
-          week.timesheets?.some((ts) =>
-            ts.entries?.some(
-              (entry) =>
-                entry.description?.toLowerCase().includes(lowerSearch) ||
-                entry.otherDescription?.toLowerCase().includes(lowerSearch) ||
-                entry.workLocation?.toLowerCase().includes(lowerSearch) ||
-                entry.projectName?.toLowerCase().includes(lowerSearch) ||
-                entry.taskName?.toLowerCase().includes(lowerSearch),
-            ),
-          ),
-        );
-
-        if (!userMatch && !nestedMatch) return false;
-      }
-
-      // 🔹 3️⃣ Date Filter — match selected date exactly
-      if (selectedDate) {
-        const hasDate = user.weeklySummary?.some((week) =>
-          week.timesheets?.some((ts) => ts.workDate === selectedDate),
-        );
-        if (!hasDate) return false;
-      }
-
-      // 🔹 4️⃣ Status Filter — match weekly or timesheet statuses
-      if (statusFilter !== "All") {
-        const hasStatus = user.weeklySummary?.some(
-          (week) =>
-            week.weeklyStatus?.toLowerCase() === statusFilter.toLowerCase() ||
-            week.timesheets?.some(
-              (ts) =>
-                ts.status?.toLowerCase() === statusFilter.toLowerCase() ||
-                ts.actionStatus?.some(
-                  (a) => a.status?.toLowerCase() === statusFilter.toLowerCase(),
-                ),
-            ),
-        );
-        if (!hasStatus) return false;
-      }
-
-      return true; // ✅ include this user
-    });
-
-    return filtered;
+    return groupedTimesheets.filter((user) => passesFilters(user, true));
   }, [statusFilter, userFilter, selectedDate, searchTerm, groupedTimesheets]);
+
+  // ✅ User dropdown options — only users actually shown in the table below.
+  const userOptions = useMemo(() => {
+    const names = groupedTimesheets
+      .filter((user) => passesFilters(user, false))
+      .map((user) => user.userName?.trim());
+    return [...new Set(names)].filter(Boolean);
+  }, [statusFilter, selectedDate, searchTerm, groupedTimesheets]);
 
   const handleResetFilters = () => {
     setSearchTerm("");
@@ -265,9 +273,7 @@ const ManagerApprovalPage = () => {
           <FilterListbox
             options={[
               { value: "All Users", label: "All Users" },
-              ...[...new Set(groupedTimesheets.map((item) => item.userName?.trim()))]
-                .filter(Boolean)
-                .map((user) => ({ value: user, label: user })),
+              ...userOptions.map((user) => ({ value: user, label: user })),
             ]}
             value={userFilter}
             onChange={setUserFilter}
