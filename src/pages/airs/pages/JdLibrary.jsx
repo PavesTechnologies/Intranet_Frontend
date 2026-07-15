@@ -18,6 +18,8 @@ import {
   CheckCircle,
   FileSpreadsheet,
   FileText,
+  FileCheck2,
+  Clock,
   X
 } from "lucide-react";
 import { toast } from "react-toastify";
@@ -27,8 +29,11 @@ import ConfirmationModal from "../../../components/confirmation_modal/Confirmati
 import Modal from "../../../components/ui/Modal";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import { Badge } from "../../../components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../../components/ui/tabs";
 import GenericTable from "../../../components/Table/table";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import JdForm from "./JdForm";
+import JdProcessingList from "./JdProcessingList";
 
 
 const statusOptions = [
@@ -87,6 +92,12 @@ export default function JdLibrary() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [closeJdId, setCloseJdId] = useState(null);
   const [isJdDelete, setIsJdDelete] = useState(false);
+  const [jdModalOpen, setJdModalOpen] = useState(false);
+  const [jdModalEditId, setJdModalEditId] = useState(null);
+
+  // Tabs State
+  const [activeTab, setActiveTab] = useState("processed");
+  const [processingRefreshToken, setProcessingRefreshToken] = useState(0);
 
   // Debounce search term to avoid spamming calls
   useEffect(() => {
@@ -159,25 +170,28 @@ export default function JdLibrary() {
 
   // Status Badge Colors using common UI Badge component
   const getStatusBadge = (status) => {
-    switch (status) {
-      case "Ready":
-        return <Badge className="bg-blue-50 text-blue-700 border-blue-100 font-semibold px-2.5 py-1 text-xs">Ready</Badge>;
-      case "Draft":
-        return <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">Draft</Badge>;
-      case "Pending Review":
-        return <Badge className="bg-amber-50 text-amber-700 border-amber-100 font-semibold px-2.5 py-1 text-xs">Pending Review</Badge>;
-      case "Parsing":
-        return (
-          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 font-semibold px-2.5 py-1 text-xs gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-            Parsing
-          </Badge>
-        );
-      case "Closed":
-        return <Badge className="bg-rose-50 text-rose-700 border-rose-100 font-semibold px-2.5 py-1 text-xs">Closed</Badge>;
-      default:
-        return null;
+    const normalized = String(status || "").toUpperCase();
+    if (normalized === "READY" || normalized === "VERIFIED") {
+      return <Badge className="bg-blue-50 text-blue-700 border-blue-100 font-semibold px-2.5 py-1 text-xs">Ready</Badge>;
     }
+    if (normalized === "DRAFT" || normalized === "UNVERIFIED") {
+      return <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">Draft</Badge>;
+    }
+    if (normalized === "PENDING_REVIEW" || normalized === "PARTIALLY_VERIFIED" || normalized === "PENDING REVIEW") {
+      return <Badge className="bg-amber-50 text-amber-700 border-amber-100 font-semibold px-2.5 py-1 text-xs">Pending Review</Badge>;
+    }
+    if (normalized === "PARSING") {
+      return (
+        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 font-semibold px-2.5 py-1 text-xs gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+          Parsing
+        </Badge>
+      );
+    }
+    if (normalized === "CLOSED") {
+      return <Badge className="bg-rose-50 text-rose-700 border-rose-100 font-semibold px-2.5 py-1 text-xs">Closed</Badge>;
+    }
+    return <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">{status}</Badge>;
   };
   const headers = [
     <div key="title" className="w-full flex justify-center select-none">Title</div>,
@@ -208,8 +222,8 @@ export default function JdLibrary() {
       const version = jd.version || jd.version_number || 1;
       const source = jd.source || (jd.source_format === "TEXT" ? "Manual" : jd.source_format === "PDF" ? "PDF Upload" : jd.source_format === "DOCX" ? "DOCX Upload" : jd.source_format || "Manual");
       const createdDate = jd.createdDate || (jd.created_at ? jd.created_at.split('T')[0] : "");
-      const createdBy = jd.createdBy || "System";
-      const status = jd.status || (jd.active === false ? "Closed" : "Ready");
+      const createdBy = jd.createdBy || jd.created_by || "System";
+      const status = jd.status || jd.is_verified || (jd.active === false ? "Closed" : "Ready");
       const campaignCount = jd.campaignCount !== undefined ? jd.campaignCount : 0;
 
       return {
@@ -279,7 +293,7 @@ export default function JdLibrary() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => navigate(`/airs/jds/create?edit=${jd.id}`)}
+                onClick={() => { setJdModalEditId(jd.id); setJdModalOpen(true); }}
                 title="Edit JD"
                 className="h-8 w-8 text-indigo-500 hover:text-indigo-700"
               >
@@ -425,7 +439,7 @@ export default function JdLibrary() {
           <Button
             variant="primary"
             size="small"
-            onClick={() => navigate("/airs/jds/create")}
+            onClick={() => { setJdModalEditId(null); setJdModalOpen(true); }}
             className="flex-1 sm:flex-none font-semibold"
           >
             <Plus className="h-4 w-4 mr-1.5" /> New JD
@@ -493,37 +507,85 @@ export default function JdLibrary() {
         </div>
       </div>
 
-      {/* Table Card */}
-      <div className="overflow-x-auto mb-6">
-        {isLoading ?
-          <div className="h-40 flex items-center justify-center">
-            <LoadingSpinner text="Loading JDs..."></LoadingSpinner>
-          </div> : paginatedJds.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400">
-              <Archive className="h-10 w-10 mx-auto stroke-1 mb-2" />
-              No Job Descriptions found matching the criteria.
-            </div>
-          ) : (
-            <GenericTable
-              headers={headers}
-              columns={columns}
-              rows={tableRows}
-              loading={isLoading}
+      {/* Processed JD / Processing JD Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="bg-white border border-slate-200 shadow-sm mb-6 p-1 h-auto">
+          <TabsTrigger
+            value="processed"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-none text-slate-500"
+          >
+            <FileCheck2 className="h-3.5 w-3.5" />
+            Processed JD
+          </TabsTrigger>
+          <TabsTrigger
+            value="processing"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-none text-slate-500"
+          >
+            <Clock className="h-3.5 w-3.5" />
+            Processing JD
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="processed" className="mt-0">
+          {/* Table Card */}
+          <div className="overflow-x-auto mb-6">
+            {isLoading ?
+              <div className="h-40 flex items-center justify-center">
+                <LoadingSpinner text="Loading JDs..."></LoadingSpinner>
+              </div> : paginatedJds.length === 0 ? (
+                <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400">
+                  <Archive className="h-10 w-10 mx-auto stroke-1 mb-2" />
+                  No Job Descriptions found matching the criteria.
+                </div>
+              ) : (
+                <GenericTable
+                  headers={headers}
+                  columns={columns}
+                  rows={tableRows}
+                  loading={isLoading}
+                />
+              )}
+          </div>
+
+          {/* Pagination bar */}
+          {totalItems > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPrevious={() => setCurrentPage(currentPage - 1)}
+              onNext={() => setCurrentPage(currentPage + 1)}
             />
           )}
-      </div>
+        </TabsContent>
 
-      {/* Pagination bar */}
-      {totalItems > 0 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPrevious={() => setCurrentPage(currentPage - 1)}
-          onNext={() => setCurrentPage(currentPage + 1)}
-        />
-      )}
+        <TabsContent value="processing" className="mt-0">
+          <JdProcessingList key={processingRefreshToken} />
+        </TabsContent>
+      </Tabs>
 
       {/* dialog overlays */}
+
+      {/* Create / Edit JD Modal */}
+      <Modal
+        isOpen={jdModalOpen}
+        onClose={() => setJdModalOpen(false)}
+        title={jdModalEditId ? "Edit Job Description" : "Create Job Description"}
+        width="700px"
+        height="85vh"
+      >
+        <JdForm
+          editId={jdModalEditId}
+          onSuccess={(info) => {
+            setJdModalOpen(false);
+            fetchJds();
+            if (info?.queuedForProcessing) {
+              setActiveTab("processing");
+              setProcessingRefreshToken((t) => t + 1);
+            }
+          }}
+          onCancel={() => setJdModalOpen(false)}
+        />
+      </Modal>
 
       {/* Delete Confirmation Modal */}
       <ConfirmationModal
