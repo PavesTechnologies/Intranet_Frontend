@@ -5,7 +5,9 @@
       "Bash(Get-ChildItem -Path . -Recurse -Filter \"App.jsx\")",
       "Bash(Select-Object FullName)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Swarnaraj.Alwala\\\\paves\\\\intranet-fe\\\\src\\\\pages\" -Filter \"*ashboard*\" -Recurse)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "Bash(npx esbuild *)"
     ]
   }
 }

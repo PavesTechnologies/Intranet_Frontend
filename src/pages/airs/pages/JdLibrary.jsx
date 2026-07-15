@@ -29,6 +29,7 @@ import FilterListbox from "../../../components/filter/FilterListbox";
 import { Badge } from "../../../components/ui/badge";
 import GenericTable from "../../../components/Table/table";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import JdForm from "./JdForm";
 
 
 const statusOptions = [
@@ -87,6 +88,8 @@ export default function JdLibrary() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [closeJdId, setCloseJdId] = useState(null);
   const [isJdDelete, setIsJdDelete] = useState(false);
+  const [jdModalOpen, setJdModalOpen] = useState(false);
+  const [jdModalEditId, setJdModalEditId] = useState(null);
 
   // Debounce search term to avoid spamming calls
   useEffect(() => {
@@ -159,25 +162,28 @@ export default function JdLibrary() {
 
   // Status Badge Colors using common UI Badge component
   const getStatusBadge = (status) => {
-    switch (status) {
-      case "Ready":
-        return <Badge className="bg-blue-50 text-blue-700 border-blue-100 font-semibold px-2.5 py-1 text-xs">Ready</Badge>;
-      case "Draft":
-        return <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">Draft</Badge>;
-      case "Pending Review":
-        return <Badge className="bg-amber-50 text-amber-700 border-amber-100 font-semibold px-2.5 py-1 text-xs">Pending Review</Badge>;
-      case "Parsing":
-        return (
-          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 font-semibold px-2.5 py-1 text-xs gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-            Parsing
-          </Badge>
-        );
-      case "Closed":
-        return <Badge className="bg-rose-50 text-rose-700 border-rose-100 font-semibold px-2.5 py-1 text-xs">Closed</Badge>;
-      default:
-        return null;
+    const normalized = String(status || "").toUpperCase();
+    if (normalized === "READY" || normalized === "VERIFIED") {
+      return <Badge className="bg-blue-50 text-blue-700 border-blue-100 font-semibold px-2.5 py-1 text-xs">Ready</Badge>;
     }
+    if (normalized === "DRAFT" || normalized === "UNVERIFIED") {
+      return <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">Draft</Badge>;
+    }
+    if (normalized === "PENDING_REVIEW" || normalized === "PARTIALLY_VERIFIED" || normalized === "PENDING REVIEW") {
+      return <Badge className="bg-amber-50 text-amber-700 border-amber-100 font-semibold px-2.5 py-1 text-xs">Pending Review</Badge>;
+    }
+    if (normalized === "PARSING") {
+      return (
+        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 font-semibold px-2.5 py-1 text-xs gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+          Parsing
+        </Badge>
+      );
+    }
+    if (normalized === "CLOSED") {
+      return <Badge className="bg-rose-50 text-rose-700 border-rose-100 font-semibold px-2.5 py-1 text-xs">Closed</Badge>;
+    }
+    return <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">{status}</Badge>;
   };
   const headers = [
     <div key="title" className="w-full flex justify-center select-none">Title</div>,
@@ -208,8 +214,8 @@ export default function JdLibrary() {
       const version = jd.version || jd.version_number || 1;
       const source = jd.source || (jd.source_format === "TEXT" ? "Manual" : jd.source_format === "PDF" ? "PDF Upload" : jd.source_format === "DOCX" ? "DOCX Upload" : jd.source_format || "Manual");
       const createdDate = jd.createdDate || (jd.created_at ? jd.created_at.split('T')[0] : "");
-      const createdBy = jd.createdBy || "System";
-      const status = jd.status || (jd.active === false ? "Closed" : "Ready");
+      const createdBy = jd.createdBy || jd.created_by || "System";
+      const status = jd.status || jd.is_verified || (jd.active === false ? "Closed" : "Ready");
       const campaignCount = jd.campaignCount !== undefined ? jd.campaignCount : 0;
 
       return {
@@ -279,7 +285,7 @@ export default function JdLibrary() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => navigate(`/airs/jds/create?edit=${jd.id}`)}
+                onClick={() => { setJdModalEditId(jd.id); setJdModalOpen(true); }}
                 title="Edit JD"
                 className="h-8 w-8 text-indigo-500 hover:text-indigo-700"
               >
@@ -425,7 +431,7 @@ export default function JdLibrary() {
           <Button
             variant="primary"
             size="small"
-            onClick={() => navigate("/airs/jds/create")}
+            onClick={() => { setJdModalEditId(null); setJdModalOpen(true); }}
             className="flex-1 sm:flex-none font-semibold"
           >
             <Plus className="h-4 w-4 mr-1.5" /> New JD
@@ -524,6 +530,24 @@ export default function JdLibrary() {
       )}
 
       {/* dialog overlays */}
+
+      {/* Create / Edit JD Modal */}
+      <Modal
+        isOpen={jdModalOpen}
+        onClose={() => setJdModalOpen(false)}
+        title={jdModalEditId ? "Edit Job Description" : "Create Job Description"}
+        width="700px"
+        height="85vh"
+      >
+        <JdForm
+          editId={jdModalEditId}
+          onSuccess={() => {
+            setJdModalOpen(false);
+            fetchJds();
+          }}
+          onCancel={() => setJdModalOpen(false)}
+        />
+      </Modal>
 
       {/* Delete Confirmation Modal */}
       <ConfirmationModal

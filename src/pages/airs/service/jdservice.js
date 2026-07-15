@@ -16,6 +16,41 @@ export const getAllJDs = async (params) => {
     }
 };
 
+export const createJD = async (payload) => {
+    try {
+        const response = await api.post(`${BASE_URL}/job-descriptions`, payload, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error creating JD:", error);
+        throw error;
+    }
+};
+
+export const createJDFromFile = async (file, fields = {}) => {
+    try {
+        const formData = new FormData();
+        formData.append("file", file);
+        Object.entries(fields).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === "") return;
+            formData.append(key, typeof value === "object" ? JSON.stringify(value) : value);
+        });
+
+        const response = await api.post(`${BASE_URL}/job-descriptions/from-file`, formData, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error creating JD from file:", error);
+        throw error;
+    }
+};
+
 export const getJDById = async (jdId) => {
     try {
         const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}`, {
@@ -89,6 +124,34 @@ export const exportJDs = async (params) => {
         return response;
     } catch (error) {
         console.error("Error exporting JDs:", error);
+        throw error;
+    }
+};
+
+export const getJDSkills = async (jdId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/skills/jd/${jdId}/skills`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching JD skills:", error);
+        throw error;
+    }
+};
+
+export const getJDUnknownSkills = async (jdId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/skills/jd/${jdId}/unknown-skills`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching JD unknown skills:", error);
         throw error;
     }
 };
