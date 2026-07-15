@@ -1,12 +1,13 @@
 // Service layer for the Skill Ontology module.
 //
 // HYBRID MODE: getSkills / getSkill / createSkill / updateSkill /
-// updateSkillStatus / getCategories / searchParents / importSkills /
-// exportSkills call the real backend (every GET/POST/PATCH endpoint provided
-// so far). Everything else (aliases, similar-skill resolution, merge,
-// hierarchy browsing, recent activity, usage breakdown, seeding) still
-// operates against the in-memory/localStorage-backed mock dataset in
-// mock/skillOntologyMockData.js, since no real endpoint exists for those yet.
+// updateSkillStatus / getCategories / searchParents / validateImportFile /
+// importSkills / getImportErrorReport / exportSkills / getSkillHierarchy /
+// getSkillChildren call the real backend (every GET/POST/PATCH endpoint
+// provided so far). Everything else (aliases, similar-skill resolution,
+// merge, recent activity, seeding) still operates against the in-memory/
+// localStorage-backed mock dataset in mock/skillOntologyMockData.js, since no
+// real endpoint exists for those yet.
 //
 // Real calls follow the same convention as src/pages/airs/service/campaignservice.js:
 // same BASE_URL source, same inline Authorization header, same try/catch/throw shape.
@@ -23,6 +24,35 @@ const authHeaders = () => ({
 const delay = (ms = 350) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const ok = (data) => ({ success: true, data });
+
+// In-flight request de-duplication, keyed per-call-shape (the "query key").
+// getSkills and getCategories never share a key — categories always uses the
+// fixed key "categories", skills is keyed by its own serialized filter params
+// — so two unrelated requests can never collide or overwrite one another,
+// while two *identical* concurrent calls (e.g. the list page's own fetch and
+// a form mounting at the same moment) share a single network request instead
+// of firing twice.
+const inFlightRequests = new Map();
+
+const dedupedRequest = (key, factory) => {
+  if (inFlightRequests.has(key)) return inFlightRequests.get(key);
+  const promise = factory().finally(() => inFlightRequests.delete(key));
+  inFlightRequests.set(key, promise);
+  return promise;
+};
+
+// Maps a hierarchy/children node into the shape HierarchyTree.jsx expects.
+// Field names are defensive (child_count/children_count/has_children) since
+// the exact response shape wasn't specified beyond "same envelope as other
+// skill-ontology endpoints".
+const mapHierarchyNode = (raw) => ({
+  id: raw.id,
+  canonicalName: raw.canonical_name || raw.canonicalName,
+  confidence: raw.confidence,
+  status: raw.is_active !== undefined ? (raw.is_active ? "ACTIVE" : "INACTIVE") : raw.status,
+  childCount: raw.child_count ?? raw.children_count ?? 0,
+  hasChildren: raw.has_children ?? (raw.child_count ?? raw.children_count ?? 0) > 0,
+});
 
 // Maps the real API's snake_case / is_active-boolean shape into the exact
 // camelCase shape every existing component already consumes, so no component
@@ -61,27 +91,37 @@ const mapApiSkillToInternal = (raw) => ({
 // in the given API, so "source" is never sent — the dropdown stays in the UI
 // per "don't change component structure" but doesn't currently narrow results.
 export const getSkills = async (params = {}) => {
-  try {
-    const response = await api.get(`${BASE_URL}/skill-ontology`, {
-      params: {
-        page: params.page,
-        page_size: params.page_size,
-        search: params.search,
-        category: params.category,
-        confidence: params.confidence,
-        is_active: params.is_active,
-      },
-      headers: authHeaders(),
-    });
-    const payload = response.data?.data || {};
-    return ok({
-      items: (payload.items || []).map(mapApiSkillToInternal),
-      total: payload.total ?? 0,
-    });
-  } catch (error) {
-    console.error("Error fetching skills:", error);
-    throw error;
-  }
+  // Built fresh from the caller's params every call — never mutated in place
+  // and never shared with getCategories' request below, so filter state from
+  // one can't leak into or collide with the other.
+  const url = `${BASE_URL}/skill-ontology`;
+  const query = {
+    page: params.page,
+    page_size: params.page_size,
+    search: params.search,
+    category: params.category,
+    confidence: params.confidence,
+    is_active: params.is_active,
+  };
+  // Query key = url + exact filters. Two callers requesting the identical
+  // page/filters at the same time share one network request; any different
+  // filter combination gets its own key and is never deduped against it.
+  const key = `GET ${url} ${JSON.stringify(query)}`;
+
+  return dedupedRequest(key, async () => {
+    try {
+      console.log("[skillOntologyService] GET", url, query);
+      const response = await api.get(url, { params: query, headers: authHeaders() });
+      const payload = response.data?.data || {};
+      return ok({
+        items: (payload.items || []).map(mapApiSkillToInternal),
+        total: payload.total ?? 0,
+      });
+    } catch (error) {
+      console.error("Error fetching skills:", error);
+      throw error;
+    }
+  });
 };
 
 export const getSkill = async (skillId) => {
@@ -137,12 +177,14 @@ export const updateSkill = async (skillId, payload) => {
 };
 
 // Dedicated status endpoint used by the Deactivate/Reactivate confirmations —
-// separate from the generic updateSkill PATCH above.
-export const updateSkillStatus = async (skillId, isActive) => {
+// separate from the generic updateSkill PATCH above. The same endpoint also
+// performs usage/child-hierarchy validation server-side: deactivating a skill
+// with child skills fails unless childHandling ("PROMOTE" | "ROOT") is given.
+export const updateSkillStatus = async (skillId, isActive, childHandling) => {
   try {
     const response = await api.patch(
       `${BASE_URL}/skill-ontology/${skillId}/status`,
-      { is_active: isActive },
+      { is_active: isActive, ...(childHandling ? { child_handling: childHandling } : {}) },
       { headers: authHeaders() }
     );
     return ok(response.data?.data || { id: skillId, is_active: isActive });
@@ -152,15 +194,23 @@ export const updateSkillStatus = async (skillId, isActive) => {
   }
 };
 
+// Fixed query key ("categories" — it takes no params) — distinct from any
+// getSkills key (always prefixed "GET .../skill-ontology ..."), so the two
+// endpoints' in-flight requests can never be mistaken for one another.
 export const getCategories = async () => {
-  try {
-    const response = await api.get(`${BASE_URL}/skill-ontology/categories`, { headers: authHeaders() });
-    const items = response.data?.data || [];
-    return ok([...items].sort((a, b) => a.category.localeCompare(b.category)));
-  } catch (error) {
-    console.error("Error fetching skill categories:", error);
-    throw error;
-  }
+  const url = `${BASE_URL}/skill-ontology/categories`;
+
+  return dedupedRequest("categories", async () => {
+    try {
+      console.log("[skillOntologyService] GET", url);
+      const response = await api.get(url, { headers: authHeaders() });
+      const items = response.data?.data || [];
+      return ok([...items].sort((a, b) => a.category.localeCompare(b.category)));
+    } catch (error) {
+      console.error("Error fetching skill categories:", error);
+      throw error;
+    }
+  });
 };
 
 // Parent-skill autocomplete. Caller is responsible for the "search after 2
@@ -179,6 +229,48 @@ export const searchParents = async (query) => {
   }
 };
 
+// Field names are defensive (snake_case/camelCase, alternate error-array
+// names) since the exact response shape wasn't specified beyond "same
+// envelope as other skill-ontology endpoints".
+const mapValidationResult = (raw) => {
+  const invalidRows = raw.invalid_rows ?? raw.invalidRows ?? 0;
+  return {
+    totalRows: raw.total_rows ?? raw.totalRows ?? 0,
+    validRows: raw.valid_rows ?? raw.validRows ?? 0,
+    invalidRows,
+    isValid: raw.is_valid ?? raw.valid ?? invalidRows === 0,
+    errors: (raw.errors || raw.row_errors || raw.validation_errors || []).map((e) => ({
+      row: e.row ?? e.row_number ?? e.rowNumber,
+      field: e.field ?? e.column ?? "",
+      message: e.message ?? e.error ?? e.detail ?? "",
+    })),
+  };
+};
+
+const mapImportResult = (raw) => ({
+  inserted: raw.inserted ?? 0,
+  updated: raw.updated ?? 0,
+  skipped: raw.skipped ?? 0,
+  failed: raw.failed ?? 0,
+  importId: raw.import_id ?? raw.importId ?? null,
+});
+
+// S07/T01 — dry-run validation of the uploaded file. Never mutates data;
+// the Import button (S07/T02) only unlocks once this returns isValid:true.
+export const validateImportFile = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post(`${BASE_URL}/skill-ontology/import/validate`, formData, {
+      headers: authHeaders(),
+    });
+    return ok(mapValidationResult(response.data?.data || response.data || {}));
+  } catch (error) {
+    console.error("Error validating import file:", error);
+    throw error;
+  }
+};
+
 export const importSkills = async (file, onUploadProgress) => {
   try {
     const formData = new FormData();
@@ -189,9 +281,50 @@ export const importSkills = async (file, onUploadProgress) => {
         if (onUploadProgress && evt.total) onUploadProgress(Math.round((evt.loaded * 100) / evt.total));
       },
     });
-    return ok(response.data?.data || response.data || {});
+    return ok(mapImportResult(response.data?.data || response.data || {}));
   } catch (error) {
     console.error("Error importing skills:", error);
+    throw error;
+  }
+};
+
+// S07/T03 — direct browser download, no preview page.
+export const getImportErrorReport = async (importId) => {
+  try {
+    const response = await api.get(`${BASE_URL}/skill-ontology/import/errors/${importId}`, {
+      headers: authHeaders(),
+      responseType: "blob",
+    });
+    return response;
+  } catch (error) {
+    console.error("Error downloading import error report:", error);
+    throw error;
+  }
+};
+
+// Root skills only (S05/T02) — the tree lazy-loads deeper levels via
+// getSkillChildren below rather than this endpoint ever taking a parent id.
+export const getSkillHierarchy = async () => {
+  try {
+    const response = await api.get(`${BASE_URL}/skill-ontology/hierarchy`, { headers: authHeaders() });
+    const payload = response.data?.data;
+    const items = payload?.items || payload || [];
+    return ok({ items: items.map(mapHierarchyNode) });
+  } catch (error) {
+    console.error("Error fetching skill hierarchy:", error);
+    throw error;
+  }
+};
+
+// Immediate children of one node, fetched only when that node is expanded.
+export const getSkillChildren = async (skillId) => {
+  try {
+    const response = await api.get(`${BASE_URL}/skill-ontology/${skillId}/children`, { headers: authHeaders() });
+    const payload = response.data?.data;
+    const items = payload?.items || payload || [];
+    return ok({ items: items.map(mapHierarchyNode) });
+  } catch (error) {
+    console.error("Error fetching child skills:", error);
     throw error;
   }
 };
@@ -216,11 +349,6 @@ export const exportSkills = async (params = {}) => {
 };
 
 // ── Still mock (no real endpoint provided yet) ──────────────────────────
-
-const withChildCount = (skill, allSkills) => ({
-  ...skill,
-  childCount: allSkills.filter((s) => s.parentSkillId === skill.id).length,
-});
 
 export const seedOntology = async () => {
   await delay();
@@ -288,24 +416,3 @@ export const addAsAlias = async (sourceSkillId, ofSkillId) => {
   return ok({ addedTo: ofSkillId });
 };
 
-// parentId omitted/null → root-level nodes (lazy-loading tree).
-export const getHierarchy = async (parentId) => {
-  await delay();
-  const all = loadMockSkills();
-  const nodes = all.filter((s) => (parentId ? s.parentSkillId === parentId : !s.parentSkillId));
-  return ok({ items: nodes.map((n) => withChildCount(n, all)) });
-};
-
-export const getSkillUsage = async (skillId) => {
-  await delay();
-  const all = loadMockSkills();
-  const skill = all.find((s) => s.id === skillId);
-  if (!skill) throw new Error("Skill not found");
-  const childSkillCount = all.filter((s) => s.parentSkillId === skillId).length;
-  return ok({
-    jdCount: skill.jdCount,
-    candidateCount: skill.candidateCount,
-    campaignCount: skill.campaignCount,
-    childSkillCount,
-  });
-};

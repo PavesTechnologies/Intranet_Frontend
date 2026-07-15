@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import { getHierarchy } from "../services/skillOntologyService";
+import { getSkillHierarchy, getSkillChildren } from "../services/skillOntologyService";
 
-// Lazy-loading tree state: root nodes fetch on mount, children fetch on first
-// expand and are cached so re-collapsing/re-expanding doesn't re-fetch.
+// Lazy-loading tree state: root nodes fetch on mount (GET .../hierarchy),
+// children fetch on first expand (GET .../{skill_id}/children) and are cached
+// so re-collapsing/re-expanding doesn't re-fetch.
 export default function useHierarchy() {
   const [rootNodes, setRootNodes] = useState([]);
   const [isLoadingRoot, setIsLoadingRoot] = useState(false);
@@ -17,11 +18,11 @@ export default function useHierarchy() {
     setIsLoadingRoot(true);
     setRootError(null);
     try {
-      const res = await getHierarchy(undefined);
+      const res = await getSkillHierarchy();
       setRootNodes(res?.data?.items || res?.items || res?.data || []);
     } catch (err) {
       setRootError(err);
-      toast.error("Failed to load the skill hierarchy.");
+      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to load the skill hierarchy.");
     } finally {
       setIsLoadingRoot(false);
     }
@@ -48,11 +49,11 @@ export default function useHierarchy() {
 
       setLoadingIds((prev) => new Set(prev).add(nodeId));
       try {
-        const res = await getHierarchy(nodeId);
+        const res = await getSkillChildren(nodeId);
         const children = res?.data?.items || res?.items || res?.data || [];
         setChildrenById((prev) => ({ ...prev, [nodeId]: children }));
-      } catch {
-        toast.error("Failed to load child skills.");
+      } catch (err) {
+        toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to load child skills.");
       } finally {
         setLoadingIds((prev) => {
           const next = new Set(prev);

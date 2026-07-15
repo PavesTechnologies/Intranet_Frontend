@@ -8,7 +8,7 @@ import { validateSkillForm } from "../utils/skillOntologyUtils.jsx";
 // Edit uses the project's existing global Modal (centered, same backdrop/animation
 // as every other edit dialog in the app) instead of a drawer — clicking the Edit
 // icon opens this in place, no navigation to a separate page.
-export default function EditSkillModal({ open, skill, existingSkills = [], onClose, onSubmit, isSubmitting }) {
+export default function EditSkillModal({ open, skill, existingSkills = [], categoryOptions, onClose, onSubmit, isSubmitting }) {
   const [values, setValues] = useState(EMPTY_SKILL_FORM);
   const [errors, setErrors] = useState({});
 
@@ -38,7 +38,15 @@ export default function EditSkillModal({ open, skill, existingSkills = [], onClo
   return (
     <Modal isOpen={open} onClose={onClose} title="Edit Skill" width="520px">
       <div className="space-y-4">
-        {open && <SkillForm values={values} errors={errors} onFieldChange={setField} excludeSkillId={skill?.id} />}
+        {open && (
+          <SkillForm
+            values={values}
+            errors={errors}
+            onFieldChange={setField}
+            excludeSkillId={skill?.id}
+            categoryOptions={categoryOptions}
+          />
+        )}
 
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" size="small" onClick={onClose}>

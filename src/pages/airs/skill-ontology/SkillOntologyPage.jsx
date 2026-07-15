@@ -11,6 +11,7 @@ import AddSkillDrawer from "./components/AddSkillDrawer";
 import EditSkillModal from "./components/EditSkillModal";
 import DeactivateDialog from "./components/DeactivateDialog";
 import ReactivateDialog from "./components/ReactivateDialog";
+import ChildHandlingDialog from "./components/ChildHandlingDialog";
 import SimilarSkillDialog from "./components/SimilarSkillDialog";
 import BulkImportDrawer from "./components/BulkImportDrawer";
 import {
@@ -18,7 +19,6 @@ import {
   updateSkill,
   updateSkillStatus,
   getSkill,
-  getSkillUsage,
   getSimilarSkills,
   mergeSkills,
   addAsAlias,
@@ -33,13 +33,18 @@ export default function SkillOntologyPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editSkill, setEditSkill] = useState(null);
   const [deactivateTarget, setDeactivateTarget] = useState(null);
-  const [deactivateUsage, setDeactivateUsage] = useState(null);
   const [reactivateTarget, setReactivateTarget] = useState(null);
+  const [childHandling, setChildHandling] = useState(null); // { skill, children }
   const [similarState, setSimilarState] = useState(null); // { newSkill, similarSkills }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
+
+  // The list's own category fetch already has these — strip the filter-only
+  // "All Categories" sentinel and hand them to the Add/Edit form instead of
+  // letting SkillForm fetch its own duplicate copy on every modal open.
+  const formCategoryOptions = list.categoryOptions.filter((o) => o.value !== "All");
 
   const handleCreate = async (values) => {
     setIsSubmitting(true);
@@ -91,21 +96,26 @@ export default function SkillOntologyPage() {
       setEditSkill(null);
       list.updateSkillInPlace(updated); // instant feedback, no manual refresh needed
       list.refresh(); // authoritative refetch — keeps page/filters/sorting correct
-    } catch {
-      toast.error("Failed to update skill.");
+    } catch (err) {
+      // Surfaces backend validation messages (e.g. circular hierarchy, cannot
+      // assign itself, parent skill inactive) instead of a generic string.
+      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to update skill.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const openDeactivate = async (skill) => {
-    setDeactivateTarget(skill);
-    try {
-      const res = await getSkillUsage(skill.id);
-      setDeactivateUsage(res?.data || res);
-    } catch {
-      setDeactivateUsage(null);
-    }
+  const openDeactivate = (skill) => setDeactivateTarget(skill);
+
+  const statusErrorMessage = (err, fallback) =>
+    err?.response?.data?.message || err?.response?.data?.detail || fallback;
+
+  // Case 3: backend rejects deactivation of a skill with child skills and
+  // returns the affected children so the user can choose PROMOTE vs ROOT.
+  const extractChildren = (err) => {
+    const data = err?.response?.data;
+    const children = data?.data?.children || data?.children;
+    return Array.isArray(children) && children.length > 0 ? children : null;
   };
 
   const confirmDeactivate = async () => {
@@ -115,8 +125,28 @@ export default function SkillOntologyPage() {
       toast.success(`"${deactivateTarget.canonicalName}" deactivated.`);
       setDeactivateTarget(null);
       list.refresh();
-    } catch {
-      toast.error("Failed to deactivate skill.");
+    } catch (err) {
+      const children = extractChildren(err);
+      if (children) {
+        setChildHandling({ skill: deactivateTarget, children });
+        setDeactivateTarget(null);
+      } else {
+        toast.error(statusErrorMessage(err, "Failed to deactivate skill."));
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const submitChildHandling = async (mode) => {
+    setIsSubmitting(true);
+    try {
+      await updateSkillStatus(childHandling.skill.id, false, mode);
+      toast.success(`"${childHandling.skill.canonicalName}" deactivated.`);
+      setChildHandling(null);
+      list.refresh();
+    } catch (err) {
+      toast.error(statusErrorMessage(err, "Failed to deactivate skill."));
     } finally {
       setIsSubmitting(false);
     }
@@ -129,8 +159,8 @@ export default function SkillOntologyPage() {
       toast.success(`"${reactivateTarget.canonicalName}" reactivated.`);
       setReactivateTarget(null);
       list.refresh();
-    } catch {
-      toast.error("Failed to reactivate skill.");
+    } catch (err) {
+      toast.error(statusErrorMessage(err, "Failed to reactivate skill."));
     } finally {
       setIsSubmitting(false);
     }
@@ -251,6 +281,7 @@ export default function SkillOntologyPage() {
       <AddSkillDrawer
         open={addOpen}
         existingSkills={list.skills}
+        categoryOptions={formCategoryOptions}
         onClose={() => setAddOpen(false)}
         onSubmit={handleCreate}
         isSubmitting={isSubmitting}
@@ -260,6 +291,7 @@ export default function SkillOntologyPage() {
         open={!!editSkill}
         skill={editSkill}
         existingSkills={list.skills}
+        categoryOptions={formCategoryOptions}
         onClose={() => setEditSkill(null)}
         onSubmit={handleUpdate}
         isSubmitting={isSubmitting}
@@ -268,7 +300,6 @@ export default function SkillOntologyPage() {
       <DeactivateDialog
         open={!!deactivateTarget}
         skill={deactivateTarget}
-        usage={deactivateUsage}
         onClose={() => setDeactivateTarget(null)}
         onConfirm={confirmDeactivate}
         isSubmitting={isSubmitting}
@@ -282,6 +313,15 @@ export default function SkillOntologyPage() {
         isSubmitting={isSubmitting}
       />
 
+      <ChildHandlingDialog
+        open={!!childHandling}
+        skill={childHandling?.skill}
+        childSkills={childHandling?.children}
+        onClose={() => setChildHandling(null)}
+        onConfirm={submitChildHandling}
+        isSubmitting={isSubmitting}
+      />
+
       <SimilarSkillDialog
         open={!!similarState}
         newSkill={similarState?.newSkill}
@@ -291,7 +331,7 @@ export default function SkillOntologyPage() {
         isSubmitting={isSubmitting}
       />
 
-      <BulkImportDrawer open={bulkImportOpen} onClose={() => setBulkImportOpen(false)} onImported={list.refresh} />
+      <BulkImportDrawer open={bulkImportOpen} onClose={() => setBulkImportOpen(false)} onImported={list.refreshAll} />
     </div>
   );
 }
