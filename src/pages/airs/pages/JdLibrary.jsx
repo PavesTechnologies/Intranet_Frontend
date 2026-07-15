@@ -18,6 +18,8 @@ import {
   CheckCircle,
   FileSpreadsheet,
   FileText,
+  FileCheck2,
+  Clock,
   X
 } from "lucide-react";
 import { toast } from "react-toastify";
@@ -27,9 +29,11 @@ import ConfirmationModal from "../../../components/confirmation_modal/Confirmati
 import Modal from "../../../components/ui/Modal";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import { Badge } from "../../../components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../../components/ui/tabs";
 import GenericTable from "../../../components/Table/table";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import JdForm from "./JdForm";
+import JdProcessingList from "./JdProcessingList";
 
 
 const statusOptions = [
@@ -90,6 +94,10 @@ export default function JdLibrary() {
   const [isJdDelete, setIsJdDelete] = useState(false);
   const [jdModalOpen, setJdModalOpen] = useState(false);
   const [jdModalEditId, setJdModalEditId] = useState(null);
+
+  // Tabs State
+  const [activeTab, setActiveTab] = useState("processed");
+  const [processingRefreshToken, setProcessingRefreshToken] = useState(0);
 
   // Debounce search term to avoid spamming calls
   useEffect(() => {
@@ -499,35 +507,61 @@ export default function JdLibrary() {
         </div>
       </div>
 
-      {/* Table Card */}
-      <div className="overflow-x-auto mb-6">
-        {isLoading ?
-          <div className="h-40 flex items-center justify-center">
-            <LoadingSpinner text="Loading JDs..."></LoadingSpinner>
-          </div> : paginatedJds.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400">
-              <Archive className="h-10 w-10 mx-auto stroke-1 mb-2" />
-              No Job Descriptions found matching the criteria.
-            </div>
-          ) : (
-            <GenericTable
-              headers={headers}
-              columns={columns}
-              rows={tableRows}
-              loading={isLoading}
+      {/* Processed JD / Processing JD Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="bg-white border border-slate-200 shadow-sm mb-6 p-1 h-auto">
+          <TabsTrigger
+            value="processed"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-none text-slate-500"
+          >
+            <FileCheck2 className="h-3.5 w-3.5" />
+            Processed JD
+          </TabsTrigger>
+          <TabsTrigger
+            value="processing"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-none text-slate-500"
+          >
+            <Clock className="h-3.5 w-3.5" />
+            Processing JD
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="processed" className="mt-0">
+          {/* Table Card */}
+          <div className="overflow-x-auto mb-6">
+            {isLoading ?
+              <div className="h-40 flex items-center justify-center">
+                <LoadingSpinner text="Loading JDs..."></LoadingSpinner>
+              </div> : paginatedJds.length === 0 ? (
+                <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400">
+                  <Archive className="h-10 w-10 mx-auto stroke-1 mb-2" />
+                  No Job Descriptions found matching the criteria.
+                </div>
+              ) : (
+                <GenericTable
+                  headers={headers}
+                  columns={columns}
+                  rows={tableRows}
+                  loading={isLoading}
+                />
+              )}
+          </div>
+
+          {/* Pagination bar */}
+          {totalItems > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPrevious={() => setCurrentPage(currentPage - 1)}
+              onNext={() => setCurrentPage(currentPage + 1)}
             />
           )}
-      </div>
+        </TabsContent>
 
-      {/* Pagination bar */}
-      {totalItems > 0 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPrevious={() => setCurrentPage(currentPage - 1)}
-          onNext={() => setCurrentPage(currentPage + 1)}
-        />
-      )}
+        <TabsContent value="processing" className="mt-0">
+          <JdProcessingList key={processingRefreshToken} />
+        </TabsContent>
+      </Tabs>
 
       {/* dialog overlays */}
 
@@ -541,9 +575,13 @@ export default function JdLibrary() {
       >
         <JdForm
           editId={jdModalEditId}
-          onSuccess={() => {
+          onSuccess={(info) => {
             setJdModalOpen(false);
             fetchJds();
+            if (info?.queuedForProcessing) {
+              setActiveTab("processing");
+              setProcessingRefreshToken((t) => t + 1);
+            }
           }}
           onCancel={() => setJdModalOpen(false)}
         />

@@ -93,6 +93,42 @@ export const updateJDById = async (jdId, updatedData) => {
     }
 };
 
+export const updateJDFromFile = async (jdId, file, fields = {}) => {
+    try {
+        const formData = new FormData();
+        formData.append("file", file);
+        Object.entries(fields).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === "") return;
+            formData.append(key, value);
+        });
+
+        const response = await api.put(`${BASE_URL}/job-descriptions/${jdId}/from-file`, formData, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error updating JD from file:", error);
+        throw error;
+    }
+};
+
+export const viewJDFile = async (jdId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}/view`, {
+            responseType: "blob",
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response;
+    } catch (error) {
+        console.error("Error viewing JD file:", error);
+        throw error;
+    }
+};
+
 export const exportSingleJD = async (jdId) => {
     try {
         const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}/export`, {
@@ -124,6 +160,20 @@ export const exportJDs = async (params) => {
         return response;
     } catch (error) {
         console.error("Error exporting JDs:", error);
+        throw error;
+    }
+};
+
+export const getMyJDUploads = async () => {
+    try {
+        const response = await api.get(`${BASE_URL}/job-descriptions/my-uploads`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching JD uploads:", error);
         throw error;
     }
 };
