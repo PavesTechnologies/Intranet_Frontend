@@ -34,9 +34,14 @@ function makeCandidate(id) {
   const template = pick(ROLE_TEMPLATES);
   const name = `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
   const exp = int(1, 14);
+  const deterministic = int(40, 100);
   const ats = int(38, 98);
   const semantic = int(40, 99);
-  const composite = Math.min(100, Math.round(ats * 0.45 + semantic * 0.35 + int(0, 20)));
+  const composite = Math.round(
+  deterministic * 0.30 +
+  semantic * 0.40 +
+  ats * 0.30
+);
   const missing = template.skills.filter(() => rng() < 0.25);
   const matched = template.skills.filter((s) => !missing.includes(s));
 
@@ -54,6 +59,7 @@ function makeCandidate(id) {
     education: pick(["B.Tech CS, IIT Bombay", "B.E. ECE, VIT", "M.S. CS, NUS", "MBA, ISB", "B.Sc Stats, Delhi Univ.", "M.Tech, IIT Madras"]),
     notice: pick(["Immediate", "15 days", "30 days", "60 days", "90 days"]),
     salary: `₹${int(12, 55)}L`,
+    deterministic,
     ats,
     semantic,
     composite,
