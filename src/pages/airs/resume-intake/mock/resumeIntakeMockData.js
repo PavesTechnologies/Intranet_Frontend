@@ -62,20 +62,25 @@ export const MOCK_UPLOAD_STATS = {
   failedUploads: MOCK_UPLOAD_HISTORY.filter((f) => f.status === "Failed").length,
 };
 
-const ZIP_BATCH_NAMES = ["batch_uploads", "resume_pool", "sourcing_drop", "candidate_zip"];
+function formatFileSize(bytes) {
+  if (!bytes || bytes <= 0) return "0 KB";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
-// Generates a plausible new upload entry when the user simulates a drag/drop or browse upload.
-export function generateMockUpload(kind, sequence) {
+// Builds a new upload entry from the actual file the user picked (browse or drag/drop),
+// so the displayed name/size reflect what they selected rather than mock data.
+export function generateMockUpload(kind, sequence, file) {
   const isZip = kind === "zip";
   const id = `UPL-${1100 + sequence}`;
   const fileCount = isZip ? int(5, 30) : 1;
-  const name = isZip
-    ? `${pick(ZIP_BATCH_NAMES)}_${int(1, 99)}.zip`
-    : `${pick(["arjun_mehta", "neha_kapoor", "vikram_rao", "isha_singh"])}_resume.pdf`;
+  const name = file?.name || (isZip ? `batch_uploads_${int(1, 99)}.zip` : `resume_${sequence}.pdf`);
+  const sizeLabel = file ? formatFileSize(file.size) : isZip ? `${(fileCount * int(2, 4)).toFixed(1)} MB` : `${int(180, 420)} KB`;
+
   return buildFile({
     id,
     name,
-    sizeLabel: isZip ? `${(fileCount * int(2, 4)).toFixed(1)} MB` : `${int(180, 420)} KB`,
+    sizeLabel,
     fileCount,
     status: "Queued",
     progress: 0,

@@ -75,9 +75,9 @@ export default function useResumeIntake() {
     intervalsRef.current[fileId] = interval;
   };
 
-  const simulateUpload = (kind) => {
+  const simulateUpload = (kind, file) => {
     sequenceRef.current += 1;
-    const newFile = generateMockUpload(kind, sequenceRef.current);
+    const newFile = generateMockUpload(kind, sequenceRef.current, file);
     setFiles((prev) => [newFile, ...prev]);
     toast.info(`${newFile.name} added to the parsing queue.`);
     runSimulation(newFile.id, newFile.name);
