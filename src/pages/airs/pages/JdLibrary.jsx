@@ -40,7 +40,7 @@ const statusOptions = [
   { label: "All Statuses", value: "All" },
   { label: "Ready", value: "Ready" },
   { label: "Draft", value: "Draft" },
-  { label: "Pending Review", value: "Pending Review" },
+  { label: "Pending", value: "Pending_Review" },
   { label: "Parsing", value: "Parsing" },
   { label: "Closed", value: "Closed" },
 ];
@@ -177,8 +177,8 @@ export default function JdLibrary() {
     if (normalized === "DRAFT" || normalized === "UNVERIFIED") {
       return <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">Draft</Badge>;
     }
-    if (normalized === "PENDING_REVIEW" || normalized === "PARTIALLY_VERIFIED" || normalized === "PENDING REVIEW") {
-      return <Badge className="bg-amber-50 text-amber-700 border-amber-100 font-semibold px-2.5 py-1 text-xs">Pending Review</Badge>;
+    if (normalized === "PARTIALLY_VERIFIED") {
+      return <Badge className="bg-amber-50 text-amber-700 border-amber-100 font-semibold px-2.5 py-1 text-xs">Pending</Badge>;
     }
     if (normalized === "PARSING") {
       return (

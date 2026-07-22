@@ -107,6 +107,8 @@ import JdDetails from "./pages/airs/pages/JdDetails.jsx";
 import Campaigns from "./pages/airs/pages/Campaigns.jsx";
 import CampaignDetails from "./pages/airs/pages/CampaignDetails.jsx";
 import ResumeIntakePage from "./pages/airs/resume-intake/ResumeIntakePage.jsx";
+import IntakeFlowPage from "./pages/airs/resume-intake/intake/IntakeFlowPage.jsx";
+import ReviewPage from "./pages/airs/resume-intake/intake/ReviewPage.jsx";
 import CandidateRankingPage from "./pages/airs/candidates/CandidateRankingPage.jsx";
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
@@ -1003,6 +1005,22 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute roles={["General"]}>
                 <ResumeIntakePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/resume-intake/new"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <IntakeFlowPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/resume-intake/review/:resumeId"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <ReviewPage />
               </ProtectedRoute>
             }
           />
