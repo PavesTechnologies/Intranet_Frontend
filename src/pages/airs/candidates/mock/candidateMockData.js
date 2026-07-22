@@ -30,6 +30,59 @@ export const ROLE_TEMPLATES = [
 
 export const CANDIDATE_STAGES = ["Screening", "Shortlisted", "Interview", "Selected", "Rejected"];
 
+// Hierarchy match weight per match type — mirrors the deterministic scoring
+// engine's own multipliers (EXACT 100% ... MISSING 0%). Computed here, once,
+// at mock-data-generation time — the UI (HierarchyMatchResults) only ever
+// reads these pre-computed fields, it never derives or recalculates them.
+const MATCH_WEIGHTS = { EXACT: 1, CHILD: 0.7, SIBLING: 0.4, SEMANTIC: 0.2, MISSING: 0 };
+
+function makeScoreBreakdownItems(skills, missingSet) {
+  // First ~60% of a role's skill list are treated as mandatory, the rest preferred.
+  const mandatoryCount = Math.max(1, Math.ceil(skills.length * 0.6));
+
+  return skills.map((skillName, i) => {
+    const mandatory = i < mandatoryCount;
+    const configuredWeight = mandatory ? int(15, 25) : int(5, 15);
+    const matchType = missingSet.has(skillName)
+      ? "MISSING"
+      : pick(["EXACT", "EXACT", "CHILD", "CHILD", "SIBLING", "SEMANTIC"]);
+    const weightApplied = MATCH_WEIGHTS[matchType];
+    const scoringConfidence = matchType === "MISSING" ? 0 : matchType === "EXACT" ? 1.0 : pick([1.0, 0.8]);
+    const scoreContribution = Math.round(configuredWeight * weightApplied * scoringConfidence * 100) / 100;
+
+    return {
+      jdSkillName: skillName,
+      mandatory,
+      matchType,
+      matchedCandidateSkill: matchType === "MISSING" ? null : skillName,
+      scoreContribution,
+      weightApplied,
+      configuredWeight,
+      scoringConfidence,
+    };
+  });
+}
+
+// M07-E01/S04 — the deterministic engine's full score_breakdown output: the
+// per-skill items list plus the NO_VERIFIED_SKILLS edge-case flag and the
+// resulting score/status. All computed once here, at mock-generation time —
+// the UI only ever reads these fields.
+function makeScoreBreakdown(skills, missing, deterministic, forceNoVerifiedSkills) {
+  const missingSet = forceNoVerifiedSkills ? new Set(skills) : new Set(missing);
+  const items = makeScoreBreakdownItems(skills, missingSet);
+  const noVerifiedSkills = forceNoVerifiedSkills || items.every((r) => r.matchType === "MISSING");
+  // Missing mandatory skills fail deterministic screening — a real backend
+  // rule, mirrored here rather than re-derived by the UI.
+  const hasMissingMandatory = items.some((r) => r.mandatory && r.matchType === "MISSING");
+  const status = noVerifiedSkills || hasMissingMandatory ? "FAILED" : "PASSED";
+  // A higher-precision variant of `deterministic` for the scorecard's
+  // "X.XX / 100" summary (the existing integer `deterministic` field is kept
+  // untouched elsewhere since ScoreRing displays already depend on its shape).
+  const score = noVerifiedSkills ? 0 : Math.round((deterministic + rng() * 0.99) * 100) / 100;
+
+  return { items, noVerifiedSkills, score, status };
+}
+
 function makeCandidate(id) {
   const template = pick(ROLE_TEMPLATES);
   const name = `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
@@ -44,6 +97,12 @@ function makeCandidate(id) {
 );
   const missing = template.skills.filter(() => rng() < 0.25);
   const matched = template.skills.filter((s) => !missing.includes(s));
+
+  // A small, deterministic sample of candidates (every 15th) exercises the
+  // zero-verified-skills edge case reliably, rather than relying on rare
+  // random chance across the 48-candidate mock pool.
+  const forceNoVerifiedSkills = id % 15 === 0;
+  const scoreBreakdown = makeScoreBreakdown(template.skills, missing, deterministic, forceNoVerifiedSkills);
 
   return {
     id: `CND-${1000 + id}`,
@@ -63,6 +122,8 @@ function makeCandidate(id) {
     ats,
     semantic,
     composite,
+    scoreBreakdown,
+    manualSkills: [],
     matchedSkills: matched.length ? matched : template.skills.slice(0, 2),
     missingSkills: missing,
     stage: pick(CANDIDATE_STAGES),
