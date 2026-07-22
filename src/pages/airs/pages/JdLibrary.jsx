@@ -38,11 +38,9 @@ import JdProcessingList from "./JdProcessingList";
 
 const statusOptions = [
   { label: "All Statuses", value: "All" },
-  { label: "Ready", value: "Ready" },
-  { label: "Draft", value: "Draft" },
-  { label: "Pending", value: "Pending_Review" },
-  { label: "Parsing", value: "Parsing" },
-  { label: "Closed", value: "Closed" },
+  { label: "VERIFIED", value: "VERIFIED" },
+  { label: "UNVERIFIED", value: "UNVERIFIED" },
+  { label: "PARTIALLY VERIFIED", value: "PARTIALLY VERIFIED" }
 ];
 
 const jurisdictionOptions = [
@@ -171,25 +169,17 @@ export default function JdLibrary() {
   // Status Badge Colors using common UI Badge component
   const getStatusBadge = (status) => {
     const normalized = String(status || "").toUpperCase();
-    if (normalized === "READY" || normalized === "VERIFIED") {
-      return <Badge className="bg-blue-50 text-blue-700 border-blue-100 font-semibold px-2.5 py-1 text-xs">Ready</Badge>;
+    if (normalized === "VERIFIED") {
+      return <Badge className="bg-blue-50 text-blue-700 border-blue-100 font-semibold px-2.5 py-1 text-xs">{status}</Badge>;
     }
-    if (normalized === "DRAFT" || normalized === "UNVERIFIED") {
-      return <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">Draft</Badge>;
+    if (normalized === "UNVERIFIED") {
+      return <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">{status}</Badge>;
     }
     if (normalized === "PARTIALLY_VERIFIED") {
-      return <Badge className="bg-amber-50 text-amber-700 border-amber-100 font-semibold px-2.5 py-1 text-xs">Pending</Badge>;
-    }
-    if (normalized === "PARSING") {
-      return (
-        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 font-semibold px-2.5 py-1 text-xs gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-          Parsing
-        </Badge>
-      );
+      return <Badge className="bg-amber-50 text-amber-700 border-amber-100 font-semibold px-2.5 py-1 text-xs">{status}</Badge>;
     }
     if (normalized === "CLOSED") {
-      return <Badge className="bg-rose-50 text-rose-700 border-rose-100 font-semibold px-2.5 py-1 text-xs">Closed</Badge>;
+      return <Badge className="bg-rose-50 text-rose-700 border-rose-100 font-semibold px-2.5 py-1 text-xs">{status}</Badge>;
     }
     return <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">{status}</Badge>;
   };
@@ -202,6 +192,7 @@ export default function JdLibrary() {
     <div key="createdDate" className="w-full flex justify-center select-none">Created Date</div>,
     <div key="campaignCount" className="w-full flex justify-center select-none">Campaigns</div>,
     <div key="status" className="w-full flex justify-center select-none">Status</div>,
+    <div key="isActive" className="w-full flex justify-center select-none">Active</div>,
     <div key="actions" className="w-full flex justify-center select-none">Actions</div>
   ];
 
@@ -214,6 +205,7 @@ export default function JdLibrary() {
     "createdDate",
     "campaignCount",
     "status",
+    "isActive",
     "actions",
   ];
 
@@ -224,7 +216,8 @@ export default function JdLibrary() {
       const createdDate = jd.createdDate || (jd.created_at ? jd.created_at.split('T')[0] : "");
       const createdBy = jd.createdBy || jd.created_by || "System";
       const status = jd.status || jd.is_verified || (jd.active === false ? "Closed" : "Ready");
-      const campaignCount = jd.campaignCount !== undefined ? jd.campaignCount : 0;
+      const campaignCount = (jd.active_campaigns_count || 0) + (jd.passed_campaigns_count || 0);
+      const isActiveVersion = jd.is_active_version;
 
       return {
         title: (
@@ -278,6 +271,15 @@ export default function JdLibrary() {
             {getStatusBadge(status)}
           </div>
         ),
+        isActive: (
+          <div className="w-full flex justify-center">
+            {isActiveVersion ? (
+              <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 font-semibold px-2.5 py-1 text-xs">Yes</Badge>
+            ) : (
+              <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">No</Badge>
+            )}
+          </div>
+        ),
         actions: (
           <div className="w-full flex justify-center items-center gap-1">
             <Button
@@ -327,7 +329,6 @@ export default function JdLibrary() {
         toast.success(res.message || "Job Description deleted successfully");
         fetchJds();
       } catch (error) {
-        toast.error("Failed to delete Job Description");
       } finally {
         setIsJdDelete(false);
       }
@@ -591,7 +592,7 @@ export default function JdLibrary() {
       <ConfirmationModal
         isOpen={confirmDelete}
         title="Confirm Job Description Deletion"
-        message="Are you sure you want to delete Job Description? This action is permanent and will remove all version history logs from the platform."
+        message="Are you sure you want to delete Job Description? This is a soft delete, not a permanent one — the record and its version history will be retained and can be restored later."
         onConfirm={handleDeleteConfirm}
         onCancel={() => { setDeleteJdId(null); setConfirmDelete(false); }}
         confirmText="Yes, Delete"
