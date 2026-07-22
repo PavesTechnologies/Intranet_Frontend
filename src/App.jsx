@@ -104,6 +104,8 @@ import AirsDashboard from "./pages/airs/pages/AirsDashboard.jsx";
 import JdLibrary from "./pages/airs/pages/JdLibrary.jsx";
 import JdCreate from "./pages/airs/pages/JdCreate.jsx";
 import JdDetails from "./pages/airs/pages/JdDetails.jsx";
+import Campaigns from "./pages/airs/pages/Campaigns.jsx";
+import CampaignDetails from "./pages/airs/pages/CampaignDetails.jsx";
 import AirsPlaceholder from "./pages/airs/pages/AirsPlaceholder.jsx";
 
 import AdminOfferLettersDashboard from "./pages/employee-onboarding/admin/AdminOfferLettersDashboard.jsx";
@@ -976,7 +978,15 @@ const AppRoutes = () => {
             path="/airs/campaigns"
             element={
               <ProtectedRoute roles={["General"]}>
-                <AirsPlaceholder />
+                <Campaigns />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/campaigns/:id"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <CampaignDetails />
               </ProtectedRoute>
             }
           />
