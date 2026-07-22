@@ -5,15 +5,18 @@ import SkillForm from "./SkillForm";
 import { EMPTY_SKILL_FORM } from "../constants/skillOntologyConstants";
 import { validateSkillForm } from "../utils/skillOntologyUtils.jsx";
 
-export default function AddSkillDrawer({ open, existingSkills = [], categoryOptions, onClose, onSubmit, isSubmitting }) {
+// initialValues is optional — omitted for the normal "Add Skill" toolbar
+// button (starts blank), passed by SkillOntologyPage's "Promote to skill"
+// action (from the Unknown Skills tab) to pre-fill the canonical name.
+export default function AddSkillDrawer({ open, existingSkills = [], categoryOptions, initialValues, onClose, onSubmit, isSubmitting }) {
   const [values, setValues] = useState(EMPTY_SKILL_FORM);
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
     if (!open) return;
-    setValues(EMPTY_SKILL_FORM);
+    setValues(initialValues || EMPTY_SKILL_FORM);
     setErrors({});
-  }, [open]);
+  }, [open, initialValues]);
 
   const setField = (field, value) => setValues((v) => ({ ...v, [field]: value }));
 

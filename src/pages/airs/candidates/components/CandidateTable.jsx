@@ -15,10 +15,11 @@ export default function CandidateTable({ candidates, onView, onToggleStar }) {
     );
   }
 
-  const headers = ["Candidate", "Composite", "ATS", "Semantic", "Exp.", "Location", "Stage", "Risk", "Actions"];
+  const headers = ["Candidate", "Deterministic", "ATS", "Semantic", "Composite","Exp.", "Location", "Stage", "Risk", "Actions"];
 
-  const columns = ["name", "composite", "ats", "semantic", "experience", "location", "stage", "risk", "actions"];
-
+  const columns = ["name", "deterministic", "ats", "semantic", "composite", "experience", "location", "stage", "risk", "actions"];
+  console.log("FIRST CANDIDATE:", candidates[0]);
+  console.log("DETERMINISTIC VALUE:", candidates[0]?.deterministic);
   const rows = candidates.map((c) => ({
     id: c.id,
     rowClass: "hover:bg-slate-50/50 transition cursor-pointer",
@@ -43,9 +44,10 @@ export default function CandidateTable({ candidates, onView, onToggleStar }) {
         </button>
       </div>
     ),
-    composite: <ScoreRing value={c.composite} size={32} color="#16A34A" />,
+    deterministic: <span className="font-semibold text-slate-900">{c.deterministic}</span>,
     ats: <span className="font-semibold text-slate-900">{c.ats}</span>,
-    semantic: <span className="font-semibold text-slate-900">{c.semantic}%</span>,
+    semantic: <span className="font-semibold text-slate-900">{c.semantic}</span>,
+    composite: <ScoreRing value={c.composite} size={32} color="#16A34A" />,
     experience: `${c.experience} yrs`,
     location: c.location,
     stage: renderStageBadge(c.stage),
