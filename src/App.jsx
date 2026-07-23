@@ -136,6 +136,40 @@ import EmployeeDocuments from "./pages/employee-onboarding/employeedocuments/Emp
 import OfferPreview from "./pages/employee-onboarding/offer-preview/OfferPreview.jsx";
 import FinalOfferPreview from "./pages/employee-onboarding/final-offer-preview/FinalOfferPreview.jsx";
 import OfferGeneratedPreview from "./pages/employee-onboarding/offer-generated-preview/OfferGeneratedPreview.jsx";
+
+// ✅ Expense Management (XMS)
+import XmsDashboardPage from "./pages/expense-management/pages/dashboard/DashboardPage.jsx";
+import XmsCreateExpensePage from "./pages/expense-management/pages/expenses/CreateExpensePage.jsx";
+import XmsMyExpensesPage from "./pages/expense-management/pages/expenses/MyExpensesPage.jsx";
+import XmsAllExpensesPage from "./pages/expense-management/pages/expenses/AllExpensesPage.jsx";
+import XmsExpenseReportsPage from "./pages/expense-management/pages/expenses/ExpenseReportsPage.jsx";
+import XmsReceiptLibraryPage from "./pages/expense-management/pages/receipts/ReceiptLibraryPage.jsx";
+import XmsOcrProcessingPage from "./pages/expense-management/pages/receipts/OcrProcessingPage.jsx";
+import XmsRequestAdvancePage from "./pages/expense-management/pages/cash-advance/RequestAdvancePage.jsx";
+import XmsMyAdvancesPage from "./pages/expense-management/pages/cash-advance/MyAdvancesPage.jsx";
+import XmsSettlementPage from "./pages/expense-management/pages/cash-advance/SettlementPage.jsx";
+import XmsPendingApprovalsPage from "./pages/expense-management/pages/approvals/PendingApprovalsPage.jsx";
+import XmsApprovedApprovalsPage from "./pages/expense-management/pages/approvals/ApprovedApprovalsPage.jsx";
+import XmsRejectedApprovalsPage from "./pages/expense-management/pages/approvals/RejectedApprovalsPage.jsx";
+import XmsVerificationPage from "./pages/expense-management/pages/finance/VerificationPage.jsx";
+import XmsReimbursementsPage from "./pages/expense-management/pages/finance/ReimbursementsPage.jsx";
+import XmsPaymentStatusPage from "./pages/expense-management/pages/finance/PaymentStatusPage.jsx";
+import XmsBillableExpensesPage from "./pages/expense-management/pages/client-billing/BillableExpensesPage.jsx";
+import XmsInvoiceHandoffPage from "./pages/expense-management/pages/client-billing/InvoiceHandoffPage.jsx";
+import XmsInvoiceStatusPage from "./pages/expense-management/pages/client-billing/InvoiceStatusPage.jsx";
+import XmsExpenseCategoriesPage from "./pages/expense-management/pages/masters/ExpenseCategoriesPage.jsx";
+import XmsGlAccountsPage from "./pages/expense-management/pages/masters/GlAccountsPage.jsx";
+import XmsCostCentersPage from "./pages/expense-management/pages/masters/CostCentersPage.jsx";
+import XmsProjectsMasterPage from "./pages/expense-management/pages/masters/ProjectsMasterPage.jsx";
+import XmsClientsMasterPage from "./pages/expense-management/pages/masters/ClientsMasterPage.jsx";
+import XmsCurrencyManagementPage from "./pages/expense-management/pages/masters/CurrencyManagementPage.jsx";
+import XmsTaxConfigurationPage from "./pages/expense-management/pages/masters/TaxConfigurationPage.jsx";
+import XmsPoliciesPage from "./pages/expense-management/pages/policies/PoliciesPage.jsx";
+import XmsReportsPage from "./pages/expense-management/pages/reports/ReportsPage.jsx";
+import XmsNotificationsPage from "./pages/expense-management/pages/activity/NotificationsPage.jsx";
+import XmsAuditLogsPage from "./pages/expense-management/pages/activity/AuditLogsPage.jsx";
+import XmsSettingsPage from "./pages/expense-management/pages/settings/SettingsPage.jsx";
+
 // ✅ User Management
 import CreateUser from "./pages/UserManagement/admin/userManagement/CreateUser";
 import EditUser from "./pages/UserManagement/admin/userManagement/EditUser";
@@ -1027,6 +1061,49 @@ const AppRoutes = () => {
             <Route path="/employee-exit" element={<EmployeeExitDashboard />} />
             <Route path="/employee-exit/:exit_uuid" element={<ExitDetailsPage />} />
           </Route>
+
+          {/* Expense Management (XMS) */}
+          <Route path="/expense-management/dashboard" element={<ProtectedRoute allowedRoles={["Employee", "Manager", "Finance", "Admin", "Super_Admin"]}><XmsDashboardPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/expenses/create" element={<ProtectedRoute allowedRoles={["Employee", "Manager"]}><XmsCreateExpensePage /></ProtectedRoute>} />
+          <Route path="/expense-management/expenses/my" element={<ProtectedRoute allowedRoles={["Employee", "Manager"]}><XmsMyExpensesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/expenses/all" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsAllExpensesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/expenses/reports" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsExpenseReportsPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/receipts/library" element={<ProtectedRoute allowedRoles={["Employee"]}><XmsReceiptLibraryPage /></ProtectedRoute>} />
+          <Route path="/expense-management/receipts/ocr-processing" element={<ProtectedRoute allowedRoles={["Employee"]}><XmsOcrProcessingPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/cash-advance/request" element={<ProtectedRoute allowedRoles={["Employee"]}><XmsRequestAdvancePage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/my" element={<ProtectedRoute allowedRoles={["Employee"]}><XmsMyAdvancesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/settlement" element={<ProtectedRoute allowedRoles={["Employee"]}><XmsSettlementPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/approvals/pending" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsPendingApprovalsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/approvals/approved" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsApprovedApprovalsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/approvals/rejected" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsRejectedApprovalsPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/finance/verification" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsVerificationPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/reimbursements" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsReimbursementsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/payment-status" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsPaymentStatusPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/client-billing/billable-expenses" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsBillableExpensesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/client-billing/invoice-handoff" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsInvoiceHandoffPage /></ProtectedRoute>} />
+          <Route path="/expense-management/client-billing/invoice-status" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsInvoiceStatusPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/masters/expense-categories" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsExpenseCategoriesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/masters/gl-accounts" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsGlAccountsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/masters/cost-centers" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsCostCentersPage /></ProtectedRoute>} />
+          <Route path="/expense-management/masters/projects" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsProjectsMasterPage /></ProtectedRoute>} />
+          <Route path="/expense-management/masters/clients" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsClientsMasterPage /></ProtectedRoute>} />
+          <Route path="/expense-management/masters/currency-management" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsCurrencyManagementPage /></ProtectedRoute>} />
+          <Route path="/expense-management/masters/tax-configuration" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsTaxConfigurationPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/policies" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsPoliciesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/reports" element={<ProtectedRoute allowedRoles={["Manager", "Finance", "Admin", "Super_Admin"]}><XmsReportsPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/activity/notifications" element={<ProtectedRoute allowedRoles={["Employee", "Manager", "Finance", "Admin", "Super_Admin"]}><XmsNotificationsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/activity/audit-logs" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsAuditLogsPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/settings" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsSettingsPage /></ProtectedRoute>} />
         </Route>
       </Routes>
       <SaveLastPath />
