@@ -24,11 +24,14 @@ const HR_ADMIN         = [ROLES.HR, ...ADMIN_ROLES];
 const HR_MANAGEMENT    = [ROLES.HR, ROLES.REPORTING_MANAGER];
 
 // XMS role groups
-const XMS_EMPLOYEE   = [ROLES.EMPLOYEE];
+// NOTE: regular staff are assigned the "General" role in this system (not "Employee"),
+// so General is treated as the XMS "Employee" tier — keep in sync with allowedRoles on
+// the /expense-management/* routes in App.jsx.
+const XMS_EMPLOYEE   = [ROLES.GENERAL];
 const XMS_MANAGER    = [ROLES.MANAGER];
 const XMS_FINANCE    = [ROLES.FINANCE];
 const XMS_ADMIN      = ADMIN_ROLES;
-const XMS_EVERYONE   = [ROLES.EMPLOYEE, ROLES.MANAGER, ROLES.FINANCE, ...ADMIN_ROLES];
+const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, ...ADMIN_ROLES];
 const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, ...ADMIN_ROLES];
 
 /**
