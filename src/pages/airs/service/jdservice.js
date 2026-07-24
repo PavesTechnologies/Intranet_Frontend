@@ -16,6 +16,41 @@ export const getAllJDs = async (params) => {
     }
 };
 
+export const createJD = async (payload) => {
+    try {
+        const response = await api.post(`${BASE_URL}/job-descriptions`, payload, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error creating JD:", error);
+        throw error;
+    }
+};
+
+export const createJDFromFile = async (file, fields = {}) => {
+    try {
+        const formData = new FormData();
+        formData.append("file", file);
+        Object.entries(fields).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === "") return;
+            formData.append(key, typeof value === "object" ? JSON.stringify(value) : value);
+        });
+
+        const response = await api.post(`${BASE_URL}/job-descriptions/from-file`, formData, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error creating JD from file:", error);
+        throw error;
+    }
+};
+
 export const getJDById = async (jdId) => {
     try {
         const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}`, {
@@ -58,6 +93,42 @@ export const updateJDById = async (jdId, updatedData) => {
     }
 };
 
+export const updateJDFromFile = async (jdId, file, fields = {}) => {
+    try {
+        const formData = new FormData();
+        formData.append("file", file);
+        Object.entries(fields).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === "") return;
+            formData.append(key, value);
+        });
+
+        const response = await api.put(`${BASE_URL}/job-descriptions/${jdId}/from-file`, formData, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error updating JD from file:", error);
+        throw error;
+    }
+};
+
+export const viewJDFile = async (jdId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}/view`, {
+            responseType: "blob",
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response;
+    } catch (error) {
+        console.error("Error viewing JD file:", error);
+        throw error;
+    }
+};
+
 export const exportSingleJD = async (jdId) => {
     try {
         const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}/export`, {
@@ -89,6 +160,48 @@ export const exportJDs = async (params) => {
         return response;
     } catch (error) {
         console.error("Error exporting JDs:", error);
+        throw error;
+    }
+};
+
+export const getMyJDUploads = async () => {
+    try {
+        const response = await api.get(`${BASE_URL}/job-descriptions/my-uploads`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching JD uploads:", error);
+        throw error;
+    }
+};
+
+export const getJDSkills = async (jdId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/skills/jd/${jdId}/skills`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching JD skills:", error);
+        throw error;
+    }
+};
+
+export const getJDUnknownSkills = async (jdId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/skills/jd/${jdId}/unknown-skills`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching JD unknown skills:", error);
         throw error;
     }
 };
