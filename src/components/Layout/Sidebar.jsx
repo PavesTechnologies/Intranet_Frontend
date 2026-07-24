@@ -485,44 +485,6 @@ const Sidebar = ({ isCollapsed }) => {
                   ))}
                 </ul>
               )}
-              {childMenu && (
-                <ul
-                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[305px]" : "left-[480px]"
-                    }`}
-                  style={{ top: `${childTop - 4}px` }}
-                  onMouseEnter={() => {
-                    childHoverRef.current = true;
-                    cancelClose();
-                  }}
-                  onMouseLeave={() => {
-                    childHoverRef.current = false;
-                    scheduleClose();
-                  }}
-                  onMouseDown={() => {
-                    childHoverRef.current = false;
-                    scheduleClose();
-                  }}
-                >
-                  {childMenu.map((child) => (
-                    <li key={child.label} className="group relative">
-                      <NavLink
-                        to={child.to}
-                        className={({ isActive }) =>
-                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
-                            ? "bg-blue-100 text-[#0a174e] font-semibold"
-                            : "hover:bg-[#263383] hover:text-white"
-                          }`
-                        }
-                      >
-                        <span>{child.label}</span>
-                        {child.children && (
-                          <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
-                        )}
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </li>
           }
 
@@ -756,6 +718,45 @@ const Sidebar = ({ isCollapsed }) => {
             );
           })}
         </ul>
+
+        {childMenu && (
+          <ul
+            className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[305px]" : "left-[480px]"
+              }`}
+            style={{ top: `${childTop - 4}px` }}
+            onMouseEnter={() => {
+              childHoverRef.current = true;
+              cancelClose();
+            }}
+            onMouseLeave={() => {
+              childHoverRef.current = false;
+              scheduleClose();
+            }}
+            onMouseDown={() => {
+              childHoverRef.current = false;
+              scheduleClose();
+            }}
+          >
+            {childMenu.map((child) => (
+              <li key={child.label} className="group relative">
+                <NavLink
+                  to={child.to}
+                  className={({ isActive }) =>
+                    `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
+                      ? "bg-blue-100 text-[#0a174e] font-semibold"
+                      : "hover:bg-[#263383] hover:text-white"
+                    }`
+                  }
+                >
+                  <span>{child.label}</span>
+                  {child.children && (
+                    <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
+                  )}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        )}
       </nav>
     </aside>
   );
