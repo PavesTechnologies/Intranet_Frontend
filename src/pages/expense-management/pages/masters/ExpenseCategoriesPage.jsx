@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from "react";
 import { Plus, Pencil, Trash2, Layers } from "lucide-react";
 import Select from "react-select";
@@ -771,5 +772,3 @@ export default function ExpenseCategoriesPage() {
         variant="danger"
       />
     </div>
-  );
-}

@@ -69,8 +69,8 @@ const EntriesTable = ({
   selectedEntryIds,
   setSelectedEntryIds,
   selectionMode,
-  pendingEntries,
-  setPendingEntries,
+  pendingEntries = [],
+  setPendingEntries = () => {},
 }) => {
   const [editIndex, setEditIndex] = useState(null);
   const [editData, setEditData] = useState({});
@@ -465,7 +465,7 @@ const EntriesTable = ({
            
       <thead>
                
-        <tr className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm">
+        <tr className="bg-indigo-900 text-white text-sm">
                    
           {selectionMode && (
             <th className="px-3 py-2">

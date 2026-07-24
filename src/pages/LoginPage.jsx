@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../contexts/AuthContext";
+import { useWebSocket } from "./leave_management/websockets/WebSocketProvider";
 import { showStatusToast } from "../components/toastfy/toast";
 
 // ─── SVG Icons ────────────────────────────────────────────────────
@@ -243,6 +244,7 @@ export default function LoginPage() {
   const [forgotShake, setForgotShake] = useState(null);
 
   const { login } = useAuth();
+  const { updateToken } = useWebSocket();
   const navigate = useNavigate();
   const location = useLocation();
   const calledOnce = useRef(false);
@@ -296,6 +298,7 @@ export default function LoginPage() {
 
         // ✅ login stores both tokens in localStorage
         login(access_token, path === "/change-password");
+        updateToken(access_token);
         if (document.startViewTransition) {
           document.startViewTransition(() => {
             navigate(path, { replace: true });
@@ -365,6 +368,7 @@ export default function LoginPage() {
         access_token,
         redirectPath === "/change-password"
       );
+      updateToken(access_token);
 
       if (document.startViewTransition) {
         document.startViewTransition(() => {

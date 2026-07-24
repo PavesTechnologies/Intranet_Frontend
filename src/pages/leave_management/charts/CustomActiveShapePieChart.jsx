@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback} from "react";
 import api from "../../../api/axiosInstance";
 import {
   PieChart,
@@ -9,6 +9,7 @@ import {
   Tooltip,
 } from "recharts";
 import { toast } from "react-toastify";
+import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 
 // Color palette
 const COLORS = [
@@ -79,44 +80,49 @@ const CustomActiveShapePieChart = ({ employeeId, refreshKey, year }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const BASE_URL = window.__APP_CONFIG__.BASE_URL;
-  useEffect(() => {
-    const fetchLeaves = async () => {
-      try {
-        setLoading(true);
-        const res = await api.get(
-          `${BASE_URL}/api/leave-requests/patterns/employee/${employeeId}/${year}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
+  const fetchLeaves = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.get(
+        `${BASE_URL}/api/leave-requests/patterns/employee/${employeeId}/${year}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        );
-        const leaveRequests = res.data.data;
+        },
+      );
+      const leaveRequests = res.data.data;
 
-        const grouped = {};
-        leaveRequests.forEach((leave) => {
-          if (leave.status !== "APPROVED" && leave.status !== "PENDING") return;
-          const name = leave.leaveName || "Unknown";
-          grouped[name] =
-            (grouped[name] || 0) + parseFloat(leave.daysRequested || 0);
-        });
+      const grouped = {};
+      leaveRequests.forEach((leave) => {
+        if (leave.status !== "APPROVED" && leave.status !== "PENDING") return;
+        const name = leave.leaveName || "Unknown";
+        grouped[name] =
+          (grouped[name] || 0) + parseFloat(leave.daysRequested || 0);
+      });
 
-        const chartData = Object.entries(grouped).map(([name, value]) => ({
-          name,
-          value,
-        }));
-        setData(chartData);
-      } catch (error) {
-        console.error("Error fetching leave data:", error);
-        toast.error(error?.message || "Failed to fetch Leave Data");
-      } finally {
-        setLoading(false);
-      }
-    };
+      const chartData = Object.entries(grouped).map(([name, value]) => ({
+        name,
+        value,
+      }));
+      setData(chartData);
+    } catch (error) {
+      console.error("Error fetching leave data:", error);
+      toast.error(error?.message || "Failed to fetch Leave Data");
+    } finally {
+      setLoading(false);
+    }
+  }, [employeeId, year]);
 
+  useEffect(() => {
     fetchLeaves();
-  }, [employeeId, refreshKey, year]);
+  }, [fetchLeaves, refreshKey]);
 
+  useLeaveWebSocket(
+    "employee-update",
+    ["LEAVE_UPDATED", "LEAVE_REJECTED", "REVOKE_APPROVED"],
+    fetchLeaves,
+  );
   const onPieEnter = (_, index) => {
     setActiveIndex(index);
   };

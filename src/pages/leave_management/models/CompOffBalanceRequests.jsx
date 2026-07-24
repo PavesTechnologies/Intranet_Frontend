@@ -86,7 +86,11 @@ const CompOffBalanceRequests = ({ managerId }) => {
     }, [fetchCompOffs]);
 
     // ✅ Fixed — array passed directly, stable callback reference
-    useLeaveWebSocket("manager-update", COMPOFF_EVENTS, fetchCompOffs);
+    useLeaveWebSocket(
+        "manager-update",
+        COMPOFF_EVENTS,
+        fetchCompOffs
+    );
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500 mb-6">

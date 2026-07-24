@@ -1,15 +1,65 @@
 import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { format, isSameDay } from "date-fns";
 import { toast } from "react-toastify";
 import api from "../../../api/axiosInstance";
+import { useAuth } from "../../../contexts/AuthContext";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
 // Style for holidays
 const holidayStyleRed = { backgroundColor: "#fee2e2", color: "#b91c1c" };
+
+const LeaveDayButton = (props) => {
+  const { day, modifiers, ...buttonProps } = props;
+  const ref = useRef(null);
+  const [coords, setCoords] = useState(null);
+
+  useEffect(() => {
+    if (modifiers.focused) ref.current?.focus();
+  }, [modifiers.focused]);
+
+  if (!modifiers.leave) {
+    return <button ref={ref} {...buttonProps} />;
+  }
+
+  const showTooltip = () => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (rect) {
+      setCoords({ top: rect.top, left: rect.left + rect.width / 5 });
+    }
+  };
+
+  return (
+    <>
+      <button
+        ref={ref}
+        {...buttonProps}
+        onMouseEnter={(e) => {
+          buttonProps.onMouseEnter?.(e);
+          showTooltip();
+        }}
+        onMouseLeave={(e) => {
+          buttonProps.onMouseLeave?.(e);
+          setCoords(null);
+        }}
+      />
+      {coords &&
+        createPortal(
+          <div
+            className="fixed z-[9999] -translate-x-1/2 -translate-y-full -mt-2 rounded-md border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-md whitespace-nowrap pointer-events-none"
+            style={{ top: coords.top, left: coords.left }}
+          >
+            You have already applied leave for this day.
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+};
 
 const DateRangePicker = ({
   label,
@@ -22,8 +72,13 @@ const DateRangePicker = ({
 }) => {
   const [selected, setSelected] = useState(defaultDate);
   const [holidaysDays, setHolidaysDays] = useState([]);
+  const [empLeaveDates, setEmpLeaveDates] = useState([]);
+  const [currentMonth, setCurrentMonth] = useState(
+    defaultMonth || defaultDate || new Date(),
+  );
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const empId = useAuth()?.user?.user_id;
 
   const fetchHolidays = async () => {
     try {
@@ -46,10 +101,41 @@ const DateRangePicker = ({
     }
   };
 
+  const fetchLeaveDates = async (monthDate) => {
+    try {
+      const month = monthDate.getMonth() + 1;
+      const year = monthDate.getFullYear();
+
+      const res = await api.get(
+        `${BASE_URL}/api/leave-requests/employee/${empId}/leave-dates`,
+        {
+          params: {
+            year,
+            month,
+          },
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+      );
+
+      const leaveDates = res.data.data.map((date) => new Date(date));
+
+      setEmpLeaveDates(leaveDates);
+    } catch (err) {
+      toast.error("Could not load leave dates");
+    }
+  };
   const handleSelect = (date) => {
     if (holidaysDays.some((holiday) => isSameDay(date, holiday))) {
       return;
     }
+
+    if (empLeaveDates.some((d) => isSameDay(d, date))) {
+      toast.info("You have already applied leave for this day.");
+      return;
+    }
+
     setSelected(date);
     if (onChange) onChange(date);
     setOpen(false);
@@ -72,6 +158,10 @@ const DateRangePicker = ({
   useEffect(() => {
     setSelected(defaultDate);
   }, [defaultDate]);
+
+  useEffect(() => {
+    if (empId) fetchLeaveDates(currentMonth);
+  }, [currentMonth, empId]);
 
   const currentYear = new Date().getFullYear();
   const toYear = currentYear + 3;
@@ -108,15 +198,26 @@ const DateRangePicker = ({
                 onSelect={handleSelect}
                 defaultMonth={defaultMonth}
                 disabled={disabledDays}
+                onMonthChange={setCurrentMonth}
                 captionLayout="dropdown-buttons"
                 toYear={toYear}
-                modifiers={{ holiday: holidaysDays }}
-                modifiersStyles={{ holiday: holidayStyleRed }}
+                modifiers={{
+                  holiday: holidaysDays,
+                  leave: empLeaveDates,
+                }}
+                modifiersStyles={{
+                  holiday: holidayStyleRed,
+                  leave: {
+                    backgroundColor: "#fee2e2",
+                    color: "#b91c1c",
+                  },
+                }}
                 modifiersClassNames={{
                   selected: "bg-indigo-600 text-white rounded-md",
                   today: "font-bold text-indigo-600",
                   disabled: "opacity-50 line-through",
                 }}
+                components={{ DayButton: LeaveDayButton }}
               />
             </div>
           </div>

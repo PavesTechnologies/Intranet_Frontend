@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from "react";
 import { Plus, Pencil, Trash2, Coins, TrendingUp, RefreshCw, Layers, DollarSign, Calendar, Sliders } from "lucide-react";
 import Select from "react-select";
@@ -1376,5 +1377,3 @@ export default function CurrencyManagementPage() {
         variant="danger"
       />
     </div>
-  );
-}

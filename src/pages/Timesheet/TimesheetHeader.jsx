@@ -102,20 +102,6 @@ const TimesheetHeader = () => {
                 Manager Reports
               </Button>
             )}
-            <Button
-              variant="primary"
-              size="medium"
-              onClick={() => navigate("/timesheets")}
-            >
-              My Timesheets
-            </Button>
-            <Button
-              variant="secondary"
-              size="medium"
-              onClick={() => navigate("/timesheet/dashboard")}
-            >
-              Dashboard
-            </Button>
           </>
         )}
 

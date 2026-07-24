@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from "react";
 import { Plus, Pencil, Trash2, Layers } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
@@ -572,5 +573,3 @@ export default function GlAccountsPage() {
         variant="danger"
       />
     </div>
-  );
-}
