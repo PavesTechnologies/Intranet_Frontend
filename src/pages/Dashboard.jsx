@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import AppCard from "../components/Cards/AppCard";
 import DynamicCardGrid from "../components/Cards/DynamicCardGrid";
@@ -11,6 +11,7 @@ import { timesheet, pmsSummary, leaveBalance } from "../services/dashboard";
 import { useAuth } from "../contexts/AuthContext";
 import { CalendarPlus, Clock, ArrowRight } from "lucide-react";
 import Button from "../components/Button/Button";
+import { useLeaveWebSocket } from "../pages/leave_management/websockets/useLeaveWebSocket";
 
 // ── Data ────────────────────────────────────────────────────────────────────
 
@@ -235,20 +236,46 @@ export default function Dashboard() {
     }
   };
 
-  const fetchLeaveBalanceData = async () => {
+  // ✅ Wrapped in useCallback with a stable identity based on [userId, year] —
+  // useLeaveWebSocket puts the onEvent callback in its effect dependency
+  // array, so an unstable (re-created every render) function would cause
+  // it to unsubscribe/resubscribe on every render.
+  const fetchLeaveBalanceData = useCallback(async () => {
     try {
       const res = await leaveBalance(userId, year);
       setLeaveBalanceData(res.data);
     } catch (err) {
       console.error("Failed to fetch leave balance data", err);
     }
-  };
+  }, [userId, year]);
 
   useEffect(() => {
     fetchTimesheetData();
     fetchPMSData();
     fetchLeaveBalanceData();
-  }, [userId]);
+  }, [userId, fetchLeaveBalanceData]);
+
+  // ✅ Live update: when the manager approves, rejects, or edits this
+  // employee's leave request, the backend pushes an event on
+  // /user/queue/data-updated ("employee-update" channel). Re-fetch the
+  // leave balance so the donut charts and KPI reflect the new balance
+  // without the user needing to refresh the page.
+  //
+  // LEAVE_UPDATED is included because manager-side edits (e.g. changing
+  // dates or leave type) can change days consumed, same as approve/reject.
+  const handleLeaveBalanceUpdate = useCallback(
+    (data) => {
+      console.log("🔄 Leave balance affected by:", data?.type, "— refetching");
+      fetchLeaveBalanceData();
+    },
+    [fetchLeaveBalanceData],
+  );
+
+  useLeaveWebSocket(
+    "employee-update",
+    ["LEAVE_APPROVED", "LEAVE_REJECTED", "LEAVE_UPDATED"],
+    handleLeaveBalanceUpdate,
+  );
 
   const STATS = [
     {
@@ -484,7 +511,8 @@ export default function Dashboard() {
         isOpen={isRequestLeaveModalOpen}
         onClose={() => setIsRequestLeaveModalOpen(false)}
         year={year}
-        onSuccess={() => setIsRequestLeaveModalOpen(false)}
+        onSuccess={() => { setIsRequestLeaveModalOpen(false); fetchLeaveBalanceData() }
+        }
       />
 
       {/* Active module toast */}

@@ -11,6 +11,11 @@ const BALANCE_AFFECTING_EVENTS = [
   "LEAVE_REJECTED",
   "REVOKE_APPROVED",
   "REVOKE_REJECTED",
+  "LEAVE_CANCELLED",
+  "COMPOFF_CANCELLED",
+  "REVOKE_CANCELLED",
+  "LEAVE_UPDATED",
+  "COMPOFF_UPDATED",
 ];
 
 const useLeaveConsumption = (employeeId, refreshKey, year) => {
@@ -25,7 +30,8 @@ const useLeaveConsumption = (employeeId, refreshKey, year) => {
   // ---------------------------
   // FUNCTION TO FETCH LEAVE DATA
   // ---------------------------
-  const fetchLeaveData = () => {
+  // ✅ Wrapped in useCallback — stable reference for useLeaveWebSocket
+  const fetchLeaveData = useCallback(() => {
     if (!employeeId) return;
 
     setLoading(true);
@@ -42,51 +48,15 @@ const useLeaveConsumption = (employeeId, refreshKey, year) => {
         toast.error("Failed to fetch leave data");
         setLoading(false);
       });
-  };
+  }, [BASE_URL, employeeId, year]);
+  // ↑ stable — only changes if employeeId/year/BASE_URL change
 
   // ---------------------------
   // FETCH DATA ON MOUNT & WHEN REFRESH KEY CHANGES
   // ---------------------------
   useEffect(() => {
     fetchLeaveData();
-  }, [employeeId, refreshKey, year]);
-
-  // ---------------------------
-  // WEBSOCKET REAL-TIME LISTENER
-  // ---------------------------
-  // useEffect(() => {
-  //   let isMounted = true;
-
-  //   const socket = new SockJS(`${BASE_URL}/ws`);
-  //   stompClient = over(socket);
-
-  //   stompClient.connect(
-  //     {},
-  //     () => {
-  //       console.log("Connected to WebSocket from Leave Consumption Hook");
-
-  //       if (!isMounted) return;
-
-  //       stompClient.subscribe("/topic/data-updated", () => {
-  //         console.log("Real-time update received → refreshing leave data");
-  //         fetchLeaveData();
-  //       });
-  //     },
-  //     (error) => {
-  //       console.error("WebSocket Connection Error:", error);
-  //     }
-  //   );
-
-  //   return () => {
-  //     isMounted = false;
-
-  //     if (stompClient && stompClient.connected) {
-  //       stompClient.disconnect(() =>
-  //         console.log("WebSocket Disconnected (safe cleanup)")
-  //       );
-  //     }
-  //   };
-  // }, []);
+  }, [fetchLeaveData, refreshKey]);
 
   // ---------------------------
   // WEBSOCKET REAL-TIME LISTENER

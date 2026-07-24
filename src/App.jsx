@@ -104,7 +104,19 @@ import AirsDashboard from "./pages/airs/pages/AirsDashboard.jsx";
 import JdLibrary from "./pages/airs/pages/JdLibrary.jsx";
 import JdCreate from "./pages/airs/pages/JdCreate.jsx";
 import JdDetails from "./pages/airs/pages/JdDetails.jsx";
-import AirsPlaceholder from "./pages/airs/pages/AirsPlaceholder.jsx";
+import Campaigns from "./pages/airs/pages/Campaigns.jsx";
+import CampaignDetails from "./pages/airs/pages/CampaignDetails.jsx";
+import ResumeIntakePage from "./pages/airs/resume-intake/ResumeIntakePage.jsx";
+import IntakeFlowPage from "./pages/airs/resume-intake/intake/IntakeFlowPage.jsx";
+import ReviewPage from "./pages/airs/resume-intake/intake/ReviewPage.jsx";
+import CandidateRankingPage from "./pages/airs/candidates/CandidateRankingPage.jsx";
+import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
+import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
+import AnalyticsPage from "./pages/airs/analytics/AnalyticsPage.jsx";
+import SettingsPage from "./pages/airs/settings/SettingsPage.jsx";
+import SkillOntologyPage from "./pages/airs/skill-ontology/SkillOntologyPage.jsx";
+import SkillDetailPage from "./pages/airs/skill-ontology/SkillDetailPage.jsx";
+import HierarchyPage from "./pages/airs/skill-ontology/HierarchyPage.jsx";
 
 import AdminOfferLettersDashboard from "./pages/employee-onboarding/admin/AdminOfferLettersDashboard.jsx";
 import HrOnboardingDashboard from "./pages/employee-onboarding/hr/HrOnboardingDashboard.jsx";
@@ -779,7 +791,7 @@ const AppRoutes = () => {
           <Route
             path="/leave-policy"
             element={
-              <ProtectedRoute allowedRoles={["HR", "Super_Admin", "Admin"]}>
+              <ProtectedRoute allowedRoles={["HR", "Super_Admin", "Admin", "Manager", "Hr-Manager", "General", "Reporting_manager"]}>
                 <LeavePolicy />
               </ProtectedRoute>
             }
@@ -899,8 +911,8 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
-          
-          
+
+
           <Route
             path="/resource-management/projects"
             element={<RMSProjectList />}
@@ -1010,7 +1022,15 @@ const AppRoutes = () => {
             path="/airs/campaigns"
             element={
               <ProtectedRoute roles={["General"]}>
-                <AirsPlaceholder />
+                <Campaigns />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/campaigns/:id"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <CampaignDetails />
               </ProtectedRoute>
             }
           />
@@ -1018,7 +1038,23 @@ const AppRoutes = () => {
             path="/airs/resume-intake"
             element={
               <ProtectedRoute roles={["General"]}>
-                <AirsPlaceholder />
+                <ResumeIntakePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/resume-intake/new"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <IntakeFlowPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/resume-intake/review/:resumeId"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <ReviewPage />
               </ProtectedRoute>
             }
           />
@@ -1026,7 +1062,15 @@ const AppRoutes = () => {
             path="/airs/candidates"
             element={
               <ProtectedRoute roles={["General"]}>
-                <AirsPlaceholder />
+                <CandidateRankingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/pipeline"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <PipelineBoardPage />
               </ProtectedRoute>
             }
           />
@@ -1034,7 +1078,7 @@ const AppRoutes = () => {
             path="/airs/talent-pool"
             element={
               <ProtectedRoute roles={["General"]}>
-                <AirsPlaceholder />
+                <TalentPoolPage />
               </ProtectedRoute>
             }
           />
@@ -1042,7 +1086,7 @@ const AppRoutes = () => {
             path="/airs/analytics"
             element={
               <ProtectedRoute roles={["General"]}>
-                <AirsPlaceholder />
+                <AnalyticsPage />
               </ProtectedRoute>
             }
           />
@@ -1050,7 +1094,31 @@ const AppRoutes = () => {
             path="/airs/settings"
             element={
               <ProtectedRoute roles={["General"]}>
-                <AirsPlaceholder />
+                <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/skill-ontology"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <SkillOntologyPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/skill-ontology/hierarchy"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <HierarchyPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/skill-ontology/:skillId"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <SkillDetailPage />
               </ProtectedRoute>
             }
           />

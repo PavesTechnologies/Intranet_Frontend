@@ -144,54 +144,9 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
       // --- PAYLOAD FOR UPDATING (Keep your existing structure) ---
       payload = isGender
         ? {
-            updateType: "GENDER_BASED",
-            genderBasedLeave: {
-              leaveTypeId: editData.leaveTypeId,
-              leaveName: formData.leaveName,
-              maxLeaveDays: Number(formData.maxLeaveDays) || 0,
-              minLeaveDays: Number(formData.minLeaveDays) || 0,
-              waitingPeriodDays: Number(formData.waitingPeriodDays) || 0,
-              advanceNotice: Number(formData.advanceNoticeDays) || 0,
-              coolDownPeriod: Number(formData.coolDownPeriod) || 0,
-              requiresDocumentation: formData.requiresDocumentation,
-              allowNegativeBalance: formData.allowNegativeBalance,
-              noticePeriodRestrictions: formData.noticePeriodRestriction,
-              weekendsAndHolidaysAllowed: formData.weekendsAndHolidaysAllowed,
-              active: formData.active,
-              gender: formData.gender,
-              effectiveStartDate: formData.effectiveStartDate,
-              maxNoOfTimes: Number(formData.maxNoOfTimes) || 0,
-            },
-          }
-        : {
-            updateType: "REGULAR",
-            leaveType: {
-              leaveTypeId: editData.leaveTypeId,
-              leaveName: formData.leaveName,
-              description: formData.description,
-              accrualFrequency: formData.accrualFrequency,
-              maxDaysPerYear: Number(formData.maxDaysPerYear) || 0,
-              maxCarryForward: Number(formData.maxCarryForward) || 0,
-              maxCarryForwardPerYear:
-                Number(formData.maxCarryForwardPerYear) || 0,
-              expiryDays: Number(formData.expiryDays) || 0,
-              waitingPeriodDays: Number(formData.waitingPeriodDays) || 0,
-              advanceNoticeDays: Number(formData.advanceNoticeDays) || 0,
-              pastDateLimitDays: Number(formData.pastDateLimitDays) || 0,
-              allowHalfDay: formData.allowHalfDay,
-              allowNegativeBalance: formData.allowNegativeBalance,
-              noticePeriodRestriction: formData.noticePeriodRestriction,
-              weekendsAndHolidaysAllowed: formData.weekendsAndHolidaysAllowed,
-              requiresDocumentation: formData.requiresDocumentation,
-              active: formData.active,
-              effectiveStartDate: formData.effectiveStartDate,
-            },
-          };
-    } else {
-      // --- PAYLOAD FOR ADDING (Flat structure, no updateType) ---
-      payload = isGender
-        ? {
-            // Gender-based Add Payload
+          updateType: "GENDER_BASED",
+          genderBasedLeave: {
+            leaveTypeId: editData.leaveTypeId,
             leaveName: formData.leaveName,
             maxLeaveDays: Number(formData.maxLeaveDays) || 0,
             minLeaveDays: Number(formData.minLeaveDays) || 0,
@@ -206,9 +161,12 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
             gender: formData.gender,
             effectiveStartDate: formData.effectiveStartDate,
             maxNoOfTimes: Number(formData.maxNoOfTimes) || 0,
-          }
+          },
+        }
         : {
-            // Regular Add Payload
+          updateType: "REGULAR",
+          leaveType: {
+            leaveTypeId: editData.leaveTypeId,
             leaveName: formData.leaveName,
             description: formData.description,
             accrualFrequency: formData.accrualFrequency,
@@ -224,9 +182,51 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
             allowNegativeBalance: formData.allowNegativeBalance,
             noticePeriodRestriction: formData.noticePeriodRestriction,
             weekendsAndHolidaysAllowed: formData.weekendsAndHolidaysAllowed,
+            requiresDocumentation: formData.requiresDocumentation,
             active: formData.active,
             effectiveStartDate: formData.effectiveStartDate,
-          };
+          },
+        };
+    } else {
+      // --- PAYLOAD FOR ADDING (Flat structure, no updateType) ---
+      payload = isGender
+        ? {
+          // Gender-based Add Payload
+          leaveName: formData.leaveName,
+          maxLeaveDays: Number(formData.maxLeaveDays) || 0,
+          minLeaveDays: Number(formData.minLeaveDays) || 0,
+          waitingPeriodDays: Number(formData.waitingPeriodDays) || 0,
+          advanceNotice: Number(formData.advanceNoticeDays) || 0,
+          coolDownPeriod: Number(formData.coolDownPeriod) || 0,
+          requiresDocumentation: formData.requiresDocumentation,
+          allowNegativeBalance: formData.allowNegativeBalance,
+          noticePeriodRestrictions: formData.noticePeriodRestriction,
+          weekendsAndHolidaysAllowed: formData.weekendsAndHolidaysAllowed,
+          active: formData.active,
+          gender: formData.gender,
+          effectiveStartDate: formData.effectiveStartDate,
+          maxNoOfTimes: Number(formData.maxNoOfTimes) || 0,
+        }
+        : {
+          // Regular Add Payload
+          leaveName: formData.leaveName,
+          description: formData.description,
+          accrualFrequency: formData.accrualFrequency,
+          maxDaysPerYear: Number(formData.maxDaysPerYear) || 0,
+          maxCarryForward: Number(formData.maxCarryForward) || 0,
+          maxCarryForwardPerYear:
+            Number(formData.maxCarryForwardPerYear) || 0,
+          expiryDays: Number(formData.expiryDays) || 0,
+          waitingPeriodDays: Number(formData.waitingPeriodDays) || 0,
+          advanceNoticeDays: Number(formData.advanceNoticeDays) || 0,
+          pastDateLimitDays: Number(formData.pastDateLimitDays) || 0,
+          allowHalfDay: formData.allowHalfDay,
+          allowNegativeBalance: formData.allowNegativeBalance,
+          noticePeriodRestriction: formData.noticePeriodRestriction,
+          weekendsAndHolidaysAllowed: formData.weekendsAndHolidaysAllowed,
+          active: formData.active,
+          effectiveStartDate: formData.effectiveStartDate,
+        };
     }
 
     // Determine URL and Method
@@ -338,6 +338,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
                 type="date"
                 name="effectiveStartDate"
                 value={formData.effectiveStartDate}
+                min={editData ? new Date().toISOString().split('T')[0] : undefined}
                 onChange={handleChange}
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
@@ -394,7 +395,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
 
           {/* Numeric Fields */}
           {formData.leaveName.toLowerCase() === "paternity_leave" ||
-          formData.leaveName.toLowerCase() === "maternity_leave" ? (
+            formData.leaveName.toLowerCase() === "maternity_leave" ? (
             <div className="grid gap-4 sm:grid-cols-2">
               {[
                 "maxLeaveDays",
@@ -467,7 +468,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
             <div className="grid gap-2 sm:grid-cols-2">
               {[
                 "requiresDocumentation",
-                "allowNegativeBalance",
+                // "allowNegativeBalance",
                 "noticePeriodRestriction",
                 "weekendsAndHolidaysAllowed",
                 "active",
@@ -495,7 +496,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
               {[
                 "requiresDocumentation",
                 "allowHalfDay",
-                "allowNegativeBalance",
+                // "allowNegativeBalance",
                 "noticePeriodRestriction",
                 "weekendsAndHolidaysAllowed",
                 "active",

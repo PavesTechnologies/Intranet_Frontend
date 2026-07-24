@@ -412,6 +412,14 @@ const EmployeeDashboard = ({ employeeId }) => {
   const handleCompOffSubmit = async (payload) => {
     setIsLoading(true);
     try {
+      // If CompOffPage is already mounted, submit through it so its own
+      // requests/table state (which the table actually reads) refreshes too.
+      if (compOffPageRef.current?.handleCompOffSubmit) {
+        return await compOffPageRef.current.handleCompOffSubmit(payload);
+      }
+
+      // CompOffPage isn't mounted yet (no pending requests) — submit directly
+      // and let fetchRequests() bring it up.
       const res = await api.post(
         `${BASE_URL}/api/compoff/request`,
         { ...payload, employeeId },

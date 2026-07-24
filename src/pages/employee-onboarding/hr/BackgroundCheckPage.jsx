@@ -15,6 +15,7 @@ import ConfirmationModal from "../../../components/confirmation_modal/Confirmati
 import { KPICard } from "../../../components/kpi/KPI";
 import Modal from "../../../components/Modal/modal";
 import { Fonts } from "../../../components/Fonts/Fonts";
+import PageHeader from "../../../components/ui/PageHeader";
 
  
 /* ── Static BG Checks (not document-linked) ── */
@@ -907,15 +908,15 @@ export default function BackgroundCheckPage() {
     <div className="min-h-screen bg-[#f4f6fb] p-6 space-y-5">
  
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className={Fonts.heading4}>Background Check Tracker</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Select a candidate to view and manage their verification status</p>
-        </div>
-        <button onClick={loadEmployees} className="flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 bg-white px-3 py-1.5 rounded-lg hover:shadow-sm transition-all">
-          <RefreshCw className="w-3.5 h-3.5" /> Refresh
-        </button>
-      </div>
+      <PageHeader
+        title="Background Check Tracker"
+        subtitle="Select a candidate to view and manage their verification status"
+        actions={
+          <Button onClick={loadEmployees} variant="outline" size="small" className="border-gray-200">
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </Button>
+        }
+      />
  
       {/* Global stats / KPI Filters */}
       <div className="grid grid-cols-3 gap-3">

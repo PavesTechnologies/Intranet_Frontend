@@ -22,7 +22,6 @@ const ApprovalDashboard = () => {
 
   useEffect(() => {
     loadPendingApprovals();
-    console.log("Actions states: ", requests);
   }, []);
 
   // ✨ 3. Function to toggle the expanded state of a request
@@ -96,7 +95,6 @@ const ApprovalDashboard = () => {
           },
         },
       );
-      console.log("Holiday change response: ", res);
     } catch (err) {
       console.error("Failed to trigger holiday change", err);
     }
@@ -104,13 +102,11 @@ const ApprovalDashboard = () => {
 
   const handleApprove = async (request) => {
     const { id } = request;
-    console.log("Request: ", request);
     const actionType = request.actionType;
     const comment = actionState[id]?.comment || "";
+    setActionLoading(true);
     try {
-      setActionLoading(true);
-      await approvalService.approveRequest(id, comment);
-      toast.success("Request Approved successfully");
+      const res = await approvalService.approveRequest(id, comment);
       if (
         actionType === "ADD_HOLIDAY" ||
         actionType === "UPDATE_HOLIDAY" ||
@@ -118,10 +114,10 @@ const ApprovalDashboard = () => {
       ) {
         handleHolidayChange();
       }
+      toast.success(res.data?.message || "Request Approved Successfully!");
       await loadPendingApprovals();
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to approve request");
-      console.error("Failed to approve:", error);
     } finally {
       setIsConfirmationOpen(false);
       setActionLoading(false);
@@ -131,13 +127,13 @@ const ApprovalDashboard = () => {
   const handleReject = async (request) => {
     const { id } = request;
     const reason = actionState[id]?.reason || "";
+    setActionLoading(true);
     try {
-      setActionLoading(true);
-      await approvalService.rejectRequest(id, reason);
-      toast.success("Request Rejected successfully");
+      const res = await approvalService.rejectRequest(id, reason);
+      toast.success(res.data?.message || "Request Rejected successfully!");
       await loadPendingApprovals();
     } catch (error) {
-      toast.error("Failed to reject request");
+      toast.error(error.response?.data?.message || "Failed to reject request");
     } finally {
       setIsConfirmationOpen(false);
       setActionLoading(false);
@@ -185,9 +181,8 @@ const ApprovalDashboard = () => {
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center">
                     <div className="flex items-center">
                       <ChevronRight
-                        className={`text-blue-800 transition-transform duration-300 ${
-                          isOpen ? "rotate-90" : ""
-                        }`}
+                        className={`text-blue-800 transition-transform duration-300 ${isOpen ? "rotate-90" : ""
+                          }`}
                         size={20}
                       />
                       <h3 className="font-semibold text-lg text-gray-900">
@@ -268,8 +263,6 @@ const ApprovalDashboard = () => {
           })}
         </div>
       )}
-
-      {isConfirmationOpen && console.log("Request: ", request)}
 
       <ConfirmationModal
         isOpen={isConfirmationOpen}

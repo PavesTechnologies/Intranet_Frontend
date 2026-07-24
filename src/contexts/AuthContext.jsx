@@ -10,6 +10,7 @@ import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom";
 import { showStatusToast } from "../components/toastfy/toast";
 import axios from "axios";
+import { useWebSocket } from "../pages/leave_management/websockets/WebSocketProvider";
 
 const AuthContext = createContext(undefined);
 
@@ -23,6 +24,7 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
+  const { updateToken } = useWebSocket();
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isfirsttlogin, setIsfirsttlogin] = useState(false);
@@ -81,6 +83,7 @@ export const AuthProvider = ({ children }) => {
     // localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
     localStorage.removeItem("lastPath");
+    updateToken(null);
 
     if (localStorage.getItem("isfirsttlogin")) {
       localStorage.removeItem("isfirsttlogin");

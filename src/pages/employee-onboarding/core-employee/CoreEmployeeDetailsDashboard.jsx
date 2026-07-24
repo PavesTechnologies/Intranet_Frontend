@@ -12,8 +12,9 @@ import ExcelPreviewModal from "./components/ExcelPreviewModal";
 import * as XLSX from "xlsx";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { KPICard } from "../../../components/kpi/KPI";
-import { Fonts } from "../../../components/Fonts/Fonts";
 import api from "../../../api/axiosInstance";
+import Button from "../../../components/Button/Button";
+import PageHeader from "../../../components/ui/PageHeader";
 
 const PAGE_SIZE = 5;
 
@@ -675,88 +676,47 @@ console.log(
   return (
     <div className="p-6 space-y-6">
       {/* HEADER */}
-
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className={Fonts.heading3}>Employee Dashboard</h1>
-
-        <p className={Fonts.paragraphMuted}>
-          Manage employee records
-        </p>
-      </div>
-
-
-      {/* Buttons Section */}
-      <div className="flex gap-3">
-        {/* Upload Button */}
-  <button
-    onClick={() => fileInputRef.current.click()}
-    className="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-sm hover:bg-indigo-700"
-  >
-    {uploadLoading ? "Uploading..." : "Upload Excel"}
-  </button>
-
-  <input
-    type="file"
-    accept=".xlsx, .xls"
-    ref={fileInputRef}
-    onChange={handleBulkUpload}
-    hidden
-  />
-
-        <button
-        onClick={handleExportPreview}
-        disabled={exportLoading}
-        className={`px-4 py-2 rounded-lg shadow-sm text-white flex items-center gap-2
-          ${exportLoading ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"}`}
-      >
-        {exportLoading ? (
+      <PageHeader
+        title="Employee Dashboard"
+        subtitle="Manage employee records"
+        actions={
           <>
-            <span className="animate-spin border-2 border-white border-t-transparent rounded-full w-4 h-4"></span>
-            Exporting...
+            <Button onClick={() => fileInputRef.current.click()} variant="primary" size="medium">
+              {uploadLoading ? "Uploading..." : "Upload Excel"}
+            </Button>
+
+            <input
+              type="file"
+              accept=".xlsx, .xls"
+              ref={fileInputRef}
+              onChange={handleBulkUpload}
+              hidden
+            />
+
+            <Button
+              onClick={handleExportPreview}
+              disabled={exportLoading}
+              loading={exportLoading}
+              loadingText="Exporting..."
+              variant="success"
+              size="medium"
+            >
+              Export Excel
+            </Button>
+
+            {failedCount > 0 && (
+              <Button onClick={handleExportPreview} variant="danger" size="medium">
+                Retry Failed
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-red-600">
+                  {failedCount}
+                </span>
+              </Button>
+            )}
           </>
-        ) : (
-          "Export Excel"
-        )}
-      </button>
-      {failedCount > 0 && (
+        }
+      />
 
-  <button
-    onClick={handleExportPreview}
-    className="
-      px-4 py-2
-      bg-red-600
-      hover:bg-red-700
-      text-white
-      rounded-lg
-      shadow-sm
-      flex items-center gap-2
-    "
-  >
-
-    Retry Failed
-
-    <span
-      className="
-        bg-white
-        text-red-600
-        px-2 py-0.5
-        rounded-full
-        text-xs
-        font-semibold
-      "
-    >
-      {failedCount}
-    </span>
-
-  </button>
-)}
-
-      </div>
-
-    </div>
-    {/* SUMMARY CARDS */}
-
+      {/* SUMMARY CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatCard title="Total Employees" value={totalEmployees} icon={Users} />
 
@@ -773,7 +733,7 @@ console.log(
 
       {/* SEARCH + FILTERS */}
 
-      <div className="flex flex-col md:flex-row gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_200px_220px]">
         <input
           placeholder="Search by Name, Email or Employee ID..."
           value={searchTerm}
@@ -781,7 +741,7 @@ console.log(
             setSearchTerm(e.target.value);
             setCurrentPage(1);
           }}
-          className="w-full md:w-1/3 px-3 py-2 border rounded-lg"
+          className="w-full rounded-lg border border-gray-300 bg-white py-2 px-4 text-sm shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
         />
 
         <FilterListbox

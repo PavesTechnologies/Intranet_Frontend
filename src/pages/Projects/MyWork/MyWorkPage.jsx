@@ -87,7 +87,7 @@ export default function MyWorkPage() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="w-full px-4 py-6">
 
         {/* ── Page header ───────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between mb-6">
@@ -101,7 +101,7 @@ export default function MyWorkPage() {
           </div>
           <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate("/projects")}
+            onClick={() => navigate(-1)}
             className="flex items-center justify-center w-5 h-5 bg-white border border-gray-200 text-gray-600 rounded-full shadow-sm hover:bg-gray-50 hover:text-gray-900 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 shrink-0"
             title="Go Back"
           >

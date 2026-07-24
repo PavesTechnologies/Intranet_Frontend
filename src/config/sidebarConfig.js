@@ -73,7 +73,7 @@ export const EO_SUBMENU = [
     children: [
       { label: "Employee Directory", to: "/employee-onboarding/employee-directory" },
       { label: "Member Records",      to: "/employee-onboarding/employeelist",       allowedRoles: HR_MANAGEMENT },
-      { label: "Org Chart",  to: "/employee-onboarding/organization-tree" },
+      // { label: "Org Chart",  to: "/employee-onboarding/organization-tree" },
     ],
   },
    {
@@ -114,11 +114,11 @@ export const EO_SUBMENU = [
       { label: "Certificates",   to: "/employee-onboarding/manage-skill-taxonomy/certificates", allowedRoles: ADMIN_ROLES },
     ],
   },
-  {
-    label: "Off-Boarding",
-    to: "/employee-exit",
-    allowedRoles: MANAGEMENT_ROLES,
-  },
+  // {
+  //   label: "Off-Boarding",
+  //   to: "/employee-exit",
+  //   allowedRoles: MANAGEMENT_ROLES,
+  // },
 ];
 
 /**
