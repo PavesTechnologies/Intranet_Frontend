@@ -1377,3 +1377,5 @@ export default function CurrencyManagementPage() {
         variant="danger"
       />
     </div>
+  );
+}

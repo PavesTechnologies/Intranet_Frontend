@@ -573,3 +573,5 @@ export default function GlAccountsPage() {
         variant="danger"
       />
     </div>
+  );
+}

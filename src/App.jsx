@@ -172,6 +172,7 @@ import XmsInvoiceStatusPage from "./pages/expense-management/pages/client-billin
 import XmsExpenseCategoriesPage from "./pages/expense-management/pages/masters/ExpenseCategoriesPage.jsx";
 import XmsGlAccountsPage from "./pages/expense-management/pages/masters/GlAccountsPage.jsx";
 import XmsCostCentersPage from "./pages/expense-management/pages/masters/CostCentersPage.jsx";
+import XmsCostCenterBudgetPage from "./pages/expense-management/pages/masters/CostCenterBudgetPage.jsx";
 import XmsProjectsMasterPage from "./pages/expense-management/pages/masters/ProjectsMasterPage.jsx";
 import XmsClientsMasterPage from "./pages/expense-management/pages/masters/ClientsMasterPage.jsx";
 import XmsCurrencyManagementPage from "./pages/expense-management/pages/masters/CurrencyManagementPage.jsx";
@@ -1131,19 +1132,19 @@ const AppRoutes = () => {
           </Route>
 
           {/* Expense Management (XMS) */}
-          <Route path="/expense-management/dashboard" element={<ProtectedRoute allowedRoles={["Employee", "Manager", "Finance", "Admin", "Super_Admin"]}><XmsDashboardPage /></ProtectedRoute>} />
+          <Route path="/expense-management/dashboard" element={<ProtectedRoute allowedRoles={["General", "Manager", "Finance", "Admin", "Super_Admin"]}><XmsDashboardPage /></ProtectedRoute>} />
 
-          <Route path="/expense-management/expenses/create" element={<ProtectedRoute allowedRoles={["Employee", "Manager"]}><XmsCreateExpensePage /></ProtectedRoute>} />
-          <Route path="/expense-management/expenses/my" element={<ProtectedRoute allowedRoles={["Employee", "Manager"]}><XmsMyExpensesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/expenses/create" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsCreateExpensePage /></ProtectedRoute>} />
+          <Route path="/expense-management/expenses/my" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsMyExpensesPage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/all" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsAllExpensesPage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/reports" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsExpenseReportsPage /></ProtectedRoute>} />
 
-          <Route path="/expense-management/receipts/library" element={<ProtectedRoute allowedRoles={["Employee"]}><XmsReceiptLibraryPage /></ProtectedRoute>} />
-          <Route path="/expense-management/receipts/ocr-processing" element={<ProtectedRoute allowedRoles={["Employee"]}><XmsOcrProcessingPage /></ProtectedRoute>} />
+          <Route path="/expense-management/receipts/library" element={<ProtectedRoute allowedRoles={["General"]}><XmsReceiptLibraryPage /></ProtectedRoute>} />
+          <Route path="/expense-management/receipts/ocr-processing" element={<ProtectedRoute allowedRoles={["General"]}><XmsOcrProcessingPage /></ProtectedRoute>} />
 
-          <Route path="/expense-management/cash-advance/request" element={<ProtectedRoute allowedRoles={["Employee"]}><XmsRequestAdvancePage /></ProtectedRoute>} />
-          <Route path="/expense-management/cash-advance/my" element={<ProtectedRoute allowedRoles={["Employee"]}><XmsMyAdvancesPage /></ProtectedRoute>} />
-          <Route path="/expense-management/cash-advance/settlement" element={<ProtectedRoute allowedRoles={["Employee"]}><XmsSettlementPage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/request" element={<ProtectedRoute allowedRoles={["General"]}><XmsRequestAdvancePage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/my" element={<ProtectedRoute allowedRoles={["General"]}><XmsMyAdvancesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/settlement" element={<ProtectedRoute allowedRoles={["General"]}><XmsSettlementPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/approvals/pending" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsPendingApprovalsPage /></ProtectedRoute>} />
           <Route path="/expense-management/approvals/approved" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsApprovedApprovalsPage /></ProtectedRoute>} />
@@ -1160,6 +1161,7 @@ const AppRoutes = () => {
           <Route path="/expense-management/masters/expense-categories" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsExpenseCategoriesPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/gl-accounts" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsGlAccountsPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/cost-centers" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsCostCentersPage /></ProtectedRoute>} />
+          <Route path="/expense-management/masters/cost-center-budgets" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsCostCenterBudgetPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/projects" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsProjectsMasterPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/clients" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsClientsMasterPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/currency-management" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsCurrencyManagementPage /></ProtectedRoute>} />
@@ -1168,7 +1170,7 @@ const AppRoutes = () => {
           <Route path="/expense-management/policies" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsPoliciesPage /></ProtectedRoute>} />
           <Route path="/expense-management/reports" element={<ProtectedRoute allowedRoles={["Manager", "Finance", "Admin", "Super_Admin"]}><XmsReportsPage /></ProtectedRoute>} />
 
-          <Route path="/expense-management/activity/notifications" element={<ProtectedRoute allowedRoles={["Employee", "Manager", "Finance", "Admin", "Super_Admin"]}><XmsNotificationsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/activity/notifications" element={<ProtectedRoute allowedRoles={["General", "Manager", "Finance", "Admin", "Super_Admin"]}><XmsNotificationsPage /></ProtectedRoute>} />
           <Route path="/expense-management/activity/audit-logs" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsAuditLogsPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/settings" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsSettingsPage /></ProtectedRoute>} />
