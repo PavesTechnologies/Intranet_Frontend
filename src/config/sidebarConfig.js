@@ -199,6 +199,7 @@ export const XMS_SUBMENU = [
       { label: "Expense Categories",  to: "/expense-management/masters/expense-categories" },
       { label: "GL Accounts",         to: "/expense-management/masters/gl-accounts" },
       { label: "Cost Centers",        to: "/expense-management/masters/cost-centers" },
+      { label: "Cost Center Budgets", to: "/expense-management/masters/cost-center-budgets" },
       { label: "Projects",            to: "/expense-management/masters/projects" },
       { label: "Clients",             to: "/expense-management/masters/clients" },
       { label: "Currency Management", to: "/expense-management/masters/currency-management" },
@@ -210,23 +211,23 @@ export const XMS_SUBMENU = [
     to: "/expense-management/policies",
     allowedRoles: XMS_ADMIN,
   },
-  {
-    label: "Reports",
-    to: "/expense-management/reports",
-    allowedRoles: XMS_REPORT_VIEWERS,
-  },
-  {
-    label: "Activity",
-    to: "/expense-management/activity/notifications",
-    allowedRoles: XMS_EVERYONE,
-    children: [
-      { label: "Notifications", to: "/expense-management/activity/notifications" },
-      { label: "Audit Logs",    to: "/expense-management/activity/audit-logs", allowedRoles: XMS_ADMIN },
-    ],
-  },
-  {
-    label: "Settings",
-    to: "/expense-management/settings",
-    allowedRoles: XMS_ADMIN,
-  },
+  // {
+  //   label: "Reports",
+  //   to: "/expense-management/reports",
+  //   allowedRoles: XMS_REPORT_VIEWERS,
+  // },
+  // {
+  //   label: "Activity",
+  //   to: "/expense-management/activity/notifications",
+  //   allowedRoles: XMS_EVERYONE,
+  //   children: [
+  //     { label: "Notifications", to: "/expense-management/activity/notifications" },
+  //     { label: "Audit Logs",    to: "/expense-management/activity/audit-logs", allowedRoles: XMS_ADMIN },
+  //   ],
+  // },
+  // {
+  //   label: "Settings",
+  //   to: "/expense-management/settings",
+  //   allowedRoles: XMS_ADMIN,
+  // },
 ];

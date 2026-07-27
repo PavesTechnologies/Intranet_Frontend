@@ -772,3 +772,5 @@ export default function ExpenseCategoriesPage() {
         variant="danger"
       />
     </div>
+  );
+}

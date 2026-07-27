@@ -172,6 +172,7 @@ import XmsInvoiceStatusPage from "./pages/expense-management/pages/client-billin
 import XmsExpenseCategoriesPage from "./pages/expense-management/pages/masters/ExpenseCategoriesPage.jsx";
 import XmsGlAccountsPage from "./pages/expense-management/pages/masters/GlAccountsPage.jsx";
 import XmsCostCentersPage from "./pages/expense-management/pages/masters/CostCentersPage.jsx";
+import XmsCostCenterBudgetPage from "./pages/expense-management/pages/masters/CostCenterBudgetPage.jsx";
 import XmsProjectsMasterPage from "./pages/expense-management/pages/masters/ProjectsMasterPage.jsx";
 import XmsClientsMasterPage from "./pages/expense-management/pages/masters/ClientsMasterPage.jsx";
 import XmsCurrencyManagementPage from "./pages/expense-management/pages/masters/CurrencyManagementPage.jsx";
@@ -1160,6 +1161,7 @@ const AppRoutes = () => {
           <Route path="/expense-management/masters/expense-categories" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsExpenseCategoriesPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/gl-accounts" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsGlAccountsPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/cost-centers" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsCostCentersPage /></ProtectedRoute>} />
+          <Route path="/expense-management/masters/cost-center-budgets" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsCostCenterBudgetPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/projects" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsProjectsMasterPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/clients" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsClientsMasterPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/currency-management" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsCurrencyManagementPage /></ProtectedRoute>} />
