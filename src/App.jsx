@@ -104,8 +104,13 @@ import AirsDashboard from "./pages/airs/pages/AirsDashboard.jsx";
 import JdLibrary from "./pages/airs/pages/JdLibrary.jsx";
 import JdCreate from "./pages/airs/pages/JdCreate.jsx";
 import JdDetails from "./pages/airs/pages/JdDetails.jsx";
-import Campaigns from "./pages/airs/pages/Campaigns.jsx";
-import CampaignDetails from "./pages/airs/pages/CampaignDetails.jsx";
+import Campaigns from "./pages/airs/campaigns/Campaigns.jsx";
+import CampaignDetails from "./pages/airs/campaigns/CampaignDetails.jsx";
+import CampaignComparePage from "./pages/airs/campaigns/CampaignComparePage.jsx";
+import WeightChangeReportPage from "./pages/airs/campaigns/WeightChangeReportPage.jsx";
+
+import AirsPlaceholder from "./pages/airs/pages/AirsPlaceholder.jsx";
+
 import ResumeIntakePage from "./pages/airs/resume-intake/ResumeIntakePage.jsx";
 import IntakeFlowPage from "./pages/airs/resume-intake/intake/IntakeFlowPage.jsx";
 import ReviewPage from "./pages/airs/resume-intake/intake/ReviewPage.jsx";
@@ -1019,10 +1024,15 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+          {/* NOTE: ProtectedRoute's prop is `allowedRoles` — the `roles={...}`
+              prop used by the other /airs/* routes is silently ignored by
+              React, so those routes have NO route-level role enforcement.
+              Campaign routes below use the working prop, mirroring the
+              backend's require_roles(...) on the corresponding endpoints. */}
           <Route
             path="/airs/campaigns"
             element={
-              <ProtectedRoute roles={["General"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <Campaigns />
               </ProtectedRoute>
             }
@@ -1030,8 +1040,24 @@ const AppRoutes = () => {
           <Route
             path="/airs/campaigns/:id"
             element={
-              <ProtectedRoute roles={["General"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <CampaignDetails />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/campaigns/compare"
+            element={
+              <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
+                <CampaignComparePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/campaigns/reports/weight-changes"
+            element={
+              <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
+                <WeightChangeReportPage />
               </ProtectedRoute>
             }
           />

@@ -31,8 +31,8 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/ui/Modal";
 import FormInput from "../../../components/forms/FormInput";
-import NewCampaignForm from "../modals/NewCampaignForm";
-import { createCampaign, getAllCampaignsHrAdmin } from "../service/campaignservice";
+import NewCampaignForm from "../campaigns/components/NewCampaignForm";
+import { createCampaign, getAllCampaignsHrAdmin } from "../campaigns/services/campaignservice";
 import Pagination from "../../../components/Pagination/pagination";
 import GenericTable from "../../../components/Table/table";
 

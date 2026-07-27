@@ -1,5 +1,5 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Check } from "lucide-react";
 import useIntakeFlow from "./hooks/useIntakeFlow";
 import UploadStep from "./components/UploadStep";
@@ -20,8 +20,23 @@ function stepIndex(step) {
 
 export default function IntakeFlowPage() {
   const navigate = useNavigate();
-  const { step, resume, status, parsedJson, candidateSkills, submit, goToReview, retry, reset } = useIntakeFlow();
+  const location = useLocation();
+  const { step, resume, status, statusError, parsedJson, candidateSkills, submit, goToReview, retryStatusCheck, reset } = useIntakeFlow();
   const activeIndex = stepIndex(step);
+  const consumedUploadResult = useRef(false);
+
+  // When arriving from the "New Structured Intake" modal (ResumeIntakePage),
+  // the resume has already been uploaded — skip straight to the Accepted step
+  // instead of showing the Upload form again.
+  useEffect(() => {
+    const uploadResult = location.state?.uploadResult;
+    if (uploadResult && !consumedUploadResult.current) {
+      consumedUploadResult.current = true;
+      submit(uploadResult);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
@@ -59,10 +74,17 @@ export default function IntakeFlowPage() {
         </ol>
       </div>
 
-      {step === "upload" && <UploadStep onSubmit={submit} />}
+      {step === "upload" && !location.state?.uploadResult && <UploadStep onSubmit={submit} />}
       {step === "accepted" && resume && status && <AcceptedStep resume={resume} status={status} />}
       {step === "processing" && resume && status && (
-        <ProcessingStep resume={resume} status={status} onComplete={goToReview} onRetry={retry} onBackToUpload={reset} />
+        <ProcessingStep
+          resume={resume}
+          status={status}
+          statusError={statusError}
+          onComplete={goToReview}
+          onRetryStatusCheck={retryStatusCheck}
+          onBackToUpload={reset}
+        />
       )}
       {step === "review" && (
         <ReviewScreen resume={resume} parsedJson={parsedJson} candidateSkills={candidateSkills} processingStatus={status} />

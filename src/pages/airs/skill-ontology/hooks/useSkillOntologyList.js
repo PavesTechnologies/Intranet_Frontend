@@ -45,7 +45,7 @@ export function buildSkillQueryParams({ search, category, confidence, source, sh
 }
 
 // Server-driven list state (search/filter/pagination all round-trip to the
-// backend) — matches the fetch pattern used by src/pages/airs/pages/Campaigns.jsx
+// backend) — matches the fetch pattern used by src/pages/airs/campaigns/Campaigns.jsx
 // rather than the client-side-filtered mock pattern used elsewhere in AIRS.
 export default function useSkillOntologyList() {
   const [search, setSearch] = useState("");
