@@ -65,6 +65,18 @@ export default function useCandidateRanking() {
     );
   };
 
+  // M07-E01/S04 — HR-admin-added skill, informational only; never touches
+  // scoreBreakdown/deterministic scoring.
+  const addManualSkill = (candidateId, skill) => {
+    setCandidates((prev) =>
+      prev.map((c) =>
+        c.id === candidateId
+          ? { ...c, manualSkills: [...c.manualSkills, { id: skill.id, canonicalName: skill.canonicalName }] }
+          : c
+      )
+    );
+  };
+
   return {
     candidates: pageItems,
     totalResults: filteredSorted.length,
@@ -80,6 +92,7 @@ export default function useCandidateRanking() {
     totalPages,
     toggleStar,
     addComment,
+    addManualSkill,
     detailCandidate,
     openCandidate: setDetailCandidateId,
     closeCandidate: () => setDetailCandidateId(null),

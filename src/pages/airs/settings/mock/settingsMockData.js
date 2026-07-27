@@ -1,11 +1,6 @@
 // Self-contained mock data for the AIRS Settings module (AI configuration style).
 
 export const DEFAULT_SETTINGS = {
-  weights: {
-    mandatorySkills: 40,
-    semantic: 35,
-    experience: 25,
-  },
   autoSkillMapping: true,
   confidenceThreshold: 75,
   auditLogRetentionDays: 90,

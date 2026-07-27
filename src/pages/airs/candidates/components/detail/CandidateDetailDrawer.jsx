@@ -10,7 +10,7 @@ import CandidateEvaluationTab from "./CandidateEvaluationTab";
 import CandidateTimelineTab from "./CandidateTimelineTab";
 import CandidateCommentsTab from "./CandidateCommentsTab";
 
-export default function CandidateDetailDrawer({ candidate, onClose, onAddComment }) {
+export default function CandidateDetailDrawer({ candidate, onClose, onAddComment, onAddManualSkill }) {
   const [tab, setTab] = useState("Summary");
 
   return (
@@ -34,6 +34,8 @@ export default function CandidateDetailDrawer({ candidate, onClose, onAddComment
                 </SheetDescription>
               </div>
               <div className="flex gap-3 shrink-0">
+                <ScoreRing value={candidate.deterministic} size={40} color="#DC2626" />
+                <ScoreRing value={candidate.semantic} size={40} color="#7C3AED" />
                 <ScoreRing value={candidate.ats} size={40} color="#2563EB" />
                 <ScoreRing value={candidate.composite} size={40} color="#16A34A" />
               </div>
@@ -57,7 +59,9 @@ export default function CandidateDetailDrawer({ candidate, onClose, onAddComment
           <div className="p-5 space-y-4 overflow-y-auto flex-1">
             {tab === "Summary" && <CandidateSummaryTab candidate={candidate} />}
             {tab === "Resume" && <CandidateResumeTab candidate={candidate} />}
-            {tab === "Evaluation" && <CandidateEvaluationTab candidate={candidate} />}
+            {tab === "Evaluation" && (
+              <CandidateEvaluationTab candidate={candidate} onAddManualSkill={onAddManualSkill} />
+            )}
             {tab === "Timeline" && <CandidateTimelineTab candidate={candidate} />}
             {tab === "Comments" && (
               <CandidateCommentsTab candidate={candidate} onAddComment={(text) => onAddComment(candidate.id, text)} />

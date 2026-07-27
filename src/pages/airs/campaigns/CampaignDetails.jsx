@@ -4,17 +4,23 @@ import { toast } from "react-toastify";
 import {
   ArrowLeft, Users, Activity, AlertTriangle, Lock, Target,
   UserCog, FileText, ArrowRight, Filter, ChevronDown, Clock, Edit2,
-  ExternalLink, ListChecks, MapPin
+  ExternalLink, ListChecks, MapPin, PauseCircle, PlayCircle, XCircle,
+  RotateCcw, Copy, Inbox, AlertOctagon
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import EditCampaignModal from "../modals/EditCampaignModal";
-import { useAuth } from "../../../contexts/AuthContext";
+import EditCampaignModal from "./components/EditCampaignModal";
+import PauseCampaignModal from "./components/PauseCampaignModal";
+import ResumeCampaignModal from "./components/ResumeCampaignModal";
+import CloseCampaignModal from "./components/CloseCampaignModal";
+import ReopenCampaignModal from "./components/ReopenCampaignModal";
+import DuplicateCampaignModal from "./components/DuplicateCampaignModal";
+import useCampaignPermissions from "./hooks/useCampaignPermissions";
 import {
   getCampaignDetails, getPipelineSummary, getCampaignTimeline,
-  getCampaignCandidates,
-} from "../service/campaignservice";
+  getCampaignCandidates, getProcessingStatus, getDeadLetterQueue,
+} from "./services/campaignservice";
 
 // Colour per pipeline stage (used for the funnel bars)
 const STAGE_COLORS = {
@@ -76,14 +82,14 @@ const fmtDate = (d) => (d ? new Date(d).toLocaleString() : "—");
 export default function CampaignDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
-
-  const isHRAdmin = hasRole(["HR_ADMIN"]);
+  const { canManageCampaigns, canViewPipeline, canViewTimeline } = useCampaignPermissions();
 
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("details");
   const [editOpen, setEditOpen] = useState(false);
+  // E03 lifecycle actions — only one of these is ever open at a time
+  const [lifecycleModal, setLifecycleModal] = useState(null); // null | "pause" | "resume" | "close" | "reopen" | "duplicate"
 
   // S06-T01 — load full campaign profile
   const loadDetail = useCallback(async () => {
@@ -127,17 +133,20 @@ export default function CampaignDetails() {
   const status = (info.status || "").toUpperCase();
   const isClosed = status === "CLOSED";
   const isActive = status === "ACTIVE";
-  const canEdit = isHRAdmin && !isClosed;            // S07-T03: closed = read-only
+  const canEdit = canManageCampaigns && !isClosed;   // S07-T03: closed = read-only
 
-  // Pipeline & Timeline tabs only exist for users the backend serves that data to.
-  // scoring != null is a reliable proxy for "not a plain HIRING_MANAGER".
-  const canSeePipeline = scoring != null;            // HR_ADMIN / RECRUITER
-  const canSeeTimeline = isHRAdmin;                  // S06-T03: HR_ADMIN only
+  // Pipeline/Processing tabs: HR_ADMIN + RECRUITER (matches the backend's
+  // require_roles on pipeline-summary / processing-status / dead-letter-queue).
+  // scoring != null is kept as a data-presence AND — the backend also omits
+  // the scoring section for roles it hides it from, so both must agree.
+  const canSeePipeline = canViewPipeline && scoring != null;
+  const canSeeTimeline = canViewTimeline;            // S06-T03: HR_ADMIN only
 
   const tabs = [
     { id: "details", label: "Details", icon: FileText, show: true },
     { id: "candidates", label: "Candidates", icon: ListChecks, show: true },
     { id: "pipeline", label: "Pipeline", icon: Users, show: canSeePipeline },
+    { id: "processing", label: "Processing", icon: Inbox, show: canSeePipeline },
     { id: "timeline", label: "Timeline", icon: Activity, show: canSeeTimeline },
   ].filter((t) => t.show);
 
@@ -168,11 +177,36 @@ export default function CampaignDetails() {
             </p>
           </div>
         </div>
-        {canEdit && (
-          <div className="flex items-start">
-            <Button variant="secondary" size="medium" onClick={() => setEditOpen(true)}>
-              <Edit2 className="h-4 w-4" /> Edit Campaign
+        {canManageCampaigns && (
+          <div className="flex items-start flex-wrap gap-2">
+            {isActive && (
+              <Button variant="outline" size="medium" onClick={() => setLifecycleModal("pause")}>
+                <PauseCircle className="h-4 w-4" /> Pause
+              </Button>
+            )}
+            {status === "PAUSED" && (
+              <Button variant="outline" size="medium" onClick={() => setLifecycleModal("resume")}>
+                <PlayCircle className="h-4 w-4" /> Resume
+              </Button>
+            )}
+            {!isClosed && (
+              <Button variant="danger" size="medium" onClick={() => setLifecycleModal("close")}>
+                <XCircle className="h-4 w-4" /> Close
+              </Button>
+            )}
+            {isClosed && (
+              <Button variant="outline" size="medium" onClick={() => setLifecycleModal("reopen")}>
+                <RotateCcw className="h-4 w-4" /> Reopen
+              </Button>
+            )}
+            <Button variant="outline" size="medium" onClick={() => setLifecycleModal("duplicate")}>
+              <Copy className="h-4 w-4" /> Duplicate
             </Button>
+            {canEdit && (
+              <Button variant="secondary" size="medium" onClick={() => setEditOpen(true)}>
+                <Edit2 className="h-4 w-4" /> Edit Campaign
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -205,7 +239,7 @@ export default function CampaignDetails() {
       {activeTab === "details" && (
         <DetailsTab info={info} jd={jd} scoring={scoring} limits={limits} hm={hm} />
       )}
-      {activeTab === "candidates" && <CandidatesTab campaignId={id} />}
+      {activeTab === "candidates" && <CandidatesTab campaignId={id} canViewPipeline={canViewPipeline} />}
       {activeTab === "pipeline" && (
         <PipelineTab
           campaignId={id}
@@ -213,6 +247,7 @@ export default function CampaignDetails() {
           onViewCandidates={() => navigate(`/airs/candidates?campaign=${id}`)}
         />
       )}
+      {activeTab === "processing" && <ProcessingTab campaignId={id} />}
       {activeTab === "timeline" && <TimelineTab campaignId={id} />}
 
       {canEdit && (
@@ -223,6 +258,44 @@ export default function CampaignDetails() {
           detail={detail}
           onSaved={() => { setEditOpen(false); setLoading(true); loadDetail(); }}
         />
+      )}
+
+      {canManageCampaigns && (
+        <>
+          <PauseCampaignModal
+            isOpen={lifecycleModal === "pause"}
+            onClose={() => setLifecycleModal(null)}
+            campaignId={id}
+            onPaused={() => { setLifecycleModal(null); setLoading(true); loadDetail(); }}
+          />
+          <ResumeCampaignModal
+            isOpen={lifecycleModal === "resume"}
+            onClose={() => setLifecycleModal(null)}
+            campaignId={id}
+            onResumed={() => { setLifecycleModal(null); setLoading(true); loadDetail(); }}
+          />
+          <CloseCampaignModal
+            isOpen={lifecycleModal === "close"}
+            onClose={() => setLifecycleModal(null)}
+            campaignId={id}
+            onClosed={() => { setLifecycleModal(null); setLoading(true); loadDetail(); }}
+          />
+          <ReopenCampaignModal
+            isOpen={lifecycleModal === "reopen"}
+            onClose={() => setLifecycleModal(null)}
+            campaignId={id}
+            onReopened={() => { setLifecycleModal(null); setLoading(true); loadDetail(); }}
+          />
+          <DuplicateCampaignModal
+            isOpen={lifecycleModal === "duplicate"}
+            onClose={() => setLifecycleModal(null)}
+            sourceCampaign={info.name ? { id, name: info.name } : null}
+            onDuplicated={(created) => {
+              setLifecycleModal(null);
+              if (created?.id) navigate(`/airs/campaigns/${created.id}`);
+            }}
+          />
+        </>
       )}
     </div>
   );
@@ -323,7 +396,7 @@ function StatTile({ label, value, suffix = "", tone = "text-slate-900", dot = "b
   );
 }
 
-function CandidatesTab({ campaignId }) {
+function CandidatesTab({ campaignId, canViewPipeline }) {
   const [candidates, setCandidates] = useState(null);
   const [summary, setSummary] = useState(null);   // pipeline-summary → KPI numbers
   const [loading, setLoading] = useState(true);
@@ -332,11 +405,12 @@ function CandidatesTab({ campaignId }) {
     let cancelled = false;
     (async () => {
       // Candidate list and the pipeline summary come from two endpoints — fetch
-      // in parallel and don't let a missing summary (e.g. no pipeline access)
-      // block the list from rendering.
+      // in parallel and don't let a missing summary block the list from
+      // rendering. The summary call is skipped outright for roles the backend
+      // would 403 (HIRING_MANAGER) — the KPI row just shows the total.
       const [candRes, sumRes] = await Promise.allSettled([
         getCampaignCandidates(campaignId),
-        getPipelineSummary(campaignId),
+        canViewPipeline ? getPipelineSummary(campaignId) : Promise.reject(new Error("skipped")),
       ]);
       if (cancelled) return;
       if (candRes.status === "fulfilled") {
@@ -349,7 +423,7 @@ function CandidatesTab({ campaignId }) {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [campaignId]);
+  }, [campaignId, canViewPipeline]);
 
   if (loading) {
     return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading candidates..." /></div>;
@@ -508,6 +582,95 @@ function PipelineTab({ campaignId, isActive, onViewCandidates }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ---------------- Processing Tab (E04-S01-T02) ---------------- */
+const TASK_STATUS_TONE = {
+  queued_count: { label: "Queued", dot: "bg-slate-400" },
+  running_count: { label: "Running", dot: "bg-blue-500" },
+  retry_count: { label: "Retry", dot: "bg-amber-500" },
+  dead_count: { label: "Dead", dot: "bg-rose-500" },
+  paused_count: { label: "Paused", dot: "bg-slate-300" },
+};
+
+function ProcessingTab({ campaignId }) {
+  const [status, setStatus] = useState(null);
+  const [dlq, setDlq] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showDlq, setShowDlq] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [statusRes, dlqRes] = await Promise.allSettled([
+        getProcessingStatus(campaignId),
+        getDeadLetterQueue(campaignId),
+      ]);
+      if (cancelled) return;
+      if (statusRes.status === "fulfilled") setStatus(unwrap(statusRes.value));
+      else toast.error("Failed to load processing status.");
+      if (dlqRes.status === "fulfilled") setDlq(unwrap(dlqRes.value) || []);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [campaignId]);
+
+  if (loading) {
+    return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading processing status..." /></div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-sm font-bold text-slate-900">Task Processing Status</h3>
+        <p className="text-[11px] text-slate-500">celery_task_log status breakdown for this campaign</p>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {Object.entries(TASK_STATUS_TONE).map(([key, meta]) => (
+          <div key={key} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{meta.label}</p>
+            </div>
+            <p className="text-xl font-black tabular-nums text-slate-900">{status?.[key] ?? 0}</p>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={() => setShowDlq((v) => !v)}
+        className="flex items-center gap-2 text-xs font-bold text-rose-600 hover:text-rose-700"
+      >
+        <AlertOctagon className="h-3.5 w-3.5" />
+        Dead Letter Queue ({status?.dead_letter_queue_count ?? dlq.length})
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showDlq ? "rotate-180" : ""}`} />
+      </button>
+
+      {showDlq && (
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+          {dlq.length === 0 ? (
+            <p className="text-xs text-slate-400 text-center py-6">No dead-lettered tasks for this campaign.</p>
+          ) : (
+            <div className="space-y-2">
+              {dlq.map((entry) => (
+                <div key={entry.id} className="p-2.5 rounded-xl bg-rose-50/50 border border-rose-100">
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase">{entry.task_type}</span>
+                    <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> {fmtDate(entry.moved_to_dlq_at)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-rose-700 mt-1">{entry.final_error_message}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Retried {entry.retry_count}x</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

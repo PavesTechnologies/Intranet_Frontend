@@ -9,7 +9,7 @@
 // localStorage-backed mock dataset in mock/skillOntologyMockData.js, since no
 // real endpoint exists for those yet.
 //
-// Real calls follow the same convention as src/pages/airs/service/campaignservice.js:
+// Real calls follow the same convention as src/pages/airs/campaigns/services/campaignservice.js:
 // same BASE_URL source, same inline Authorization header, same try/catch/throw shape.
 
 import api from "../../../../api/axiosInstance";
@@ -85,6 +85,44 @@ const mapApiSkillToInternal = (raw) => ({
 });
 
 // ── Real endpoints ──────────────────────────────────────────────────────
+
+// Raw/unrecognized skill mentions — a distinct resource from canonical
+// skills (note the different path: /skills/unknown, not /skill-ontology).
+// Field names are defensive since the exact response shape wasn't specified.
+const mapUnknownSkill = (raw) => ({
+  id: raw.id,
+  rawSkill: raw.raw_skill ?? raw.rawSkill ?? raw.raw_text ?? "",
+  normalizedKey: raw.normalized_key ?? raw.normalizedKey ?? "",
+  frequency: raw.frequency ?? raw.occurrence_count ?? raw.count ?? 0,
+  firstSeen: raw.first_seen ?? raw.firstSeen ?? null,
+  lastSeen: raw.last_seen ?? raw.lastSeen ?? null,
+  status: raw.status ?? "PENDING",
+});
+
+export const getUnknownSkills = async (params = {}) => {
+  const url = `${BASE_URL}/skills/unknown`;
+  const query = { page: params.page, page_size: params.page_size, search: params.search };
+  // Own query-key prefix ("GET .../skills/unknown ...") — never collides with
+  // getSkills' ("GET .../skill-ontology ...") or getCategories' ("categories")
+  // keys, so the two tabs' in-flight requests can never be mistaken for one another.
+  const key = `GET ${url} ${JSON.stringify(query)}`;
+
+  return dedupedRequest(key, async () => {
+    try {
+      console.log("[skillOntologyService] GET", url, query);
+      const response = await api.get(url, { params: query, headers: authHeaders() });
+      const payload = response.data?.data || {};
+      const items = payload.items || (Array.isArray(payload) ? payload : []);
+      return ok({
+        items: items.map(mapUnknownSkill),
+        total: payload.total ?? items.length,
+      });
+    } catch (error) {
+      console.error("Error fetching unknown skills:", error);
+      throw error;
+    }
+  });
+};
 
 // Accepts: page, page_size, search, category, confidence, is_active.
 // Note: this module's Source filter dropdown has no server-side equivalent

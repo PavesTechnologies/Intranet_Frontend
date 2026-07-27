@@ -22,6 +22,7 @@ export default function CandidateRankingPage() {
     totalPages,
     toggleStar,
     addComment,
+    addManualSkill,
     detailCandidate,
     openCandidate,
     closeCandidate,
@@ -60,7 +61,12 @@ export default function CandidateRankingPage() {
         />
       )}
 
-      <CandidateDetailDrawer candidate={detailCandidate} onClose={closeCandidate} onAddComment={addComment} />
+      <CandidateDetailDrawer
+        candidate={detailCandidate}
+        onClose={closeCandidate}
+        onAddComment={addComment}
+        onAddManualSkill={addManualSkill}
+      />
     </div>
   );
 }

@@ -3,9 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import Pagination from "../../../components/Pagination/pagination";
 import useSkillOntologyList from "./hooks/useSkillOntologyList";
+import useUnknownSkillsList from "./hooks/useUnknownSkillsList";
 import SkillToolbar from "./components/SkillToolbar";
+import SkillTabs from "./components/SkillTabs";
 import SkillFilters from "./components/SkillFilters";
 import SkillTable from "./components/SkillTable";
+import UnknownSkillTable from "./components/UnknownSkillTable";
 import ErrorState from "./components/ErrorState";
 import AddSkillDrawer from "./components/AddSkillDrawer";
 import EditSkillModal from "./components/EditSkillModal";
@@ -25,12 +28,17 @@ import {
   exportSkills,
   seedOntology,
 } from "./services/skillOntologyService";
+import { EMPTY_SKILL_FORM } from "./constants/skillOntologyConstants";
 
 export default function SkillOntologyPage() {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("verified");
+
   const list = useSkillOntologyList();
+  const unknown = useUnknownSkillsList(activeTab === "unknown");
 
   const [addOpen, setAddOpen] = useState(false);
+  const [addInitialValues, setAddInitialValues] = useState(null);
   const [editSkill, setEditSkill] = useState(null);
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [reactivateTarget, setReactivateTarget] = useState(null);
@@ -45,6 +53,18 @@ export default function SkillOntologyPage() {
   // "All Categories" sentinel and hand them to the Add/Edit form instead of
   // letting SkillForm fetch its own duplicate copy on every modal open.
   const formCategoryOptions = list.categoryOptions.filter((o) => o.value !== "All");
+
+  const openAdd = () => {
+    setAddInitialValues(null);
+    setAddOpen(true);
+  };
+
+  // Reuses the existing Add Skill flow / createSkill API — no dedicated
+  // "promote" endpoint exists, so this just pre-fills the canonical name.
+  const handlePromote = (unknownSkill) => {
+    setAddInitialValues({ ...EMPTY_SKILL_FORM, canonicalName: unknownSkill.rawSkill });
+    setAddOpen(true);
+  };
 
   const handleCreate = async (values) => {
     setIsSubmitting(true);
@@ -231,57 +251,95 @@ export default function SkillOntologyPage() {
       <SkillToolbar
         onRefresh={list.refresh}
         onExport={handleExport}
-        onAddSkill={() => setAddOpen(true)}
+        onAddSkill={openAdd}
         onBulkImport={() => setBulkImportOpen(true)}
         isRefreshing={list.isLoading}
         isExporting={isExporting}
       />
 
-      <SkillFilters
-        search={list.search}
-        setSearch={list.setSearch}
-        category={list.category}
-        setCategory={list.setCategory}
-        categoryOptions={list.categoryOptions}
-        confidenceFilter={list.confidenceFilter}
-        setConfidenceFilter={list.setConfidenceFilter}
-        source={list.source}
-        setSource={list.setSource}
-        showInactive={list.showInactive}
-        setShowInactive={list.setShowInactive}
-      />
+      <SkillTabs activeTab={activeTab} onChange={setActiveTab} />
 
-      {list.error ? (
-        <ErrorState onRetry={list.refresh} message="We couldn't load the skill ontology. Please try again." />
-      ) : (
-        <SkillTable
-          skills={list.skills}
-          isLoading={list.isLoading}
-          onView={(skill) => navigate(`/airs/skill-ontology/${skill.id}`)}
-          onEdit={openEdit}
-          onDeactivate={openDeactivate}
-          onReactivate={setReactivateTarget}
-          onSeedOntology={handleSeed}
-          seeding={isSeeding}
-        />
-      )}
-
-      {!list.isLoading && !list.error && list.totalCount > 0 && (
-        <div className="flex items-center justify-between mt-4">
-          <span className="text-[12px] text-slate-400">{list.totalCount} skills</span>
-          <Pagination
-            currentPage={list.currentPage}
-            totalPages={list.totalPages}
-            onPrevious={() => list.setCurrentPage(list.currentPage - 1)}
-            onNext={() => list.setCurrentPage(list.currentPage + 1)}
+      {activeTab === "verified" ? (
+        <>
+          <SkillFilters
+            search={list.search}
+            setSearch={list.setSearch}
+            category={list.category}
+            setCategory={list.setCategory}
+            categoryOptions={list.categoryOptions}
+            confidenceFilter={list.confidenceFilter}
+            setConfidenceFilter={list.setConfidenceFilter}
+            source={list.source}
+            setSource={list.setSource}
+            showInactive={list.showInactive}
+            setShowInactive={list.setShowInactive}
           />
-        </div>
+
+          {list.error ? (
+            <ErrorState onRetry={list.refresh} message="We couldn't load the skill ontology. Please try again." />
+          ) : (
+            <SkillTable
+              skills={list.skills}
+              isLoading={list.isLoading}
+              onView={(skill) => navigate(`/airs/skill-ontology/${skill.id}`)}
+              onEdit={openEdit}
+              onDeactivate={openDeactivate}
+              onReactivate={setReactivateTarget}
+              onSeedOntology={handleSeed}
+              seeding={isSeeding}
+            />
+          )}
+
+          {!list.isLoading && !list.error && list.totalCount > 0 && (
+            <div className="grid grid-cols-3 items-center mt-4">
+              <span className="text-[12px] text-slate-400">{list.totalCount} skills</span>
+              <div className="justify-self-center">
+                <Pagination
+                  currentPage={list.currentPage}
+                  totalPages={list.totalPages}
+                  onPrevious={() => list.setCurrentPage(list.currentPage - 1)}
+                  onNext={() => list.setCurrentPage(list.currentPage + 1)}
+                />
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <SkillFilters
+            search={unknown.search}
+            setSearch={unknown.setSearch}
+            onlySearch
+            searchPlaceholder="Search by raw skill text..."
+          />
+
+          {unknown.error ? (
+            <ErrorState onRetry={unknown.refresh} message="We couldn't load unknown skills. Please try again." />
+          ) : (
+            <UnknownSkillTable skills={unknown.skills} isLoading={unknown.isLoading} onPromote={handlePromote} />
+          )}
+
+          {!unknown.isLoading && !unknown.error && unknown.totalCount > 0 && (
+            <div className="grid grid-cols-3 items-center mt-4">
+              <span className="text-[12px] text-slate-400">{unknown.totalCount} unknown skills</span>
+              <div className="justify-self-center">
+                <Pagination
+                  currentPage={unknown.currentPage}
+                  totalPages={unknown.totalPages}
+                  onPrevious={() => unknown.setCurrentPage(unknown.currentPage - 1)}
+                  onNext={() => unknown.setCurrentPage(unknown.currentPage + 1)}
+                />
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <AddSkillDrawer
         open={addOpen}
         existingSkills={list.skills}
         categoryOptions={formCategoryOptions}
+        initialValues={addInitialValues}
         onClose={() => setAddOpen(false)}
         onSubmit={handleCreate}
         isSubmitting={isSubmitting}
