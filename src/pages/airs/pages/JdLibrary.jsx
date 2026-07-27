@@ -28,6 +28,7 @@ import Pagination from "../../../components/Pagination/pagination";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import Modal from "../../../components/ui/Modal";
 import FilterListbox from "../../../components/filter/FilterListbox";
+import CountriesList from "../../../components/CountriesList";
 import { Badge } from "../../../components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../../components/ui/tabs";
 import GenericTable from "../../../components/Table/table";
@@ -517,13 +518,14 @@ export default function JdLibrary() {
             {/* Jurisdiction Filter */}
             <div className="flex flex-col gap-1 w-full">
               {/* <span className="text-[10px] uppercase font-bold text-slate-400 px-1">Region</span> */}
-              <FilterListbox
-                options={jurisdictionOptions}
-                value={jurisdictionFilter}
+              <CountriesList
+                variant="filter"
+                value={jurisdictionFilter === "All" ? "" : jurisdictionFilter}
                 onChange={(value) => {
-                  setJurisdictionFilter(value);
+                  setJurisdictionFilter(value || "All");
                   setCurrentPage(1);
                 }}
+                placeholder="All Jurisdictions"
               />
             </div>
 

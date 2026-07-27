@@ -1,134 +1,139 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { MOCK_UPLOAD_HISTORY, generateMockUpload } from "../mock/resumeIntakeMockData";
-import { RESUME_INTAKE_PAGE_SIZE, MOCK_UPLOAD_TICK_MS, MOCK_UPLOAD_STEP_PERCENT } from "../constants/resumeIntakeConstants";
-import { filterUploads, sortUploads, paginate, computeUploadStats } from "../utils/resumeIntakeUtils.jsx";
-
-const STORAGE_KEY = "airs_resume_intake_uploads";
-
-const readStored = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : MOCK_UPLOAD_HISTORY;
-  } catch {
-    return MOCK_UPLOAD_HISTORY;
-  }
-};
-
-const persist = (files) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(files));
-  } catch {
-    // Ignore storage quota errors.
-  }
-};
-
-// Weighted mock outcome once a simulated upload reaches 100%.
-const rollFinalStatus = () => {
-  const r = Math.random();
-  if (r < 0.72) return "Parsed";
-  if (r < 0.87) return "Duplicate flagged";
-  return "Failed";
-};
+import { getAllResumes, getResumeById, activeCampaigns } from "../../service/resumeIntake";
+import { extractErrorMessage } from "../intake/utils/intakeUtils.jsx";
+import { RESUME_LIST_PAGE_SIZE } from "../constants/resumeIntakeConstants";
 
 export default function useResumeIntake() {
-  const [files, setFiles] = useState(readStored);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [sortValue, setSortValue] = useState("uploadedAt:desc");
+  const [campaignFilter, setCampaignFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("");
+  const [sortValue, setSortValue] = useState("created_at:desc");
   const [currentPage, setCurrentPage] = useState(1);
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  const [campaigns, setCampaigns] = useState([]);
+
+  const [files, setFiles] = useState([]);
+  const [totalResults, setTotalResults] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [listError, setListError] = useState("");
+
   const [detailsFile, setDetailsFile] = useState(null);
-  const sequenceRef = useRef(1100);
-  const intervalsRef = useRef({});
+  const [detailsData, setDetailsData] = useState(null);
+  const [isDetailsLoading, setIsDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState("");
 
   useEffect(() => {
-    persist(files);
-  }, [files]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, statusFilter, sortValue]);
-
-  useEffect(() => {
-    return () => {
-      Object.values(intervalsRef.current).forEach(clearInterval);
-    };
+    activeCampaigns()
+      .then((res) => setCampaigns(res?.data || []))
+      .catch(() => setCampaigns([]));
   }, []);
 
-  const runSimulation = (fileId, fileName) => {
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress = Math.min(100, progress + MOCK_UPLOAD_STEP_PERCENT);
-      const isDone = progress >= 100;
-      const finalStatus = isDone ? rollFinalStatus() : "Parsing";
+  // Reset the page inline, in the same handler as the filter change, instead
+  // of via a separate effect reacting to the filter — a separate effect would
+  // fire the fetch-resumes effect once with the *old* page (still mid-flight)
+  // and again once the page resets, causing a duplicate request per filter
+  // change and a visible flash of mismatched data.
+  const changeFilter = (setter) => (value) => {
+    setter(value);
+    setCurrentPage(1);
+  };
+  const handleCampaignFilterChange = changeFilter(setCampaignFilter);
+  const handleStatusFilterChange = changeFilter(setStatusFilter);
+  const handleSourceFilterChange = changeFilter(setSourceFilter);
+  const handleSortValueChange = changeFilter(setSortValue);
 
-      setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, progress, status: finalStatus } : f)));
+  const [sortBy, sortDir] = sortValue.split(":");
 
-      if (isDone) {
-        clearInterval(interval);
-        delete intervalsRef.current[fileId];
-        if (finalStatus === "Parsed") toast.success(`${fileName} parsed successfully.`);
-        else if (finalStatus === "Duplicate flagged") toast.warning(`${fileName} flagged as a possible duplicate.`);
-        else toast.error(`${fileName} failed to parse. You can retry the upload.`);
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchResumes = async () => {
+      setIsLoading(true);
+      setListError("");
+      try {
+        const res = await getAllResumes({
+          campaign_id: campaignFilter || undefined,
+          parse_status: statusFilter || undefined,
+          source: sourceFilter || undefined,
+          page: currentPage,
+          size: RESUME_LIST_PAGE_SIZE,
+          sort_by: sortBy,
+          sort_dir: sortDir,
+        });
+        if (cancelled) return;
+        setFiles(res?.data?.items || []);
+        setTotalResults(res?.data?.total || 0);
+      } catch (err) {
+        if (cancelled) return;
+        const message = extractErrorMessage(err, "Failed to load resumes.");
+        setListError(message);
+        toast.error(message);
+        setFiles([]);
+        setTotalResults(0);
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
-    }, MOCK_UPLOAD_TICK_MS);
-    intervalsRef.current[fileId] = interval;
-  };
+    };
 
-  const simulateUpload = (kind, file) => {
-    sequenceRef.current += 1;
-    const newFile = generateMockUpload(kind, sequenceRef.current, file);
-    setFiles((prev) => [newFile, ...prev]);
-    toast.info(`${newFile.name} added to the parsing queue.`);
-    runSimulation(newFile.id, newFile.name);
-  };
+    fetchResumes();
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignFilter, statusFilter, sourceFilter, sortBy, sortDir, currentPage, refreshToken]);
 
-  const retryUpload = (fileId) => {
-    const target = files.find((f) => f.id === fileId);
-    setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, status: "Queued", progress: 0 } : f)));
-    runSimulation(fileId, target?.name || "File");
-  };
+  const campaignOptions = useMemo(
+    () => [{ label: "All Campaigns", value: "" }, ...campaigns.map((c) => ({ label: c.name, value: c.id }))],
+    [campaigns]
+  );
 
-  const deleteUpload = (fileId) => {
-    if (intervalsRef.current[fileId]) {
-      clearInterval(intervalsRef.current[fileId]);
-      delete intervalsRef.current[fileId];
+  const totalPages = Math.max(1, Math.ceil(totalResults / RESUME_LIST_PAGE_SIZE));
+
+  const openDetails = async (file) => {
+    setDetailsFile(file);
+    setDetailsData(null);
+    setDetailsError("");
+    setIsDetailsLoading(true);
+    try {
+      const res = await getResumeById(file.id);
+      setDetailsData(res?.data || null);
+    } catch (err) {
+      setDetailsError(extractErrorMessage(err, "Failed to load resume details."));
+    } finally {
+      setIsDetailsLoading(false);
     }
-    setFiles((prev) => prev.filter((f) => f.id !== fileId));
-    if (detailsFile?.id === fileId) setDetailsFile(null);
-    toast.success("Upload removed from history.");
   };
 
-  const filteredSorted = useMemo(
-    () => sortUploads(filterUploads(files, { search, status: statusFilter }), sortValue),
-    [files, search, statusFilter, sortValue]
-  );
-
-  const { pageItems, totalPages, currentPage: safePage } = useMemo(
-    () => paginate(filteredSorted, currentPage, RESUME_INTAKE_PAGE_SIZE),
-    [filteredSorted, currentPage]
-  );
-
-  const stats = useMemo(() => computeUploadStats(files), [files]);
+  const closeDetails = () => {
+    setDetailsFile(null);
+    setDetailsData(null);
+    setDetailsError("");
+  };
 
   return {
-    files: pageItems,
-    totalResults: filteredSorted.length,
-    stats,
-    search,
-    setSearch,
+    files,
+    totalResults,
+    isLoading,
+    listError,
+    campaignOptions,
+    campaignFilter,
+    setCampaignFilter: handleCampaignFilterChange,
     statusFilter,
-    setStatusFilter,
+    setStatusFilter: handleStatusFilterChange,
+    sourceFilter,
+    setSourceFilter: handleSourceFilterChange,
     sortValue,
-    setSortValue,
-    currentPage: safePage,
+    setSortValue: handleSortValueChange,
+    currentPage,
     setCurrentPage,
     totalPages,
     detailsFile,
-    openDetails: setDetailsFile,
-    closeDetails: () => setDetailsFile(null),
-    simulateUpload,
-    retryUpload,
-    deleteUpload,
+    detailsData,
+    isDetailsLoading,
+    detailsError,
+    openDetails,
+    closeDetails,
+    refreshResumes: () => setRefreshToken((t) => t + 1),
   };
 }

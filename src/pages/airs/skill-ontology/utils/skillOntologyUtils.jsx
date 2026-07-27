@@ -3,7 +3,7 @@ import { Badge } from "../../../../components/ui/badge";
 import { SKILL_SOURCE_LABELS } from "../constants/skillOntologyConstants";
 
 // Hand-rolled status pill, matching the style convention used by the newest
-// real-backend AIRS pages (src/pages/airs/pages/Campaigns.jsx / CampaignDetails.jsx)
+// real-backend AIRS pages (src/pages/airs/campaigns/Campaigns.jsx / CampaignDetails.jsx)
 // rather than the shared Badge component — kept visually consistent with its
 // sidebar neighbor.
 const STATUS_PILL = {

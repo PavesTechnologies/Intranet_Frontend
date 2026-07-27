@@ -17,8 +17,10 @@ function StageIcon({ status }) {
   return <div className={`w-7 h-7 rounded-full border-2 border-slate-300 bg-white`} />;
 }
 
-export default function ProcessingStep({ resume, status, onComplete, onRetry, onBackToUpload }) {
-  const isFailure = status.overall_status === "FAILURE";
+const FAILURE_STATUSES = ["FAILURE", "FAILED"];
+
+export default function ProcessingStep({ resume, status, statusError, onComplete, onRetryStatusCheck, onBackToUpload }) {
+  const isFailure = FAILURE_STATUSES.includes(status.overall_status);
   const isSuccess = status.overall_status === "SUCCESS";
 
   useEffect(() => {
@@ -50,6 +52,21 @@ export default function ProcessingStep({ resume, status, onComplete, onRetry, on
           )}
         </div>
 
+        {statusError && (
+          <div className="mx-6 mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3.5 flex items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <AlertTriangle size={15} className="text-amber-600 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-[12.5px] font-bold text-amber-800">Couldn't refresh processing status</div>
+                <div className="text-[11.5px] text-amber-700 mt-0.5">{statusError} · showing the last known progress below.</div>
+              </div>
+            </div>
+            <Button variant="outline" size="small" onClick={onRetryStatusCheck} className="shrink-0">
+              Retry
+            </Button>
+          </div>
+        )}
+
         <div className="p-6">
           <ol>
             {status.stages.map((s, i) => {
@@ -76,20 +93,32 @@ export default function ProcessingStep({ resume, status, onComplete, onRetry, on
             })}
           </ol>
 
-          {isFailure && failedStage && (
+          {isFailure && (
             <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 p-4">
               <div className="flex items-start gap-2.5">
                 <AlertTriangle size={16} className="text-rose-600 mt-0.5 shrink-0" />
                 <div className="min-w-0">
-                  <div className="text-[13px] font-bold text-rose-800">{STAGE_LABELS[failedStage.stage]} failed</div>
-                  <div className="text-[12.5px] text-rose-700 mt-1">
-                    <span className="font-semibold">What this means: </span>
-                    {STAGE_FAILURE_COPY[failedStage.stage]}
+                  <div className="text-[13px] font-bold text-rose-800">
+                    {failedStage ? `${STAGE_LABELS[failedStage.stage]} failed` : "Processing failed"}
                   </div>
-                  <details className="mt-2">
-                    <summary className="text-[11.5px] text-rose-500 cursor-pointer select-none">Technical details</summary>
-                    <div className="text-[11px] text-rose-500 font-mono mt-1 break-all">{failedStage.error_message}</div>
-                  </details>
+                  <div className="text-[12.5px] text-rose-700 mt-1">
+                    {failedStage ? (
+                      <>
+                        <span className="font-semibold">What this means: </span>
+                        {STAGE_FAILURE_COPY[failedStage.stage]}
+                      </>
+                    ) : (
+                      status.error_message || "The parsing pipeline was unable to complete for this file."
+                    )}
+                  </div>
+                  {(failedStage?.error_message || status.error_message) && (
+                    <details className="mt-2">
+                      <summary className="text-[11.5px] text-rose-500 cursor-pointer select-none">Technical details</summary>
+                      <div className="text-[11px] text-rose-500 font-mono mt-1 break-all">
+                        {failedStage?.error_message || status.error_message}
+                      </div>
+                    </details>
+                  )}
                 </div>
               </div>
             </div>
@@ -98,14 +127,9 @@ export default function ProcessingStep({ resume, status, onComplete, onRetry, on
 
         <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
           {isFailure && (
-            <>
-              <Button variant="ghost" size="medium" onClick={onBackToUpload}>
-                Upload a different file
-              </Button>
-              <Button variant="primary" size="medium" onClick={onRetry}>
-                Retry parsing
-              </Button>
-            </>
+            <Button variant="primary" size="medium" onClick={onBackToUpload}>
+              Upload a different file
+            </Button>
           )}
           {isSuccess && (
             <Button variant="primary" size="medium" onClick={onComplete}>

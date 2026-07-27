@@ -7,7 +7,7 @@ import SettingsWeightConfig from "./components/SettingsWeightConfig";
 import SettingsToggles from "./components/SettingsToggles";
 
 export default function SettingsPage() {
-  const { settings, setWeight, setField, weightTotal, isDirty, save, reset } = useAirsSettings();
+  const { settings, setField, isDirty, save, reset } = useAirsSettings();
 
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
@@ -36,7 +36,7 @@ export default function SettingsPage() {
       <SettingsSystemInfo />
 
       <div className="grid md:grid-cols-2 gap-5">
-        <SettingsWeightConfig weights={settings.weights} onChange={setWeight} total={weightTotal} />
+        <SettingsWeightConfig />
         <SettingsToggles settings={settings} onChange={setField} />
       </div>
     </div>
