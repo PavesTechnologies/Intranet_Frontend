@@ -8,7 +8,9 @@
       "Bash(npx tsc *)",
       "Bash(npx eslint *)",
       "Bash(npx esbuild *)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"console.log\\(require\\('./package.json'\\).scripts\\)\")"
     ]
   }
 }

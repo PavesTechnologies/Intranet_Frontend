@@ -7,7 +7,16 @@ import { CONFIDENCE_FORM_OPTIONS, STATUS_FORM_OPTIONS } from "../constants/skill
 
 const PARENT_SEARCH_MIN_CHARS = 2;
 
-// Shared field markup for both AddSkillModal and EditSkillModal — a pure
+function FieldLabel({ children, required }) {
+  return (
+    <label className="text-[12px] font-semibold text-slate-600">
+      {children}
+      {required && <span className="text-rose-500 ml-0.5">*</span>}
+    </label>
+  );
+}
+
+// Shared field markup for both AddSkillDrawer and EditSkillModal — a pure
 // controlled component; the wrapper owns values/errors/validation/submit.
 //
 // categoryOptions is optional: SkillOntologyPage already has these (from its
@@ -71,9 +80,9 @@ export default function SkillForm({ values, errors, onFieldChange, excludeSkillI
   };
 
   return (
-    <>
+    <div className="grid grid-cols-2 gap-x-4 gap-y-4">
       <div>
-        <label className="text-[12px] font-semibold text-slate-600">Canonical name</label>
+        <FieldLabel required>Canonical name</FieldLabel>
         <input
           type="text"
           value={values.canonicalName}
@@ -85,7 +94,7 @@ export default function SkillForm({ values, errors, onFieldChange, excludeSkillI
       </div>
 
       <div>
-        <label className="text-[12px] font-semibold text-slate-600">Category</label>
+        <FieldLabel required>Category</FieldLabel>
         <div className="mt-1">
           <FilterListbox
             options={[{ label: "Select a category…", value: "" }, ...categoryOptions]}
@@ -97,7 +106,7 @@ export default function SkillForm({ values, errors, onFieldChange, excludeSkillI
       </div>
 
       <div>
-        <label className="text-[12px] font-semibold text-slate-600">Aliases</label>
+        <FieldLabel>Aliases</FieldLabel>
         <div className="mt-1">
           <AliasEditor
             aliases={values.aliases}
@@ -108,7 +117,7 @@ export default function SkillForm({ values, errors, onFieldChange, excludeSkillI
       </div>
 
       <div className="relative">
-        <label className="text-[12px] font-semibold text-slate-600">Parent skill</label>
+        <FieldLabel>Parent skill</FieldLabel>
         <div className="mt-1 relative">
           <input
             type="text"
@@ -152,30 +161,29 @@ export default function SkillForm({ values, errors, onFieldChange, excludeSkillI
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-[12px] font-semibold text-slate-600">Confidence</label>
-          <div className="mt-1">
-            <FilterListbox
-              options={CONFIDENCE_FORM_OPTIONS}
-              value={values.confidence}
-              onChange={(v) => onFieldChange("confidence", v)}
-            />
-          </div>
-          {errors.confidence && <p className="text-[11px] text-rose-600 mt-1">{errors.confidence}</p>}
+      <div>
+        <FieldLabel required>Confidence</FieldLabel>
+        <div className="mt-1">
+          <FilterListbox
+            options={CONFIDENCE_FORM_OPTIONS}
+            value={values.confidence}
+            onChange={(v) => onFieldChange("confidence", v)}
+          />
         </div>
-        <div>
-          <label className="text-[12px] font-semibold text-slate-600">Status</label>
-          <div className="mt-1">
-            <FilterListbox
-              options={STATUS_FORM_OPTIONS}
-              value={values.status}
-              onChange={(v) => onFieldChange("status", v)}
-            />
-          </div>
-          {errors.status && <p className="text-[11px] text-rose-600 mt-1">{errors.status}</p>}
-        </div>
+        {errors.confidence && <p className="text-[11px] text-rose-600 mt-1">{errors.confidence}</p>}
       </div>
-    </>
+
+      <div>
+        <FieldLabel required>Status</FieldLabel>
+        <div className="mt-1">
+          <FilterListbox
+            options={STATUS_FORM_OPTIONS}
+            value={values.status}
+            onChange={(v) => onFieldChange("status", v)}
+          />
+        </div>
+        {errors.status && <p className="text-[11px] text-rose-600 mt-1">{errors.status}</p>}
+      </div>
+    </div>
   );
 }
