@@ -1,12 +1,13 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import Pagination from "../../../components/Pagination/pagination";
 import useCandidateRanking from "./hooks/useCandidateRanking";
 import CandidateStats from "./components/CandidateStats";
 import CandidateFilters from "./components/CandidateFilters";
 import CandidateTable from "./components/CandidateTable";
-import CandidateDetailModal from "./components/detail/CandidateDetailModal";
 
 export default function CandidateRankingPage() {
+  const navigate = useNavigate();
   const {
     candidates,
     totalResults,
@@ -21,11 +22,6 @@ export default function CandidateRankingPage() {
     setCurrentPage,
     totalPages,
     toggleStar,
-    addComment,
-    addManualSkill,
-    detailCandidate,
-    openCandidate,
-    closeCandidate,
   } = useCandidateRanking();
 
   return (
@@ -49,7 +45,11 @@ export default function CandidateRankingPage() {
       />
 
       <div className="mb-4">
-        <CandidateTable candidates={candidates} onView={(c) => openCandidate(c.id)} onToggleStar={toggleStar} />
+        <CandidateTable
+          candidates={candidates}
+          onView={(c) => navigate(`/airs/candidates/${c.id}`)}
+          onToggleStar={toggleStar}
+        />
       </div>
 
       {totalResults > 0 && (
@@ -60,13 +60,6 @@ export default function CandidateRankingPage() {
           onNext={() => setCurrentPage(currentPage + 1)}
         />
       )}
-
-      <CandidateDetailModal
-        candidate={detailCandidate}
-        onClose={closeCandidate}
-        onAddComment={addComment}
-        onAddManualSkill={addManualSkill}
-      />
     </div>
   );
 }
