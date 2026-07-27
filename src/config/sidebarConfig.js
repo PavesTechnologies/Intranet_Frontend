@@ -13,12 +13,26 @@ export const ROLES = {
   DELIVERY_MANAGER:  "Delivery_Manager",
   REPORTING_MANAGER: "Reporting_Manager",
   EMPLOYEE:          "Employee",
+  // Expense Management (XMS) roles
+  MANAGER:           "Manager",
+  FINANCE:           "Finance",
 };
 
 const ADMIN_ROLES      = [ROLES.ADMIN, ROLES.SUPER_ADMIN];
 const MANAGEMENT_ROLES = [...ADMIN_ROLES, ROLES.HR, ROLES.REPORTING_MANAGER];
 const HR_ADMIN         = [ROLES.HR, ...ADMIN_ROLES];
 const HR_MANAGEMENT    = [ROLES.HR, ROLES.REPORTING_MANAGER];
+
+// XMS role groups
+// NOTE: regular staff are assigned the "General" role in this system (not "Employee"),
+// so General is treated as the XMS "Employee" tier — keep in sync with allowedRoles on
+// the /expense-management/* routes in App.jsx.
+const XMS_EMPLOYEE   = [ROLES.GENERAL];
+const XMS_MANAGER    = [ROLES.MANAGER];
+const XMS_FINANCE    = [ROLES.FINANCE];
+const XMS_ADMIN      = ADMIN_ROLES;
+const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, ...ADMIN_ROLES];
+const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, ...ADMIN_ROLES];
 
 /**
  * Employee Onboarding flyout submenu config.
@@ -104,5 +118,116 @@ export const EO_SUBMENU = [
   //   label: "Off-Boarding",
   //   to: "/employee-exit",
   //   allowedRoles: MANAGEMENT_ROLES,
+  // },
+];
+
+/**
+ * Expense Management (XMS) flyout submenu config.
+ * Same shape/filtering contract as EO_SUBMENU above.
+ */
+export const XMS_SUBMENU = [
+  {
+    label: "Dashboard",
+    to: "/expense-management/dashboard",
+    allowedRoles: XMS_EVERYONE,
+  },
+  {
+    label: "Expenses",
+    to: "/expense-management/expenses/my",
+    allowedRoles: [...XMS_EMPLOYEE, ...XMS_MANAGER],
+    children: [
+      { label: "Create Expense",  to: "/expense-management/expenses/create" },
+      { label: "My Expenses",     to: "/expense-management/expenses/my" },
+      { label: "All Expenses",    to: "/expense-management/expenses/all",     allowedRoles: XMS_MANAGER },
+      { label: "Expense Reports", to: "/expense-management/expenses/reports", allowedRoles: XMS_MANAGER },
+    ],
+  },
+  {
+    label: "Receipts",
+    to: "/expense-management/receipts/library",
+    allowedRoles: XMS_EMPLOYEE,
+    children: [
+      { label: "Receipt Library",  to: "/expense-management/receipts/library" },
+      { label: "OCR Processing",   to: "/expense-management/receipts/ocr-processing" },
+    ],
+  },
+  {
+    label: "Cash Advance",
+    to: "/expense-management/cash-advance/my",
+    allowedRoles: XMS_EMPLOYEE,
+    children: [
+      { label: "Request Advance", to: "/expense-management/cash-advance/request" },
+      { label: "My Advances",     to: "/expense-management/cash-advance/my" },
+      { label: "Settlement",      to: "/expense-management/cash-advance/settlement" },
+    ],
+  },
+  {
+    label: "Approvals",
+    to: "/expense-management/approvals/pending",
+    allowedRoles: XMS_MANAGER,
+    children: [
+      { label: "Pending",  to: "/expense-management/approvals/pending" },
+      { label: "Approved", to: "/expense-management/approvals/approved" },
+      { label: "Rejected", to: "/expense-management/approvals/rejected" },
+    ],
+  },
+  {
+    label: "Finance",
+    to: "/expense-management/finance/verification",
+    allowedRoles: XMS_FINANCE,
+    children: [
+      { label: "Verification",    to: "/expense-management/finance/verification" },
+      { label: "Reimbursements",  to: "/expense-management/finance/reimbursements" },
+      { label: "Payment Status",  to: "/expense-management/finance/payment-status" },
+    ],
+  },
+  {
+    label: "Client Billing",
+    to: "/expense-management/client-billing/billable-expenses",
+    allowedRoles: XMS_FINANCE,
+    children: [
+      { label: "Billable Expenses", to: "/expense-management/client-billing/billable-expenses" },
+      { label: "Invoice Handoff",   to: "/expense-management/client-billing/invoice-handoff" },
+      { label: "Invoice Status",    to: "/expense-management/client-billing/invoice-status" },
+    ],
+  },
+  {
+    label: "Masters",
+    to: "/expense-management/masters/expense-categories",
+    allowedRoles: XMS_ADMIN,
+    children: [
+      { label: "Expense Categories",  to: "/expense-management/masters/expense-categories" },
+      { label: "GL Accounts",         to: "/expense-management/masters/gl-accounts" },
+      { label: "Cost Centers",        to: "/expense-management/masters/cost-centers" },
+      { label: "Cost Center Budgets", to: "/expense-management/masters/cost-center-budgets" },
+      { label: "Projects",            to: "/expense-management/masters/projects" },
+      { label: "Clients",             to: "/expense-management/masters/clients" },
+      { label: "Currency Management", to: "/expense-management/masters/currency-management" },
+      { label: "Tax Configuration",   to: "/expense-management/masters/tax-configuration" },
+    ],
+  },
+  {
+    label: "Policies",
+    to: "/expense-management/policies",
+    allowedRoles: XMS_ADMIN,
+  },
+  // {
+  //   label: "Reports",
+  //   to: "/expense-management/reports",
+  //   allowedRoles: XMS_REPORT_VIEWERS,
+  // },
+  // {
+  //   label: "Activity",
+  //   to: "/expense-management/activity/notifications",
+  //   allowedRoles: XMS_EVERYONE,
+  //   children: [
+  //     { label: "Notifications", to: "/expense-management/activity/notifications" },
+  //     { label: "Audit Logs",    to: "/expense-management/activity/audit-logs", allowedRoles: XMS_ADMIN },
+  //   ],
+  // },
+  // {
+  //   label: "Settings",
+  //   to: "/expense-management/settings",
+  //   allowedRoles: XMS_ADMIN,
   // },
 ];
