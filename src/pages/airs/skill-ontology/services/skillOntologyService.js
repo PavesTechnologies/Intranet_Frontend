@@ -128,6 +128,150 @@ export const getUnknownSkills = async (params = {}) => {
 // Note: this module's Source filter dropdown has no server-side equivalent
 // in the given API, so "source" is never sent — the dropdown stays in the UI
 // per "don't change component structure" but doesn't currently narrow results.
+// Unknown Skill Suggestions (HR_ADMIN verification workflow) — four
+// independent match-suggestion feeds for one raw/unknown skill. Each tab is
+// fetched lazily and cached by useUnknownSkillSuggestions, so this layer only
+// owns the network call + response mapping, keyed per suggestion type so the
+// four tabs' in-flight requests/dedup keys never collide with one another.
+const SUGGESTION_ENDPOINT_BY_TYPE = {
+  rapidfuzz_canonical: "rapidfuzz-canonical",
+  semantic_canonical: "semantic-canonical",
+  rapidfuzz_alias: "rapidfuzz-alias",
+  semantic_alias: "semantic-alias",
+};
+
+const isAliasSuggestionType = (type) => type === "rapidfuzz_alias" || type === "semantic_alias";
+
+// Field names are defensive (snake_case/camelCase) since the exact response
+// shape wasn't specified beyond "same envelope as other skill-ontology
+// endpoints". Values are surfaced exactly as returned — no re-sorting or
+// re-scoring here.
+const mapSuggestion = (raw, isAlias) => ({
+  skillId: raw.skill_id ?? raw.id ?? raw.canonical_skill_id ?? raw.canonicalSkillId ?? "",
+  skillName: raw.skill_name ?? raw.skillName ?? raw.canonical_name ?? raw.canonicalName ?? "",
+  ...(isAlias ? { alias: raw.matched_alias ?? raw.alias ?? raw.matchedAlias ?? "" } : {}),
+  similarity: raw.similarity ?? raw.similarity_score ?? raw.similarityScore ?? raw.score ?? 0,
+});
+
+// params.limit / params.threshold are optional — omitted entirely when not
+// provided so the backend applies its own default configuration.
+// HR_ADMIN-only hard delete of a raw/unknown skill mention. payload (reason,
+// comments) is sent as the DELETE body for the audit trail the confirmation
+// modal collects; the backend only strictly requires the id in the path.
+export const deleteUnknownSkill = async (unknownSkillId, payload = {}) => {
+  try {
+    console.log("[skillOntologyService] DELETE", `${BASE_URL}/skills/unknown/${unknownSkillId}`, payload);
+    const response = await api.delete(`${BASE_URL}/skills/unknown/${unknownSkillId}`, {
+      headers: authHeaders(),
+      data: payload,
+    });
+    return ok({ message: response.data?.message, ...(response.data?.data || {}) });
+  } catch (error) {
+    console.error("Error deleting unknown skill:", error);
+    throw error;
+  }
+};
+
+// HR_ADMIN-only bulk approve — creates a canonical skill for each selected
+// unknown skill in one call. Response carries a per-item results array
+// (partial success is normal: some ids can succeed while others fail), plus
+// aggregate succeeded/failed counts the caller surfaces in its confirmation
+// summary.
+export const bulkApproveUnknownSkills = async (unknownSkillIds) => {
+  try {
+    const url = `${BASE_URL}/skills/unknown/bulk-approve`;
+    const body = { unknown_skill_ids: unknownSkillIds };
+    console.log("[skillOntologyService] POST", url, body);
+    const response = await api.post(url, body, { headers: authHeaders() });
+    return ok({ message: response.data?.message, ...(response.data?.data || {}) });
+  } catch (error) {
+    console.error("Error bulk approving unknown skills:", error);
+    throw error;
+  }
+};
+
+// HR_ADMIN-only bulk hard-delete — same per-item results/succeeded/failed
+// shape as bulkApproveUnknownSkills above.
+export const bulkDeleteUnknownSkills = async (unknownSkillIds) => {
+  try {
+    const url = `${BASE_URL}/skills/unknown/bulk-delete`;
+    const body = { unknown_skill_ids: unknownSkillIds };
+    console.log("[skillOntologyService] POST", url, body);
+    const response = await api.post(url, body, { headers: authHeaders() });
+    return ok({ message: response.data?.message, ...(response.data?.data || {}) });
+  } catch (error) {
+    console.error("Error bulk deleting unknown skills:", error);
+    throw error;
+  }
+};
+
+// HR_ADMIN-only resolution of a raw/unknown skill mention — maps it onto an
+// existing canonical skill (or records it as a new alias of one), per the
+// chosen `type`. Both ids are supplied by the caller (path param +
+// canonical_skill_id from the suggestion the user picked); this layer only
+// owns the request shape + response envelope.
+export const resolveUnknownSkill = async (unknownSkillId, payload) => {
+  try {
+    const url = `${BASE_URL}/unknown-skills/${unknownSkillId}/resolve`;
+    const body = {
+      canonical_skill_id: payload.canonical_skill_id,
+      canonical_name: payload.canonical_name,
+      type: payload.type,
+    };
+    console.log("[skillOntologyService] POST", url, body);
+    const response = await api.post(url, body, { headers: authHeaders() });
+    return ok({ message: response.data?.message, ...(response.data?.data || {}) });
+  } catch (error) {
+    console.error("Error resolving unknown skill:", error);
+    throw error;
+  }
+};
+
+// HR_ADMIN-only — creates a brand new canonical skill directly from a raw/
+// unknown skill mention (as opposed to mapping it onto one that already
+// exists via resolveUnknownSkill above). Field mapping mirrors createSkill's
+// convention so SkillForm/validateSkillForm can be reused as-is.
+export const createCanonicalSkillFromUnknown = async (unknownSkillId, payload) => {
+  try {
+    const url = `${BASE_URL}/skills/unknown/${unknownSkillId}/create-canonical`;
+    const body = {
+      canonical_name: payload.canonical_name,
+      category: payload.category,
+      aliases: payload.aliases,
+      parent_skill_id: payload.parent_skill_id || null,
+      confidence: payload.confidence?.toLowerCase(),
+    };
+    console.log("[skillOntologyService] POST", url, body);
+    const response = await api.post(url, body, { headers: authHeaders() });
+    return ok({ message: response.data?.message, ...(response.data?.data || {}) });
+  } catch (error) {
+    console.error("Error creating canonical skill from unknown skill:", error);
+    throw error;
+  }
+};
+
+export const getUnknownSkillSuggestions = async (unknownSkillId, suggestionType, params = {}) => {
+  const endpoint = SUGGESTION_ENDPOINT_BY_TYPE[suggestionType];
+  const url = `${BASE_URL}/unknown-skills/${unknownSkillId}/suggestions/${endpoint}`;
+  const query = {};
+  if (params.limit !== undefined) query.limit = params.limit;
+  if (params.threshold !== undefined) query.threshold = params.threshold;
+  const key = `GET ${url} ${JSON.stringify(query)}`;
+
+  return dedupedRequest(key, async () => {
+    try {
+      console.log("[skillOntologyService] GET", url, query);
+      const response = await api.get(url, { params: query, headers: authHeaders() });
+      const items = response.data?.data || [];
+      const isAlias = isAliasSuggestionType(suggestionType);
+      return ok(items.map((raw) => mapSuggestion(raw, isAlias)));
+    } catch (error) {
+      console.error(`Error fetching ${suggestionType} suggestions:`, error);
+      throw error;
+    }
+  });
+};
+
 export const getSkills = async (params = {}) => {
   // Built fresh from the caller's params every call — never mutated in place
   // and never shared with getCategories' request below, so filter state from

@@ -116,6 +116,7 @@ import AnalyticsPage from "./pages/airs/analytics/AnalyticsPage.jsx";
 import SettingsPage from "./pages/airs/settings/SettingsPage.jsx";
 import SkillOntologyPage from "./pages/airs/skill-ontology/SkillOntologyPage.jsx";
 import SkillDetailPage from "./pages/airs/skill-ontology/SkillDetailPage.jsx";
+import UnknownSkillDetailPage from "./pages/airs/skill-ontology/UnknownSkillDetailPage.jsx";
 import HierarchyPage from "./pages/airs/skill-ontology/HierarchyPage.jsx";
 
 import AdminOfferLettersDashboard from "./pages/employee-onboarding/admin/AdminOfferLettersDashboard.jsx";
@@ -1077,6 +1078,14 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute roles={["General"]}>
                 <HierarchyPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/skill-ontology/unknown/:unknownSkillId"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <UnknownSkillDetailPage />
               </ProtectedRoute>
             }
           />
