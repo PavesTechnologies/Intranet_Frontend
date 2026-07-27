@@ -1,119 +1,113 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
+import { pipelineStatus } from "../../../service/resumeIntake";
 import {
-  PARSE_STAGE_ORDER,
-  createMockIntake,
+  buildStages,
+  registerMockIntake,
   finalizeMockIntake,
   getResumeById,
   getParsedJsonByResumeId,
   getCandidateSkillsByResumeId,
+  maskEmail,
 } from "../mock/intakeMockData";
-import { MOCK_POLL_INTERVAL_MS } from "../constants/intakeConstants";
+import { STATUS_POLL_INTERVAL_MS } from "../constants/intakeConstants";
+import { extractErrorMessage } from "../utils/intakeUtils.jsx";
 
-// Weighted mock outcome — mirrors the real pipeline's occasional AI_EXTRACTION
-// failure on scanned/low-quality documents.
-function rollOutcome() {
-  return Math.random() < 0.82 ? "SUCCESS" : "FAILURE";
-}
+const TERMINAL_STATUSES = ["SUCCESS", "FAILURE", "FAILED"];
 
-// Drives the upload -> processing -> review wizard. In a real integration,
-// `submit` becomes a POST to the intake endpoint and the stage-advance timer
-// becomes a `setInterval` poll of GET /resumes/{id}/status — everything
-// downstream (the `status`/`resume` shape consumers see) stays identical.
+// Drives the upload -> processing -> review wizard. Upload posts the real
+// resume to the backend; processing then polls the real
+// GET /resumes/processing-status/{taskId} endpoint until the pipeline
+// reaches a terminal state. Parsed data / candidate skills have no real
+// endpoint yet, so those still come from the mock lookup tables once the
+// real pipeline reports SUCCESS.
 export default function useIntakeFlow() {
   const [step, setStep] = useState("upload"); // "upload" | "accepted" | "processing" | "review"
   const [resume, setResume] = useState(null);
   const [status, setStatus] = useState(null);
+  const [statusError, setStatusError] = useState(null);
   const pollRef = useRef(null);
   const acceptedTimeoutRef = useRef(null);
-  const outcomeRef = useRef("SUCCESS");
 
   useEffect(() => {
-    return () => {
-      clearInterval(pollRef.current);
-      clearTimeout(acceptedTimeoutRef.current);
-    };
+    return () => clearInterval(pollRef.current);
   }, []);
 
-  const submit = (formValues) => {
-    const { resume: newResume, status: newStatus } = createMockIntake(formValues);
+  // `uploadResponse` is the accepted-response `data` payload returned by the
+  // real POST /resumes call (resume_id, task_id, campaign_name, ...).
+  const submit = ({ uploadResponse, candidateName, candidateEmail, fileFormat }) => {
+    const newResume = {
+      resume_id: uploadResponse.resume_id,
+      candidate_id: uploadResponse.campaign_candidate_id,
+      candidate_name: candidateName,
+      candidate_email_masked: maskEmail(candidateEmail),
+      file_format: fileFormat,
+      version_number: 1,
+      parse_status: uploadResponse.parse_status || "PENDING",
+      parse_confidence_score: null,
+      parser_version: "—",
+      parse_duration_ms: null,
+      created_at: new Date().toISOString(),
+      campaign_name: uploadResponse.campaign_name,
+      pipeline_stage: uploadResponse.pipeline_stage,
+    };
+
+    const newStatus = {
+      task_id: uploadResponse.task_id,
+      overall_status: "QUEUED",
+      current_stage: null,
+      stages: buildStages(),
+      error_message: null,
+    };
+
+    registerMockIntake(newResume, newStatus);
     setResume(newResume);
     setStatus(newStatus);
+    setStatusError(null);
     setStep("accepted");
-    outcomeRef.current = rollOutcome();
 
     acceptedTimeoutRef.current = setTimeout(() => {
       setStep("processing");
-      beginPolling(newResume.resume_id);
+      beginPolling(newResume.resume_id, newStatus.task_id);
     }, 1400);
   };
 
-  const beginPolling = (resumeId) => {
-    let stageIndex = 0;
-    setStatus((prev) => ({ ...prev, overall_status: "RUNNING", current_stage: PARSE_STAGE_ORDER[0] }));
+  const beginPolling = (resumeId, taskId) => {
+    clearInterval(pollRef.current);
 
-    pollRef.current = setInterval(() => {
-      const failingHere = outcomeRef.current === "FAILURE" && stageIndex === 2; // AI_EXTRACTION
-      setStatus((prev) => {
-        const stages = prev.stages.map((s, i) => {
-          if (i < stageIndex) return s;
-          if (i === stageIndex) {
-            return failingHere
-              ? {
-                  ...s,
-                  status: "FAILED",
-                  duration_ms: 1400 + Math.floor(Math.random() * 600),
-                  error_message:
-                    "LLM extraction returned malformed JSON after 3 retries. Source text density suggests a scanned/image-based PDF with low OCR confidence.",
-                }
-              : { ...s, status: "SUCCESS", duration_ms: 300 + Math.floor(Math.random() * 1600) };
-          }
-          return s;
-        });
+    const poll = async () => {
+      try {
+        const res = await pipelineStatus(taskId);
+        const data = res?.data;
+        if (!data) return;
 
-        if (failingHere) {
-          return { ...prev, overall_status: "FAILURE", current_stage: PARSE_STAGE_ORDER[stageIndex], stages, error_message: stages[stageIndex].error_message };
+        setStatus(data);
+        setStatusError(null);
+
+        const overall = String(data.overall_status || "").toUpperCase();
+        if (TERMINAL_STATUSES.includes(overall)) {
+          clearInterval(pollRef.current);
+          const outcome = overall === "SUCCESS" ? "SUCCESS" : "FAILURE";
+          finalizeMockIntake(resumeId, outcome);
+          setResume(getResumeById(resumeId));
+          if (outcome === "SUCCESS") toast.success("Resume parsed successfully.");
+          else toast.error("Resume parsing failed. See the processing screen for details.");
         }
-
-        const isLastStage = stageIndex === PARSE_STAGE_ORDER.length - 1;
-        return {
-          ...prev,
-          overall_status: isLastStage ? "SUCCESS" : "RUNNING",
-          current_stage: isLastStage ? null : PARSE_STAGE_ORDER[stageIndex + 1],
-          stages,
-        };
-      });
-
-      if (failingHere) {
-        clearInterval(pollRef.current);
-        finalizeMockIntake(resumeId, "FAILURE");
-        setResume(getResumeById(resumeId));
-        toast.error("Resume parsing failed. See the processing screen for details.");
-        return;
+      } catch (err) {
+        setStatusError(extractErrorMessage(err, "Failed to fetch processing status."));
       }
+    };
 
-      if (stageIndex === PARSE_STAGE_ORDER.length - 1) {
-        clearInterval(pollRef.current);
-        finalizeMockIntake(resumeId, "SUCCESS");
-        setResume(getResumeById(resumeId));
-        toast.success("Resume parsed successfully.");
-        return;
-      }
-
-      stageIndex += 1;
-    }, MOCK_POLL_INTERVAL_MS);
+    poll();
+    pollRef.current = setInterval(poll, STATUS_POLL_INTERVAL_MS);
   };
 
-  const retry = () => {
-    if (!resume) return;
-    outcomeRef.current = Math.random() < 0.95 ? "SUCCESS" : "FAILURE";
-    setStatus((prev) => ({
-      ...prev,
-      overall_status: "RUNNING",
-      error_message: null,
-      stages: prev.stages.map((s) => ({ ...s, status: "PENDING", duration_ms: null, error_message: null })),
-    }));
-    beginPolling(resume.resume_id);
+  // Re-checks the current task's status — used when the last poll failed to
+  // reach the server (network/validation error), not to restart a pipeline
+  // that has already reported a real FAILURE.
+  const retryStatusCheck = () => {
+    if (!status?.task_id || !resume?.resume_id) return;
+    beginPolling(resume.resume_id, status.task_id);
   };
 
   const goToReview = () => setStep("review");
@@ -122,6 +116,7 @@ export default function useIntakeFlow() {
     clearTimeout(acceptedTimeoutRef.current);
     setResume(null);
     setStatus(null);
+    setStatusError(null);
     setStep("upload");
   };
 
@@ -132,11 +127,12 @@ export default function useIntakeFlow() {
     step,
     resume,
     status,
+    statusError,
     parsedJson,
     candidateSkills,
     submit,
     goToReview,
-    retry,
+    retryStatusCheck,
     reset,
   };
 }

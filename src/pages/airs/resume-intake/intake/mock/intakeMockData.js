@@ -20,7 +20,7 @@ export const MOCK_CAMPAIGNS = [
   { id: "CMP-2036", name: "Data Scientist — Analytics" },
 ];
 
-function buildStages(overrides = {}) {
+export function buildStages(overrides = {}) {
   return PARSE_STAGE_ORDER.map((stage) => ({
     stage,
     status: "PENDING",
@@ -264,44 +264,7 @@ export const MOCK_CANDIDATE_SKILLS = {
   "a18e5d0c-4b7f-4d0a-9a3c-5e8d1f2a43d4": [],
 };
 
-let sequence = 4;
-
-// Builds a brand-new resume record + matching processing status for a
-// freshly submitted upload, in the same shape a real "create intake" +
-// polling endpoint would return.
-export function createMockIntake({ candidateName, candidateEmail }) {
-  sequence += 1;
-  const resumeId = `mock-resume-${sequence}-${Math.floor(Math.random() * 1e6).toString(16)}`;
-  const taskId = `mock-task-${sequence}`;
-  const maskedEmail = maskEmail(candidateEmail);
-
-  const resume = {
-    resume_id: resumeId,
-    candidate_id: `mock-candidate-${sequence}`,
-    candidate_name: candidateName,
-    candidate_email_masked: maskedEmail,
-    file_format: "PDF",
-    version_number: 1,
-    parse_status: "PENDING",
-    parse_confidence_score: null,
-    parser_version: "resume-parser-v3.2.1",
-    parse_duration_ms: null,
-    created_at: new Date().toISOString(),
-  };
-
-  const status = {
-    task_id: taskId,
-    overall_status: "QUEUED",
-    current_stage: null,
-    stages: buildStages(),
-    error_message: null,
-  };
-
-  registerMockIntake(resume, status);
-  return { resume, status };
-}
-
-function maskEmail(email) {
+export function maskEmail(email) {
   if (!email || !email.includes("@")) return "u***@example.com";
   const [local, domain] = email.split("@");
   return `${local.charAt(0)}***@${domain}`;

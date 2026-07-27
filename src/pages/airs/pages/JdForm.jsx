@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button/Button";
+import CountriesList from "../../../components/CountriesList";
 
 const JURISDICTIONS = ["USA", "EU", "India", "UK", "Global"];
 
@@ -307,7 +308,7 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
         </FormField>
 
         <FormField label="Region (Jurisdiction)" required error={errors.jurisdiction}>
-          <select
+          {/* <select
             value={jurisdiction}
             onChange={(e) => {
               setJurisdiction(e.target.value);
@@ -320,7 +321,18 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
             {JURISDICTIONS.map((j) => (
               <option key={j} value={j}>{j}</option>
             ))}
-          </select>
+          </select> */}
+          <CountriesList
+            value={jurisdiction}
+            onChange={(value) => {
+              setJurisdiction(value);
+              clearError("jurisdiction");
+            }}
+            placeholder="Select Region"
+            // label="Region (Jurisdiction)"
+            required
+            error={errors.jurisdiction}
+          />
         </FormField>
 
         <FormField label="Notice Period (Days)" required error={errors.noticePeriod}>

@@ -1,7 +1,18 @@
-import React from "react"
+import React, { useEffect } from "react"
 import { cn } from "@/lib/utils"
 
 const Sheet = ({ open, onOpenChange, children }) => {
+    // Lock background scroll while the sheet is open, so dragging/scrolling
+    // inside SheetContent doesn't also scroll the page behind it.
+    useEffect(() => {
+        if (!open) return
+        const previousOverflow = document.body.style.overflow
+        document.body.style.overflow = "hidden"
+        return () => {
+            document.body.style.overflow = previousOverflow
+        }
+    }, [open])
+
     // Basic state handling if needed, but usually controlled
     return <>{open && <div className="fixed inset-0 z-50 bg-black/80" onClick={() => onOpenChange(false)} />}{open && children}</>
 }
