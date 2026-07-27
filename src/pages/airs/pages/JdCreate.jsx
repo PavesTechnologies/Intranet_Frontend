@@ -10,14 +10,13 @@ export default function JdCreate() {
 
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans max-w-4xl mx-auto">
-      <button
-        onClick={() => navigate("/airs/jds")}
-        className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition mb-6"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back to JDs
-      </button>
-
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mb-6">
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mb-6 flex items-center gap-4">
+        <button
+          onClick={() => navigate("/airs/jds")}
+          className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm shrink-0"
+        >
+          <ArrowLeft size={18} />
+        </button>
         <h1 className="text-lg font-bold">{editId ? "Edit Job Description" : "Create Job Description"}</h1>
       </div>
 

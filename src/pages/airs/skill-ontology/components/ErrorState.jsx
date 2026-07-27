@@ -10,9 +10,9 @@ export default function ErrorState({
   return (
     <div className="flex flex-col items-center justify-center py-16 px-6 bg-slate-50 rounded-xl border border-dashed border-slate-200">
       {/* Retry Icon */}
-      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
+      {/* <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
         <RotateCcw className="h-8 w-8 text-slate-500" strokeWidth={2.2} />
-      </div>
+      </div> */}
 
       {/* Title */}
       <h3 className="text-lg font-semibold text-slate-800">
@@ -24,8 +24,8 @@ export default function ErrorState({
         {message}
       </p>
 
-      {/* Retry Button */}
-      {onRetry && (
+     
+      {/* {onRetry && (
         <Button
           variant="primary"
           size="small"
@@ -35,7 +35,7 @@ export default function ErrorState({
           <RotateCcw className="h-4 w-4" />
           Retry
         </Button>
-      )}
+      )} */}
     </div>
   );
 }
