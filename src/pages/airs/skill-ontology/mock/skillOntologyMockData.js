@@ -152,3 +152,103 @@ export function buildActivityForSkill(skill) {
   events.push({ timestamp: skill.lastSeen, eventType: "SEEN", actorName: "AIRS Parser Engine", description: "Matched against an incoming resume/JD." });
   return events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 }
+
+// ── Unknown-skill "people" mock data ────────────────────────────────────
+// Unknown skills have no real "who mentioned this" endpoint yet, so the
+// person-icon detail view (UnknownSkillDetailPage.jsx) renders entirely
+// mock content. Each generator is seeded off the skill's own id/rawSkill
+// (not the shared module-level `rng`) so the same unknown skill renders the
+// same mock people/occurrences/activity on every visit and refresh, without
+// disturbing the verified-skills tree's rng sequence above.
+function hashSeed(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+  return h;
+}
+
+const CANDIDATE_NAMES = [
+  "Ananya Rao", "Karthik Iyer", "Priya Sharma", "Rahul Verma", "Sneha Nair",
+  "Vikram Singh", "Divya Menon", "Arjun Reddy", "Meera Pillai", "Rohan Gupta",
+];
+const CANDIDATE_TITLES = [
+  "Senior Software Engineer", "Data Analyst", "Full Stack Developer", "DevOps Engineer",
+  "Product Manager", "QA Engineer", "UI/UX Designer", "Backend Developer", "ML Engineer", "Business Analyst",
+];
+const JD_TITLES = [
+  "Senior Backend Engineer - Platform", "Data Engineer - Analytics", "Frontend Developer - Consumer App",
+  "DevOps Engineer - Infrastructure", "Machine Learning Engineer", "Full Stack Developer - Fintech",
+];
+const DEPARTMENTS = ["Engineering", "Data & Analytics", "Product", "Infrastructure", "Design"];
+
+export function buildPeopleForUnknownSkill(skill) {
+  const rand = mulberry32(hashSeed(`people-${skill.id || skill.rawSkill}`));
+  const pickL = (arr) => arr[Math.floor(rand() * arr.length)];
+  const intL = (min, max) => Math.floor(min + rand() * (max - min + 1));
+  const dateL = (daysAgoMax) => {
+    const d = new Date();
+    d.setDate(d.getDate() - intL(0, daysAgoMax));
+    return d.toISOString();
+  };
+  const count = Math.min(8, Math.max(1, intL(1, Math.max(1, Math.round((skill.frequency || 1) * 0.6)))));
+  return Array.from({ length: count }, (_, i) => ({
+    id: `CAND-${skill.id || "x"}-${i}`,
+    name: pickL(CANDIDATE_NAMES),
+    title: pickL(CANDIDATE_TITLES),
+    appliedRole: pickL(JD_TITLES),
+    matchScore: intL(62, 97),
+    lastActive: dateL(45),
+  }));
+}
+
+export function buildOccurrencesForUnknownSkill(skill) {
+  const rand = mulberry32(hashSeed(`occurrences-${skill.id || skill.rawSkill}`));
+  const pickL = (arr) => arr[Math.floor(rand() * arr.length)];
+  const intL = (min, max) => Math.floor(min + rand() * (max - min + 1));
+  const dateL = (daysAgoMax) => {
+    const d = new Date();
+    d.setDate(d.getDate() - intL(0, daysAgoMax));
+    return d.toISOString();
+  };
+  const count = Math.min(6, Math.max(1, intL(1, Math.max(1, Math.round((skill.frequency || 1) * 0.4)))));
+  return Array.from({ length: count }, (_, i) => ({
+    id: `JD-${skill.id || "x"}-${i}`,
+    title: pickL(JD_TITLES),
+    department: pickL(DEPARTMENTS),
+    postedDate: dateL(90),
+    snippet: `"...hands-on experience with ${skill.rawSkill} in a production environment..."`,
+  }));
+}
+
+export function buildActivityForUnknownSkill(skill) {
+  const rand = mulberry32(hashSeed(`activity-${skill.id || skill.rawSkill}`));
+  const pickL = (arr) => arr[Math.floor(rand() * arr.length)];
+  const intL = (min, max) => Math.floor(min + rand() * (max - min + 1));
+  const dateL = (daysAgoMax) => {
+    const d = new Date();
+    d.setDate(d.getDate() - intL(0, daysAgoMax));
+    return d.toISOString();
+  };
+  const events = [
+    {
+      timestamp: skill.firstSeen || dateL(60),
+      description: `First detected as an unrecognized skill mention ("${skill.rawSkill}").`,
+      actorName: "AIRS Parser Engine",
+    },
+    {
+      timestamp: dateL(30),
+      description: `Occurrence count reached ${skill.frequency ?? intL(2, 40)} across parsed resumes and job descriptions.`,
+      actorName: "AIRS Parser Engine",
+    },
+    {
+      timestamp: dateL(10),
+      description: "Flagged for review — no matching canonical skill found above the confidence threshold.",
+      actorName: pickL(ACTORS),
+    },
+    {
+      timestamp: skill.lastSeen || dateL(3),
+      description: "Matched against an incoming resume/JD.",
+      actorName: "AIRS Parser Engine",
+    },
+  ];
+  return events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+}

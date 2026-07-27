@@ -142,11 +142,17 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
   };
 
   const handleFileSelected = (file) => {
-    const validExtensions = ["pdf", "docx"];
+    const validExtensions = ["pdf", "docx", "txt", "jpeg", "jpg"];
     const ext = file.name.split(".").pop().toLowerCase();
 
     if (!validExtensions.includes(ext)) {
-      toast.error("Invalid file format. Please upload a PDF or DOCX file.");
+      toast.error("Invalid file format. Allowed formats: DOCX, TXT, PDF, JPEG.");
+      return;
+    }
+
+    const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3MB in bytes
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("File size exceeds the 3MB limit. Please upload a smaller file.");
       return;
     }
 
@@ -201,7 +207,7 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
       newErrors.rawText = "Please enter the job description text.";
     }
     if (jdInputType === "file" && !uploadedFile && !isEditMode) {
-      newErrors.uploadedFile = "Please upload a job description file (PDF or DOCX).";
+      newErrors.uploadedFile = "Please upload a job description file (DOCX, TXT, PDF, JPEG).";
     }
 
     setErrors(newErrors);
@@ -553,14 +559,14 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
                         <Upload className="h-5 w-5" />
                       </div>
                       <p className="text-xs font-bold text-slate-800">Drag & drop your file here</p>
-                      <p className="text-[11px] text-slate-400 mt-1">Supports PDF, DOCX formats up to 10MB</p>
+                      <p className="text-[11px] text-slate-400 mt-1">Supports DOCX, TXT, PDF, JPEG formats up to 3MB</p>
                       <div className="relative mt-3">
                         <input
                           type="file"
                           id="jd-file-upload-input"
                           className="hidden"
                           onChange={handleFileInput}
-                          accept=".pdf,.docx"
+                          accept=".docx,.txt,.pdf,.jpeg,.jpg"
                         />
                         <label
                           htmlFor="jd-file-upload-input"
