@@ -1,5 +1,4 @@
 import React from "react";
-import { AlertTriangle } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 
 export default function ErrorState({
@@ -9,7 +8,6 @@ export default function ErrorState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center text-center py-16 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-      <AlertTriangle className="h-10 w-10 text-rose-500 mb-3" />
       <h2 className="text-xs font-bold text-slate-800">{title}</h2>
       <p className="text-[11px] text-slate-400 mt-1 mb-4 max-w-sm">{message}</p>
       {onRetry && (

@@ -34,6 +34,7 @@ import FormInput from "../../../components/forms/FormInput";
 import NewCampaignForm from "../campaigns/components/NewCampaignForm";
 import { createCampaign, getAllCampaignsHrAdmin } from "../campaigns/services/campaignservice";
 import Pagination from "../../../components/Pagination/pagination";
+import GenericTable from "../../../components/Table/table";
 
 const DEFAULT_CAMPAIGN_FORM = {
   name: "",
@@ -194,6 +195,130 @@ export default function JdDetails() {
     (unknownSkillsCurrentPage - 1) * SKILLS_PAGE_SIZE,
     unknownSkillsCurrentPage * SKILLS_PAGE_SIZE
   );
+
+  const jdSkillsHeaders = [
+    <div key="canonical" className="w-full flex justify-start select-none">Canonical Skill</div>,
+    <div key="tier" className="w-full flex justify-center select-none">Match Tier</div>,
+    <div key="confidence" className="w-full flex justify-center select-none">Confidence</div>,
+    <div key="mandatory" className="w-full flex justify-center select-none">Mandatory</div>,
+    <div key="status" className="w-full flex justify-center select-none">Status</div>,
+    <div key="createdAt" className="w-full flex justify-center select-none">Created Date</div>
+  ];
+
+  const jdSkillsColumns = [
+    "canonical_name",
+    "match_tier",
+    "confidence",
+    "mandatory",
+    "status",
+    "created_at"
+  ];
+
+  const jdSkillsRows = useMemo(() => {
+    return paginatedSkills.map((sk, pageIdx) => {
+      const globalIdx = (skillsCurrentPage - 1) * SKILLS_PAGE_SIZE + pageIdx;
+      return {
+        canonical_name: (
+          <div className="w-full flex justify-start font-bold text-slate-900">
+            {sk.canonical_name}
+          </div>
+        ),
+        match_tier: (
+          <div className="w-full flex justify-center">
+            <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold border border-blue-100 text-[9px]">
+              {sk.match_tier}
+            </span>
+          </div>
+        ),
+        confidence: (
+          <div className="w-full flex justify-center font-bold text-slate-700">
+            {Math.round((sk.confidence || 0) * 100)}%
+          </div>
+        ),
+        mandatory: (
+          <div className="w-full flex justify-center">
+            <input
+              type="checkbox"
+              checked={sk.mandatory}
+              onChange={() => {
+                const updated = [...jdSkillsData];
+                updated[globalIdx] = { ...updated[globalIdx], mandatory: !updated[globalIdx].mandatory };
+                setJdSkillsData(updated);
+              }}
+              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+          </div>
+        ),
+        status: (
+          <div className="w-full flex justify-center">
+            <span className="text-[9px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-bold border border-emerald-100">
+              {sk.verification_status}
+            </span>
+          </div>
+        ),
+        created_at: (
+          <div className="w-full flex justify-center text-slate-500">
+            {sk.created_at ? sk.created_at.split("T")[0] : ""}
+          </div>
+        ),
+        rowClass: "hover:bg-slate-50/50 transition",
+      };
+    });
+  }, [paginatedSkills, skillsCurrentPage, jdSkillsData]);
+
+  const jdUnknownSkillsHeaders = [
+    <div key="rawSkill" className="w-full flex justify-start select-none">Raw Skill</div>,
+    <div key="mandatory" className="w-full flex justify-center select-none">Mandatory</div>,
+    <div key="status" className="w-full flex justify-center select-none">Status</div>,
+    <div key="createdAt" className="w-full flex justify-center select-none">Created Date</div>
+  ];
+
+  const jdUnknownSkillsColumns = [
+    "raw_text",
+    "mandatory",
+    "status",
+    "created_at"
+  ];
+
+  const jdUnknownSkillsRows = useMemo(() => {
+    return paginatedUnknownSkills.map((sk, pageIdx) => {
+      const globalIdx = (unknownSkillsCurrentPage - 1) * SKILLS_PAGE_SIZE + pageIdx;
+      return {
+        raw_text: (
+          <div className="w-full flex justify-start font-bold text-slate-900">
+            {sk.raw_text}
+          </div>
+        ),
+        mandatory: (
+          <div className="w-full flex justify-center">
+            <input
+              type="checkbox"
+              checked={sk.mandatory}
+              onChange={() => {
+                const updated = [...jdUnknownSkillsData];
+                updated[globalIdx] = { ...updated[globalIdx], mandatory: !updated[globalIdx].mandatory };
+                setJdUnknownSkillsData(updated);
+              }}
+              className="rounded border-slate-300 text-blue-605 focus:ring-blue-500"
+            />
+          </div>
+        ),
+        status: (
+          <div className="w-full flex justify-center">
+            <span className="text-[9px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-bold border border-amber-100">
+              {sk.status}
+            </span>
+          </div>
+        ),
+        created_at: (
+          <div className="w-full flex justify-center text-slate-500">
+            {sk.created_at ? sk.created_at.split("T")[0] : ""}
+          </div>
+        ),
+        rowClass: "hover:bg-slate-50/50 transition",
+      };
+    });
+  }, [paginatedUnknownSkills, unknownSkillsCurrentPage, jdUnknownSkillsData]);
 
   const fetchJdSkills = async () => {
     setIsLoadingSkills(true);
@@ -823,96 +948,12 @@ export default function JdDetails() {
                 No JD skills found.
               </div>
             ) : (
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                    <th className="px-6 py-4">Canonical Skill</th>
-                    <th className="px-6 py-4">Match Tier</th>
-                    <th className="px-6 py-4 text-center">Weight</th>
-                    <th className="px-6 py-4 text-center">Confidence</th>
-                    <th className="px-6 py-4 text-center">Mandatory</th>
-                    <th className="px-6 py-4 text-center">Status</th>
-                    <th className="px-6 py-4 text-center">Created Date</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-150 font-medium">
-                  {paginatedSkills.map((sk, pageIdx) => {
-                    const globalIdx = (skillsCurrentPage - 1) * SKILLS_PAGE_SIZE + pageIdx;
-                    return (
-                    <tr key={sk.id || globalIdx} className="hover:bg-slate-50/50 transition">
-                      <td className="px-6 py-4 font-bold text-slate-900">{sk.canonical_name}</td>
-                      <td className="px-6 py-4">
-                        <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold border border-blue-100 text-[9px]">
-                          {sk.match_tier}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center text-slate-800">
-                        {editingSkillIdx === globalIdx ? (
-                          <input
-                            type="number"
-                            value={editedSkillWeight}
-                            onChange={(e) => setEditedSkillWeight(e.target.value)}
-                            className="w-12 px-1 py-0.5 border rounded text-center text-xs"
-                          />
-                        ) : (
-                          `${sk.weight}%`
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-center font-bold text-slate-700">
-                        {Math.round((sk.confidence || 0) * 100)}%
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <input
-                          type="checkbox"
-                          checked={sk.mandatory}
-                          onChange={() => {
-                            const updated = [...jdSkillsData];
-                            updated[globalIdx] = { ...updated[globalIdx], mandatory: !updated[globalIdx].mandatory };
-                            setJdSkillsData(updated);
-                          }}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="text-[9px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-bold border border-emerald-100">
-                          {sk.verification_status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center text-slate-500">
-                        {sk.created_at ? sk.created_at.split("T")[0] : ""}
-                      </td>
-                      <td className="px-6 py-4 text-right flex items-center justify-end">
-                        {editingSkillIdx === globalIdx ? (
-                          <button
-                            onClick={() => {
-                              const updated = [...jdSkillsData];
-                              updated[globalIdx].weight = Number(editedSkillWeight);
-                              setJdSkillsData(updated);
-                              setEditingSkillIdx(null);
-                              toast.success("Skill weight updated locally.");
-                            }}
-                            className="p-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded transition"
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setEditingSkillIdx(globalIdx);
-                              setEditedSkillWeight(sk.weight);
-                            }}
-                            className="p-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded transition"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <GenericTable
+                headers={jdSkillsHeaders}
+                columns={jdSkillsColumns}
+                rows={jdSkillsRows}
+                loading={isLoadingSkills}
+              />
             )}
           </div>
           <Pagination
@@ -944,55 +985,12 @@ export default function JdDetails() {
                 No JD unknown skills found.
               </div>
             ) : (
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                    <th className="px-6 py-4">Raw Skill</th>
-                    <th className="px-6 py-4 text-center">Mandatory</th>
-                    <th className="px-6 py-4 text-center">Status</th>
-                    <th className="px-6 py-4 text-center">Created Date</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-150 font-medium">
-                  {paginatedUnknownSkills.map((sk, pageIdx) => {
-                    const globalIdx = (unknownSkillsCurrentPage - 1) * SKILLS_PAGE_SIZE + pageIdx;
-                    return (
-                    <tr key={sk.id || globalIdx} className="hover:bg-slate-50/50 transition">
-                      <td className="px-6 py-4 font-bold text-slate-900">{sk.raw_text}</td>
-                      <td className="px-6 py-4 text-center">
-                        <input
-                          type="checkbox"
-                          checked={sk.mandatory}
-                          onChange={() => {
-                            const updated = [...jdUnknownSkillsData];
-                            updated[globalIdx] = { ...updated[globalIdx], mandatory: !updated[globalIdx].mandatory };
-                            setJdUnknownSkillsData(updated);
-                          }}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="text-[9px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-bold border border-amber-100">
-                          {sk.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center text-slate-500">
-                        {sk.created_at ? sk.created_at.split("T")[0] : ""}
-                      </td>
-                      <td className="px-6 py-4 text-right flex items-center justify-end">
-                        <button
-                          onClick={() => setEditingSkillIdx(editingSkillIdx === globalIdx ? null : globalIdx)}
-                          className="p-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded transition"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <GenericTable
+                headers={jdUnknownSkillsHeaders}
+                columns={jdUnknownSkillsColumns}
+                rows={jdUnknownSkillsRows}
+                loading={isLoadingUnknownSkills}
+              />
             )}
           </div>
           <Pagination

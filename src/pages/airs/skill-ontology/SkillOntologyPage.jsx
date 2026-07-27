@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import Pagination from "../../../components/Pagination/pagination";
 import useSkillOntologyList from "./hooks/useSkillOntologyList";
@@ -32,7 +32,8 @@ import { EMPTY_SKILL_FORM } from "./constants/skillOntologyConstants";
 
 export default function SkillOntologyPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("verified");
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(location.state?.tab || "verified");
 
   const list = useSkillOntologyList();
   const unknown = useUnknownSkillsList(activeTab === "unknown");
@@ -65,6 +66,14 @@ export default function SkillOntologyPage() {
     setAddInitialValues({ ...EMPTY_SKILL_FORM, canonicalName: unknownSkill.rawSkill });
     setAddOpen(true);
   };
+
+  // "Promote to Skill" from UnknownSkillDetailPage navigates back here with
+  // the target skill in location state, since that page has no create-skill
+  // flow of its own — reuses the exact same Add Skill drawer flow as above.
+  useEffect(() => {
+    if (location.state?.promoteSkill) handlePromote(location.state.promoteSkill);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCreate = async (values) => {
     setIsSubmitting(true);
@@ -316,7 +325,13 @@ export default function SkillOntologyPage() {
           {unknown.error ? (
             <ErrorState onRetry={unknown.refresh} message="We couldn't load unknown skills. Please try again." />
           ) : (
-            <UnknownSkillTable skills={unknown.skills} isLoading={unknown.isLoading} onPromote={handlePromote} />
+            <UnknownSkillTable
+              skills={unknown.skills}
+              isLoading={unknown.isLoading}
+              onPromote={handlePromote}
+              onViewPeople={(skill) => navigate(`/airs/skill-ontology/unknown/${skill.id}`, { state: { skill } })}
+              onBulkDone={unknown.refresh}
+            />
           )}
 
           {!unknown.isLoading && !unknown.error && unknown.totalCount > 0 && (
