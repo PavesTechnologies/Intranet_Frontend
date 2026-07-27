@@ -70,6 +70,15 @@ function Toggle({ checked, onChange, label }) {
   );
 }
 
+const jurisdictionOptions = [
+  { label: "All Jurisdictions", value: "All" },
+  { label: "USA", value: "USA" },
+  { label: "EU", value: "EU" },
+  { label: "India", value: "India" },
+  { label: "UK", value: "UK" },
+  { label: "Global", value: "Global" },
+];
+
 const sourceOptions = [
   { label: "All Sources", value: "All" },
   { label: "Manual", value: "Manual" },
@@ -506,19 +515,19 @@ export default function JdLibrary() {
               />
             </div>
 
-          {/* Jurisdiction Filter */}
-          <div className="flex flex-col gap-1 w-full">
-            {/* <span className="text-[10px] uppercase font-bold text-slate-400 px-1">Region</span> */}
-            <CountriesList
-              variant="filter"
-              value={jurisdictionFilter === "All" ? "" : jurisdictionFilter}
-              onChange={(value) => {
-                setJurisdictionFilter(value || "All");
-                setCurrentPage(1);
-              }}
-              placeholder="All Jurisdictions"
-            />
-          </div>
+            {/* Jurisdiction Filter */}
+            <div className="flex flex-col gap-1 w-full">
+              {/* <span className="text-[10px] uppercase font-bold text-slate-400 px-1">Region</span> */}
+              <CountriesList
+                variant="filter"
+                value={jurisdictionFilter === "All" ? "" : jurisdictionFilter}
+                onChange={(value) => {
+                  setJurisdictionFilter(value || "All");
+                  setCurrentPage(1);
+                }}
+                placeholder="All Jurisdictions"
+              />
+            </div>
 
             {/* Source Filter */}
             <div className="flex flex-col gap-1 w-full">
