@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
-import { AlertTriangle } from "lucide-react";
-import Button from "../../../components/Button/Button";
-import Modal from "../../../components/ui/Modal";
-import FormInput from "../../../components/forms/FormInput";
-import { updateCampaign } from "../service/campaignservice";
+import { AlertTriangle, RotateCcw } from "lucide-react";
+import Button from "../../../../components/Button/Button";
+import Modal from "../../../../components/ui/Modal";
+import FormInput from "../../../../components/forms/FormInput";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import { updateCampaign, getWeightPresets, resetScoringConfig } from "../services/campaignservice";
+
+const unwrap = (res) => (res && res.data !== undefined ? res.data : res);
 
 // ISO timestamp -> value usable by <input type="datetime-local"> (minute precision, local time)
 const toLocalInput = (iso) => {
@@ -28,6 +31,9 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
     const [form, setForm] = useState({});
     const [confirmScoring, setConfirmScoring] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [presets, setPresets] = useState([]);
+    const [selectedPresetId, setSelectedPresetId] = useState("");
+    const [resetting, setResetting] = useState(false);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -42,8 +48,50 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
             ai_threshold: scoring?.ai_threshold ?? "",
         });
         setConfirmScoring(false);
+        setSelectedPresetId("");
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, detail]);
+
+    // E02-S03: presets only matter when scoring is editable at all
+    useEffect(() => {
+        if (!isOpen || !scoring) return;
+        (async () => {
+            try {
+                const res = await getWeightPresets();
+                setPresets(unwrap(res) || []);
+            } catch {
+                // Non-fatal — the picker just stays empty if presets can't load.
+            }
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen]);
+
+    const applyPreset = (presetId) => {
+        setSelectedPresetId(presetId);
+        const preset = presets.find((p) => p.id === presetId);
+        if (!preset) return;
+        setForm((p) => ({
+            ...p,
+            weight_deterministic: preset.weight_deterministic,
+            weight_semantic: preset.weight_semantic,
+            weight_ai: preset.weight_ai,
+            semantic_threshold: preset.semantic_threshold,
+            ai_threshold: preset.ai_threshold,
+        }));
+    };
+
+    const handleResetToDefaults = async () => {
+        setResetting(true);
+        try {
+            await resetScoringConfig(campaignId);
+            toast.success("Scoring configuration reset to platform defaults.");
+            onSaved();
+        } catch (err) {
+            toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to reset scoring configuration.");
+        } finally {
+            setResetting(false);
+        }
+    };
 
     const change = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
@@ -145,6 +193,34 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
                 {/* Scoring config is only editable when the backend sent it (HR_ADMIN) */}
                 {scoring && (
                     <>
+                        <div className="flex justify-between items-center">
+                            <span className="text-[10px] uppercase font-bold text-slate-400">Scoring Configuration</span>
+                            <Button
+                                variant="link"
+                                size="small"
+                                onClick={handleResetToDefaults}
+                                loading={resetting}
+                                loadingText="Resetting..."
+                                disabled={scoringLocked}
+                            >
+                                <RotateCcw className="h-3 w-3" /> Reset to Platform Defaults
+                            </Button>
+                        </div>
+
+                        {presets.length > 0 && (
+                            <div>
+                                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
+                                    Apply a Preset
+                                </label>
+                                <FilterListbox
+                                    options={[{ value: "", label: "Choose a preset..." }, ...presets.map((p) => ({ value: p.id, label: p.name }))]}
+                                    value={selectedPresetId}
+                                    onChange={applyPreset}
+                                    disabled={scoringLocked}
+                                />
+                            </div>
+                        )}
+
                         {/* S07-T02: warning + confirm gate on ACTIVE campaigns */}
                         {isActive && (
                             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">

@@ -3,15 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
   Briefcase, CheckCircle, PauseCircle, XCircle, Plus, Search, Calendar, Edit2,
+  GitCompare, FileBarChart, Sliders,
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/ui/Modal";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { KPICard } from "../../../components/kpi/KPI";
-import NewCampaignForm from "../modals/NewCampaignForm";
-import EditCampaignModal from "../modals/EditCampaignModal";
-import { useAuth } from "../../../contexts/AuthContext";
+import NewCampaignForm from "./components/NewCampaignForm";
+import EditCampaignModal from "./components/EditCampaignModal";
+import WeightPresetsModal from "./components/WeightPresetsModal";
+import useCampaignPermissions from "./hooks/useCampaignPermissions";
 import { getAllJDs } from "../service/jdservice";
 import {
   createCampaign,
@@ -21,7 +23,7 @@ import {
   getCampaignDetails,
   getPipelineSummary,
   getNameByRoles,
-} from "../service/campaignservice";
+} from "./services/campaignservice";
 
 const DEFAULT_CAMPAIGN_FORM = {
   jd_id: "",
@@ -72,9 +74,10 @@ const deriveStats = (summary) => {
 
 export default function Campaigns() {
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
-  const isHRAdmin = hasRole(["HR_ADMIN"]);
-  const isHiringManager = hasRole(["HIRING_MANAGER"]);
+  const {
+    isHRAdmin, isHiringManager, canManageCampaigns, canManageScoring,
+    canCompareCampaigns, canViewWeightReport, canViewPipeline,
+  } = useCampaignPermissions();
 
   const [campaigns, setCampaigns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -95,6 +98,7 @@ export default function Campaigns() {
   const [editCampaignId, setEditCampaignId] = useState(null);
   const [editDetail, setEditDetail] = useState(null);
   const [editLoadingId, setEditLoadingId] = useState(null);
+  const [presetsModalOpen, setPresetsModalOpen] = useState(false);
 
   const handleEditClick = async (e, campaign) => {
     e.stopPropagation();                 // don't trigger the card's navigate
@@ -214,6 +218,10 @@ export default function Campaigns() {
   //   value === object     -> real { candidates, shortlisted, selected }
   const [pipelineStats, setPipelineStats] = useState({});
   useEffect(() => {
+    // HIRING_MANAGER can't call pipeline-summary at all (backend 403s it) —
+    // don't fire a doomed request per visible card; cards fall back to the
+    // "Pipeline metrics unavailable" state.
+    if (!canViewPipeline) return;
     const missing = paginatedCampaigns
       .map((c) => c.id)
       .filter((id) => id && !(id in pipelineStats));
@@ -237,7 +245,7 @@ export default function Campaigns() {
     })();
 
     return () => { cancelled = true; };
-  }, [paginatedCampaigns, pipelineStats]);
+  }, [paginatedCampaigns, pipelineStats, canViewPipeline]);
 
   // ---- Create campaign ----
   const handleCampaignFormChange = (e) => {
@@ -303,18 +311,35 @@ export default function Campaigns() {
             Create hiring campaigns, monitor screening pipelines, and track candidate progress.
           </p>
         </div>
-        {isHRAdmin && (
-          <Button
-            variant="primary"
-            size="medium"
-            onClick={() => {
-              setCampaignForm(DEFAULT_CAMPAIGN_FORM);
-              setCreateModalOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" /> New Campaign
-          </Button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {canCompareCampaigns && (
+            <Button variant="outline" size="medium" onClick={() => navigate("/airs/campaigns/compare")}>
+              <GitCompare className="h-4 w-4" /> Compare
+            </Button>
+          )}
+          {canViewWeightReport && (
+            <Button variant="outline" size="medium" onClick={() => navigate("/airs/campaigns/reports/weight-changes")}>
+              <FileBarChart className="h-4 w-4" /> Weight Report
+            </Button>
+          )}
+          {canManageScoring && (
+            <Button variant="outline" size="medium" onClick={() => setPresetsModalOpen(true)}>
+              <Sliders className="h-4 w-4" /> Presets
+            </Button>
+          )}
+          {canManageCampaigns && (
+            <Button
+              variant="primary"
+              size="medium"
+              onClick={() => {
+                setCampaignForm(DEFAULT_CAMPAIGN_FORM);
+                setCreateModalOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4" /> New Campaign
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -375,8 +400,10 @@ export default function Campaigns() {
                 "Unassigned";
               const initials = String(managerName).substring(0, 2).toUpperCase();
 
-              // Real pipeline metrics (undefined = loading, null = unavailable)
-              const stats = pipelineStats[c.id];
+              // Real pipeline metrics (undefined = loading, null = unavailable).
+              // Roles without pipeline access resolve straight to "unavailable"
+              // since no fetch is ever attempted for them.
+              const stats = canViewPipeline ? pipelineStats[c.id] : null;
               const hasStats = stats != null;
               const progressPct = hasStats
                 ? c.max_candidates
@@ -399,7 +426,7 @@ export default function Campaigns() {
                         {statusLabel(status)}
                       </span>
                       {/* Edit shortcut — HR_ADMIN only, closed campaigns are read-only (S07-T03) */}
-                      {isHRAdmin && status !== "CLOSED" && (
+                      {canManageCampaigns && status !== "CLOSED" && (
                         <button
                           onClick={(e) => handleEditClick(e, c)}
                           disabled={editLoadingId === c.id}
@@ -527,6 +554,10 @@ export default function Campaigns() {
           handleInitiateCampaign={handleInitiateCampaign}
         />
       </Modal>
+
+      {canManageScoring && (
+        <WeightPresetsModal isOpen={presetsModalOpen} onClose={() => setPresetsModalOpen(false)} />
+      )}
 
       {/* Edit Campaign Modal (opened from a card's edit button) */}
       {editDetail && (

@@ -9,7 +9,7 @@
 // localStorage-backed mock dataset in mock/skillOntologyMockData.js, since no
 // real endpoint exists for those yet.
 //
-// Real calls follow the same convention as src/pages/airs/service/campaignservice.js:
+// Real calls follow the same convention as src/pages/airs/campaigns/services/campaignservice.js:
 // same BASE_URL source, same inline Authorization header, same try/catch/throw shape.
 
 import api from "../../../../api/axiosInstance";
