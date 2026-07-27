@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Eye, Check, Trash2, AlertTriangle } from "lucide-react";
+import { Check, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "react-toastify";
 import GenericTable from "../../../../components/Table/table";
 import Button from "../../../../components/Button/Button";
@@ -7,7 +7,7 @@ import Modal from "../../../../components/ui/Modal";
 import { formatDate } from "../utils/skillOntologyUtils.jsx";
 import { bulkApproveUnknownSkills, bulkDeleteUnknownSkills } from "../services/skillOntologyService";
 
-export default function UnknownSkillTable({ skills, isLoading, onPromote, onViewPeople, onBulkDone }) {
+export default function UnknownSkillTable({ skills, isLoading, onPromote, onBulkDone }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [confirmAction, setConfirmAction] = useState(null); // "approve" | "delete" | null
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,9 +78,8 @@ export default function UnknownSkillTable({ skills, isLoading, onPromote, onView
     <span className="block w-full text-left">First Seen</span>,
     <span className="block w-full text-left">Last Seen</span>,
     <span className="block w-full text-left">Status</span>,
-    <span className="block w-full text-left">Actions</span>,
   ];
-  const columns = ["select", "rawSkill", "normalizedKey", "frequency", "firstSeen", "lastSeen", "status", "actions"];
+  const columns = ["select", "rawSkill", "normalizedKey", "frequency", "firstSeen", "lastSeen", "status"];
 
   const rows = skills.map((skill) => ({
     id: skill.id,
@@ -110,19 +109,6 @@ export default function UnknownSkillTable({ skills, isLoading, onPromote, onView
         <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
           {skill.status}
         </span>
-      </div>
-    ),
-    actions: (
-      <div className="flex items-center gap-1 w-full">
-        <Button
-          variant="ghost"
-          size="icon"
-          title="View people"
-          onClick={() => onViewPeople(skill)}
-          className="h-8 w-8 !text-blue-500 hover:!text-blue-600"
-        >
-          <Eye className="h-4 w-4" />
-        </Button>
       </div>
     ),
   }));

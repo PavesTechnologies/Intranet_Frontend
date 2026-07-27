@@ -19,7 +19,6 @@ import { updateSkill as updateSkillApi, updateSkillStatus } from "./services/ski
 const TABS = [
   { id: "aliases", label: "Aliases" },
   { id: "hierarchy", label: "Hierarchy" },
-  { id: "activity", label: "Recent Activity" },
 ];
 
 export default function SkillDetailPage() {
@@ -260,30 +259,6 @@ export default function SkillDetailPage() {
                   </div>
                 )}
               </div>
-            </div>
-          )}
-
-          {tab === "activity" && (
-            <div className="space-y-4 pl-1">
-              {detail.isLoadingActivity ? (
-                <LoadingSpinner text="Loading activity..." />
-              ) : detail.activity.length === 0 ? (
-                <p className="text-[12px] text-slate-400">No recent activity.</p>
-              ) : (
-                detail.activity.map((event, i) => (
-                  <div key={i} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className="w-2 h-2 rounded-full mt-1.5 bg-blue-600" />
-                      {i < detail.activity.length - 1 && <div className="w-px flex-1 bg-slate-200" />}
-                    </div>
-                    <div className="pb-1">
-                      <div className="text-[11px] font-semibold text-slate-400">{formatDate(event.timestamp)}</div>
-                      <div className="text-[13px] text-slate-900">{event.description}</div>
-                      {event.actorName && <div className="text-[11px] text-slate-400">by {event.actorName}</div>}
-                    </div>
-                  </div>
-                ))
-              )}
             </div>
           )}
         </div>

@@ -6,7 +6,7 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import EmptyState from "./EmptyState";
 import { renderStatusPill, renderVerificationBadge, formatDate, getSourceLabel } from "../utils/skillOntologyUtils.jsx";
 
-export default function SkillTable({ skills, isLoading, onView, onEdit, onDeactivate, onReactivate, onSeedOntology, seeding }) {
+export default function SkillTable({ skills, isLoading, onView, onEdit, onDeactivate, onReactivate }) {
   if (isLoading) {
     return (
       <div className="bg-white border border-slate-200 rounded-xl py-16 flex items-center justify-center">
@@ -15,7 +15,7 @@ export default function SkillTable({ skills, isLoading, onView, onEdit, onDeacti
     );
   }
 
-  if (skills.length === 0) return <EmptyState onSeedOntology={onSeedOntology} seeding={seeding} />;
+  if (skills.length === 0) return <EmptyState />;
 
   const headers = ["Canonical Skill", "Category", "Aliases", "Confidence", "Status", "Occurrences", "Last Seen", "Source", "Actions"];
 

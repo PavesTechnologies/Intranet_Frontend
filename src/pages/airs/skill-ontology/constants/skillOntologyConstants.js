@@ -60,12 +60,6 @@ export const EMBEDDING_STATUS_LABEL = {
   OUTDATED: "Outdated",
 };
 
-export const SIMILAR_SKILL_ACTIONS = {
-  KEEP_NEW: "keep_new",
-  MERGE_EXISTING: "merge_existing",
-  ADD_AS_ALIAS: "add_as_alias",
-};
-
 export const SKILL_ONTOLOGY_PAGE_SIZE = 10;
 
 export const BULK_IMPORT_ACCEPTED_TYPES = [".xlsx"];

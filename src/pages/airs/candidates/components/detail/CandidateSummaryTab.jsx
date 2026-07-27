@@ -1,5 +1,6 @@
 import React from "react";
 import { Sparkles } from "lucide-react";
+import HierarchyMatchResults from "./HierarchyMatchResults";
 
 export default function CandidateSummaryTab({ candidate }) {
   return (
@@ -30,29 +31,11 @@ export default function CandidateSummaryTab({ candidate }) {
         <p className="text-[12.5px] leading-relaxed text-slate-900">{candidate.summary}</p>
       </div>
 
-      <div>
-        <div className="text-[12px] font-semibold mb-1.5 text-slate-600">Matched skills</div>
-        <div className="flex flex-wrap gap-1.5">
-          {candidate.matchedSkills.map((s) => (
-            <span key={s} className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700">
-              {s}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {candidate.missingSkills.length > 0 && (
-        <div>
-          <div className="text-[12px] font-semibold mb-1.5 text-slate-600">Missing skills</div>
-          <div className="flex flex-wrap gap-1.5">
-            {candidate.missingSkills.map((s) => (
-              <span key={s} className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700">
-                {s}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      <HierarchyMatchResults
+        scoreBreakdown={candidate.scoreBreakdown}
+        manualSkills={candidate.manualSkills}
+        additionalSkills={candidate.additionalSkills}
+      />
     </>
   );
 }

@@ -28,7 +28,11 @@ export default function CandidateEvaluationTab({ candidate, onAddManualSkill }) 
         </div>
       </div>
 
-      <HierarchyMatchResults scoreBreakdown={candidate.scoreBreakdown} manualSkills={candidate.manualSkills} />
+      <HierarchyMatchResults
+        scoreBreakdown={candidate.scoreBreakdown}
+        manualSkills={candidate.manualSkills}
+        additionalSkills={candidate.additionalSkills}
+      />
 
       <div>
         <div className="text-[12px] font-semibold mb-1.5 text-emerald-600">Strengths</div>

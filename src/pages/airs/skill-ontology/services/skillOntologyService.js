@@ -1,27 +1,15 @@
-// Service layer for the Skill Ontology module.
-//
-// HYBRID MODE: getSkills / getSkill / createSkill / updateSkill /
-// updateSkillStatus / getCategories / searchParents / validateImportFile /
-// importSkills / getImportErrorReport / exportSkills / getSkillHierarchy /
-// getSkillChildren call the real backend (every GET/POST/PATCH endpoint
-// provided so far). Everything else (aliases, similar-skill resolution,
-// merge, recent activity, seeding) still operates against the in-memory/
-// localStorage-backed mock dataset in mock/skillOntologyMockData.js, since no
-// real endpoint exists for those yet.
-//
-// Real calls follow the same convention as src/pages/airs/campaigns/services/campaignservice.js:
-// same BASE_URL source, same inline Authorization header, same try/catch/throw shape.
+// Service layer for the Skill Ontology module. Every call here hits the real
+// backend — same convention as src/pages/airs/service/campaignservice.js:
+// same BASE_URL source, same inline Authorization header, same
+// try/catch/throw shape.
 
 import api from "../../../../api/axiosInstance";
-import { loadMockSkills, persistMockSkills, buildActivityForSkill } from "../mock/skillOntologyMockData";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
 });
-
-const delay = (ms = 350) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const ok = (data) => ({ success: true, data });
 
@@ -283,6 +271,7 @@ export const getSkills = async (params = {}) => {
     search: params.search,
     category: params.category,
     confidence: params.confidence,
+    source: params.source,
     is_active: params.is_active,
   };
   // Query key = url + exact filters. Two callers requesting the identical
@@ -518,6 +507,7 @@ export const exportSkills = async (params = {}) => {
         search: params.search,
         category: params.category,
         confidence: params.confidence,
+        source: params.source,
         is_active: params.is_active,
       },
       headers: authHeaders(),
@@ -530,71 +520,33 @@ export const exportSkills = async (params = {}) => {
   }
 };
 
-// ── Still mock (no real endpoint provided yet) ──────────────────────────
-
-export const seedOntology = async () => {
-  await delay();
-  localStorage.removeItem("airs_skill_ontology_mock_v1");
-  const skills = loadMockSkills();
-  return ok({ count: skills.length });
-};
-
+// Alias add/remove has no dedicated endpoint — both go through the generic
+// updateSkill PATCH with the full aliases array, so the current skill is
+// fetched first to avoid clobbering its other fields.
 export const addAlias = async (skillId, alias) => {
-  await delay();
-  const all = loadMockSkills();
-  persistMockSkills(
-    all.map((s) => (s.id === skillId && !s.aliases.includes(alias) ? { ...s, aliases: [...s.aliases, alias] } : s))
-  );
-  return ok({ id: skillId, alias });
+  const current = await getSkill(skillId);
+  const skill = current?.data || current;
+  const aliases = skill.aliases.includes(alias) ? skill.aliases : [...skill.aliases, alias];
+  return updateSkill(skillId, {
+    canonical_name: skill.canonicalName,
+    category: skill.category,
+    aliases,
+    parent_skill_id: skill.parentSkillId,
+    confidence: skill.confidence,
+    status: skill.status,
+  });
 };
 
-export const removeAlias = async (skillId, aliasId) => {
-  await delay();
-  const all = loadMockSkills();
-  persistMockSkills(all.map((s) => (s.id === skillId ? { ...s, aliases: s.aliases.filter((a) => a !== aliasId) } : s)));
-  return ok({ id: skillId });
-};
-
-export const getSkillActivity = async (skillId) => {
-  await delay();
-  const all = loadMockSkills();
-  const skill = all.find((s) => s.id === skillId);
-  if (!skill) return ok({ events: [] });
-  return ok({ events: buildActivityForSkill(skill) });
-};
-
-export const getSimilarSkills = async (skillId) => {
-  await delay();
-  const all = loadMockSkills();
-  const skill = all.find((s) => s.id === skillId);
-  if (!skill) return ok([]);
-  const candidates = all.filter((s) => s.id !== skillId && s.category === skill.category).slice(0, 3);
-  return ok(candidates.map((c, i) => ({ ...c, similarity: 0.92 - i * 0.12 })));
-};
-
-export const mergeSkills = async (sourceSkillId, targetSkillId) => {
-  await delay();
-  const all = loadMockSkills();
-  const source = all.find((s) => s.id === sourceSkillId);
-  const updated = all
-    .filter((s) => s.id !== sourceSkillId)
-    .map((s) =>
-      s.id === targetSkillId && source
-        ? { ...s, aliases: [...new Set([...s.aliases, source.canonicalName, ...source.aliases])] }
-        : s
-    );
-  persistMockSkills(updated);
-  return ok({ mergedInto: targetSkillId });
-};
-
-export const addAsAlias = async (sourceSkillId, ofSkillId) => {
-  await delay();
-  const all = loadMockSkills();
-  const source = all.find((s) => s.id === sourceSkillId);
-  const updated = all
-    .filter((s) => s.id !== sourceSkillId)
-    .map((s) => (s.id === ofSkillId && source ? { ...s, aliases: [...new Set([...s.aliases, source.canonicalName])] } : s));
-  persistMockSkills(updated);
-  return ok({ addedTo: ofSkillId });
+export const removeAlias = async (skillId, alias) => {
+  const current = await getSkill(skillId);
+  const skill = current?.data || current;
+  return updateSkill(skillId, {
+    canonical_name: skill.canonicalName,
+    category: skill.category,
+    aliases: skill.aliases.filter((a) => a !== alias),
+    parent_skill_id: skill.parentSkillId,
+    confidence: skill.confidence,
+    status: skill.status,
+  });
 };
 
