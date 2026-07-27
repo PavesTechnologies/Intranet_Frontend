@@ -10,7 +10,7 @@ function isAcceptedZipFile(file) {
   return ACCEPTED_BULK_FILE_TYPES.some((ext) => name.endsWith(ext));
 }
 
-export default function BulkUploadPanel({ onUploaded }) {
+export default function BulkUploadPanel({ onUploaded, bare = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const [campaignId, setCampaignId] = useState("");
   const [campaigns, setCampaigns] = useState([]);
@@ -92,6 +92,122 @@ export default function BulkUploadPanel({ onUploaded }) {
     }
   };
 
+  const renderFormBody = () => (
+    <>
+      <div className={bare ? "space-y-5 pt-3" : "p-6 space-y-5"}>
+        <div>
+          <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Campaign <span className="text-red-500">*</span></label>
+          <select
+            value={campaignId}
+            onChange={(e) => setCampaignId(e.target.value)}
+            disabled={isLoadingCampaigns}
+            className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50 disabled:cursor-not-allowed"
+          >
+            <option value="">
+              {isLoadingCampaigns ? "Loading campaigns..." : "Select a campaign..."}
+            </option>
+            {campaigns.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          {errors.campaignId && <p className="text-[11.5px] text-rose-600 mt-1">{errors.campaignId}</p>}
+          {campaignsError && <p className="text-[11.5px] text-rose-600 mt-1">{campaignsError}</p>}
+        </div>
+
+        <div>
+          <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Resume ZIP file <span className="text-red-500">*</span></label>
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              handleFile(e.dataTransfer?.files?.[0]);
+            }}
+            onClick={() => inputRef.current?.click()}
+            className="rounded-xl p-6 border-2 border-dashed text-center cursor-pointer transition-colors"
+            style={{ borderColor: isDragging ? "#2563EB" : "#E6E9F0", background: isDragging ? "#DBEAFE" : "#F8FAFC" }}
+          >
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".zip"
+              className="hidden"
+              onChange={(e) => handleFile(e.target.files?.[0])}
+            />
+            {!file ? (
+              <>
+                <UploadCloud size={22} className="text-blue-600 mx-auto mb-2" />
+                <div className="text-[13px] font-semibold text-slate-900">Drag & drop, or click to browse</div>
+                <div className="text-[11.5px] text-slate-500 mt-1">ZIP archives only, up to 200MB</div>
+              </>
+            ) : (
+              <div className="flex items-center justify-between bg-white rounded-lg border border-slate-200 px-3 py-2 text-left">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileArchive size={16} className="text-blue-600 shrink-0" />
+                  <span className="text-[12.5px] font-medium text-slate-900 truncate">{file.name}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFile(null);
+                  }}
+                  className="text-slate-400 hover:text-slate-600 shrink-0"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            )}
+          </div>
+          {fileError && <p className="text-[11.5px] text-rose-600 mt-1.5">{fileError}</p>}
+          {!fileError && errors.file && <p className="text-[11.5px] text-rose-600 mt-1.5">{errors.file}</p>}
+        </div>
+
+        <div>
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-[12.5px] text-slate-600">
+              I confirm consent has been obtained to process and store each candidate's resume in this archive, in line with our data handling policy. <span className="text-red-500">*</span>
+            </span>
+          </label>
+          {errors.consent && <p className="text-[11.5px] text-rose-600 mt-1 ml-6.5">{errors.consent}</p>}
+        </div>
+      </div>
+
+      <div className={bare ? "flex justify-end gap-2 pt-5 mt-1 border-t border-slate-100" : "px-6 py-4 border-t border-slate-100 flex justify-end gap-2"}>
+        <Button
+          type="submit"
+          variant="primary"
+          size="medium"
+          disabled={!isFormValid}
+          loading={isSubmitting}
+          loadingText="Submitting..."
+        >
+          <CheckCircle2 className="h-4 w-4 mr-1.5" /> Submit for parsing
+        </Button>
+      </div>
+    </>
+  );
+
+  if (bare) {
+    return (
+      <form onSubmit={handleSubmit}>
+        {renderFormBody()}
+      </form>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="rounded-xl border border-slate-200 bg-white shadow-sm mb-6">
       <button
@@ -109,113 +225,7 @@ export default function BulkUploadPanel({ onUploaded }) {
         </div>
       </button>
 
-      {isOpen && (
-        <>
-          <div className="p-6 space-y-5">
-            <div>
-              <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Campaign <span className="text-red-500">*</span></label>
-              <select
-                value={campaignId}
-                onChange={(e) => setCampaignId(e.target.value)}
-                disabled={isLoadingCampaigns}
-                className="w-full h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50 disabled:cursor-not-allowed"
-              >
-                <option value="">
-                  {isLoadingCampaigns ? "Loading campaigns..." : "Select a campaign..."}
-                </option>
-                {campaigns.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              {errors.campaignId && <p className="text-[11.5px] text-rose-600 mt-1">{errors.campaignId}</p>}
-              {campaignsError && <p className="text-[11.5px] text-rose-600 mt-1">{campaignsError}</p>}
-            </div>
-
-            <div>
-              <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Resume ZIP file <span className="text-red-500">*</span></label>
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDragging(true);
-                }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setIsDragging(false);
-                  handleFile(e.dataTransfer?.files?.[0]);
-                }}
-                onClick={() => inputRef.current?.click()}
-                className="rounded-xl p-6 border-2 border-dashed text-center cursor-pointer transition-colors"
-                style={{ borderColor: isDragging ? "#2563EB" : "#E6E9F0", background: isDragging ? "#DBEAFE" : "#F8FAFC" }}
-              >
-                <input
-                  ref={inputRef}
-                  type="file"
-                  accept=".zip"
-                  className="hidden"
-                  onChange={(e) => handleFile(e.target.files?.[0])}
-                />
-                {!file ? (
-                  <>
-                    <UploadCloud size={22} className="text-blue-600 mx-auto mb-2" />
-                    <div className="text-[13px] font-semibold text-slate-900">Drag & drop, or click to browse</div>
-                    <div className="text-[11.5px] text-slate-500 mt-1">ZIP archives only, up to 200MB</div>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-between bg-white rounded-lg border border-slate-200 px-3 py-2 text-left">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <FileArchive size={16} className="text-blue-600 shrink-0" />
-                      <span className="text-[12.5px] font-medium text-slate-900 truncate">{file.name}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFile(null);
-                      }}
-                      className="text-slate-400 hover:text-slate-600 shrink-0"
-                    >
-                      <X size={15} />
-                    </button>
-                  </div>
-                )}
-              </div>
-              {fileError && <p className="text-[11.5px] text-rose-600 mt-1.5">{fileError}</p>}
-              {!fileError && errors.file && <p className="text-[11.5px] text-rose-600 mt-1.5">{errors.file}</p>}
-            </div>
-
-            <div>
-              <label className="flex items-start gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={consent}
-                  onChange={(e) => setConsent(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-[12.5px] text-slate-600">
-                  I confirm consent has been obtained to process and store each candidate's resume in this archive, in line with our data handling policy. <span className="text-red-500">*</span>
-                </span>
-              </label>
-              {errors.consent && <p className="text-[11.5px] text-rose-600 mt-1 ml-6.5">{errors.consent}</p>}
-            </div>
-          </div>
-
-          <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <Button
-              type="submit"
-              variant="primary"
-              size="medium"
-              disabled={!isFormValid}
-              loading={isSubmitting}
-              loadingText="Submitting..."
-            >
-              <CheckCircle2 className="h-4 w-4 mr-1.5" /> Submit for parsing
-            </Button>
-          </div>
-        </>
-      )}
+      {isOpen && renderFormBody()}
     </form>
   );
 }

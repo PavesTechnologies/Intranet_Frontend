@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Check } from "lucide-react";
 import useIntakeFlow from "./hooks/useIntakeFlow";
 import UploadStep from "./components/UploadStep";
-import AcceptedStep from "./components/AcceptedStep";
 import ProcessingStep from "./components/ProcessingStep";
 import ReviewScreen from "./components/ReviewScreen";
 
@@ -14,7 +13,6 @@ const STEPS = [
 ];
 
 function stepIndex(step) {
-  if (step === "accepted") return 0;
   return STEPS.findIndex((s) => s.key === step);
 }
 
@@ -75,7 +73,6 @@ export default function IntakeFlowPage() {
       </div>
 
       {step === "upload" && !location.state?.uploadResult && <UploadStep onSubmit={submit} />}
-      {step === "accepted" && resume && status && <AcceptedStep resume={resume} status={status} />}
       {step === "processing" && resume && status && (
         <ProcessingStep
           resume={resume}
