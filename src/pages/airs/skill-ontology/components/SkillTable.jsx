@@ -6,7 +6,7 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import EmptyState from "./EmptyState";
 import { renderStatusPill, renderVerificationBadge, formatDate, getSourceLabel } from "../utils/skillOntologyUtils.jsx";
 
-export default function SkillTable({ skills, isLoading, onView, onEdit, onDeactivate, onReactivate, onSeedOntology, seeding }) {
+export default function SkillTable({ skills, isLoading, onView, onEdit, onDeactivate, onReactivate }) {
   if (isLoading) {
     return (
       <div className="bg-white border border-slate-200 rounded-xl py-16 flex items-center justify-center">
@@ -15,7 +15,7 @@ export default function SkillTable({ skills, isLoading, onView, onEdit, onDeacti
     );
   }
 
-  if (skills.length === 0) return <EmptyState onSeedOntology={onSeedOntology} seeding={seeding} />;
+  if (skills.length === 0) return <EmptyState />;
 
   const headers = ["Canonical Skill", "Category", "Aliases", "Confidence", "Status", "Occurrences", "Last Seen", "Source", "Actions"];
 
@@ -25,20 +25,24 @@ export default function SkillTable({ skills, isLoading, onView, onEdit, onDeacti
     id: skill.id,
     rowClass: "hover:bg-slate-50/50 transition cursor-pointer",
     onRowClick: () => onView(skill),
-    canonicalName: <span className="font-semibold text-slate-900">{skill.canonicalName}</span>,
-    category: <span className="text-slate-500">{skill.category}</span>,
+    canonicalName: (
+      <div className="w-full flex justify-center font-semibold text-slate-900" title={skill.canonicalName}>
+        <span className="line-clamp-1 truncate max-w-[180px]">{skill.canonicalName}</span>
+      </div>
+    ),
+    category: (
+      <div className="w-full flex justify-center text-slate-500" title={skill.category}>
+        <span className="line-clamp-1 truncate max-w-[150px]">{skill.category}</span>
+      </div>
+    ),
     aliases: (
-      <div className="flex gap-1 flex-wrap max-w-[200px] justify-center">
-        {(skill.aliases || []).slice(0, 2).map((a) => (
-          <span key={a} className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
-            {a}
-          </span>
-        ))}
-        {(skill.aliases || []).length > 2 && (
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
-            +{skill.aliases.length - 2}
-          </span>
-        )}
+      <div
+        className="w-full flex justify-center"
+        title={(skill.aliases || []).join(", ")}
+      >
+        <span className="line-clamp-1 truncate max-w-[200px] text-slate-500">
+          {(skill.aliases || []).length > 0 ? skill.aliases.join(", ") : "-"}
+        </span>
       </div>
     ),
     confidence: renderVerificationBadge(skill.confidence),

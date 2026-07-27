@@ -39,15 +39,17 @@ export default function IntakeFlowPage() {
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
       <div className="mb-6 flex items-center justify-between">
-        <div>
+        <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/airs/resume-intake")}
-            className="text-[12px] text-slate-500 hover:text-slate-700 inline-flex items-center gap-1 mb-2"
+            className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm shrink-0"
           >
-            <ArrowLeft size={13} /> Back to resume intake
+            <ArrowLeft size={18} />
           </button>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">New Resume Intake</h1>
-          <p className="text-xs text-slate-500 mt-1">Upload a resume, watch it parse, then review the extracted data.</p>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900">New Resume Intake</h1>
+            <p className="text-xs text-slate-500 mt-1">Upload a resume, watch it parse, then review the extracted data.</p>
+          </div>
         </div>
 
         <ol className="flex items-center gap-2">

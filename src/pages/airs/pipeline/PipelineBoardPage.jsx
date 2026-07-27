@@ -4,7 +4,7 @@ import Button from "../../../components/Button/Button";
 import usePipelineBoard from "./hooks/usePipelineBoard";
 import PipelineColumn from "./components/PipelineColumn";
 import { MOCK_CANDIDATES } from "../candidates/mock/candidateMockData";
-import CandidateDetailDrawer from "../candidates/components/detail/CandidateDetailDrawer";
+import CandidateDetailModal from "../candidates/components/detail/CandidateDetailModal";
 
 export default function PipelineBoardPage() {
   const { columns, startDrag, dropOnStage, refresh } = usePipelineBoard();
@@ -44,7 +44,7 @@ export default function PipelineBoardPage() {
         ))}
       </div>
 
-      <CandidateDetailDrawer candidate={viewCandidate} onClose={() => setViewCandidateId(null)} onAddComment={addComment} />
+      <CandidateDetailModal candidate={viewCandidate} onClose={() => setViewCandidateId(null)} onAddComment={addComment} />
     </div>
   );
 }

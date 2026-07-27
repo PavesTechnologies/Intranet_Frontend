@@ -34,53 +34,92 @@ export const CANDIDATE_STAGES = ["Screening", "Shortlisted", "Interview", "Selec
 // engine's own multipliers (EXACT 100% ... MISSING 0%). Computed here, once,
 // at mock-data-generation time — the UI (HierarchyMatchResults) only ever
 // reads these pre-computed fields, it never derives or recalculates them.
-const MATCH_WEIGHTS = { EXACT: 1, CHILD: 0.7, SIBLING: 0.4, SEMANTIC: 0.2, MISSING: 0 };
+const MATCH_WEIGHTS = { EXACT: 1, CHILD: 0.7, GRANDCHILD: 0.5, SIBLING: 0.4, SEMANTIC: 0.2, MISSING: 0 };
 
+// Field names below mirror the deterministic scoring engine's own
+// score_breakdown contract (M07-E01/S05): jd_weight, candidate_scoring_weight,
+// hierarchy_multiplier, match_type, matched_candidate_skill, skill_contribution.
 function makeScoreBreakdownItems(skills, missingSet) {
   // First ~60% of a role's skill list are treated as mandatory, the rest preferred.
   const mandatoryCount = Math.max(1, Math.ceil(skills.length * 0.6));
 
   return skills.map((skillName, i) => {
     const mandatory = i < mandatoryCount;
-    const configuredWeight = mandatory ? int(15, 25) : int(5, 15);
+    const jdWeight = mandatory ? int(15, 25) : int(5, 15);
     const matchType = missingSet.has(skillName)
       ? "MISSING"
-      : pick(["EXACT", "EXACT", "CHILD", "CHILD", "SIBLING", "SEMANTIC"]);
-    const weightApplied = MATCH_WEIGHTS[matchType];
-    const scoringConfidence = matchType === "MISSING" ? 0 : matchType === "EXACT" ? 1.0 : pick([1.0, 0.8]);
-    const scoreContribution = Math.round(configuredWeight * weightApplied * scoringConfidence * 100) / 100;
+      : pick(["EXACT", "EXACT", "CHILD", "CHILD", "GRANDCHILD", "SIBLING", "SEMANTIC"]);
+    const hierarchyMultiplier = MATCH_WEIGHTS[matchType];
+    // candidate_scoring_weight: 1.0 for an exact/alias match, 0.8 for a
+    // partial-fuzzy/vector-normalized one, 0 when there's no match at all.
+    const candidateScoringWeight = matchType === "MISSING" ? 0 : matchType === "EXACT" ? 1.0 : pick([1.0, 0.8]);
+    const skillContribution = Math.round(jdWeight * hierarchyMultiplier * candidateScoringWeight * 100) / 100;
 
     return {
       jdSkillName: skillName,
       mandatory,
       matchType,
       matchedCandidateSkill: matchType === "MISSING" ? null : skillName,
-      scoreContribution,
-      weightApplied,
-      configuredWeight,
-      scoringConfidence,
+      jdWeight,
+      candidateScoringWeight,
+      hierarchyMultiplier,
+      skillContribution,
     };
   });
 }
 
-// M07-E01/S04 — the deterministic engine's full score_breakdown output: the
-// per-skill items list plus the NO_VERIFIED_SKILLS edge-case flag and the
-// resulting score/status. All computed once here, at mock-generation time —
-// the UI only ever reads these fields.
+// M07-E01/S04-S05 — the deterministic engine's full score_breakdown output:
+// the per-skill items list, the NO_VERIFIED_SKILLS edge-case flag, mandatory
+// coverage, preferred-skill bonus, and the resulting score/status. All
+// computed once here, at mock-generation time — the UI only ever reads
+// these fields, it never derives or recalculates any of them.
 function makeScoreBreakdown(skills, missing, deterministic, forceNoVerifiedSkills) {
   const missingSet = forceNoVerifiedSkills ? new Set(skills) : new Set(missing);
   const items = makeScoreBreakdownItems(skills, missingSet);
   const noVerifiedSkills = forceNoVerifiedSkills || items.every((r) => r.matchType === "MISSING");
+
+  const mandatoryItems = items.filter((r) => r.mandatory);
+  const preferredItems = items.filter((r) => !r.mandatory);
+
   // Missing mandatory skills fail deterministic screening — a real backend
   // rule, mirrored here rather than re-derived by the UI.
-  const hasMissingMandatory = items.some((r) => r.mandatory && r.matchType === "MISSING");
+  const hasMissingMandatory = mandatoryItems.some((r) => r.matchType === "MISSING");
   const status = noVerifiedSkills || hasMissingMandatory ? "FAILED" : "PASSED";
   // A higher-precision variant of `deterministic` for the scorecard's
   // "X.XX / 100" summary (the existing integer `deterministic` field is kept
   // untouched elsewhere since ScoreRing displays already depend on its shape).
   const score = noVerifiedSkills ? 0 : Math.round((deterministic + rng() * 0.99) * 100) / 100;
 
-  return { items, noVerifiedSkills, score, status };
+  const mandatoryCoveragePct = mandatoryItems.length
+    ? Math.round(
+        ((mandatoryItems.length - mandatoryItems.filter((r) => r.matchType === "MISSING").length) /
+          mandatoryItems.length) *
+          1000
+      ) / 10
+    : 100;
+
+  const preferredSkillBonus = Math.round(preferredItems.reduce((sum, r) => sum + r.skillContribution, 0) * 100) / 100;
+
+  return { items, noVerifiedSkills, score, status, mandatoryCoveragePct, preferredSkillBonus };
+}
+
+const ADDITIONAL_SKILL_POOL = ["Docker Compose", "Redis", "GraphQL Federation", "Storybook", "Vite", "Notion API", "Zoom SDK", "Figma Plugins", "Postman", "Segment"];
+const MATCH_TIERS = ["RELATED", "ADJACENT"];
+
+// S05-T03 — candidate skills that don't correspond to any JD skill row at
+// all (so they can't appear in the mandatory/preferred tables above).
+// scoringWeight === 0 marks an unrecognised skill, rendered in its own
+// sub-list rather than force-added to the ontology.
+function makeAdditionalSkills() {
+  const count = int(0, 3);
+  return Array.from({ length: count }, () => {
+    const isUnrecognized = rng() < 0.35;
+    return {
+      canonicalName: pick(ADDITIONAL_SKILL_POOL),
+      matchTier: isUnrecognized ? "UNRECOGNIZED" : pick(MATCH_TIERS),
+      scoringWeight: isUnrecognized ? 0 : pick([0.3, 0.5, 0.6]),
+    };
+  });
 }
 
 function makeCandidate(id) {
@@ -124,6 +163,7 @@ function makeCandidate(id) {
     composite,
     scoreBreakdown,
     manualSkills: [],
+    additionalSkills: makeAdditionalSkills(),
     matchedSkills: matched.length ? matched : template.skills.slice(0, 2),
     missingSkills: missing,
     stage: pick(CANDIDATE_STAGES),

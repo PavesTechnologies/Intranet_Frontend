@@ -5,11 +5,18 @@ import GenericTable from "../../../../../components/Table/table";
 import Button from "../../../../../components/Button/Button";
 import LoadingSpinner from "../../../../../components/LoadingSpinner";
 import Tooltip from "../../../../../components/status/Tooltip";
-import { renderMatchTypeBadge, formatWeightApplied, renderDeterministicStatusBadge } from "../../utils/scoreBreakdownUtils.jsx";
+import {
+  renderMatchTypeBadge,
+  formatWeightApplied,
+  formatNormalisationDiscount,
+  renderDeterministicStatusBadge,
+  renderMatchTierBadge,
+} from "../../utils/scoreBreakdownUtils.jsx";
 
 const WEIGHT_LEGEND = [
   { label: "Exact Match", weight: "100%" },
   { label: "Child Match", weight: "70%" },
+  { label: "Grandchild Match", weight: "50%" },
   { label: "Sibling Match", weight: "40%" },
   { label: "Semantic Match", weight: "20%" },
   { label: "Missing", weight: "0%" },
@@ -20,16 +27,87 @@ const CONFIDENCE_LEGEND = [
   { value: "0.8", label: "Partial fuzzy / Vector normalized" },
 ];
 
-// M03-E05 → S06: Candidate Scorecard — Hierarchy Match Results. Every value
-// rendered here (match type, score contribution, weight applied, configured
-// weight, deterministic score/status) is read directly from the candidate's
-// score_breakdown — nothing is calculated in this component.
+const SKILL_TABLE_HEADERS = [
+  "JD Skill",
+  "Match Type",
+  "Matched Candidate Skill",
+  "JD Weight",
+  "Normalisation Discount",
+  "Hierarchy Multiplier",
+  "Skill Contribution",
+];
+const SKILL_TABLE_COLUMNS = [
+  "jdSkillName",
+  "matchType",
+  "matchedCandidateSkill",
+  "jdWeight",
+  "normalisationDiscount",
+  "hierarchyMultiplier",
+  "skillContribution",
+];
+
+// Shared between the Mandatory and Preferred sections (S05-T01/T02) — same
+// column set, same row shape, so neither reimplements the other.
+function SkillTable({ items }) {
+  const rows = items.map((r, i) => ({
+    id: i,
+    jdSkillName: <span className="font-semibold text-slate-900">{r.jdSkillName}</span>,
+    matchType: renderMatchTypeBadge(r.matchType),
+    matchedCandidateSkill: r.matchedCandidateSkill || <span className="text-slate-400">—</span>,
+    jdWeight: r.jdWeight,
+    normalisationDiscount: formatNormalisationDiscount(r.candidateScoringWeight),
+    hierarchyMultiplier: formatWeightApplied(r.hierarchyMultiplier),
+    skillContribution: <span className="font-semibold text-slate-900">{r.skillContribution.toFixed(2)}</span>,
+  }));
+
+  return (
+    <>
+      <div className="hidden sm:block overflow-x-auto rounded-xl">
+        <GenericTable headers={SKILL_TABLE_HEADERS} columns={SKILL_TABLE_COLUMNS} rows={rows} />
+      </div>
+
+      <div className="sm:hidden space-y-2">
+        {items.map((r, i) => (
+          <div key={i} className="rounded-xl border border-slate-200 bg-white p-3 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-[12.5px] text-slate-900 truncate">{r.jdSkillName}</span>
+              {renderMatchTypeBadge(r.matchType)}
+            </div>
+            <div className="text-[11.5px] text-slate-500">Matched: {r.matchedCandidateSkill || "—"}</div>
+            <div className="grid grid-cols-2 gap-1.5 text-[11.5px] text-slate-500">
+              <span>
+                JD Weight: <span className="font-semibold text-slate-900">{r.jdWeight}</span>
+              </span>
+              <span>
+                Discount: <span className="font-semibold text-slate-900">{formatNormalisationDiscount(r.candidateScoringWeight)}</span>
+              </span>
+              <span>
+                Multiplier: <span className="font-semibold text-slate-900">{formatWeightApplied(r.hierarchyMultiplier)}</span>
+              </span>
+              <span>
+                Contribution: <span className="font-semibold text-slate-900">{r.skillContribution.toFixed(2)}</span>
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// M03-E05 → S06 / M07-E01 → S05: Candidate Scorecard — Hierarchy Match
+// Results. Every value rendered here (match type, jd weight, normalisation
+// discount, hierarchy multiplier, skill contribution, mandatory coverage,
+// preferred skill bonus, deterministic score/status) is read directly from
+// the candidate's score_breakdown — nothing is calculated in this component.
 //
-// scoreBreakdown shape: { items: [...], noVerifiedSkills, score, status }.
-// manualSkills (M07-E01/S04) are HR-admin-added entries — shown for
-// visibility but never folded into the deterministic score/status above.
-export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [], isLoading = false }) {
+// scoreBreakdown shape: { items, noVerifiedSkills, score, status,
+// mandatoryCoveragePct, preferredSkillBonus }. manualSkills (M07-E01/S04) and
+// additionalSkills (M07-E01/S05-T03) are shown for visibility but never
+// folded into the deterministic score/status above.
+export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [], additionalSkills = [], isLoading = false }) {
   const [helpOpen, setHelpOpen] = useState(false);
+  const [additionalOpen, setAdditionalOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -48,34 +126,16 @@ export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [
     );
   }
 
-  const items = scoreBreakdown.items;
+  const mandatoryItems = scoreBreakdown.items.filter((r) => r.mandatory);
+  const preferredItems = scoreBreakdown.items.filter((r) => !r.mandatory);
+
   // The dedicated No Verified Skills banner already covers this candidate's
   // total-failure case at the top of the tab — skip the redundant
   // missing-mandatory card here so the two warnings don't stack.
-  const missingMandatory = scoreBreakdown.noVerifiedSkills ? [] : items.filter((r) => r.mandatory && r.matchType === "MISSING");
+  const missingMandatory = scoreBreakdown.noVerifiedSkills ? [] : mandatoryItems.filter((r) => r.matchType === "MISSING");
 
-  const headers = ["JD Skill", "Match Type", "Matched Candidate Skill", "Score Contribution", "Weight Applied"];
-  const columns = ["jdSkillName", "matchType", "matchedCandidateSkill", "scoreContribution", "weightApplied"];
-
-  const rows = items.map((r, i) => ({
-    id: i,
-    jdSkillName: (
-      <span className="inline-flex items-center gap-1.5">
-        <span className="font-semibold text-slate-900">{r.jdSkillName}</span>
-        {r.mandatory && (
-          <Tooltip content="Mandatory skill">
-            <span className="text-[9px] font-bold uppercase tracking-wide text-rose-500 border border-rose-200 rounded px-1 py-0.5">
-              M
-            </span>
-          </Tooltip>
-        )}
-      </span>
-    ),
-    matchType: renderMatchTypeBadge(r.matchType),
-    matchedCandidateSkill: r.matchedCandidateSkill || <span className="text-slate-400">—</span>,
-    scoreContribution: <span className="font-semibold text-slate-900">{r.scoreContribution.toFixed(2)}</span>,
-    weightApplied: formatWeightApplied(r.weightApplied),
-  }));
+  const recognisedAdditional = additionalSkills.filter((s) => s.scoringWeight > 0);
+  const unrecognisedAdditional = additionalSkills.filter((s) => s.scoringWeight === 0);
 
   return (
     <div className="space-y-4">
@@ -97,8 +157,8 @@ export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [
       {helpOpen && (
         <div id="hierarchy-match-help" className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-4">
           <div>
-            <div className="text-[12px] font-bold text-slate-700 mb-2">Hierarchy match weight</div>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <div className="text-[12px] font-bold text-slate-700 mb-2">Hierarchy multiplier</div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
               {WEIGHT_LEGEND.map((l) => (
                 <div key={l.label} className="rounded-lg bg-white border border-slate-200 p-2 text-center">
                   <div className="text-[10.5px] text-slate-500">{l.label}</div>
@@ -114,7 +174,7 @@ export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [
           </p>
 
           <div>
-            <div className="text-[12px] font-bold text-slate-700 mb-2">Candidate scoring confidence</div>
+            <div className="text-[12px] font-bold text-slate-700 mb-2">Candidate scoring weight (normalisation discount)</div>
             <div className="grid grid-cols-2 gap-2">
               {CONFIDENCE_LEGEND.map((c) => (
                 <div key={c.value} className="rounded-lg bg-white border border-slate-200 p-2.5">
@@ -140,7 +200,7 @@ export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [
                     className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-[12px] text-rose-700 bg-white/70 rounded-lg px-3 py-1.5"
                   >
                     <span className="font-semibold">{r.jdSkillName}</span>
-                    <span>Configured Weight: {r.configuredWeight}</span>
+                    <span>Configured Weight: {r.jdWeight}</span>
                     <span className="italic">No hierarchy match found</span>
                   </div>
                 ))}
@@ -158,36 +218,35 @@ export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [
         </div>
       )}
 
-      <div className="hidden sm:block overflow-x-auto rounded-xl">
-        <GenericTable headers={headers} columns={columns} rows={rows} />
+      {/* S05-T01 — Mandatory Skills. Mandatory Coverage % is a summary stat
+          above the table, distinct from the Deterministic Score/Passed-Failed
+          badge which stays at the bottom of the whole section. */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[12.5px] font-bold text-slate-900">Mandatory Skills</div>
+          <div className="text-[11.5px] text-slate-500">
+            Mandatory Coverage: <span className="font-semibold text-slate-900">{scoreBreakdown.mandatoryCoveragePct.toFixed(1)}%</span>
+          </div>
+        </div>
+        <SkillTable items={mandatoryItems} />
       </div>
 
-      <div className="sm:hidden space-y-2">
-        {items.map((r, i) => (
-          <div key={i} className="rounded-xl border border-slate-200 bg-white p-3 space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 min-w-0">
-                <span className="font-semibold text-[12.5px] text-slate-900 truncate">{r.jdSkillName}</span>
-                {r.mandatory && (
-                  <span className="text-[9px] font-bold uppercase tracking-wide text-rose-500 border border-rose-200 rounded px-1 py-0.5 shrink-0">
-                    M
-                  </span>
-                )}
-              </span>
-              {renderMatchTypeBadge(r.matchType)}
-            </div>
-            <div className="text-[11.5px] text-slate-500">Matched: {r.matchedCandidateSkill || "—"}</div>
-            <div className="flex items-center justify-between text-[11.5px] text-slate-500">
-              <span>
-                Score: <span className="font-semibold text-slate-900">{r.scoreContribution.toFixed(2)}</span>
-              </span>
-              <span>
-                Weight: <span className="font-semibold text-slate-900">{formatWeightApplied(r.weightApplied)}</span>
-              </span>
+      {/* S05-T02 — Preferred (Bonus) Skills, visually distinct from Mandatory,
+          hidden entirely when the JD has no preferred skills. */}
+      {preferredItems.length > 0 && (
+        <div className="rounded-xl bg-indigo-50/60 border border-indigo-100 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[12.5px] font-bold text-indigo-900">Preferred (Bonus)</div>
+            <div className="text-[11.5px] text-indigo-700">
+              Preferred skill bonus: <span className="font-semibold">{scoreBreakdown.preferredSkillBonus.toFixed(2)}</span>
             </div>
           </div>
-        ))}
-      </div>
+          <SkillTable items={preferredItems} />
+          <p className="text-[11px] text-indigo-600 mt-2">
+            Preferred skill bonus contributes to composite score via the deterministic weight component.
+          </p>
+        </div>
+      )}
 
       {manualSkills.length > 0 && (
         <div>
@@ -205,6 +264,67 @@ export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [
         </div>
       )}
 
+      {/* S05-T03 — Additional Candidate Skills (collapsible) */}
+      <div className="rounded-xl border border-slate-200">
+        <button
+          type="button"
+          onClick={() => setAdditionalOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-left"
+          aria-expanded={additionalOpen}
+          aria-controls="additional-candidate-skills"
+        >
+          <span className="text-[12.5px] font-bold text-slate-900">
+            Additional Candidate Skills{" "}
+            <span className="text-slate-400 font-normal">
+              — {additionalSkills.length} additional skill{additionalSkills.length === 1 ? "" : "s"} — click to view
+            </span>
+          </span>
+          {additionalOpen ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
+        </button>
+
+        {additionalOpen && (
+          <div id="additional-candidate-skills" className="px-4 pb-4 space-y-4">
+            {additionalSkills.length === 0 ? (
+              <p className="text-[11.5px] text-slate-400">No additional or unrecognised skills detected.</p>
+            ) : (
+              <>
+                {recognisedAdditional.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Not matched to any JD skill</div>
+                    {recognisedAdditional.map((s, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 bg-slate-50 rounded-lg px-3 py-1.5">
+                        <span className="text-[12.5px] font-semibold text-slate-900">{s.canonicalName}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {renderMatchTierBadge(s.matchTier)}
+                          <span className="text-[11.5px] text-slate-500">Weight: {s.scoringWeight.toFixed(1)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {unrecognisedAdditional.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Unrecognised Skills</div>
+                    {unrecognisedAdditional.map((s, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 bg-slate-50 rounded-lg px-3 py-1.5">
+                        <span className="text-[12.5px] font-semibold text-slate-900">{s.canonicalName}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {renderMatchTierBadge(s.matchTier)}
+                          <span className="text-[11.5px] text-slate-500">Weight: 0.0</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* S05-T01 summary — Deterministic Score + Passed/Failed at the bottom
+          of the section (Mandatory Coverage % is shown above the table). */}
       <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200 p-4">
         <div>
           <div className="text-[11px] text-slate-400">Deterministic Score</div>

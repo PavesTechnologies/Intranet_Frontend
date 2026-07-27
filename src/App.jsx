@@ -115,13 +115,13 @@ import ResumeIntakePage from "./pages/airs/resume-intake/ResumeIntakePage.jsx";
 import IntakeFlowPage from "./pages/airs/resume-intake/intake/IntakeFlowPage.jsx";
 import ReviewPage from "./pages/airs/resume-intake/intake/ReviewPage.jsx";
 import CandidateRankingPage from "./pages/airs/candidates/CandidateRankingPage.jsx";
+import CandidateDetailPage from "./pages/airs/candidates/CandidateDetailPage.jsx";
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
 import AnalyticsPage from "./pages/airs/analytics/AnalyticsPage.jsx";
 import SettingsPage from "./pages/airs/settings/SettingsPage.jsx";
 import SkillOntologyPage from "./pages/airs/skill-ontology/SkillOntologyPage.jsx";
 import SkillDetailPage from "./pages/airs/skill-ontology/SkillDetailPage.jsx";
-import UnknownSkillDetailPage from "./pages/airs/skill-ontology/UnknownSkillDetailPage.jsx";
 import HierarchyPage from "./pages/airs/skill-ontology/HierarchyPage.jsx";
 
 import AdminOfferLettersDashboard from "./pages/employee-onboarding/admin/AdminOfferLettersDashboard.jsx";
@@ -1095,6 +1095,14 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path="/airs/candidates/:candidateId"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <CandidateDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/airs/pipeline"
             element={
               <ProtectedRoute roles={["General"]}>
@@ -1139,14 +1147,6 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute roles={["General"]}>
                 <HierarchyPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/airs/skill-ontology/unknown/:unknownSkillId"
-            element={
-              <ProtectedRoute roles={["General"]}>
-                <UnknownSkillDetailPage />
               </ProtectedRoute>
             }
           />
