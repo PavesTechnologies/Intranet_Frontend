@@ -5,15 +5,15 @@
 // importSkills / getImportErrorReport / exportSkills / getSkillHierarchy /
 // getSkillChildren call the real backend (every GET/POST/PATCH endpoint
 // provided so far). Everything else (aliases, similar-skill resolution,
-// merge, recent activity, seeding) still operates against the in-memory/
-// localStorage-backed mock dataset in mock/skillOntologyMockData.js, since no
-// real endpoint exists for those yet.
+// merge, seeding) still operates against the in-memory/localStorage-backed
+// mock dataset in mock/skillOntologyMockData.js, since no real endpoint
+// exists for those yet.
 //
 // Real calls follow the same convention as src/pages/airs/service/campaignservice.js:
 // same BASE_URL source, same inline Authorization header, same try/catch/throw shape.
 
 import api from "../../../../api/axiosInstance";
-import { loadMockSkills, persistMockSkills, buildActivityForSkill } from "../mock/skillOntologyMockData";
+import { loadMockSkills, persistMockSkills } from "../mock/skillOntologyMockData";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 
@@ -124,10 +124,7 @@ export const getUnknownSkills = async (params = {}) => {
   });
 };
 
-// Accepts: page, page_size, search, category, confidence, is_active.
-// Note: this module's Source filter dropdown has no server-side equivalent
-// in the given API, so "source" is never sent — the dropdown stays in the UI
-// per "don't change component structure" but doesn't currently narrow results.
+// Accepts: page, page_size, search, category, confidence, source, is_active.
 export const getSkills = async (params = {}) => {
   // Built fresh from the caller's params every call — never mutated in place
   // and never shared with getCategories' request below, so filter state from
@@ -139,6 +136,7 @@ export const getSkills = async (params = {}) => {
     search: params.search,
     category: params.category,
     confidence: params.confidence,
+    source: params.source,
     is_active: params.is_active,
   };
   // Query key = url + exact filters. Two callers requesting the identical
@@ -374,6 +372,7 @@ export const exportSkills = async (params = {}) => {
         search: params.search,
         category: params.category,
         confidence: params.confidence,
+        source: params.source,
         is_active: params.is_active,
       },
       headers: authHeaders(),
@@ -409,14 +408,6 @@ export const removeAlias = async (skillId, aliasId) => {
   const all = loadMockSkills();
   persistMockSkills(all.map((s) => (s.id === skillId ? { ...s, aliases: s.aliases.filter((a) => a !== aliasId) } : s)));
   return ok({ id: skillId });
-};
-
-export const getSkillActivity = async (skillId) => {
-  await delay();
-  const all = loadMockSkills();
-  const skill = all.find((s) => s.id === skillId);
-  if (!skill) return ok({ events: [] });
-  return ok({ events: buildActivityForSkill(skill) });
 };
 
 export const getSimilarSkills = async (skillId) => {

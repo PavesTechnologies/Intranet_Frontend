@@ -138,17 +138,3 @@ export function persistMockSkills(skills) {
     // Ignore storage quota errors.
   }
 }
-
-export function buildActivityForSkill(skill) {
-  const events = [
-    { timestamp: skill.createdAt, eventType: "CREATED", actorName: pick(ACTORS), description: `Skill "${skill.canonicalName}" created via ${skill.source}.` },
-  ];
-  if (skill.embeddingStatus === "GENERATED") {
-    events.push({ timestamp: randomDate(20), eventType: "EMBEDDING", actorName: "AIRS Parser Engine", description: "Embedding vector generated." });
-  }
-  if (skill.aliases.length > 0) {
-    events.push({ timestamp: randomDate(15), eventType: "ALIAS_ADDED", actorName: pick(ACTORS), description: `Alias "${skill.aliases[0]}" added.` });
-  }
-  events.push({ timestamp: skill.lastSeen, eventType: "SEEN", actorName: "AIRS Parser Engine", description: "Matched against an incoming resume/JD." });
-  return events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-}

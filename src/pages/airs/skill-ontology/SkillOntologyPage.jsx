@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import Pagination from "../../../components/Pagination/pagination";
-import useSkillOntologyList from "./hooks/useSkillOntologyList";
+import useSkillOntologyList, { buildSkillQueryParams } from "./hooks/useSkillOntologyList";
 import useUnknownSkillsList from "./hooks/useUnknownSkillsList";
 import SkillToolbar from "./components/SkillToolbar";
 import SkillTabs from "./components/SkillTabs";
@@ -10,7 +10,7 @@ import SkillFilters from "./components/SkillFilters";
 import SkillTable from "./components/SkillTable";
 import UnknownSkillTable from "./components/UnknownSkillTable";
 import ErrorState from "./components/ErrorState";
-import AddSkillDrawer from "./components/AddSkillDrawer";
+import AddSkillModal from "./components/AddSkillModal";
 import EditSkillModal from "./components/EditSkillModal";
 import DeactivateDialog from "./components/DeactivateDialog";
 import ReactivateDialog from "./components/ReactivateDialog";
@@ -84,8 +84,13 @@ export default function SkillOntologyPage() {
       const similarRes = await getSimilarSkills(newSkill.id).catch(() => null);
       const similarSkills = similarRes?.data || similarRes || [];
       if (similarSkills.length > 0) setSimilarState({ newSkill, similarSkills });
-    } catch {
-      toast.error("Failed to create skill.");
+    } catch (err) {
+      // Surfaces backend validation messages (e.g. 409 Conflict — "Skill
+      // 'Java' already exists.") instead of a generic string. The dialog is
+      // deliberately left open and no refresh/success toast fires here —
+      // toast.success/setAddOpen(false)/list.refresh() above only run on
+      // the happy path, so a rejected request never reaches them.
+      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to create skill.");
     } finally {
       setIsSubmitting(false);
     }
@@ -210,12 +215,15 @@ export default function SkillOntologyPage() {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const response = await exportSkills({
-        search: list.search || undefined,
-        category: list.category === "All" ? undefined : list.category,
-        confidence: list.confidenceFilter === "All" ? undefined : list.confidenceFilter.toLowerCase(),
-        is_active: list.showInactive ? undefined : true,
-      });
+      const response = await exportSkills(
+        buildSkillQueryParams({
+          search: list.search,
+          category: list.category,
+          confidence: list.confidenceFilter,
+          source: list.source,
+          showInactive: list.showInactive,
+        })
+      );
       const blob = new Blob([response.data], { type: response.headers["content-type"] });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -335,7 +343,7 @@ export default function SkillOntologyPage() {
         </>
       )}
 
-      <AddSkillDrawer
+      <AddSkillModal
         open={addOpen}
         existingSkills={list.skills}
         categoryOptions={formCategoryOptions}

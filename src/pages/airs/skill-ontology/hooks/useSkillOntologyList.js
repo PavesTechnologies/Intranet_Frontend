@@ -1,7 +1,48 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { getSkills, getCategories } from "../services/skillOntologyService";
 import { SKILL_ONTOLOGY_PAGE_SIZE } from "../constants/skillOntologyConstants";
+
+// Safety cap for the page-fetch loop below — this dataset is small, so this
+// is just a backstop against looping forever if a response's `total` is ever
+// wrong or missing, not a size we expect to actually hit.
+const MAX_FALLBACK_PAGES = 20;
+
+// Fetches every page for one is_active value, using ONLY the already-valid
+// page_size (never an inflated one — see fetchSkills below for why that
+// matters) and stopping as soon as a page comes back short or `total` is
+// reached.
+async function fetchAllPages(params) {
+  let page = 1;
+  let all = [];
+  let total = Infinity;
+  while (page <= MAX_FALLBACK_PAGES && all.length < total) {
+    const res = await getSkills({ ...params, page, page_size: SKILL_ONTOLOGY_PAGE_SIZE });
+    const items = res?.data?.items || res?.items || [];
+    total = res?.data?.total ?? res?.total ?? all.length + items.length;
+    if (items.length === 0) break;
+    all = all.concat(items);
+    page += 1;
+  }
+  return all;
+}
+
+// Single source of truth for turning raw filter state into the exact
+// query params the backend expects. Used by both the list's own fetch and
+// SkillOntologyPage's export handler so the two can never drift — e.g. one
+// omitting "All Sources" while the other forgets to (the bug that caused
+// the Source filter to silently do nothing everywhere it was used).
+export function buildSkillQueryParams({ search, category, confidence, source, showInactive }) {
+  return {
+    search: search || undefined,
+    category: category === "All" ? undefined : category,
+    confidence: confidence === "All" ? undefined : confidence?.toLowerCase(),
+    source: source === "All" ? undefined : source,
+    // Default (toggle off): active only. Toggle on: omit is_active entirely
+    // so the backend returns both active and inactive records.
+    is_active: showInactive ? undefined : true,
+  };
+}
 
 // Server-driven list state (search/filter/pagination all round-trip to the
 // backend) — matches the fetch pattern used by src/pages/airs/pages/Campaigns.jsx
@@ -22,6 +63,12 @@ export default function useSkillOntologyList() {
 
   const [categoryOptions, setCategoryOptions] = useState([{ label: "All Categories", value: "All" }]);
 
+  // Guards against an older, slower fetch (e.g. the two-request Show
+  // Inactive fallback below) resolving after a newer one and overwriting
+  // fresher results with stale data — only the most recently *started*
+  // fetch is allowed to commit its results.
+  const latestRequestId = useRef(0);
+
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(search), 500);
     return () => clearTimeout(handler);
@@ -32,28 +79,60 @@ export default function useSkillOntologyList() {
   }, [debouncedSearch, category, confidenceFilter, source, showInactive]);
 
   const fetchSkills = useCallback(async () => {
+    const requestId = ++latestRequestId.current;
     setIsLoading(true);
     setError(null);
     try {
-      const res = await getSkills({
-        search: debouncedSearch || undefined,
-        category: category === "All" ? undefined : category,
-        confidence: confidenceFilter === "All" ? undefined : confidenceFilter.toLowerCase(),
-        // Default (toggle off): active only. Toggle on: omit is_active entirely
-        // so the backend returns both active and inactive records.
-        is_active: showInactive ? undefined : true,
-        page: currentPage,
-        page_size: SKILL_ONTOLOGY_PAGE_SIZE,
+      const baseParams = buildSkillQueryParams({
+        search: debouncedSearch,
+        category,
+        confidence: confidenceFilter,
+        source,
+        showInactive,
       });
-      setSkills(res?.data?.items || res?.items || []);
-      setTotalCount(res?.data?.total ?? res?.total ?? 0);
+
+      let items;
+      let total;
+
+      if (!showInactive) {
+        // Show Inactive off — single, server-paginated, active-only request.
+        // Unchanged from before.
+        const res = await getSkills({ ...baseParams, page: currentPage, page_size: SKILL_ONTOLOGY_PAGE_SIZE });
+        items = res?.data?.items || res?.items || [];
+        total = res?.data?.total ?? res?.total ?? 0;
+      } else {
+        // Show Inactive on — temporary client-side fallback. Omitting
+        // is_active and trusting the backend to return both statuses isn't
+        // reliable for every category/search/confidence/source combination,
+        // so fetch active and inactive explicitly (same other filters, same
+        // single source of truth via baseParams) and merge here instead.
+        // Every request this sends uses the same page/page_size/is_active
+        // shape as the already-working non-fallback path above — no new or
+        // out-of-range parameter values are ever introduced.
+        const [activeItems, inactiveItems] = await Promise.all([
+          fetchAllPages({ ...baseParams, is_active: true }),
+          fetchAllPages({ ...baseParams, is_active: false }),
+        ]);
+        const combined = [...activeItems, ...inactiveItems].sort((a, b) =>
+          (a.canonicalName || "").localeCompare(b.canonicalName || "")
+        );
+
+        total = combined.length;
+        const start = (currentPage - 1) * SKILL_ONTOLOGY_PAGE_SIZE;
+        items = combined.slice(start, start + SKILL_ONTOLOGY_PAGE_SIZE);
+      }
+
+      if (requestId !== latestRequestId.current) return; // a newer fetch has since started — drop this one
+      setSkills(items);
+      setTotalCount(total);
     } catch (err) {
+      if (requestId !== latestRequestId.current) return;
       setError(err);
       toast.error("Failed to load the skill ontology.");
     } finally {
-      setIsLoading(false);
+      if (requestId === latestRequestId.current) setIsLoading(false);
     }
-  }, [debouncedSearch, category, confidenceFilter, showInactive, currentPage]);
+  }, [debouncedSearch, category, confidenceFilter, source, showInactive, currentPage]);
 
   const fetchCategories = useCallback(async () => {
     try {

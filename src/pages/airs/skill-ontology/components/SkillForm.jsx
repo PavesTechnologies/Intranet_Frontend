@@ -7,7 +7,7 @@ import { CONFIDENCE_FORM_OPTIONS, STATUS_FORM_OPTIONS } from "../constants/skill
 
 const PARENT_SEARCH_MIN_CHARS = 2;
 
-// Shared field markup for both AddSkillDrawer and EditSkillModal — a pure
+// Shared field markup for both AddSkillModal and EditSkillModal — a pure
 // controlled component; the wrapper owns values/errors/validation/submit.
 //
 // categoryOptions is optional: SkillOntologyPage already has these (from its

@@ -4,7 +4,7 @@ import useCandidateRanking from "./hooks/useCandidateRanking";
 import CandidateStats from "./components/CandidateStats";
 import CandidateFilters from "./components/CandidateFilters";
 import CandidateTable from "./components/CandidateTable";
-import CandidateDetailDrawer from "./components/detail/CandidateDetailDrawer";
+import CandidateDetailModal from "./components/detail/CandidateDetailModal";
 
 export default function CandidateRankingPage() {
   const {
@@ -61,7 +61,7 @@ export default function CandidateRankingPage() {
         />
       )}
 
-      <CandidateDetailDrawer
+      <CandidateDetailModal
         candidate={detailCandidate}
         onClose={closeCandidate}
         onAddComment={addComment}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import { getSkill, addAlias, removeAlias, getSkillActivity } from "../services/skillOntologyService";
+import { getSkill, addAlias, removeAlias } from "../services/skillOntologyService";
 
 // Aliases may come back from the backend either as plain strings (form-local,
 // unsaved) or as { id, name } objects (persisted, removable by id) — this
@@ -12,9 +12,6 @@ export default function useSkillDetail(skillId) {
   const [skill, setSkill] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  const [activity, setActivity] = useState([]);
-  const [isLoadingActivity, setIsLoadingActivity] = useState(false);
 
   const [isMutatingAlias, setIsMutatingAlias] = useState(false);
 
@@ -32,26 +29,9 @@ export default function useSkillDetail(skillId) {
     }
   }, [skillId]);
 
-  const fetchActivity = useCallback(async () => {
-    if (!skillId) return;
-    setIsLoadingActivity(true);
-    try {
-      const res = await getSkillActivity(skillId);
-      setActivity(res?.data?.events || res?.events || res?.data || []);
-    } catch {
-      setActivity([]);
-    } finally {
-      setIsLoadingActivity(false);
-    }
-  }, [skillId]);
-
   useEffect(() => {
     fetchSkill();
   }, [fetchSkill]);
-
-  useEffect(() => {
-    fetchActivity();
-  }, [fetchActivity]);
 
   const handleAddAlias = async (alias) => {
     setIsMutatingAlias(true);
@@ -94,8 +74,6 @@ export default function useSkillDetail(skillId) {
     error,
     refresh: fetchSkill,
     applyUpdate,
-    activity,
-    isLoadingActivity,
     aliasNames: (skill?.aliases || []).map(aliasName),
     addAlias: handleAddAlias,
     removeAlias: handleRemoveAlias,
