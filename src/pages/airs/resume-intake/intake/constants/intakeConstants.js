@@ -78,6 +78,6 @@ export const SKILL_STATUS_STYLE = {
 export const ACCEPTED_FILE_TYPES = [".pdf", ".docx"];
 export const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15MB
 
-// How the mock polling loop advances through stages, purely for the demo —
-// a real integration replaces this with a setInterval hitting the status endpoint.
-export const MOCK_POLL_INTERVAL_MS = 900;
+// Cadence for polling GET /resumes/processing-status/{taskId} while a resume
+// is queued or running.
+export const STATUS_POLL_INTERVAL_MS = 3000;

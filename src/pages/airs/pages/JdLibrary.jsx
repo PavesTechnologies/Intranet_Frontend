@@ -28,6 +28,7 @@ import Pagination from "../../../components/Pagination/pagination";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import Modal from "../../../components/ui/Modal";
 import FilterListbox from "../../../components/filter/FilterListbox";
+import CountriesList from "../../../components/CountriesList";
 import { Badge } from "../../../components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../../components/ui/tabs";
 import GenericTable from "../../../components/Table/table";
@@ -38,12 +39,36 @@ import JdProcessingList from "./JdProcessingList";
 
 const statusOptions = [
   { label: "All Statuses", value: "All" },
-  { label: "Ready", value: "Ready" },
-  { label: "Draft", value: "Draft" },
-  { label: "Pending", value: "Pending_Review" },
-  { label: "Parsing", value: "Parsing" },
-  { label: "Closed", value: "Closed" },
+  { label: "VERIFIED", value: "VERIFIED" },
+  { label: "UNVERIFIED", value: "UNVERIFIED" },
+  { label: "PARTIALLY VERIFIED", value: "PARTIALLY_VERIFIED" }
 ];
+
+function Toggle({ checked, onChange, label }) {
+  return (
+    <div className="flex items-center gap-2.5 select-none">
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+          checked ? "bg-blue-600" : "bg-slate-200"
+        }`}
+      >
+        <span
+          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+            checked ? "translate-x-4" : "translate-x-0"
+          }`}
+        />
+      </button>
+      <span
+        className="text-xs font-bold text-slate-700 cursor-pointer"
+        onClick={() => onChange(!checked)}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
 
 const jurisdictionOptions = [
   { label: "All Jurisdictions", value: "All" },
@@ -73,6 +98,7 @@ export default function JdLibrary() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [jurisdictionFilter, setJurisdictionFilter] = useState("All");
   const [sourceFilter, setSourceFilter] = useState("All");
+  const [activeFilter, setActiveFilter] = useState(true);
   // Sorting State
   const [sortField, setSortField] = useState("createdDate");
   const [sortOrder, setSortOrder] = useState("desc");
@@ -129,7 +155,8 @@ export default function JdLibrary() {
       const params = {
         search: debouncedSearch || undefined,
         jurisdiction: jurisdictionFilter === "All" ? undefined : jurisdictionFilter,
-        active: statusFilter === "Closed" ? false : (statusFilter === "All" ? undefined : true),
+        is_verified: statusFilter === "All" ? undefined : statusFilter,
+        active: activeFilter,
         source_format: getSourceFormatParam(sourceFilter),
         page: currentPage,
         size: itemsPerPage,
@@ -152,7 +179,7 @@ export default function JdLibrary() {
 
   useEffect(() => {
     fetchJds();
-  }, [debouncedSearch, statusFilter, jurisdictionFilter, sourceFilter, currentPage, sortField, sortOrder]);
+  }, [debouncedSearch, statusFilter, jurisdictionFilter, sourceFilter, activeFilter, currentPage, sortField, sortOrder]);
 
   // 1. Sort handler
   const handleSort = (field) => {
@@ -171,49 +198,43 @@ export default function JdLibrary() {
   // Status Badge Colors using common UI Badge component
   const getStatusBadge = (status) => {
     const normalized = String(status || "").toUpperCase();
-    if (normalized === "READY" || normalized === "VERIFIED") {
-      return <Badge className="bg-blue-50 text-blue-700 border-blue-100 font-semibold px-2.5 py-1 text-xs">Ready</Badge>;
+    if (normalized === "VERIFIED") {
+      return <Badge className="bg-blue-50 text-blue-700 border-blue-100 font-semibold px-2.5 py-1 text-xs">{status}</Badge>;
     }
-    if (normalized === "DRAFT" || normalized === "UNVERIFIED") {
-      return <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">Draft</Badge>;
+    if (normalized === "UNVERIFIED") {
+      return <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">{status}</Badge>;
     }
     if (normalized === "PARTIALLY_VERIFIED") {
-      return <Badge className="bg-amber-50 text-amber-700 border-amber-100 font-semibold px-2.5 py-1 text-xs">Pending</Badge>;
-    }
-    if (normalized === "PARSING") {
-      return (
-        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 font-semibold px-2.5 py-1 text-xs gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-          Parsing
-        </Badge>
-      );
+      return <Badge className="bg-amber-50 text-amber-700 border-amber-100 font-semibold px-2.5 py-1 text-xs">{status}</Badge>;
     }
     if (normalized === "CLOSED") {
-      return <Badge className="bg-rose-50 text-rose-700 border-rose-100 font-semibold px-2.5 py-1 text-xs">Closed</Badge>;
+      return <Badge className="bg-rose-50 text-rose-700 border-rose-100 font-semibold px-2.5 py-1 text-xs">{status}</Badge>;
     }
     return <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">{status}</Badge>;
   };
   const headers = [
+    <div key="jobId" className="w-full flex justify-center select-none">Job ID</div>,
     <div key="title" className="w-full flex justify-center select-none">Title</div>,
     <div key="version" className="w-full flex justify-center select-none">Version</div>,
     <div key="source" className="w-full flex justify-center select-none">Source</div>,
     <div key="jurisdiction" className="w-full flex justify-center select-none">Region</div>,
-    <div key="createdBy" className="w-full flex justify-center select-none">Created By</div>,
-    <div key="createdDate" className="w-full flex justify-center select-none">Created Date</div>,
+    <div key="createdAt" className="w-full flex justify-center select-none">Created At</div>,
     <div key="campaignCount" className="w-full flex justify-center select-none">Campaigns</div>,
     <div key="status" className="w-full flex justify-center select-none">Status</div>,
+    <div key="isActive" className="w-full flex justify-center select-none">Active</div>,
     <div key="actions" className="w-full flex justify-center select-none">Actions</div>
   ];
 
   const columns = [
+    "jobId",
     "title",
     "version",
     "source",
     "jurisdiction",
-    "createdBy",
-    "createdDate",
+    "createdAt",
     "campaignCount",
     "status",
+    "isActive",
     "actions",
   ];
 
@@ -221,12 +242,19 @@ export default function JdLibrary() {
     return paginatedJds.map((jd) => {
       const version = jd.version || jd.version_number || 1;
       const source = jd.source || (jd.source_format === "TEXT" ? "Manual" : jd.source_format === "PDF" ? "PDF Upload" : jd.source_format === "DOCX" ? "DOCX Upload" : jd.source_format || "Manual");
-      const createdDate = jd.createdDate || (jd.created_at ? jd.created_at.split('T')[0] : "");
-      const createdBy = jd.createdBy || jd.created_by || "System";
+      const createdAt = jd.createdDate || (jd.created_at ? jd.created_at.split('T')[0] : "");
       const status = jd.status || jd.is_verified || (jd.active === false ? "Closed" : "Ready");
-      const campaignCount = jd.campaignCount !== undefined ? jd.campaignCount : 0;
+      const activeAndPausedCount = (jd.active_campaigns_count || 0) + (jd.paused_campaigns_count || 0);
+      const campaignCount = (jd.active_campaigns_count || 0) + (jd.passed_campaigns_count || 0);
+      const isActiveVersion = jd.is_active_version;
+      const isBlocked = activeAndPausedCount > 0;
 
       return {
+        jobId: (
+          <div className="w-full flex justify-center font-mono text-slate-500 text-xs">
+            {jd.job_id || jd.id || ""}
+          </div>
+        ),
         title: (
           <div
             className="w-full flex justify-center font-bold text-slate-900"
@@ -252,14 +280,9 @@ export default function JdLibrary() {
             {jd.jurisdiction}
           </div>
         ),
-        createdBy: (
+        createdAt: (
           <div className="w-full flex justify-center text-slate-500">
-            {createdBy}
-          </div>
-        ),
-        createdDate: (
-          <div className="w-full flex justify-center text-slate-500">
-            {createdDate}
+            {createdAt}
           </div>
         ),
         campaignCount: (
@@ -278,6 +301,15 @@ export default function JdLibrary() {
             {getStatusBadge(status)}
           </div>
         ),
+        isActive: (
+          <div className="w-full flex justify-center">
+            {isActiveVersion ? (
+              <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 font-semibold px-2.5 py-1 text-xs">Yes</Badge>
+            ) : (
+              <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">No</Badge>
+            )}
+          </div>
+        ),
         actions: (
           <div className="w-full flex justify-center items-center gap-1">
             <Button
@@ -293,9 +325,13 @@ export default function JdLibrary() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => { setJdModalEditId(jd.id); setJdModalOpen(true); }}
-                title="Edit JD"
-                className="h-8 w-8 text-indigo-500 hover:text-indigo-700"
+                onClick={isBlocked ? undefined : () => { setJdModalEditId(jd.id); setJdModalOpen(true); }}
+                title={isBlocked ? "Cannot edit JD linked to active or paused campaigns" : "Edit JD"}
+                className={`h-8 w-8 ${
+                  isBlocked
+                    ? "!text-indigo-300 cursor-not-allowed !pointer-events-auto"
+                    : "text-indigo-500 hover:text-indigo-700"
+                }`}
               >
                 <PencilIcon className="h-4 w-4" />
               </Button>
@@ -303,9 +339,13 @@ export default function JdLibrary() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => { setDeleteJdId(jd.id); setConfirmDelete(true); }}
-              title="Delete JD"
-              className="h-8 w-8 text-rose-500 hover:text-rose-600"
+              onClick={isBlocked ? undefined : () => { setDeleteJdId(jd.id); setConfirmDelete(true); }}
+              title={isBlocked ? "Cannot delete JD linked to active or paused campaigns" : "Delete JD"}
+              className={`h-8 w-8 ${
+                isBlocked
+                  ? "!text-rose-300 cursor-not-allowed !pointer-events-auto"
+                  : "text-rose-500 hover:text-rose-600"
+              }`}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -327,7 +367,6 @@ export default function JdLibrary() {
         toast.success(res.message || "Job Description deleted successfully");
         fetchJds();
       } catch (error) {
-        toast.error("Failed to delete Job Description");
       } finally {
         setIsJdDelete(false);
       }
@@ -361,12 +400,8 @@ export default function JdLibrary() {
           jurisdictionFilter === "All"
             ? undefined
             : jurisdictionFilter,
-        active:
-          statusFilter === "Closed"
-            ? false
-            : statusFilter === "All"
-              ? undefined
-              : true,
+        is_verified: statusFilter === "All" ? undefined : statusFilter,
+        active: activeFilter,
         source_format: getSourceFormatParam(sourceFilter),
         sort_by: getSortByParam(sortField),
         order: sortOrder,
@@ -465,43 +500,58 @@ export default function JdLibrary() {
         </div>
 
         {/* Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-auto lg:min-w-[500px]">
-          {/* Status Filter */}
-          <div className="flex flex-col gap-1 w-full">
-            {/* <span className="text-[10px] uppercase font-bold text-slate-400 px-1">Status</span> */}
-            <FilterListbox
-              options={statusOptions}
-              value={statusFilter}
-              onChange={(value) => {
-                setStatusFilter(value);
-                setCurrentPage(1);
-              }}
-            />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full lg:w-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-auto lg:min-w-[500px]">
+            {/* Status Filter */}
+            <div className="flex flex-col gap-1 w-full">
+              {/* <span className="text-[10px] uppercase font-bold text-slate-400 px-1">Status</span> */}
+              <FilterListbox
+                options={statusOptions}
+                value={statusFilter}
+                onChange={(value) => {
+                  setStatusFilter(value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
+
+            {/* Jurisdiction Filter */}
+            <div className="flex flex-col gap-1 w-full">
+              {/* <span className="text-[10px] uppercase font-bold text-slate-400 px-1">Region</span> */}
+              <CountriesList
+                variant="filter"
+                value={jurisdictionFilter === "All" ? "" : jurisdictionFilter}
+                onChange={(value) => {
+                  setJurisdictionFilter(value || "All");
+                  setCurrentPage(1);
+                }}
+                placeholder="All Jurisdictions"
+              />
+            </div>
+
+            {/* Source Filter */}
+            <div className="flex flex-col gap-1 w-full">
+              {/* <span className="text-[10px] uppercase font-bold text-slate-400 px-1">Source</span> */}
+              <FilterListbox
+                options={sourceOptions}
+                value={sourceFilter}
+                onChange={(value) => {
+                  setSourceFilter(value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
           </div>
 
-          {/* Jurisdiction Filter */}
-          <div className="flex flex-col gap-1 w-full">
-            {/* <span className="text-[10px] uppercase font-bold text-slate-400 px-1">Region</span> */}
-            <FilterListbox
-              options={jurisdictionOptions}
-              value={jurisdictionFilter}
-              onChange={(value) => {
-                setJurisdictionFilter(value);
+          {/* Active Filter Toggle */}
+          <div className="flex items-center shrink-0 px-2">
+            <Toggle
+              checked={activeFilter}
+              onChange={(checked) => {
+                setActiveFilter(checked);
                 setCurrentPage(1);
               }}
-            />
-          </div>
-
-          {/* Source Filter */}
-          <div className="flex flex-col gap-1 w-full">
-            {/* <span className="text-[10px] uppercase font-bold text-slate-400 px-1">Source</span> */}
-            <FilterListbox
-              options={sourceOptions}
-              value={sourceFilter}
-              onChange={(value) => {
-                setSourceFilter(value);
-                setCurrentPage(1);
-              }}
+              label="Active"
             />
           </div>
         </div>
@@ -591,7 +641,7 @@ export default function JdLibrary() {
       <ConfirmationModal
         isOpen={confirmDelete}
         title="Confirm Job Description Deletion"
-        message="Are you sure you want to delete Job Description? This action is permanent and will remove all version history logs from the platform."
+        message="Are you sure you want to delete Job Description? This is a soft delete, not a permanent one — the record and its version history will be retained and can be restored later."
         onConfirm={handleDeleteConfirm}
         onCancel={() => { setDeleteJdId(null); setConfirmDelete(false); }}
         confirmText="Yes, Delete"

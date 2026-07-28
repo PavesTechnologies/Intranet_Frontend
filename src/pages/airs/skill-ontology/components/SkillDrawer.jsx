@@ -2,9 +2,10 @@ import React from "react";
 import { X } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../../../../components/ui/sheet";
 
-// Shared drawer chrome reused by AddSkillDrawer and BulkImportDrawer — keeps
-// title/subtitle/width/close/footer consistent across the module's drawers.
-// (Edit uses the centered global Modal instead — see EditSkillModal.jsx.)
+// Shared drawer chrome used by BulkImportDrawer — keeps title/subtitle/
+// width/close/footer consistent for the module's remaining drawer.
+// (Add and Edit both use the centered global Modal instead — see
+// AddSkillModal.jsx / EditSkillModal.jsx.)
 export default function SkillDrawer({ open, onClose, title, subtitle, width = "max-w-lg", children, footer }) {
   return (
     <Sheet open={open} onOpenChange={(next) => !next && onClose()}>

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ChevronLeft, PencilIcon, Ban, RotateCcw, Network } from "lucide-react";
+import { ArrowLeft, PencilIcon, Ban, RotateCcw, Network } from "lucide-react";
 import { toast } from "react-toastify";
 import Button from "../../../components/Button/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -19,7 +19,6 @@ import { updateSkill as updateSkillApi, updateSkillStatus } from "./services/ski
 const TABS = [
   { id: "aliases", label: "Aliases" },
   { id: "hierarchy", label: "Hierarchy" },
-  { id: "activity", label: "Recent Activity" },
 ];
 
 export default function SkillDetailPage() {
@@ -144,23 +143,24 @@ export default function SkillDetailPage() {
 
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
-      <button
-        onClick={() => navigate("/airs/skill-ontology")}
-        className="flex items-center gap-1 text-[13px] font-semibold text-blue-600 mb-4"
-      >
-        <ChevronLeft size={15} /> Back to Skill Ontology
-      </button>
-
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 mb-4">
         <div className="flex items-start justify-between flex-wrap gap-3">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="font-extrabold text-[16px] text-slate-900">{skill.canonicalName}</div>
-              {renderStatusPill(skill.status)}
-              {renderVerificationBadge(skill.confidence)}
-            </div>
-            <div className="text-[12.5px] text-slate-500">
-              {skill.category} · Source: {getSourceLabel(skill.source)} · Last seen {formatDate(skill.lastSeen)}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate("/airs/skill-ontology")}
+              className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm shrink-0"
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="font-extrabold text-[16px] text-slate-900">{skill.canonicalName}</div>
+                {renderStatusPill(skill.status)}
+                {renderVerificationBadge(skill.confidence)}
+              </div>
+              <div className="text-[12.5px] text-slate-500">
+                {skill.category} · Source: {getSourceLabel(skill.source)} · Last seen {formatDate(skill.lastSeen)}
+              </div>
             </div>
           </div>
           <div className="flex gap-2">
@@ -260,30 +260,6 @@ export default function SkillDetailPage() {
                   </div>
                 )}
               </div>
-            </div>
-          )}
-
-          {tab === "activity" && (
-            <div className="space-y-4 pl-1">
-              {detail.isLoadingActivity ? (
-                <LoadingSpinner text="Loading activity..." />
-              ) : detail.activity.length === 0 ? (
-                <p className="text-[12px] text-slate-400">No recent activity.</p>
-              ) : (
-                detail.activity.map((event, i) => (
-                  <div key={i} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className="w-2 h-2 rounded-full mt-1.5 bg-blue-600" />
-                      {i < detail.activity.length - 1 && <div className="w-px flex-1 bg-slate-200" />}
-                    </div>
-                    <div className="pb-1">
-                      <div className="text-[11px] font-semibold text-slate-400">{formatDate(event.timestamp)}</div>
-                      <div className="text-[13px] text-slate-900">{event.description}</div>
-                      {event.actorName && <div className="text-[11px] text-slate-400">by {event.actorName}</div>}
-                    </div>
-                  </div>
-                ))
-              )}
             </div>
           )}
         </div>

@@ -1,8 +1,8 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import Pagination from "../../../components/Pagination/pagination";
-import useSkillOntologyList from "./hooks/useSkillOntologyList";
+import useSkillOntologyList, { buildSkillQueryParams } from "./hooks/useSkillOntologyList";
 import useUnknownSkillsList from "./hooks/useUnknownSkillsList";
 import SkillToolbar from "./components/SkillToolbar";
 import SkillTabs from "./components/SkillTabs";
@@ -10,29 +10,25 @@ import SkillFilters from "./components/SkillFilters";
 import SkillTable from "./components/SkillTable";
 import UnknownSkillTable from "./components/UnknownSkillTable";
 import ErrorState from "./components/ErrorState";
-import AddSkillDrawer from "./components/AddSkillDrawer";
+import AddSkillModal from "./components/AddSkillModal";
 import EditSkillModal from "./components/EditSkillModal";
 import DeactivateDialog from "./components/DeactivateDialog";
 import ReactivateDialog from "./components/ReactivateDialog";
 import ChildHandlingDialog from "./components/ChildHandlingDialog";
-import SimilarSkillDialog from "./components/SimilarSkillDialog";
 import BulkImportDrawer from "./components/BulkImportDrawer";
 import {
   createSkill,
   updateSkill,
   updateSkillStatus,
   getSkill,
-  getSimilarSkills,
-  mergeSkills,
-  addAsAlias,
   exportSkills,
-  seedOntology,
 } from "./services/skillOntologyService";
 import { EMPTY_SKILL_FORM } from "./constants/skillOntologyConstants";
 
 export default function SkillOntologyPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("verified");
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(location.state?.tab || "verified");
 
   const list = useSkillOntologyList();
   const unknown = useUnknownSkillsList(activeTab === "unknown");
@@ -43,10 +39,8 @@ export default function SkillOntologyPage() {
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [reactivateTarget, setReactivateTarget] = useState(null);
   const [childHandling, setChildHandling] = useState(null); // { skill, children }
-  const [similarState, setSimilarState] = useState(null); // { newSkill, similarSkills }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
 
   // The list's own category fetch already has these — strip the filter-only
@@ -66,6 +60,14 @@ export default function SkillOntologyPage() {
     setAddOpen(true);
   };
 
+  // "Promote to Skill" from UnknownSkillDetailPage navigates back here with
+  // the target skill in location state, since that page has no create-skill
+  // flow of its own — reuses the exact same Add Skill drawer flow as above.
+  useEffect(() => {
+    if (location.state?.promoteSkill) handlePromote(location.state.promoteSkill);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleCreate = async (values) => {
     setIsSubmitting(true);
     try {
@@ -76,16 +78,16 @@ export default function SkillOntologyPage() {
         parent_skill_id: values.parentSkillId || null,
         confidence: values.confidence,
       });
-      const newSkill = res?.data || res;
       toast.success(`Skill "${values.canonicalName}" created successfully.`);
       setAddOpen(false);
       list.refresh();
-
-      const similarRes = await getSimilarSkills(newSkill.id).catch(() => null);
-      const similarSkills = similarRes?.data || similarRes || [];
-      if (similarSkills.length > 0) setSimilarState({ newSkill, similarSkills });
-    } catch {
-      toast.error("Failed to create skill.");
+    } catch (err) {
+      // Surfaces backend validation messages (e.g. 409 Conflict — "Skill
+      // 'Java' already exists.") instead of a generic string. The dialog is
+      // deliberately left open and no refresh/success toast fires here —
+      // toast.success/setAddOpen(false)/list.refresh() above only run on
+      // the happy path, so a rejected request never reaches them.
+      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to create skill.");
     } finally {
       setIsSubmitting(false);
     }
@@ -186,36 +188,18 @@ export default function SkillOntologyPage() {
     }
   };
 
-  const handleSimilarAction = async (action, otherSkill) => {
-    setIsSubmitting(true);
-    try {
-      if (action === "merge_existing") {
-        await mergeSkills(similarState.newSkill.id, otherSkill.id);
-        toast.success(`Merged into "${otherSkill.canonicalName}".`);
-      } else if (action === "add_as_alias") {
-        await addAsAlias(similarState.newSkill.id, otherSkill.id);
-        toast.success(`Added as an alias of "${otherSkill.canonicalName}".`);
-      } else {
-        toast.success("Kept as a new canonical skill.");
-      }
-      setSimilarState(null);
-      list.refresh();
-    } catch {
-      toast.error("Failed to resolve similar skill.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const response = await exportSkills({
-        search: list.search || undefined,
-        category: list.category === "All" ? undefined : list.category,
-        confidence: list.confidenceFilter === "All" ? undefined : list.confidenceFilter.toLowerCase(),
-        is_active: list.showInactive ? undefined : true,
-      });
+      const response = await exportSkills(
+        buildSkillQueryParams({
+          search: list.search,
+          category: list.category,
+          confidence: list.confidenceFilter,
+          source: list.source,
+          showInactive: list.showInactive,
+        })
+      );
       const blob = new Blob([response.data], { type: response.headers["content-type"] });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -230,19 +214,6 @@ export default function SkillOntologyPage() {
       toast.error("Failed to export the skill ontology.");
     } finally {
       setIsExporting(false);
-    }
-  };
-
-  const handleSeed = async () => {
-    setIsSeeding(true);
-    try {
-      await seedOntology();
-      toast.success("Skill ontology seeded successfully.");
-      list.refresh();
-    } catch {
-      toast.error("Failed to seed the skill ontology.");
-    } finally {
-      setIsSeeding(false);
     }
   };
 
@@ -285,8 +256,6 @@ export default function SkillOntologyPage() {
               onEdit={openEdit}
               onDeactivate={openDeactivate}
               onReactivate={setReactivateTarget}
-              onSeedOntology={handleSeed}
-              seeding={isSeeding}
             />
           )}
 
@@ -316,7 +285,12 @@ export default function SkillOntologyPage() {
           {unknown.error ? (
             <ErrorState onRetry={unknown.refresh} message="We couldn't load unknown skills. Please try again." />
           ) : (
-            <UnknownSkillTable skills={unknown.skills} isLoading={unknown.isLoading} onPromote={handlePromote} />
+            <UnknownSkillTable
+              skills={unknown.skills}
+              isLoading={unknown.isLoading}
+              onPromote={handlePromote}
+              onBulkDone={unknown.refresh}
+            />
           )}
 
           {!unknown.isLoading && !unknown.error && unknown.totalCount > 0 && (
@@ -335,7 +309,7 @@ export default function SkillOntologyPage() {
         </>
       )}
 
-      <AddSkillDrawer
+      <AddSkillModal
         open={addOpen}
         existingSkills={list.skills}
         categoryOptions={formCategoryOptions}
@@ -377,15 +351,6 @@ export default function SkillOntologyPage() {
         childSkills={childHandling?.children}
         onClose={() => setChildHandling(null)}
         onConfirm={submitChildHandling}
-        isSubmitting={isSubmitting}
-      />
-
-      <SimilarSkillDialog
-        open={!!similarState}
-        newSkill={similarState?.newSkill}
-        similarSkills={similarState?.similarSkills}
-        onClose={() => setSimilarState(null)}
-        onAction={handleSimilarAction}
         isSubmitting={isSubmitting}
       />
 

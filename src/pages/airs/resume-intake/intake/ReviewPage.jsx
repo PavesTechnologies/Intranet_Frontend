@@ -21,15 +21,17 @@ export default function ReviewPage() {
 
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
-      <div className="mb-6">
+      <div className="mb-6 flex items-center gap-4">
         <button
           onClick={() => navigate("/airs/resume-intake")}
-          className="text-[12px] text-slate-500 hover:text-slate-700 inline-flex items-center gap-1 mb-2"
+          className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm shrink-0"
         >
-          <ArrowLeft size={13} /> Back to resume intake
+          <ArrowLeft size={18} />
         </button>
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">Candidate Resume Review</h1>
-        <p className="text-xs text-slate-500 mt-1">Parsed data extracted from the candidate's uploaded resume.</p>
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">Candidate Resume Review</h1>
+          <p className="text-xs text-slate-500 mt-1">Parsed data extracted from the candidate's uploaded resume.</p>
+        </div>
       </div>
 
       <div className="flex gap-6">

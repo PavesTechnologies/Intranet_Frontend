@@ -1,5 +1,5 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Check } from "lucide-react";
 import useIntakeFlow from "./hooks/useIntakeFlow";
 import UploadStep from "./components/UploadStep";
@@ -20,21 +20,38 @@ function stepIndex(step) {
 
 export default function IntakeFlowPage() {
   const navigate = useNavigate();
-  const { step, resume, status, parsedJson, candidateSkills, submit, goToReview, retry, reset } = useIntakeFlow();
+  const location = useLocation();
+  const { step, resume, status, statusError, parsedJson, candidateSkills, submit, goToReview, retryStatusCheck, reset } = useIntakeFlow();
   const activeIndex = stepIndex(step);
+  const consumedUploadResult = useRef(false);
+
+  // When arriving from the "New Structured Intake" modal (ResumeIntakePage),
+  // the resume has already been uploaded — skip straight to the Accepted step
+  // instead of showing the Upload form again.
+  useEffect(() => {
+    const uploadResult = location.state?.uploadResult;
+    if (uploadResult && !consumedUploadResult.current) {
+      consumedUploadResult.current = true;
+      submit(uploadResult);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
       <div className="mb-6 flex items-center justify-between">
-        <div>
+        <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/airs/resume-intake")}
-            className="text-[12px] text-slate-500 hover:text-slate-700 inline-flex items-center gap-1 mb-2"
+            className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm shrink-0"
           >
-            <ArrowLeft size={13} /> Back to resume intake
+            <ArrowLeft size={18} />
           </button>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">New Resume Intake</h1>
-          <p className="text-xs text-slate-500 mt-1">Upload a resume, watch it parse, then review the extracted data.</p>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900">New Resume Intake</h1>
+            <p className="text-xs text-slate-500 mt-1">Upload a resume, watch it parse, then review the extracted data.</p>
+          </div>
         </div>
 
         <ol className="flex items-center gap-2">
@@ -59,10 +76,17 @@ export default function IntakeFlowPage() {
         </ol>
       </div>
 
-      {step === "upload" && <UploadStep onSubmit={submit} />}
+      {step === "upload" && !location.state?.uploadResult && <UploadStep onSubmit={submit} />}
       {step === "accepted" && resume && status && <AcceptedStep resume={resume} status={status} />}
       {step === "processing" && resume && status && (
-        <ProcessingStep resume={resume} status={status} onComplete={goToReview} onRetry={retry} onBackToUpload={reset} />
+        <ProcessingStep
+          resume={resume}
+          status={status}
+          statusError={statusError}
+          onComplete={goToReview}
+          onRetryStatusCheck={retryStatusCheck}
+          onBackToUpload={reset}
+        />
       )}
       {step === "review" && (
         <ReviewScreen resume={resume} parsedJson={parsedJson} candidateSkills={candidateSkills} processingStatus={status} />

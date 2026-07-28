@@ -16,6 +16,20 @@ export function renderConfidenceBadge(score) {
   );
 }
 
+// Handles both the API's normal `{ success, message }` error shape and
+// FastAPI's 422 validation error shape (`{ detail: [{ loc, msg, ... }] }`).
+export function extractErrorMessage(err, fallback) {
+  const data = err?.response?.data;
+  if (!data) return err?.message || fallback;
+  if (data.message) return data.message;
+  if (Array.isArray(data.detail)) {
+    const joined = data.detail.map((d) => d.msg).filter(Boolean).join(" ");
+    return joined || fallback;
+  }
+  if (typeof data.detail === "string") return data.detail;
+  return fallback;
+}
+
 export function formatDuration(ms) {
   if (ms === null || ms === undefined) return "—";
   if (ms < 1000) return `${ms}ms`;
