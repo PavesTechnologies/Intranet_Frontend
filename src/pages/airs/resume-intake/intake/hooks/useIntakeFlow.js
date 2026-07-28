@@ -22,12 +22,11 @@ const TERMINAL_STATUSES = ["SUCCESS", "FAILURE", "FAILED"];
 // endpoint yet, so those still come from the mock lookup tables once the
 // real pipeline reports SUCCESS.
 export default function useIntakeFlow() {
-  const [step, setStep] = useState("upload"); // "upload" | "accepted" | "processing" | "review"
+  const [step, setStep] = useState("upload"); // "upload" | "processing" | "review"
   const [resume, setResume] = useState(null);
   const [status, setStatus] = useState(null);
   const [statusError, setStatusError] = useState(null);
   const pollRef = useRef(null);
-  const acceptedTimeoutRef = useRef(null);
 
   useEffect(() => {
     return () => clearInterval(pollRef.current);
@@ -64,12 +63,8 @@ export default function useIntakeFlow() {
     setResume(newResume);
     setStatus(newStatus);
     setStatusError(null);
-    setStep("accepted");
-
-    acceptedTimeoutRef.current = setTimeout(() => {
-      setStep("processing");
-      beginPolling(newResume.resume_id, newStatus.task_id);
-    }, 1400);
+    setStep("processing");
+    beginPolling(newResume.resume_id, newStatus.task_id);
   };
 
   const beginPolling = (resumeId, taskId) => {
@@ -113,7 +108,6 @@ export default function useIntakeFlow() {
   const goToReview = () => setStep("review");
   const reset = () => {
     clearInterval(pollRef.current);
-    clearTimeout(acceptedTimeoutRef.current);
     setResume(null);
     setStatus(null);
     setStatusError(null);
