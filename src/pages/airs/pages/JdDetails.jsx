@@ -7,8 +7,8 @@ import {
   Briefcase,
   Download,
   Clock,
-  Sparkles,
   GitBranch,
+  GitMerge,
   History,
   Activity,
   Layers,
@@ -30,11 +30,19 @@ import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/ui/Modal";
+import SkillActionModal from "../../../components/Modal/modal";
 import FormInput from "../../../components/forms/FormInput";
 import NewCampaignForm from "../campaigns/components/NewCampaignForm";
 import { createCampaign, getAllCampaignsHrAdmin } from "../campaigns/services/campaignservice";
 import Pagination from "../../../components/Pagination/pagination";
 import GenericTable from "../../../components/Table/table";
+import {
+  CreateSkillModalBody,
+  MapSkillModalBody,
+  DeleteSkillModalBody,
+  SuggestionTabsSection,
+} from "../skill-ontology/UnknownSkillDetailPage";
+import { bulkApproveUnknownSkills, bulkDeleteUnknownSkills } from "../skill-ontology/services/skillOntologyService";
 
 const DEFAULT_CAMPAIGN_FORM = {
   name: "",
@@ -180,6 +188,85 @@ export default function JdDetails() {
   const [isLoadingSkills, setIsLoadingSkills] = useState(false);
   const [isLoadingUnknownSkills, setIsLoadingUnknownSkills] = useState(false);
 
+  // Unknown Skill resolution actions — Create / Map / Delete — reuse the same
+  // modal bodies, endpoints, and suggestion-tab UI as the Skill Ontology
+  // Unknown Skill detail page.
+  const [unknownSkillModal, setUnknownSkillModal] = useState(null); // "create" | "suggestions" | "confirmMap" | "delete" | null
+  const [activeUnknownSkill, setActiveUnknownSkill] = useState(null);
+  const [unknownSkillMapTarget, setUnknownSkillMapTarget] = useState(null);
+
+  const closeUnknownSkillModal = () => {
+    setUnknownSkillModal(null);
+    setActiveUnknownSkill(null);
+    setUnknownSkillMapTarget(null);
+  };
+
+  const handleUnknownSkillResolved = () => {
+    closeUnknownSkillModal();
+    fetchJdUnknownSkills();
+  };
+
+  // Bulk Approve / Reject — same bulk endpoints as the Skill Ontology Unknown
+  // Skills table, applied across the full unknown-skills list for this JD
+  // (not just the current page), keyed by unknown_skill_id.
+  const [selectedUnknownSkillIds, setSelectedUnknownSkillIds] = useState(new Set());
+  const [bulkConfirmAction, setBulkConfirmAction] = useState(null); // "approve" | "delete" | null
+  const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
+
+  useEffect(() => {
+    setSelectedUnknownSkillIds((prev) => {
+      const visibleIds = new Set(jdUnknownSkillsData.map((s) => s.unknown_skill_id));
+      const next = new Set([...prev].filter((id) => visibleIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [jdUnknownSkillsData]);
+
+  const allUnknownSkillsSelected =
+    jdUnknownSkillsData.length > 0 &&
+    jdUnknownSkillsData.every((s) => selectedUnknownSkillIds.has(s.unknown_skill_id));
+
+  const toggleSelectAllUnknownSkills = () => {
+    setSelectedUnknownSkillIds(
+      allUnknownSkillsSelected ? new Set() : new Set(jdUnknownSkillsData.map((s) => s.unknown_skill_id))
+    );
+  };
+
+  const toggleUnknownSkillSelection = (unknownSkillId) => {
+    setSelectedUnknownSkillIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(unknownSkillId)) next.delete(unknownSkillId);
+      else next.add(unknownSkillId);
+      return next;
+    });
+  };
+
+  const closeBulkConfirm = () => {
+    if (isBulkSubmitting) return;
+    setBulkConfirmAction(null);
+  };
+
+  const handleConfirmBulkUnknownSkillAction = async () => {
+    const ids = Array.from(selectedUnknownSkillIds);
+    setIsBulkSubmitting(true);
+    try {
+      const action = bulkConfirmAction === "approve" ? bulkApproveUnknownSkills : bulkDeleteUnknownSkills;
+      const res = await action(ids);
+      const { message, failed = 0, results = [] } = res?.data || {};
+      toast.success(message || "Bulk action completed.");
+      if (failed > 0) {
+        const firstFailure = results.find((r) => !r.success);
+        toast.error(`${failed} of ${ids.length} failed${firstFailure ? `: ${firstFailure.message}` : "."}`);
+      }
+      setSelectedUnknownSkillIds(new Set());
+      setBulkConfirmAction(null);
+      fetchJdUnknownSkills();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Bulk action failed.");
+    } finally {
+      setIsBulkSubmitting(false);
+    }
+  };
+
   // Pagination state — JD Skills
   const [skillsCurrentPage, setSkillsCurrentPage] = useState(1);
   const skillsTotalPages = Math.max(1, Math.ceil(jdSkillsData.length / SKILLS_PAGE_SIZE));
@@ -215,8 +302,7 @@ export default function JdDetails() {
   ];
 
   const jdSkillsRows = useMemo(() => {
-    return paginatedSkills.map((sk, pageIdx) => {
-      const globalIdx = (skillsCurrentPage - 1) * SKILLS_PAGE_SIZE + pageIdx;
+    return paginatedSkills.map((sk) => {
       return {
         canonical_name: (
           <div className="w-full flex justify-start font-bold text-slate-900">
@@ -237,16 +323,15 @@ export default function JdDetails() {
         ),
         mandatory: (
           <div className="w-full flex justify-center">
-            <input
-              type="checkbox"
-              checked={sk.mandatory}
-              onChange={() => {
-                const updated = [...jdSkillsData];
-                updated[globalIdx] = { ...updated[globalIdx], mandatory: !updated[globalIdx].mandatory };
-                setJdSkillsData(updated);
-              }}
-              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-            />
+            <span
+              className={`text-[9px] px-2 py-0.5 rounded font-bold border ${
+                sk.mandatory
+                  ? "bg-blue-50 text-blue-700 border-blue-100"
+                  : "bg-slate-100 text-slate-500 border-slate-200"
+              }`}
+            >
+              {sk.mandatory ? "True" : "False"}
+            </span>
           </div>
         ),
         status: (
@@ -267,23 +352,43 @@ export default function JdDetails() {
   }, [paginatedSkills, skillsCurrentPage, jdSkillsData]);
 
   const jdUnknownSkillsHeaders = [
+    <div key="select" className="w-full flex justify-center select-none">
+      <input
+        type="checkbox"
+        checked={allUnknownSkillsSelected}
+        onChange={toggleSelectAllUnknownSkills}
+        className="h-3.5 w-3.5 cursor-pointer accent-indigo-600"
+      />
+    </div>,
     <div key="rawSkill" className="w-full flex justify-start select-none">Raw Skill</div>,
     <div key="mandatory" className="w-full flex justify-center select-none">Mandatory</div>,
     <div key="status" className="w-full flex justify-center select-none">Status</div>,
-    <div key="createdAt" className="w-full flex justify-center select-none">Created Date</div>
+    <div key="createdAt" className="w-full flex justify-center select-none">Created Date</div>,
+    <div key="action" className="w-full flex justify-center select-none">Action</div>
   ];
 
   const jdUnknownSkillsColumns = [
+    "select",
     "raw_text",
     "mandatory",
     "status",
-    "created_at"
+    "created_at",
+    "action"
   ];
 
   const jdUnknownSkillsRows = useMemo(() => {
-    return paginatedUnknownSkills.map((sk, pageIdx) => {
-      const globalIdx = (unknownSkillsCurrentPage - 1) * SKILLS_PAGE_SIZE + pageIdx;
+    return paginatedUnknownSkills.map((sk) => {
       return {
+        select: (
+          <div className="w-full flex justify-center">
+            <input
+              type="checkbox"
+              checked={selectedUnknownSkillIds.has(sk.unknown_skill_id)}
+              onChange={() => toggleUnknownSkillSelection(sk.unknown_skill_id)}
+              className="h-3.5 w-3.5 cursor-pointer accent-indigo-600"
+            />
+          </div>
+        ),
         raw_text: (
           <div className="w-full flex justify-start font-bold text-slate-900">
             {sk.raw_text}
@@ -291,16 +396,15 @@ export default function JdDetails() {
         ),
         mandatory: (
           <div className="w-full flex justify-center">
-            <input
-              type="checkbox"
-              checked={sk.mandatory}
-              onChange={() => {
-                const updated = [...jdUnknownSkillsData];
-                updated[globalIdx] = { ...updated[globalIdx], mandatory: !updated[globalIdx].mandatory };
-                setJdUnknownSkillsData(updated);
-              }}
-              className="rounded border-slate-300 text-blue-605 focus:ring-blue-500"
-            />
+            <span
+              className={`text-[9px] px-2 py-0.5 rounded font-bold border ${
+                sk.mandatory
+                  ? "bg-blue-50 text-blue-700 border-blue-100"
+                  : "bg-slate-100 text-slate-500 border-slate-200"
+              }`}
+            >
+              {sk.mandatory ? "True" : "False"}
+            </span>
           </div>
         ),
         status: (
@@ -315,10 +419,48 @@ export default function JdDetails() {
             {sk.created_at ? sk.created_at.split("T")[0] : ""}
           </div>
         ),
+        action: (
+          <div className="w-full flex justify-center gap-1.5">
+            <Button
+              variant="outline"
+              size="small"
+              title="Create New Canonical Skill"
+              onClick={() => {
+                setActiveUnknownSkill(sk);
+                setUnknownSkillModal("create");
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="small"
+              title="Map to Existing Skill"
+              onClick={() => {
+                setActiveUnknownSkill(sk);
+                setUnknownSkillMapTarget(null);
+                setUnknownSkillModal("suggestions");
+              }}
+            >
+              <GitMerge className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="danger"
+              size="small"
+              title="Delete Unknown Skill"
+              onClick={() => {
+                setActiveUnknownSkill(sk);
+                setUnknownSkillModal("delete");
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ),
         rowClass: "hover:bg-slate-50/50 transition",
       };
     });
-  }, [paginatedUnknownSkills, unknownSkillsCurrentPage, jdUnknownSkillsData]);
+  }, [paginatedUnknownSkills, unknownSkillsCurrentPage, jdUnknownSkillsData, selectedUnknownSkillIds]);
 
   const fetchJdSkills = async () => {
     setIsLoadingSkills(true);
@@ -975,6 +1117,25 @@ export default function JdDetails() {
             </div>
           </div>
 
+          {selectedUnknownSkillIds.size > 0 && (
+            <div className="flex items-center justify-between px-5 py-2.5 border-b border-blue-100 bg-blue-50">
+              <span className="text-[12.5px] font-semibold text-blue-700">{selectedUnknownSkillIds.size} selected</span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="small" onClick={() => setSelectedUnknownSkillIds(new Set())}>
+                  Clear
+                </Button>
+                <Button variant="danger" size="small" onClick={() => setBulkConfirmAction("delete")}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Reject Selected
+                </Button>
+                <Button variant="primary" size="small" onClick={() => setBulkConfirmAction("approve")}>
+                  <Check className="h-3.5 w-3.5" />
+                  Approve Selected
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             {isLoadingUnknownSkills ? (
               <div className="h-40 flex items-center justify-center">
@@ -1311,6 +1472,124 @@ export default function JdDetails() {
           isSubmittingCampaign={isSubmittingCampaign}
           handleInitiateCampaign={handleInitiateCampaign}
         />
+      </Modal>
+
+      {/* Create New Canonical Skill — from a JD Unknown Skill */}
+      <SkillActionModal
+        isOpen={unknownSkillModal === "create"}
+        onClose={closeUnknownSkillModal}
+        title="Create New Canonical Skill"
+        subtitle={activeUnknownSkill ? `Resolving: "${activeUnknownSkill.raw_text}"` : ""}
+        size="2xl"
+        animation="zoom"
+        titleIcon={<Plus className="h-5 w-5" />}
+        maxHeight="max-h-[90vh]"
+      >
+        {activeUnknownSkill && (
+          <CreateSkillModalBody
+            rawSkill={activeUnknownSkill.raw_text}
+            unknownSkillId={activeUnknownSkill.unknown_skill_id}
+            onClose={closeUnknownSkillModal}
+            onCreated={handleUnknownSkillResolved}
+          />
+        )}
+      </SkillActionModal>
+
+      {/* Map to Existing Skill — suggestion tabs */}
+      <SkillActionModal
+        isOpen={unknownSkillModal === "suggestions"}
+        onClose={closeUnknownSkillModal}
+        title="Map to Existing Skill"
+        subtitle={activeUnknownSkill ? `Resolving: "${activeUnknownSkill.raw_text}"` : ""}
+        size="4xl"
+        animation="zoom"
+        titleIcon={<GitMerge className="h-5 w-5" />}
+        maxHeight="max-h-[90vh]"
+      >
+        {activeUnknownSkill && (
+          <SuggestionTabsSection
+            unknownSkillId={activeUnknownSkill.unknown_skill_id}
+            onMapClick={(row) => {
+              setUnknownSkillMapTarget(row);
+              setUnknownSkillModal("confirmMap");
+            }}
+          />
+        )}
+      </SkillActionModal>
+
+      {/* Map to Existing Skill — confirm */}
+      <SkillActionModal
+        isOpen={unknownSkillModal === "confirmMap"}
+        onClose={() => setUnknownSkillModal("suggestions")}
+        title="Map to Existing Skill"
+        subtitle={activeUnknownSkill ? `Resolving: "${activeUnknownSkill.raw_text}"` : ""}
+        size="2xl"
+        animation="zoom"
+        titleIcon={<GitMerge className="h-5 w-5" />}
+        maxHeight="max-h-[90vh]"
+      >
+        {activeUnknownSkill && (
+          <MapSkillModalBody
+            rawSkill={activeUnknownSkill.raw_text}
+            unknownSkillId={activeUnknownSkill.unknown_skill_id}
+            target={unknownSkillMapTarget}
+            onClose={() => setUnknownSkillModal("suggestions")}
+            onMapped={handleUnknownSkillResolved}
+          />
+        )}
+      </SkillActionModal>
+
+      {/* Delete Unknown Skill */}
+      <SkillActionModal
+        isOpen={unknownSkillModal === "delete"}
+        onClose={closeUnknownSkillModal}
+        title="Delete Unknown Skill"
+        size="sm"
+        animation="zoom"
+        titleIcon={<Trash2 className="h-5 w-5 text-rose-500" />}
+        maxHeight="max-h-[90vh]"
+      >
+        {activeUnknownSkill && (
+          <DeleteSkillModalBody
+            rawSkill={activeUnknownSkill.raw_text}
+            unknownSkillId={activeUnknownSkill.unknown_skill_id}
+            onClose={closeUnknownSkillModal}
+            onDeleted={handleUnknownSkillResolved}
+          />
+        )}
+      </SkillActionModal>
+
+      {/* Bulk Approve / Reject — JD Unknown Skills */}
+      <Modal
+        isOpen={!!bulkConfirmAction}
+        onClose={closeBulkConfirm}
+        title={bulkConfirmAction === "approve" ? "Approve Selected Skills" : "Reject Selected Skills"}
+        width="460px"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-100">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <p className="text-[12px] text-amber-700">
+              {bulkConfirmAction === "approve"
+                ? `This creates a new canonical skill for each of the ${selectedUnknownSkillIds.size} selected unknown skill${selectedUnknownSkillIds.size > 1 ? "s" : ""}.`
+                : `This permanently deletes the ${selectedUnknownSkillIds.size} selected unknown skill${selectedUnknownSkillIds.size > 1 ? "s" : ""}. This action cannot be undone.`}
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" size="small" onClick={closeBulkConfirm} disabled={isBulkSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              variant={bulkConfirmAction === "approve" ? "primary" : "danger"}
+              size="small"
+              loading={isBulkSubmitting}
+              onClick={handleConfirmBulkUnknownSkillAction}
+            >
+              Confirm
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* Restore Confirmation Dialog */}

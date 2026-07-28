@@ -7,6 +7,7 @@ import {
   Trash2,
   GitMerge,
   Sparkles,
+  Plus,
   Calendar,
   Tag,
 } from "lucide-react";
@@ -97,7 +98,7 @@ function ActionToggleButton({ icon: Icon, label, active, color, onClick }) {
 
 // ─── Create New Canonical Skill – Modal body ──────────────────────────────────
 
-function CreateSkillModalBody({ rawSkill, unknownSkillId, onClose, onCreated }) {
+export function CreateSkillModalBody({ rawSkill, unknownSkillId, onClose, onCreated }) {
   const [values, setValues] = useState({
     ...EMPTY_SKILL_FORM,
     canonicalName: rawSkill,
@@ -144,7 +145,7 @@ function CreateSkillModalBody({ rawSkill, unknownSkillId, onClose, onCreated }) 
           Cancel
         </Button>
         <Button variant="primary" size="medium" loading={isSubmitting} onClick={handleSubmit}>
-          <Sparkles className="h-4 w-4" />
+          <Plus className="h-4 w-4" />
           Create Canonical Skill
         </Button>
       </div>
@@ -155,7 +156,7 @@ function CreateSkillModalBody({ rawSkill, unknownSkillId, onClose, onCreated }) 
 // ─── Map to Existing Skill – Modal body ──────────────────────────────────────
 // target is the suggestion row the user clicked "Map" on: { skillId, skillName, alias }
 
-function MapSkillModalBody({ rawSkill, unknownSkillId, target, onClose, onMapped }) {
+export function MapSkillModalBody({ rawSkill, unknownSkillId, target, onClose, onMapped }) {
   const [mapType, setMapType] = useState(MAP_TYPE_OPTIONS[0].value);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -237,7 +238,7 @@ function MapSkillModalBody({ rawSkill, unknownSkillId, target, onClose, onMapped
 
 // ─── Delete Unknown Skill – Modal body ────────────────────────────────────────
 
-function DeleteSkillModalBody({ rawSkill, unknownSkillId, onClose, onDeleted }) {
+export function DeleteSkillModalBody({ rawSkill, unknownSkillId, onClose, onDeleted }) {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
@@ -276,7 +277,7 @@ function DeleteSkillModalBody({ rawSkill, unknownSkillId, onClose, onDeleted }) 
 
 // ─── Suggestion Tabs section (always visible on page) ────────────────────────
 
-function SuggestionTabsSection({ unknownSkillId, onMapClick }) {
+export function SuggestionTabsSection({ unknownSkillId, onMapClick }) {
   const [activeTab,    setActiveTab]    = useState("rapidfuzz_canonical");
   const [searchQuery,  setSearchQuery]  = useState("");
   const [selectedRow,  setSelectedRow]  = useState(null);
@@ -379,24 +380,9 @@ function SuggestionTabsSection({ unknownSkillId, onMapClick }) {
 
   return (
     <Card>
-      {/* Tabs + search bar */}
-      <div className="flex items-center gap-3 px-5 py-2 border-b border-slate-200 flex-wrap">
-        <div className="flex items-center gap-1 overflow-x-auto">
-          {MAP_TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => handleTabChange(t.id)}
-              className="px-3 py-2.5 text-[13px] font-semibold relative whitespace-nowrap shrink-0"
-              style={{ color: activeTab === t.id ? "#2563EB" : "#98A1AF" }}
-            >
-              {t.label}
-              {activeTab === t.id && (
-                <div className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full bg-blue-600" />
-              )}
-            </button>
-          ))}
-        </div>
-
+      {/* Section label + search bar */}
+      <div className="flex items-center gap-3 px-5 py-2.5">
+        <span className="text-[13px] font-bold text-slate-800 shrink-0">Suggestions</span>
         <div className="relative ml-auto w-full max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
@@ -407,6 +393,23 @@ function SuggestionTabsSection({ unknownSkillId, onMapClick }) {
             className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 text-[13px] outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 px-5 py-2 border-b border-slate-200 overflow-x-auto">
+        {MAP_TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => handleTabChange(t.id)}
+            className="px-3 py-2.5 text-[13px] font-semibold relative whitespace-nowrap shrink-0"
+            style={{ color: activeTab === t.id ? "#2563EB" : "#98A1AF" }}
+          >
+            {t.label}
+            {activeTab === t.id && (
+              <div className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full bg-blue-600" />
+            )}
+          </button>
+        ))}
       </div>
 
       {/* Loading indicator — only for the active tab */}
@@ -564,19 +567,12 @@ export default function UnknownSkillDetailPage() {
           {/* Right: action buttons — each opens its own modal */}
           <div className="flex flex-col gap-2 shrink-0">
             <ActionToggleButton
-              icon={Sparkles}
+              icon={Plus}
               label="Create New Canonical Skill"
               active={openModal === "create"}
               color="create"
               onClick={() => setOpenModal("create")}
             />
-            {/* <ActionToggleButton
-              icon={GitMerge}
-              label="Map to Existing Skill"
-              active={openModal === "map"}
-              color="map"
-              onClick={() => setOpenModal("map")}
-            /> */}
             <ActionToggleButton
               icon={Trash2}
               label="Delete Unknown Skill"
@@ -617,7 +613,7 @@ export default function UnknownSkillDetailPage() {
         subtitle={`Resolving: "${skill.rawSkill}"`}
         size="2xl"
         animation="zoom"
-        titleIcon={<Sparkles className="h-5 w-5" />}
+        titleIcon={<Plus className="h-5 w-5" />}
         maxHeight="max-h-[90vh]"
       >
         <CreateSkillModalBody
