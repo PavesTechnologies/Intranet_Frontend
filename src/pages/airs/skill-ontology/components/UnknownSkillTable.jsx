@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Check, Trash2, AlertTriangle } from "lucide-react";
+import { Check, Trash2, AlertTriangle, Eye } from "lucide-react";
 import { toast } from "react-toastify";
 import GenericTable from "../../../../components/Table/table";
 import Button from "../../../../components/Button/Button";
@@ -7,7 +7,7 @@ import Modal from "../../../../components/ui/Modal";
 import { formatDate } from "../utils/skillOntologyUtils.jsx";
 import { bulkApproveUnknownSkills, bulkDeleteUnknownSkills } from "../services/skillOntologyService";
 
-export default function UnknownSkillTable({ skills, isLoading, onPromote, onBulkDone }) {
+export default function UnknownSkillTable({ skills, isLoading, onPromote, onBulkDone, onView }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [confirmAction, setConfirmAction] = useState(null); // "approve" | "delete" | null
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,8 +78,9 @@ export default function UnknownSkillTable({ skills, isLoading, onPromote, onBulk
     <span className="block w-full text-left">First Seen</span>,
     <span className="block w-full text-left">Last Seen</span>,
     <span className="block w-full text-left">Status</span>,
+    <span className="block w-full text-left">Action</span>,
   ];
-  const columns = ["select", "rawSkill", "normalizedKey", "frequency", "firstSeen", "lastSeen", "status"];
+  const columns = ["select", "rawSkill", "normalizedKey", "frequency", "firstSeen", "lastSeen", "status", "action"];
 
   const rows = skills.map((skill) => ({
     id: skill.id,
@@ -109,6 +110,18 @@ export default function UnknownSkillTable({ skills, isLoading, onPromote, onBulk
         <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
           {skill.status}
         </span>
+      </div>
+    ),
+    action: (
+      <div className="w-full text-left">
+        <button
+          type="button"
+          title="View details"
+          onClick={() => onView?.(skill)}
+          className="inline-flex items-center justify-center h-7 w-7 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition-colors"
+        >
+          <Eye className="h-4 w-4" />
+        </button>
       </div>
     ),
   }));
