@@ -499,3 +499,156 @@ export const getDeadLetterQueue = async (campaignId) => {
         throw error;
     }
 };
+
+// ── E04-S03 — Processing queue breakdown + DLQ replay ────────────────────
+
+export const getProcessingQueue = async (campaignId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/processing-queue`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching processing queue:", error);
+        throw error;
+    }
+};
+
+export const replayDeadLetterTasks = async (campaignId, dlqIds) => {
+    try {
+        const response = await api.post(
+            `${BASE_URL}/campaigns/${campaignId}/dead-letter-queue/replay`,
+            { dlq_ids: dlqIds },
+            { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        );
+        return response.data;
+    } catch (error) {
+        console.error("Error replaying dead letter tasks:", error);
+        throw error;
+    }
+};
+
+// ── E04-S04 — Stalled candidates ─────────────────────────────────────────
+
+export const getStalledCandidates = async (campaignId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/stalled-candidates`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching stalled candidates:", error);
+        throw error;
+    }
+};
+
+export const reprocessStalledCandidate = async (campaignId, campaignCandidateId) => {
+    try {
+        const response = await api.post(
+            `${BASE_URL}/campaigns/${campaignId}/stalled-candidates/${campaignCandidateId}/reprocess`,
+            {},
+            { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        );
+        return response.data;
+    } catch (error) {
+        console.error("Error reprocessing stalled candidate:", error);
+        throw error;
+    }
+};
+
+export const escalateStalledCandidate = async (campaignId, campaignCandidateId, note) => {
+    try {
+        const response = await api.post(
+            `${BASE_URL}/campaigns/${campaignId}/stalled-candidates/${campaignCandidateId}/escalate`,
+            { note: note || null },
+            { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        );
+        return response.data;
+    } catch (error) {
+        console.error("Error escalating stalled candidate:", error);
+        throw error;
+    }
+};
+
+export const overrideCandidateStage = async (campaignId, campaignCandidateId, reason, targetStage) => {
+    try {
+        const response = await api.post(
+            `${BASE_URL}/campaigns/${campaignId}/stalled-candidates/${campaignCandidateId}/override-stage`,
+            { reason, target_stage: targetStage || null },
+            { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        );
+        return response.data;
+    } catch (error) {
+        console.error("Error overriding candidate stage:", error);
+        throw error;
+    }
+};
+
+export const flagCandidateForReview = async (campaignId, campaignCandidateId, reason) => {
+    try {
+        const response = await api.post(
+            `${BASE_URL}/campaigns/${campaignId}/stalled-candidates/${campaignCandidateId}/flag-review`,
+            { reason },
+            { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        );
+        return response.data;
+    } catch (error) {
+        console.error("Error flagging candidate for review:", error);
+        throw error;
+    }
+};
+
+// ── E04-S02-T01 — Bulk uploads for one campaign (campaign detail section) ─
+
+export const getBulkUploadsForCampaign = async (campaignId, { page = 1, size = 10 } = {}) => {
+    try {
+        const response = await api.get(`${BASE_URL}/bulk-uploads`, {
+            params: { campaign_id: campaignId, page, size },
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching bulk uploads for campaign:", error);
+        throw error;
+    }
+};
+
+// ── E04-S05/S06 — Rejection analytics + summary export ──────────────────
+
+export const getRejectionAnalytics = async (campaignId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/rejection-analytics`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching rejection analytics:", error);
+        throw error;
+    }
+};
+
+export const exportRejectionAnalytics = async (campaignId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/rejection-analytics/export`, {
+            responseType: "blob",
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error exporting rejection analytics:", error);
+        throw error;
+    }
+};
+
+export const exportCampaignSummary = async (campaignId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/summary-report/export`, {
+            responseType: "blob",
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error exporting campaign summary:", error);
+        throw error;
+    }
+};
