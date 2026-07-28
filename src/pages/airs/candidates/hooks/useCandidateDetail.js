@@ -13,23 +13,5 @@ export default function useCandidateDetail(candidateId) {
     [candidates, candidateId]
   );
 
-  const addComment = (id, text) => {
-    setCandidates((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, comments: [...c.comments, { author: "You", text }] } : c))
-    );
-  };
-
-  // M07-E01/S04 — HR-admin-added skill, informational only; never touches
-  // scoreBreakdown/deterministic scoring.
-  const addManualSkill = (id, skill) => {
-    setCandidates((prev) =>
-      prev.map((c) =>
-        c.id === id
-          ? { ...c, manualSkills: [...c.manualSkills, { id: skill.id, canonicalName: skill.canonicalName }] }
-          : c
-      )
-    );
-  };
-
-  return { candidate, addComment, addManualSkill };
+  return { candidate };
 }
