@@ -353,3 +353,27 @@ export function finalizeMockIntake(resumeId, outcome) {
     status: "AUTO_VERIFIED",
   }));
 }
+
+export function updateParsedJson(resumeId, updatedJson) {
+  if (MOCK_PARSED_JSON[resumeId] !== undefined) {
+    MOCK_PARSED_JSON[resumeId] = {
+      ...MOCK_PARSED_JSON[resumeId],
+      ...updatedJson,
+    };
+  }
+}
+
+export function updateCandidateSkills(resumeId, updatedSkills) {
+  MOCK_CANDIDATE_SKILLS[resumeId] = updatedSkills;
+}
+
+export function updateResumeDetails(resumeId, updatedResume) {
+  const index = MOCK_RESUMES.findIndex((r) => r.resume_id === resumeId);
+  if (index !== -1) {
+    MOCK_RESUMES[index] = {
+      ...MOCK_RESUMES[index],
+      ...updatedResume,
+    };
+  }
+}
+

@@ -88,3 +88,17 @@ export const bulkUpload = async (formData) => {
         throw error;
     }
 };
+
+export const candidateJson = async (candidateId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/resumes/candidate/${candidateId}/parsed-json`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching candidate JSON:", error);
+        throw error;
+    }
+};
