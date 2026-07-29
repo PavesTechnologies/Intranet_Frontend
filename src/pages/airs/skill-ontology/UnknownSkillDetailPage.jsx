@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
-  ChevronLeft,
+  ArrowLeft,
   Search,
   Trash2,
   GitMerge,
@@ -381,7 +381,12 @@ export function SuggestionTabsSection({ unknownSkillId, onMapClick }) {
     <Card>
       {/* Section label + search bar */}
       <div className="flex items-center gap-3 px-5 py-2.5">
-        <span className="text-[13px] font-bold text-slate-800 shrink-0">Suggestions</span>
+        <div className="shrink-0">
+          <h2 className="text-[14px] font-bold text-slate-800">Suggestion Matches</h2>
+          <p className="text-[12px] text-slate-400 mt-0.5">
+            Review match suggestions below, then use an action above to resolve this unknown skill.
+          </p>
+        </div>
         <div className="relative ml-auto w-full max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
@@ -497,69 +502,69 @@ export default function UnknownSkillDetailPage() {
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
 
-      {/* ── Back navigation ─────────────────────────────────────────────── */}
-      <button
-        onClick={() =>
-          navigate("/airs/skill-ontology", { state: { tab: "unknown" } })
-        }
-        className="flex items-center gap-1 text-[13px] font-semibold text-blue-600 mb-5"
-      >
-        <ChevronLeft size={15} />
-        Back to Skill Ontology
-      </button>
-
       {/* ── Summary Card ─────────────────────────────────────────────────── */}
       <Card className="p-5 mb-5">
         <div className="flex items-start justify-between flex-wrap gap-4">
 
-          {/* Left: skill info */}
-          <div className="flex-1 min-w-0">
-            {/* Title + status badges */}
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <div className="font-extrabold text-[17px] text-slate-900">
-                {skill.rawSkill}
-              </div>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-slate-100 text-slate-600 border-slate-200">
-                {skill.status}
-              </span>
-              <Badge className="bg-amber-50 text-amber-700 border-amber-100 font-semibold px-2.5 py-0.5 text-[11px]">
-                Unverified
-              </Badge>
-            </div>
+          {/* Left: back button + skill info */}
+          <div className="flex items-start gap-4 flex-1 min-w-0">
+            <button
+              onClick={() =>
+                navigate("/airs/skill-ontology", { state: { tab: "unknown" } })
+              }
+              className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm shrink-0"
+            >
+              <ArrowLeft size={18} />
+            </button>
 
-            {/* Meta */}
-            <div className="text-[12px] text-slate-500 mb-4 flex flex-wrap gap-x-3 gap-y-1">
-              <span>
-                <span className="font-medium text-slate-700">Normalized Key: </span>
-                {skill.normalizedKey}
-              </span>
-              <span className="text-slate-300">·</span>
-              <span className="flex items-center gap-1">
-                <Calendar size={11} className="text-slate-400" />
-                First seen {formatDate(skill.firstSeen)}
-              </span>
-              <span className="text-slate-300">·</span>
-              <span className="flex items-center gap-1">
-                <Calendar size={11} className="text-slate-400" />
-                Last seen {formatDate(skill.lastSeen)}
-              </span>
-            </div>
-
-            {/* Stat blocks */}
-            <div className="flex gap-6 flex-wrap">
-              {[
-                { icon: Sparkles, label: "Frequency", value: skill.frequency ?? 0, color: "text-indigo-600 bg-indigo-50" },
-              ].map(({ icon: Icon, label, value, color }) => (
-                <div key={label} className="flex items-center gap-2.5">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-slate-400">{label}</div>
-                    <div className="text-[14px] font-bold text-slate-900">{value}</div>
-                  </div>
+            <div className="flex-1 min-w-0">
+              {/* Title + status badges */}
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <div className="font-extrabold text-[17px] text-slate-900">
+                  {skill.rawSkill}
                 </div>
-              ))}
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-slate-100 text-slate-600 border-slate-200">
+                  {skill.status}
+                </span>
+                <Badge className="bg-amber-50 text-amber-700 border-amber-100 font-semibold px-2.5 py-0.5 text-[11px]">
+                  Unverified
+                </Badge>
+              </div>
+
+              {/* Meta */}
+              <div className="text-[12px] text-slate-500 mb-4 flex flex-wrap gap-x-3 gap-y-1">
+                <span>
+                  <span className="font-medium text-slate-700">Normalized Key: </span>
+                  {skill.normalizedKey}
+                </span>
+                <span className="text-slate-300">·</span>
+                <span className="flex items-center gap-1">
+                  <Calendar size={11} className="text-slate-400" />
+                  First seen {formatDate(skill.firstSeen)}
+                </span>
+                <span className="text-slate-300">·</span>
+                <span className="flex items-center gap-1">
+                  <Calendar size={11} className="text-slate-400" />
+                  Last seen {formatDate(skill.lastSeen)}
+                </span>
+              </div>
+
+              {/* Stat blocks */}
+              <div className="flex gap-6 flex-wrap">
+                {[
+                  { icon: Sparkles, label: "Frequency", value: skill.frequency ?? 0, color: "text-indigo-600 bg-indigo-50" },
+                ].map(({ icon: Icon, label, value, color }) => (
+                  <div key={label} className="flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-slate-400">{label}</div>
+                      <div className="text-[14px] font-bold text-slate-900">{value}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -585,14 +590,6 @@ export default function UnknownSkillDetailPage() {
 
       {/* ── Suggestion Tabs – always visible ──────────────────────────────── */}
       <div className="mb-2">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-[14px] font-bold text-slate-800">Suggestion Matches</h2>
-            <p className="text-[12px] text-slate-400 mt-0.5">
-              Review match suggestions below, then use an action above to resolve this unknown skill.
-            </p>
-          </div>
-        </div>
         <SuggestionTabsSection
           unknownSkillId={skill.id}
           onMapClick={(row) => {
