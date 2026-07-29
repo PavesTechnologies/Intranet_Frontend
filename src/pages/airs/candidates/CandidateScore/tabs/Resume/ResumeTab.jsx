@@ -1,7 +1,7 @@
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { GraduationCap, BadgeCheck, FolderGit2 } from "lucide-react";
-import { getResumeMock } from "./resumeMock";
+import { getResumeMock, getResumeFromParsedData, hasRealResumeData } from "./resumeMock";
 import ResumePreview from "./components/ResumePreview";
 
 function SectionCard({ icon: Icon, title, children }) {
@@ -17,11 +17,17 @@ function SectionCard({ icon: Icon, title, children }) {
 }
 
 export default function ResumeTab({ candidate }) {
-  const resume = getResumeMock(candidate);
+  const resume = hasRealResumeData(candidate) ? getResumeFromParsedData(candidate) : getResumeMock(candidate);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,340px)_1fr] gap-4">
-      <ResumePreview file={resume.file} previewPages={resume.previewPages} />
+      {resume.file ? (
+        <ResumePreview file={resume.file} previewPages={resume.previewPages} />
+      ) : (
+        <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-[12.5px] text-slate-400 h-fit">
+          Resume file preview isn't available yet.
+        </div>
+      )}
 
       <div className="space-y-4 min-w-0">
         <SectionCard title="Skills extracted">
@@ -80,6 +86,9 @@ export default function ResumeTab({ candidate }) {
         </div>
 
         <SectionCard icon={FolderGit2} title="Projects">
+          {resume.projects.length === 0 ? (
+            <div className="text-[12px] text-slate-400">Not extracted from this resume yet.</div>
+          ) : (
           <div className="space-y-2.5">
             {resume.projects.map((p) => (
               <div key={p.name} className="rounded-lg bg-slate-50 border border-slate-200 p-3">
@@ -95,6 +104,7 @@ export default function ResumeTab({ candidate }) {
               </div>
             ))}
           </div>
+          )}
         </SectionCard>
       </div>
     </div>

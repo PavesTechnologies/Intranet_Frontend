@@ -1,11 +1,12 @@
 import React, { useState, lazy, Suspense } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import CandidateHeader from "../candidates/CandidateScore/components/CandidateHeader";
 import CandidateTabs from "../candidates/CandidateScore/components/CandidateTabs";
 import ErrorState from "../skill-ontology/components/ErrorState";
-import { MOCK_CANDIDATES } from "../candidates/mock/candidateMockData";
-import { mapMockCandidateForScorecard } from "./utils/mapMockCandidateForScorecard";
+import useParsedResumeCandidate from "./hooks/useParsedResumeCandidate";
+// import { MOCK_CANDIDATES } from "../candidates/mock/candidateMockData";
+// import { mapMockCandidateForScorecard } from "./utils/mapMockCandidateForScorecard";
 
 const SummaryTab = lazy(() => import("../candidates/CandidateScore/tabs/Summary/SummaryTab"));
 const ResumeTab = lazy(() => import("../candidates/CandidateScore/tabs/Resume/ResumeTab"));
@@ -24,22 +25,42 @@ const TABS = [
 ];
 
 // Pipeline Board's candidate detail page — reuses the same Candidate
-// Scorecard header/tabs as /airs/candidates/:candidateId, but sourced from
-// the Pipeline Board's mock candidate pool instead of the live backend.
+// Scorecard header/tabs as /airs/candidates/:candidateId, sourced from the
+// resume parsed-json endpoint (the campaign-candidates detail endpoint isn't
+// implemented on the backend). `location.state.resume` is the Resume Upload
+// History row (candidate name/email/etc.) forwarded on navigation, since
+// parsed-json only returns resume/parsing data, not candidate profile fields.
 export default function PipelineCandidateScorecardPage() {
   const { candidateId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const resumeRow = location.state?.resume;
+  const fallback = {
+    name: resumeRow?.candidate_full_name,
+    email: resumeRow?.candidate_email,
+    createdAt: resumeRow?.created_at,
+  };
+  const { candidate, loading, error } = useParsedResumeCandidate(candidateId, fallback);
   const [activeTab, setActiveTab] = useState(TABS[0].id);
 
-  const mockCandidate = MOCK_CANDIDATES.find((c) => c.id === candidateId) || null;
-  const candidate = mockCandidate ? mapMockCandidateForScorecard(mockCandidate) : null;
+  if (loading) {
+    return (
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
+        <LoadingSpinner text="Loading candidate scorecard..." />
+      </div>
+    );
+  }
 
-  if (!candidate) {
+  if (error || !candidate) {
     return (
       <div className="p-8 bg-[#F8FAFC] min-h-screen">
         <ErrorState
           title="Candidate not found"
-          message="We couldn't find this candidate. They may have been removed."
+          message={
+            error
+              ? "We couldn't load this candidate. Please try again."
+              : "We couldn't find this candidate. They may have been removed."
+          }
           onRetry={() => navigate("/airs/pipeline")}
         />
       </div>

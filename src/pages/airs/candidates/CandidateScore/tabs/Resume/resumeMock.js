@@ -1,5 +1,8 @@
-// Mock data for the Resume tab — a mock parsed-resume record. No backend
-// integration; the "preview" is a plain-text mock rendered in a PDF-page frame.
+// Mock data for the Resume tab — a mock parsed-resume record, used as a
+// fallback when the candidate record has no real parsed-resume data (e.g.
+// CandidateScorePage, whose campaign-candidates detail endpoint doesn't
+// return resume parsing results). No backend integration; the "preview" is
+// a plain-text mock rendered in a PDF-page frame.
 const CERTIFICATION_POOL = ["AWS Certified Solutions Architect", "Scrum Fundamentals Certified", "Google Cloud Professional", "PMP", "Certified Kubernetes Administrator"];
 const PROJECT_POOL = [
   { name: "Internal Analytics Platform", description: "Led the migration of the reporting stack to a event-driven pipeline serving 40+ internal dashboards.", tech: ["React", "Node.js", "Kafka"] },
@@ -71,5 +74,33 @@ export function getResumeMock(candidate) {
     ],
     projects: PROJECT_POOL.slice(0, 2 + (candidate.experience % 2)),
     certifications: CERTIFICATION_POOL.slice(0, 1 + (candidate.experience % 3)),
+  };
+}
+
+// A candidate record carries real parsed-resume data (from
+// GET /resumes/candidate/{candidateId}/parsed-json) when it has a `skills`
+// array — only mapParsedResumeToCandidate sets this field.
+export function hasRealResumeData(candidate) {
+  return Array.isArray(candidate.skills);
+}
+
+// Resume tab view model built directly from parsed-json data — no synthesized
+// fields. `file`/`previewPages` stay null/empty (no file metadata or raw text
+// is returned by the backend yet) and `projects` stays empty (the resume
+// parser doesn't extract a projects section) until those are added.
+export function getResumeFromParsedData(candidate) {
+  return {
+    file: null,
+    previewPages: [],
+    skillsExtracted: candidate.skills,
+    experienceExtracted: candidate.workExperience.map((w) => ({
+      company: w.company,
+      title: w.title,
+      durationYears: "-",
+      highlights: w.highlights,
+    })),
+    educationExtracted: candidate.educationExtracted,
+    projects: [],
+    certifications: candidate.certifications,
   };
 }
