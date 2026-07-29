@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Button from "../../../../components/Button/Button";
 import FormInput from "../../../../components/forms/FormInput";
 import FilterListbox from "../../../../components/filter/FilterListbox";
+import usePromptTemplateLookup from "../../prompt-templates/hooks/usePromptTemplateLookup";
 import { getNameByRoles } from "../services/campaignservice";
 
 export default function NewCampaignForm({
@@ -15,6 +16,7 @@ export default function NewCampaignForm({
 }) {
     const [hiringManager, setHiringManager] = useState([]);
     const [recruiter, setRecruiter] = useState([]);
+    const resumeParsePromptLookup = usePromptTemplateLookup("resume-parse");
 
     useEffect(() => {
         const fetchNamesByRoles = async () => {
@@ -48,6 +50,11 @@ export default function NewCampaignForm({
             value: rec.user_id?.toString() || "",
             label: rec.employee_name || `ID: ${rec.user_id}`
         }))
+    ];
+
+    const resumeParsePromptOptions = [
+        { value: "", label: resumeParsePromptLookup.isLoading ? "Loading prompt templates..." : "Select Resume Parsing Prompt" },
+        ...resumeParsePromptLookup.options,
     ];
 
     return (
@@ -163,6 +170,18 @@ export default function NewCampaignForm({
                             onChange={(value) => handleCampaignFormChange({ target: { name: "recruiter_id", value } })}
                         />
                     </div>
+                </div>
+
+                <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
+                        Resume Parsing Prompt <span className="text-red-500">*</span>
+                    </label>
+                    <FilterListbox
+                        options={resumeParsePromptOptions}
+                        value={campaignForm.prompt_template_id}
+                        onChange={(value) => handleCampaignFormChange({ target: { name: "prompt_template_id", value } })}
+                        disabled={resumeParsePromptLookup.isLoading}
+                    />
                 </div>
             </div>
 

@@ -100,7 +100,6 @@ import DegreeMasterManagement from "./pages/employee-onboarding/hr-configuration
 import AdminApprovalDashboard from "./pages/employee-onboarding/admin/AdminApprovalDashboard.jsx"; import AdminOfferView from "./pages/employee-onboarding/admin/AdminOfferView.jsx";
 
 // AI Screening (AIRS)
-import AirsDashboard from "./pages/airs/pages/AirsDashboard.jsx";
 import JdLibrary from "./pages/airs/pages/JdLibrary.jsx";
 import JdCreate from "./pages/airs/pages/JdCreate.jsx";
 import JdDetails from "./pages/airs/pages/JdDetails.jsx";
@@ -123,6 +122,9 @@ import SettingsPage from "./pages/airs/settings/SettingsPage.jsx";
 import SkillOntologyPage from "./pages/airs/skill-ontology/SkillOntologyPage.jsx";
 import SkillDetailPage from "./pages/airs/skill-ontology/SkillDetailPage.jsx";
 import HierarchyPage from "./pages/airs/skill-ontology/HierarchyPage.jsx";
+import UnknownSkillDetailPage from "./pages/airs/skill-ontology/UnknownSkillDetailPage.jsx";
+import PromptTemplatesPage from "./pages/airs/prompt-templates/PromptTemplatesPage.jsx";
+import PromptTemplateViewPage from "./pages/airs/prompt-templates/PromptTemplateViewPage.jsx";
 
 import AdminOfferLettersDashboard from "./pages/employee-onboarding/admin/AdminOfferLettersDashboard.jsx";
 import HrOnboardingDashboard from "./pages/employee-onboarding/hr/HrOnboardingDashboard.jsx";
@@ -994,14 +996,6 @@ const AppRoutes = () => {
             }
           />          {/* AI Screening (AIRS) Routes */}
           <Route
-            path="/airs/dashboard"
-            element={
-              <ProtectedRoute roles={["General"]}>
-                <AirsDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/airs/jds"
             element={
               <ProtectedRoute roles={["General"]}>
@@ -1155,6 +1149,37 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute roles={["General"]}>
                 <SkillDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/skill-ontology/unknown/:unknownSkillId"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <UnknownSkillDetailPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Prompt Templates — HR_ADMIN only. Uses ProtectedRoute's working
+              `allowedRoles` prop (see the note on the Campaign routes above),
+              so this module has real route-level RBAC enforcement. Create/Edit
+              are modals opened from the list/view pages (see
+              AddPromptTemplateModal/EditPromptTemplateModal), matching the
+              skill-ontology module's pattern — only List and View are routed. */}
+          <Route
+            path="/airs/prompt-templates"
+            element={
+              <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
+                <PromptTemplatesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/prompt-templates/:id/view"
+            element={
+              <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
+                <PromptTemplateViewPage />
               </ProtectedRoute>
             }
           />
