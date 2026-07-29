@@ -1073,7 +1073,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/resume-intake/review/:resumeId"
+            path="/airs/resume-intake/review/:candidateId"
             element={
               <ProtectedRoute roles={["General"]}>
                 <ReviewPage />
