@@ -95,14 +95,16 @@ export default function MyExpensesPage() {
       };
       const res = await expenseReportService.getAll(params);
 
-      if (res.data && typeof res.data === "object" && !Array.isArray(res.data)) {
-        const items = res.data.reports || res.data.expenseReports || res.data.content || res.data.data || [];
-        const total = res.data.total !== undefined ? res.data.total : res.data.totalElements ?? items.length ?? 0;
+      const payload = res.data?.data;
+
+      if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+        const items = payload.reports || payload.expenseReports || payload.content || payload.data || [];
+        const total = payload.total !== undefined ? payload.total : payload.totalElements ?? items.length ?? 0;
         setReports(items);
         setTotalItems(total);
         setIsServerPaginated(true);
-      } else if (Array.isArray(res.data)) {
-        setReports(res.data);
+      } else if (Array.isArray(payload)) {
+        setReports(payload);
         setIsServerPaginated(false);
       } else {
         setReports([]);
@@ -134,7 +136,7 @@ export default function MyExpensesPage() {
       const number = (r.reportNumber || "").toLowerCase();
       const q = searchTerm.toLowerCase();
       const matchesSearch = !q || title.includes(q) || number.includes(q);
-      const matchesStatus = !statusFilter || (r.status || "").toUpperCase() === statusFilter;
+      const matchesStatus = !statusFilter || (r.reportStatus || "").toUpperCase() === statusFilter;
       return matchesSearch && matchesStatus;
     },
     [searchTerm, statusFilter]
@@ -151,9 +153,9 @@ export default function MyExpensesPage() {
   const totalCount = isServerPaginated ? totalItems : reports.filter(matchesFilters).length;
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE) || 0;
 
-  const allReportsForStats = isServerPaginated ? reports : reports;
-  const totalReportsCount = isServerPaginated ? totalItems : reports.length;
-  const draftCount = allReportsForStats.filter((r) => (r.status || "").toUpperCase() === "DRAFT").length;
+  const allReportsForStats = isServerPaginated ? reports : reports.filter(matchesFilters);
+  const totalReportsCount = isServerPaginated ? totalItems : reports.filter(matchesFilters).length;
+  const draftCount = allReportsForStats.filter((r) => (r.reportStatus || "").toUpperCase() === "DRAFT").length;
   const totalReimbursable = allReportsForStats.reduce((sum, r) => sum + (Number(r.reimbursableAmount) || 0), 0);
 
   const handleSearch = useCallback((value) => {
@@ -276,7 +278,7 @@ export default function MyExpensesPage() {
     costCenter: r.costCenterName || "—",
     currency: <span className="font-semibold text-gray-600">{r.currencyCode || "—"}</span>,
     totalAmount: <span className="font-mono font-semibold text-gray-900">{formatAmount(r.totalAmount)}</span>,
-    status: <StatusBadge label={r.status || "DRAFT"} size="sm" />,
+    status: <StatusBadge label={r.reportStatus || "DRAFT"} size="sm" />,
     created: formatDate(r.createdAt),
     actions: (
       <div className="flex items-center gap-1 justify-center">
