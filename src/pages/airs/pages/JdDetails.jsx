@@ -32,7 +32,7 @@ import Button from "../../../components/Button/Button";
 import Modal from "../../../components/ui/Modal";
 import FormInput from "../../../components/forms/FormInput";
 import NewCampaignForm from "../campaigns/components/NewCampaignForm";
-import { createCampaign, getAllCampaignsHrAdmin } from "../campaigns/services/campaignservice";
+import { createCampaign, getAllCampaigns } from "../campaigns/services/campaignservice";
 import Pagination from "../../../components/Pagination/pagination";
 import GenericTable from "../../../components/Table/table";
 
@@ -161,7 +161,7 @@ export default function JdDetails() {
   const fetchDbCampaigns = async () => {
     setIsLoadingCampaigns(true);
     try {
-      const res = await getAllCampaignsHrAdmin();
+      const res = await getAllCampaigns({jd_id: id, show_closed: true});
       if (res?.success && res.data) {
         setDbCampaigns(res.data);
       }
@@ -406,6 +406,7 @@ export default function JdDetails() {
   const education = currentJd.education || (currentJd.education_criteria ? `${currentJd.education_criteria.degree || ""} in ${currentJd.education_criteria.field || ""}` : "Not Specified");
   const source = currentJd.source || (currentJd.source_format === "TEXT" ? "Manual" : currentJd.source_format === "PDF" ? "PDF Upload" : currentJd.source_format === "DOCX" ? "DOCX Upload" : currentJd.source_format || "Manual");
   const status = currentJd.status || currentJd.is_verified || (currentJd.is_active_version ? "Ready" : "Closed");
+  const isJdCampaignEligible = currentJd.is_active_version && (currentJd.is_verified || "").toUpperCase() === "VERIFIED";
   const createdBy = currentJd.createdBy || currentJd.created_by || "System";
   const createdDate = currentJd.createdDate || (currentJd.created_at ? currentJd.created_at.split('T')[0] : "");
   const updatedDate = currentJd.updatedDate || (currentJd.updated_at ? currentJd.updated_at.split('T')[0] : createdDate);
@@ -1035,6 +1036,10 @@ export default function JdDetails() {
               <Button
                 size="small"
                 variant="primary"
+                disabled={!isJdCampaignEligible}
+                title={!isJdCampaignEligible
+                  ?"Campaigns require a verified,active JD - resolve unknown skills first."
+                  :undefined}
                 onClick={() => {
                   setCampaignForm(DEFAULT_CAMPAIGN_FORM);
                   setLinkCampaignModalOpen(true);

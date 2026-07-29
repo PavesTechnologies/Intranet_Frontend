@@ -50,21 +50,18 @@ export default function NewCampaignForm({
         }))
     ];
 
-    return (
-        <>
+    return (<>
             <div className="space-y-4">
                 <div>
                     <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
                         Job Description {jdOptions && <span className="text-red-500">*</span>}
                     </label>
-                    {jdOptions ? (
-                        <FilterListbox
+                    {jdOptions ? (<FilterListbox
                             options={jdOptions}
                             value={campaignForm.jd_id}
                             onChange={(value) => handleCampaignFormChange({ target: { name: "jd_id", value } })}
                         />
-                    ) : (
-                        <div className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-xs font-bold text-slate-700">
+                    ) : (<div className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-xs font-bold text-slate-700">
                             {title}
                         </div>
                     )}

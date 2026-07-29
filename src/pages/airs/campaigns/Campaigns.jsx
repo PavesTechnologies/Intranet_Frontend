@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
   Briefcase, CheckCircle, PauseCircle, XCircle, Plus, Search, Calendar, Edit2,
-  GitCompare, FileBarChart, Sliders,
+  Sliders,
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/ui/Modal";
@@ -76,7 +76,7 @@ export default function Campaigns() {
   const navigate = useNavigate();
   const {
     isHRAdmin, isHiringManager, canManageCampaigns, canManageScoring,
-    canCompareCampaigns, canViewWeightReport, canViewPipeline,
+    canViewPipeline,
   } = useCampaignPermissions();
 
   const [campaigns, setCampaigns] = useState([]);
@@ -174,10 +174,21 @@ export default function Campaigns() {
     })();
   }, [createModalOpen, jdList.length]);
 
+  //only verified+active jobs are campaign create eligible
+  const eligibleJds = useMemo(() => jdList.filter((jd) => jd.is_active_version && (jd.is_verified || "").toUpperCase() === "VERIFIED"
+    ),
+    [jdList]
+  );
+
   const jdOptions = useMemo(() => ([
-    { value: "", label: "Select Job Description" },
-    ...jdList.map((jd) => ({ value: jd.id, label: jd.title })),
-  ]), [jdList]);
+    {
+      value: "",
+      label: eligibleJds.length === 0 && jdList.length > 0
+        ? "No verified JDs available"
+        : "Select a job description",
+    },
+    ...eligibleJds.map((jd) => ({ value: jd.id, label: jd.title })),
+  ]), [eligibleJds, jdList.length]);
 
   // KPI counts
   const counts = useMemo(() => {
@@ -229,8 +240,7 @@ export default function Campaigns() {
 
     let cancelled = false;
     (async () => {
-      const entries = await Promise.all(
-        missing.map(async (id) => {
+      const entries = await Promise.all(missing.map(async (id) => {
           try {
             const res = await getPipelineSummary(id);
             return [id, deriveStats(res?.data ?? res)];
@@ -301,8 +311,7 @@ export default function Campaigns() {
     }
   };
 
-  return (
-    <div className="relative min-h-screen p-8 bg-slate-50/40 text-slate-800 font-sans">
+  return (<div className="relative min-h-screen p-8 bg-slate-50/40 text-slate-800 font-sans">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
         <div>
@@ -312,23 +321,11 @@ export default function Campaigns() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {canCompareCampaigns && (
-            <Button variant="outline" size="medium" onClick={() => navigate("/airs/campaigns/compare")}>
-              <GitCompare className="h-4 w-4" /> Compare
-            </Button>
-          )}
-          {canViewWeightReport && (
-            <Button variant="outline" size="medium" onClick={() => navigate("/airs/campaigns/reports/weight-changes")}>
-              <FileBarChart className="h-4 w-4" /> Weight Report
-            </Button>
-          )}
-          {canManageScoring && (
-            <Button variant="outline" size="medium" onClick={() => setPresetsModalOpen(true)}>
+          {canManageScoring && (<Button variant="outline" size="medium" onClick={() => setPresetsModalOpen(true)}>
               <Sliders className="h-4 w-4" /> Presets
             </Button>
           )}
-          {canManageCampaigns && (
-            <Button
+          {canManageCampaigns && (<Button
               variant="primary"
               size="medium"
               onClick={() => {
@@ -372,12 +369,10 @@ export default function Campaigns() {
       </div>
 
       {/* Campaign cards */}
-      {isLoading ? (
-        <div className="flex justify-center py-16">
+      {isLoading ? (<div className="flex justify-center py-16">
           <LoadingSpinner text="Loading campaigns..." />
         </div>
-      ) : filteredCampaigns.length === 0 ? (
-        <div className="text-center py-16 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+      ) : filteredCampaigns.length === 0 ? (<div className="text-center py-16 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
           <Briefcase className="h-10 w-10 text-slate-300 mx-auto mb-3" />
           <p className="text-xs font-bold text-slate-700">No campaigns found</p>
           <p className="text-[11px] text-slate-400 mt-1">
@@ -386,8 +381,7 @@ export default function Campaigns() {
               : "Try adjusting your search or status filter."}
           </p>
         </div>
-      ) : (
-        <>
+      ) : (<>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {paginatedCampaigns.map((c) => {
               const status = (c.status || "").toUpperCase();
@@ -413,8 +407,7 @@ export default function Campaigns() {
                     : 0
                 : 0;
 
-              return (
-                <div
+              return (<div
                   key={c.id}
                   onClick={() => navigate(`/airs/campaigns/${c.id}`)}
                   className="bg-white border border-slate-200 rounded-2xl px-6 py-5 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:border-indigo-200 transition"
@@ -425,18 +418,15 @@ export default function Campaigns() {
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_BADGE[status] || "bg-slate-50 text-slate-600"}`}>
                         {statusLabel(status)}
                       </span>
-                      {/* Edit shortcut — HR_ADMIN only, closed campaigns are read-only (S07-T03) */}
-                      {canManageCampaigns && status !== "CLOSED" && (
-                        <button
+                      {/* Edit shortcut — HR_ADMIN only, closed campaigns are read-only */}
+                      {canManageCampaigns && status !== "CLOSED" && (<button
                           onClick={(e) => handleEditClick(e, c)}
                           disabled={editLoadingId === c.id}
                           title="Edit campaign"
                           className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition disabled:opacity-50"
                         >
-                          {editLoadingId === c.id ? (
-                            <span className="block h-3.5 w-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <Edit2 className="h-3.5 w-3.5" />
+                          {editLoadingId === c.id ? (<span className="block h-3.5 w-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                          ) : (<Edit2 className="h-3.5 w-3.5" />
                           )}
                         </button>
                       )}
@@ -450,13 +440,11 @@ export default function Campaigns() {
                     </p>
 
                     {/* Candidate stats + progress — real pipeline data */}
-                    {stats === undefined ? (
-                      <div className="mb-4">
+                    {stats === undefined ? (<div className="mb-4">
                         <div className="h-3 w-full bg-slate-100 rounded animate-pulse mb-2.5" />
                         <div className="h-2.5 w-full bg-slate-100 rounded-full animate-pulse" />
                       </div>
-                    ) : hasStats ? (
-                      <>
+                    ) : hasStats ? (<>
                         <div className="flex justify-between items-center text-xs text-slate-500 font-semibold mb-1.5">
                           <span>{stats.candidates} candidates</span>
                           <span>{stats.shortlisted} shortlisted</span>
@@ -469,8 +457,7 @@ export default function Campaigns() {
                           />
                         </div>
                       </>
-                    ) : (
-                      <p className="text-[11px] text-slate-400 font-medium mb-4">
+                    ) : (<p className="text-[11px] text-slate-400 font-medium mb-4">
                         Pipeline metrics unavailable
                       </p>
                     )}
@@ -497,8 +484,7 @@ export default function Campaigns() {
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-between items-center border-t border-slate-100 pt-5 mt-6 text-xs text-slate-500 font-medium">
+          {totalPages > 1 && (<div className="flex justify-between items-center border-t border-slate-100 pt-5 mt-6 text-xs text-slate-500 font-medium">
               <div>
                 Showing <span className="font-semibold text-slate-700">{(currentPage - 1) * CAMPAIGNS_PER_PAGE + 1}</span> to{" "}
                 <span className="font-semibold text-slate-700">{Math.min(currentPage * CAMPAIGNS_PER_PAGE, filteredCampaigns.length)}</span> of{" "}
@@ -512,8 +498,7 @@ export default function Campaigns() {
                 >
                   Previous
                 </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                  <button
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (<button
                     key={pageNum}
                     onClick={() => setCurrentPage(pageNum)}
                     className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold transition-all shadow-sm ${currentPage === pageNum
@@ -555,13 +540,11 @@ export default function Campaigns() {
         />
       </Modal>
 
-      {canManageScoring && (
-        <WeightPresetsModal isOpen={presetsModalOpen} onClose={() => setPresetsModalOpen(false)} />
+      {canManageScoring && (<WeightPresetsModal isOpen={presetsModalOpen} onClose={() => setPresetsModalOpen(false)} />
       )}
 
       {/* Edit Campaign Modal (opened from a card's edit button) */}
-      {editDetail && (
-        <EditCampaignModal
+      {editDetail && (<EditCampaignModal
           isOpen={!!editCampaignId}
           onClose={() => { setEditCampaignId(null); setEditDetail(null); }}
           campaignId={editCampaignId}
