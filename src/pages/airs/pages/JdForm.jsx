@@ -12,6 +12,8 @@ import {
 import toast from "react-hot-toast";
 import Button from "../../../components/Button/Button";
 import CountriesList from "../../../components/CountriesList";
+import FilterListbox from "../../../components/filter/FilterListbox";
+import usePromptTemplateLookup from "../prompt-templates/hooks/usePromptTemplateLookup";
 
 const JURISDICTIONS = ["USA", "EU", "India", "UK", "Global"];
 
@@ -40,6 +42,9 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
   const [educationField, setEducationField] = useState("");
   const [rawText, setRawText] = useState("");
   const [originalRawText, setOriginalRawText] = useState("");
+  const [promptTemplateId, setPromptTemplateId] = useState("");
+
+  const jdParsePromptLookup = usePromptTemplateLookup("jd-parse");
 
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
@@ -101,6 +106,7 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
             const loadedRawText = data.rawText || data.raw_text || "";
             setRawText(loadedRawText);
             setOriginalRawText(loadedRawText);
+            setPromptTemplateId(data.prompt_template_id || "");
             const resolvedType =
               data.source_format === "PDF" || data.source_format === "DOCX" ? "file" : "text";
             setJdInputType(resolvedType);
@@ -180,6 +186,7 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
 
     if (!title.trim()) newErrors.title = "Job title is required.";
     if (!jurisdiction) newErrors.jurisdiction = "Jurisdiction is required.";
+    if (!promptTemplateId) newErrors.promptTemplateId = "Please select a JD Parsing Prompt.";
     if (minExperienceYears === "") newErrors.minExperienceYears = "Minimum experience is required.";
     if (maxExperienceYears === "") newErrors.maxExperienceYears = "Maximum experience is required.";
     if (noticePeriod === "") newErrors.noticePeriod = "Notice period is required.";
@@ -225,6 +232,7 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
         degree: educationDegree || undefined,
         field: educationField || undefined,
       },
+      prompt_template_id: promptTemplateId,
     };
 
     if (jdInputType === "text") {
@@ -246,6 +254,7 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
     notice_period: noticePeriod !== "" ? Number(noticePeriod) : undefined,
     education_degree: educationDegree || undefined,
     education_field: educationField || undefined,
+    prompt_template_id: promptTemplateId,
   });
 
   const handleSubmit = async (e) => {
@@ -412,6 +421,21 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
             }}
             className={`w-full px-3 py-2 border rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${errors.educationField ? "border-red-500 ring-1 ring-red-500" : "border-slate-200"
               }`}
+          />
+        </FormField>
+
+        <FormField label="JD Parsing Prompt" required error={errors.promptTemplateId} className="sm:col-span-2">
+          <FilterListbox
+            options={[
+              { value: "", label: jdParsePromptLookup.isLoading ? "Loading prompt templates..." : "Select JD Parsing Prompt" },
+              ...jdParsePromptLookup.options,
+            ]}
+            value={promptTemplateId}
+            onChange={(value) => {
+              setPromptTemplateId(value);
+              clearError("promptTemplateId");
+            }}
+            disabled={jdParsePromptLookup.isLoading}
           />
         </FormField>
       </div>

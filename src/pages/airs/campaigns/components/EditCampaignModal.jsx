@@ -5,6 +5,7 @@ import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/ui/Modal";
 import FormInput from "../../../../components/forms/FormInput";
 import FilterListbox from "../../../../components/filter/FilterListbox";
+import usePromptTemplateLookup from "../../prompt-templates/hooks/usePromptTemplateLookup";
 import { updateCampaign, getWeightPresets, resetScoringConfig } from "../services/campaignservice";
 
 const unwrap = (res) => (res && res.data !== undefined ? res.data : res);
@@ -34,6 +35,7 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
     const [presets, setPresets] = useState([]);
     const [selectedPresetId, setSelectedPresetId] = useState("");
     const [resetting, setResetting] = useState(false);
+    const resumeParsePromptLookup = usePromptTemplateLookup("resume-parse");
 
     useEffect(() => {
         if (!isOpen) return;
@@ -46,6 +48,7 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
             weight_ai: scoring?.weight_ai ?? "",
             semantic_threshold: scoring?.semantic_threshold ?? "",
             ai_threshold: scoring?.ai_threshold ?? "",
+            prompt_template_id: info.prompt_template_id || "",
         });
         setConfirmScoring(false);
         setSelectedPresetId("");
@@ -107,6 +110,10 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
             return toast.error(`A campaign named "${name}" already exists.`);
         }
 
+        if (!String(form.prompt_template_id || "").trim()) {
+            return toast.error("Please select a Resume Parsing Prompt.");
+        }
+
         // S07-T01: can't drop the cap below the number of candidates already in
         const cap = form.max_candidates === "" ? null : Number(form.max_candidates);
         if (cap !== null && cap < currentCount) {
@@ -117,6 +124,7 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
         // avoids spurious audit entries and accidental clears of untouched fields.
         const payload = {};
         if (name !== (info.name || "")) payload.name = name;
+        if (form.prompt_template_id !== (info.prompt_template_id || "")) payload.prompt_template_id = form.prompt_template_id;
 
         // max_candidates: the backend only clears it via an explicit
         // clear_max_candidates flag — sending max_candidates: null is a no-op
@@ -183,6 +191,21 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
         <Modal isOpen={isOpen} onClose={onClose} title="Edit Campaign Configuration" width="560px" height="90vh">
             <div className="space-y-4">
                 <FormInput label="Campaign Name" name="name" value={form.name} onChange={change} maxLength={255} requiredMark />
+
+                <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
+                        Resume Parsing Prompt <span className="text-red-500">*</span>
+                    </label>
+                    <FilterListbox
+                        options={[
+                            { value: "", label: resumeParsePromptLookup.isLoading ? "Loading prompt templates..." : "Select Resume Parsing Prompt" },
+                            ...resumeParsePromptLookup.options,
+                        ]}
+                        value={form.prompt_template_id}
+                        onChange={(value) => setForm((p) => ({ ...p, prompt_template_id: value }))}
+                        disabled={resumeParsePromptLookup.isLoading}
+                    />
+                </div>
 
                 <div className="grid grid-cols-2 gap-4">
                     <FormInput label="Max Candidates" name="max_candidates" type="number" min="1" value={form.max_candidates} onChange={change} />
