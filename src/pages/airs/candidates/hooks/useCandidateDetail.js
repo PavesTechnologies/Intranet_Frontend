@@ -1,17 +1,35 @@
-import { useEffect, useMemo, useState } from "react";
-import { readCandidates, persistCandidates } from "../store/candidateStore";
+import { useCallback, useEffect, useState } from "react";
+import { getCampaignCandidateDetail } from "../services/candidateScoreService";
+import { mapCandidateScoreDetail } from "../utils/mapCandidateScoreDetail";
 
-export default function useCandidateDetail(candidateId) {
-  const [candidates, setCandidates] = useState(readCandidates);
+export default function useCandidateDetail(campaignCandidateId) {
+  const [candidate, setCandidate] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchCandidate = useCallback(async () => {
+    if (!campaignCandidateId) {
+      setCandidate(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await getCampaignCandidateDetail(campaignCandidateId);
+      setCandidate(mapCandidateScoreDetail(response));
+    } catch (err) {
+      setError(err);
+      setCandidate(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [campaignCandidateId]);
 
   useEffect(() => {
-    persistCandidates(candidates);
-  }, [candidates]);
+    fetchCandidate();
+  }, [fetchCandidate]);
 
-  const candidate = useMemo(
-    () => candidates.find((c) => c.id === candidateId) || null,
-    [candidates, candidateId]
-  );
-
-  return { candidate };
+  return { candidate, loading, error, refetch: fetchCandidate };
 }

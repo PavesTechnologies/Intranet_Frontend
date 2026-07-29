@@ -12,6 +12,7 @@ const FIELD_ROWS = [
   ["education", "Education"],
   ["expectedSalary", "Expected salary"],
   ["appliedOn", "Applied on"],
+  ["status", "Status"],
 ];
 
 export default function SummaryTab({ candidate }) {
@@ -35,12 +36,14 @@ export default function SummaryTab({ candidate }) {
         </div>
       </div>
 
-      <div className="p-4 rounded-xl bg-purple-50">
-        <div className="flex items-center gap-1.5 text-[12px] font-bold mb-1.5 text-purple-700">
-          <Sparkles size={13} /> AI candidate summary
+      {summary.aiCandidateSummary && (
+        <div className="p-4 rounded-xl bg-purple-50">
+          <div className="flex items-center gap-1.5 text-[12px] font-bold mb-1.5 text-purple-700">
+            <Sparkles size={13} /> AI candidate summary
+          </div>
+          <p className="text-[12.5px] leading-relaxed text-slate-900">{summary.aiCandidateSummary}</p>
         </div>
-        <p className="text-[12.5px] leading-relaxed text-slate-900">{summary.aiCandidateSummary}</p>
-      </div>
+      )}
     </div>
   );
 }

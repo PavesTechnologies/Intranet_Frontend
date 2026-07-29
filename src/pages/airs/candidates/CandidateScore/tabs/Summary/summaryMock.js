@@ -1,10 +1,10 @@
-// Mock data for the Summary tab — high-level overview only, no scoring.
-// Derived from the shared candidate record so the header and this tab never
-// disagree, but nothing below is used by the scoring tabs.
+// Adapts the mapped candidate record (from GET /airs/campaign-candidates/{id})
+// into the shape the Summary tab renders. No values are computed here — all
+// fields are read directly from the candidate record.
 export function getSummaryMock(candidate) {
   return {
     currentDesignation: candidate.role,
-    department: candidate.dept,
+    department: candidate.department,
     experienceYears: candidate.experience,
     location: candidate.location,
     contact: {
@@ -15,7 +15,8 @@ export function getSummaryMock(candidate) {
     noticePeriod: candidate.notice,
     education: candidate.education,
     expectedSalary: candidate.salary,
-    appliedOn: candidate.appliedOn,
-    aiCandidateSummary: candidate.summary,
+    appliedOn: candidate.createdAt,
+    status: candidate.status,
+    aiCandidateSummary: candidate.aiCandidateSummary,
   };
 }

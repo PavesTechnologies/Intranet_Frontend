@@ -25,15 +25,27 @@ const TABS = [
 export default function CandidateScorePage() {
   const { candidateId } = useParams();
   const navigate = useNavigate();
-  const { candidate } = useCandidateDetail(candidateId);
+  const { candidate, loading, error } = useCandidateDetail(candidateId);
   const [activeTab, setActiveTab] = useState(TABS[0].id);
 
-  if (!candidate) {
+  if (loading) {
+    return (
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
+        <LoadingSpinner text="Loading candidate scorecard..." />
+      </div>
+    );
+  }
+
+  if (error || !candidate) {
     return (
       <div className="p-8 bg-[#F8FAFC] min-h-screen">
         <ErrorState
           title="Candidate not found"
-          message="We couldn't find this candidate. They may have been removed."
+          message={
+            error
+              ? "We couldn't load this candidate. Please try again."
+              : "We couldn't find this candidate. They may have been removed."
+          }
           onRetry={() => navigate("/airs/candidates")}
         />
       </div>

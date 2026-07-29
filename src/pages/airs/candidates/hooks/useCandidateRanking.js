@@ -1,17 +1,42 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CANDIDATE_PAGE_SIZE } from "../constants/candidateConstants";
 import { filterCandidates, sortCandidates, paginate, computeCandidateStats } from "../utils/candidateUtils.jsx";
-import { readCandidates, persistCandidates } from "../store/candidateStore";
+import { getCampaignCandidates } from "../../campaigns/services/campaignservice";
+import { mapCampaignCandidateList } from "../utils/mapCampaignCandidateList";
 
-export default function useCandidateRanking() {
-  const [candidates, setCandidates] = useState(readCandidates);
+export default function useCandidateRanking(campaignId) {
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("All");
   const [sortValue, setSortValue] = useState("composite:desc");
   const [currentPage, setCurrentPage] = useState(1);
+
+  const fetchCandidates = useCallback(async () => {
+    if (!campaignId) {
+      setCandidates([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await getCampaignCandidates(campaignId);
+      const list = response && response.data !== undefined ? response.data : response;
+      setCandidates(mapCampaignCandidateList(list));
+    } catch (err) {
+      setError(err);
+      setCandidates([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [campaignId]);
+
   useEffect(() => {
-    persistCandidates(candidates);
-  }, [candidates]);
+    fetchCandidates();
+  }, [fetchCandidates]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -47,5 +72,8 @@ export default function useCandidateRanking() {
     setCurrentPage,
     totalPages,
     toggleStar,
+    loading,
+    error,
+    refetch: fetchCandidates,
   };
 }

@@ -228,7 +228,11 @@ export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [
             Mandatory Coverage: <span className="font-semibold text-slate-900">{scoreBreakdown.mandatoryCoveragePct.toFixed(1)}%</span>
           </div>
         </div>
-        <SkillTable items={mandatoryItems} />
+        {mandatoryItems.length > 0 ? (
+          <SkillTable items={mandatoryItems} />
+        ) : (
+          <p className="text-[11.5px] text-slate-400">No mandatory skills found</p>
+        )}
       </div>
 
       {/* S05-T02 — Preferred (Bonus) Skills, visually distinct from Mandatory,
@@ -285,7 +289,7 @@ export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [
         {additionalOpen && (
           <div id="additional-candidate-skills" className="px-4 pb-4 space-y-4">
             {additionalSkills.length === 0 ? (
-              <p className="text-[11.5px] text-slate-400">No additional or unrecognised skills detected.</p>
+              <p className="text-[11.5px] text-slate-400">No additional candidate skills</p>
             ) : (
               <>
                 {recognisedAdditional.length > 0 && (
