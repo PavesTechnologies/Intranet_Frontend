@@ -8,8 +8,11 @@ export default function useCandidateDetail(candidateId) {
     persistCandidates(candidates);
   }, [candidates]);
 
+  // Resume-intake links here with a real backend candidate_id (a UUID) that
+  // won't match any entry in this mock pool — fall back to the first mock
+  // candidate so the page still renders instead of showing "not found".
   const candidate = useMemo(
-    () => candidates.find((c) => c.id === candidateId) || null,
+    () => candidates.find((c) => c.id === candidateId) || candidates[0] || null,
     [candidates, candidateId]
   );
 

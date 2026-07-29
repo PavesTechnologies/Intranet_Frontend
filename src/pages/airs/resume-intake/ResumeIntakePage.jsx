@@ -8,7 +8,6 @@ import useResumeIntake from "./hooks/useResumeIntake";
 import BulkUploadPanel from "./components/BulkUploadPanel";
 import ResumeIntakeFilters from "./components/ResumeIntakeFilters";
 import ResumeUploadHistoryList from "./components/ResumeUploadHistoryList";
-import ResumeFileDetailsDrawer from "./components/ResumeFileDetailsDrawer";
 import UploadStep from "./intake/components/UploadStep";
 
 export default function ResumeIntakePage() {
@@ -31,12 +30,6 @@ export default function ResumeIntakePage() {
     currentPage,
     setCurrentPage,
     totalPages,
-    detailsFile,
-    detailsData,
-    isDetailsLoading,
-    detailsError,
-    openDetails,
-    closeDetails,
     refreshResumes,
   } = useResumeIntake();
 
@@ -66,7 +59,7 @@ export default function ResumeIntakePage() {
         setSortValue={setSortValue}
       />
 
-      <ResumeUploadHistoryList files={files} isLoading={isLoading} onViewDetails={openDetails} />
+      <ResumeUploadHistoryList files={files} isLoading={isLoading} />
 
       {totalResults > 0 && (
         <Pagination
@@ -76,14 +69,6 @@ export default function ResumeIntakePage() {
           onNext={() => setCurrentPage(currentPage + 1)}
         />
       )}
-
-      <ResumeFileDetailsDrawer
-        file={detailsFile}
-        detailsData={detailsData}
-        isLoading={isDetailsLoading}
-        error={detailsError}
-        onClose={closeDetails}
-      />
 
       <Modal
         isOpen={isIntakeModalOpen}
