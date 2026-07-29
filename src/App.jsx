@@ -155,6 +155,7 @@ import XmsCreateExpensePage from "./pages/expense-management/pages/expenses/Crea
 import XmsMyExpensesPage from "./pages/expense-management/pages/expenses/MyExpensesPage.jsx";
 import XmsAllExpensesPage from "./pages/expense-management/pages/expenses/AllExpensesPage.jsx";
 import XmsExpenseReportsPage from "./pages/expense-management/pages/expenses/ExpenseReportsPage.jsx";
+import XmsExpenseReportDetailPage from "./pages/expense-management/pages/expenses/ExpenseReportDetailPage.jsx";
 import XmsReceiptLibraryPage from "./pages/expense-management/pages/receipts/ReceiptLibraryPage.jsx";
 import XmsOcrProcessingPage from "./pages/expense-management/pages/receipts/OcrProcessingPage.jsx";
 import XmsRequestAdvancePage from "./pages/expense-management/pages/cash-advance/RequestAdvancePage.jsx";
@@ -1136,6 +1137,7 @@ const AppRoutes = () => {
 
           <Route path="/expense-management/expenses/create" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsCreateExpensePage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/my" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsMyExpensesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/expenses/reports/:reportId" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsExpenseReportDetailPage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/all" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsAllExpensesPage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/reports" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsExpenseReportsPage /></ProtectedRoute>} />
 
