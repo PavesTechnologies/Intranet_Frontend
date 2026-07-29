@@ -60,7 +60,7 @@ function SectionHeading({ children }) {
 
 function SimilarityBadge({ score }) {
   let cls = "bg-rose-50 text-rose-700 border-rose-100";
-  if (score >= 85)      cls = "bg-emerald-50 text-emerald-700 border-emerald-100";
+  if (score >= 85) cls = "bg-emerald-50 text-emerald-700 border-emerald-100";
   else if (score >= 70) cls = "bg-blue-50 text-blue-700 border-blue-100";
   else if (score >= 55) cls = "bg-amber-50 text-amber-700 border-amber-100";
   return (
@@ -77,7 +77,7 @@ function SimilarityBadge({ score }) {
 function ActionToggleButton({ icon: Icon, label, active, color, onClick }) {
   const activeStyles = {
     create: "bg-[#0A0082] text-white border-[#0A0082] shadow-md",
-    map:    "bg-indigo-600 text-white border-indigo-600 shadow-md",
+    map: "bg-indigo-600 text-white border-indigo-600 shadow-md",
     delete: "bg-rose-600  text-white border-rose-600  shadow-md",
   };
   const inactiveStyle =
@@ -86,9 +86,8 @@ function ActionToggleButton({ icon: Icon, label, active, color, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border text-[13px] font-semibold transition-all duration-200 ${
-        active ? activeStyles[color] : inactiveStyle
-      }`}
+      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border text-[13px] font-semibold transition-all duration-200 ${active ? activeStyles[color] : inactiveStyle
+        }`}
     >
       <Icon className="h-4 w-4" />
       {label}
@@ -278,16 +277,16 @@ export function DeleteSkillModalBody({ rawSkill, unknownSkillId, onClose, onDele
 // ─── Suggestion Tabs section (always visible on page) ────────────────────────
 
 export function SuggestionTabsSection({ unknownSkillId, onMapClick }) {
-  const [activeTab,    setActiveTab]    = useState("rapidfuzz_canonical");
-  const [searchQuery,  setSearchQuery]  = useState("");
-  const [selectedRow,  setSelectedRow]  = useState(null);
+  const [activeTab, setActiveTab] = useState("rapidfuzz_canonical");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedRow, setSelectedRow] = useState(null);
 
   // Per-tab pages stored in a map so each tab remembers its own page
   const [pages, setPages] = useState({
     rapidfuzz_canonical: 1,
-    semantic_canonical:  1,
-    rapidfuzz_alias:     1,
-    semantic_alias:      1,
+    semantic_canonical: 1,
+    rapidfuzz_alias: 1,
+    semantic_alias: 1,
   });
 
   const { dataForTab, isLoadingTab, errorForTab, ensureLoaded } =
@@ -302,18 +301,18 @@ export function SuggestionTabsSection({ unknownSkillId, onMapClick }) {
 
   const isLoading = isLoadingTab(activeTab);
   const loadError = errorForTab(activeTab);
-  const rawData   = dataForTab(activeTab) || [];
+  const rawData = dataForTab(activeTab) || [];
 
   const filteredData = searchQuery.trim()
     ? rawData.filter((r) => {
-        const q = searchQuery.trim().toLowerCase();
-        return (r.skillName || "").toLowerCase().includes(q) || (r.alias || "").toLowerCase().includes(q);
-      })
+      const q = searchQuery.trim().toLowerCase();
+      return (r.skillName || "").toLowerCase().includes(q) || (r.alias || "").toLowerCase().includes(q);
+    })
     : rawData;
 
-  const currentPage  = pages[activeTab];
-  const totalPages   = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
-  const pagedData    = filteredData.slice(
+  const currentPage = pages[activeTab];
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
+  const pagedData = filteredData.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE
   );
@@ -453,8 +452,8 @@ export function SuggestionTabsSection({ unknownSkillId, onMapClick }) {
 
 export default function UnknownSkillDetailPage() {
   const { unknownSkillId } = useParams();
-  const navigate           = useNavigate();
-  const location           = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Which modal is open: "create" | "map" | "delete" | null
   const [openModal, setOpenModal] = useState(null);
@@ -464,13 +463,13 @@ export default function UnknownSkillDetailPage() {
   const skill = useMemo(
     () =>
       location.state?.skill || {
-        id:           unknownSkillId,
-        rawSkill:     "azure databricks",
-        normalizedKey:"azure_databricks",
-        frequency:    42,
-        firstSeen:    "2024-09-12T00:00:00Z",
-        lastSeen:     "2025-06-01T00:00:00Z",
-        status:       "PENDING",
+        id: unknownSkillId,
+        rawSkill: "azure databricks",
+        normalizedKey: "azure_databricks",
+        frequency: 42,
+        firstSeen: "2024-09-12T00:00:00Z",
+        lastSeen: "2025-06-01T00:00:00Z",
+        status: "PENDING",
       },
     [location.state, unknownSkillId]
   );

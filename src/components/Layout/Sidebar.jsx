@@ -82,6 +82,11 @@ const hrAdminAirsSubmenu = [
   { label: "Prompt Templates", to: "/airs/prompt-templates" },
 ];
 
+// RECRUITER gets a trimmed-down AIRS menu — only these items.
+const recruiterAirsSubmenu = airsSubmenu.filter((item) =>
+  ["Campaigns", "Resume Intake", "Pipeline"].includes(item.label),
+);
+
 
 const deliveryManagerResourceManagementSubmenu =
   resourceManagementSubmenu.filter(
@@ -145,7 +150,12 @@ const Sidebar = ({ isCollapsed }) => {
   const isGeneral = hasRole(["GENERAL"]);
   const airsRBACAccess = hasRole(["HIRING_MANAGER", "HR", "HR_ADMIN", "RECRUITER"]);
   const isHrAdmin = hasRole(["HR_ADMIN"]);
-  const filteredAirsSubmenu = isHrAdmin ? hrAdminAirsSubmenu : airsSubmenu;
+  const isRecruiter = hasRole(["RECRUITER"]);
+  const filteredAirsSubmenu = isHrAdmin
+    ? hrAdminAirsSubmenu
+    : isRecruiter
+      ? recruiterAirsSubmenu
+      : airsSubmenu;
 
   // State for User Management Hover
   const [userHovered, setUserHovered] = useState(false);
