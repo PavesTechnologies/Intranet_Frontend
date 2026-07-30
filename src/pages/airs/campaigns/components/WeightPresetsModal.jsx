@@ -5,7 +5,7 @@ import Modal from "../../../../components/ui/Modal";
 import Button from "../../../../components/Button/Button";
 import FormInput from "../../../../components/forms/FormInput";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
-import { getWeightPresets, createWeightPreset, updateWeightPreset, deleteWeightPreset } from "../services/campaignservice";
+import { getWeightPresets, createWeightPreset, updateWeightPreset, deleteWeightPreset, formatApiError } from "../services/campaignservice";
 
 const unwrap = (res) => (res && res.data !== undefined ? res.data : res);
 
@@ -27,7 +27,7 @@ const EMPTY_FORM = {
   deterministic_threshold: "", semantic_threshold: "", ai_threshold: "",
 };
 
-// E02-S03 — Apply Campaign Weight Presets. This modal manages presets
+// Apply Campaign Weight Presets. This modal manages presets
 // (list/create/update/delete); applying a preset's values onto a specific
 // campaign's edit form happens via the picker in EditCampaignModal, which
 // reuses getWeightPresets() to populate its own dropdown.
@@ -109,7 +109,7 @@ export default function WeightPresetsModal({ isOpen, onClose }) {
       setEditingId(null);
       load();
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to save preset.");
+      toast.error(formatApiError(err, "Failed to save preset."));
     } finally {
       setSubmitting(false);
     }
@@ -123,7 +123,7 @@ export default function WeightPresetsModal({ isOpen, onClose }) {
       setConfirmDeleteId(null);
       load();
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to delete preset.");
+      toast.error(formatApiError(err, "Failed to delete preset."));
     } finally {
       setSubmitting(false);
     }
@@ -131,12 +131,9 @@ export default function WeightPresetsModal({ isOpen, onClose }) {
 
   const isForm = editingId !== null;
 
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Scoring Weight Presets" width="560px" height="85vh">
-      {loading ? (
-        <div className="py-8 flex justify-center"><LoadingSpinner text="Loading presets..." /></div>
-      ) : isForm ? (
-        <div className="space-y-4">
+  return (<Modal isOpen={isOpen} onClose={onClose} title="Scoring Weight Presets" width="560px" height="85vh">
+      {loading ? (<div className="py-8 flex justify-center"><LoadingSpinner text="Loading presets..." /></div>
+      ) : isForm ? (<div className="space-y-4">
           <FormInput label="Preset Name" name="name" value={form.name} onChange={change} maxLength={100} requiredMark />
           <FormInput label="Description" name="description" value={form.description} onChange={change} maxLength={255} />
 
@@ -160,8 +157,7 @@ export default function WeightPresetsModal({ isOpen, onClose }) {
             </Button>
           </div>
         </div>
-      ) : (
-        <div className="space-y-4">
+      ) : (<div className="space-y-4">
           <div className="flex justify-end">
             <Button variant="primary" size="small" onClick={startCreate}>
               <Plus className="h-4 w-4" /> New Preset
@@ -171,28 +167,24 @@ export default function WeightPresetsModal({ isOpen, onClose }) {
           <div className="space-y-2">
             {presets.map((preset) => {
               const isSystem = SYSTEM_PRESET_IDS.has(String(preset.id));
-              return (
-                <div key={preset.id} className="p-3 rounded-xl border border-slate-200 bg-white">
+              return (<div key={preset.id} className="p-3 rounded-xl border border-slate-200 bg-white">
                   <div className="flex justify-between items-start gap-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="text-[13px] font-bold text-slate-900 truncate">{preset.name}</span>
-                        {isSystem && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+                        {isSystem && (<span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
                             <Lock className="h-2.5 w-2.5" /> System
                           </span>
                         )}
                       </div>
-                      {preset.description && (
-                        <p className="text-[11px] text-slate-400 mt-0.5">{preset.description}</p>
+                      {preset.description && (<p className="text-[11px] text-slate-400 mt-0.5">{preset.description}</p>
                       )}
                       <p className="text-[10px] text-slate-400 mt-1">
                         {preset.weight_deterministic}% / {preset.weight_semantic}% / {preset.weight_ai}%
                         {" "}(deterministic / semantic / AI)
                       </p>
                     </div>
-                    {!isSystem && (
-                      <div className="flex items-center gap-1 shrink-0">
+                    {!isSystem && (<div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => startEdit(preset)}
                           title="Edit preset"
@@ -200,8 +192,7 @@ export default function WeightPresetsModal({ isOpen, onClose }) {
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
-                        {confirmDeleteId === preset.id ? (
-                          <div className="flex items-center gap-1">
+                        {confirmDeleteId === preset.id ? (<div className="flex items-center gap-1">
                             <button
                               onClick={() => handleDelete(preset.id)}
                               disabled={submitting}
@@ -216,8 +207,7 @@ export default function WeightPresetsModal({ isOpen, onClose }) {
                               Cancel
                             </button>
                           </div>
-                        ) : (
-                          <button
+                        ) : (<button
                             onClick={() => setConfirmDeleteId(preset.id)}
                             title="Delete preset"
                             className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
@@ -231,8 +221,7 @@ export default function WeightPresetsModal({ isOpen, onClose }) {
                 </div>
               );
             })}
-            {presets.length === 0 && (
-              <p className="text-xs text-slate-400 text-center py-8">No presets found.</p>
+            {presets.length === 0 && (<p className="text-xs text-slate-400 text-center py-8">No presets found.</p>
             )}
           </div>
         </div>

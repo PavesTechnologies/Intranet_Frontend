@@ -20,16 +20,9 @@ const EMPTY = { weight_deterministic: 30, weight_semantic: 40, weight_ai: 30, se
 
 // E02-S05-T02 — org-wide scoring defaults used by new campaigns and the
 // "Reset to Defaults" option on an existing campaign's scoring config.
-// Wired to the real PUT /campaigns/platform-defaults/scoring endpoint —
-// this card previously edited unrelated mock fields (mandatorySkills/
-// semantic/experience) that had no backend behind them at all.
-//
-// There is no standalone "get current platform defaults" endpoint — the
-// only place defaults are ever returned is embedded on a campaign's own
-// scoring-config response. getPlatformScoringDefaults() sources them from
-// the first accessible active campaign as a best-effort seed; if there
-// isn't one yet (brand-new org), the form starts from the same static
-// defaults CampaignCreateRequest itself falls back to and is disclosed as such.
+// Wired to GET/PUT /campaigns/platform-defaults/scoring. If the fetch
+// fails, the form starts from the same static defaults
+// CampaignCreateRequest itself falls back to and is disclosed as such.
 export default function SettingsWeightConfig() {
   const [values, setValues] = useState(EMPTY);
   const [loading, setLoading] = useState(true);
