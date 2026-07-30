@@ -27,7 +27,6 @@ import {
   overrideCandidateStage, flagCandidateForReview,
   getRejectionAnalytics,
   getBulkUploadsForCampaign,
-  getScoringHistory,
   formatApiError,
 } from "./services/campaignservice";
 
@@ -48,7 +47,7 @@ const fmtDate = (d) => (d ? new Date(d).toLocaleString() : "—");
 export default function CampaignDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isHRAdmin, canManageCampaigns, canViewPipeline, canViewTimeline } = useCampaignPermissions();
+  const { canManageCampaigns, canViewPipeline, canViewTimeline } = useCampaignPermissions();
 
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -182,15 +181,7 @@ export default function CampaignDetails() {
         ))}
       </div>
 
-      {activeTab === "details" && (<DetailsTab
-          info={info}
-          jd={jd}
-          scoring={scoring}
-          limits={limits}
-          hm={hm}
-          campaignId={id}
-          canViewScoringHistory={isHRAdmin}
-        />
+      {activeTab === "details" && (<DetailsTab info={info} jd={jd} scoring={scoring} limits={limits} hm={hm} />
       )}
       {activeTab === "candidates" && (<CandidatesTab
           campaignId={id}
@@ -244,151 +235,189 @@ export default function CampaignDetails() {
 }
 
 /* ---------------- Details Tab ---------------- */
-function Section({ title, icon: Icon, children }) {
-  return (<div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm h-fit">
-      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest border-b pb-2 mb-3 flex items-center gap-2">
-        {Icon && <Icon className="h-4 w-4 text-blue-600" />} {title}
-      </h3>
-      <div className="space-y-3">{children}</div>
+// h-full + flex-col: siblings in a row match the tallest card instead of
+// shrink-wrapping to their content and leaving ragged whitespace beneath.
+function Card({ title, icon: Icon, children, className = "" }) {
+  return (<div className={`bg-white border border-slate-200 rounded-xl shadow-sm h-full flex flex-col overflow-hidden ${className}`}>
+      <div className="flex items-center gap-2 px-5 py-3.5 border-b border-slate-100 bg-slate-50/60">
+        {Icon && <Icon className="h-4 w-4 text-blue-600" />}
+        <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-widest">{title}</h3>
+      </div>
+      <div className="p-5 flex-1">{children}</div>
     </div>
   );
 }
 
-function Field({ label, value }) {
-  return (<div>
-      <span className="text-[10px] uppercase font-bold text-slate-400 block">{label}</span>
-      <span className="text-xs font-bold text-slate-800">{value ?? "—"}</span>
+function Row({ label, value, className = "" }) {
+  return (<div className={`min-w-0 ${className}`}>
+      <dt className="text-[10px] uppercase font-bold tracking-wide text-slate-400">{label}</dt>
+      <dd className="text-xs font-bold text-slate-800 mt-0.5 break-words">{value ?? "—"}</dd>
     </div>
   );
 }
 
-// Diff line for one scoring change: only fields whose value actually
-// changed are shown ("Semantic Weight 40 → 35").
-const HISTORY_FIELD_LABELS = {
-  weight_deterministic: "Det. Weight",
-  weight_semantic: "Sem. Weight",
-  weight_ai: "AI Weight",
-  deterministic_threshold: "Det. Threshold",
-  semantic_threshold: "Sem. Threshold",
-  ai_threshold: "AI Threshold",
+// Summary strip cell — cells sit flush against each other (divide-x, no
+// gutters) so the strip reads as one continuous band.
+function GlanceCell({ label, children }) {
+  return (<div className="px-5 py-4 flex-1 min-w-0">
+      <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400 mb-1.5">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+const STATUS_PILL = {
+  ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  PAUSED: "bg-amber-50 text-amber-700 border-amber-200",
+  CLOSED: "bg-slate-100 text-slate-600 border-slate-300",
 };
 
-function historyDiff(before = {}, after = {}) {
-  return Object.keys(HISTORY_FIELD_LABELS)
-    .filter((k) => k in after && String(before[k]) !== String(after[k]))
-    .map((k) => `${HISTORY_FIELD_LABELS[k]} ${before[k] ?? "—"} → ${after[k]}`);
-}
+// Same palette the rejection-analytics chart uses, so a layer reads as the
+// same colour everywhere in the module.
+const SCORING_LAYERS = [
+  { key: "weight_deterministic", label: "Deterministic", color: "#6366F1" },
+  { key: "weight_semantic", label: "Semantic", color: "#0EA5E9" },
+  { key: "weight_ai", label: "AI", color: "#8B5CF6" },
+];
 
-// HR_ADMIN-only (endpoint is role-gated): collapsible list of past weight/
-// threshold changes shown under the Scoring Configuration card. Fetched
-// lazily on first expand so the details tab costs nothing extra by default.
-function ScoringHistory({ campaignId }) {
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [entries, setEntries] = useState(null); // null = not fetched yet
+function DetailsTab({ info, jd, scoring, limits, hm }) {
+  const status = (info.status || "").toUpperCase();
 
-  const toggle = async () => {
-    const next = !open;
-    setOpen(next);
-    if (next && entries === null) {
-      setLoading(true);
-      try {
-        const res = await getScoringHistory(campaignId);
-        const data = res?.data || res;
-        setEntries(Array.isArray(data?.history) ? data.history : []);
-      } catch (error) {
-        console.error("Error fetching scoring history:", error);
-        setEntries([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
+  const max = limits.max_candidates;
+  const current = limits.current_candidate_count ?? 0;
+  const capPct = max ? Math.min(100, Math.round((current / max) * 100)) : null;
+  // full cap is the state that actually blocks new uploads, so it gets the
+  // strongest colour rather than being buried in plain text
+  const capTone = capPct == null ? "bg-slate-300"
+    : capPct >= 100 ? "bg-rose-500"
+      : capPct >= 80 ? "bg-amber-500"
+        : "bg-indigo-500";
 
-  return (<div className="border-t pt-2 mt-1">
-      <button
-        type="button"
-        onClick={toggle}
-        className="flex items-center gap-1 text-[10px] uppercase font-bold text-slate-400 hover:text-slate-600"
-      >
-        <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
-        Change History
-      </button>
-      {open && (<div className="mt-2 space-y-2 max-h-48 overflow-y-auto pr-1">
-          {loading && <p className="text-[11px] text-slate-400">Loading…</p>}
-          {!loading && entries?.length === 0 && (<p className="text-[11px] text-slate-400">No scoring changes yet.</p>
+  const weightTotal = scoring
+    ? SCORING_LAYERS.reduce((sum, l) => sum + Number(scoring[l.key] || 0), 0)
+    : 0;
+
+  return (<div className="space-y-5">
+      {/* At-a-glance strip — the four numbers worth knowing before reading
+          anything else. Flush cells, full width, no empty slots. */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+        <GlanceCell label="Status">
+          <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${STATUS_PILL[status] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
+            {status || "—"}
+          </span>
+        </GlanceCell>
+
+        <GlanceCell label="Candidates">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-lg font-black text-slate-900 tabular-nums leading-none">{current}</span>
+            <span className="text-[11px] font-bold text-slate-400">
+              {max == null ? "of unlimited" : `of ${max}`}
+            </span>
+          </div>
+          {capPct != null && (<div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+              <div className={`h-1.5 rounded-full ${capTone} transition-all duration-500`} style={{ width: `${capPct}%` }} />
+            </div>
           )}
-          {!loading && (entries || []).map((h, i) => {
-            const changes = historyDiff(h.before, h.after);
-            return (<div key={i} className="rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-1.5">
-                <p className="text-[10px] font-bold text-slate-500">
-                  {fmtDate(h.changed_at)} · {h.changed_by || "Unknown"}
-                </p>
-                {changes.length > 0 ? (changes.map((c) => (<p key={c} className="text-[11px] text-slate-700">{c}</p>
-                  ))
-                ) : (<p className="text-[11px] text-slate-400">No field-level change recorded.</p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
+        </GlanceCell>
 
-function DetailsTab({ info, jd, scoring, limits, hm, campaignId, canViewScoringHistory }) {
-  return (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <Section title="Campaign Info" icon={FileText}>
-        <Field label="Name" value={info.name} />
-        <Field label="Status" value={(info.status || "").toUpperCase()} />
-        <Field label="Created By" value={info.created_by_name} />
-        <Field label="Created At" value={fmtDate(info.created_at)} />
-        <Field label="Updated At" value={fmtDate(info.updated_at)} />
-      </Section>
+        <GlanceCell label="Deadline">
+          <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            {limits.deadline ? fmtDate(limits.deadline) : "None set"}
+          </p>
+        </GlanceCell>
 
-      <Section title="JD Configuration" icon={FileText}>
-        <div>
-          <span className="text-[10px] uppercase font-bold text-slate-400 block">Linked JD</span>
+        <GlanceCell label="Job Description">
           {jd.jd_id ? (<Link
               to={`/airs/jds/${jd.jd_id}`}
               className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
             >
-              {jd.jd_title} <ExternalLink className="h-3 w-3" />
+              <span className="truncate">{jd.jd_title}</span>
+              <ExternalLink className="h-3 w-3 shrink-0" />
             </Link>
-          ) : (<span className="text-xs font-bold text-slate-800">{jd.jd_title ?? "—"}</span>
+          ) : (<p className="text-xs font-bold text-slate-800 truncate">{jd.jd_title ?? "—"}</p>
           )}
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            v{jd.version_number ?? "—"} · {jd.jurisdiction ?? "—"} · {jd.mandatory_skill_count ?? 0} mandatory skills
+          </p>
+        </GlanceCell>
+      </div>
+
+      {/* Two equal-height cards. Scoring is null for HIRING_MANAGER, in which
+          case the left card takes the full width instead of leaving a hole. */}
+      <div className={`grid grid-cols-1 gap-5 ${scoring ? "lg:grid-cols-5" : ""}`}>
+        <div className={scoring ? "lg:col-span-3" : ""}>
+          <Card title="Campaign" icon={FileText}>
+            {/* Name and the two people sit on the top row as the identity of
+                the campaign; timestamps are metadata and go below, three to a
+                row so nothing is left orphaned in a half-empty column.
+                Jurisdiction lives in the summary strip above, not repeated. */}
+            <dl className="space-y-4">
+              <Row label="Name" value={info.name} />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                {hm && (<div className="min-w-0">
+                    <dt className="text-[10px] uppercase font-bold tracking-wide text-slate-400 flex items-center gap-1">
+                      <UserCog className="h-3 w-3" /> Hiring Manager
+                    </dt>
+                    <dd className="mt-1.5 flex items-center gap-2.5 min-w-0">
+                      <span className="h-8 w-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                        {(hm.full_name || "?").trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase()}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-xs font-bold text-slate-800 truncate">{hm.full_name}</span>
+                        <span className="block text-[11px] text-slate-500 truncate">{hm.email}</span>
+                      </span>
+                    </dd>
+                  </div>
+                )}
+                <Row label="Created By" value={info.created_by_name} />
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                <Row label="Created At" value={fmtDate(info.created_at)} />
+                <Row label="Last Updated" value={fmtDate(info.updated_at)} />
+              </div>
+            </dl>
+          </Card>
         </div>
-        <Field label="Version" value={jd.version_number} />
-        <Field label="Jurisdiction" value={jd.jurisdiction} />
-        <Field label="Mandatory Skills" value={jd.mandatory_skill_count} />
-      </Section>
 
-      {/* Rendered only when backend supplied it (null for HIRING_MANAGER) */}
-      {scoring && (<Section title="Scoring Configuration" icon={Target}>
-          <Field label="Deterministic Weight" value={asPct(scoring.weight_deterministic)} />
-          <Field label="Semantic Weight" value={asPct(scoring.weight_semantic)} />
-          <Field label="AI Weight" value={asPct(scoring.weight_ai)} />
-          <Field label="Semantic Threshold" value={scoring.semantic_threshold} />
-          <Field label="AI Threshold" value={scoring.ai_threshold} />
-          {canViewScoringHistory && <ScoringHistory campaignId={campaignId} />}
-        </Section>
-      )}
+        {scoring && (<div className="lg:col-span-2">
+            <Card title="Scoring Configuration" icon={Target}>
+              {/* Three weights are one distribution, so they read as one bar
+                  rather than three unrelated numbers. */}
+              <div className="flex h-2.5 rounded-full overflow-hidden bg-slate-100">
+                {SCORING_LAYERS.map((l) => {
+                  const w = Number(scoring[l.key] || 0);
+                  return (<div
+                      key={l.key}
+                      className="h-2.5 transition-all duration-500"
+                      style={{ width: weightTotal ? `${(w / weightTotal) * 100}%` : "0%", backgroundColor: l.color }}
+                      title={`${l.label}: ${asPct(w)}`}
+                    />
+                  );
+                })}
+              </div>
+              <dl className="mt-3 space-y-2">
+                {SCORING_LAYERS.map((l) => (<div key={l.key} className="flex items-center justify-between gap-2">
+                    <dt className="text-[11px] font-semibold text-slate-600 flex items-center gap-2 min-w-0">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: l.color }} />
+                      <span className="truncate">{l.label}</span>
+                    </dt>
+                    <dd className="text-xs font-bold text-slate-900 tabular-nums">{asPct(scoring[l.key])}</dd>
+                  </div>
+                ))}
+              </dl>
 
-      <Section title="Pipeline Limits" icon={Users}>
-        <Field
-          label="Max Candidates"
-          value={limits.max_candidates == null ? "Unlimited" : `${limits.current_candidate_count} / ${limits.max_candidates}`}
-        />
-        <Field label="Current Candidates" value={limits.current_candidate_count} />
-        <Field label="Deadline" value={limits.deadline ? fmtDate(limits.deadline) : "None"} />
-      </Section>
-
-      {hm && (<Section title="Assigned Hiring Manager" icon={UserCog}>
-          <Field label="Name" value={hm.full_name} />
-          <Field label="Email" value={hm.email} />
-        </Section>
-      )}
+              <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-3 gap-3">
+                <Row label="Det. Cutoff" value={scoring.deterministic_threshold ?? "—"} />
+                <Row label="Sem. Cutoff" value={scoring.semantic_threshold} />
+                <Row label="AI Cutoff" value={scoring.ai_threshold} />
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
