@@ -565,7 +565,13 @@ export default function JdLibrary() {
       </div>
 
       {/* Processed JD / Processing JD Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs
+        value={activeTab}
+        onValueChange={(tab) => {
+          setActiveTab(tab);
+          if (tab === "processed") fetchJds();
+        }}
+      >
         <TabsList className="bg-white border border-slate-200 shadow-sm mb-6 p-1 h-auto">
           <TabsTrigger
             value="processed"

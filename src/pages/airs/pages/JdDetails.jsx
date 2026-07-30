@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAirsStore } from "./airsStore";
-import { getJDById, exportSingleJD, getJDSkills, getJDUnknownSkills } from "../service/jdservice";
+import { getJDById, exportSingleJD, downloadJDById, getJDSkills, getJDUnknownSkills } from "../service/jdservice";
+import { useAuth } from "../../../contexts/AuthContext";
 import {
   ArrowLeft,
   Briefcase,
@@ -63,6 +64,8 @@ export default function JdDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { jds, campaigns, updateJd, restoreJdVersion, addCampaign } = useAirsStore();
+  const { hasRole } = useAuth();
+  const isHRAdmin = hasRole(["HR_ADMIN"]);
 
   const jd = jds.find((j) => j.id === id);
 
@@ -89,6 +92,53 @@ export default function JdDetails() {
   }, [id]);
 
   const [isExporting, setIsExporting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadJD = async () => {
+    try {
+      setIsDownloading(true);
+
+      const response = await downloadJDById(currentJd.id);
+
+      const blob = new Blob([response.data], {
+        type: response.headers["content-type"] || "application/octet-stream",
+      });
+
+      const url = window.URL.createObjectURL(blob);
+
+      let filename = "Job_Description";
+
+      const disposition = response.headers["content-disposition"];
+
+      if (disposition) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+
+        if (match) {
+          filename = match[1];
+        }
+      }
+
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = filename;
+
+      document.body.appendChild(link);
+
+      link.click();
+
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Job Description downloaded successfully.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to download Job Description.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const handleExportJD = async () => {
     try {
@@ -854,7 +904,7 @@ export default function JdDetails() {
             </div>
           </div> */}
           <Button
-            variant="secondary"
+            variant="primary"
             size="medium"
             onClick={handleExportJD}
             title="Export JD"
@@ -864,6 +914,19 @@ export default function JdDetails() {
           >
             <Download className="h-4 w-4" /> Export JD
           </Button>
+          {isHRAdmin && (
+            <Button
+              variant="secondary"
+              size="medium"
+              onClick={handleDownloadJD}
+              title="Download JD"
+              disabled={isDownloading}
+              loading={isDownloading}
+              loadingText="Downloading..."
+            >
+              <Download className="h-4 w-4" /> Download JD
+            </Button>
+          )}
         </div>
       </div>
 

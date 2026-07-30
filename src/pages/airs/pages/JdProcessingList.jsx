@@ -10,8 +10,10 @@ import {
   RefreshCw,
   AlertTriangle,
   ArrowRight,
+  Trash2,
 } from "lucide-react";
-import { getMyJDUploads } from "../service/jdservice";
+import { getMyJDUploads, deleteJDProcessingTask, getJDById } from "../service/jdservice";
+import { useAuth } from "../../../contexts/AuthContext";
 import { Badge } from "../../../components/ui/badge";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ExpandableList from "../../../components/List/List";
@@ -119,8 +121,12 @@ export default function JdProcessingList() {
   const [uploads, setUploads] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [deletingTaskId, setDeletingTaskId] = useState(null);
+  const [viewingJdId, setViewingJdId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const navigate = useNavigate();
+  const { hasRole } = useAuth();
+  const isHRAdmin = hasRole(["HR_ADMIN"]);
 
   const fetchUploads = async (silent = false) => {
     if (silent) setIsRefreshing(true);
@@ -139,6 +145,30 @@ export default function JdProcessingList() {
   useEffect(() => {
     fetchUploads(false);
   }, []);
+
+  const handleViewJD = async (jdId) => {
+    setViewingJdId(jdId);
+    try {
+      await getJDById(jdId);
+      navigate(`/airs/jds/${jdId}`);
+    } catch (err) {
+      // Error toast already shown by getJDById.
+    } finally {
+      setViewingJdId(null);
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    setDeletingTaskId(taskId);
+    try {
+      await deleteJDProcessingTask(taskId);
+      await fetchUploads(true);
+    } catch (err) {
+      // Error toast already shown by deleteJDProcessingTask.
+    } finally {
+      setDeletingTaskId(null);
+    }
+  };
 
   const totalPages = Math.max(1, Math.ceil(uploads.length / ITEMS_PER_PAGE));
 
@@ -195,6 +225,8 @@ export default function JdProcessingList() {
               }
             });
             const isSuccess = String(u.status).toUpperCase() === "SUCCESS";
+            const isFailure = ["FAILURE", "FAILED"].includes(String(u.status).toUpperCase());
+            const isDeleting = deletingTaskId === u.task_id;
 
             return (
               <ExpandableList
@@ -215,11 +247,25 @@ export default function JdProcessingList() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate(`/airs/jds/${u.jd_id}`);
+                          handleViewJD(u.jd_id);
                         }}
-                        className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 transition"
+                        disabled={viewingJdId === u.jd_id}
+                        className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 transition disabled:opacity-50"
                       >
                         View JD <ArrowRight className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {isFailure && isHRAdmin && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteTask(u.task_id);
+                        }}
+                        disabled={isDeleting}
+                        className="flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 transition disabled:opacity-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {isDeleting ? "Deleting..." : "Delete"}
                       </button>
                     )}
                   </div>
