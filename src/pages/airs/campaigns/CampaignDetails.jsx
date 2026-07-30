@@ -40,39 +40,6 @@ const STAGE_COLORS = {
 const stageLabel = (s) =>
   s.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 
-// Tailwind badge styles per pipeline stage (candidate list chips)
-const STAGE_BADGE = {
-  UPLOADED: "bg-slate-100 text-slate-600",
-  SCREENING: "bg-amber-50 text-amber-700",
-  SHORTLISTED: "bg-sky-50 text-sky-700",
-  HM_REVIEW: "bg-teal-50 text-teal-700",
-  INTERVIEW: "bg-indigo-50 text-indigo-700",
-  SELECTED: "bg-emerald-50 text-emerald-700",
-  HOLD: "bg-slate-100 text-slate-500",
-  REJECTED: "bg-rose-50 text-rose-700",
-  FRAUD_REVIEW: "bg-orange-50 text-orange-700",
-};
-
-// Composite-score colour tone
-const scoreTone = (s) =>
-  s >= 70 ? "bg-emerald-50 text-emerald-700"
-    : s >= 50 ? "bg-amber-50 text-amber-700"
-      : "bg-rose-50 text-rose-700";
-
-const initialsOf = (name) =>
-  (name || "?").trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
-
-// The candidate list endpoint's payload field names aren't nailed down in the
-// frontend yet, so read the most likely keys defensively and normalise to a
-// stable shape the row renderer can rely on.
-const normalizeCandidate = (cd, idx) => ({
-  id: cd.id ?? cd.campaign_candidate_id ?? cd.candidate_id ?? idx,
-  name: cd.candidate_name ?? cd.full_name ?? cd.name ?? "Unknown Candidate",
-  location: cd.location ?? cd.city ?? cd.current_location ?? "",
-  stage: (cd.pipeline_stage ?? cd.current_stage ?? cd.stage ?? cd.candidate_stage ?? cd.status ?? "").toUpperCase(),
-  score: cd.composite_score ?? cd.composite ?? cd.overall_score ?? cd.score ?? null,
-});
-
 // service returns the raw APIResponse ({ success, message, data }); pull out data
 const unwrap = (res) => (res && res.data !== undefined ? res.data : res);
 const asPct = (n) => (n == null ? "—" : `${Math.round(n)}%`);
@@ -479,7 +446,12 @@ function CandidatesTab({ campaignId, canViewPipeline, stageFilter = "", onStageF
     return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading candidates..." /></div>;
   }
 
-  const allCandidates = (candidates || []).map(normalizeCandidate);
+  // same row shape the standalone candidates screen renders, so CandidateTable
+  // and the star/pagination helpers work unchanged here
+  const allCandidates = mapCampaignCandidateList(candidates || []).map((c) => ({
+    ...c,
+    starred: starredIds.has(c.id),
+  }));
   // stage filter — set by clicking a funnel bar, changeable here too
   const list = stageFilter
     ? allCandidates.filter((c) => (c.stage || "").toUpperCase() === stageFilter)
@@ -547,38 +519,19 @@ function CandidatesTab({ campaignId, canViewPipeline, stageFilter = "", onStageF
         ))}
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-        {list.length === 0 ? (<p className="text-xs text-slate-400 text-center py-10">
-            No candidates sourced yet for this campaign.
-          </p>
-        ) : (<div className="space-y-2">
-            {list.map((cd) => (<div
-                key={cd.id}
-                className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100"
-              >
-                <div className="h-8 w-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold uppercase shrink-0">
-                  {initialsOf(cd.name)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-bold text-slate-900 truncate">{cd.name}</div>
-                  {cd.location && (<div className="text-[11px] text-slate-400 truncate flex items-center gap-1">
-                      <MapPin className="h-3 w-3" /> {cd.location}
-                    </div>
-                  )}
-                </div>
-                {cd.stage && (<span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase ${STAGE_BADGE[cd.stage] || "bg-slate-100 text-slate-600"}`}>
-                    {stageLabel(cd.stage)}
-                  </span>
-                )}
-                {cd.score != null && (<span className={`text-[11px] font-bold px-2.5 py-1 rounded-full tabular-nums ${scoreTone(cd.score)}`}>
-                    {Math.round(cd.score)}%
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <CandidateTable
+        candidates={pageItems}
+        onView={(c) => navigate(`/airs/candidates/${c.id}`)}
+        onToggleStar={toggleStar}
+      />
+
+      {list.length > 0 && (<Pagination
+          currentPage={safePage}
+          totalPages={totalPages}
+          onPrevious={() => setCurrentPage(safePage - 1)}
+          onNext={() => setCurrentPage(safePage + 1)}
+        />
+      )}
     </div>
   );
 }
