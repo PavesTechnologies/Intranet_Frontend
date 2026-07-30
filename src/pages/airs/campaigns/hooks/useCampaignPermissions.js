@@ -23,11 +23,9 @@ export default function useCampaignPermissions() {
     // ── HR_ADMIN only ────────────────────────────────────────────────
     // create / edit / pause / resume / close / reopen / duplicate
     canManageCampaigns: isHRAdmin,
-    // scoring edit, copy, reset, presets, platform defaults
+    // scoring edit, reset, presets, platform defaults
     canManageScoring: isHRAdmin,
     canViewTimeline: isHRAdmin,
-    canCompareCampaigns: isHRAdmin,
-    canViewWeightReport: isHRAdmin,
 
     // ── HR_ADMIN + RECRUITER ─────────────────────────────────────────
     // pipeline-summary, processing-status, dead-letter-queue
