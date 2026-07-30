@@ -706,7 +706,7 @@ function LineItemDrawer({
   const handleFileChange = (files) => {
     if (!files?.length) return;
     const newFiles = [];
-    let hasDuplicate = false;
+    let hasDuplicate = false; 
 
     for (const file of Array.from(files)) {
       const isDuplicate = pendingFiles.some(
