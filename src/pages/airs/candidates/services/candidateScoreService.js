@@ -16,3 +16,35 @@ export const getCampaignCandidateDetail = async (campaignCandidateId) => {
     throw error;
   }
 };
+
+// Candidate Scorecard — Deterministic tab —
+// GET /airs/campaign-candidates/{campaign_candidate_id}/deterministic
+export const getDeterministicScoreBreakdown = async (campaignCandidateId) => {
+  try {
+    const response = await api.get(`${BASE_URL}/campaign-candidates/${campaignCandidateId}/deterministic`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching deterministic score breakdown:", error);
+    throw error;
+  }
+};
+
+// Candidate Scorecard — Semantic tab —
+// GET /airs/campaign-candidates/{campaign_candidate_id}/semantic
+export const getSemanticScoreBreakdown = async (campaignCandidateId) => {
+  try {
+    const response = await api.get(`${BASE_URL}/campaign-candidates/${campaignCandidateId}/semantic`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching semantic score breakdown:", error);
+    throw error;
+  }
+};

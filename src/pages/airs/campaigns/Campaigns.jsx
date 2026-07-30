@@ -2,14 +2,12 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
-  Briefcase, CheckCircle, PauseCircle, XCircle, Plus, Search, Calendar, Edit2,
-  Sliders,
+  Briefcase, Plus, Search, Calendar, Edit2, Sliders,
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/ui/Modal";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import { KPICard } from "../../../components/kpi/KPI";
 import NewCampaignForm from "./components/NewCampaignForm";
 import EditCampaignModal from "./components/EditCampaignModal";
 import WeightPresetsModal from "./components/WeightPresetsModal";
@@ -195,17 +193,6 @@ export default function Campaigns() {
     ...eligibleJds.map((jd) => ({ value: jd.id, label: jd.title })),
   ]), [eligibleJds, jdList.length]);
 
-  // KPI counts
-  const counts = useMemo(() => {
-    const byStatus = (s) => campaigns.filter((c) => (c.status || "").toUpperCase() === s).length;
-    return {
-      total: campaigns.length,
-      active: byStatus("ACTIVE"),
-      paused: byStatus("PAUSED"),
-      closed: byStatus("CLOSED"),
-    };
-  }, [campaigns]);
-
   // Client-side search + status filter
   const filteredCampaigns = useMemo(() => {
     const query = searchQuery.toLowerCase();
@@ -346,14 +333,6 @@ export default function Campaigns() {
             </Button>
           )}
         </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <KPICard label="Total Campaigns" value={counts.total} icon={<Briefcase className="h-5 w-5" />} color="bg-slate-100 text-slate-600" />
-        <KPICard label="Active" value={counts.active} icon={<CheckCircle className="h-5 w-5" />} color="bg-emerald-50 text-emerald-600" />
-        <KPICard label="Paused" value={counts.paused} icon={<PauseCircle className="h-5 w-5" />} color="bg-amber-50 text-amber-600" />
-        <KPICard label="Closed" value={counts.closed} icon={<XCircle className="h-5 w-5" />} color="bg-slate-100 text-slate-500" />
       </div>
 
       {/* Toolbar: search + status filter */}

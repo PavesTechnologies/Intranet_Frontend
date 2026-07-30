@@ -326,18 +326,28 @@ export const createSkill = async (payload) => {
   }
 };
 
+// The PATCH endpoint's alias fields are additive/subtractive, not a full
+// replacement: "aliases" adds/ensures the listed names are present, while
+// actually removing an existing alias requires it to be listed in
+// "remove_aliases" with "confirm_alias_removal: true" alongside it — sending
+// a shorter "aliases" array on its own does not remove anything. Callers pass
+// the aliases the user removed via payload.remove_aliases so this can attach
+// both fields whenever a removal is intended.
 export const updateSkill = async (skillId, payload) => {
   try {
+    const removeAliases = payload.remove_aliases || [];
+    const body = {
+      canonical_name: payload.canonical_name,
+      category: payload.category,
+      aliases: payload.aliases,
+      ...(removeAliases.length > 0 ? { remove_aliases: removeAliases, confirm_alias_removal: true } : {}),
+      parent_skill_id: payload.parent_skill_id || null,
+      confidence: payload.confidence?.toLowerCase(),
+      is_active: payload.status ? payload.status === "ACTIVE" : undefined,
+    };
     const response = await api.patch(
       `${BASE_URL}/skill-ontology/${skillId}`,
-      {
-        canonical_name: payload.canonical_name,
-        category: payload.category,
-        aliases: payload.aliases,
-        parent_skill_id: payload.parent_skill_id || null,
-        confidence: payload.confidence?.toLowerCase(),
-        is_active: payload.status ? payload.status === "ACTIVE" : undefined,
-      },
+      body,
       { headers: authHeaders() }
     );
     return ok(mapApiSkillToInternal(response.data?.data || {}));
@@ -520,13 +530,23 @@ export const exportSkills = async (params = {}) => {
   }
 };
 
+// Aliases may come back from the backend either as plain strings or as
+// { id, name } objects (see useSkillDetail's own aliasName helper) — these
+// two normalise either shape so add/remove below compare correctly instead
+// of an object reference against a string always failing to match.
+const aliasName = (a) => (a && typeof a === "object" ? a.name : a);
+const isTargetAlias = (a, target) => (a && typeof a === "object" ? a.id === target : a === target);
+
 // Alias add/remove has no dedicated endpoint — both go through the generic
 // updateSkill PATCH with the full aliases array, so the current skill is
-// fetched first to avoid clobbering its other fields.
+// fetched first to avoid clobbering its other fields. The PATCH body always
+// sends plain name strings (matching what the Edit Skill form sends), even
+// when the GET response returned { id, name } objects.
 export const addAlias = async (skillId, alias) => {
   const current = await getSkill(skillId);
   const skill = current?.data || current;
-  const aliases = skill.aliases.includes(alias) ? skill.aliases : [...skill.aliases, alias];
+  const names = skill.aliases.map(aliasName);
+  const aliases = names.includes(alias) ? names : [...names, alias];
   return updateSkill(skillId, {
     canonical_name: skill.canonicalName,
     category: skill.category,
@@ -540,10 +560,13 @@ export const addAlias = async (skillId, alias) => {
 export const removeAlias = async (skillId, alias) => {
   const current = await getSkill(skillId);
   const skill = current?.data || current;
+  const removedNames = skill.aliases.filter((a) => isTargetAlias(a, alias)).map(aliasName);
+  const aliases = skill.aliases.filter((a) => !isTargetAlias(a, alias)).map(aliasName);
   return updateSkill(skillId, {
     canonical_name: skill.canonicalName,
     category: skill.category,
-    aliases: skill.aliases.filter((a) => a !== alias),
+    aliases,
+    remove_aliases: removedNames,
     parent_skill_id: skill.parentSkillId,
     confidence: skill.confidence,
     status: skill.status,
