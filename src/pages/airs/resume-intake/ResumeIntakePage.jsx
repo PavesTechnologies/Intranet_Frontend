@@ -41,7 +41,13 @@ export default function ResumeIntakePage() {
     totalResults: inProcessingTotal,
     isLoading: inProcessingLoading,
     refreshInProcessing,
-  } = useInProcessingResumes({ campaignFilter, statusFilter, sourceFilter, sortValue });
+  } = useInProcessingResumes({
+    campaignFilter,
+    statusFilter,
+    sourceFilter,
+    sortValue,
+    enabled: activeListTab === "processing",
+  });
 
   const handleSingleUploaded = () => {
     setIsIntakeModalOpen(false);
