@@ -48,8 +48,83 @@ export function mapParsedResumeToCandidate(raw, fallback = {}) {
     semantic: 0,
     ats: 0,
     composite: 0,
+    risk: 0,
+
+    matchedSkills: [],
+    missingSkills: [],
+    strengths: [],
+    weaknesses: [],
+    summary: parsed.summary || "",
+
+    scoreBreakdown: {
+      score: 0,
+      status: "FAILED",
+      mandatoryCoveragePct: 0,
+      items: [],
+      noVerifiedSkills: true,
+      preferredSkillBonus: 0,
+    },
+    rawScoreBreakdown: {
+      score_breakdown: {
+        score: 0,
+        status: "FAILED",
+        mandatory_coverage_pct: 0,
+        items: [],
+        no_verified_skills: true,
+        preferred_skill_bonus: 0,
+      },
+      experience_validation: {
+        required_experience_years: 0,
+        candidate_experience_years: parsed.total_experience_years ?? 0,
+        tolerance_years: 0,
+        result: "FAIL",
+      },
+      education_validation: {
+        required_degree: "",
+        candidate_degree: "",
+        equivalent_experience_applied: false,
+        result: "FAIL",
+      },
+      score_calculation: {
+        skills_score: 0,
+        experience_score: 0,
+        education_score: 0,
+        final_deterministic_score: 0,
+      },
+    },
+
+    experienceValidation: {
+      requiredExperience: 0,
+      candidateExperience: parsed.total_experience_years ?? 0,
+      toleranceYears: 0,
+      result: "FAIL",
+    },
+    educationValidation: {
+      requiredDegree: "",
+      candidateDegree: "",
+      equivalentExperienceApplied: false,
+      result: "FAIL",
+    },
+    scoreCalculation: {
+      skillsScore: 0,
+      experienceScore: 0,
+      educationScore: 0,
+      finalScore: 0,
+    },
+    deterministicThreshold: 60,
 
     aiCandidateSummary: parsed.summary || null,
+
+    downloadUrl: data.download_url ?? null,
+    originalFilename: data.original_filename ?? "Resume",
+    fileFormat: data.file_format ?? "PDF",
+    fileSizeBytes: data.file_size_bytes ?? 0,
+    pageCount: data.page_count ?? 1,
+    projects: arr(parsed.projects).map((p) => ({
+      name: textOrDash(p.name),
+      description: textOrDash(p.description),
+      tech: arr(p.tech),
+    })),
 
     // Resume tab fields — read directly off parsed_json, no synthesized data.
     skills: arr(parsed.skills),

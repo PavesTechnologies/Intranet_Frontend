@@ -19,7 +19,7 @@ export default function CandidateHeader({ candidate, onBack }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[15px] font-bold text-slate-900">{candidate.name}</span>
-            {renderStageBadge(candidate.stage)}
+            {/* {renderStageBadge(candidate.stage)} */}
           </div>
           <div className="text-[12px] flex items-center gap-3 flex-wrap text-slate-400">
             <span className="flex items-center gap-1">
