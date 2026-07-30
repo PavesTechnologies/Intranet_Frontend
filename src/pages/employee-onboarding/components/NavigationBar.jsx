@@ -166,7 +166,7 @@ export default function OnboardingNavBar() {
 
   const managementNav = [
     ...(!isOnlyGeneral
-      ? [{ label: "Pending Approvals", path: "/employee-onboarding" }]
+      ? [{ label: "Workflow Overview", path: "/employee-onboarding" }]
       : []),
     ...(isAdmin ? [
       { label: "Admin Dashboard", path: "/employee-onboarding/admin/offer-letters" }
