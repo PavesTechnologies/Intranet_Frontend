@@ -3,6 +3,27 @@ import api from "../../../../api/axiosInstance";
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 const UMS_BASE_URL = window.__APP_CONFIG__.USER_MANAGEMENT_URL;
 
+// Turns any backend error into a toast-ready string. FastAPI 422 validation
+// errors arrive as detail: [{loc, msg, type}, ...] — rendering that object
+// directly shows "[object Object]", so flatten it to "field: message".
+export const formatApiError = (error, fallback = "Something went wrong.") => {
+    const data = error?.response?.data;
+    if (typeof data?.message === "string" && data.message) return data.message;
+    const detail = data?.detail;
+    if (typeof detail === "string" && detail) return detail;
+    if (Array.isArray(detail) && detail.length) {
+        return detail
+            .slice(0, 3)
+            .map((d) => {
+                const field = Array.isArray(d?.loc) ? d.loc[d.loc.length - 1] : null;
+                const msg = d?.msg || "Invalid value";
+                return field && field !== "body" ? `${field}: ${msg}` : msg;
+            })
+            .join(" · ");
+    }
+    return fallback;
+};
+
 export const createCampaign = async (campaignData) => {
     try {
         const response = await api.post(`${BASE_URL}/campaigns`, campaignData, {
@@ -17,9 +38,10 @@ export const createCampaign = async (campaignData) => {
     }
 };
 
-export const getAllCampaignsHrAdmin = async () => {
+export const getAllCampaignsHrAdmin = async ({ show_closed = false } = {}) => {
     try {
         const response = await api.get(`${BASE_URL}/campaigns/hr_admin`, {
+            params: { show_closed },
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
@@ -51,9 +73,10 @@ export const getAllCampaigns = async (filters = {}) => {
     }
 };
 
-export const getCampaignsByHiringManager = async () => {
+export const getCampaignsByHiringManager = async ({ show_closed = false } = {}) => {
     try {
         const response = await api.get(`${BASE_URL}/campaigns/hiring_manager`, {
+            params: { show_closed },
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
@@ -125,20 +148,6 @@ export const updateCampaign = async (campaignId, payload) => {
 };
 
 
-export const getCampaignById = async (campaignId) => {
-    try {
-        const response = await api.get(`${BASE_URL}/campaigns/${campaignId}`, {
-            headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-            }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching campaign:", error);
-        throw error;
-    }
-};
-
 export const getCampaignCandidates = async (campaignId) => {
     try {
         const response = await api.get(`${BASE_URL}/campaign-candidates/campaign/${campaignId}`, {
@@ -166,21 +175,6 @@ export const getNameByRoles = async (roleName) => {
         throw error;
     }
 };
-
-export const getActiveCampaigns = async () => {
-    try {
-        const response = await api.get(`${BASE_URL}/campaigns/active`, {
-            headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-            }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching active campaigns:", error);
-        throw error;
-    }
-};
-
 
 export const getPauseSummary = async (campaignId) => {
     try {
@@ -309,19 +303,7 @@ export const deleteWeightPreset = async (presetId) => {
     }
 };
 
-// ── /S02/Scoring configuration ──────────────────────────────
-
-export const getScoringConfig = async (campaignId) => {
-    try {
-        const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/scoring-config`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching scoring configuration:", error);
-        throw error;
-    }
-};
+// ── Scoring configuration ──────────────────────────────
 
 export const getScoringHistory = async (campaignId) => {
     try {
@@ -331,18 +313,6 @@ export const getScoringHistory = async (campaignId) => {
         return response.data;
     } catch (error) {
         console.error("Error fetching scoring history:", error);
-        throw error;
-    }
-};
-
-export const updateScoringConfig = async (campaignId, payload) => {
-    try {
-        const response = await api.put(`${BASE_URL}/campaigns/${campaignId}/scoring-config`, payload, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error updating scoring configuration:", error);
         throw error;
     }
 };
@@ -373,20 +343,14 @@ export const updatePlatformDefaultWeights = async (payload) => {
     }
 };
 
-// No standalone "get current platform defaults" endpoint exists on the
-// backend — the only place default weights are ever returned is embedded as
-// `.defaults` on a campaign's own GET /{id}/scoring-config response. This
-// reads them off the first accessible active campaign as a best-effort seed
-// for the platform-defaults form; returns null (blank form) if there isn't
-// one, e.g. a brand-new org with no campaigns yet.
+// Org-wide default weights/thresholds from platform_config; returns null on
+// failure so the settings form falls back to its static defaults.
 export const getPlatformScoringDefaults = async () => {
     try {
-        const activeRes = await getActiveCampaigns();
-        const activeCampaigns = Array.isArray(activeRes) ? activeRes : (activeRes?.data || []);
-        if (!activeCampaigns.length) return null;
-        const config = await getScoringConfig(activeCampaigns[0].id);
-        const data = config?.data || config;
-        return data?.defaults || null;
+        const response = await api.get(`${BASE_URL}/campaigns/platform-defaults/scoring`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        });
+        return response.data?.data || null;
     } catch (error) {
         console.error("Error fetching platform scoring defaults:", error);
         return null;

@@ -5,7 +5,7 @@ import Modal from "../../../../components/ui/Modal";
 import Button from "../../../../components/Button/Button";
 import FormInput from "../../../../components/forms/FormInput";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
-import { getWeightPresets, createWeightPreset, updateWeightPreset, deleteWeightPreset } from "../services/campaignservice";
+import { getWeightPresets, createWeightPreset, updateWeightPreset, deleteWeightPreset, formatApiError } from "../services/campaignservice";
 
 const unwrap = (res) => (res && res.data !== undefined ? res.data : res);
 
@@ -109,7 +109,7 @@ export default function WeightPresetsModal({ isOpen, onClose }) {
       setEditingId(null);
       load();
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to save preset.");
+      toast.error(formatApiError(err, "Failed to save preset."));
     } finally {
       setSubmitting(false);
     }
@@ -123,7 +123,7 @@ export default function WeightPresetsModal({ isOpen, onClose }) {
       setConfirmDeleteId(null);
       load();
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to delete preset.");
+      toast.error(formatApiError(err, "Failed to delete preset."));
     } finally {
       setSubmitting(false);
     }

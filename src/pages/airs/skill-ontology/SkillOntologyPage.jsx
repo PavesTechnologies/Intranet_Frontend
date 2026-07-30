@@ -290,6 +290,9 @@ export default function SkillOntologyPage() {
               isLoading={unknown.isLoading}
               onPromote={handlePromote}
               onBulkDone={unknown.refresh}
+              onView={(skill) =>
+                navigate(`/airs/skill-ontology/unknown/${skill.id}`, { state: { skill } })
+              }
             />
           )}
 

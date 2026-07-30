@@ -5,9 +5,11 @@ import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/ui/Modal";
 import FormInput from "../../../../components/forms/FormInput";
 import FilterListbox from "../../../../components/filter/FilterListbox";
+import usePromptTemplateLookup from "../../prompt-templates/hooks/usePromptTemplateLookup";
 import {
     updateCampaign, getWeightPresets, resetScoringConfig,
     getPauseSummary, getResumeSummary, getClosureSummary, closeCampaign,
+    formatApiError,
 } from "../services/campaignservice";
 
 const unwrap = (res) => (res && res.data !== undefined ? res.data : res);
@@ -52,6 +54,7 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
     const [targetStatus, setTargetStatus] = useState(currentStatus);
     const [closureReason, setClosureReason] = useState("");
     const [impact, setImpact] = useState(null);   // lazy-loaded transition impact summary
+    const resumeParsePromptLookup = usePromptTemplateLookup("resume-parse");
 
     useEffect(() => {
         if (!isOpen) return;
@@ -64,6 +67,8 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
             weight_ai: scoring?.weight_ai ?? "",
             semantic_threshold: scoring?.semantic_threshold ?? "",
             ai_threshold: scoring?.ai_threshold ?? "",
+            deterministic_threshold: scoring?.deterministic_threshold ?? "",
+            prompt_template_id: info.prompt_template_id || "",
         });
         setConfirmScoring(false);
         setSelectedPresetId("");
@@ -125,6 +130,7 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
             weight_ai: preset.weight_ai,
             semantic_threshold: preset.semantic_threshold,
             ai_threshold: preset.ai_threshold,
+            deterministic_threshold: preset.deterministic_threshold,
         }));
     };
 
@@ -135,7 +141,7 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
             toast.success("Scoring configuration reset to platform defaults.");
             onSaved();
         } catch (err) {
-            toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to reset scoring configuration.");
+            toast.error(formatApiError(err, "Failed to reset scoring configuration."));
         } finally {
             setResetting(false);
         }
@@ -155,6 +161,12 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
             return toast.error(`A campaign named "${name}" already exists.`);
         }
 
+        // every campaign carries a resume-parse prompt, so the prefilled
+        // selection must not be cleared on the way out
+        if (!String(form.prompt_template_id || "").trim()) {
+            return toast.error("Please select a Resume Parsing Prompt.");
+        }
+
         // can't drop the cap below the number of candidates already in
         const cap = form.max_candidates === "" ? null : Number(form.max_candidates);
         if (cap !== null && cap < currentCount) {
@@ -165,6 +177,7 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
         // avoids spurious audit entries and accidental clears of untouched fields.
         const payload = {};
         if (name !== (info.name || "")) payload.name = name;
+        if (form.prompt_template_id !== (info.prompt_template_id || "")) payload.prompt_template_id = form.prompt_template_id;
 
         // max_candidates: the backend only clears it via an explicit
         // clear_max_candidates flag — sending max_candidates: null is a no-op
@@ -192,7 +205,8 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
             Number(form.weight_semantic) !== Number(scoring.weight_semantic) ||
             Number(form.weight_ai) !== Number(scoring.weight_ai) ||
             Number(form.semantic_threshold) !== Number(scoring.semantic_threshold) ||
-            Number(form.ai_threshold) !== Number(scoring.ai_threshold)
+            Number(form.ai_threshold) !== Number(scoring.ai_threshold) ||
+            Number(form.deterministic_threshold) !== Number(scoring.deterministic_threshold)
         );
 
         if (scoringChanged) {
@@ -204,6 +218,7 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
                 weight_ai: Number(form.weight_ai),
                 semantic_threshold: Number(form.semantic_threshold),
                 ai_threshold: Number(form.ai_threshold),
+                deterministic_threshold: Number(form.deterministic_threshold),
                 confirm_scoring_change: true,   // backend requires this on ACTIVE
             });
         }
@@ -238,7 +253,7 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
             onSaved();
         } catch (err) {
             // 403 (closed) / 409 (cap conflict) messages come straight from the API
-            toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to update campaign.");
+            toast.error(formatApiError(err, "Failed to update campaign."));
         } finally {
             setSaving(false);
         }
@@ -248,7 +263,22 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
             <div className="space-y-4">
                 <FormInput label="Campaign Name" name="name" value={form.name} onChange={change} maxLength={255} requiredMark />
 
-                {/* Status transition — replaces the old header Pause/Close buttons */}
+                <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
+                        Resume Parsing Prompt <span className="text-red-500">*</span>
+                    </label>
+                    <FilterListbox
+                        options={[
+                            { value: "", label: resumeParsePromptLookup.isLoading ? "Loading prompt templates..." : "Select Resume Parsing Prompt" },
+                            ...resumeParsePromptLookup.options,
+                        ]}
+                        value={form.prompt_template_id}
+                        onChange={(value) => setForm((p) => ({ ...p, prompt_template_id: value }))}
+                        disabled={resumeParsePromptLookup.isLoading}
+                    />
+                </div>
+
+                {/* Status transition — pause/resume/close live here, not as header buttons */}
                 <div>
                     <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Status</label>
                     <FilterListbox options={statusOptions} value={targetStatus} onChange={handleStatusChange} />
@@ -277,8 +307,7 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
                             <AlertTriangle className="h-4 w-4 text-rose-600 mt-0.5 shrink-0" />
                             <p className="text-[11.5px] text-rose-700">
                                 Closing permanently concludes this campaign — new uploads stop and queued
-                                processing is cancelled. This cannot be undone from here (reopening is a
-                                separate action).
+                                processing is cancelled. Reopening is a separate action afterwards.
                                 {impact && ` ${impact.candidate_count ?? 0} candidate(s), ${impact.in_progress_task_count ?? 0} in-progress task(s), ${impact.pending_human_decision_count ?? 0} pending human decision(s).`}
                             </p>
                         </div>
@@ -347,7 +376,8 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
                             <FormInput label="Semantic Wt" name="weight_semantic" type="number" value={form.weight_semantic} onChange={change} disabled={scoringLocked} />
                             <FormInput label="AI Wt" name="weight_ai" type="number" value={form.weight_ai} onChange={change} disabled={scoringLocked} />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-4">
+                            <FormInput label="Deterministic Threshold" name="deterministic_threshold" type="number" value={form.deterministic_threshold} onChange={change} disabled={scoringLocked} />
                             <FormInput label="Semantic Threshold" name="semantic_threshold" type="number" step="0.01" value={form.semantic_threshold} onChange={change} disabled={scoringLocked} />
                             <FormInput label="AI Threshold" name="ai_threshold" type="number" value={form.ai_threshold} onChange={change} disabled={scoringLocked} />
                         </div>

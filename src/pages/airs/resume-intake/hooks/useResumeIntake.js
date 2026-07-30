@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { getAllResumes, getResumeById, activeCampaigns } from "../../service/resumeIntake";
+import { getAllResumes, activeCampaigns } from "../../service/resumeIntake";
 import { extractErrorMessage } from "../intake/utils/intakeUtils.jsx";
 import { RESUME_LIST_PAGE_SIZE } from "../constants/resumeIntakeConstants";
 
@@ -18,11 +18,6 @@ export default function useResumeIntake() {
   const [totalResults, setTotalResults] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [listError, setListError] = useState("");
-
-  const [detailsFile, setDetailsFile] = useState(null);
-  const [detailsData, setDetailsData] = useState(null);
-  const [isDetailsLoading, setIsDetailsLoading] = useState(false);
-  const [detailsError, setDetailsError] = useState("");
 
   useEffect(() => {
     activeCampaigns()
@@ -90,27 +85,6 @@ export default function useResumeIntake() {
 
   const totalPages = Math.max(1, Math.ceil(totalResults / RESUME_LIST_PAGE_SIZE));
 
-  const openDetails = async (file) => {
-    setDetailsFile(file);
-    setDetailsData(null);
-    setDetailsError("");
-    setIsDetailsLoading(true);
-    try {
-      const res = await getResumeById(file.id);
-      setDetailsData(res?.data || null);
-    } catch (err) {
-      setDetailsError(extractErrorMessage(err, "Failed to load resume details."));
-    } finally {
-      setIsDetailsLoading(false);
-    }
-  };
-
-  const closeDetails = () => {
-    setDetailsFile(null);
-    setDetailsData(null);
-    setDetailsError("");
-  };
-
   return {
     files,
     totalResults,
@@ -128,12 +102,6 @@ export default function useResumeIntake() {
     currentPage,
     setCurrentPage,
     totalPages,
-    detailsFile,
-    detailsData,
-    isDetailsLoading,
-    detailsError,
-    openDetails,
-    closeDetails,
     refreshResumes: () => setRefreshToken((t) => t + 1),
   };
 }

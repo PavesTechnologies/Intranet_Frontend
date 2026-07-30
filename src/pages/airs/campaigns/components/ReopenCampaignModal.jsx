@@ -4,7 +4,7 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import Modal from "../../../../components/ui/Modal";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
-import { getReopenReadiness, reopenCampaign } from "../services/campaignservice";
+import { getReopenReadiness, reopenCampaign, formatApiError } from "../services/campaignservice";
 
 const unwrap = (res) => (res && res.data !== undefined ? res.data : res);
 
@@ -39,7 +39,7 @@ export default function ReopenCampaignModal({ isOpen, onClose, campaignId, onReo
       toast.success("Campaign reopened successfully.");
       onReopened();
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to reopen campaign.");
+      toast.error(formatApiError(err, "Failed to reopen campaign."));
     } finally {
       setSubmitting(false);
     }

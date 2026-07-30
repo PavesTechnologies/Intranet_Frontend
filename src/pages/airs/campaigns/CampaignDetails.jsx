@@ -22,6 +22,8 @@ import {
   overrideCandidateStage, flagCandidateForReview,
   getRejectionAnalytics,
   getBulkUploadsForCampaign,
+  getScoringHistory,
+  formatApiError,
 } from "./services/campaignservice";
 
 // Colour per pipeline stage (used for the funnel bars)
@@ -62,7 +64,7 @@ const normalizeCandidate = (cd, idx) => ({
   id: cd.id ?? cd.campaign_candidate_id ?? cd.candidate_id ?? idx,
   name: cd.candidate_name ?? cd.full_name ?? cd.name ?? "Unknown Candidate",
   location: cd.location ?? cd.city ?? cd.current_location ?? "",
-  stage: (cd.current_stage ?? cd.stage ?? cd.candidate_stage ?? cd.status ?? "").toUpperCase(),
+  stage: (cd.pipeline_stage ?? cd.current_stage ?? cd.stage ?? cd.candidate_stage ?? cd.status ?? "").toUpperCase(),
   score: cd.composite_score ?? cd.composite ?? cd.overall_score ?? cd.score ?? null,
 });
 
@@ -74,7 +76,7 @@ const fmtDate = (d) => (d ? new Date(d).toLocaleString() : "—");
 export default function CampaignDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { canManageCampaigns, canViewPipeline, canViewTimeline } = useCampaignPermissions();
+  const { isHRAdmin, canManageCampaigns, canViewPipeline, canViewTimeline } = useCampaignPermissions();
 
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -208,7 +210,15 @@ export default function CampaignDetails() {
         ))}
       </div>
 
-      {activeTab === "details" && (<DetailsTab info={info} jd={jd} scoring={scoring} limits={limits} hm={hm} />
+      {activeTab === "details" && (<DetailsTab
+          info={info}
+          jd={jd}
+          scoring={scoring}
+          limits={limits}
+          hm={hm}
+          campaignId={id}
+          canViewScoringHistory={isHRAdmin}
+        />
       )}
       {activeTab === "candidates" && (<CandidatesTab
           campaignId={id}
@@ -280,7 +290,82 @@ function Field({ label, value }) {
   );
 }
 
-function DetailsTab({ info, jd, scoring, limits, hm }) {
+// Diff line for one scoring change: only fields whose value actually
+// changed are shown ("Semantic Weight 40 → 35").
+const HISTORY_FIELD_LABELS = {
+  weight_deterministic: "Det. Weight",
+  weight_semantic: "Sem. Weight",
+  weight_ai: "AI Weight",
+  deterministic_threshold: "Det. Threshold",
+  semantic_threshold: "Sem. Threshold",
+  ai_threshold: "AI Threshold",
+};
+
+function historyDiff(before = {}, after = {}) {
+  return Object.keys(HISTORY_FIELD_LABELS)
+    .filter((k) => k in after && String(before[k]) !== String(after[k]))
+    .map((k) => `${HISTORY_FIELD_LABELS[k]} ${before[k] ?? "—"} → ${after[k]}`);
+}
+
+// HR_ADMIN-only (endpoint is role-gated): collapsible list of past weight/
+// threshold changes shown under the Scoring Configuration card. Fetched
+// lazily on first expand so the details tab costs nothing extra by default.
+function ScoringHistory({ campaignId }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [entries, setEntries] = useState(null); // null = not fetched yet
+
+  const toggle = async () => {
+    const next = !open;
+    setOpen(next);
+    if (next && entries === null) {
+      setLoading(true);
+      try {
+        const res = await getScoringHistory(campaignId);
+        const data = res?.data || res;
+        setEntries(Array.isArray(data?.history) ? data.history : []);
+      } catch (error) {
+        console.error("Error fetching scoring history:", error);
+        setEntries([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  return (<div className="border-t pt-2 mt-1">
+      <button
+        type="button"
+        onClick={toggle}
+        className="flex items-center gap-1 text-[10px] uppercase font-bold text-slate-400 hover:text-slate-600"
+      >
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
+        Change History
+      </button>
+      {open && (<div className="mt-2 space-y-2 max-h-48 overflow-y-auto pr-1">
+          {loading && <p className="text-[11px] text-slate-400">Loading…</p>}
+          {!loading && entries?.length === 0 && (<p className="text-[11px] text-slate-400">No scoring changes yet.</p>
+          )}
+          {!loading && (entries || []).map((h, i) => {
+            const changes = historyDiff(h.before, h.after);
+            return (<div key={i} className="rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-1.5">
+                <p className="text-[10px] font-bold text-slate-500">
+                  {fmtDate(h.changed_at)} · {h.changed_by || "Unknown"}
+                </p>
+                {changes.length > 0 ? (changes.map((c) => (<p key={c} className="text-[11px] text-slate-700">{c}</p>
+                  ))
+                ) : (<p className="text-[11px] text-slate-400">No field-level change recorded.</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailsTab({ info, jd, scoring, limits, hm, campaignId, canViewScoringHistory }) {
   return (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <Section title="Campaign Info" icon={FileText}>
         <Field label="Name" value={info.name} />
@@ -314,6 +399,7 @@ function DetailsTab({ info, jd, scoring, limits, hm }) {
           <Field label="AI Weight" value={asPct(scoring.weight_ai)} />
           <Field label="Semantic Threshold" value={scoring.semantic_threshold} />
           <Field label="AI Threshold" value={scoring.ai_threshold} />
+          {canViewScoringHistory && <ScoringHistory campaignId={campaignId} />}
         </Section>
       )}
 
@@ -613,7 +699,7 @@ function ProcessingTab({ campaignId, canManageCampaigns }) {
       setSelectedIds([]);
       load();
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to replay tasks.");
+      toast.error(formatApiError(err, "Failed to replay tasks."));
     } finally {
       setReplaying(false);
     }
@@ -933,7 +1019,7 @@ function StalledTab({ campaignId }) {
       setLoading(true);
       load();
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Action failed.");
+      toast.error(formatApiError(err, "Action failed."));
     } finally {
       setSubmitting(false);
     }

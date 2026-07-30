@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, Archive, ArrowRight } from "lucide-react";
+import { Archive, ArrowRight } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
 import { renderParseStatusBadge, renderSourceBadge, formatResumeDate } from "../utils/resumeIntakeUtils.jsx";
@@ -20,7 +20,7 @@ const progressColor = (status) => {
   return "bg-blue-600";
 };
 
-export default function ResumeUploadHistoryList({ files, isLoading, onViewDetails }) {
+export default function ResumeUploadHistoryList({ files, isLoading }) {
   const navigate = useNavigate();
 
   if (isLoading) {
@@ -69,8 +69,6 @@ export default function ResumeUploadHistoryList({ files, isLoading, onViewDetail
     const isFinished = f.parse_status === "PARSED" || f.parse_status === "FAILED";
 
     return {
-      onRowClick: () => onViewDetails(f),
-      rowClass: "cursor-pointer",
       candidate: (
         <div className="flex items-center gap-3 text-left w-full">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100">
@@ -115,26 +113,14 @@ export default function ResumeUploadHistoryList({ files, isLoading, onViewDetail
       status: renderParseStatusBadge(f.parse_status),
       actions: (
         <div className="flex items-center gap-1 justify-center">
-          <Button
-            variant="ghost"
-            size="icon"
-            title="View details log"
-            onClick={(e) => {
-              e.stopPropagation();
-              onViewDetails(f);
-            }}
-            className="h-8 w-8 !text-slate-500 hover:!text-slate-700"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
           {isFinished && (
             <Button
               variant="ghost"
               size="icon"
-              title="Review candidate profile"
+              title="View candidate resume"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/airs/resume-intake/review/${f.candidate_id}`, { state: { resume: f } });
+                navigate(`/airs/candidates/${f.candidate_id}`, { state: { resume: f } });
               }}
               className="h-8 w-8 !text-blue-600 hover:!text-blue-700 hover:bg-blue-50"
             >

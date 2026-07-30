@@ -64,7 +64,6 @@ const resourceManagementSubmenu = [
 ];
 
 const airsSubmenu = [
-  { label: "Dashboard", to: "/airs/dashboard" },
   { label: "JD Management", to: "/airs/jds" },
   { label: "Campaigns", to: "/airs/campaigns" },
   { label: "Resume Intake", to: "/airs/resume-intake" },
@@ -74,6 +73,13 @@ const airsSubmenu = [
   { label: "Talent Pool", to: "/airs/talent-pool" },
   { label: "Analytics", to: "/airs/analytics" },
   { label: "Settings", to: "/airs/settings" },
+];
+
+// HR_ADMIN gets a trimmed-down AIRS menu — only these items, plus
+// Prompt Templates below (HR_ADMIN-only, not part of the general airsSubmenu).
+const hrAdminAirsSubmenu = [
+  ...airsSubmenu.filter((item) => ["JD Management", "Skill Ontology", "Campaigns"].includes(item.label)),
+  { label: "Prompt Templates", to: "/airs/prompt-templates" },
 ];
 
 
@@ -138,6 +144,8 @@ const Sidebar = ({ isCollapsed }) => {
   const isDM = hasRole(["DELIVERY_MANAGER"]);
   const isGeneral = hasRole(["GENERAL"]);
   const airsRBACAccess = hasRole(["HIRING_MANAGER", "HR", "HR_ADMIN", "RECRUITER"]);
+  const isHrAdmin = hasRole(["HR_ADMIN"]);
+  const filteredAirsSubmenu = isHrAdmin ? hrAdminAirsSubmenu : airsSubmenu;
 
   // State for User Management Hover
   const [userHovered, setUserHovered] = useState(false);
@@ -369,8 +377,9 @@ const Sidebar = ({ isCollapsed }) => {
               onMouseEnter={handleAirsMouseEnter}
               onMouseLeave={handleAirsMouseLeave}
             >
-              <div
-                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/airs")
+              <Link
+                to="/airs/jds"
+                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${location.pathname.startsWith("/airs")
                   ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
                   : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
                   }`}
@@ -387,7 +396,7 @@ const Sidebar = ({ isCollapsed }) => {
                     />
                   </>
                 )}
-              </div>
+              </Link>
 
               {airsHovered && (
                 <ul
@@ -397,7 +406,7 @@ const Sidebar = ({ isCollapsed }) => {
                   onMouseEnter={handleAirsMouseEnter}
                   onMouseLeave={handleAirsMouseLeave}
                 >
-                  {airsSubmenu.map((item) => (
+                  {filteredAirsSubmenu.map((item) => (
                     <li key={item.label} className="group relative">
                       <NavLink
                         to={item.to}

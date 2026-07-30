@@ -23,6 +23,7 @@ import {
   getCampaignDetails,
   getPipelineSummary,
   getNameByRoles,
+  formatApiError,
 } from "./services/campaignservice";
 
 const DEFAULT_CAMPAIGN_FORM = {
@@ -37,6 +38,8 @@ const DEFAULT_CAMPAIGN_FORM = {
   ai_threshold: 50,
   hiring_manager_id: "",
   recruiter_id: "",
+  prompt_template_id: "",
+  deterministic_threshold: 70,
 };
 
 const STATUS_OPTIONS = [
@@ -118,11 +121,13 @@ export default function Campaigns() {
   const fetchCampaigns = useCallback(async () => {
     setIsLoading(true);
     try {
+      // show_closed: true — the page has a "Closed" KPI card and status
+      // filter, so closed campaigns must actually be in the dataset
       const res = isHRAdmin
-        ? await getAllCampaignsHrAdmin()
+        ? await getAllCampaignsHrAdmin({ show_closed: true })
         : isHiringManager
-          ? await getCampaignsByHiringManager()
-          : await getAllCampaigns();
+          ? await getCampaignsByHiringManager({ show_closed: true })
+          : await getAllCampaigns({ show_closed: true });
       setCampaigns(res?.data || []);
     } catch (err) {
       console.error("Failed to load campaigns:", err);
@@ -273,6 +278,8 @@ export default function Campaigns() {
     }
     if (!String(campaignForm.hiring_manager_id).trim()) return toast.error("Please select a hiring manager.");
     if (!String(campaignForm.recruiter_id).trim()) return toast.error("Please select a recruiter.");
+    // prompt requirement is enforced inside NewCampaignForm, conditional on
+    // the template lookup actually having options (backend not deployed yet)
     if (campaignForm.max_candidates !== "" && campaignForm.max_candidates !== null && Number(campaignForm.max_candidates) <= 0) {
       return toast.error("Max candidates must be greater than 0.");
     }
@@ -289,8 +296,10 @@ export default function Campaigns() {
       weight_ai: Number(campaignForm.weight_ai),
       semantic_threshold: Number(campaignForm.semantic_threshold),
       ai_threshold: Number(campaignForm.ai_threshold),
+      deterministic_threshold: Number(campaignForm.deterministic_threshold),
       hiring_manager_id: String(campaignForm.hiring_manager_id).trim(),
       recruiter_id: String(campaignForm.recruiter_id).trim(),
+      prompt_template_id: String(campaignForm.prompt_template_id || "").trim(),
     };
 
     setIsSubmitting(true);
@@ -305,7 +314,7 @@ export default function Campaigns() {
       setCampaignForm(DEFAULT_CAMPAIGN_FORM);
       fetchCampaigns();
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to initiate campaign.");
+      toast.error(formatApiError(err, "Failed to initiate campaign."));
     } finally {
       setIsSubmitting(false);
     }

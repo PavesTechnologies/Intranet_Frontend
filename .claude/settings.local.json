@@ -10,7 +10,10 @@
       "Bash(npx esbuild *)",
       "Bash(npx vite *)",
       "Bash(node -e ' *)",
-      "Bash(node -e \"console.log\\(require\\('./package.json'\\).scripts\\)\")"
+      "Bash(node -e \"console.log\\(require\\('./package.json'\\).scripts\\)\")",
+      "Bash(npm install *)",
+      "Bash(python3 -c \"import datetime; print\\(datetime.datetime.utcfromtimestamp\\(1785150176\\)\\)\")",
+      "Bash(node -e \"console.log\\(new Date\\(1785150176*1000\\).toISOString\\(\\)\\)\")"
     ]
   }
 }
