@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import Modal from "../../../../components/ui/Modal";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
@@ -35,8 +35,11 @@ export default function ReopenCampaignModal({ isOpen, onClose, campaignId, onReo
   const handleConfirm = async () => {
     setSubmitting(true);
     try {
-      await reopenCampaign(campaignId);
+      const res = await reopenCampaign(campaignId);
       toast.success("Campaign reopened successfully.");
+      // non-blocking caveats (e.g. reopened while at the candidate cap)
+      const warning = unwrap(res)?.warning;
+      if (warning) toast.info(warning);
       onReopened();
     } catch (err) {
       toast.error(formatApiError(err, "Failed to reopen campaign."));
@@ -47,6 +50,8 @@ export default function ReopenCampaignModal({ isOpen, onClose, campaignId, onReo
 
   const isReady = readiness?.is_ready ?? false;
   const issues = readiness?.issues || [];
+  // advisory only — these never gate the confirm button
+  const warnings = readiness?.warnings || [];
 
   return (<Modal isOpen={isOpen} onClose={onClose} title="Reopen Campaign" width="480px">
       {loading ? (<div className="py-8 flex justify-center"><LoadingSpinner text="Checking reopen readiness..." /></div>
@@ -84,6 +89,14 @@ export default function ReopenCampaignModal({ isOpen, onClose, campaignId, onReo
               </ul>
             </div>
           )}
+
+          {/* Advisory caveats — shown alongside either state; reopening
+              stays allowed, so these must not look like blockers. */}
+          {warnings.map((w) => (<div key={w.code} className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-100">
+              <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-[11.5px] text-amber-800">{w.message}</p>
+            </div>
+          ))}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" size="small" onClick={onClose} disabled={submitting}>

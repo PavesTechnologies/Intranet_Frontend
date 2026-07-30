@@ -305,18 +305,6 @@ export const deleteWeightPreset = async (presetId) => {
 
 // ── Scoring configuration ──────────────────────────────
 
-export const getScoringHistory = async (campaignId) => {
-    try {
-        const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/scoring-history`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching scoring history:", error);
-        throw error;
-    }
-};
-
 export const resetScoringConfig = async (campaignId) => {
     try {
         const response = await api.post(`${BASE_URL}/campaigns/${campaignId}/scoring-config/reset`, {}, {
