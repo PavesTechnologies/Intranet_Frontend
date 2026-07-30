@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Plus,
@@ -11,6 +11,13 @@ import {
   Calendar,
   FileText,
   Receipt,
+  CheckCircle2,
+  AlertTriangle,
+  UploadCloud,
+  Image as ImageIcon,
+  Eye,
+  Download,
+  Loader2,
 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import { PageCard, PageCardContent } from "@/components/Cards/PageCard";
@@ -28,10 +35,18 @@ import {
   expenseReportService,
   lineItemService,
   lookupService,
+  receiptService,
 } from "@/pages/expense-management/api/expenseReportsApi";
 import ReportFormFields from "@/pages/expense-management/components/expense-reports/ReportFormFields";
 import SummaryPanel from "@/pages/expense-management/components/expense-reports/SummaryPanel";
-import LineItemDrawer from "@/pages/expense-management/components/expense-reports/LineItemDrawer";
+import api from "@/api/axiosInstance";
+import Select from "react-select";
+import FormInput from "@/components/forms/FormInput";
+import FormTextArea from "@/components/forms/FormTextArea";
+import FormDatePicker from "@/components/forms/FormDatePicker";
+import GstCalculationCard from "@/pages/expense-management/components/expense-reports/GstCalculationCard";
+import CurrencyConversionCard from "@/pages/expense-management/components/expense-reports/CurrencyConversionCard";
+import ReceiptDropzone from "@/pages/expense-management/components/expense-reports/ReceiptDropzone";
 
 const formatDate = (value) => {
   if (!value) return "—";
@@ -554,3 +569,692 @@ export default function ExpenseReportDetailPage() {
     </div>
   );
 }
+
+const customSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    borderRadius: "0.5rem",
+    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+    boxShadow: state.isFocused ? "0 0 0 2px rgba(59, 130, 246, 0.5)" : "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+    padding: "0.125rem 0.25rem",
+    minHeight: "42px",
+    backgroundColor: "#ffffff",
+    "&:hover": { borderColor: state.isFocused ? "#3b82f6" : "#d1d5db" },
+  }),
+  menu: (base) => ({ ...base, zIndex: 9999 }),
+};
+
+const emptyForm = (defaultCostCenterId) => ({
+  categoryId: "",
+  expenseDate: new Date().toISOString().split("T")[0],
+  merchantName: "",
+  description: "",
+  amount: "",
+  currencyId: "",
+  taxAmount: "0",
+  costCenterId: defaultCostCenterId || "",
+  clientBillable: false,
+  projectId: "",
+});
+
+function LineItemDrawer({
+  isOpen,
+  onClose,
+  reportId,
+  lineItem,
+  defaultCostCenterId,
+  categoryOptions = [],
+  costCenterOptions = [],
+  currencyOptions = [],
+  onSaved,
+}) {
+  const [formData, setFormData] = useState(emptyForm(defaultCostCenterId));
+  const [formErrors, setFormErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [savedLineItem, setSavedLineItem] = useState(null);
+  const [projects, setProjects] = useState([]);
+
+  const [receipts, setReceipts] = useState([]);
+  const [loadingReceipts, setLoadingReceipts] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState([]); // [{ id, file, name, size }]
+  const [receiptToDelete, setReceiptToDelete] = useState(null);
+  const [deletingReceipt, setDeletingReceipt] = useState(false);
+  const inputRef = useRef(null);
+
+  const isEditingExisting = !!lineItem;
+
+  const fetchReceipts = useCallback(async () => {
+    const idToFetch = lineItem?.lineItemId || savedLineItem?.lineItemId;
+    if (!idToFetch) return;
+    try {
+      setLoadingReceipts(true);
+      const res = await receiptService.getAll(idToFetch);
+      const list = Array.isArray(res.data) ? res.data : res.data?.receipts || res.data?.content || res.data?.data || [];
+      setReceipts(list);
+    } catch (err) {
+      console.error("Failed to fetch receipts:", err);
+    } finally {
+      setLoadingReceipts(false);
+    }
+  }, [lineItem?.lineItemId, savedLineItem?.lineItemId]);
+
+  useEffect(() => {
+    if (isOpen && (lineItem?.lineItemId || savedLineItem?.lineItemId)) {
+      fetchReceipts();
+    }
+  }, [isOpen, lineItem?.lineItemId, savedLineItem?.lineItemId, fetchReceipts]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSavedLineItem(null);
+      setPendingFiles([]);
+      setReceipts([]);
+      return;
+    }
+
+    const loadProjects = async () => {
+      try {
+        const res = await api.get("/xms/admin/projects", {
+          baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+        const list = res.data?.data || res.data || [];
+        setProjects(Array.isArray(list) ? list : []);
+      } catch (err) {
+        console.error("Failed to load projects:", err);
+      }
+    };
+    loadProjects();
+
+    if (lineItem) {
+      if (!savedLineItem || lineItem.lineItemId !== savedLineItem.lineItemId) {
+        setFormData({
+          categoryId: lineItem.categoryId || "",
+          expenseDate: lineItem.expenseDate || new Date().toISOString().split("T")[0],
+          merchantName: lineItem.merchantName || "",
+          description: lineItem.description || "",
+          amount: lineItem.amount ?? "",
+          currencyId: lineItem.currencyId || "",
+          taxAmount: lineItem.taxAmount ?? "0",
+          costCenterId: lineItem.costCenterId || defaultCostCenterId || "",
+          clientBillable: !!lineItem.clientBillable,
+          projectId: lineItem.projectId || "",
+        });
+        setSavedLineItem(lineItem);
+      }
+    } else {
+      setFormData(emptyForm(defaultCostCenterId));
+      setSavedLineItem(null);
+    }
+    setFormErrors({});
+  }, [isOpen, lineItem, defaultCostCenterId]);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const handleSelectChange = (name, value) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const handleFileChange = (files) => {
+    if (!files?.length) return;
+    const newFiles = [];
+    let hasDuplicate = false; 
+
+    for (const file of Array.from(files)) {
+      const isDuplicate = pendingFiles.some(
+        (pf) => pf.name === file.name && pf.size === file.size
+      );
+      if (isDuplicate) {
+        hasDuplicate = true;
+      } else {
+        newFiles.push({
+          id: Math.random().toString(36).substring(2, 9),
+          file,
+          name: file.name,
+          size: file.size,
+        });
+      }
+    }
+
+    if (hasDuplicate) {
+      showStatusToast("This receipt has already been uploaded.", "error");
+    }
+
+    if (newFiles.length > 0) {
+      setPendingFiles((prev) => [...prev, ...newFiles]);
+    }
+  };
+
+  const handleViewReceipt = async (receipt) => {
+    try {
+      if (receipt.receiptId) {
+        const res = await receiptService.getViewUrl(receipt.receiptId);
+        const url = extractUrl(res.data?.data || res.data);
+        if (url) window.open(url, "_blank", "noopener,noreferrer");
+      } else if (receipt.file) {
+        const url = URL.createObjectURL(receipt.file);
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      showStatusToast("Failed to open receipt preview.", "error");
+    }
+  };
+
+  const handleDownloadReceipt = async (receipt) => {
+    try {
+      const res = await receiptService.getDownloadUrl(receipt.receiptId);
+      const url = extractUrl(res.data?.data || res.data);
+      if (url) {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = receipt.fileName || "receipt";
+        link.rel = "noopener noreferrer";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+    } catch (err) {
+      showStatusToast("Failed to download receipt.", "error");
+    }
+  };
+
+  const handleDeleteReceiptConfirm = async () => {
+    if (!receiptToDelete) return;
+    try {
+      setDeletingReceipt(true);
+      await receiptService.delete(receiptToDelete.receiptId);
+      showStatusToast("Receipt deleted successfully!", "success");
+      setReceiptToDelete(null);
+      fetchReceipts();
+    } catch (err) {
+      const errMsg = err.response?.data?.message || err.response?.data?.detail || "Failed to delete receipt.";
+      showStatusToast(errMsg, "error");
+    } finally {
+      setDeletingReceipt(false);
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    const amountNum = Number(formData.amount);
+    const gstNum = Number(formData.taxAmount);
+
+    if (!formData.amount || amountNum <= 0) {
+      errors.amount = "Amount is required and must be greater than 0.";
+    }
+    if (formData.taxAmount === "" || gstNum < 0) {
+      errors.taxAmount = "GST must be zero or a positive number.";
+    } else if (amountNum > 0 && gstNum > amountNum) {
+      errors.taxAmount = "GST cannot exceed the expense amount.";
+    }
+    if (!formData.merchantName.trim()) errors.merchantName = "Merchant is required.";
+    if (!formData.currencyId) errors.currencyId = "Currency is required.";
+    if (!formData.categoryId) errors.categoryId = "Category is required.";
+    if (!formData.costCenterId) errors.costCenterId = "Cost center is required.";
+    if (!formData.expenseDate) errors.expenseDate = "Expense date is required.";
+    if (formData.clientBillable && !formData.projectId) {
+      errors.projectId = "Project is required when billable.";
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    const payload = {
+      categoryId: formData.categoryId,
+      expenseDate: formData.expenseDate,
+      merchantName: formData.merchantName.trim(),
+      description: formData.description ? formData.description.trim() : "",
+      amount: Number(formData.amount),
+      currencyId: formData.currencyId,
+      taxAmount: Number(formData.taxAmount),
+      costCenterId: formData.costCenterId,
+      projectId: formData.clientBillable ? (formData.projectId || null) : null,
+      clientBillable: !!formData.clientBillable,
+    };
+
+    try {
+      setSubmitting(true);
+      let res;
+      if (savedLineItem) {
+        res = await lineItemService.update(reportId, savedLineItem.lineItemId, payload);
+        showStatusToast("Line item updated successfully!", "success");
+        setSavedLineItem(res.data?.data || res.data || { ...payload, lineItemId: savedLineItem?.lineItemId });
+        onSaved?.();
+      } else {
+        res = await lineItemService.create(reportId, payload);
+        const createdItem = res.data?.data || res.data;
+        const lineItemId = createdItem?.lineItemId;
+
+        if (lineItemId && pendingFiles.length > 0) {
+          for (const pf of pendingFiles) {
+            const formDataUpload = new FormData();
+            formDataUpload.append("file", pf.file);
+            try {
+              await receiptService.upload(lineItemId, formDataUpload);
+            } catch (uploadErr) {
+              console.error(`Failed to upload ${pf.name}:`, uploadErr);
+              showStatusToast(`Failed to upload ${pf.name}`, "error");
+            }
+          }
+        }
+
+        showStatusToast("Line item added successfully!", "success");
+        onSaved?.();
+        onClose();
+      }
+    } catch (err) {
+      console.error("Error saving line item:", err);
+      const errMsg = err.response?.data?.message || err.response?.data?.detail || "Failed to save line item.";
+      showStatusToast(errMsg, "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const mergedCategoryOptions = useMemo(() => {
+    if (!lineItem?.categoryId) return categoryOptions;
+    const alreadyPresent = categoryOptions.some((o) => o.value === lineItem.categoryId);
+    if (alreadyPresent) return categoryOptions;
+    return [{ value: lineItem.categoryId, label: lineItem.categoryName || lineItem.categoryId }, ...categoryOptions];
+  }, [categoryOptions, lineItem]);
+
+  const projectOptions = useMemo(() => {
+    return projects
+      .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
+      .map((p) => ({
+        value: p.projectId,
+        label: `${p.projectCode} - ${p.projectName}`,
+      }));
+  }, [projects]);
+
+  const selectedCurrency = currencyOptions.find((o) => o.value === formData.currencyId) || null;
+  const selectedCostCenter = costCenterOptions.find((o) => o.value === formData.costCenterId) || null;
+  const selectedCategory = mergedCategoryOptions.find((o) => o.value === formData.categoryId) || null;
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={savedLineItem ? "Edit Line Item" : "Add Line Item"}
+      subtitle={
+        savedLineItem
+          ? "Modify this expense line item, or attach supporting receipts below."
+          : "Capture a single expense with real-time currency and GST calculation."
+      }
+      size="2xl"
+      fullScreenMobile
+      closeOnBackdrop={false}
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" onClick={onClose} disabled={submitting} className="w-full sm:w-auto">
+            {savedLineItem ? "Done" : "Cancel"}
+          </Button>
+          <Button
+            type="submit"
+            form="line-item-form"
+            variant="primary"
+            loading={submitting}
+            loadingText="Saving..."
+            disabled={submitting}
+            className="w-full sm:w-auto"
+          >
+            {savedLineItem ? "Save Changes" : "Save Line Item"}
+          </Button>
+        </div>
+      }
+    >
+      {savedLineItem && !isEditingExisting && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs font-medium text-green-700">
+          <CheckCircle2 size={14} />
+          Line item saved. You can keep editing, attach receipts, or click Done.
+        </div>
+      )}
+
+      {categoryOptions.length === 0 && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-medium text-amber-700">
+          <AlertTriangle size={14} />
+          Expense categories couldn't be loaded for your account — contact your administrator if this
+          persists.
+        </div>
+      )}
+
+      <form id="line-item-form" onSubmit={handleSubmit} className="space-y-4 py-1">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">
+              Category <span className="text-red-500">*</span>
+            </label>
+            <Select
+              options={mergedCategoryOptions}
+              value={selectedCategory}
+              onChange={(opt) => handleSelectChange("categoryId", opt ? opt.value : "")}
+              placeholder="Select expense category..."
+              isSearchable
+              styles={customSelectStyles}
+              isDisabled={submitting}
+            />
+            {formErrors.categoryId && <span className="text-xs text-red-600 block mt-1">{formErrors.categoryId}</span>}
+          </div>
+
+          <FormDatePicker
+            label="Expense Date *"
+            name="expenseDate"
+            value={formData.expenseDate}
+            onChange={handleInputChange}
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormInput
+            label="Merchant"
+            name="merchantName"
+            placeholder="e.g. REDBUS"
+            value={formData.merchantName}
+            onChange={handleInputChange}
+            requiredMark
+            disabled={submitting}
+            error={formErrors.merchantName}
+          />
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">
+              Cost Center <span className="text-red-500">*</span>
+            </label>
+            <Select
+              options={costCenterOptions}
+              value={selectedCostCenter}
+              onChange={(opt) => handleSelectChange("costCenterId", opt ? opt.value : "")}
+              placeholder="Select cost center..."
+              isSearchable
+              styles={customSelectStyles}
+              isDisabled={submitting}
+            />
+            {formErrors.costCenterId && <span className="text-xs text-red-600 block mt-1">{formErrors.costCenterId}</span>}
+          </div>
+        </div>
+
+        <FormTextArea
+          label="Description"
+          name="description"
+          placeholder="Optional notes about this expense..."
+          value={formData.description}
+          onChange={handleInputChange}
+          disabled={submitting}
+        />
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <FormInput
+            label="Amount"
+            name="amount"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="0.00"
+            value={formData.amount}
+            onChange={handleInputChange}
+            requiredMark
+            disabled={submitting}
+            error={formErrors.amount}
+          />
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">
+              Currency <span className="text-red-500">*</span>
+            </label>
+            <Select
+              options={currencyOptions}
+              value={selectedCurrency}
+              onChange={(opt) => handleSelectChange("currencyId", opt ? opt.value : "")}
+              placeholder="Select currency..."
+              isSearchable
+              styles={customSelectStyles}
+              isDisabled={submitting}
+            />
+            {formErrors.currencyId && <span className="text-xs text-red-600 block mt-1">{formErrors.currencyId}</span>}
+          </div>
+
+          <FormInput
+            label="GST"
+            name="taxAmount"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="0.00"
+            value={formData.taxAmount}
+            onChange={handleInputChange}
+            requiredMark
+            disabled={submitting}
+            error={formErrors.taxAmount}
+          />
+        </div>
+
+        <FormSelect
+          label="Client Billable?"
+          name="clientBillable"
+          value={formData.clientBillable}
+          onChange={(e) => handleSelectChange("clientBillable", e.target.value === true || e.target.value === "true")}
+          options={[
+            { label: "Yes", value: true },
+            { label: "No", value: false },
+          ]}
+        />
+
+        {formData.clientBillable && (
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">
+              Project <span className="text-red-500">*</span>
+            </label>
+            <Select
+              options={projectOptions}
+              value={projectOptions.find((o) => o.value === formData.projectId) || null}
+              onChange={(opt) => handleSelectChange("projectId", opt ? opt.value : "")}
+              placeholder="Select project..."
+              isSearchable
+              styles={customSelectStyles}
+              isDisabled={submitting}
+            />
+            {formErrors.projectId && <span className="text-xs text-red-600 block mt-1">{formErrors.projectId}</span>}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <GstCalculationCard amount={formData.amount} gst={formData.taxAmount} />
+          <CurrencyConversionCard
+            amount={formData.amount}
+            currencyCode={selectedCurrency?.code}
+            exchangeRate={savedLineItem?.exchangeRate}
+            baseAmount={savedLineItem?.baseAmount}
+            baseCurrencyCode={savedLineItem?.baseCurrencyCode}
+            pending={!savedLineItem}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="block text-sm font-medium text-gray-700">Receipts</label>
+          {isEditingExisting ? (
+            <div className="space-y-3">
+              {loadingReceipts ? (
+                <div className="flex items-center justify-center py-6 text-gray-400">
+                  <Loader2 className="animate-spin" size={18} />
+                </div>
+              ) : receipts.length === 0 ? (
+                <p className="text-center text-xs text-gray-400 py-2">No receipts uploaded yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {receipts.map((r) => (
+                    <div
+                      key={r.receiptId}
+                      className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-2.5 hover:border-gray-300 hover:shadow-sm transition"
+                    >
+                      <div className="shrink-0 p-2 rounded-lg bg-blue-50 text-blue-600">
+                        {isImageFile(r.fileName) ? <ImageIcon size={16} /> : <FileText size={16} />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-gray-800 truncate">{r.fileName || "Receipt"}</p>
+                        <p className="text-[10px] text-gray-400">
+                          {formatFileSize(r.fileSize)} &bull; {formatDate(r.uploadedAt)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="icon"
+                          title="View Receipt"
+                          className="h-7 w-7 p-0 text-gray-600 hover:bg-gray-100 rounded-md"
+                          onClick={() => handleViewReceipt(r)}
+                        >
+                          <Eye size={14} />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="icon"
+                          title="Download Receipt"
+                          className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 rounded-md"
+                          onClick={() => handleDownloadReceipt(r)}
+                        >
+                          <Download size={14} />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="icon"
+                          title="Delete Receipt"
+                          className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 rounded-md"
+                          onClick={() => setReceiptToDelete(r)}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  handleFileChange(e.dataTransfer.files);
+                }}
+                onClick={() => inputRef.current?.click()}
+                className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed p-5 text-center cursor-pointer transition ${
+                  isDragging ? "border-[#0A0082] bg-indigo-50" : "border-gray-300 bg-gray-50 hover:bg-gray-100"
+                }`}
+              >
+                <UploadCloud className={isDragging ? "text-[#0A0082]" : "text-gray-400"} size={22} />
+                <p className="text-xs font-medium text-gray-600">
+                  Drag &amp; drop a receipt, or <span className="text-[#0A0082] font-semibold">browse</span>
+                </p>
+                <p className="text-[10px] text-gray-400">PDF, PNG, JPG up to 10MB</p>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  multiple
+                  accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    handleFileChange(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+
+              {pendingFiles.length > 0 && (
+                <div className="space-y-2">
+                  {pendingFiles.map((pf) => (
+                    <div
+                      key={pf.id}
+                      className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-2.5 hover:border-gray-300 hover:shadow-sm transition"
+                    >
+                      <div className="shrink-0 p-2 rounded-lg bg-blue-50 text-blue-600">
+                        {isImageFile(pf.name) ? <ImageIcon size={16} /> : <FileText size={16} />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-gray-800 truncate">{pf.name}</p>
+                        <p className="text-[10px] text-gray-400">
+                          {formatFileSize(pf.size)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="icon"
+                          title="View Receipt"
+                          className="h-7 w-7 p-0 text-gray-600 hover:bg-gray-100 rounded-md"
+                          onClick={() => handleViewReceipt(pf)}
+                        >
+                          <Eye size={14} />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="icon"
+                          title="Remove File"
+                          className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 rounded-md"
+                          onClick={() => setPendingFiles((prev) => prev.filter((item) => item.id !== pf.id))}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </form>
+
+      <ConfirmationModal
+        isOpen={!!receiptToDelete}
+        title="Delete Receipt"
+        message={`Are you sure you want to delete the receipt "${receiptToDelete?.fileName}"? This action cannot be undone.`}
+        confirmText="Delete Receipt"
+        cancelText="Cancel"
+        onConfirm={handleDeleteReceiptConfirm}
+        onCancel={() => setReceiptToDelete(null)}
+        isLoading={deletingReceipt}
+        variant="danger"
+      />
+    </Modal>
+  );
+}
+
+const formatFileSize = (bytes) => {
+  if (!bytes && bytes !== 0) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const isImageFile = (fileName = "") => /\.(png|jpe?g|gif|webp|heic)$/i.test(fileName);
+
+const extractUrl = (data) => {
+  if (!data) return null;
+  if (typeof data === "string") return data;
+  return data.url || data.viewUrl || data.downloadUrl || data.presignedUrl || null;
+};
