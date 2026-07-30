@@ -689,6 +689,10 @@ export default function JdDetails() {
       toast.error("Please enter a recruiter ID.");
       return;
     }
+    if (!String(campaignForm.prompt_template_id).trim()) {
+      toast.error("Please select a Resume Parsing Prompt.");
+      return;
+    }
     if (campaignForm.max_candidates !== "" && campaignForm.max_candidates !== null && Number(campaignForm.max_candidates) <= 0) {
       toast.error("Max candidates must be greater than 0.");
       return;

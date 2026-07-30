@@ -180,8 +180,8 @@ export default function CurrencyManagementPage() {
   const [isRateModalOpen, setIsRateModalOpen] = useState(false);
   const [currentRate, setCurrentRate] = useState(null);
   const [rateForm, setRateForm] = useState({
-    fromCurrency: "",
-    toCurrency: "",
+    fromCurrencyId: "",
+    toCurrencyId: "",
     rate: "",
     effectiveDate: new Date().toISOString().split("T")[0],
     source: "Manual",
@@ -207,15 +207,16 @@ export default function CurrencyManagementPage() {
       };
 
       const res = await currencyService.getAll(params);
+      const payload = res.data?.data;
 
-      if (res.data && typeof res.data === "object" && !Array.isArray(res.data)) {
-        const items = res.data.currencies || res.data.content || res.data.data || [];
-        const total = res.data.total !== undefined ? res.data.total : (res.data.totalElements || items.length || 0);
+      if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+        const items = payload.currencies || payload.content || payload.data || [];
+        const total = payload.total !== undefined ? payload.total : (payload.totalElements || items.length || 0);
         setCurrencies(items);
         setTotalCurrenciesCount(total);
         setIsCurrenciesServerPaginated(true);
-      } else if (Array.isArray(res.data)) {
-        setAllCurrencies(res.data);
+      } else if (Array.isArray(payload)) {
+        setAllCurrencies(payload);
         setIsCurrenciesServerPaginated(false);
       } else {
         setCurrencies([]);
@@ -245,15 +246,28 @@ export default function CurrencyManagementPage() {
       };
 
       const res = await exchangeRateService.getAll(params);
+      const payload = res.data?.data;
 
-      if (res.data && typeof res.data === "object" && !Array.isArray(res.data)) {
-        const items = res.data.exchangeRates || res.data.content || res.data.data || [];
-        const total = res.data.total !== undefined ? res.data.total : (res.data.totalElements || items.length || 0);
+      if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+        const items = payload.exchangeRates || payload.content || payload.data || [];
+        const total = payload.total !== undefined ? payload.total : (payload.totalElements || items.length || 0);
         setExchangeRates(items);
         setTotalRatesCount(total);
         setIsRatesServerPaginated(true);
-      } else if (Array.isArray(res.data)) {
-        setAllExchangeRates(res.data);
+
+        // Fetch all rates (unpaginated/higher limit) to compute global dashboard statistics
+        try {
+          const statsRes = await exchangeRateService.getAll({ page: 1, limit: 1000 });
+          const statsPayload = statsRes.data?.data;
+          const allItems = (statsPayload && typeof statsPayload === "object" && !Array.isArray(statsPayload))
+            ? (statsPayload.exchangeRates || statsPayload.content || statsPayload.data || [])
+            : (Array.isArray(statsPayload) ? statsPayload : []);
+          setAllExchangeRates(allItems);
+        } catch (errStats) {
+          console.error("Failed to fetch exchange rates for stats:", errStats);
+        }
+      } else if (Array.isArray(payload)) {
+        setAllExchangeRates(payload);
         setIsRatesServerPaginated(false);
       } else {
         setExchangeRates([]);
@@ -273,11 +287,12 @@ export default function CurrencyManagementPage() {
   const fetchAllCurrenciesForLookup = useCallback(async () => {
     try {
       const res = await currencyService.getAll({ page: 1, limit: 1000 });
+      const payload = res.data?.data;
       let list = [];
-      if (res.data && typeof res.data === "object" && !Array.isArray(res.data)) {
-        list = res.data.currencies || res.data.content || res.data.data || [];
-      } else if (Array.isArray(res.data)) {
-        list = res.data;
+      if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+        list = payload.currencies || payload.content || payload.data || [];
+      } else if (Array.isArray(payload)) {
+        list = payload;
       }
       setAllCurrencies(list);
       const activeList = list.filter((c) => c && (c.status === "ACTIVE" || c.status === "active"));
@@ -302,7 +317,7 @@ export default function CurrencyManagementPage() {
 
   // Helper selectors for dynamic options
   const currencyOptionsForDropdown = dropdownCurrencies.map((c) => ({
-    value: c.currencyCode,
+    value: c.currencyId,
     label: `${c.currencyCode} - ${c.currencyName || "N/A"}`,
   }));
 
@@ -482,20 +497,21 @@ export default function CurrencyManagementPage() {
 
   const handleRateSelectChange = (name, value) => {
     setRateForm((prev) => ({ ...prev, [name]: value }));
-    if (rateErrors[name]) {
-      setRateErrors((prev) => ({ ...prev, [name]: "" }));
+    const errorKey = name === "fromCurrencyId" ? "fromCurrency" : name === "toCurrencyId" ? "toCurrency" : name;
+    if (rateErrors[errorKey]) {
+      setRateErrors((prev) => ({ ...prev, [errorKey]: "" }));
     }
   };
 
   const validateRateForm = () => {
     const errors = {};
-    if (!rateForm.fromCurrency) {
+    if (!rateForm.fromCurrencyId) {
       errors.fromCurrency = "From currency is required.";
     }
-    if (!rateForm.toCurrency) {
+    if (!rateForm.toCurrencyId) {
       errors.toCurrency = "To currency is required.";
     }
-    if (rateForm.fromCurrency && rateForm.toCurrency && rateForm.fromCurrency === rateForm.toCurrency) {
+    if (rateForm.fromCurrencyId && rateForm.toCurrencyId && rateForm.fromCurrencyId === rateForm.toCurrencyId) {
       errors.toCurrency = "Source and target currencies must be different.";
     }
     if (!rateForm.rate || Number(rateForm.rate) <= 0) {
@@ -513,8 +529,8 @@ export default function CurrencyManagementPage() {
     if (!isAdmin) return;
     setCurrentRate(null);
     setRateForm({
-      fromCurrency: "",
-      toCurrency: "",
+      fromCurrencyId: "",
+      toCurrencyId: "",
       rate: "",
       effectiveDate: new Date().toISOString().split("T")[0],
       source: "Manual",
@@ -528,8 +544,8 @@ export default function CurrencyManagementPage() {
     if (!isAdmin) return;
     setCurrentRate(r);
     setRateForm({
-      fromCurrency: r.fromCurrency || "",
-      toCurrency: r.toCurrency || "",
+      fromCurrencyId: r.fromCurrencyId || "",
+      toCurrencyId: r.toCurrencyId || "",
       rate: r.rate || "",
       effectiveDate: r.effectiveDate || "",
       source: r.source || "Manual",
@@ -544,12 +560,11 @@ export default function CurrencyManagementPage() {
     if (!validateRateForm()) return;
 
     const payload = {
-      fromCurrency: rateForm.fromCurrency,
-      toCurrency: rateForm.toCurrency,
+      fromCurrencyId: rateForm.fromCurrencyId,
+      toCurrencyId: rateForm.toCurrencyId,
       rate: Number(rateForm.rate),
       effectiveDate: rateForm.effectiveDate,
       source: rateForm.source,
-      status: rateForm.status,
     };
 
     try {
@@ -780,6 +795,18 @@ export default function CurrencyManagementPage() {
     return rowObj;
   });
 
+  const latestRateRecord = React.useMemo(() => {
+    if (!allExchangeRates || allExchangeRates.length === 0) return null;
+    return [...allExchangeRates].sort((a, b) => {
+      const dateA = a.effectiveDate || "";
+      const dateB = b.effectiveDate || "";
+      if (dateA !== dateB) {
+        return dateB.localeCompare(dateA);
+      }
+      return (b.exchangeRateId || 0) - (a.exchangeRateId || 0);
+    })[0];
+  }, [allExchangeRates]);
+
   return (
     <div className="space-y-4">
       <Breadcrumb items={breadcrumbs} />
@@ -928,7 +955,9 @@ export default function CurrencyManagementPage() {
               <div>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Manual Convertors</p>
                 <p className="text-2xl font-bold text-blue-600 mt-1">
-                  {allExchangeRates.filter((r) => r.source === "Manual").length || (isRatesServerPaginated ? "—" : "0")}
+                  {allExchangeRates.length > 0
+                    ? allExchangeRates.filter((r) => r.source === "Manual" || r.source === "MANUAL" || r.source?.toLowerCase() === "manual").length
+                    : (isRatesServerPaginated && ratesLoading ? "—" : "0")}
                 </p>
               </div>
             </div>
@@ -939,7 +968,7 @@ export default function CurrencyManagementPage() {
               <div>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Last Rate Record</p>
                 <p className="text-sm font-bold text-purple-700 mt-2 truncate">
-                  {allExchangeRates[0]?.effectiveDate || "N/A"}
+                  {latestRateRecord?.effectiveDate || "N/A"}
                 </p>
               </div>
             </div>
@@ -1275,12 +1304,12 @@ export default function CurrencyManagementPage() {
             </label>
             <Select
               options={currencyOptionsForDropdown}
-              value={currencyOptionsForDropdown.find((o) => o.value === rateForm.fromCurrency) || null}
-              onChange={(opt) => handleRateSelectChange("fromCurrency", opt ? opt.value : "")}
+              value={currencyOptionsForDropdown.find((o) => o.value === rateForm.fromCurrencyId) || null}
+              onChange={(opt) => handleRateSelectChange("fromCurrencyId", opt ? opt.value : "")}
               placeholder="Select conversion source..."
               isSearchable
               styles={selectStyles}
-              isDisabled={submitting || !!currentRate}
+              isDisabled={submitting}
             />
             {rateErrors.fromCurrency && (
               <span className="text-xs text-red-600 block mt-1">{rateErrors.fromCurrency}</span>
@@ -1293,12 +1322,12 @@ export default function CurrencyManagementPage() {
             </label>
             <Select
               options={currencyOptionsForDropdown}
-              value={currencyOptionsForDropdown.find((o) => o.value === rateForm.toCurrency) || null}
-              onChange={(opt) => handleRateSelectChange("toCurrency", opt ? opt.value : "")}
+              value={currencyOptionsForDropdown.find((o) => o.value === rateForm.toCurrencyId) || null}
+              onChange={(opt) => handleRateSelectChange("toCurrencyId", opt ? opt.value : "")}
               placeholder="Select conversion target..."
               isSearchable
               styles={selectStyles}
-              isDisabled={submitting || !!currentRate}
+              isDisabled={submitting}
             />
             {rateErrors.toCurrency && (
               <span className="text-xs text-red-600 block mt-1">{rateErrors.toCurrency}</span>
