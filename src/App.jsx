@@ -105,8 +105,6 @@ import JdCreate from "./pages/airs/pages/JdCreate.jsx";
 import JdDetails from "./pages/airs/pages/JdDetails.jsx";
 import Campaigns from "./pages/airs/campaigns/Campaigns.jsx";
 import CampaignDetails from "./pages/airs/campaigns/CampaignDetails.jsx";
-import CampaignComparePage from "./pages/airs/campaigns/CampaignComparePage.jsx";
-import WeightChangeReportPage from "./pages/airs/campaigns/WeightChangeReportPage.jsx";
 
 import AirsPlaceholder from "./pages/airs/pages/AirsPlaceholder.jsx";
 
@@ -1039,22 +1037,6 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <CampaignDetails />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/airs/campaigns/compare"
-            element={
-              <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
-                <CampaignComparePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/airs/campaigns/reports/weight-changes"
-            element={
-              <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
-                <WeightChangeReportPage />
               </ProtectedRoute>
             }
           />
