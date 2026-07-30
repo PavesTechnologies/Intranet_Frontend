@@ -1,12 +1,15 @@
 import React from "react";
-import { Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Loader2, ArrowRight } from "lucide-react";
 import GenericTable from "../../../../components/Table/table";
 import LoadingSpinner from "../../../../components/LoadingSpinner.jsx";
+import Button from "../../../../components/Button/Button";
 import { renderParseStatusBadge, renderSourceBadge, formatResumeDate } from "../utils/resumeIntakeUtils.jsx";
-import { STAGE_LABELS } from "../intake/constants/intakeConstants";
-import { getStageProgressPct } from "../intake/mock/inProcessingMockData";
+import InProcessingStageCell from "./InProcessingStageCell";
 
 export default function InProcessingList({ files, isLoading }) {
+  const navigate = useNavigate();
+
   if (isLoading) {
     return (
       <div className="bg-white border border-slate-200 p-12 text-center text-slate-400 rounded-xl">
@@ -24,10 +27,15 @@ export default function InProcessingList({ files, isLoading }) {
     );
   }
 
-  const headers = ["Candidate", "Upload Source", "Campaign", "Current Stage", "Queued", "Status"];
-  const columns = ["candidate", "source", "campaign", "stage", "queued", "status"];
+  const headers = ["Candidate", "Upload Source", "Format & Date", "Status", "Actions"];
+  const columns = ["candidate", "source", "fileDetails", "status", "actions"];
+
+  const handleOpenProcessStep = (f) => {
+    navigate("/airs/resume-intake/new", { state: { existingResume: f } });
+  };
 
   const rows = files.map((f) => {
+    const resumeId = f.id || f.resume_id;
     const initials = (f.candidate_full_name || "??")
       .split(" ")
       .map((n) => n[0])
@@ -35,42 +43,50 @@ export default function InProcessingList({ files, isLoading }) {
       .substring(0, 2)
       .toUpperCase();
 
-    const stagePct = getStageProgressPct(f.current_stage);
-
     return {
       candidate: (
-        <div className="flex items-center gap-3 text-left w-full">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-amber-50 text-amber-700 text-xs font-bold border border-amber-100">
+        <button
+          type="button"
+          onClick={() => handleOpenProcessStep(f)}
+          className="flex items-center gap-3 text-left w-full group focus:outline-none"
+        >
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-amber-50 text-amber-700 text-xs font-bold border border-amber-100 group-hover:bg-blue-50 group-hover:text-blue-700 group-hover:border-blue-200 transition-colors">
             {initials}
           </div>
           <div className="flex flex-col min-w-0 text-left">
-            <span className="text-[12.5px] font-bold text-slate-900 truncate">{f.candidate_full_name}</span>
+            <span className="text-[12.5px] font-bold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
+              {f.candidate_full_name}
+            </span>
             <span className="text-[11px] text-slate-500 truncate">{f.candidate_email}</span>
           </div>
-        </div>
+        </button>
       ),
       source: renderSourceBadge(f.source),
-      campaign: (
-        <span className="text-[12px] text-slate-700">{f.campaign_name || "—"}</span>
-      ),
-      stage: (
-        <div className="w-40 flex flex-col justify-center text-left mx-auto">
-          <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
-            <span>{f.current_stage ? STAGE_LABELS[f.current_stage] : "Queued"}</span>
-            <span className="font-mono">{stagePct}%</span>
-          </div>
-          <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-amber-500 transition-all duration-500"
-              style={{ width: `${stagePct}%` }}
-            />
-          </div>
+      fileDetails: (
+        <div className="flex flex-col text-center">
+          <span className="text-[12px] font-semibold text-slate-800">{f.file_format}</span>
+          <span className="text-[10px] text-slate-400">{formatResumeDate(f.created_at)}</span>
         </div>
       ),
-      queued: (
-        <span className="text-[10px] text-slate-400">{formatResumeDate(f.created_at)}</span>
+      status: (
+        <div className="flex flex-col items-center gap-1">
+          {renderParseStatusBadge(f.parse_status)}
+          <InProcessingStageCell resumeId={resumeId} parseStatus={f.parse_status} />
+        </div>
       ),
-      status: renderParseStatusBadge(f.parse_status),
+      actions: (
+        <div className="flex items-center gap-1 justify-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            title="View processing step"
+            onClick={() => handleOpenProcessStep(f)}
+            className="h-8 w-8 !text-blue-600 hover:!text-blue-700 hover:bg-blue-50"
+          >
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
     };
   });
 
