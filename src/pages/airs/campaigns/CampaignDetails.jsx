@@ -185,7 +185,6 @@ export default function CampaignDetails() {
       )}
       {activeTab === "candidates" && (<CandidatesTab
           campaignId={id}
-          canViewPipeline={canViewPipeline}
           stageFilter={candidateStageFilter}
           onStageFilterChange={setCandidateStageFilter}
         />
@@ -423,22 +422,9 @@ function DetailsTab({ info, jd, scoring, limits, hm }) {
 }
 
 /* ---------------- Candidates Tab ---------------- */
-// Small stat tile for the candidate KPI row
-function StatTile({ label, value, suffix = "", tone = "text-slate-900", dot = "bg-slate-300" }) {
-  return (<div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="flex items-center gap-1.5 mb-1">
-        <span className={`h-2 w-2 rounded-full ${dot}`} />
-        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 truncate">{label}</p>
-      </div>
-      <p className={`text-xl font-black tabular-nums ${tone}`}>{value}{suffix}</p>
-    </div>
-  );
-}
-
-function CandidatesTab({ campaignId, canViewPipeline, stageFilter = "", onStageFilterChange }) {
+function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const navigate = useNavigate();
   const [candidates, setCandidates] = useState(null);
-  const [summary, setSummary] = useState(null);   // pipeline-summary → KPI numbers
   const [loading, setLoading] = useState(true);
   const [starredIds, setStarredIds] = useState(() => new Set());
   const [currentPage, setCurrentPage] = useState(1);
@@ -450,26 +436,20 @@ function CandidatesTab({ campaignId, canViewPipeline, stageFilter = "", onStageF
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // Candidate list and the pipeline summary come from two endpoints — fetch
-      // in parallel and don't let a missing summary block the list from
-      // rendering. The summary call is skipped outright for roles the backend
-      // would 403 (HIRING_MANAGER) — the KPI row just shows the total.
-      const [candRes, sumRes] = await Promise.allSettled([
-        getCampaignCandidates(campaignId),
-        canViewPipeline ? getPipelineSummary(campaignId) : Promise.reject(new Error("skipped")),
-      ]);
-      if (cancelled) return;
-      if (candRes.status === "fulfilled") {
-        setCandidates(unwrap(candRes.value) || []);
-      } else {
+      try {
+        const res = await getCampaignCandidates(campaignId);
+        if (cancelled) return;
+        setCandidates(unwrap(res) || []);
+      } catch {
+        if (cancelled) return;
         toast.error("Failed to load campaign candidates.");
         setCandidates([]);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      if (sumRes.status === "fulfilled") setSummary(unwrap(sumRes.value));
-      setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [campaignId, canViewPipeline]);
+  }, [campaignId]);
 
   if (loading) {
     return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading candidates..." /></div>;
@@ -504,28 +484,6 @@ function CandidatesTab({ campaignId, canViewPipeline, stageFilter = "", onStageF
     });
   };
 
-  // KPI numbers from the pipeline summary (falls back to list length for total)
-  const stageCount = (key) => (summary?.stages || []).find((s) => s.stage === key)?.count ?? 0;
-  const total = summary?.total_candidates ?? allCandidates.length;
-  const shortlisted = stageCount("SHORTLISTED");
-  const selected = stageCount("SELECTED");
-  const rejected = stageCount("REJECTED");
-  const inReview = stageCount("SCREENING") + stageCount("HM_REVIEW") + stageCount("INTERVIEW");
-  const selectionRate = total ? Math.round((selected / total) * 100) : 0;
-
-  const kpis = [
-    { label: "Candidates", value: total, dot: "bg-indigo-500", tone: "text-slate-900" },
-    ...(summary
-      ? [
-        { label: "In Review", value: inReview, dot: "bg-amber-500", tone: "text-amber-600" },
-        { label: "Shortlisted", value: shortlisted, dot: "bg-sky-500", tone: "text-sky-600" },
-        { label: "Selected", value: selected, dot: "bg-emerald-500", tone: "text-emerald-600" },
-        { label: "Rejected", value: rejected, dot: "bg-rose-500", tone: "text-rose-600" },
-        { label: "Selection Rate", value: selectionRate, suffix: "%", dot: "bg-violet-500", tone: "text-violet-600" },
-      ]
-      : []),
-  ];
-
   return (<div className="space-y-4">
       <div className="flex justify-between items-end flex-wrap gap-2">
         <div>
@@ -540,12 +498,6 @@ function CandidatesTab({ campaignId, canViewPipeline, stageFilter = "", onStageF
             <FilterListbox options={stageOptions} value={stageFilter} onChange={onStageFilterChange} />
           </div>
         )}
-      </div>
-
-      {/* KPI row — numbers sourced from the pipeline-summary endpoint */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {kpis.map((k) => (<StatTile key={k.label} {...k} />
-        ))}
       </div>
 
       <CandidateTable

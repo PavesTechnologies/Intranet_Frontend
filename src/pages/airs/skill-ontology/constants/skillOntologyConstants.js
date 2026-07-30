@@ -48,6 +48,15 @@ export const STATUS_FORM_OPTIONS = [
   { label: "Inactive", value: SKILL_STATUS.INACTIVE },
 ];
 
+// List filter — three-way, because "Active only", "Inactive only" and "both"
+// are three distinct backend states (is_active=true / false / omitted) that a
+// two-state toggle cannot express.
+export const STATUS_FILTER_OPTIONS = [
+  { label: "All Statuses", value: "All" },
+  { label: "Active", value: SKILL_STATUS.ACTIVE },
+  { label: "Inactive", value: SKILL_STATUS.INACTIVE },
+];
+
 export const EMBEDDING_STATUS = {
   GENERATED: "GENERATED",
   PENDING: "PENDING",

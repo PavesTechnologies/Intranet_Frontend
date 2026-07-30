@@ -24,7 +24,6 @@ import {
   Eye,
   FileText,
   Search,
-  SlidersHorizontal,
   Calendar
 } from "lucide-react";
 import { toast } from "react-toastify";
@@ -1280,9 +1279,6 @@ export default function JdDetails() {
               >
                 <Plus className="h-3.5 w-3.5" /> New campaign
               </Button>
-              <button className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 transition-all shadow-sm">
-                <SlidersHorizontal className="h-4 w-4" /> Filters
-              </button>
             </div>
           </div>
 
