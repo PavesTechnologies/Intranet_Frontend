@@ -56,13 +56,13 @@ export default function CandidateScorePage() {
 
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
-      <CandidateHeader candidate={candidate} onBack={() => navigate("/airs/candidates")} />
+      <CandidateHeader candidate={candidate} onBack={() => navigate(-1)} />
 
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
         <CandidateTabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
 
         <div className="p-5">
-          <Suspense fallback={<LoadingSpinner text="Loading tab..." />}>
+          <Suspense fallback={null}>
             <ActiveTabComponent candidate={candidate} />
           </Suspense>
         </div>

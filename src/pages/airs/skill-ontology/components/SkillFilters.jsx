@@ -1,7 +1,11 @@
 import React from "react";
 import { Search } from "lucide-react";
 import FilterListbox from "../../../../components/filter/FilterListbox";
-import { CONFIDENCE_FILTER_OPTIONS, SKILL_SOURCE_FILTER_OPTIONS } from "../constants/skillOntologyConstants";
+import {
+  CONFIDENCE_FILTER_OPTIONS,
+  SKILL_SOURCE_FILTER_OPTIONS,
+  STATUS_FILTER_OPTIONS,
+} from "../constants/skillOntologyConstants";
 
 export default function SkillFilters({
   search,
@@ -13,8 +17,8 @@ export default function SkillFilters({
   setConfidenceFilter,
   source,
   setSource,
-  showInactive,
-  setShowInactive,
+  statusFilter,
+  setStatusFilter,
   // Unknown Skills has no category/confidence/source/is_active filters — only
   // search — so this renders just the search box instead of a second,
   // near-duplicate filter-bar component.
@@ -36,26 +40,14 @@ export default function SkillFilters({
 
       {!onlySearch && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-auto lg:min-w-[440px]">
+          {/* Status is a dropdown, not a toggle: Active / Inactive / All are
+              three distinct states and a toggle can only express two. */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto lg:min-w-[580px]">
             <FilterListbox options={categoryOptions} value={category} onChange={setCategory} />
             <FilterListbox options={CONFIDENCE_FILTER_OPTIONS} value={confidenceFilter} onChange={setConfidenceFilter} />
             <FilterListbox options={SKILL_SOURCE_FILTER_OPTIONS} value={source} onChange={setSource} />
+            <FilterListbox options={STATUS_FILTER_OPTIONS} value={statusFilter} onChange={setStatusFilter} />
           </div>
-
-          <label className="flex items-center gap-2 shrink-0 cursor-pointer">
-            <span className="text-[12px] font-semibold text-slate-600 whitespace-nowrap">Show inactive</span>
-            <button
-              type="button"
-              onClick={() => setShowInactive(!showInactive)}
-              className="w-11 h-6 rounded-full relative transition-colors"
-              style={{ background: showInactive ? "#2563EB" : "#D9DEE7" }}
-            >
-              <div
-                className="w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all shadow"
-                style={{ left: showInactive ? 22 : 2 }}
-              />
-            </button>
-          </label>
         </>
       )}
     </div>
