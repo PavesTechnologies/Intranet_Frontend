@@ -57,6 +57,7 @@ const DEFAULT_CAMPAIGN_FORM = {
   hiring_manager_id: "",
   recruiter_id: "",
   prompt_template_id: "",
+  prompt_template_id: "",
 };
 
 export default function JdDetails() {
@@ -687,6 +688,10 @@ export default function JdDetails() {
     }
     if (!campaignForm.recruiter_id.trim()) {
       toast.error("Please enter a recruiter ID.");
+      return;
+    }
+    if (!String(campaignForm.prompt_template_id).trim()) {
+      toast.error("Please select a Resume Parsing Prompt.");
       return;
     }
     if (campaignForm.max_candidates !== "" && campaignForm.max_candidates !== null && Number(campaignForm.max_candidates) <= 0) {

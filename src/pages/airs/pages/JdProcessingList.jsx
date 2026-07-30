@@ -180,7 +180,20 @@ export default function JdProcessingList() {
         <>
           {paginatedUploads.map((u) => {
             const meta = overallStatusMeta(u.status);
-            const stageMap = new Map((u.stages || []).map((s) => [s.stage, s]));
+            const stageMap = new Map();
+            (u.stages || []).forEach((s) => {
+              const existing = stageMap.get(s.stage);
+              const existingStatus = String(existing?.status || "").toUpperCase();
+              const incomingStatus = String(s.status || "").toUpperCase();
+              if (!existing || existingStatus === "SUCCESS") {
+                if (!existing || incomingStatus === "SUCCESS") {
+                  stageMap.set(s.stage, s);
+                }
+                // existing already SUCCESS and incoming isn't: keep existing success
+              } else {
+                stageMap.set(s.stage, s);
+              }
+            });
             const isSuccess = String(u.status).toUpperCase() === "SUCCESS";
 
             return (
