@@ -203,7 +203,7 @@ export default function SkillOntologyPage() {
           category: list.category,
           confidence: list.confidenceFilter,
           source: list.source,
-          showInactive: list.showInactive,
+          statusFilter: list.statusFilter,
         })
       );
       const blob = new Blob([response.data], { type: response.headers["content-type"] });
@@ -248,8 +248,8 @@ export default function SkillOntologyPage() {
             setConfidenceFilter={list.setConfidenceFilter}
             source={list.source}
             setSource={list.setSource}
-            showInactive={list.showInactive}
-            setShowInactive={list.setShowInactive}
+            statusFilter={list.statusFilter}
+            setStatusFilter={list.setStatusFilter}
           />
 
           {list.error ? (
