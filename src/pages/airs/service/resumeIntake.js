@@ -117,3 +117,17 @@ export const candidateJson = async (candidateId) => {
         throw error;
     }
 };
+
+export const deleteCandidate = async (candidateId) => {
+    try {
+        const response = await api.delete(`${BASE_URL}/candidates/${candidateId}`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error deleting candidate:", error);
+        throw error;
+    }
+};

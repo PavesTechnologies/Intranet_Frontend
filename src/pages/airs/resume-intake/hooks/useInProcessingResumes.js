@@ -11,13 +11,9 @@ const IN_PROCESS_STATUSES = ["PENDING", "PARSING"];
 
 // No pagination UI on this tab yet, so each status is capped at a page big
 // enough to cover realistic in-flight volume rather than left unbounded.
-const IN_PROCESS_PAGE_SIZE = 50;
+const IN_PROCESS_PAGE_SIZE = 12;
 
-// Lighter cadence than the 3s single-resume status poll (STATUS_POLL_INTERVAL_MS)
-// since this refetches a list rather than one task.
-const LIST_POLL_INTERVAL_MS = 10000;
-
-export default function useInProcessingResumes({ campaignFilter, statusFilter, sourceFilter, sortValue }) {
+export default function useInProcessingResumes({ campaignFilter, statusFilter, sourceFilter, sortValue, enabled = true }) {
   const [files, setFiles] = useState([]);
   const [totalResults, setTotalResults] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,6 +22,8 @@ export default function useInProcessingResumes({ campaignFilter, statusFilter, s
   const statusesToFetch = statusFilter ? [statusFilter] : IN_PROCESS_STATUSES;
 
   useEffect(() => {
+    if (!enabled) return undefined;
+
     let cancelled = false;
 
     const baseParams = {
@@ -55,22 +53,18 @@ export default function useInProcessingResumes({ campaignFilter, statusFilter, s
         setFiles(items);
         setTotalResults(responses.reduce((sum, res) => sum + (res?.data?.total || 0), 0));
       } catch (err) {
-        // Transient poll failures keep the last known list rather than clearing it.
+        // Transient failures keep the last known list rather than clearing it.
       } finally {
         if (!cancelled && isFirstLoad) setIsLoading(false);
       }
     };
 
-    const triggerRefetch = () => fetchInProcessing(false);
-
     fetchInProcessing(true);
-    const intervalId = setInterval(() => fetchInProcessing(false), LIST_POLL_INTERVAL_MS);
 
     return () => {
       cancelled = true;
-      clearInterval(intervalId);
     };
-  }, [campaignFilter, statusFilter, sourceFilter, sortBy, sortDir]);
+  }, [campaignFilter, statusFilter, sourceFilter, sortBy, sortDir, enabled]);
 
   const refreshInProcessing = async () => {
     const baseParams = {

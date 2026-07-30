@@ -6,6 +6,7 @@ import { textOrDash, numberOr, numberOrDash, initialsFromName } from "./candidat
 export function mapCampaignCandidateRow(row = {}) {
   return {
     id: row.campaign_candidate_id ?? row.id ?? null,
+    candidate_id: row.candidate_id ?? null,
     name: textOrDash(row.candidate_name),
     initials: initialsFromName(row.candidate_name),
     role: textOrDash(row.current_designation),
