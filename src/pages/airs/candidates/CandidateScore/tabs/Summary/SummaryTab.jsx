@@ -8,9 +8,7 @@ const FIELD_ROWS = [
   ["experienceYears", "Experience", (v) => `${v} yrs`],
   ["location", "Location"],
   ["currentCompany", "Current company"],
-  ["noticePeriod", "Notice period"],
   ["education", "Education"],
-  ["expectedSalary", "Expected salary"],
   ["appliedOn", "Applied on"],
   ["status", "Status"],
 ];

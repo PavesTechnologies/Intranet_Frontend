@@ -40,7 +40,8 @@ export default function PipelineCandidateScorecardPage() {
     email: resumeRow?.candidate_email,
     createdAt: resumeRow?.created_at,
   };
-  const { candidate, loading, error } = useParsedResumeCandidate(candidateId, fallback);
+  const { candidate, loading, error, refetch } = useParsedResumeCandidate(candidateId, fallback);
+  console.log("Candidate: ", candidate);
   const [activeTab, setActiveTab] = useState(TABS[0].id);
   // Came from Resume Upload History (resumeRow present) → back should return
   // there instead of the Pipeline Board, which this page otherwise defaults to.
@@ -81,7 +82,7 @@ export default function PipelineCandidateScorecardPage() {
 
         <div className="p-5">
           <Suspense fallback={<LoadingSpinner text="Loading tab..." />}>
-            <ActiveTabComponent candidate={candidate} />
+            <ActiveTabComponent candidate={candidate} onExpired={refetch} />
           </Suspense>
         </div>
       </div>
