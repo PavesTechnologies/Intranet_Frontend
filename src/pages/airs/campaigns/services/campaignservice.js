@@ -38,10 +38,13 @@ export const createCampaign = async (campaignData) => {
     }
 };
 
-export const getAllCampaignsHrAdmin = async ({ show_closed = false } = {}) => {
+export const getAllCampaignsHrAdmin = async ({ show_closed = false, search, status, page = 1 } = {}) => {
     try {
+        const params = { show_closed, page };
+        if (search) params.search = search;
+        if (status) params.status = status;
         const response = await api.get(`${BASE_URL}/campaigns/hr_admin`, {
-            params: { show_closed },
+            params,
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }

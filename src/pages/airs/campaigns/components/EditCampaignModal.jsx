@@ -14,6 +14,8 @@ import {
 
 const unwrap = (res) => (res && res.data !== undefined ? res.data : res);
 
+const LABEL_CLASS = "text-[10px] uppercase font-bold text-slate-400 block mb-1.5";
+
 const CLOSURE_REASONS = [
     { value: "", label: "Select a closure reason" },
     { value: "POSITION_FILLED", label: "Position Filled" },
@@ -259,12 +261,20 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
         }
     };
 
-    return (<Modal isOpen={isOpen} onClose={onClose} title="Edit Campaign Configuration" width="560px" height="90vh">
+    return (<Modal isOpen={isOpen} onClose={onClose} title="Edit Campaign Configuration" width="640px" height="90vh">
             <div className="space-y-4">
-                <FormInput label="Campaign Name" name="name" value={form.name} onChange={change} maxLength={255} requiredMark />
+                <div className="grid grid-cols-2 gap-4">
+                    <FormInput label="Campaign Name" name="name" value={form.name} onChange={change} maxLength={255} requiredMark labelClassName={LABEL_CLASS} />
+
+                    {/* Status transition — pause/resume/close live here, not as header buttons */}
+                    <div>
+                        <label className={LABEL_CLASS}>Status</label>
+                        <FilterListbox options={statusOptions} value={targetStatus} onChange={handleStatusChange} />
+                    </div>
+                </div>
 
                 <div>
-                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
+                    <label className={LABEL_CLASS}>
                         Resume Parsing Prompt <span className="text-red-500">*</span>
                     </label>
                     <FilterListbox
@@ -276,12 +286,6 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
                         onChange={(value) => setForm((p) => ({ ...p, prompt_template_id: value }))}
                         disabled={resumeParsePromptLookup.isLoading}
                     />
-                </div>
-
-                {/* Status transition — pause/resume/close live here, not as header buttons */}
-                <div>
-                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Status</label>
-                    <FilterListbox options={statusOptions} value={targetStatus} onChange={handleStatusChange} />
                 </div>
 
                 {statusChanged && targetStatus === "PAUSED" && (<div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-100">
@@ -321,8 +325,8 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
                 )}
 
                 <div className="grid grid-cols-2 gap-4">
-                    <FormInput label="Max Candidates" name="max_candidates" type="number" min="1" value={form.max_candidates} onChange={change} />
-                    <FormInput label="Deadline" name="deadline" type="datetime-local" value={form.deadline} onChange={change} />
+                    <FormInput label="Max Candidates" name="max_candidates" type="number" min="1" value={form.max_candidates} onChange={change} labelClassName={LABEL_CLASS} />
+                    <FormInput label="Deadline" name="deadline" type="datetime-local" value={form.deadline} onChange={change} labelClassName={LABEL_CLASS} />
                 </div>
                 <p className="text-[10px] text-slate-400">Current candidate count: {currentCount}</p>
 
@@ -343,7 +347,7 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
                         </div>
 
                         {presets.length > 0 && (<div>
-                                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
+                                <label className={LABEL_CLASS}>
                                     Apply a Preset
                                 </label>
                                 <FilterListbox
@@ -371,15 +375,13 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
                             </div>
                         )}
 
-                        <div className="grid grid-cols-3 gap-4">
-                            <FormInput label="Deterministic Wt" name="weight_deterministic" type="number" value={form.weight_deterministic} onChange={change} disabled={scoringLocked} />
-                            <FormInput label="Semantic Wt" name="weight_semantic" type="number" value={form.weight_semantic} onChange={change} disabled={scoringLocked} />
-                            <FormInput label="AI Wt" name="weight_ai" type="number" value={form.weight_ai} onChange={change} disabled={scoringLocked} />
-                        </div>
-                        <div className="grid grid-cols-3 gap-4">
-                            <FormInput label="Deterministic Threshold" name="deterministic_threshold" type="number" value={form.deterministic_threshold} onChange={change} disabled={scoringLocked} />
-                            <FormInput label="Semantic Threshold" name="semantic_threshold" type="number" step="0.01" value={form.semantic_threshold} onChange={change} disabled={scoringLocked} />
-                            <FormInput label="AI Threshold" name="ai_threshold" type="number" value={form.ai_threshold} onChange={change} disabled={scoringLocked} />
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormInput label="Deterministic Wt" name="weight_deterministic" type="number" value={form.weight_deterministic} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
+                            <FormInput label="Deterministic Threshold" name="deterministic_threshold" type="number" value={form.deterministic_threshold} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
+                            <FormInput label="Semantic Wt" name="weight_semantic" type="number" value={form.weight_semantic} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
+                            <FormInput label="Semantic Threshold" name="semantic_threshold" type="number" step="0.01" value={form.semantic_threshold} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
+                            <FormInput label="AI Wt" name="weight_ai" type="number" value={form.weight_ai} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
+                            <FormInput label="AI Threshold" name="ai_threshold" type="number" value={form.ai_threshold} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
                         </div>
                     </>
                 )}

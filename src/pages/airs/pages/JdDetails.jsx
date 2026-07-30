@@ -33,7 +33,7 @@ import Modal from "../../../components/ui/Modal";
 import SkillActionModal from "../../../components/Modal/modal";
 import FormInput from "../../../components/forms/FormInput";
 import NewCampaignForm from "../campaigns/components/NewCampaignForm";
-import { createCampaign, getAllCampaigns, formatApiError } from "../campaigns/services/campaignservice";
+import { createCampaign, getAllCampaigns, getPipelineSummary, formatApiError } from "../campaigns/services/campaignservice";
 import Pagination from "../../../components/Pagination/pagination";
 import GenericTable from "../../../components/Table/table";
 import {
@@ -59,12 +59,35 @@ const DEFAULT_CAMPAIGN_FORM = {
   prompt_template_id: "",
 };
 
+const STATUS_BADGE = {
+  ACTIVE: "bg-emerald-50 text-emerald-700",
+  PAUSED: "bg-amber-50 text-amber-700",
+  CLOSED: "bg-slate-100 text-slate-600",
+  DRAFT: "bg-slate-100 text-slate-700",
+};
+
+// Title-case a status enum for display, e.g. "ACTIVE" -> "Active"
+const statusLabel = (s) =>
+  s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "—";
+
+// Reduce a pipeline-summary payload into the three headline counts the card shows.
+const deriveCampaignStats = (summary) => {
+  const stageCount = (key) =>
+    (summary?.stages || []).find((s) => s.stage === key)?.count ?? 0;
+  return {
+    candidates: summary?.total_candidates ?? 0,
+    shortlisted: stageCount("SHORTLISTED"),
+    selected: stageCount("SELECTED"),
+  };
+};
+
 export default function JdDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { jds, campaigns, updateJd, restoreJdVersion, addCampaign } = useAirsStore();
   const { hasRole } = useAuth();
   const isHRAdmin = hasRole(["HR_ADMIN"]);
+  const canViewPipeline = hasRole(["HR_ADMIN", "RECRUITER"]);
 
   const jd = jds.find((j) => j.id === id);
 
@@ -216,6 +239,38 @@ export default function JdDetails() {
   const totalCampaignPages = useMemo(() => {
     return Math.ceil(filteredCampaigns.length / campaignsPerPage) || 1;
   }, [filteredCampaigns]);
+
+  // Real candidate metrics per card come from the pipeline-summary endpoint —
+  // fetched only for the campaigns visible on the current page, and cached by
+  // id so paging back and forth doesn't re-hit the API.
+  //   value === undefined -> not fetched yet (loading placeholder)
+  //   value === null       -> unavailable (e.g. role can't see the pipeline)
+  //   value === object     -> real { candidates, shortlisted, selected }
+  const [campaignPipelineStats, setCampaignPipelineStats] = useState({});
+  useEffect(() => {
+    if (!canViewPipeline) return;
+    const missing = paginatedCampaigns
+      .map((c) => c.id)
+      .filter((cid) => cid && !(cid in campaignPipelineStats));
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(missing.map(async (cid) => {
+        try {
+          const res = await getPipelineSummary(cid);
+          return [cid, deriveCampaignStats(res?.data ?? res)];
+        } catch {
+          return [cid, null];
+        }
+      }));
+      if (!cancelled) {
+        setCampaignPipelineStats((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [paginatedCampaigns, campaignPipelineStats, canViewPipeline]);
 
   const fetchDbCampaigns = async () => {
     setIsLoadingCampaigns(true);
@@ -1257,7 +1312,7 @@ export default function JdDetails() {
                     setCampaignSearchQuery(e.target.value);
                     setCampaignCurrentPage(1); // Reset page on search
                   }}
-                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white shadow-sm"
+                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white shadow-sm"
                 />
               </div>
             </div>
@@ -1279,6 +1334,7 @@ export default function JdDetails() {
               >
                 <Plus className="h-3.5 w-3.5" /> New campaign
               </Button>
+              
             </div>
           </div>
 
@@ -1297,84 +1353,72 @@ export default function JdDetails() {
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {paginatedCampaigns.map((c, idx) => {
-                  // Generate some realistic looking metrics deterministically from ID
-                  const hash = (c.id || "").split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) || idx;
-                  const maxCandidates = c.max_candidates || 5;
+                  const status = (c.status || "").toUpperCase();
+                  const managerName = c.hiring_manager || "Unassigned";
+                  const initials = String(managerName).substring(0, 2).toUpperCase();
 
-                  // selected is progress towards the target maxCandidates
-                  const selected = Math.max(1, Math.floor(maxCandidates * (0.4 + (hash % 5) * 0.12)));
-                  const shortlisted = selected * 2 + (hash % 3) + 2;
-                  const candidates = shortlisted * 2 + (hash % 4) + 4;
-                  const progressPercent = Math.min(100, Math.round((selected / maxCandidates) * 100));
-                  const displayId = `CMP-${200 + (hash % 50)}`;
-
-                  // Initials for avatar
-                  const managerName = c.hiring_manager || "Recruiter";
-                  const initials = managerName.substring(0, 2).toUpperCase();
-
-                  // Format Created date
-                  const createdDate = c.created_at ? new Date(c.created_at).toISOString().split('T')[0] : "2026-07-06";
-
-                  // Format Deadline
-                  const deadlineText = c.deadline ? `Due ${new Date(c.deadline).toISOString().split('T')[0]}` : `Due 2026-07-16`;
+                  const stats = canViewPipeline ? campaignPipelineStats[c.id] : null;
+                  const hasStats = stats != null;
+                  const progressPercent = hasStats
+                    ? c.max_candidates
+                      ? Math.min(100, Math.round((stats.selected / c.max_candidates) * 100))
+                      : stats.candidates
+                        ? Math.min(100, Math.round((stats.selected / stats.candidates) * 100))
+                        : 0
+                    : 0;
 
                   return (
                     <div
                       key={c.id || idx}
                       onClick={() => c.id && navigate(`/airs/campaigns/${c.id}`)}
-                      className="bg-white border border-slate-200 rounded-3xl px-6 py-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:border-indigo-200 transition"
+                      className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col gap-4 cursor-pointer hover:border-blue-300 transition"
                     >
+                      {/* Title + status */}
                       <div>
-                        {/* Top row */}
-                        <div className="flex justify-between items-center mb-2.5">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${(c.status || "").toUpperCase() === "ACTIVE"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-slate-50 text-slate-600"
-                            }`}>
-                            {(c.status || "").toUpperCase() === "ACTIVE" ? "Active" : c.status || "Active"}
+                        <div className="flex justify-between items-center gap-2">
+                          <h4 className="text-base font-bold text-slate-900 leading-snug truncate">{c.name}</h4>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold shrink-0 ${STATUS_BADGE[status] || "bg-slate-50 text-slate-600"}`}>
+                            {statusLabel(status)}
                           </span>
-                          <span className="text-xs text-slate-400 font-medium">{displayId}</span>
                         </div>
-
-                        {/* Title */}
-                        <h4 className="text-base font-bold text-slate-900 leading-snug mt-2.5 mb-0.5">
-                          {c.name}
-                        </h4>
-
-                        {/* Subtitle */}
-                        <p className="text-xs text-slate-500 font-medium mb-3.5">
-                          {c.jd_title || "Engineering"} · {maxCandidates} openings
+                        <p className="text-xs text-slate-500 font-medium mt-1">
+                          {c.jd_title || "—"}
+                          {c.max_candidates != null && ` · ${c.max_candidates} opening${c.max_candidates === 1 ? "" : "s"}`}
                         </p>
-
-                        {/* Candidate stats */}
-                        <div className="flex justify-between items-center text-xs text-slate-400 font-semibold mb-1.5">
-                          <span>{candidates} candidates</span>
-                          <span>{shortlisted} shortlisted</span>
-                          <span>{selected} selected</span>
-                        </div>
-
-                        {/* Progress bar */}
-                        <div className="w-full bg-slate-100 rounded-full h-2.5 mb-3.5 overflow-hidden">
-                          <div
-                            className="bg-indigo-650 h-2.5 rounded-full transition-all duration-500"
-                            style={{ width: `${progressPercent}%` }}
-                          />
-                        </div>
                       </div>
 
-                      {/* Divider */}
-                      <div className="border-t border-slate-150 my-1" />
+                      {/* Candidate stats — real pipeline data */}
+                      {stats === undefined ? (<div className="h-4 w-full bg-slate-100 rounded animate-pulse" />
+                      ) : hasStats ? (<div>
+                          <div className="flex justify-between text-xs text-slate-500 font-semibold">
+                            <span>{stats.candidates} candidates</span>
+                            <span>{stats.shortlisted} shortlisted</span>
+                            <span>{stats.selected} selected</span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-2 mt-2 overflow-hidden">
+                            <div
+                              className="h-2 rounded-full bg-blue-600 transition-all duration-500"
+                              style={{ width: `${progressPercent}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : (<p className="text-[11px] text-slate-400 font-medium">
+                          Pipeline metrics unavailable
+                        </p>
+                      )}
 
                       {/* Footer */}
-                      <div className="flex justify-between items-center pt-2.5">
-                        <div className="flex items-center gap-2.5">
-                          <div className="h-7 w-7 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px] uppercase shadow-sm flex-shrink-0">
+                      <div className="border-t border-slate-100 pt-3 flex justify-between items-center">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="h-7 w-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] uppercase shrink-0">
                             {initials}
                           </div>
-                          <span className="text-xs font-bold text-slate-700">{managerName}</span>
+                          <span className="text-xs font-bold text-slate-700 truncate">{managerName}</span>
                         </div>
-                        <span className="text-xs text-slate-450 font-semibold">
-                          {deadlineText}
+                        <span className="text-[11px] text-slate-400 font-semibold shrink-0">
+                          {c.deadline
+                            ? `Due ${new Date(c.deadline).toLocaleDateString(undefined, { month: "short", day: "2-digit", year: "numeric" })}`
+                            : "No deadline"}
                         </span>
                       </div>
                     </div>
@@ -1382,42 +1426,14 @@ export default function JdDetails() {
                 })}
               </div>
 
-              {/* Pagination controls */}
-              {filteredCampaigns.length > campaignsPerPage && (
-                <div className="flex justify-between items-center border-t border-slate-100 pt-5 mt-6 text-xs text-slate-500 font-medium">
-                  <div>
-                    Showing <span className="font-semibold text-slate-700">{(campaignCurrentPage - 1) * campaignsPerPage + 1}</span> to <span className="font-semibold text-slate-700">{Math.min(campaignCurrentPage * campaignsPerPage, filteredCampaigns.length)}</span> of <span className="font-semibold text-slate-700">{filteredCampaigns.length}</span> campaigns
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setCampaignCurrentPage(prev => Math.max(prev - 1, 1))}
-                      disabled={campaignCurrentPage === 1}
-                      className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-sm flex items-center gap-1 text-slate-600 font-semibold"
-                    >
-                      Previous
-                    </button>
-                    {Array.from({ length: totalCampaignPages }, (_, i) => i + 1).map((pageNum) => (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCampaignCurrentPage(pageNum)}
-                        className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold transition-all shadow-sm ${campaignCurrentPage === pageNum
-                          ? "bg-[#0A0082] text-white"
-                          : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                          }`}
-                      >
-                        {pageNum}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => setCampaignCurrentPage(prev => Math.min(prev + 1, totalCampaignPages))}
-                      disabled={campaignCurrentPage === totalCampaignPages}
-                      className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-sm flex items-center gap-1 text-slate-600 font-semibold"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
+              {/* Pagination */}
+              <Pagination
+                currentPage={campaignCurrentPage}
+                totalPages={totalCampaignPages}
+                onPrevious={() => setCampaignCurrentPage((p) => Math.max(p - 1, 1))}
+                onNext={() => setCampaignCurrentPage((p) => Math.min(p + 1, totalCampaignPages))}
+                className="mt-6"
+              />
             </>
           )}
         </div>
@@ -1533,7 +1549,7 @@ export default function JdDetails() {
         isOpen={linkCampaignModalOpen}
         onClose={() => setLinkCampaignModalOpen(false)}
         title="Initiate Recruitment Campaign"
-        width="520px"
+        width="640px"
         height="90vh"
       >
         <NewCampaignForm
