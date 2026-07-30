@@ -1,6 +1,8 @@
 export const PARSE_STAGE_ORDER = [
   "TEXT_EXTRACTION",
   "TEXT_CLEANING",
+  "PII_DETECTION",
+  "PII_REDACTION",
   "AI_EXTRACTION",
   "JSON_VALIDATION",
   "SKILL_NORMALIZATION",
@@ -11,6 +13,8 @@ export const PARSE_STAGE_ORDER = [
 export const STAGE_LABELS = {
   TEXT_EXTRACTION: "Extracting text",
   TEXT_CLEANING: "Cleaning text",
+  PII_DETECTION: "Detecting PII",
+  PII_REDACTION: "Redacting PII",
   AI_EXTRACTION: "AI extraction",
   JSON_VALIDATION: "Validating structure",
   SKILL_NORMALIZATION: "Normalizing skills",
@@ -23,6 +27,8 @@ export const STAGE_LABELS = {
 export const STAGE_FAILURE_COPY = {
   TEXT_EXTRACTION: "We couldn't read any text out of this file. It may be corrupted, password-protected, or an empty document.",
   TEXT_CLEANING: "The extracted text couldn't be normalized for processing. This can happen with unusual character encodings.",
+  PII_DETECTION: "We couldn't scan this document for personally identifiable information. This is usually transient — retrying the upload will typically resolve it.",
+  PII_REDACTION: "We couldn't redact the personally identifiable information detected in this document.",
   AI_EXTRACTION:
     "The AI couldn't reliably pull structured fields out of this document. This is common with scanned or image-based PDFs, heavily templated resumes, or files with very little text.",
   JSON_VALIDATION: "The AI's extraction didn't match the expected data structure. The resume may have an unusual or non-standard layout.",
