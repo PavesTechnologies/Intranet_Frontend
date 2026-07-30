@@ -2,12 +2,14 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
-  Briefcase, Plus, Search, Calendar, Edit2, Sliders,
+  Briefcase, Plus, Search, Calendar, Sliders,
 } from "lucide-react";
+import { EditIcon } from "../../../components/icons/ActionIcons";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/ui/Modal";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import Pagination from "../../../components/Pagination/pagination";
 import NewCampaignForm from "./components/NewCampaignForm";
 import EditCampaignModal from "./components/EditCampaignModal";
 import WeightPresetsModal from "./components/WeightPresetsModal";
@@ -54,7 +56,7 @@ const STATUS_BADGE = {
   DRAFT: "bg-slate-100 text-slate-700",
 };
 
-const CAMPAIGNS_PER_PAGE = 9;
+const CAMPAIGNS_PER_PAGE = 6;
 
 // Title-case a status enum for display, e.g. "ACTIVE" -> "Active"
 const statusLabel = (s) =>
@@ -115,18 +117,58 @@ export default function Campaigns() {
     }
   };
 
-  // Role decides which list endpoint we can call
-  const fetchCampaigns = useCallback(async () => {
+  // HR_ADMIN's list endpoint paginates/searches/filters server-side (fixed
+  // page size of 6), so its query params must be debounced and re-sent on
+  // every search/status/page change instead of filtered client-side.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 350);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const [hrTotalPages, setHrTotalPages] = useState(1);
+  const fetchHrAdminCampaigns = useCallback(async () => {
+    if (!isHRAdmin) return;
     setIsLoading(true);
     try {
       // show_closed: true — the page has a "Closed" KPI card and status
       // filter, so closed campaigns must actually be in the dataset
-      const res = isHRAdmin
-        ? await getAllCampaignsHrAdmin({ show_closed: true })
-        : isHiringManager
-          ? await getCampaignsByHiringManager({ show_closed: true })
-          : await getAllCampaigns({ show_closed: true });
-      setCampaigns(res?.data || []);
+      const res = await getAllCampaignsHrAdmin({
+        show_closed: true,
+        search: debouncedSearch || undefined,
+        status: statusFilter !== "All" ? statusFilter : undefined,
+        page: currentPage,
+      });
+      const data = res?.data || {};
+      const items = Array.isArray(data.items) ? data.items : [];
+      setCampaigns(items);
+      setHrTotalPages(Math.max(1, Math.ceil((data.total ?? items.length) / (data.page_size || CAMPAIGNS_PER_PAGE))));
+    } catch (err) {
+      console.error("Failed to load campaigns:", err);
+      toast.error("Failed to load campaigns.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isHRAdmin, debouncedSearch, statusFilter, currentPage]);
+
+  useEffect(() => { fetchHrAdminCampaigns(); }, [fetchHrAdminCampaigns]);
+
+  // Other roles: full list fetched once, filtered/paginated client-side below
+  const fetchCampaigns = useCallback(async () => {
+    if (isHRAdmin) return;
+    setIsLoading(true);
+    try {
+      const res = isHiringManager
+        ? await getCampaignsByHiringManager({ show_closed: true })
+        : await getAllCampaigns({ show_closed: true });
+      const list = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res?.data?.items)
+          ? res.data.items
+          : Array.isArray(res)
+            ? res
+            : [];
+      setCampaigns(list);
     } catch (err) {
       console.error("Failed to load campaigns:", err);
       toast.error("Failed to load campaigns.");
@@ -136,6 +178,12 @@ export default function Campaigns() {
   }, [isHRAdmin, isHiringManager]);
 
   useEffect(() => { fetchCampaigns(); }, [fetchCampaigns]);
+
+  // Unified refresh after create/edit, regardless of which path is active
+  const refreshCampaigns = useCallback(() => {
+    if (isHRAdmin) fetchHrAdminCampaigns();
+    else fetchCampaigns();
+  }, [isHRAdmin, fetchHrAdminCampaigns, fetchCampaigns]);
 
   // Resolve hiring-manager / recruiter user IDs to display names.
   // The campaign list returns these people as bare user IDs (e.g. "5100022"),
@@ -193,8 +241,10 @@ export default function Campaigns() {
     ...eligibleJds.map((jd) => ({ value: jd.id, label: jd.title })),
   ]), [eligibleJds, jdList.length]);
 
-  // Client-side search + status filter
+  // Client-side search + status filter — HR_ADMIN already gets a filtered,
+  // paginated page from the server, so `campaigns` there IS the page to show.
   const filteredCampaigns = useMemo(() => {
+    if (isHRAdmin) return campaigns;
     const query = searchQuery.toLowerCase();
     return campaigns.filter((c) => {
       const matchesQuery =
@@ -205,13 +255,15 @@ export default function Campaigns() {
         statusFilter === "All" || (c.status || "").toUpperCase() === statusFilter;
       return matchesQuery && matchesStatus;
     });
-  }, [campaigns, searchQuery, statusFilter]);
+  }, [campaigns, searchQuery, statusFilter, isHRAdmin]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredCampaigns.length / CAMPAIGNS_PER_PAGE));
+  const clientTotalPages = Math.max(1, Math.ceil(filteredCampaigns.length / CAMPAIGNS_PER_PAGE));
+  const totalPages = isHRAdmin ? hrTotalPages : clientTotalPages;
   const paginatedCampaigns = useMemo(() => {
+    if (isHRAdmin) return filteredCampaigns;
     const start = (currentPage - 1) * CAMPAIGNS_PER_PAGE;
     return filteredCampaigns.slice(start, start + CAMPAIGNS_PER_PAGE);
-  }, [filteredCampaigns, currentPage]);
+  }, [filteredCampaigns, currentPage, isHRAdmin]);
 
   // Real candidate metrics per card come from the pipeline-summary endpoint.
   // We only fetch the campaigns visible on the current page, in parallel, and
@@ -299,7 +351,7 @@ export default function Campaigns() {
       toast.success(response?.message || "Campaign initiated successfully.");
       setCreateModalOpen(false);
       setCampaignForm(DEFAULT_CAMPAIGN_FORM);
-      fetchCampaigns();
+      refreshCampaigns();
     } catch (err) {
       toast.error(formatApiError(err, "Failed to initiate campaign."));
     } finally {
@@ -344,7 +396,7 @@ export default function Campaigns() {
             placeholder="Search by name, JD, or hiring manager..."
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white shadow-sm"
+            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white shadow-sm"
           />
         </div>
         <div className="w-44">
@@ -364,7 +416,7 @@ export default function Campaigns() {
           <Briefcase className="h-10 w-10 text-slate-300 mx-auto mb-3" />
           <p className="text-xs font-bold text-slate-700">No campaigns found</p>
           <p className="text-[11px] text-slate-400 mt-1">
-            {campaigns.length === 0
+            {campaigns.length === 0 && !searchQuery && statusFilter === "All"
               ? "Create your first campaign to start screening candidates."
               : "Try adjusting your search or status filter."}
           </p>
@@ -398,63 +450,60 @@ export default function Campaigns() {
               return (<div
                   key={c.id}
                   onClick={() => navigate(`/airs/campaigns/${c.id}`)}
-                  className="bg-white border border-slate-200 rounded-2xl px-6 py-5 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:border-indigo-200 transition"
+                  className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col gap-4 cursor-pointer hover:border-blue-300 transition"
                 >
+                  {/* Title + status + edit shortcut */}
                   <div>
-                    {/* Top row: status + edit shortcut */}
-                    <div className="flex justify-between items-center mb-2.5">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_BADGE[status] || "bg-slate-50 text-slate-600"}`}>
-                        {statusLabel(status)}
-                      </span>
-                      {/* Edit shortcut — HR_ADMIN only, closed campaigns are read-only */}
-                      {canManageCampaigns && status !== "CLOSED" && (<button
-                          onClick={(e) => handleEditClick(e, c)}
-                          disabled={editLoadingId === c.id}
-                          title="Edit campaign"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition disabled:opacity-50"
-                        >
-                          {editLoadingId === c.id ? (<span className="block h-3.5 w-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                          ) : (<Edit2 className="h-3.5 w-3.5" />
-                          )}
-                        </button>
-                      )}
+                    <div className="flex justify-between items-center gap-2">
+                      <h4 className="text-base font-bold text-slate-900 leading-snug truncate">{c.name}</h4>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_BADGE[status] || "bg-slate-50 text-slate-600"}`}>
+                          {statusLabel(status)}
+                        </span>
+                        {/* Edit shortcut — HR_ADMIN only, closed campaigns are read-only */}
+                        {canManageCampaigns && status !== "CLOSED" && (<button
+                            onClick={(e) => handleEditClick(e, c)}
+                            disabled={editLoadingId === c.id}
+                            title="Edit campaign"
+                            className="p-1.5 rounded-lg text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition disabled:opacity-50"
+                          >
+                            {editLoadingId === c.id ? (<span className="block h-3.5 w-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                            ) : (<EditIcon className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        )}
+                      </div>
                     </div>
-
-                    {/* Title + subtitle */}
-                    <h4 className="text-base font-bold text-slate-900 leading-snug">{c.name}</h4>
-                    <p className="text-xs text-slate-500 font-medium mt-1 mb-4">
+                    <p className="text-xs text-slate-500 font-medium mt-1">
                       {c.jd_title || "—"}
                       {c.max_candidates != null && ` · ${c.max_candidates} opening${c.max_candidates === 1 ? "" : "s"}`}
                     </p>
-
-                    {/* Candidate stats + progress — real pipeline data */}
-                    {stats === undefined ? (<div className="mb-4">
-                        <div className="h-3 w-full bg-slate-100 rounded animate-pulse mb-2.5" />
-                        <div className="h-2.5 w-full bg-slate-100 rounded-full animate-pulse" />
-                      </div>
-                    ) : hasStats ? (<>
-                        <div className="flex justify-between items-center text-xs text-slate-500 font-semibold mb-1.5">
-                          <span>{stats.candidates} candidates</span>
-                          <span>{stats.shortlisted} shortlisted</span>
-                          <span>{stats.selected} selected</span>
-                        </div>
-                        <div className="w-full bg-slate-100 rounded-full h-2.5 mb-4 overflow-hidden">
-                          <div
-                            className="h-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-violet-500 transition-all duration-500"
-                            style={{ width: `${progressPct}%` }}
-                          />
-                        </div>
-                      </>
-                    ) : (<p className="text-[11px] text-slate-400 font-medium mb-4">
-                        Pipeline metrics unavailable
-                      </p>
-                    )}
                   </div>
+
+                  {/* Candidate stats — real pipeline data */}
+                  {stats === undefined ? (<div className="h-4 w-full bg-slate-100 rounded animate-pulse" />
+                  ) : hasStats ? (<div>
+                      <div className="flex justify-between text-xs text-slate-500 font-semibold">
+                        <span>{stats.candidates} candidates</span>
+                        <span>{stats.shortlisted} shortlisted</span>
+                        <span>{stats.selected} selected</span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-2 mt-2 overflow-hidden">
+                        <div
+                          className="h-2 rounded-full bg-blue-600 transition-all duration-500"
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : (<p className="text-[11px] text-slate-400 font-medium">
+                      Pipeline metrics unavailable
+                    </p>
+                  )}
 
                   {/* Footer: manager + deadline */}
                   <div className="border-t border-slate-100 pt-3 flex justify-between items-center">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="h-7 w-7 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px] uppercase shrink-0">
+                      <div className="h-7 w-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] uppercase shrink-0">
                         {initials}
                       </div>
                       <span className="text-xs font-bold text-slate-700 truncate">{managerName}</span>
@@ -472,41 +521,13 @@ export default function Campaigns() {
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (<div className="flex justify-between items-center border-t border-slate-100 pt-5 mt-6 text-xs text-slate-500 font-medium">
-              <div>
-                Showing <span className="font-semibold text-slate-700">{(currentPage - 1) * CAMPAIGNS_PER_PAGE + 1}</span> to{" "}
-                <span className="font-semibold text-slate-700">{Math.min(currentPage * CAMPAIGNS_PER_PAGE, filteredCampaigns.length)}</span> of{" "}
-                <span className="font-semibold text-slate-700">{filteredCampaigns.length}</span> campaigns
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-sm text-slate-600 font-semibold"
-                >
-                  Previous
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (<button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold transition-all shadow-sm ${currentPage === pageNum
-                      ? "bg-[#0A0082] text-white"
-                      : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                      }`}
-                  >
-                    {pageNum}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-sm text-slate-600 font-semibold"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+            onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+            className="mt-6"
+          />
         </>
       )}
 
@@ -515,7 +536,7 @@ export default function Campaigns() {
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         title="Initiate Recruitment Campaign"
-        width="520px"
+        width="640px"
         height="90vh"
       >
         <NewCampaignForm
@@ -543,7 +564,7 @@ export default function Campaigns() {
           onSaved={() => {
             setEditCampaignId(null);
             setEditDetail(null);
-            fetchCampaigns();
+            refreshCampaigns();
           }}
         />
       )}

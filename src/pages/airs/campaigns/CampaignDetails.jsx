@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
   ArrowLeft, Users, Activity, AlertTriangle, Lock, Target,
-  UserCog, FileText, ArrowRight, Filter, ChevronDown, Clock, Edit2,
+  UserCog, FileText, ArrowRight, Filter, ChevronDown, Clock,
   ExternalLink, ListChecks,
   RotateCcw, Inbox, AlertOctagon, Hourglass, PieChart,
   Send, Flag, SkipForward, Lightbulb, FileUp
@@ -135,10 +135,12 @@ export default function CampaignDetails() {
             <ArrowLeft size={18} />
           </button>
           <div>
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${statusStyle}`}>
-              {status}
-            </span>
-            <h1 className="text-xl font-bold text-slate-900 mt-1">{info.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-slate-900">{info.name}</h1>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${statusStyle}`}>
+                {status}
+              </span>
+            </div>
             <p className="text-xs text-slate-500 mt-0.5">
               Created by {info.created_by_name || "System"} on {fmtDate(info.created_at)}
             </p>
@@ -150,8 +152,8 @@ export default function CampaignDetails() {
             {isClosed ? (<Button variant="outline" size="medium" onClick={() => setLifecycleModal("reopen")}>
                 <RotateCcw className="h-4 w-4" /> Reopen
               </Button>
-            ) : (<Button variant="secondary" size="medium" onClick={() => setEditOpen(true)}>
-                <Edit2 className="h-4 w-4" /> Edit Campaign
+            ) : (<Button variant="primary" size="medium" onClick={() => setEditOpen(true)}>
+                Edit Campaign
               </Button>
             )}
           </div>
@@ -176,7 +178,7 @@ export default function CampaignDetails() {
               activeTab === t.id ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
             }`}
           >
-            <t.icon className="h-4 w-4" /> {t.label}
+            {t.label}
           </button>
         ))}
       </div>

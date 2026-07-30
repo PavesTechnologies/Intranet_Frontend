@@ -6,6 +6,8 @@ import FilterListbox from "../../../../components/filter/FilterListbox";
 import usePromptTemplateLookup from "../../prompt-templates/hooks/usePromptTemplateLookup";
 import { getNameByRoles } from "../services/campaignservice";
 
+const LABEL_CLASS = "text-[10px] uppercase font-bold text-slate-400 block mb-1.5";
+
 export default function NewCampaignForm({
     title,
     jdOptions,          // optional: when provided, render a JD dropdown instead of the static title
@@ -61,7 +63,7 @@ export default function NewCampaignForm({
     return (<>
             <div className="space-y-4">
                 <div>
-                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
+                    <label className={LABEL_CLASS}>
                         Job Description {jdOptions && <span className="text-red-500">*</span>}
                     </label>
                     {jdOptions ? (<FilterListbox
@@ -83,6 +85,7 @@ export default function NewCampaignForm({
                     placeholder="e.g. Q3 React Platform Lead Hiring"
                     maxLength={255}
                     requiredMark
+                    labelClassName={LABEL_CLASS}
                 />
 
                 <div className="grid grid-cols-2 gap-4">
@@ -93,6 +96,7 @@ export default function NewCampaignForm({
                         min="1"
                         value={campaignForm.max_candidates}
                         onChange={handleCampaignFormChange}
+                        labelClassName={LABEL_CLASS}
                     />
                     <FormInput
                         label="Deadline"
@@ -100,16 +104,26 @@ export default function NewCampaignForm({
                         type="datetime-local"
                         value={campaignForm.deadline}
                         onChange={handleCampaignFormChange}
+                        labelClassName={LABEL_CLASS}
                     />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                     <FormInput
                         label="Deterministic Weight"
                         name="weight_deterministic"
                         type="number"
                         value={campaignForm.weight_deterministic}
                         onChange={handleCampaignFormChange}
+                        labelClassName={LABEL_CLASS}
+                    />
+                    <FormInput
+                        label="Deterministic Threshold"
+                        name="deterministic_threshold"
+                        type="number"
+                        value={campaignForm.deterministic_threshold}
+                        onChange={handleCampaignFormChange}
+                        labelClassName={LABEL_CLASS}
                     />
                     <FormInput
                         label="Semantic Weight"
@@ -117,23 +131,7 @@ export default function NewCampaignForm({
                         type="number"
                         value={campaignForm.weight_semantic}
                         onChange={handleCampaignFormChange}
-                    />
-                    <FormInput
-                        label="AI Weight"
-                        name="weight_ai"
-                        type="number"
-                        value={campaignForm.weight_ai}
-                        onChange={handleCampaignFormChange}
-                    />
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                    <FormInput
-                        label="Deterministic Threshold"
-                        name="deterministic_threshold"
-                        type="number"
-                        value={campaignForm.deterministic_threshold}
-                        onChange={handleCampaignFormChange}
+                        labelClassName={LABEL_CLASS}
                     />
                     <FormInput
                         label="Semantic Threshold"
@@ -144,6 +142,15 @@ export default function NewCampaignForm({
                         max="1"
                         value={campaignForm.semantic_threshold}
                         onChange={handleCampaignFormChange}
+                        labelClassName={LABEL_CLASS}
+                    />
+                    <FormInput
+                        label="AI Weight"
+                        name="weight_ai"
+                        type="number"
+                        value={campaignForm.weight_ai}
+                        onChange={handleCampaignFormChange}
+                        labelClassName={LABEL_CLASS}
                     />
                     <FormInput
                         label="AI Threshold"
@@ -151,12 +158,13 @@ export default function NewCampaignForm({
                         type="number"
                         value={campaignForm.ai_threshold}
                         onChange={handleCampaignFormChange}
+                        labelClassName={LABEL_CLASS}
                     />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
+                        <label className={LABEL_CLASS}>
                             Hiring Manager <span className="text-red-500">*</span>
                         </label>
                         <FilterListbox
@@ -166,7 +174,7 @@ export default function NewCampaignForm({
                         />
                     </div>
                     <div className="space-y-1">
-                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
+                        <label className={LABEL_CLASS}>
                             Recruiter <span className="text-red-500">*</span>
                         </label>
                         <FilterListbox
@@ -178,7 +186,7 @@ export default function NewCampaignForm({
                 </div>
 
                 <div className="space-y-1">
-                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
+                    <label className={LABEL_CLASS}>
                         Resume Parsing Prompt <span className="text-red-500">*</span>
                     </label>
                     <FilterListbox
