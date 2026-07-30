@@ -32,15 +32,34 @@ async function fetchAllPages(params) {
 // SkillOntologyPage's export handler so the two can never drift — e.g. one
 // omitting "All Sources" while the other forgets to (the bug that caused
 // the Source filter to silently do nothing everywhere it was used).
-export function buildSkillQueryParams({ search, category, confidence, source, showInactive }) {
+export function buildSkillQueryParams({
+  search,
+  category,
+  confidence,
+  source,
+  statusFilter,
+}) {
+  let is_active;
+
+  switch (statusFilter) {
+    case "ACTIVE":
+      is_active = true;
+      break;
+
+    case "INACTIVE":
+      is_active = false;
+      break;
+
+    default:
+      is_active = undefined; // All
+  }
+
   return {
     search: search || undefined,
     category: category === "All" ? undefined : category,
     confidence: confidence === "All" ? undefined : confidence?.toLowerCase(),
     source: source === "All" ? undefined : source,
-    // Default (toggle off): active only. Toggle on: omit is_active entirely
-    // so the backend returns both active and inactive records.
-    is_active: showInactive ? undefined : true,
+    is_active,
   };
 }
 
@@ -53,7 +72,7 @@ export default function useSkillOntologyList() {
   const [category, setCategory] = useState("All");
   const [confidenceFilter, setConfidenceFilter] = useState("All");
   const [source, setSource] = useState("All"); // kept for the Source filter UI — no server-side equivalent exists yet
-  const [showInactive, setShowInactive] = useState(false);
+  const [statusFilter, setStatusFilter] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   const [skills, setSkills] = useState([]);
@@ -109,13 +128,7 @@ export default function useSkillOntologyList() {
         // Every request this sends uses the same page/page_size/is_active
         // shape as the already-working non-fallback path above — no new or
         // out-of-range parameter values are ever introduced.
-        const [activeItems, inactiveItems] = await Promise.all([
-          fetchAllPages({ ...baseParams, is_active: true }),
-          fetchAllPages({ ...baseParams, is_active: false }),
-        ]);
-        const combined = [...activeItems, ...inactiveItems].sort((a, b) =>
-          (a.canonicalName || "").localeCompare(b.canonicalName || "")
-        );
+        
 
         total = combined.length;
         const start = (currentPage - 1) * SKILL_ONTOLOGY_PAGE_SIZE;

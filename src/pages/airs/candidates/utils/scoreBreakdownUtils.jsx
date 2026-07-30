@@ -6,6 +6,7 @@ import Tooltip from "../../../../components/status/Tooltip";
 // amber, SEMANTIC orange, MISSING red — per the Hierarchy Match Results spec.
 export const MATCH_TYPE_TONE = {
   EXACT: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  HIERARCHY: "bg-teal-50 text-teal-700 border-teal-100",
   CHILD: "bg-emerald-50 text-emerald-600 border-emerald-100",
   GRANDCHILD: "bg-teal-50 text-teal-700 border-teal-100",
   SIBLING: "bg-amber-50 text-amber-700 border-amber-100",
@@ -15,6 +16,7 @@ export const MATCH_TYPE_TONE = {
 
 export const MATCH_TYPE_TOOLTIP = {
   EXACT: "Exact skill match — 100% hierarchy weight.",
+  HIERARCHY: "Matched via a hierarchy (parent/child) relationship in the skill taxonomy.",
   CHILD: "Candidate skill is a child of the JD skill — 70% hierarchy weight.",
   GRANDCHILD: "Candidate skill is a grandchild of the JD skill — 50% hierarchy weight.",
   SIBLING: "Candidate skill is a sibling in the taxonomy — 40% hierarchy weight.",

@@ -105,10 +105,16 @@ export default function SkillOntologyPage() {
   const handleUpdate = async (values) => {
     setIsSubmitting(true);
     try {
+      // Removing an alias isn't a smaller "aliases" array on its own — the
+      // backend only drops an alias when it's also listed in remove_aliases
+      // (with confirm_alias_removal), so the diff against the pre-edit list
+      // has to be computed and sent explicitly.
+      const removedAliases = (editSkill.aliases || []).filter((a) => !values.aliases.includes(a));
       const res = await updateSkill(editSkill.id, {
         canonical_name: values.canonicalName,
         category: values.category,
         aliases: values.aliases,
+        remove_aliases: removedAliases,
         parent_skill_id: values.parentSkillId || null,
         confidence: values.confidence,
         status: values.status,
