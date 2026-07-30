@@ -4,13 +4,18 @@ import { toast } from "react-toastify";
 import {
   ArrowLeft, Users, Activity, AlertTriangle, Lock, Target,
   UserCog, FileText, ArrowRight, Filter, ChevronDown, Clock, Edit2,
-  ExternalLink, ListChecks, MapPin,
+  ExternalLink, ListChecks,
   RotateCcw, Inbox, AlertOctagon, Hourglass, PieChart,
   Send, Flag, SkipForward, Lightbulb, FileUp
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import Pagination from "../../../components/Pagination/pagination";
+import CandidateTable from "../candidates/components/CandidateTable";
+import { mapCampaignCandidateList } from "../candidates/utils/mapCampaignCandidateList";
+import { paginate } from "../candidates/utils/candidateUtils.jsx";
+import { CANDIDATE_PAGE_SIZE } from "../candidates/constants/candidateConstants";
 import EditCampaignModal from "./components/EditCampaignModal";
 import ReopenCampaignModal from "./components/ReopenCampaignModal";
 import useCampaignPermissions from "./hooks/useCampaignPermissions";
@@ -435,9 +440,16 @@ function StatTile({ label, value, suffix = "", tone = "text-slate-900", dot = "b
 }
 
 function CandidatesTab({ campaignId, canViewPipeline, stageFilter = "", onStageFilterChange }) {
+  const navigate = useNavigate();
   const [candidates, setCandidates] = useState(null);
   const [summary, setSummary] = useState(null);   // pipeline-summary → KPI numbers
   const [loading, setLoading] = useState(true);
+  const [starredIds, setStarredIds] = useState(() => new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [campaignId, stageFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -470,15 +482,26 @@ function CandidatesTab({ campaignId, canViewPipeline, stageFilter = "", onStageF
   const allCandidates = (candidates || []).map(normalizeCandidate);
   // stage filter — set by clicking a funnel bar, changeable here too
   const list = stageFilter
-    ? allCandidates.filter((cd) => (cd.stage || "").toUpperCase() === stageFilter)
+    ? allCandidates.filter((c) => (c.stage || "").toUpperCase() === stageFilter)
     : allCandidates;
 
   const stageOptions = [
     { value: "", label: "All Stages" },
-    ...[...new Set(allCandidates.map((cd) => (cd.stage || "").toUpperCase()).filter(Boolean))]
+    ...[...new Set(allCandidates.map((c) => (c.stage || "").toUpperCase()).filter(Boolean))]
       .sort()
       .map((s) => ({ value: s, label: stageLabel(s) })),
   ];
+
+  const { pageItems, totalPages, currentPage: safePage } = paginate(list, currentPage, CANDIDATE_PAGE_SIZE);
+
+  const toggleStar = (candidateId) => {
+    setStarredIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(candidateId)) next.delete(candidateId);
+      else next.add(candidateId);
+      return next;
+    });
+  };
 
   // KPI numbers from the pipeline summary (falls back to list length for total)
   const stageCount = (key) => (summary?.stages || []).find((s) => s.stage === key)?.count ?? 0;

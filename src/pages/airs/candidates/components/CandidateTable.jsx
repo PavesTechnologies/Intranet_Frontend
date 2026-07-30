@@ -18,8 +18,6 @@ export default function CandidateTable({ candidates, onView, onToggleStar }) {
   const headers = ["Candidate", "Deterministic", "ATS", "Semantic", "Composite","Exp.", "Location", "Stage", "Risk", "Actions"];
 
   const columns = ["name", "deterministic", "ats", "semantic", "composite", "experience", "location", "stage", "risk", "actions"];
-  console.log("FIRST CANDIDATE:", candidates[0]);
-  console.log("DETERMINISTIC VALUE:", candidates[0]?.deterministic);
   const rows = candidates.map((c) => ({
     id: c.id,
     rowClass: "hover:bg-slate-50/50 transition cursor-pointer",

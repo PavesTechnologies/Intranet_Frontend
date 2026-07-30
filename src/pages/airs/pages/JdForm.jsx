@@ -11,11 +11,18 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button/Button";
-import CountriesList from "../../../components/CountriesList";
+// import CountriesList from "../../../components/CountriesList";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import usePromptTemplateLookup from "../prompt-templates/hooks/usePromptTemplateLookup";
 
-const JURISDICTIONS = ["USA", "EU", "India", "UK", "Global"];
+// const JURISDICTIONS = ["USA", "EU", "India", "UK", "Global"];
+
+const JURISDICTIONS = [
+  { key: "GLOBAL", value: "GLOBAL" },
+  { key: "EU", value: "EUROPE" },
+  { key: "US", value: "US" },
+  { key: "IN", value: "INDIA" },
+];
 
 const FormField = ({ label, required, error, className = "", children }) => (
   <div className={className}>
@@ -323,7 +330,7 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
         </FormField>
 
         <FormField label="Region (Jurisdiction)" required error={errors.jurisdiction}>
-          {/* <select
+          <select
             value={jurisdiction}
             onChange={(e) => {
               setJurisdiction(e.target.value);
@@ -334,10 +341,10 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
           >
             <option value="">Select region</option>
             {JURISDICTIONS.map((j) => (
-              <option key={j} value={j}>{j}</option>
+              <option key={j.key} value={j.value}>{j.key}</option>
             ))}
-          </select> */}
-          <CountriesList
+          </select>
+          {/* <CountriesList
             value={jurisdiction}
             onChange={(value) => {
               setJurisdiction(value);
@@ -347,7 +354,7 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
             // label="Region (Jurisdiction)"
             required
             error={errors.jurisdiction}
-          />
+          /> */}
         </FormField>
 
         <FormField label="Notice Period (Days)" required error={errors.noticePeriod}>
