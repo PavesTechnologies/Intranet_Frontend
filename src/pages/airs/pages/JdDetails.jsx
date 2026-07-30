@@ -24,7 +24,6 @@ import {
   Eye,
   FileText,
   Search,
-  SlidersHorizontal,
   Calendar
 } from "lucide-react";
 import { toast } from "react-toastify";

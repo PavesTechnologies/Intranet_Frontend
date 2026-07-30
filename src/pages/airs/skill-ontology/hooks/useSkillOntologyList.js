@@ -1,31 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { getSkills, getCategories } from "../services/skillOntologyService";
-import { SKILL_ONTOLOGY_PAGE_SIZE } from "../constants/skillOntologyConstants";
-
-// Safety cap for the page-fetch loop below — this dataset is small, so this
-// is just a backstop against looping forever if a response's `total` is ever
-// wrong or missing, not a size we expect to actually hit.
-const MAX_FALLBACK_PAGES = 20;
-
-// Fetches every page for one is_active value, using ONLY the already-valid
-// page_size (never an inflated one — see fetchSkills below for why that
-// matters) and stopping as soon as a page comes back short or `total` is
-// reached.
-async function fetchAllPages(params) {
-  let page = 1;
-  let all = [];
-  let total = Infinity;
-  while (page <= MAX_FALLBACK_PAGES && all.length < total) {
-    const res = await getSkills({ ...params, page, page_size: SKILL_ONTOLOGY_PAGE_SIZE });
-    const items = res?.data?.items || res?.items || [];
-    total = res?.data?.total ?? res?.total ?? all.length + items.length;
-    if (items.length === 0) break;
-    all = all.concat(items);
-    page += 1;
-  }
-  return all;
-}
+import { SKILL_ONTOLOGY_PAGE_SIZE, SKILL_STATUS } from "../constants/skillOntologyConstants";
 
 // Single source of truth for turning raw filter state into the exact
 // query params the backend expects. Used by both the list's own fetch and
@@ -39,20 +15,12 @@ export function buildSkillQueryParams({
   source,
   statusFilter,
 }) {
+  // The backend only filters on is_active when the param is present
+  // (`if is_active is not None`), so "All" must OMIT it entirely — sending
+  // false there would return inactive rows only.
   let is_active;
-
-  switch (statusFilter) {
-    case "ACTIVE":
-      is_active = true;
-      break;
-
-    case "INACTIVE":
-      is_active = false;
-      break;
-
-    default:
-      is_active = undefined; // All
-  }
+  if (statusFilter === SKILL_STATUS.ACTIVE) is_active = true;
+  else if (statusFilter === SKILL_STATUS.INACTIVE) is_active = false;
 
   return {
     search: search || undefined,
@@ -72,7 +40,7 @@ export default function useSkillOntologyList() {
   const [category, setCategory] = useState("All");
   const [confidenceFilter, setConfidenceFilter] = useState("All");
   const [source, setSource] = useState("All"); // kept for the Source filter UI — no server-side equivalent exists yet
-  const [statusFilter, setStatusFilter] = useState(false);
+  const [statusFilter, setStatusFilter] = useState(SKILL_STATUS.ACTIVE);
   const [currentPage, setCurrentPage] = useState(1);
 
   const [skills, setSkills] = useState([]);
@@ -82,10 +50,9 @@ export default function useSkillOntologyList() {
 
   const [categoryOptions, setCategoryOptions] = useState([{ label: "All Categories", value: "All" }]);
 
-  // Guards against an older, slower fetch (e.g. the two-request Show
-  // Inactive fallback below) resolving after a newer one and overwriting
-  // fresher results with stale data — only the most recently *started*
-  // fetch is allowed to commit its results.
+  // Guards against an older, slower fetch resolving after a newer one and
+  // overwriting fresher results with stale data (debounced search racing a
+  // page change) — only the most recently *started* fetch may commit.
   const latestRequestId = useRef(0);
 
   useEffect(() => {
@@ -95,7 +62,7 @@ export default function useSkillOntologyList() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, category, confidenceFilter, source, showInactive]);
+  }, [debouncedSearch, category, confidenceFilter, source, statusFilter]);
 
   const fetchSkills = useCallback(async () => {
     const requestId = ++latestRequestId.current;
@@ -107,33 +74,19 @@ export default function useSkillOntologyList() {
         category,
         confidence: confidenceFilter,
         source,
-        showInactive,
+        statusFilter,
       });
 
-      let items;
-      let total;
-
-      if (!showInactive) {
-        // Show Inactive off — single, server-paginated, active-only request.
-        // Unchanged from before.
-        const res = await getSkills({ ...baseParams, page: currentPage, page_size: SKILL_ONTOLOGY_PAGE_SIZE });
-        items = res?.data?.items || res?.items || [];
-        total = res?.data?.total ?? res?.total ?? 0;
-      } else {
-        // Show Inactive on — temporary client-side fallback. Omitting
-        // is_active and trusting the backend to return both statuses isn't
-        // reliable for every category/search/confidence/source combination,
-        // so fetch active and inactive explicitly (same other filters, same
-        // single source of truth via baseParams) and merge here instead.
-        // Every request this sends uses the same page/page_size/is_active
-        // shape as the already-working non-fallback path above — no new or
-        // out-of-range parameter values are ever introduced.
-        
-
-        total = combined.length;
-        const start = (currentPage - 1) * SKILL_ONTOLOGY_PAGE_SIZE;
-        items = combined.slice(start, start + SKILL_ONTOLOGY_PAGE_SIZE);
-      }
+      // One server-paginated request for every status choice — the backend
+      // applies every filter (including is_active) to the same query it
+      // counts with, so `total` and the page slice always agree.
+      const res = await getSkills({
+        ...baseParams,
+        page: currentPage,
+        page_size: SKILL_ONTOLOGY_PAGE_SIZE,
+      });
+      const items = res?.data?.items || res?.items || [];
+      const total = res?.data?.total ?? res?.total ?? 0;
 
       if (requestId !== latestRequestId.current) return; // a newer fetch has since started — drop this one
       setSkills(items);
@@ -145,7 +98,7 @@ export default function useSkillOntologyList() {
     } finally {
       if (requestId === latestRequestId.current) setIsLoading(false);
     }
-  }, [debouncedSearch, category, confidenceFilter, source, showInactive, currentPage]);
+  }, [debouncedSearch, category, confidenceFilter, source, statusFilter, currentPage]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -217,7 +170,7 @@ export default function useSkillOntologyList() {
     setConfidenceFilter,
     source,
     setSource,
-    showInactive,
-    setShowInactive,
+    statusFilter,
+    setStatusFilter,
   };
 }
