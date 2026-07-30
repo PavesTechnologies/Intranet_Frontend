@@ -42,6 +42,9 @@ export default function PipelineCandidateScorecardPage() {
   };
   const { candidate, loading, error } = useParsedResumeCandidate(candidateId, fallback);
   const [activeTab, setActiveTab] = useState(TABS[0].id);
+  // Came from Resume Upload History (resumeRow present) → back should return
+  // there instead of the Pipeline Board, which this page otherwise defaults to.
+  const backTo = resumeRow ? "/airs/resume-intake" : "/airs/pipeline";
 
   if (loading) {
     return (
@@ -61,7 +64,7 @@ export default function PipelineCandidateScorecardPage() {
               ? "We couldn't load this candidate. Please try again."
               : "We couldn't find this candidate. They may have been removed."
           }
-          onRetry={() => navigate("/airs/pipeline")}
+          onRetry={() => navigate(backTo)}
         />
       </div>
     );
@@ -71,7 +74,7 @@ export default function PipelineCandidateScorecardPage() {
 
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
-      <CandidateHeader candidate={candidate} onBack={() => navigate("/airs/pipeline")} />
+      <CandidateHeader candidate={candidate} onBack={() => navigate(backTo)} />
 
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
         <CandidateTabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
