@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
@@ -272,15 +272,19 @@ export default function Campaigns() {
   //   value === null       -> unavailable (e.g. role can't see the pipeline)
   //   value === object     -> real { candidates, shortlisted, selected }
   const [pipelineStats, setPipelineStats] = useState({});
+  // Tracks ids already requested (in-flight or done) so the effect below can't
+  // fire a duplicate fetch for the same campaign — e.g. if it re-runs again
+  // before the previous getPipelineSummary() call has landed in state.
+  const requestedIdsRef = useRef(new Set());
   useEffect(() => {
     // HIRING_MANAGER can't call pipeline-summary at all (backend 403s it) —
     // don't fire a doomed request per visible card; cards fall back to the
     // "Pipeline metrics unavailable" state.
     if (!canViewPipeline) return;
-    const missing = paginatedCampaigns
-      .map((c) => c.id)
-      .filter((id) => id && !(id in pipelineStats));
+    const idsOnPage = [...new Set(paginatedCampaigns.map((c) => c.id).filter(Boolean))];
+    const missing = idsOnPage.filter((id) => !(id in pipelineStats) && !requestedIdsRef.current.has(id));
     if (missing.length === 0) return;
+    missing.forEach((id) => requestedIdsRef.current.add(id));
 
     let cancelled = false;
     (async () => {
@@ -298,7 +302,14 @@ export default function Campaigns() {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      // Release ids whose fetch never landed in pipelineStats (effect re-ran
+      // or unmounted before it resolved) so they're retried instead of stuck
+      // "requested" forever; ids that did land are already excluded above via
+      // the `id in pipelineStats` check, so this is a no-op for those.
+      missing.forEach((id) => requestedIdsRef.current.delete(id));
+    };
   }, [paginatedCampaigns, pipelineStats, canViewPipeline]);
 
   // ---- Create campaign ----
