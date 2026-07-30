@@ -95,7 +95,7 @@ export default function ExpenseReportDetailPage() {
   const fetchReport = useCallback(async () => {
     try {
       const res = await expenseReportService.getById(reportId);
-      setReport(res.data);
+      setReport(res.data?.data);
     } catch (err) {
       console.error("Failed to fetch expense report:", err);
       setLoadError(true);
@@ -105,7 +105,8 @@ export default function ExpenseReportDetailPage() {
   const fetchLineItems = useCallback(async () => {
     try {
       const res = await lineItemService.getAll(reportId);
-      const list = Array.isArray(res.data) ? res.data : res.data?.lineItems || res.data?.content || res.data?.data || [];
+      const payload = res.data?.data;
+      const list = Array.isArray(payload) ? payload : payload?.lineItems || payload?.content || payload?.data || [];
       setLineItems(list);
     } catch (err) {
       console.error("Failed to fetch line items:", err);
@@ -405,7 +406,7 @@ export default function ExpenseReportDetailPage() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-xl font-bold text-[#0a174e]">{report.title}</h1>
-                  <StatusBadge label={report.status || "DRAFT"} size="sm" />
+                  <StatusBadge label={report.reportStatus || "DRAFT"} size="sm" />
                 </div>
                 <p className="text-xs text-gray-400 font-mono mt-1">{report.reportNumber}</p>
               </div>
@@ -478,7 +479,7 @@ export default function ExpenseReportDetailPage() {
 
         {/* Right column */}
         <div className="lg:col-span-1">
-          <SummaryPanel report={report} lineItems={lineItems} />
+          <SummaryPanel report={{ ...report, status: report?.reportStatus }} lineItems={lineItems} />
         </div>
       </div>
 

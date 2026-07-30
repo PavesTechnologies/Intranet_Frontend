@@ -55,6 +55,7 @@ const DEFAULT_CAMPAIGN_FORM = {
   ai_threshold: 50,
   hiring_manager_id: "",
   recruiter_id: "",
+  prompt_template_id: "",
 };
 
 export default function JdDetails() {
@@ -686,6 +687,10 @@ export default function JdDetails() {
       toast.error("Please enter a recruiter ID.");
       return;
     }
+    if (!String(campaignForm.prompt_template_id).trim()) {
+      toast.error("Please select a Resume Parsing Prompt.");
+      return;
+    }
     if (campaignForm.max_candidates !== "" && campaignForm.max_candidates !== null && Number(campaignForm.max_candidates) <= 0) {
       toast.error("Max candidates must be greater than 0.");
       return;
@@ -707,7 +712,8 @@ export default function JdDetails() {
       semantic_threshold: Number(campaignForm.semantic_threshold),
       ai_threshold: Number(campaignForm.ai_threshold),
       hiring_manager_id: campaignForm.hiring_manager_id.trim(),
-      recruiter_id: campaignForm.recruiter_id.trim()
+      recruiter_id: campaignForm.recruiter_id.trim(),
+      prompt_template_id: String(campaignForm.prompt_template_id).trim()
     };
 
     setIsSubmittingCampaign(true);
