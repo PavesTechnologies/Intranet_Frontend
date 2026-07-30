@@ -19,19 +19,38 @@ function stepIndex(step) {
 export default function IntakeFlowPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { step, resume, status, statusError, parsedJson, candidateSkills, submit, goToReview, retryStatusCheck, reset } = useIntakeFlow();
+  const {
+    step,
+    resume,
+    status,
+    statusError,
+    parsedJson,
+    candidateSkills,
+    submit,
+    loadExistingResume,
+    goToReview,
+    retryStatusCheck,
+    reset,
+  } = useIntakeFlow();
   const activeIndex = stepIndex(step);
   const consumedUploadResult = useRef(false);
 
-  // When arriving from the "New Structured Intake" modal (ResumeIntakePage),
-  // the resume has already been uploaded — skip straight to the Accepted step
-  // instead of showing the Upload form again.
+  // When arriving from the "New Structured Intake" modal or the "In Processing" tab,
+  // load the resume and skip straight to processing/review instead of showing Upload form.
   useEffect(() => {
     const uploadResult = location.state?.uploadResult;
-    if (uploadResult && !consumedUploadResult.current) {
-      consumedUploadResult.current = true;
-      submit(uploadResult);
-      navigate(location.pathname, { replace: true, state: null });
+    const existingResume = location.state?.existingResume;
+
+    if (!consumedUploadResult.current) {
+      if (existingResume) {
+        consumedUploadResult.current = true;
+        loadExistingResume(existingResume);
+        navigate(location.pathname, { replace: true, state: null });
+      } else if (uploadResult) {
+        consumedUploadResult.current = true;
+        submit(uploadResult);
+        navigate(location.pathname, { replace: true, state: null });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

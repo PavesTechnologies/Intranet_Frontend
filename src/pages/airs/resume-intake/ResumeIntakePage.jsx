@@ -40,7 +40,22 @@ export default function ResumeIntakePage() {
     files: inProcessingFiles,
     totalResults: inProcessingTotal,
     isLoading: inProcessingLoading,
+    refreshInProcessing,
   } = useInProcessingResumes({ campaignFilter, statusFilter, sourceFilter, sortValue });
+
+  const handleSingleUploaded = () => {
+    setIsIntakeModalOpen(false);
+    setActiveListTab("processing");
+    refreshInProcessing?.();
+    refreshResumes?.();
+  };
+
+  const handleBulkUploaded = () => {
+    setIsIntakeModalOpen(false);
+    setActiveListTab("processing");
+    refreshInProcessing?.();
+    refreshResumes?.();
+  };
 
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
@@ -55,6 +70,18 @@ export default function ResumeIntakePage() {
           </Button>
         </div>
       </div>
+
+      <ResumeIntakeFilters
+        campaignOptions={campaignOptions}
+        campaignFilter={campaignFilter}
+        setCampaignFilter={setCampaignFilter}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        sourceFilter={sourceFilter}
+        setSourceFilter={setSourceFilter}
+        sortValue={sortValue}
+        setSortValue={setSortValue}
+      />
 
       <div className="flex border-b border-slate-200 mb-6">
         <button
@@ -83,18 +110,6 @@ export default function ResumeIntakePage() {
           )}
         </button>
       </div>
-
-      <ResumeIntakeFilters
-        campaignOptions={campaignOptions}
-        campaignFilter={campaignFilter}
-        setCampaignFilter={setCampaignFilter}
-        statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
-        sourceFilter={sourceFilter}
-        setSourceFilter={setSourceFilter}
-        sortValue={sortValue}
-        setSortValue={setSortValue}
-      />
 
       {activeListTab === "history" ? (
         <>
@@ -148,18 +163,12 @@ export default function ResumeIntakePage() {
         {activeModalTab === "single" ? (
           <UploadStep
             bare
-            onSubmit={(uploadResult) => {
-              setIsIntakeModalOpen(false);
-              navigate("/airs/resume-intake/new", { state: { uploadResult } });
-            }}
+            onSubmit={handleSingleUploaded}
           />
         ) : (
           <BulkUploadPanel
             bare
-            onUploaded={() => {
-              setIsIntakeModalOpen(false);
-              refreshResumes();
-            }}
+            onUploaded={handleBulkUploaded}
           />
         )}
       </Modal>
