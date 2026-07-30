@@ -90,7 +90,13 @@ export function hasRealResumeData(candidate) {
 // parser doesn't extract a projects section) until those are added.
 export function getResumeFromParsedData(candidate) {
   return {
-    file: null,
+    file: candidate.downloadUrl ? {
+      name: candidate.originalFilename,
+      sizeKb: Math.round(candidate.fileSizeBytes / 1024),
+      pageCount: candidate.pageCount,
+      url: candidate.downloadUrl,
+      format: candidate.fileFormat,
+    } : null,
     previewPages: [],
     skillsExtracted: candidate.skills,
     experienceExtracted: candidate.workExperience.map((w) => ({
@@ -100,7 +106,7 @@ export function getResumeFromParsedData(candidate) {
       highlights: w.highlights,
     })),
     educationExtracted: candidate.educationExtracted,
-    projects: [],
+    projects: candidate.projects || [],
     certifications: candidate.certifications,
   };
 }
