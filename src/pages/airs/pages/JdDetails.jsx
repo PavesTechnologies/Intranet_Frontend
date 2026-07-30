@@ -58,6 +58,7 @@ const DEFAULT_CAMPAIGN_FORM = {
   hiring_manager_id: "",
   recruiter_id: "",
   prompt_template_id: "",
+  prompt_template_id: "",
 };
 
 export default function JdDetails() {
