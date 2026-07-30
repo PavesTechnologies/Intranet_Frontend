@@ -16,13 +16,13 @@ function SectionCard({ icon: Icon, title, children }) {
   );
 }
 
-export default function ResumeTab({ candidate }) {
+export default function ResumeTab({ candidate, onExpired }) {
   const resume = hasRealResumeData(candidate) ? getResumeFromParsedData(candidate) : getResumeMock(candidate);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,340px)_1fr] gap-4">
       {resume.file ? (
-        <ResumePreview file={resume.file} previewPages={resume.previewPages} />
+        <ResumePreview file={resume.file} previewPages={resume.previewPages} onExpired={onExpired} />
       ) : (
         <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-[12.5px] text-slate-400 h-fit">
           Resume file preview isn't available yet.
