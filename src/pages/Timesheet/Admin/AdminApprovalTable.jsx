@@ -14,6 +14,7 @@ import InternalActivities from "./InternalActivities";
 import HourSettingsModal from "./HourSettingsModal";
 import CancellationModal from "../../leave_management/models/CancellationModal";
 import RejectWithSelectionModal from "../RejectWithSelectionModal";
+import BulkApprovalBar from "../components/BulkApprovalBar";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 
 const AdminApprovalTable = ({
@@ -161,6 +162,84 @@ const AdminApprovalTable = ({
       })),
     [groupedData, projectIdToName, taskIdToName],
   );
+
+  // -----------------------------
+  // Bulk multi-employee select + Approve/Reject
+  // -----------------------------
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkRejectOpen, setBulkRejectOpen] = useState(false);
+
+  const shownEmployeeIds = enrichedGroupedData.map((u) => u.userId);
+  const allSelected =
+    shownEmployeeIds.length > 0 &&
+    selectedEmployeeIds.length === shownEmployeeIds.length;
+  const someSelected = selectedEmployeeIds.length > 0 && !allSelected;
+
+  const toggleEmployeeSelect = (userId) =>
+    setSelectedEmployeeIds((prev) =>
+      prev.includes(userId)
+        ? prev.filter((id) => id !== userId)
+        : [...prev, userId],
+    );
+  const toggleSelectAll = () =>
+    setSelectedEmployeeIds(allSelected ? [] : shownEmployeeIds);
+  const clearSelection = () => setSelectedEmployeeIds([]);
+
+  // Flatten each selected employee's actionable weeks into the array the
+  // multi-user review endpoint expects: [{ userId, timesheetIds, status, comments }].
+  const buildBulkPayload = (status, comments) => {
+    const isActionable = (w) => {
+      const s = (w.weeklyStatus || "").toUpperCase().replace(/\s+/g, "_");
+      return s === "SUBMITTED" || s === "PARTIALLY_APPROVED";
+    };
+    const rows = [];
+    enrichedGroupedData
+      .filter((u) => selectedEmployeeIds.includes(u.userId))
+      .forEach((u) =>
+        (u.weeklySummary || []).filter(isActionable).forEach((w) => {
+          const ids = (w.timesheets || []).map((t) => t.timesheetId);
+          if (ids.length)
+            rows.push({ userId: u.userId, timesheetIds: ids, status, comments });
+        }),
+      );
+    return rows;
+  };
+
+  const submitBulkReview = async (status, comments) => {
+    const payload = buildBulkPayload(status, comments);
+    if (payload.length === 0) {
+      showStatusToast(
+        `Nothing to ${status === "APPROVED" ? "approve" : "reject"} for the selected employees`,
+        "info",
+      );
+      return;
+    }
+    setBulkLoading(true);
+    try {
+      await api.post(
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/timesheets/review/internal/bulk`,
+        payload,
+      );
+      showStatusToast(
+        `Selected timesheets ${status === "APPROVED" ? "approved" : "rejected"} successfully`,
+        "success",
+      );
+      clearSelection();
+      onRefresh?.();
+    } catch (err) {
+      console.error("Bulk review failed:", err);
+      showStatusToast(
+        err.response?.data?.message || "Failed to update selected timesheets",
+        "error",
+      );
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkApprove = () => submitBulkReview("APPROVED", "Approved");
+  const handleBulkReject = (reason) => submitBulkReview("REJECTED", reason);
 
   // -----------------------------
   // Approve / Reject Logic
@@ -779,7 +858,20 @@ const AdminApprovalTable = ({
         <LoadingSpinner text="Loading Admin view..." />
       ) : (
         <>
-          <div className="flex justify-end gap-3 mb-4">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <label className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-gray-600">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = someSelected;
+                }}
+                onChange={toggleSelectAll}
+                className="h-4 w-4 cursor-pointer accent-[#263383]"
+              />
+              Select all
+            </label>
+            <div className="flex justify-end gap-3">
             <Button variant="primary" size="medium" onClick={exportCSV}>
               Export CSV
             </Button>
@@ -807,7 +899,28 @@ const AdminApprovalTable = ({
             >
               <MoreVertical size={14} />
             </Button>
+            </div>
           </div>
+
+          <BulkApprovalBar
+            count={selectedEmployeeIds.length}
+            loading={bulkLoading}
+            onApprove={handleBulkApprove}
+            onReject={() => setBulkRejectOpen(true)}
+            onClear={clearSelection}
+          />
+          <CancellationModal
+            title="Reject Selected Employees"
+            subtitle="Enter a reason to reject the selected employees' timesheets."
+            isOpen={bulkRejectOpen}
+            onCancel={() => setBulkRejectOpen(false)}
+            onConfirm={async (reason) => {
+              await handleBulkReject(reason);
+              setBulkRejectOpen(false);
+            }}
+            isLoading={bulkLoading}
+            confirmText="Reject"
+          />
 
           {enrichedGroupedData.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
@@ -846,6 +959,17 @@ const AdminApprovalTable = ({
                 >
                   {/* ✅ Collapsible user header */}
                   <div className="flex items-center justify-between">
+                    <input
+                      type="checkbox"
+                      checked={selectedEmployeeIds.includes(user.userId)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        toggleEmployeeSelect(user.userId);
+                      }}
+                      className="mr-3 h-4 w-4 shrink-0 cursor-pointer accent-[#263383]"
+                      title="Select employee"
+                    />
                     <button
                       type="button"
                       onClick={() => toggleUser(user.userId)}
