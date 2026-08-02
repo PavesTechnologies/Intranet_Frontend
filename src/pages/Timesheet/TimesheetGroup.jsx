@@ -599,7 +599,7 @@ const TimesheetGroup = ({
             {/* Week Header */}     {" "}
       {isWeeklyFormat && (
         <div
-          className={`${getWeekHeaderBgColor()} border-b px-4 py-3 ${showBody ? "mb-2" : ""} ${collapsible ? "cursor-pointer hover:brightness-95 transition" : ""}`}
+          className={`${getWeekHeaderBgColor()} border-b px-4 py-2 ${showBody ? "mb-1" : ""} ${collapsible ? "cursor-pointer hover:brightness-95 transition" : ""}`}
           onClick={collapsible ? () => onToggleCollapse() : undefined}
           role={collapsible ? "button" : undefined}
           aria-expanded={collapsible ? !isCollapsed : undefined}
@@ -611,21 +611,21 @@ const TimesheetGroup = ({
                            {" "}
               {collapsible &&
                 (isCollapsed ? (
-                  <ChevronDown size={20} className="text-gray-600 shrink-0" />
+                  <ChevronDown size={16} className="text-gray-600 shrink-0" />
                 ) : (
-                  <ChevronUp size={20} className="text-gray-600 shrink-0" />
+                  <ChevronUp size={16} className="text-gray-600 shrink-0" />
                 ))}
               <div
-                className={`${getWeekBadgeColor()} text-white px-3 py-1 rounded-full text-sm font-bold`}
+                className={`${getWeekBadgeColor()} text-white px-2.5 py-0.5 rounded-full text-xs font-bold`}
               >
                 Week {weekGroup.weekId || weekNumber}
               </div>
                            {" "}
               <div className="flex items-center gap-3">
-                <div className="text-lg font-semibold text-gray-800">
+                <div className="text-sm font-semibold text-gray-800">
                   {monthName} {year}
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-xs text-gray-600">
                   {weekData.weekRange}
                 </div>
               </div>
@@ -668,15 +668,15 @@ const TimesheetGroup = ({
                            {" "}
               <div className="flex flex-col items-center leading-tight">
                                {" "}
-                <div className={`text-lg font-bold ${getTotalHoursColor()}`}>
+                <div className={`text-sm font-bold ${getTotalHoursColor()}`}>
                   {totalHours} hrs
                 </div>
                                {" "}
-                <div className="text-xs text-gray-500">Total Hours</div>       
+                <div className="text-[10px] text-gray-500">Total Hours</div>       
                      {" "}
               </div>
                            {" "}
-              <CustomStatusBadge label={currentStatus} size="md" />         
+              <CustomStatusBadge label={currentStatus} size="sm" />         
                {" "}
             </div>
                      {" "}

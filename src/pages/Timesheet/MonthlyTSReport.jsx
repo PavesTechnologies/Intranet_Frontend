@@ -656,20 +656,32 @@ const MonthlyTSReport = () => {
   }
   if (!apiData) return null;
 
+  const employeeInitials =
+    (apiData.employeeName || "")
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((w) => w.charAt(0).toUpperCase())
+      .join("") || "U";
+
   return (
     <div className="timesheet-container">
       <div className="timesheet-wrapper">
         <div>
           <button
-            className="flex gap-1 text-lg text-blue-500 hover:text-blue-700"
+            className="inline-flex items-center gap-1.5 mb-2 rounded-lg px-3 py-1.5 text-sm font-semibold text-[#263383] bg-[#f4f6fc] hover:bg-[#e8ebf8] transition-colors"
             onClick={() => navigate(-1)}
           >
-            <ArrowLeft size={20} className="mt-1" /> Back
+            <ArrowLeft size={18} /> Back
           </button>
         </div>
         <header className="timesheet-header">
           <div className="header-content">
-            <div>
+            <div className="flex items-center gap-4">
+              <div className="hidden sm:flex h-14 w-14 rounded-2xl bg-[#263383] text-white items-center justify-center text-lg font-bold shrink-0">
+                {employeeInitials}
+              </div>
+              <div>
               <h1 className="timesheet-title">
                 Monthly Timesheet :
                 <button
@@ -712,6 +724,7 @@ const MonthlyTSReport = () => {
                 Employee ID: {apiData.employeeId}
               </p>
               <p className="employee-name">Employee: {apiData.employeeName}</p>
+              </div>
             </div>
             <div className="flex gap-2">
               <Button
@@ -753,9 +766,7 @@ const MonthlyTSReport = () => {
         />
 
         <section className="timesheet-section">
-          <div className="mb-4 text-lg font-semibold text-gray-800">
-            Month (Week-wise)
-          </div>
+          <div className="section-title">Month (Week-wise)</div>
           <div className="space-y-4">
             {apiData.weeklySummaryHistory.length === 0 ? (
               <p className="text-gray-500 text-sm font-semibold italic">
