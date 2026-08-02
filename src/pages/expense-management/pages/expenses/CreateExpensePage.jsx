@@ -1,17 +1,33 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FileText, Sparkles } from "lucide-react";
+import { FileText, Sparkles, Briefcase, Landmark } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { expenseReportService, lookupService } from "@/pages/expense-management/api/expenseReportsApi";
-import ReportFormFields from "@/pages/expense-management/components/expense-reports/ReportFormFields";
+import Select from "react-select";
+import FormInput from "@/components/forms/FormInput";
+import FormTextArea from "@/components/forms/FormTextArea";
 
 const breadcrumbs = [
   { label: "Expense Management", to: "/expense-management/dashboard" },
   { label: "Expenses", to: "/expense-management/expenses/my" },
   { label: "Create Expense" },
 ];
+
+const customSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    borderRadius: "0.5rem",
+    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+    boxShadow: state.isFocused ? "0 0 0 2px rgba(59, 130, 246, 0.5)" : "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+    padding: "0.125rem 0.25rem",
+    minHeight: "42px",
+    backgroundColor: "#ffffff",
+    "&:hover": { borderColor: state.isFocused ? "#3b82f6" : "#d1d5db" },
+  }),
+  menu: (base) => ({ ...base, zIndex: 9999 }),
+};
 
 export default function CreateExpensePage() {
   const navigate = useNavigate();
@@ -133,16 +149,68 @@ export default function CreateExpensePage() {
 
       <div className="mx-auto max-w-2xl rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <form onSubmit={handleSubmit} className="space-y-5">
-          <ReportFormFields
-            formData={formData}
-            formErrors={formErrors}
-            onInputChange={handleInputChange}
-            onSelectChange={handleSelectChange}
-            costCenterOptions={costCenterOptions}
-            currencyOptions={currencyOptions}
+          <FormInput
+            label="Report Title"
+            name="title"
+            placeholder="e.g. US Business Trip"
+            value={formData.title}
+            onChange={handleInputChange}
+            requiredMark
             disabled={submitting}
-            lookupsLoading={lookupsLoading}
+            error={formErrors.title}
           />
+
+          <FormTextArea
+            label="Business Purpose"
+            name="businessPurpose"
+            placeholder="e.g. Client meeting with acquisition prospects"
+            value={formData.businessPurpose}
+            onChange={handleInputChange}
+            disabled={submitting}
+          />
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                <Briefcase size={14} className="text-gray-400" />
+                Cost Center <span className="text-red-500">*</span>
+              </label>
+              <Select
+                options={costCenterOptions}
+                value={costCenterOptions.find((o) => o.value === formData.costCenterId) || null}
+                onChange={(opt) => handleSelectChange("costCenterId", opt ? opt.value : "")}
+                placeholder="Search and select cost center..."
+                isSearchable
+                isLoading={lookupsLoading}
+                styles={customSelectStyles}
+                isDisabled={submitting}
+              />
+              {formErrors.costCenterId && <span className="text-xs text-red-600 block mt-1">{formErrors.costCenterId}</span>}
+            </div>
+
+            <div className="space-y-1">
+              <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                <Landmark size={14} className="text-gray-400" />
+                Report Currency <span className="text-red-500">*</span>
+              </label>
+              <Select
+                options={currencyOptions}
+                value={currencyOptions.find((o) => o.value === formData.currencyId) || null}
+                onChange={(opt) => handleSelectChange("currencyId", opt ? opt.value : "")}
+                placeholder="Select report currency..."
+                isSearchable
+                isLoading={lookupsLoading}
+                menuPortalTarget={document.body}
+                menuPosition="fixed"
+                styles={{
+                  ...customSelectStyles,
+                  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                }}
+                isDisabled={submitting}
+              />
+              {formErrors.currencyId && <span className="text-xs text-red-600 block mt-1">{formErrors.currencyId}</span>}
+            </div>
+          </div>
 
           <div className="flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-100 p-3">
             <FileText size={16} className="text-blue-500 shrink-0 mt-0.5" />

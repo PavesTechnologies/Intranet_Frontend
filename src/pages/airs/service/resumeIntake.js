@@ -60,6 +60,21 @@ export const getAllResumes = async (filters) => {
     }
 };
 
+export const resumeTimeline = async (resumeId, attemptNumber) => {
+    try {
+        const response = await api.get(`${BASE_URL}/resumes/${resumeId}/timeline`, {
+            params: attemptNumber ? { attempt_number: attemptNumber } : undefined,
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching resume timeline:", error);
+        throw error;
+    }
+};
+
 export const getResumeById = async (resumeId) => {
     try {
         const response = await api.get(`${BASE_URL}/resumes/${resumeId}`, {
@@ -99,6 +114,20 @@ export const candidateJson = async (candidateId) => {
         return response.data;
     } catch (error) {
         console.error("Error fetching candidate JSON:", error);
+        throw error;
+    }
+};
+
+export const deleteCandidate = async (candidateId) => {
+    try {
+        const response = await api.delete(`${BASE_URL}/candidates/${candidateId}`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error deleting candidate:", error);
         throw error;
     }
 };

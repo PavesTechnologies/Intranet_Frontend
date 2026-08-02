@@ -13,7 +13,11 @@
       "Bash(node -e \"console.log\\(require\\('./package.json'\\).scripts\\)\")",
       "Bash(npm install *)",
       "Bash(python3 -c \"import datetime; print\\(datetime.datetime.utcfromtimestamp\\(1785150176\\)\\)\")",
-      "Bash(node -e \"console.log\\(new Date\\(1785150176*1000\\).toISOString\\(\\)\\)\")"
+      "Bash(node -e \"console.log\\(new Date\\(1785150176*1000\\).toISOString\\(\\)\\)\")",
+      "Bash(grep -Hm1 ^description: /c/Users/Rangaswamy.Dama/Downloads/Intranet_Frontend/.claude/skills/*/SKILL.md)",
+      "Bash(ls /c/Users/Rangaswamy.Dama/Downloads/Intranet_Frontend/.claude/skills)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5173/ --max-time 3)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:5173/src/pages/airs/candidates/CandidateScore/tabs/Resume/ResumeTab.jsx\" --max-time 5)"
     ]
   }
 }

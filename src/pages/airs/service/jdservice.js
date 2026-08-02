@@ -187,6 +187,22 @@ export const exportJDs = async (params) => {
     }
 };
 
+export const downloadJDById = async (jdId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/jd/${jdId}/download`, {
+            responseType: "blob",
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response;
+    } catch (error) {
+        console.error("Error downloading JD:", error);
+        toast.error(getErrorMessage(error, "Failed to download job description."));
+        throw error;
+    }
+};
+
 export const getMyJDUploads = async () => {
     try {
         const response = await api.get(`${BASE_URL}/job-descriptions/my-uploads`, {
@@ -199,6 +215,22 @@ export const getMyJDUploads = async () => {
     } catch (error) {
         console.error("Error fetching JD uploads:", error);
         toast.error(getErrorMessage(error, "Failed to fetch JD uploads."));
+        throw error;
+    }
+};
+
+export const deleteJDProcessingTask = async (taskId) => {
+    try {
+        const response = await api.delete(`${BASE_URL}/dead-letter-queue/${taskId}`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        toast.success(response.data?.message || "Processing task deleted successfully.");
+        return response.data;
+    } catch (error) {
+        console.error("Error deleting JD processing task:", error);
+        toast.error(getErrorMessage(error, "Failed to delete processing task."));
         throw error;
     }
 };

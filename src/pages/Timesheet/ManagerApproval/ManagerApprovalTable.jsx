@@ -8,7 +8,7 @@ import { TimesheetGroup } from "../TimesheetGroup";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
 import FilterListbox from "../../../components/filter/FilterListbox";
-import { MoreVertical, X, ChevronDown, ChevronUp } from "lucide-react";
+import { MoreVertical, X, ChevronDown, ChevronUp, CheckCircle2, Plus, Minus } from "lucide-react";
 import CancellationModal from "../../leave_management/models/CancellationModal";
 import ConfirmationModal from "../../leave_management/models/ConfirmationModal";
 import RejectWithSelectionModal from "../RejectWithSelectionModal";
@@ -49,6 +49,18 @@ const ManagerApprovalTable = ({
 
   // ✅ Per-user expand/collapse state — collapsed by default
   const [expandedUsers, setExpandedUsers] = useState({});
+  // UI-only: track which weeks are collapsed inside an employee (default expanded).
+  const [expandedWeeks, setExpandedWeeks] = useState({});
+  const toggleWeekCollapse = (key) =>
+    setExpandedWeeks((prev) => ({ ...prev, [key]: !prev[key] }));
+  const setAllWeeksExpanded = (user, expanded) =>
+    setExpandedWeeks((prev) => {
+      const next = { ...prev };
+      (user.weeklySummary || []).forEach((w) => {
+        next[`${user.userId}-${w.weekId}`] = expanded;
+      });
+      return next;
+    });
   const toggleUser = (userId) =>
     setExpandedUsers((prev) => ({ ...prev, [userId]: !prev[userId] }));
 
@@ -435,12 +447,12 @@ const ManagerApprovalTable = ({
         return (
         <div
           key={week.weekId}
-          className="bg-white border rounded-xl shadow-sm mb-6 overflow-hidden"
+          className="mb-5"
         >
           {/* Manager actions */}
           {(week.weeklyStatus === "SUBMITTED" ||
             week.weeklyStatus === "PARTIALLY_APPROVED") && (
-              <div className="p-4 border-t flex gap-3 justify-end items-center">
+              <div className="px-1 pb-3 flex gap-3 justify-end items-center">
                 {weekLevelLoading?.[`${user.userId}-${week.weekId}`] ? (
                   <LoadingSpinner text="Processing..." />
                 ) : (
@@ -633,6 +645,10 @@ const ManagerApprovalTable = ({
             refreshData={onRefresh}
             mapWorkType={(type) => type}
             projectInfo={projectInfo}
+            isCollapsed={!expandedWeeks[`${user.userId}-${week.weekId}`]}
+            onToggleCollapse={() =>
+              toggleWeekCollapse(`${user.userId}-${week.weekId}`)
+            }
           />
         </div>
         );
@@ -855,13 +871,22 @@ const ManagerApprovalTable = ({
           </div>
 
           {enrichedGroupedData.length === 0 ? (
-            <div className="text-center text-gray-500 py-10 text-lg font-medium">
-              No Approvals
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-50 text-green-500">
+                <CheckCircle2 size={30} />
+              </div>
+              <p className="text-lg font-semibold text-gray-700">All caught up</p>
+              <p className="text-sm text-gray-400">
+                No timesheets are waiting for your approval.
+              </p>
             </div>
           ) : (
             enrichedGroupedData.map((user) => {
               const isExpanded = !!expandedUsers[user.userId];
               const totalWeeks = user.weeklySummary?.length || 0;
+              const anyWeekExpanded = (user.weeklySummary || []).some(
+                (w) => expandedWeeks[`${user.userId}-${w.weekId}`]
+              );
               const pendingWeeks =
                 user.weeklySummary?.filter((w) => {
                   const s = w.weeklyStatus?.toUpperCase();
@@ -871,11 +896,20 @@ const ManagerApprovalTable = ({
                     s === "PARTIALLY_APPROVED"
                   );
                 }).length || 0;
+              const pendingHours =
+                user.weeklySummary?.reduce((sum, w) => {
+                  const s = w.weeklyStatus?.toUpperCase();
+                  const isPending =
+                    s === "SUBMITTED" ||
+                    s === "PARTIALLY APPROVED" ||
+                    s === "PARTIALLY_APPROVED";
+                  return isPending ? sum + (Number(w.totalHours) || 0) : sum;
+                }, 0) || 0;
 
               return (
                 <div
                   key={user.userId}
-                  className="bg-white rounded-xl shadow-md border p-4"
+                  className="bg-white rounded-2xl shadow-sm border border-gray-100 border-l-4 border-l-[#263383] p-4 transition-shadow hover:shadow-md"
                 >
                   {/* ✅ Collapsible user header */}
                   <div className="flex items-center justify-between">
@@ -890,15 +924,31 @@ const ManagerApprovalTable = ({
                       ) : (
                         <ChevronDown size={20} className="text-gray-500 shrink-0" />
                       )}
-                      <h2 className="text-xl font-bold text-gray-800 truncate">
-                        {user.userName} (ID: {user.userId})
+                      <span className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#263383] to-[#4f46e5] text-white text-sm font-bold">
+                        {(user.userName || "")
+                          .trim()
+                          .split(/\s+/)
+                          .slice(0, 2)
+                          .map((w) => w.charAt(0).toUpperCase())
+                          .join("") || "U"}
+                      </span>
+                      <h2 className="text-lg font-bold text-gray-800 truncate">
+                        {user.userName}{" "}
+                        <span className="text-sm font-medium text-gray-400">
+                          (ID: {user.userId})
+                        </span>
                       </h2>
-                      <span className="text-sm text-gray-500 shrink-0">
-                        • {totalWeeks} {totalWeeks === 1 ? "week" : "weeks"}
+                      <span className="hidden md:inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 shrink-0">
+                        {totalWeeks} {totalWeeks === 1 ? "week" : "weeks"}
                       </span>
                       {pendingWeeks > 0 && (
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300 shrink-0">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                           {pendingWeeks} pending
+                        </span>
+                      )}
+                      {pendingWeeks > 0 && pendingHours > 0 && (
+                        <span className="hidden lg:inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
+                          {pendingHours.toFixed(1)} hrs
                         </span>
                       )}
                     </button>
@@ -931,6 +981,35 @@ const ManagerApprovalTable = ({
                           >
                             Reject All Weeks
                           </Button>
+                          {isExpanded && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAllWeeksExpanded(user, !anyWeekExpanded)
+                              }
+                              title={
+                                anyWeekExpanded
+                                  ? "Collapse all weeks"
+                                  : "Expand all weeks"
+                              }
+                              aria-label={
+                                anyWeekExpanded
+                                  ? "Collapse all weeks"
+                                  : "Expand all weeks"
+                              }
+                              className={`inline-flex items-center justify-center h-8 w-8 rounded-lg border shadow-sm transition-all duration-200 hover:shadow-md hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+                                anyWeekExpanded
+                                  ? "bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100 focus:ring-amber-300"
+                                  : "bg-indigo-50 border-indigo-200 text-[#4f46e5] hover:bg-indigo-100 focus:ring-indigo-300"
+                              }`}
+                            >
+                              {anyWeekExpanded ? (
+                                <Minus size={16} />
+                              ) : (
+                                <Plus size={16} />
+                              )}
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
@@ -974,10 +1053,10 @@ const ManagerApprovalTable = ({
                   />
 
                   {isExpanded && (
-                    <>
-                      <hr className="my-3 border-gray-200" />
+                    <div className="ts-reveal">
+                      <hr className="my-4 border-gray-100" />
                       {renderUserWeeks(user)}
-                    </>
+                    </div>
                   )}
                 </div>
               );

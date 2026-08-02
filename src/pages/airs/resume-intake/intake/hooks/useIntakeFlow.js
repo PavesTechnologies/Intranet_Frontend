@@ -105,6 +105,42 @@ export default function useIntakeFlow() {
     beginPolling(resume.resume_id, status.task_id);
   };
 
+  const loadExistingResume = (existingResume) => {
+    if (!existingResume) return;
+    const resumeId = existingResume.id || existingResume.resume_id;
+    const taskId = existingResume.task_id || existingResume.task_id_ref || resumeId;
+    const loadedResume = {
+      resume_id: resumeId,
+      candidate_id: existingResume.candidate_id || existingResume.campaign_candidate_id,
+      candidate_name: existingResume.candidate_full_name || existingResume.candidate_name || "Candidate",
+      candidate_email_masked: maskEmail(existingResume.candidate_email || ""),
+      file_format: existingResume.file_format || "PDF",
+      version_number: existingResume.version_number || 1,
+      parse_status: existingResume.parse_status || "PARSING",
+      parse_confidence_score: existingResume.parse_confidence_score || null,
+      parser_version: existingResume.parser_version || "—",
+      parse_duration_ms: existingResume.parse_duration_ms || null,
+      created_at: existingResume.created_at || new Date().toISOString(),
+      campaign_name: existingResume.campaign_name || "—",
+      pipeline_stage: existingResume.pipeline_stage,
+    };
+
+    const initialStatus = {
+      task_id: taskId,
+      overall_status: existingResume.parse_status === "PENDING" ? "QUEUED" : "RUNNING",
+      current_stage: null,
+      stages: buildStages(),
+      error_message: null,
+    };
+
+    registerMockIntake(loadedResume, initialStatus);
+    setResume(loadedResume);
+    setStatus(initialStatus);
+    setStatusError(null);
+    setStep("processing");
+    beginPolling(resumeId, taskId);
+  };
+
   const goToReview = () => setStep("review");
   const reset = () => {
     clearInterval(pollRef.current);
@@ -125,6 +161,7 @@ export default function useIntakeFlow() {
     parsedJson,
     candidateSkills,
     submit,
+    loadExistingResume,
     goToReview,
     retryStatusCheck,
     reset,
