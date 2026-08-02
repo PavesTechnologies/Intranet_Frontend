@@ -8,6 +8,9 @@ import {
   MoreVertical,
   ChevronDown,
   ChevronUp,
+  Plus,
+  Trash2,
+  MousePointerClick,
 } from "lucide-react";
 import Tooltip from "../../components/status/Tooltip";
 import { showStatusToast } from "../../components/toastfy/toast";
@@ -893,27 +896,27 @@ const TimesheetGroup = ({
             )}
                        {" "}
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-32 bg-white rounded-md shadow-lg py-1 z-50 border">
+              <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl border border-gray-100 py-1.5 z-50 overflow-hidden" style={{ boxShadow: "0 12px 32px rgba(8,21,52,0.16)" }}>
                                {" "}
                 <button
                   onClick={handleAddEntryDaily}
-                  className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-[#f4f6fc] hover:text-[#263383] transition-colors"
                 >
-                                    Add Entry                {" "}
+                  <Plus size={16} className="flex-shrink-0" /> Add Entry
                 </button>
                                {" "}
                 <button
                   onClick={handleDeleteClick}
-                  className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100"
+                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
                 >
-                                    Delete                {" "}
+                  <Trash2 size={16} className="flex-shrink-0" /> Delete
                 </button>
                                {" "}
                 <button
                   onClick={() => handleSelect(timesheetId)}
-                  className="block w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-gray-100"
+                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm font-medium text-[#263383] hover:bg-[#f4f6fc] transition-colors"
                 >
-                                    Select                {" "}
+                  <MousePointerClick size={16} className="flex-shrink-0" /> Select
                 </button>
                              {" "}
               </div>
@@ -1035,7 +1038,7 @@ const TimesheetGroup = ({
                           </button>
                                                  {" "}
                           {openMenuId === timesheet.timesheetId && (
-                            <div className="absolute right-0 mt-2 w-32 bg-white rounded-md shadow-lg py-1 z-50 border">
+                            <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl border border-gray-100 py-1.5 z-50 overflow-hidden" style={{ boxShadow: "0 12px 32px rgba(8,21,52,0.16)" }}>
                                                          {" "}
                               <button
                                 onClick={(e) => {
@@ -1044,9 +1047,9 @@ const TimesheetGroup = ({
                                   setOpenMenuId(null);
                                   setMenuOpen(false);
                                 }}
-                                className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-[#f4f6fc] hover:text-[#263383] transition-colors"
                               >
-                                                              Add Entry        
+                  <Plus size={16} className="flex-shrink-0" /> Add Entry
                                                    {" "}
                               </button>
                                                          {" "}
@@ -1057,9 +1060,9 @@ const TimesheetGroup = ({
                                   setOpenMenuId(null);
                                   setMenuOpen(false);
                                 }}
-                                className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100"
+                                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
                               >
-                                                              Delete            
+                  <Trash2 size={16} className="flex-shrink-0" /> Delete
                                                {" "}
                               </button>
                                                          {" "}
@@ -1070,9 +1073,9 @@ const TimesheetGroup = ({
                                   setOpenMenuId(null);
                                   setMenuOpen(false);
                                 }}
-                                className="block w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-gray-100"
+                                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm font-medium text-[#263383] hover:bg-[#f4f6fc] transition-colors"
                               >
-                                                              Select            
+                  <MousePointerClick size={16} className="flex-shrink-0" /> Select
                                                {" "}
                               </button>
                                                        {" "}
