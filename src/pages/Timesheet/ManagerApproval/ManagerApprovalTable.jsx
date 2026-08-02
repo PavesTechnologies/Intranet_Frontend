@@ -8,7 +8,7 @@ import { TimesheetGroup } from "../TimesheetGroup";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import Button from "../../../components/Button/Button";
 import FilterListbox from "../../../components/filter/FilterListbox";
-import { MoreVertical, X, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
+import { MoreVertical, X, ChevronDown, ChevronUp, CheckCircle2, Plus, Minus } from "lucide-react";
 import CancellationModal from "../../leave_management/models/CancellationModal";
 import ConfirmationModal from "../../leave_management/models/ConfirmationModal";
 import RejectWithSelectionModal from "../RejectWithSelectionModal";
@@ -50,9 +50,17 @@ const ManagerApprovalTable = ({
   // ✅ Per-user expand/collapse state — collapsed by default
   const [expandedUsers, setExpandedUsers] = useState({});
   // UI-only: track which weeks are collapsed inside an employee (default expanded).
-  const [collapsedWeeks, setCollapsedWeeks] = useState({});
+  const [expandedWeeks, setExpandedWeeks] = useState({});
   const toggleWeekCollapse = (key) =>
-    setCollapsedWeeks((prev) => ({ ...prev, [key]: !prev[key] }));
+    setExpandedWeeks((prev) => ({ ...prev, [key]: !prev[key] }));
+  const setAllWeeksExpanded = (user, expanded) =>
+    setExpandedWeeks((prev) => {
+      const next = { ...prev };
+      (user.weeklySummary || []).forEach((w) => {
+        next[`${user.userId}-${w.weekId}`] = expanded;
+      });
+      return next;
+    });
   const toggleUser = (userId) =>
     setExpandedUsers((prev) => ({ ...prev, [userId]: !prev[userId] }));
 
@@ -637,7 +645,7 @@ const ManagerApprovalTable = ({
             refreshData={onRefresh}
             mapWorkType={(type) => type}
             projectInfo={projectInfo}
-            isCollapsed={!!collapsedWeeks[`${user.userId}-${week.weekId}`]}
+            isCollapsed={!expandedWeeks[`${user.userId}-${week.weekId}`]}
             onToggleCollapse={() =>
               toggleWeekCollapse(`${user.userId}-${week.weekId}`)
             }
@@ -876,6 +884,9 @@ const ManagerApprovalTable = ({
             enrichedGroupedData.map((user) => {
               const isExpanded = !!expandedUsers[user.userId];
               const totalWeeks = user.weeklySummary?.length || 0;
+              const anyWeekExpanded = (user.weeklySummary || []).some(
+                (w) => expandedWeeks[`${user.userId}-${w.weekId}`]
+              );
               const pendingWeeks =
                 user.weeklySummary?.filter((w) => {
                   const s = w.weeklyStatus?.toUpperCase();
@@ -970,6 +981,35 @@ const ManagerApprovalTable = ({
                           >
                             Reject All Weeks
                           </Button>
+                          {isExpanded && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAllWeeksExpanded(user, !anyWeekExpanded)
+                              }
+                              title={
+                                anyWeekExpanded
+                                  ? "Collapse all weeks"
+                                  : "Expand all weeks"
+                              }
+                              aria-label={
+                                anyWeekExpanded
+                                  ? "Collapse all weeks"
+                                  : "Expand all weeks"
+                              }
+                              className={`inline-flex items-center justify-center h-8 w-8 rounded-lg border shadow-sm transition-all duration-200 hover:shadow-md hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+                                anyWeekExpanded
+                                  ? "bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100 focus:ring-amber-300"
+                                  : "bg-indigo-50 border-indigo-200 text-[#4f46e5] hover:bg-indigo-100 focus:ring-indigo-300"
+                              }`}
+                            >
+                              {anyWeekExpanded ? (
+                                <Minus size={16} />
+                              ) : (
+                                <Plus size={16} />
+                              )}
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
