@@ -18,7 +18,7 @@ import api from "../../api/axiosInstance";
 import { submitWeeklyTimesheet } from "./api";
 import "react-datepicker/dist/react-datepicker.css";
 import DatePicker from "react-datepicker";
-import { addDays, startOfMonth, endOfMonth } from "date-fns";
+import { addDays, startOfMonth } from "date-fns";
 
 // Converts a "YYYY-MM-DD" string safely to a Date object in local Indian time
 const parseLocalDate = (dateStr) => {
@@ -709,6 +709,14 @@ const TimesheetGroup = ({
                     if (!selectedDate) return;
 
                     const iso = toLocalISODate(selectedDate);
+                    // 🧩 Future date guard (defensive — maxDate already blocks the click)
+                    if (iso > toLocalISODate(new Date())) {
+                      showStatusToast(
+                        "Future date — Timesheet not allowed",
+                        "error",
+                      );
+                      return;
+                    }
                     const holiday = holidaysMap[iso];
                     const day = selectedDate.getDay(); // 0=Sunday, 6=Saturday
                     // 🧩 Weekend check (Saturday/Sunday)
@@ -745,9 +753,8 @@ const TimesheetGroup = ({
                   minDate={startOfMonth(
                     parseLocalDate(toLocalISODate(new Date())),
                   )}
-                  maxDate={endOfMonth(
-                    parseLocalDate(toLocalISODate(new Date())),
-                  )}
+                  // Future dates are not allowed: cap at today (current month only).
+                  maxDate={parseLocalDate(toLocalISODate(new Date()))}
                   calendarStartDay={1} // Monday first (Indian style)
                   renderCustomHeader={({ date }) => (
                     <div className="text-center font-semibold text-indigo-600 mb-1">
@@ -763,6 +770,14 @@ const TimesheetGroup = ({
                     const iso = toLocalISODate(dateObj);
                     const holiday = holidaysMap[iso];
                     const day = dateObj.getDay(); // 0=Sunday, 6=Saturday
+                    // --- 0️⃣ Out-of-range days (previous month + future): low-color ---
+                    const todayIso = toLocalISODate(new Date());
+                    const monthStartIso = toLocalISODate(
+                      startOfMonth(parseLocalDate(todayIso)),
+                    );
+                    if (iso < monthStartIso || iso > todayIso) {
+                      return "text-gray-300 cursor-not-allowed opacity-50";
+                    }
                     // --- 1️⃣ Weekends ---
 
                     if (day === 0 || day === 6) {

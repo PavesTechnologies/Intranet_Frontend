@@ -4,6 +4,7 @@ import { TimesheetGroup } from "./TimesheetGroup";
 import Button from "../../components/Button/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { fetchCalendarHolidays } from "./api";
+import { showStatusToast } from "../../components/toastfy/toast";
 
 const TimesheetTable = ({
   loading,
@@ -20,9 +21,51 @@ const TimesheetTable = ({
   const [holidaysMap, setHolidaysMap] = useState({});
   const [holidayLoading, setHolidayLoading] = useState(false);
   const [expandedWeeks, setExpandedWeeks] = useState({});
+  const [newTimesheetDate, setNewTimesheetDate] = useState(null);
 
   const toggleWeek = (key) =>
     setExpandedWeeks((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  // Default date for a new timesheet: today if it's an allowed working day,
+  // otherwise step back to the most recent allowed day within the current month.
+  // "Allowed" mirrors the date-picker rule: weekends are blocked unless a holiday
+  // overrides with submitTimesheet === true; any holiday with submitTimesheet === false
+  // is blocked. Returns a "YYYY-MM-DD" string, or null when no day qualifies.
+  const getDefaultWorkDate = () => {
+    const toISO = (d) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate(),
+      ).padStart(2, "0")}`;
+    const isAllowed = (d) => {
+      const holiday = holidaysMap[toISO(d)];
+      const dow = d.getDay(); // 0 = Sunday, 6 = Saturday
+      if ((dow === 0 || dow === 6) && (!holiday || holiday.submitTimesheet === false))
+        return false;
+      if (holiday && holiday.submitTimesheet === false) return false;
+      return true;
+    };
+    const today = new Date();
+    const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const d = new Date(today);
+    while (d >= firstOfMonth && !isAllowed(d)) d.setDate(d.getDate() - 1);
+    return d >= firstOfMonth ? toISO(d) : null;
+  };
+
+  // Toggle the new-timesheet panel. When opening, pick a submittable default date;
+  // if none is available in the current month, show a toast and keep it closed.
+  const handleToggleNewTimesheet = () => {
+    if (addingNewTimesheet) {
+      setAddingNewTimesheet(false);
+      return;
+    }
+    const def = getDefaultWorkDate();
+    if (!def) {
+      showStatusToast("No dates available for timesheet entry", "error");
+      return;
+    }
+    setNewTimesheetDate(def);
+    setAddingNewTimesheet(true);
+  };
 
   useEffect(() => {
     setHolidayLoading(true);
@@ -64,7 +107,7 @@ const TimesheetTable = ({
         size="small"
         variant={addingNewTimesheet ? "secondary" : "primary"}
         className={`mb-4 ${holidayLoading ? "opacity-15 cursor-not-allowed" : ""}`}
-        onClick={() => setAddingNewTimesheet((s) => !s) }
+        onClick={handleToggleNewTimesheet}
         disabled={holidayLoading}
       >
         {addingNewTimesheet ? "Cancel Timesheet" : "+ New Timesheet"}
@@ -74,7 +117,7 @@ const TimesheetTable = ({
         <div style={{ marginBottom: "20px" }}>
           <TimesheetGroup
             emptyTimesheet={true}
-            workDate={new Date().toISOString().split("T")[0]}
+            workDate={newTimesheetDate}
             entries={[]}
             status="Pending"
             mapWorkType={mapWorkType}
