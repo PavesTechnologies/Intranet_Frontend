@@ -177,6 +177,7 @@ const TimesheetGroup = ({
   ],
   isCollapsed,
   onToggleCollapse,
+  onApproveDay,
 }) => {
   const collapsible = typeof onToggleCollapse === "function";
   const showBody = !collapsible || !isCollapsed;
@@ -198,6 +199,7 @@ const TimesheetGroup = ({
   );
   const [editDateIndex, setEditDateIndex] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [approvingDay, setApprovingDay] = useState(null); // per-day overturn (re-approve) in flight
   const [openMenuId, setOpenMenuId] = useState(null);
   const [selectionTimesheetId, setSelectionTimesheetId] = useState(null);
   const menuRef = useRef(null);
@@ -979,7 +981,24 @@ const TimesheetGroup = ({
                   ) ? (
                     <div className="flex items-center gap-2 relative overflow-visible">
                                                              {" "}
-                      <CustomStatusBadge label={timesheet.status} size="sm" /> 
+                      <CustomStatusBadge label={timesheet.status} size="sm" />
+                      {typeof onApproveDay === "function" &&
+                        (timesheet.status || "").toUpperCase() === "REJECTED" && (
+                          <button
+                            type="button"
+                            disabled={approvingDay === timesheet.timesheetId}
+                            title="Re-approve this rejected day"
+                            onClick={() => {
+                              setApprovingDay(timesheet.timesheetId);
+                              Promise.resolve(
+                                onApproveDay(timesheet.timesheetId),
+                              ).finally(() => setApprovingDay(null));
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            <CheckCircle size={13} /> Approve
+                          </button>
+                        )} 
                                        {" "}
                       {/* Show approval status tooltip if available */}         
                                {" "}

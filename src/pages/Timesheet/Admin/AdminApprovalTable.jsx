@@ -188,17 +188,43 @@ const AdminApprovalTable = ({
 
   // Flatten each selected employee's actionable weeks into the array the
   // multi-user review endpoint expects: [{ userId, timesheetIds, status, comments }].
+  // UI-only loading flag for overturn (re-approve rejected) actions.
+  const [overturnBusy, setOverturnBusy] = useState(false);
+  // Re-approve (overturn) rejected timesheets directly by id. Reuses the view's
+  // approve endpoint; the backend permits only the reviewer who rejected to overturn.
+  const approveIds = async (userId, ids) => {
+    const list = (ids || []).filter(Boolean);
+    if (list.length === 0) return;
+    setOverturnBusy(true);
+    try {
+      await handleBulkReviewAdmin(userId, list, "APPROVED", "approved");
+      onRefresh?.();
+    } finally {
+      setOverturnBusy(false);
+    }
+  };
+
   const buildBulkPayload = (status, comments) => {
-    const isActionable = (w) => {
-      const s = (w.weeklyStatus || "").toUpperCase().replace(/\s+/g, "_");
-      return s === "SUBMITTED" || s === "PARTIALLY_APPROVED";
-    };
+    const norm = (s) => (s || "").toUpperCase().replace(/\s+/g, "_");
     const rows = [];
     enrichedGroupedData
       .filter((u) => selectedEmployeeIds.includes(u.userId))
       .forEach((u) =>
-        (u.weeklySummary || []).filter(isActionable).forEach((w) => {
-          const ids = (w.timesheets || []).map((t) => t.timesheetId);
+        (u.weeklySummary || []).forEach((w) => {
+          const ws = norm(w.weeklyStatus);
+          let ids;
+          if (status === "APPROVED") {
+            // Approve submitted/partial weeks AND overturn rejected weeks in one pass.
+            if (ws !== "SUBMITTED" && ws !== "PARTIALLY_APPROVED" && ws !== "REJECTED")
+              return;
+            ids = (w.timesheets || [])
+              .filter((t) => norm(t.status) !== "APPROVED")
+              .map((t) => t.timesheetId);
+          } else {
+            // Reject: only actionable weeks; leave already-rejected weeks as-is.
+            if (ws !== "SUBMITTED" && ws !== "PARTIALLY_APPROVED") return;
+            ids = (w.timesheets || []).map((t) => t.timesheetId);
+          }
           if (ids.length)
             rows.push({ userId: u.userId, timesheetIds: ids, status, comments });
         }),
@@ -584,6 +610,28 @@ const AdminApprovalTable = ({
               )}
             </div>
           )}
+          {week.weeklyStatus?.toUpperCase() === "REJECTED" && (
+            <div className="px-1 pb-3 flex gap-3 justify-end items-center">
+              <Button
+                variant="success"
+                size="medium"
+                disabled={overturnBusy}
+                title="Re-approve this rejected week"
+                onClick={() =>
+                  approveIds(
+                    user.userId,
+                    (week.timesheets || [])
+                      .filter(
+                        (t) => (t.status || "").toUpperCase() === "REJECTED",
+                      )
+                      .map((t) => t.timesheetId),
+                  )
+                }
+              >
+                Approve (Overturn)
+              </Button>
+            </div>
+          )}
           <TimesheetGroup
             weekGroup={{
               weekStart: week.startDate,
@@ -609,6 +657,7 @@ const AdminApprovalTable = ({
             onToggleCollapse={() =>
               toggleWeekCollapse(`${user.userId}-${week.weekId}`)
             }
+            onApproveDay={(id) => approveIds(user.userId, [id])}
           />
 
           <RejectWithSelectionModal
@@ -859,6 +908,7 @@ const AdminApprovalTable = ({
       ) : (
         <>
           <div className="flex items-center justify-between gap-3 mb-4">
+            {enrichedGroupedData.length > 0 ? (
             <label className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-gray-600">
               <input
                 type="checkbox"
@@ -871,6 +921,9 @@ const AdminApprovalTable = ({
               />
               Select all
             </label>
+            ) : (
+              <div />
+            )}
             <div className="flex justify-end gap-3">
             <Button variant="primary" size="medium" onClick={exportCSV}>
               Export CSV
