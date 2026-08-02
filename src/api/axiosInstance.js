@@ -138,6 +138,12 @@ api.interceptors.response.use(
       isPublicUrl(originalRequest?.url) ||
       alreadyRetried
     ) {
+      // Replace the raw "Request failed with status code 401" surfaced to the UI
+      // with a friendly session message (but not for public auth endpoints such
+      // as login, where a 401 means bad credentials, not an expired session).
+      if (is401 && !isPublicUrl(originalRequest?.url)) {
+        error.message = "Session expired. Please login again.";
+      }
       return Promise.reject(error);
     }
 
@@ -208,6 +214,12 @@ api.interceptors.response.use(
         clearTokens();
 
         window.location.href = "/login";
+      }
+
+      // Friendly message only for a 401 (session could not be renewed).
+      // Other refresh failures (network/5xx) keep their original message.
+      if (refreshError.response?.status === 401) {
+        refreshError.message = "Session expired. Please login again.";
       }
 
       return Promise.reject(refreshError);
