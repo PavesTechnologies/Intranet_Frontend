@@ -11,7 +11,7 @@ import FilterListbox from "../../../components/filter/FilterListbox";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import CancellationModal from "../../leave_management/models/CancellationModal";
 import RejectWithSelectionModal from "../RejectWithSelectionModal";
-import { ChevronDown, ChevronUp, MoreVertical, X } from "lucide-react";
+import { ChevronDown, ChevronUp, MoreVertical, X, CheckCircle2 } from "lucide-react";
 
 const ReportingManagerApprovalTable = ({
   loading,
@@ -584,11 +584,11 @@ const ReportingManagerApprovalTable = ({
         return (
         <div
           key={week.weekId}
-          className="bg-white border rounded-xl shadow-sm mb-6 overflow-hidden"
+          className="mb-5"
         >
           {/* Manager actions */}
           {isActionable && pendingTimesheets.length > 0 && (
-            <div className="p-4 border-t flex gap-3 justify-end items-center">
+            <div className="px-1 pb-3 flex gap-3 justify-end items-center">
               {weekLevelLoading?.[`${user.userId}-${week.weekId}`] ? (
                 <LoadingSpinner text="Processing..." />
               ) : (
@@ -746,8 +746,14 @@ const ReportingManagerApprovalTable = ({
           </div>
 
           {enrichedGroupedData.length === 0 ? (
-            <div className="text-center text-gray-500 py-10 text-lg font-medium">
-              No Approvals
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-50 text-green-500">
+                <CheckCircle2 size={30} />
+              </div>
+              <p className="text-lg font-semibold text-gray-700">All caught up</p>
+              <p className="text-sm text-gray-400">
+                No timesheets are waiting for your approval.
+              </p>
             </div>
           ) : (
             enrichedGroupedData.map((user) => {
@@ -762,7 +768,7 @@ const ReportingManagerApprovalTable = ({
               return (
                 <div
                   key={user.userId}
-                  className="bg-white rounded-xl shadow-md border p-4"
+                  className="bg-white rounded-2xl shadow-sm border border-gray-100 border-l-4 border-l-[#263383] p-4 transition-shadow hover:shadow-md"
                 >
                   {/* ✅ Collapsible user header */}
                   <div className="flex items-center justify-between">
@@ -777,14 +783,25 @@ const ReportingManagerApprovalTable = ({
                       ) : (
                         <ChevronDown size={20} className="text-gray-500 shrink-0" />
                       )}
-                      <h2 className="text-xl font-bold text-gray-800 truncate">
-                        {user.userName} (ID: {user.userId})
+                      <span className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#263383] to-[#4f46e5] text-white text-sm font-bold">
+                        {(user.userName || "")
+                          .trim()
+                          .split(/\s+/)
+                          .slice(0, 2)
+                          .map((w) => w.charAt(0).toUpperCase())
+                          .join("") || "U"}
+                      </span>
+                      <h2 className="text-lg font-bold text-gray-800 truncate">
+                        {user.userName}{" "}
+                        <span className="text-sm font-medium text-gray-400">
+                          (ID: {user.userId})
+                        </span>
                       </h2>
-                      <span className="text-sm text-gray-500 shrink-0">
-                        • {totalWeeks} {totalWeeks === 1 ? "week" : "weeks"}
+                      <span className="hidden md:inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 shrink-0">
+                        {totalWeeks} {totalWeeks === 1 ? "week" : "weeks"}
                       </span>
                       {pendingWeeks > 0 && (
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300 shrink-0">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                           {pendingWeeks} pending
                         </span>
                       )}
@@ -851,7 +868,7 @@ const ReportingManagerApprovalTable = ({
 
                   {isExpanded && (
                     <>
-                      <hr className="my-3 border-gray-200" />
+                      <hr className="my-4 border-gray-100" />
                       {renderUserWeeks(user)}
                     </>
                   )}
