@@ -31,6 +31,10 @@ const ReportingManagerApprovalTable = ({
 
   // ✅ Per-user expand/collapse state — collapsed by default
   const [expandedUsers, setExpandedUsers] = useState({});
+  // UI-only: track which weeks are collapsed inside an employee (default expanded).
+  const [collapsedWeeks, setCollapsedWeeks] = useState({});
+  const toggleWeekCollapse = (key) =>
+    setCollapsedWeeks((prev) => ({ ...prev, [key]: !prev[key] }));
   const toggleUser = (userId) =>
     setExpandedUsers((prev) => ({ ...prev, [userId]: !prev[userId] }));
 
@@ -672,6 +676,10 @@ const ReportingManagerApprovalTable = ({
             refreshData={onRefresh}
             mapWorkType={(type) => type}
             projectInfo={projectInfo}
+            isCollapsed={!!collapsedWeeks[`${user.userId}-${week.weekId}`]}
+            onToggleCollapse={() =>
+              toggleWeekCollapse(`${user.userId}-${week.weekId}`)
+            }
           />
 
           <RejectWithSelectionModal
@@ -764,6 +772,13 @@ const ReportingManagerApprovalTable = ({
                   const s = w.weeklyStatus?.toUpperCase();
                   return s === "SUBMITTED" || s === "PARTIALLY APPROVED";
                 }).length || 0;
+              const pendingHours =
+                user.weeklySummary?.reduce((sum, w) => {
+                  const s = w.weeklyStatus?.toUpperCase();
+                  const isPending =
+                    s === "SUBMITTED" || s === "PARTIALLY APPROVED";
+                  return isPending ? sum + (Number(w.totalHours) || 0) : sum;
+                }, 0) || 0;
 
               return (
                 <div
@@ -803,6 +818,11 @@ const ReportingManagerApprovalTable = ({
                       {pendingWeeks > 0 && (
                         <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                           {pendingWeeks} pending
+                        </span>
+                      )}
+                      {pendingWeeks > 0 && pendingHours > 0 && (
+                        <span className="hidden lg:inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
+                          {pendingHours.toFixed(1)} hrs
                         </span>
                       )}
                     </button>
@@ -867,10 +887,10 @@ const ReportingManagerApprovalTable = ({
                   />
 
                   {isExpanded && (
-                    <>
+                    <div className="ts-reveal">
                       <hr className="my-4 border-gray-100" />
                       {renderUserWeeks(user)}
-                    </>
+                    </div>
                   )}
                 </div>
               );
