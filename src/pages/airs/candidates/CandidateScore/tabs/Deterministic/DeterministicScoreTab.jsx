@@ -8,7 +8,6 @@ import SkillsTable from "./components/SkillsTable";
 import MissingSkillsList from "./components/MissingSkillsList";
 import AdditionalSkillsList from "./components/AdditionalSkillsList";
 import PaginatedSkillsSection from "./components/PaginatedSkillsSection";
-import HierarchyMatchesTable from "./components/HierarchyMatchesTable";
 import ValidationSection from "./components/ValidationSection";
 import ScoreCalculation from "./components/ScoreCalculation";
 import ConfigurationCard from "./components/ConfigurationCard";
@@ -78,8 +77,6 @@ export default function DeterministicScoreTab({ candidate }) {
           )}
         </div>
       </div>
-
-      <HierarchyMatchesTable items={breakdown.hierarchyMatches} />
 
       <ValidationSection
         experienceValidation={breakdown.experienceValidation}

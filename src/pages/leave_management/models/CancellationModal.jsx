@@ -13,10 +13,10 @@ export default function CancellationModal({
   isLoading,
 }) {
   const predefinedReasons = [
-    "Personal emergency",
-    "Change of plan",
     "Workload increased",
     "Incorrect request submitted",
+    "Entered wrong dates",
+    "Enter Valid description",
     "Other",
   ];
 

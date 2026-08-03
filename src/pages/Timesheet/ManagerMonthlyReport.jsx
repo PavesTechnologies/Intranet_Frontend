@@ -190,6 +190,10 @@ const ManagerMonthlyReport = () => {
     { name: "December", value: 12 },
   ];
   const currentYear = new Date().getFullYear();
+  // Cap the month list at the real current month (1-indexed) taken from today's date,
+  // NOT from the applied `appliedMonth` selection — otherwise picking an earlier month
+  // would shrink the list the next time the filter is opened.
+  const currentMonth = new Date().getMonth() + 1;
   const yearOptions = [currentYear, currentYear - 1];
 
   const totalBillable = apiData?.billableHours ?? 0;
@@ -197,7 +201,7 @@ const ManagerMonthlyReport = () => {
 
   const filteredMonths =
     selectedYear === currentYear
-      ? monthOptions.filter((m) => m.value <= appliedMonth)
+      ? monthOptions.filter((m) => m.value < currentMonth)
       : monthOptions;
 
   const underutilized = useMemo(() => {
