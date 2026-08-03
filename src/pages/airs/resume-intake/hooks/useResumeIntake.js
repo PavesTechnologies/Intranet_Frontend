@@ -1,15 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { getAllResumes, activeCampaigns } from "../../service/resumeIntake";
 import { extractErrorMessage } from "../intake/utils/intakeUtils.jsx";
 import { RESUME_LIST_PAGE_SIZE } from "../constants/resumeIntakeConstants";
 
+const DEFAULT_SORT_VALUE = "created_at:desc";
+
 export default function useResumeIntake() {
-  const [campaignFilter, setCampaignFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("");
-  const [sortValue, setSortValue] = useState("created_at:desc");
-  const [currentPage, setCurrentPage] = useState(1);
+  // Kept in the URL (not plain useState) so navigating away to a candidate
+  // scorecard and back restores the exact filters/page you had, instead of
+  // resetting to defaults on remount — same pattern as the tab in
+  // ResumeIntakePage.
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const campaignFilter = searchParams.get("campaign") || "";
+  const statusFilter = searchParams.get("status") || "";
+  const sourceFilter = searchParams.get("source") || "";
+  const sortValue = searchParams.get("sort") || DEFAULT_SORT_VALUE;
+  const currentPage = Number(searchParams.get("page")) || 1;
   const [refreshToken, setRefreshToken] = useState(0);
 
   const [campaigns, setCampaigns] = useState([]);
@@ -25,19 +34,39 @@ export default function useResumeIntake() {
       .catch(() => setCampaigns([]));
   }, []);
 
-  // Reset the page inline, in the same handler as the filter change, instead
-  // of via a separate effect reacting to the filter — a separate effect would
-  // fire the fetch-resumes effect once with the *old* page (still mid-flight)
-  // and again once the page resets, causing a duplicate request per filter
-  // change and a visible flash of mismatched data.
-  const changeFilter = (setter) => (value) => {
-    setter(value);
-    setCurrentPage(1);
+  // Reset the page inline, in the same searchParams update as the filter
+  // change, instead of via a separate effect reacting to the filter — a
+  // separate effect would fire the fetch-resumes effect once with the *old*
+  // page (still mid-flight) and again once the page resets, causing a
+  // duplicate request per filter change and a visible flash of mismatched
+  // data.
+  const changeFilter = (key) => (value) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        next.set("page", "1");
+        return next;
+      },
+      { replace: true }
+    );
   };
-  const handleCampaignFilterChange = changeFilter(setCampaignFilter);
-  const handleStatusFilterChange = changeFilter(setStatusFilter);
-  const handleSourceFilterChange = changeFilter(setSourceFilter);
-  const handleSortValueChange = changeFilter(setSortValue);
+  const handleCampaignFilterChange = changeFilter("campaign");
+  const handleStatusFilterChange = changeFilter("status");
+  const handleSourceFilterChange = changeFilter("source");
+  const handleSortValueChange = changeFilter("sort");
+
+  const handleCurrentPageChange = (page) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("page", String(page));
+        return next;
+      },
+      { replace: true }
+    );
+  };
 
   const [sortBy, sortDir] = sortValue.split(":");
 
@@ -100,7 +129,7 @@ export default function useResumeIntake() {
     sortValue,
     setSortValue: handleSortValueChange,
     currentPage,
-    setCurrentPage,
+    setCurrentPage: handleCurrentPageChange,
     totalPages,
     refreshResumes: () => setRefreshToken((t) => t + 1),
   };

@@ -131,3 +131,90 @@ export const deleteCandidate = async (candidateId) => {
         throw error;
     }
 };
+
+export const getBulkUploadJobs = async (params) => {
+    try {
+        const response = await api.get(`${BASE_URL}/bulk-uploads`, {
+            params,
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching bulk upload jobs:", error);
+        throw error;
+    }
+};
+
+export const getBulkUploadProgress = async (bulkUploadJobId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/bulk-uploads/${bulkUploadJobId}/progress`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching bulk upload progress:", error);
+        throw error;
+    }
+};
+
+export const getBulkUploadFileLog = async (bulkUploadJobId, params) => {
+    try {
+        const response = await api.get(`${BASE_URL}/bulk-uploads/${bulkUploadJobId}/file-log`, {
+            params,
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching bulk upload file log:", error);
+        throw error;
+    }
+};
+
+export const getBulkUploadFiles = async (bulkUploadJobId, params) => {
+    try {
+        const response = await api.get(`${BASE_URL}/bulk-uploads/${bulkUploadJobId}/files`, {
+            params,
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching bulk upload files:", error);
+        throw error;
+    }
+};
+
+export const getBulkUploadFileDetail = async (bulkUploadJobId, fileId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/bulk-uploads/${bulkUploadJobId}/files/${fileId}`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching bulk upload file detail:", error);
+        throw error;
+    }
+};
+
+export const getBulkUploadFileTimeline = async (bulkUploadJobId, fileId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/bulk-uploads/${bulkUploadJobId}/files/${fileId}/timeline`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching bulk upload file timeline:", error);
+        throw error;
+    }
+};
