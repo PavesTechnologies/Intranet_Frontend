@@ -1,11 +1,12 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, ArrowRight } from "lucide-react";
+import { Loader2, ArrowRight, Cpu } from "lucide-react";
 import GenericTable from "../../../../components/Table/table";
 import LoadingSpinner from "../../../../components/LoadingSpinner.jsx";
 import Button from "../../../../components/Button/Button";
 import { renderParseStatusBadge, renderSourceBadge, formatResumeDate } from "../utils/resumeIntakeUtils.jsx";
 import InProcessingStageCell from "./InProcessingStageCell";
+import { STAGE_LABELS } from "../intake/constants/intakeConstants";
 
 export default function InProcessingList({ files, isLoading }) {
   const navigate = useNavigate();
@@ -27,8 +28,8 @@ export default function InProcessingList({ files, isLoading }) {
     );
   }
 
-  const headers = ["Candidate", "Upload Source", "Format & Date", "Status", "Actions"];
-  const columns = ["candidate", "source", "fileDetails", "status", "actions"];
+  const headers = ["Candidate", "Upload Source", "Format & Date", "Current Stage", "Status", "Actions"];
+  const columns = ["candidate", "source", "fileDetails", "stage", "status", "actions"];
 
   const handleOpenProcessStep = (f) => {
     navigate("/airs/resume-intake/new", { state: { existingResume: f } });
@@ -68,10 +69,30 @@ export default function InProcessingList({ files, isLoading }) {
           <span className="text-[10px] text-slate-400">{formatResumeDate(f.created_at)}</span>
         </div>
       ),
+      stage: (() => {
+        const rawStage = f.pipeline_stage || f.current_stage || null;
+        const stageLabel = rawStage ? (STAGE_LABELS[rawStage] || rawStage) : null;
+        if (f.parse_status === "PENDING") {
+          return <span className="text-[11px] text-slate-400 italic">Waiting in queue…</span>;
+        }
+        if (f.parse_status === "PARSING" && stageLabel) {
+          return (
+            <div className="flex items-center gap-1.5">
+              <Cpu size={13} className="text-blue-500 animate-pulse shrink-0" />
+              <span className="text-[11.5px] font-semibold text-blue-700">{stageLabel}</span>
+            </div>
+          );
+        }
+        return <span className="text-[11px] text-slate-400">—</span>;
+      })(),
       status: (
         <div className="flex flex-col items-center gap-1">
           {renderParseStatusBadge(f.parse_status)}
-          <InProcessingStageCell resumeId={resumeId} parseStatus={f.parse_status} />
+          <InProcessingStageCell
+            resumeId={resumeId}
+            parseStatus={f.parse_status}
+            initialStage={f.pipeline_stage || f.current_stage}
+          />
         </div>
       ),
       actions: (
