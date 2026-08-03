@@ -1,9 +1,8 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
 import { Mail } from "lucide-react";
 import { ViewIcon } from "../../../components/icons/ActionIcons";
-import Button from "../../../components/Button/Button";
 import { Fonts } from "../../../components/Fonts/Fonts";
+import EmployeeViewModal from "./EmployeeViewModal";
 const colors = [
   "bg-teal-400",
   "bg-orange-500",
@@ -33,8 +32,8 @@ const getInitials = (name) => {
   ).toUpperCase();
 };
 const EmployeeCard = ({ employee, index }) => {
-  const navigate = useNavigate();
   const bgColor = getSafeColor(index);
+  const [isViewOpen, setIsViewOpen] = useState(false);
   return (
     <>
       <div
@@ -46,13 +45,11 @@ const EmployeeCard = ({ employee, index }) => {
           active:scale-[0.98] active:shadow-lg
         "
       >
-        {/* View Icon */}
+        {/* View Icon — opens a read-only Personal/Job details modal */}
         <button
           onClick={(e) => {
             e.stopPropagation();
-            if (employee.employee_uuid) {
-              navigate(`/employee-onboarding/employeeProfile/${employee.employee_uuid}`);
-            }
+            setIsViewOpen(true);
           }}
           className="
             absolute top-3 right-3
@@ -129,30 +126,21 @@ const EmployeeCard = ({ employee, index }) => {
         </div>
         {/* Actions */}
         <div className="mt-5 flex items-center gap-2 w-full">
-          <Button
-            onClick={() => {
-              if (employee.employee_uuid) {
-                navigate(`/employee-onboarding/employeeProfile/${employee.employee_uuid}`);
-              }
-            }}
-            variant="primary"
-            size="medium"
-            className="flex-1 py-2"
-          >
-            View Profile
-          </Button>
           <a
             href={`mailto:${employee.email}`}
             className="
-              shrink-0 p-2.5
+              flex-1 flex items-center justify-center gap-2 py-2.5
               bg-indigo-50 hover:bg-indigo-100
-              rounded-lg transition
+              rounded-lg transition text-sm font-medium text-indigo-800
             "
           >
-            <Mail className="h-4 w-4 text-indigo-800" />
+            <Mail className="h-4 w-4" />
+            Email
           </a>
         </div>
       </div>
+
+      <EmployeeViewModal open={isViewOpen} employee={employee} onClose={() => setIsViewOpen(false)} />
     </>
   );
 };

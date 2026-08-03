@@ -623,8 +623,6 @@ export default function EmployeeProfileView() {
   const [expandedSkills, setExpandedSkills] = useState(new Set());
   const [selectedSkill, setSelectedSkill] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, resourceSkillId: null, isDeleting: false });
-  const [isDeleteEmployeeModalOpen, setIsDeleteEmployeeModalOpen] = useState(false);
-  const [isDeletingEmployee, setIsDeletingEmployee] = useState(false);
   const navigate = useNavigate();
 
   const toggleExpand = (skillId) => {
@@ -1093,30 +1091,6 @@ export default function EmployeeProfileView() {
     }
   };
 
-  /* ── DELETE EMPLOYEE ── */
-  const handleDeleteEmployee = async () => {
-    setIsDeletingEmployee(true);
-    try {
-      await api.delete(
-        `${BASE_URL}/permanent-employee/core-employee-details/${employee_uuid}`,
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-      );
-      showStatusToast("Employee deleted successfully", "success");
-      setIsDeleteEmployeeModalOpen(false);
-      navigate(-1);
-    } catch (error) {
-      console.error("Delete employee failed:", error);
-      showStatusToast(
-        error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        "Failed to delete employee",
-        "error"
-      );
-    } finally {
-      setIsDeletingEmployee(false);
-    }
-  };
-
   const filteredMySkillRequests = useMemo(() => {
     const search = mySkillRequestsSearch.trim().toLowerCase();
     const status = mySkillRequestsStatus;
@@ -1385,31 +1359,6 @@ export default function EmployeeProfileView() {
                       </span>
                     )}
                 </div>
-              </div>
-
-              {/* Delete Employee Button */}
-              <div style={{ position: "absolute", top: 12, right: 16, zIndex: 10 }}>
-                <button
-                  onClick={() => setIsDeleteEmployeeModalOpen(true)}
-                  title="Delete Employee"
-                  aria-label="Delete Employee"
-                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-110"
-                  style={{
-                    background: "rgba(239,68,68,0.08)",
-                    border: "1px solid rgba(239,68,68,0.18)",
-                    color: "#ef4444",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(239,68,68,0.15)";
-                    e.currentTarget.style.borderColor = "rgba(239,68,68,0.35)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(239,68,68,0.08)";
-                    e.currentTarget.style.borderColor = "rgba(239,68,68,0.18)";
-                  }}
-                >
-                  <Trash2 size={15} />
-                </button>
               </div>
             </div>
           </div>
@@ -1904,19 +1853,6 @@ export default function EmployeeProfileView() {
         isLoading={deleteConfirm.isDeleting}
         onConfirm={confirmDeleteSkill}
         onCancel={() => setDeleteConfirm({ isOpen: false, resourceSkillId: null, isDeleting: false })}
-      />
-      <ConfirmationModal
-        isOpen={isDeleteEmployeeModalOpen}
-        title="Delete Employee"
-        message="Are you sure you want to permanently delete this employee? This action cannot be undone and all associated data will be removed."
-        confirmText="Delete"
-        cancelText="Cancel"
-        variant="danger"
-        isLoading={isDeletingEmployee}
-        onConfirm={handleDeleteEmployee}
-        onCancel={() => {
-          if (!isDeletingEmployee) setIsDeleteEmployeeModalOpen(false);
-        }}
       />
     </div>
   );
