@@ -29,9 +29,6 @@ export const approvalService = {
       { comment },
       { headers: getAuthHeader() },
     );
-    {
-      startJob(response.data.data.jobId);
-    }
     return response.data;
   },
 
