@@ -11,8 +11,18 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button/Button";
+// import CountriesList from "../../../components/CountriesList";
+import FilterListbox from "../../../components/filter/FilterListbox";
+import usePromptTemplateLookup from "../prompt-templates/hooks/usePromptTemplateLookup";
 
-const JURISDICTIONS = ["USA", "EU", "India", "UK", "Global"];
+// const JURISDICTIONS = ["USA", "EU", "India", "UK", "Global"];
+
+const JURISDICTIONS = [
+  { key: "GLOBAL", value: "GLOBAL" },
+  { key: "EU", value: "EUROPE" },
+  { key: "US", value: "US" },
+  { key: "IN", value: "INDIA" },
+];
 
 const FormField = ({ label, required, error, className = "", children }) => (
   <div className={className}>
@@ -39,6 +49,9 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
   const [educationField, setEducationField] = useState("");
   const [rawText, setRawText] = useState("");
   const [originalRawText, setOriginalRawText] = useState("");
+  const [promptTemplateId, setPromptTemplateId] = useState("");
+
+  const jdParsePromptLookup = usePromptTemplateLookup("jd-parse");
 
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
@@ -100,6 +113,7 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
             const loadedRawText = data.rawText || data.raw_text || "";
             setRawText(loadedRawText);
             setOriginalRawText(loadedRawText);
+            setPromptTemplateId(data.prompt_template_id || "");
             const resolvedType =
               data.source_format === "PDF" || data.source_format === "DOCX" ? "file" : "text";
             setJdInputType(resolvedType);
@@ -141,11 +155,17 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
   };
 
   const handleFileSelected = (file) => {
-    const validExtensions = ["pdf", "docx"];
+    const validExtensions = ["pdf", "docx", "txt", "jpeg", "jpg"];
     const ext = file.name.split(".").pop().toLowerCase();
 
     if (!validExtensions.includes(ext)) {
-      toast.error("Invalid file format. Please upload a PDF or DOCX file.");
+      toast.error("Invalid file format. Allowed formats: DOCX, TXT, PDF, JPEG.");
+      return;
+    }
+
+    const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3MB in bytes
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("File size exceeds the 3MB limit. Please upload a smaller file.");
       return;
     }
 
@@ -173,6 +193,7 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
 
     if (!title.trim()) newErrors.title = "Job title is required.";
     if (!jurisdiction) newErrors.jurisdiction = "Jurisdiction is required.";
+    if (!promptTemplateId) newErrors.promptTemplateId = "Please select a JD Parsing Prompt.";
     if (minExperienceYears === "") newErrors.minExperienceYears = "Minimum experience is required.";
     if (maxExperienceYears === "") newErrors.maxExperienceYears = "Maximum experience is required.";
     if (noticePeriod === "") newErrors.noticePeriod = "Notice period is required.";
@@ -200,7 +221,7 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
       newErrors.rawText = "Please enter the job description text.";
     }
     if (jdInputType === "file" && !uploadedFile && !isEditMode) {
-      newErrors.uploadedFile = "Please upload a job description file (PDF or DOCX).";
+      newErrors.uploadedFile = "Please upload a job description file (DOCX, TXT, PDF, JPEG).";
     }
 
     setErrors(newErrors);
@@ -218,6 +239,7 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
         degree: educationDegree || undefined,
         field: educationField || undefined,
       },
+      prompt_template_id: promptTemplateId,
     };
 
     if (jdInputType === "text") {
@@ -239,6 +261,7 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
     notice_period: noticePeriod !== "" ? Number(noticePeriod) : undefined,
     education_degree: educationDegree || undefined,
     education_field: educationField || undefined,
+    prompt_template_id: promptTemplateId,
   });
 
   const handleSubmit = async (e) => {
@@ -318,9 +341,20 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
           >
             <option value="">Select region</option>
             {JURISDICTIONS.map((j) => (
-              <option key={j} value={j}>{j}</option>
+              <option key={j.key} value={j.value}>{j.key}</option>
             ))}
           </select>
+          {/* <CountriesList
+            value={jurisdiction}
+            onChange={(value) => {
+              setJurisdiction(value);
+              clearError("jurisdiction");
+            }}
+            placeholder="Select Region"
+            // label="Region (Jurisdiction)"
+            required
+            error={errors.jurisdiction}
+          /> */}
         </FormField>
 
         <FormField label="Notice Period (Days)" required error={errors.noticePeriod}>
@@ -394,6 +428,21 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
             }}
             className={`w-full px-3 py-2 border rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${errors.educationField ? "border-red-500 ring-1 ring-red-500" : "border-slate-200"
               }`}
+          />
+        </FormField>
+
+        <FormField label="JD Parsing Prompt" required error={errors.promptTemplateId} className="sm:col-span-2">
+          <FilterListbox
+            options={[
+              { value: "", label: jdParsePromptLookup.isLoading ? "Loading prompt templates..." : "Select JD Parsing Prompt" },
+              ...jdParsePromptLookup.options,
+            ]}
+            value={promptTemplateId}
+            onChange={(value) => {
+              setPromptTemplateId(value);
+              clearError("promptTemplateId");
+            }}
+            disabled={jdParsePromptLookup.isLoading}
           />
         </FormField>
       </div>
@@ -541,14 +590,14 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
                         <Upload className="h-5 w-5" />
                       </div>
                       <p className="text-xs font-bold text-slate-800">Drag & drop your file here</p>
-                      <p className="text-[11px] text-slate-400 mt-1">Supports PDF, DOCX formats up to 10MB</p>
+                      <p className="text-[11px] text-slate-400 mt-1">Supports DOCX, TXT, PDF, JPEG formats up to 3MB</p>
                       <div className="relative mt-3">
                         <input
                           type="file"
                           id="jd-file-upload-input"
                           className="hidden"
                           onChange={handleFileInput}
-                          accept=".pdf,.docx"
+                          accept=".docx,.txt,.pdf,.jpeg,.jpg"
                         />
                         <label
                           htmlFor="jd-file-upload-input"

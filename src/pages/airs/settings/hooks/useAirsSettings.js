@@ -17,15 +17,10 @@ export default function useAirsSettings() {
   const [settings, setSettings] = useState(readStored);
   const [savedSettings, setSavedSettings] = useState(readStored);
 
-  const setWeight = (key, value) => {
-    setSettings((s) => ({ ...s, weights: { ...s.weights, [key]: value } }));
-  };
-
   const setField = (key, value) => {
     setSettings((s) => ({ ...s, [key]: value }));
   };
 
-  const weightTotal = settings.weights.mandatorySkills + settings.weights.semantic + settings.weights.experience;
   const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
   const save = () => {
@@ -43,5 +38,5 @@ export default function useAirsSettings() {
     toast.info("Settings reset to defaults.");
   };
 
-  return { settings, setWeight, setField, weightTotal, isDirty, save, reset };
+  return { settings, setField, isDirty, save, reset };
 }

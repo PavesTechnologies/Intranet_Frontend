@@ -4,7 +4,7 @@ import useTalentPool from "./hooks/useTalentPool";
 import TalentPoolFilters from "./components/TalentPoolFilters";
 import TalentPoolCard from "./components/TalentPoolCard";
 import { MOCK_CANDIDATES } from "../candidates/mock/candidateMockData";
-import CandidateDetailDrawer from "../candidates/components/detail/CandidateDetailDrawer";
+import CandidateDetailModal from "../candidates/components/detail/CandidateDetailModal";
 
 export default function TalentPoolPage() {
   const { search, setSearch, tags, toggleTag, results } = useTalentPool();
@@ -41,7 +41,7 @@ export default function TalentPoolPage() {
         </div>
       )}
 
-      <CandidateDetailDrawer candidate={viewCandidate} onClose={() => setViewCandidateId(null)} onAddComment={addComment} />
+      <CandidateDetailModal candidate={viewCandidate} onClose={() => setViewCandidateId(null)} onAddComment={addComment} />
     </div>
   );
 }

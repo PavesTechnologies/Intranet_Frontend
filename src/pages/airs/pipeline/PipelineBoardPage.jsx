@@ -1,23 +1,13 @@
-import React, { useState } from "react";
+import React from "react";
 import { RefreshCw } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button/Button";
 import usePipelineBoard from "./hooks/usePipelineBoard";
 import PipelineColumn from "./components/PipelineColumn";
-import { MOCK_CANDIDATES } from "../candidates/mock/candidateMockData";
-import CandidateDetailDrawer from "../candidates/components/detail/CandidateDetailDrawer";
 
 export default function PipelineBoardPage() {
+  const navigate = useNavigate();
   const { columns, startDrag, dropOnStage, refresh } = usePipelineBoard();
-  const [candidatePool, setCandidatePool] = useState(MOCK_CANDIDATES);
-  const [viewCandidateId, setViewCandidateId] = useState(null);
-
-  const viewCandidate = candidatePool.find((c) => c.id === viewCandidateId) || null;
-
-  const addComment = (candidateId, text) => {
-    setCandidatePool((prev) =>
-      prev.map((c) => (c.id === candidateId ? { ...c, comments: [...c.comments, { author: "You", text }] } : c))
-    );
-  };
 
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
@@ -39,12 +29,10 @@ export default function PipelineBoardPage() {
             cards={cards}
             onDragStart={startDrag}
             onDrop={() => dropOnStage(stage)}
-            onCardClick={(card) => setViewCandidateId(card.id)}
+            onCardClick={(card) => navigate(`/airs/pipeline/candidates/${card.id}`)}
           />
         ))}
       </div>
-
-      <CandidateDetailDrawer candidate={viewCandidate} onClose={() => setViewCandidateId(null)} onAddComment={addComment} />
     </div>
   );
 }

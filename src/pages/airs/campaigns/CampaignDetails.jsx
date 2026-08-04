@@ -1,0 +1,1331 @@
+import React, { useState, useEffect, useCallback } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { toast } from "react-toastify";
+import {
+  ArrowLeft, Users, Activity, AlertTriangle, Lock, Target,
+  UserCog, FileText, ArrowRight, Filter, ChevronDown, Clock,
+  ExternalLink, ListChecks,
+  RotateCcw, Inbox, AlertOctagon, Hourglass, PieChart,
+  Send, Flag, SkipForward, Lightbulb, FileUp
+} from "lucide-react";
+import Button from "../../../components/Button/Button";
+import FilterListbox from "../../../components/filter/FilterListbox";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import Pagination from "../../../components/Pagination/pagination";
+import CandidateTable from "../candidates/components/CandidateTable";
+import { mapCampaignCandidateList } from "../candidates/utils/mapCampaignCandidateList";
+import { paginate } from "../candidates/utils/candidateUtils.jsx";
+import { CANDIDATE_PAGE_SIZE } from "../candidates/constants/candidateConstants";
+import EditCampaignModal from "./components/EditCampaignModal";
+import ReopenCampaignModal from "./components/ReopenCampaignModal";
+import useCampaignPermissions from "./hooks/useCampaignPermissions";
+import {
+  getCampaignDetails, getPipelineSummary, getCampaignTimeline,
+  getCampaignCandidates, getProcessingStatus, getDeadLetterQueue,
+  getProcessingQueue, replayDeadLetterTasks,
+  getStalledCandidates, reprocessStalledCandidate, escalateStalledCandidate,
+  overrideCandidateStage, flagCandidateForReview,
+  getRejectionAnalytics,
+  getBulkUploadsForCampaign,
+  formatApiError,
+} from "./services/campaignservice";
+
+// Colour per pipeline stage (used for the funnel bars)
+const STAGE_COLORS = {
+  UPLOADED: "#6366F1", SCREENING: "#3B82F6", SHORTLISTED: "#0EA5E9",
+  HM_REVIEW: "#14B8A6", INTERVIEW: "#10B981", SELECTED: "#22C55E",
+  HOLD: "#94A3B8", REJECTED: "#F43F5E", FRAUD_REVIEW: "#F59E0B",
+};
+const stageLabel = (s) =>
+  s.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+
+// service returns the raw APIResponse ({ success, message, data }); pull out data
+const unwrap = (res) => (res && res.data !== undefined ? res.data : res);
+const asPct = (n) => (n == null ? "—" : `${Math.round(n)}%`);
+const fmtDate = (d) => (d ? new Date(d).toLocaleString() : "—");
+
+export default function CampaignDetails() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { canManageCampaigns, canViewPipeline, canViewTimeline } = useCampaignPermissions();
+
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("details");
+  const [editOpen, setEditOpen] = useState(false);
+  // lifecycle actions — only one of these is ever open at a time
+  const [lifecycleModal, setLifecycleModal] = useState(null); // null | "pause" | "resume" | "close" | "reopen"
+  // set when a funnel stage bar is clicked — pre-filters the Candidates tab
+  const [candidateStageFilter, setCandidateStageFilter] = useState("");
+
+  // — load full campaign profile
+  const loadDetail = useCallback(async () => {
+    try {
+      const res = await getCampaignDetails(id);
+      setDetail(unwrap(res));
+    } catch {
+      toast.error("Failed to load campaign details.");
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => { loadDetail(); }, [loadDetail]);
+
+  if (loading) {
+    return (<div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner text="Loading campaign..." />
+      </div>
+    );
+  }
+  if (!detail) {
+    return (<div className="p-8 min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
+        <AlertTriangle className="h-12 w-12 text-rose-500 mb-4" />
+        <h2 className="text-lg font-bold text-slate-800">Campaign Not Found</h2>
+        <Button variant="primary" size="small" className="mt-4" onClick={() => navigate("/airs/campaigns")}>
+          Back to Campaigns
+        </Button>
+      </div>
+    );
+  }
+
+  const info = detail.campaign_info || {};
+  const jd = detail.jd_configuration || {};
+  const scoring = detail.scoring_configuration;      // null for HIRING_MANAGER
+  const limits = detail.pipeline_limits || {};
+  const hm = detail.hiring_manager;                  // null for HIRING_MANAGER
+
+  const status = (info.status || "").toUpperCase();
+  const isClosed = status === "CLOSED";
+  const isActive = status === "ACTIVE";
+  const canEdit = canManageCampaigns && !isClosed;   // closed = read-only
+
+  // Pipeline/Processing tabs: HR_ADMIN + RECRUITER (matches the backend's
+  // require_roles on pipeline-summary / processing-status / dead-letter-queue).
+  // scoring != null is kept as a data-presence AND — the backend also omits
+  // the scoring section for roles it hides it from, so both must agree.
+  const canSeePipeline = canViewPipeline && scoring != null;
+  const canSeeTimeline = canViewTimeline;            // HR_ADMIN only
+
+  const tabs = [
+    { id: "details", label: "Details", icon: FileText, show: true },
+    { id: "candidates", label: "Candidates", icon: ListChecks, show: true },
+    { id: "pipeline", label: "Pipeline", icon: Users, show: canSeePipeline },
+    { id: "processing", label: "Processing", icon: Inbox, show: canSeePipeline },
+    { id: "uploads", label: "Uploads", icon: FileUp, show: canSeePipeline },
+    { id: "stalled", label: "Stalled", icon: Hourglass, show: canManageCampaigns },
+    { id: "rejections", label: "Rejections", icon: PieChart, show: canSeePipeline },
+    { id: "timeline", label: "Timeline", icon: Activity, show: canSeeTimeline },
+  ].filter((t) => t.show);
+
+  const statusStyle = {
+    ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    PAUSED: "bg-amber-50 text-amber-700 border-amber-100",
+    CLOSED: "bg-slate-100 text-slate-600 border-slate-200",
+  }[status] || "bg-slate-50 text-slate-600 border-slate-200";
+
+  return (<div className="bg-[#F8FAFC] text-slate-900 font-sans min-h-screen p-6">
+      {/* Header */}
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm mb-6 flex flex-col md:flex-row justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 shadow-sm shrink-0"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-slate-900">{info.name}</h1>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${statusStyle}`}>
+                {status}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Created by {info.created_by_name || "System"} on {fmtDate(info.created_at)}
+            </p>
+          </div>
+        </div>
+        {canManageCampaigns && (<div className="flex items-start flex-wrap gap-2">
+            {/* Pause/Resume/Close live inside Edit Campaign as a Status dropdown;
+                Reopen stays here since closed campaigns are read-only. */}
+            {isClosed ? (<Button variant="outline" size="medium" onClick={() => setLifecycleModal("reopen")}>
+                <RotateCcw className="h-4 w-4" /> Reopen
+              </Button>
+            ) : (<Button variant="primary" size="medium" onClick={() => setEditOpen(true)}>
+                Edit Campaign
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* closed read-only banner */}
+      {isClosed && (<div className="mb-6 flex items-center gap-3 bg-slate-100 border border-slate-200 rounded-xl px-5 py-3">
+          <Lock className="h-4 w-4 text-slate-500" />
+          <p className="text-xs font-semibold text-slate-600">
+            This campaign is <b>closed</b> and read-only. Reopen the campaign to make changes.
+          </p>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200 mb-6 gap-6">
+        {tabs.map((t) => (<button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`flex items-center gap-2 pb-3 text-xs font-bold border-b-2 transition ${
+              activeTab === t.id ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "details" && (<DetailsTab info={info} jd={jd} scoring={scoring} limits={limits} hm={hm} />
+      )}
+      {activeTab === "candidates" && (<CandidatesTab
+          campaignId={id}
+          stageFilter={candidateStageFilter}
+          onStageFilterChange={setCandidateStageFilter}
+        />
+      )}
+      {activeTab === "pipeline" && (<PipelineTab
+          campaignId={id}
+          isActive={isActive}
+          onViewCandidates={() => navigate(`/airs/candidates?campaign=${id}`)}
+          onStageClick={(stage) => {
+            setCandidateStageFilter(stage);
+            setActiveTab("candidates");
+          }}
+        />
+      )}
+      {activeTab === "processing" && (<ProcessingTab campaignId={id} canManageCampaigns={canManageCampaigns} />
+      )}
+      {activeTab === "uploads" && <UploadsTab campaignId={id} />}
+      {activeTab === "stalled" && canManageCampaigns && <StalledTab campaignId={id} />}
+      {activeTab === "rejections" && (<RejectionsTab
+          campaignId={id}
+          jdId={jd.jd_id}
+          onAdjustThreshold={canEdit ? () => setEditOpen(true) : null}
+        />
+      )}
+      {activeTab === "timeline" && <TimelineTab campaignId={id} />}
+
+      {canEdit && (<EditCampaignModal
+          isOpen={editOpen}
+          onClose={() => setEditOpen(false)}
+          campaignId={id}
+          detail={detail}
+          onSaved={() => { setEditOpen(false); setLoading(true); loadDetail(); }}
+        />
+      )}
+
+      {canManageCampaigns && (<>
+          <ReopenCampaignModal
+            isOpen={lifecycleModal === "reopen"}
+            onClose={() => setLifecycleModal(null)}
+            campaignId={id}
+            onReopened={() => { setLifecycleModal(null); setLoading(true); loadDetail(); }}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Details Tab ---------------- */
+// h-full + flex-col: siblings in a row match the tallest card instead of
+// shrink-wrapping to their content and leaving ragged whitespace beneath.
+function Card({ title, icon: Icon, children, className = "" }) {
+  return (<div className={`bg-white border border-slate-200 rounded-xl shadow-sm h-full flex flex-col overflow-hidden ${className}`}>
+      <div className="flex items-center gap-2 px-5 py-3.5 border-b border-slate-100 bg-slate-50/60">
+        {Icon && <Icon className="h-4 w-4 text-blue-600" />}
+        <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-widest">{title}</h3>
+      </div>
+      <div className="p-5 flex-1">{children}</div>
+    </div>
+  );
+}
+
+function Row({ label, value, className = "" }) {
+  return (<div className={`min-w-0 ${className}`}>
+      <dt className="text-[10px] uppercase font-bold tracking-wide text-slate-400">{label}</dt>
+      <dd className="text-xs font-bold text-slate-800 mt-0.5 break-words">{value ?? "—"}</dd>
+    </div>
+  );
+}
+
+// Summary strip cell — cells sit flush against each other (divide-x, no
+// gutters) so the strip reads as one continuous band.
+function GlanceCell({ label, children }) {
+  return (<div className="px-5 py-4 flex-1 min-w-0">
+      <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400 mb-1.5">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+const STATUS_PILL = {
+  ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  PAUSED: "bg-amber-50 text-amber-700 border-amber-200",
+  CLOSED: "bg-slate-100 text-slate-600 border-slate-300",
+};
+
+// Same palette the rejection-analytics chart uses, so a layer reads as the
+// same colour everywhere in the module.
+const SCORING_LAYERS = [
+  { key: "weight_deterministic", label: "Deterministic", color: "#6366F1" },
+  { key: "weight_semantic", label: "Semantic", color: "#0EA5E9" },
+  { key: "weight_ai", label: "AI", color: "#8B5CF6" },
+];
+
+function DetailsTab({ info, jd, scoring, limits, hm }) {
+  const status = (info.status || "").toUpperCase();
+
+  const max = limits.max_candidates;
+  const current = limits.current_candidate_count ?? 0;
+  const capPct = max ? Math.min(100, Math.round((current / max) * 100)) : null;
+  // full cap is the state that actually blocks new uploads, so it gets the
+  // strongest colour rather than being buried in plain text
+  const capTone = capPct == null ? "bg-slate-300"
+    : capPct >= 100 ? "bg-rose-500"
+      : capPct >= 80 ? "bg-amber-500"
+        : "bg-indigo-500";
+
+  const weightTotal = scoring
+    ? SCORING_LAYERS.reduce((sum, l) => sum + Number(scoring[l.key] || 0), 0)
+    : 0;
+
+  return (<div className="space-y-5">
+      {/* At-a-glance strip — the four numbers worth knowing before reading
+          anything else. Flush cells, full width, no empty slots. */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+        <GlanceCell label="Status">
+          <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${STATUS_PILL[status] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
+            {status || "—"}
+          </span>
+        </GlanceCell>
+
+        <GlanceCell label="Candidates">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-lg font-black text-slate-900 tabular-nums leading-none">{current}</span>
+            <span className="text-[11px] font-bold text-slate-400">
+              {max == null ? "of unlimited" : `of ${max}`}
+            </span>
+          </div>
+          {capPct != null && (<div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+              <div className={`h-1.5 rounded-full ${capTone} transition-all duration-500`} style={{ width: `${capPct}%` }} />
+            </div>
+          )}
+        </GlanceCell>
+
+        <GlanceCell label="Deadline">
+          <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            {limits.deadline ? fmtDate(limits.deadline) : "None set"}
+          </p>
+        </GlanceCell>
+
+        <GlanceCell label="Job Description">
+          {jd.jd_id ? (<Link
+              to={`/airs/jds/${jd.jd_id}`}
+              className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+            >
+              <span className="truncate">{jd.jd_title}</span>
+              <ExternalLink className="h-3 w-3 shrink-0" />
+            </Link>
+          ) : (<p className="text-xs font-bold text-slate-800 truncate">{jd.jd_title ?? "—"}</p>
+          )}
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            v{jd.version_number ?? "—"} · {jd.jurisdiction ?? "—"} · {jd.mandatory_skill_count ?? 0} mandatory skills
+          </p>
+        </GlanceCell>
+      </div>
+
+      {/* Two equal-height cards. Scoring is null for HIRING_MANAGER, in which
+          case the left card takes the full width instead of leaving a hole. */}
+      <div className={`grid grid-cols-1 gap-5 ${scoring ? "lg:grid-cols-5" : ""}`}>
+        <div className={scoring ? "lg:col-span-3" : ""}>
+          <Card title="Campaign" icon={FileText}>
+            {/* Name and the two people sit on the top row as the identity of
+                the campaign; timestamps are metadata and go below, three to a
+                row so nothing is left orphaned in a half-empty column.
+                Jurisdiction lives in the summary strip above, not repeated. */}
+            <dl className="space-y-4">
+              <Row label="Name" value={info.name} />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                {hm && (<div className="min-w-0">
+                    <dt className="text-[10px] uppercase font-bold tracking-wide text-slate-400 flex items-center gap-1">
+                      <UserCog className="h-3 w-3" /> Hiring Manager
+                    </dt>
+                    <dd className="mt-1.5 flex items-center gap-2.5 min-w-0">
+                      <span className="h-8 w-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                        {(hm.full_name || "?").trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase()}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-xs font-bold text-slate-800 truncate">{hm.full_name}</span>
+                        <span className="block text-[11px] text-slate-500 truncate">{hm.email}</span>
+                      </span>
+                    </dd>
+                  </div>
+                )}
+                <Row label="Created By" value={info.created_by_name} />
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                <Row label="Created At" value={fmtDate(info.created_at)} />
+                <Row label="Last Updated" value={fmtDate(info.updated_at)} />
+              </div>
+            </dl>
+          </Card>
+        </div>
+
+        {scoring && (<div className="lg:col-span-2">
+            <Card title="Scoring Configuration" icon={Target}>
+              {/* Three weights are one distribution, so they read as one bar
+                  rather than three unrelated numbers. */}
+              <div className="flex h-2.5 rounded-full overflow-hidden bg-slate-100">
+                {SCORING_LAYERS.map((l) => {
+                  const w = Number(scoring[l.key] || 0);
+                  return (<div
+                      key={l.key}
+                      className="h-2.5 transition-all duration-500"
+                      style={{ width: weightTotal ? `${(w / weightTotal) * 100}%` : "0%", backgroundColor: l.color }}
+                      title={`${l.label}: ${asPct(w)}`}
+                    />
+                  );
+                })}
+              </div>
+              <dl className="mt-3 space-y-2">
+                {SCORING_LAYERS.map((l) => (<div key={l.key} className="flex items-center justify-between gap-2">
+                    <dt className="text-[11px] font-semibold text-slate-600 flex items-center gap-2 min-w-0">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: l.color }} />
+                      <span className="truncate">{l.label}</span>
+                    </dt>
+                    <dd className="text-xs font-bold text-slate-900 tabular-nums">{asPct(scoring[l.key])}</dd>
+                  </div>
+                ))}
+              </dl>
+
+              <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-3 gap-3">
+                <Row label="Det. Cutoff" value={scoring.deterministic_threshold ?? "—"} />
+                <Row label="Sem. Cutoff" value={scoring.semantic_threshold} />
+                <Row label="AI Cutoff" value={scoring.ai_threshold} />
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Candidates Tab ---------------- */
+function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
+  const navigate = useNavigate();
+  const [candidates, setCandidates] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [starredIds, setStarredIds] = useState(() => new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [campaignId, stageFilter]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getCampaignCandidates(campaignId);
+        if (cancelled) return;
+        setCandidates(unwrap(res) || []);
+      } catch {
+        if (cancelled) return;
+        toast.error("Failed to load campaign candidates.");
+        setCandidates([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [campaignId]);
+
+  if (loading) {
+    return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading candidates..." /></div>;
+  }
+
+  // same row shape the standalone candidates screen renders, so CandidateTable
+  // and the star/pagination helpers work unchanged here
+  const allCandidates = mapCampaignCandidateList(candidates || []).map((c) => ({
+    ...c,
+    starred: starredIds.has(c.id),
+  }));
+  // stage filter — set by clicking a funnel bar, changeable here too
+  const list = stageFilter
+    ? allCandidates.filter((c) => (c.stage || "").toUpperCase() === stageFilter)
+    : allCandidates;
+
+  const stageOptions = [
+    { value: "", label: "All Stages" },
+    ...[...new Set(allCandidates.map((c) => (c.stage || "").toUpperCase()).filter(Boolean))]
+      .sort()
+      .map((s) => ({ value: s, label: stageLabel(s) })),
+  ];
+
+  const { pageItems, totalPages, currentPage: safePage } = paginate(list, currentPage, CANDIDATE_PAGE_SIZE);
+
+  const toggleStar = (candidateId) => {
+    setStarredIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(candidateId)) next.delete(candidateId);
+      else next.add(candidateId);
+      return next;
+    });
+  };
+
+  return (<div className="space-y-4">
+      <div className="flex justify-between items-end flex-wrap gap-2">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">Candidates</h3>
+          <p className="text-[11px] text-slate-500">
+            {stageFilter
+              ? `${list.length} of ${allCandidates.length} candidate${allCandidates.length === 1 ? "" : "s"} — filtered to ${stageLabel(stageFilter)}`
+              : `${list.length} candidate${list.length === 1 ? "" : "s"} sourced for this campaign`}
+          </p>
+        </div>
+        {onStageFilterChange && allCandidates.length > 0 && (<div className="w-44">
+            <FilterListbox options={stageOptions} value={stageFilter} onChange={onStageFilterChange} />
+          </div>
+        )}
+      </div>
+
+      <CandidateTable
+        candidates={pageItems}
+        onView={(c) => navigate(`/airs/candidates/${c.id}`)}
+        onToggleStar={toggleStar}
+      />
+
+      {list.length > 0 && (<Pagination
+          currentPage={safePage}
+          totalPages={totalPages}
+          onPrevious={() => setCurrentPage(safePage - 1)}
+          onNext={() => setCurrentPage(safePage + 1)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Pipeline Tab ---------------- */
+function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick }) {
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await getPipelineSummary(campaignId);
+      setSummary(unwrap(res));
+    } catch {
+      toast.error("Failed to load pipeline summary.");
+    } finally {
+      setLoading(false);
+    }
+  }, [campaignId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // refresh in real time while the campaign is active — poll every 10s
+  useEffect(() => {
+    if (!isActive) return;
+    const t = setInterval(load, 10000);
+    return () => clearInterval(t);
+  }, [isActive, load]);
+
+  if (loading) {
+    return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading pipeline..." /></div>;
+  }
+  if (!summary) return null;
+
+  const stages = summary.stages || [];
+  const maxCount = Math.max(1, ...stages.map((s) => s.count));
+
+  return (<div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">Pipeline Funnel</h3>
+          <p className="text-[11px] text-slate-500">
+            {summary.total_candidates} candidates submitted
+            {isActive && <span className="text-emerald-600 font-semibold"> · live</span>}
+          </p>
+        </div>
+        <Button size="small" variant="primary" onClick={onViewCandidates}>
+          View All Candidates <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
+        {stages.map((s) => (// each stage bar is clickable → Candidates tab filtered to that stage
+          <button
+            key={s.stage}
+            type="button"
+            onClick={() => onStageClick?.(s.stage)}
+            title={`View candidates in ${stageLabel(s.stage)}`}
+            className="block w-full text-left group cursor-pointer rounded-lg -mx-1 px-1 py-0.5 hover:bg-slate-50 transition"
+          >
+            <div className="flex justify-between items-center text-xs mb-1">
+              <span className="font-bold text-slate-700 group-hover:text-indigo-700">{stageLabel(s.stage)}</span>
+              <div className="flex items-center gap-3">
+                {s.drop_off_pct != null && (<span className="text-[10px] font-semibold text-rose-500">
+                    ▼ {Math.round(s.drop_off_pct)}% drop-off
+                  </span>
+                )}
+                <span className="font-black text-slate-900 tabular-nums">{s.count}</span>
+              </div>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+              <div
+                className="h-2.5 rounded-full transition-all duration-500"
+                style={{ width: `${(s.count / maxCount) * 100}%`, backgroundColor: STAGE_COLORS[s.stage] || "#6366F1" }}
+              />
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Processing Tab ---------------- */
+const TASK_STATUS_TONE = {
+  queued_count: { label: "Queued", dot: "bg-slate-400" },
+  running_count: { label: "Running", dot: "bg-blue-500" },
+  retry_count: { label: "Retry", dot: "bg-amber-500" },
+  dead_count: { label: "Dead", dot: "bg-rose-500" },
+  paused_count: { label: "Paused", dot: "bg-slate-300" },
+};
+
+const BREAKER_TONE = {
+  CLOSED: "bg-emerald-50 text-emerald-700",
+  HALF_OPEN: "bg-amber-50 text-amber-700",
+  OPEN: "bg-rose-50 text-rose-700",
+};
+
+const QUEUE_STATUS_COLUMNS = ["QUEUED", "RUNNING", "RETRY", "SUCCESS", "FAILURE", "DEAD"];
+
+function ProcessingTab({ campaignId, canManageCampaigns }) {
+  const [status, setStatus] = useState(null);          // overall summary (HR_ADMIN + RECRUITER)
+  const [queue, setQueue] = useState(null);            // per-task-type breakdown (HR_ADMIN only)
+  const [dlq, setDlq] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [replaying, setReplaying] = useState(false);
+
+  const load = useCallback(async () => {
+    const calls = [getProcessingStatus(campaignId), getDeadLetterQueue(campaignId)];
+    if (canManageCampaigns) calls.push(getProcessingQueue(campaignId));
+    const [statusRes, dlqRes, queueRes] = await Promise.allSettled(calls);
+    if (statusRes.status === "fulfilled") setStatus(unwrap(statusRes.value));
+    if (dlqRes.status === "fulfilled") setDlq(unwrap(dlqRes.value) || []);
+    if (queueRes?.status === "fulfilled") setQueue(unwrap(queueRes.value));
+    setLoading(false);
+  }, [campaignId, canManageCampaigns]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // S03: queue status + estimate refresh every 60 seconds
+  useEffect(() => {
+    const t = setInterval(load, 60000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  const toggleEntry = (id) =>
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const handleReplay = async () => {
+    if (selectedIds.length === 0) return toast.error("Select at least one failed task to replay.");
+    setReplaying(true);
+    try {
+      const res = await replayDeadLetterTasks(campaignId, selectedIds);
+      const data = unwrap(res);
+      toast.success(`Replayed ${data.replayed_count}, skipped ${data.skipped_count}.`);
+      (data.results || [])
+        .filter((r) => r.status === "SKIPPED" && r.reason)
+        .slice(0, 3)
+        .forEach((r) => toast.info(r.reason));
+      setSelectedIds([]);
+      load();
+    } catch (err) {
+      toast.error(formatApiError(err, "Failed to replay tasks."));
+    } finally {
+      setReplaying(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading processing queue..." /></div>;
+  }
+
+  const estimate = queue?.estimated_completion || status?.estimated_completion;
+
+  return (<div className="space-y-5">
+      <div>
+        <h3 className="text-sm font-bold text-slate-900">Processing Queue</h3>
+        <p className="text-[11px] text-slate-500">
+          celery_task_log breakdown for this campaign · auto-refreshes every 60s
+        </p>
+      </div>
+
+      {/* — completion estimate */}
+      {estimate && (<div className={`px-4 py-3 rounded-xl border text-xs font-semibold ${
+          estimate.estimate_available
+            ? "bg-indigo-50 border-indigo-100 text-indigo-700"
+            : "bg-slate-50 border-slate-200 text-slate-500"
+        }`}>
+          <Clock className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
+          {estimate.message}
+          {estimate.remaining_task_count > 0 && ` · ${estimate.remaining_task_count} task(s) remaining`}
+        </div>
+      )}
+
+      {/* — circuit breaker states (HR_ADMIN) */}
+      {queue?.circuit_breakers && (<div className="flex flex-wrap gap-2">
+          {queue.circuit_breakers.map((b) => (<span
+              key={b.service_name}
+              className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase ${BREAKER_TONE[b.state] || "bg-slate-100 text-slate-600"}`}
+              title={b.state === "OPEN"
+                ? `Open since ${fmtDate(b.opened_at)} — retry after ${fmtDate(b.retry_after)}`
+                : `${b.failure_count} recorded failure(s)`}
+            >
+              {b.service_name}: {b.state}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* — per-task-type breakdown (HR_ADMIN); overall cards otherwise */}
+      {queue?.task_types?.length ? (<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
+          <table className="min-w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-100">
+                <th className="text-left p-3 font-bold text-slate-400 uppercase text-[10px]">Task Type</th>
+                {QUEUE_STATUS_COLUMNS.map((s) => (<th key={s} className="text-right p-3 font-bold text-slate-400 uppercase text-[10px]">{s}</th>
+                ))}
+                <th className="text-right p-3 font-bold text-slate-400 uppercase text-[10px]">Avg Duration</th>
+                <th className="text-right p-3 font-bold text-slate-400 uppercase text-[10px]">LLM Tokens</th>
+              </tr>
+            </thead>
+            <tbody>
+              {queue.task_types.map((t) => (<tr key={t.task_type} className="border-b border-slate-50">
+                  <td className="p-3 font-bold text-slate-800 whitespace-nowrap">{t.task_type.replace(/_/g, " ")}</td>
+                  {QUEUE_STATUS_COLUMNS.map((s) => (<td key={s} className="p-3 text-right tabular-nums text-slate-600">
+                      {t.status_counts[s] || 0}
+                    </td>
+                  ))}
+                  <td className="p-3 text-right tabular-nums text-slate-600">
+                    {t.avg_duration_ms != null ? `${(t.avg_duration_ms / 1000).toFixed(1)}s` : "—"}
+                  </td>
+                  <td className="p-3 text-right tabular-nums text-slate-600">
+                    {t.total_token_count ? t.total_token_count.toLocaleString() : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {Object.entries(TASK_STATUS_TONE).map(([key, meta]) => (<div key={key} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{meta.label}</p>
+              </div>
+              <p className="text-xl font-black tabular-nums text-slate-900">{status?.[key] ?? 0}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* — DLQ with multi-select replay (replay = HR_ADMIN only) */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-xs font-bold text-rose-600 flex items-center gap-1.5">
+            <AlertOctagon className="h-3.5 w-3.5" /> Dead Letter Queue ({dlq.length})
+          </h3>
+          {canManageCampaigns && dlq.length > 0 && (<Button
+              variant="danger" size="small" onClick={handleReplay}
+              loading={replaying} loadingText="Replaying..."
+              disabled={selectedIds.length === 0}
+            >
+              Replay Selected ({selectedIds.length})
+            </Button>
+          )}
+        </div>
+        {dlq.length === 0 ? (<p className="text-xs text-slate-400 text-center py-6">No dead-lettered tasks for this campaign.</p>
+        ) : (<div className="space-y-2">
+            {dlq.map((entry) => {
+              const replayable = canManageCampaigns && entry.replay_supported && !entry.replayed_at;
+              return (<label
+                  key={entry.id}
+                  className={`flex gap-3 p-2.5 rounded-xl border ${replayable ? "cursor-pointer bg-rose-50/50 border-rose-100" : "bg-slate-50 border-slate-100"}`}
+                >
+                  {canManageCampaigns && (<input
+                      type="checkbox" className="mt-1 accent-rose-600"
+                      disabled={!replayable}
+                      checked={selectedIds.includes(entry.id)}
+                      onChange={() => toggleEntry(entry.id)}
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-700 uppercase">{entry.task_type}</span>
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        retried {entry.retry_count}x · last {fmtDate(entry.last_attempted_at || entry.moved_to_dlq_at)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-rose-700 mt-1 truncate">{entry.final_error_message}</p>
+                    {entry.replayed_at && (<p className="text-[10px] text-emerald-600 mt-0.5">Replayed {fmtDate(entry.replayed_at)}</p>
+                    )}
+                    {entry.resolution_notes && (<p className="text-[10px] text-slate-500 mt-0.5">{entry.resolution_notes}</p>
+                    )}
+                    {!entry.replay_supported && !entry.replayed_at && (<p className="text-[10px] text-slate-400 mt-0.5">
+                        Replay for this task type is handled from the bulk-upload screen.
+                      </p>
+                    )}
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Bulk Uploads Tab ---------------- */
+const UPLOAD_STATUS_BADGE = {
+  PENDING: "bg-slate-100 text-slate-600",
+  EXTRACTING: "bg-blue-50 text-blue-700",
+  PROCESSING: "bg-indigo-50 text-indigo-700",
+  COMPLETED: "bg-emerald-50 text-emerald-700",
+  PARTIAL_FAILURE: "bg-amber-50 text-amber-700",
+  FAILED: "bg-rose-50 text-rose-700",
+  CANCELLED: "bg-slate-100 text-slate-500",
+};
+
+function UploadsTab({ campaignId }) {
+  const navigate = useNavigate();
+  const [jobs, setJobs] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await getBulkUploadsForCampaign(campaignId, { page: 1, size: 10 });
+      const data = unwrap(res);
+      setJobs(data?.items || []);
+      setTotal(data?.total ?? 0);
+    } catch {
+      toast.error("Failed to load bulk uploads.");
+    } finally {
+      setLoading(false);
+    }
+  }, [campaignId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // refresh while jobs are still moving (30s, matching the pipeline cadence)
+  useEffect(() => {
+    const anyActive = jobs.some((j) => ["PENDING", "EXTRACTING", "PROCESSING"].includes(j.status));
+    if (!anyActive) return;
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
+  }, [jobs, load]);
+
+  if (loading) {
+    return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading bulk uploads..." /></div>;
+  }
+
+  return (<div className="space-y-4">
+      <div className="flex justify-between items-end flex-wrap gap-2">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">Bulk Uploads</h3>
+          <p className="text-[11px] text-slate-500">
+            {total} upload{total === 1 ? "" : "s"} for this campaign · showing the {Math.min(10, jobs.length)} most recent
+          </p>
+        </div>
+        {total > 0 && (<button
+            type="button"
+            onClick={() => navigate("/airs/resume-intake")}
+            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center gap-1"
+          >
+            View All Uploads <ExternalLink className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+
+      {jobs.length === 0 ? (<div className="bg-white border border-slate-200 rounded-xl p-8 shadow-sm text-center">
+          <p className="text-xs font-bold text-slate-700">No bulk uploads yet</p>
+          <p className="text-[11px] text-slate-400 mt-1">ZIP uploads for this campaign will appear here.</p>
+        </div>
+      ) : (<div className="space-y-2">
+          {jobs.map((job) => {
+            const resolved = (job.processed_count || 0) + (job.failed_count || 0) + (job.duplicate_count || 0);
+            const pct = job.total_files ? Math.round((resolved / job.total_files) * 100) : 0;
+            const hasError = ["FAILED", "PARTIAL_FAILURE"].includes(job.status);
+            const isExpanded = expandedId === job.id;
+            return (<div key={job.id} className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => hasError && setExpandedId(isExpanded ? null : job.id)}
+                  className={`w-full text-left ${hasError ? "cursor-pointer" : "cursor-default"}`}
+                >
+                  <div className="flex flex-wrap justify-between items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileUp className="h-4 w-4 text-slate-400 shrink-0" />
+                      <span className="text-[12.5px] font-bold text-slate-900 truncate">{job.original_filename}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${UPLOAD_STATUS_BADGE[job.status] || "bg-slate-100 text-slate-600"}`}>
+                        {job.status.replace(/_/g, " ")}
+                      </span>
+                      {hasError && (<ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                      )}
+                    </div>
+                    <span className="text-[10px] text-slate-400">
+                      {fmtDate(job.created_at)} · {job.completed_at ? `completed ${fmtDate(job.completed_at)}` : "In Progress"}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-[10.5px] text-slate-500">
+                    <span>{job.total_files} file(s)</span>
+                    <span className="text-emerald-600 font-semibold">{job.processed_count} processed</span>
+                    <span className={job.failed_count ? "text-rose-600 font-semibold" : ""}>{job.failed_count} failed</span>
+                    <span className={job.duplicate_count ? "text-amber-600 font-semibold" : ""}>{job.duplicate_count} duplicate(s)</span>
+                    {job.queued_count > 0 && <span>{job.queued_count} queued</span>}
+                  </div>
+
+                  {job.status === "PROCESSING" && (<div className="mt-2">
+                      <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span>Processing…</span>
+                        <span className="tabular-nums">{pct}%</span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="h-2 rounded-full bg-indigo-500 transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </button>
+
+                {isExpanded && hasError && (<div className="mt-2.5 pt-2.5 border-t border-slate-100">
+                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Error Summary</p>
+                    <p className="text-xs text-rose-700">
+                      {job.error_summary || "No error summary recorded — check the file-level detail on the uploads screen."}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Stalled Candidates Tab ---------------- */
+const STALL_REASON_LABEL = {
+  AI_EVALUATION_FAILED: { text: "AI evaluation failed", tone: "bg-rose-50 text-rose-700" },
+  SCREENING_OVERDUE: { text: "Screening overdue", tone: "bg-amber-50 text-amber-700" },
+  HM_REVIEW_OVERDUE: { text: "HM review overdue", tone: "bg-orange-50 text-orange-700" },
+  INTERVIEW_NOT_SCHEDULED: { text: "Interview not scheduled", tone: "bg-sky-50 text-sky-700" },
+};
+
+function StalledTab({ campaignId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  // one inline action form open at a time: { id, action } | null
+  const [actionForm, setActionForm] = useState(null);
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await getStalledCandidates(campaignId);
+      setData(unwrap(res));
+    } catch {
+      toast.error("Failed to load stalled candidates.");
+    } finally {
+      setLoading(false);
+    }
+  }, [campaignId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const runAction = async (fn, successMessage) => {
+    setSubmitting(true);
+    try {
+      const res = await fn();
+      const detail = unwrap(res)?.detail;
+      toast.success(detail || successMessage);
+      setActionForm(null);
+      setReason("");
+      setLoading(true);
+      load();
+    } catch (err) {
+      toast.error(formatApiError(err, "Action failed."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openForm = (id, action) => {
+    setActionForm((prev) => (prev?.id === id && prev?.action === action ? null : { id, action }));
+    setReason("");
+  };
+
+  if (loading) {
+    return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading stalled candidates..." /></div>;
+  }
+
+  const items = data?.items || [];
+  const slas = data?.sla_config || {};
+
+  return (<div className="space-y-4">
+      <div>
+        <h3 className="text-sm font-bold text-slate-900">Stalled Candidates</h3>
+        <p className="text-[11px] text-slate-500">
+          Stuck past SLA — screening {slas.screening_sla_hours}h · HM review {slas.hm_review_sla_days}d · interview {slas.interview_sla_days}d
+        </p>
+      </div>
+
+      {items.length === 0 ? (<div className="bg-white border border-slate-200 rounded-xl p-8 shadow-sm text-center">
+          <p className="text-xs font-bold text-slate-700">No stalled candidates</p>
+          <p className="text-[11px] text-slate-400 mt-1">Every candidate is progressing within the configured SLAs.</p>
+        </div>
+      ) : (<div className="space-y-2">
+          {items.map((item) => {
+            const reasonMeta = STALL_REASON_LABEL[item.stall_reason] || { text: item.stall_reason, tone: "bg-slate-100 text-slate-600" };
+            const isFormOpen = (a) => actionForm?.id === item.campaign_candidate_id && actionForm?.action === a;
+            return (<div key={item.campaign_candidate_id} className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
+                <div className="flex flex-wrap justify-between items-center gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] font-mono text-slate-500 truncate" title={item.campaign_candidate_id}>
+                        {String(item.campaign_candidate_id).slice(0, 8)}…
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-indigo-50 text-indigo-700">
+                        {item.pipeline_stage.replace(/_/g, " ")}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${reasonMeta.tone}`}>
+                        {reasonMeta.text}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Stalled {item.days_stalled} day(s) · last update {fmtDate(item.last_updated_at)}
+                      {item.last_action_by && <> · last action by {item.last_action_by}</>}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                    {item.has_dead_letter_tasks && (<Button variant="outline" size="small" disabled={submitting}
+                        onClick={() => runAction(() => reprocessStalledCandidate(campaignId, item.campaign_candidate_id),
+                          "Re-process triggered.",
+                        )}>
+                        <RotateCcw className="h-3 w-3" /> Re-Process
+                      </Button>
+                    )}
+                    {item.pipeline_stage === "HM_REVIEW" && (<Button variant="outline" size="small" disabled={submitting}
+                        onClick={() => runAction(() => escalateStalledCandidate(campaignId, item.campaign_candidate_id),
+                          "Escalation recorded.",
+                        )}>
+                        <Send className="h-3 w-3" /> Escalate to HM
+                      </Button>
+                    )}
+                    <Button variant="outline" size="small"
+                      onClick={() => openForm(item.campaign_candidate_id, "override")}>
+                      <SkipForward className="h-3 w-3" /> Override Stage
+                    </Button>
+                    <Button variant="outline" size="small"
+                      onClick={() => openForm(item.campaign_candidate_id, "flag")}>
+                      <Flag className="h-3 w-3" /> Flag for Review
+                    </Button>
+                  </div>
+                </div>
+
+                {(isFormOpen("override") || isFormOpen("flag")) && (<div className="mt-3 pt-3 border-t border-slate-100 flex gap-2 items-end flex-wrap">
+                    <div className="flex-1 min-w-[220px]">
+                      <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                        {isFormOpen("override")
+                          ? "Reason for manual stage advance (required)"
+                          : "Reason for routing to FRAUD_REVIEW (required)"}
+                      </label>
+                      <input
+                        type="text" value={reason} maxLength={1000}
+                        onChange={(e) => setReason(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs"
+                        placeholder="e.g. Reviewed offline with the hiring manager"
+                      />
+                    </div>
+                    <Button
+                      variant={isFormOpen("flag") ? "danger" : "primary"} size="small"
+                      loading={submitting} loadingText="Saving..."
+                      disabled={!reason.trim()}
+                      onClick={() => runAction(isFormOpen("override")
+                          ? () => overrideCandidateStage(campaignId, item.campaign_candidate_id, reason.trim())
+                          : () => flagCandidateForReview(campaignId, item.campaign_candidate_id, reason.trim()),
+                        isFormOpen("override") ? "Stage overridden." : "Flagged for review.",
+                      )}>
+                      Confirm
+                    </Button>
+                    <Button variant="outline" size="small" onClick={() => setActionForm(null)}>Cancel</Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Rejection Analytics Tab ---------------- */
+const REJECTION_LAYER_COLOR = {
+  DETERMINISTIC: "#6366F1", SEMANTIC: "#0EA5E9", AI: "#8B5CF6",
+  MANUAL: "#F59E0B", FRAUD: "#F43F5E",
+};
+
+function RejectionsTab({ campaignId, jdId, onAdjustThreshold }) {
+  const [analytics, setAnalytics] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await getRejectionAnalytics(campaignId);
+      setAnalytics(unwrap(res));
+    } catch {
+      toast.error("Failed to load rejection analytics.");
+    } finally {
+      setLoading(false);
+    }
+  }, [campaignId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // "refresh in real time" — same 60s cadence as the processing queue
+  useEffect(() => {
+    const t = setInterval(load, 60000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  if (loading) {
+    return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading rejection analytics..." /></div>;
+  }
+  if (!analytics) return null;
+
+  const layers = ["DETERMINISTIC", "SEMANTIC", "AI", "MANUAL", "FRAUD"];
+  const maxCount = Math.max(1, ...layers.map((l) => analytics.layer_breakdown[l] || 0));
+
+  return (<div className="space-y-5">
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">Rejection Analytics</h3>
+          <p className="text-[11px] text-slate-500">
+            {analytics.total_rejections} rejection(s) across {analytics.total_candidates} candidate(s) · auto-refreshes every 60s
+          </p>
+        </div>
+      </div>
+
+      {/* recommendations panel */}
+      {analytics.recommendations?.length > 0 && (<div className="space-y-2">
+          {analytics.recommendations.map((rec) => (<div key={rec.condition} className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-100">
+              <Lightbulb className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <div className="flex-1 text-[11.5px] text-amber-800">
+                <span className="font-bold">{rec.layer} rejection rate {rec.rate_pct}%</span>
+                {" "}(threshold {rec.threshold_pct}%) — {rec.recommendation}
+                {/* direct action link per recommendation */}
+                <div className="mt-1.5">
+                  {rec.action === "REVIEW_JD_SKILLS" && jdId && (<Link
+                      to={`/airs/jds/${jdId}`}
+                      className="text-[11px] font-bold text-amber-900 underline hover:text-amber-700 inline-flex items-center gap-1"
+                    >
+                      Review JD Skills <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  )}
+                  {rec.action === "ADJUST_THRESHOLD" && onAdjustThreshold && (<button
+                      type="button"
+                      onClick={onAdjustThreshold}
+                      className="text-[11px] font-bold text-amber-900 underline hover:text-amber-700"
+                    >
+                      Adjust Threshold
+                    </button>
+                  )}
+                  {rec.action === "REVIEW_PROMPT" && (<span className="text-[10px] text-amber-600 italic" title="Prompt version management UI is owned by the AI module and not yet available">
+                      Review Prompt — prompt management screen pending
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {!analytics.analytics_ready && (<div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11.5px] text-slate-500">
+          Recommendations appear once at least {analytics.min_candidates_required} candidates have been processed
+          (currently {analytics.total_candidates}).
+        </div>
+      )}
+
+      {/* layer breakdown chart */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
+        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Rejections by Layer</h4>
+        {layers.map((layer) => {
+          const count = analytics.layer_breakdown[layer] || 0;
+          return (<div key={layer}>
+              <div className="flex justify-between items-center text-xs mb-1">
+                <span className="font-bold text-slate-700">{layer}</span>
+                <span className="font-black text-slate-900 tabular-nums">{count}</span>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                <div
+                  className="h-2.5 rounded-full transition-all duration-500"
+                  style={{ width: `${(count / maxCount) * 100}%`, backgroundColor: REJECTION_LAYER_COLOR[layer] }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* top missing mandatory skill highlight */}
+      {analytics.top_missing_skill && (<div className="flex items-start gap-2.5 p-3 rounded-xl bg-indigo-50 border border-indigo-100">
+          <Target className="h-4 w-4 text-indigo-600 mt-0.5 shrink-0" />
+          <p className="text-[11.5px] text-indigo-800">
+            Most common missing mandatory skill: <b>{analytics.top_missing_skill.canonical_name}</b> — missing for{" "}
+            {analytics.top_missing_skill.count} candidate(s) ({analytics.top_missing_skill.percentage_of_deterministic}% of
+            deterministic rejections). This may indicate a JD calibration issue.
+          </p>
+        </div>
+      )}
+
+      {/* top reasons table */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
+        <table className="min-w-full text-xs">
+          <thead>
+            <tr className="border-b border-slate-100">
+              <th className="text-left p-3 font-bold text-slate-400 uppercase text-[10px]">Rejection Reason</th>
+              <th className="text-right p-3 font-bold text-slate-400 uppercase text-[10px]">Count</th>
+              <th className="text-right p-3 font-bold text-slate-400 uppercase text-[10px]">% of Rejections</th>
+            </tr>
+          </thead>
+          <tbody>
+            {analytics.top_reasons.length === 0 ? (<tr><td colSpan={3} className="p-6 text-center text-slate-400 text-xs">No rejections recorded yet.</td></tr>
+            ) : (analytics.top_reasons.map((r) => (<tr key={r.reason} className="border-b border-slate-50">
+                  <td className="p-3 font-semibold text-slate-700">{r.reason}</td>
+                  <td className="p-3 text-right tabular-nums text-slate-600">{r.count}</td>
+                  <td className="p-3 text-right tabular-nums text-slate-600">{r.percentage}%</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Timeline Tab ---------------- */
+function TimelineTab({ campaignId }) {
+  const [events, setEvents] = useState([]);
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [eventType, setEventType] = useState("");
+  const [availableTypes, setAvailableTypes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const LIMIT = 20;
+
+  const load = useCallback(async (reset) => {
+    setLoading(true);
+    try {
+      const off = reset ? 0 : offset;
+      const res = await getCampaignTimeline(campaignId, {
+        limit: LIMIT, offset: off, event_type: eventType || undefined,
+      });
+      const data = unwrap(res);
+      const list = data.events || [];
+      setEvents((prev) => (reset ? list : [...prev, ...list]));
+      setTotal(data.total_events || 0);
+      setOffset(off + list.length);
+      // server-computed from the FULL unfiltered timeline, so the dropdown
+      // only ever offers types that actually exist for this campaign
+      if (data.available_event_types) setAvailableTypes(data.available_event_types);
+    } catch {
+      toast.error("Failed to load timeline.");
+    } finally {
+      setLoading(false);
+    }
+  }, [campaignId, offset, eventType]);
+
+  const eventTypeOptions = [
+    { value: "", label: "All Events" },
+    ...availableTypes.map((t) => ({ value: t, label: stageLabel(t) })),
+  ];
+
+  // Reload from scratch whenever the event-type filter changes
+  useEffect(() => { load(true); /* eslint-disable-next-line */ }, [eventType]);
+
+  const hasMore = events.length < total;
+
+  return (<div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">Activity Timeline</h3>
+          <p className="text-[11px] text-slate-500">
+            {total} event{total === 1 ? "" : "s"}{eventType ? " (filtered)" : ""}
+          </p>
+        </div>
+        <div className="w-56 flex items-center gap-2">
+          <Filter className="h-4 w-4 text-slate-400" />
+          <div className="flex-1">
+            <FilterListbox options={eventTypeOptions} value={eventType} onChange={setEventType} />
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        {events.length === 0 && !loading ? (<p className="text-xs text-slate-400 text-center py-8">No activity recorded.</p>
+        ) : (<div className="space-y-6 relative border-l border-slate-200 pl-6 ml-2">
+            {events.map((ev, idx) => (<div key={idx} className="relative">
+                <span className="absolute -left-[30px] top-1 w-3.5 h-3.5 rounded-full border-2 border-blue-500 bg-blue-50" />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="bg-indigo-50 text-indigo-700 text-[9px] font-bold px-2 py-0.5 rounded border border-indigo-100 uppercase">
+                    {ev.event_type}
+                  </span>
+                  <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                    <Clock className="h-3 w-3" /> {fmtDate(ev.timestamp)}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-700 mt-1">{ev.description}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">by {ev.actor_name || "System"}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {loading && <div className="py-4 flex justify-center"><LoadingSpinner text="Loading..." /></div>}
+
+        {hasMore && !loading && (<div className="flex justify-center mt-6">
+            <Button variant="outline" size="small" onClick={() => load(false)}>
+              Load More <ChevronDown className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

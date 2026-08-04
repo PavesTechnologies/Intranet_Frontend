@@ -143,9 +143,9 @@ const ProjectDonutChart = ({ entries }) => {
     <div className="donut-chart-container relative" ref={wrapperRef}>
       <h2 className="section-title">Project-wise Hours Distribution</h2>
 
-      <div className="flex gap-8 relative">
+      <div className="flex flex-col md:flex-row gap-8 items-center relative">
         {/* Donut */}
-        <div className="relative" style={{ width: "350px", height: "350px" }}>
+        <div className="relative shrink-0" style={{ width: "300px", height: "300px" }}>
           <svg width="100%" height="100%" viewBox="0 0 200 200">
             {donutSegments.map((segment, idx) => (
               <path
@@ -253,41 +253,49 @@ const ProjectDonutChart = ({ entries }) => {
         </div>
 
         {/* Legend */}
-        <div className="flex-1">
-          <h3 className="font-semibold mb-2">Projects</h3>
+        <div className="flex-1 w-full self-stretch">
+          <div className="h-full rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
+              Projects
+            </h3>
 
-          {donutSegments.map((segment, idx) => (
-            <div
-              key={idx}
-              className={`flex items-center gap-3 p-2 cursor-pointer rounded ${
-                hoveredProject === segment.project ? "bg-gray-100" : ""
-              }`}
-              onMouseEnter={() => {
-                setHoveredProject(segment.project);
-                updateTooltipPos(segment);
-              }}
-              onMouseLeave={() => setHoveredProject(null)}
-            >
-              <div
-                className="w-4 h-4 rounded"
-                style={{ backgroundColor: segment.color.main }}
-              ></div>
+            <div className="divide-y divide-gray-100">
+              {donutSegments.map((segment, idx) => (
+                <div
+                  key={idx}
+                  className={`flex items-center gap-3 px-2 py-3 cursor-pointer rounded-lg transition-colors ${
+                    hoveredProject === segment.project ? "bg-white shadow-sm" : "hover:bg-white/70"
+                  }`}
+                  onMouseEnter={() => {
+                    setHoveredProject(segment.project);
+                    updateTooltipPos(segment);
+                  }}
+                  onMouseLeave={() => setHoveredProject(null)}
+                >
+                  <div
+                    className="w-3.5 h-3.5 rounded-md shrink-0"
+                    style={{ backgroundColor: segment.color.main }}
+                  ></div>
 
-              <div className="flex-1">
-                <div>{segment.project}</div>
-                <div className="text-gray-500 text-sm">
-                  {segment.data.totalHours.toFixed(1)} hrs
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-800 truncate">
+                      {segment.project}
+                    </div>
+                    <div className="text-gray-500 text-sm">
+                      {segment.data.totalHours.toFixed(1)} hrs
+                    </div>
+                  </div>
+
+                  <div
+                    className="text-sm font-bold tabular-nums"
+                    style={{ color: segment.color.main }}
+                  >
+                    {segment.data.percentage}%
+                  </div>
                 </div>
-              </div>
-
-              <div
-                className="font-semibold"
-                style={{ color: segment.color.main }}
-              >
-                {segment.data.percentage}%
-              </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       </div>
     </div>

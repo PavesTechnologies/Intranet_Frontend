@@ -123,21 +123,30 @@ import DegreeMasterManagement from "./pages/employee-onboarding/hr-configuration
 import AdminApprovalDashboard from "./pages/employee-onboarding/admin/AdminApprovalDashboard.jsx"; import AdminOfferView from "./pages/employee-onboarding/admin/AdminOfferView.jsx";
 
 // AI Screening (AIRS)
-import AirsDashboard from "./pages/airs/pages/AirsDashboard.jsx";
 import JdLibrary from "./pages/airs/pages/JdLibrary.jsx";
 import JdCreate from "./pages/airs/pages/JdCreate.jsx";
 import JdDetails from "./pages/airs/pages/JdDetails.jsx";
-import Campaigns from "./pages/airs/pages/Campaigns.jsx";
-import CampaignDetails from "./pages/airs/pages/CampaignDetails.jsx";
+import Campaigns from "./pages/airs/campaigns/Campaigns.jsx";
+import CampaignDetails from "./pages/airs/campaigns/CampaignDetails.jsx";
+
+import AirsPlaceholder from "./pages/airs/pages/AirsPlaceholder.jsx";
+
 import ResumeIntakePage from "./pages/airs/resume-intake/ResumeIntakePage.jsx";
+import IntakeFlowPage from "./pages/airs/resume-intake/intake/IntakeFlowPage.jsx";
+import ReviewPage from "./pages/airs/resume-intake/intake/ReviewPage.jsx";
 import CandidateRankingPage from "./pages/airs/candidates/CandidateRankingPage.jsx";
+import CandidateScorePage from "./pages/airs/candidates/CandidateScore/CandidateScorePage.jsx";
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
+import PipelineCandidateScorecardPage from "./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
 import AnalyticsPage from "./pages/airs/analytics/AnalyticsPage.jsx";
 import SettingsPage from "./pages/airs/settings/SettingsPage.jsx";
 import SkillOntologyPage from "./pages/airs/skill-ontology/SkillOntologyPage.jsx";
 import SkillDetailPage from "./pages/airs/skill-ontology/SkillDetailPage.jsx";
 import HierarchyPage from "./pages/airs/skill-ontology/HierarchyPage.jsx";
+import UnknownSkillDetailPage from "./pages/airs/skill-ontology/UnknownSkillDetailPage.jsx";
+import PromptTemplatesPage from "./pages/airs/prompt-templates/PromptTemplatesPage.jsx";
+import PromptTemplateViewPage from "./pages/airs/prompt-templates/PromptTemplateViewPage.jsx";
 
 import AdminOfferLettersDashboard from "./pages/employee-onboarding/admin/AdminOfferLettersDashboard.jsx";
 import HrOnboardingDashboard from "./pages/employee-onboarding/hr/HrOnboardingDashboard.jsx";
@@ -169,6 +178,42 @@ import EmployeeDocuments from "./pages/employee-onboarding/employeedocuments/Emp
 import OfferPreview from "./pages/employee-onboarding/offer-preview/OfferPreview.jsx";
 import FinalOfferPreview from "./pages/employee-onboarding/final-offer-preview/FinalOfferPreview.jsx";
 import OfferGeneratedPreview from "./pages/employee-onboarding/offer-generated-preview/OfferGeneratedPreview.jsx";
+
+// ✅ Expense Management (XMS)
+import XmsDashboardPage from "./pages/expense-management/pages/dashboard/DashboardPage.jsx";
+import XmsCreateExpensePage from "./pages/expense-management/pages/expenses/CreateExpensePage.jsx";
+import XmsMyExpensesPage from "./pages/expense-management/pages/expenses/MyExpensesPage.jsx";
+import XmsAllExpensesPage from "./pages/expense-management/pages/expenses/AllExpensesPage.jsx";
+import XmsExpenseReportsPage from "./pages/expense-management/pages/expenses/ExpenseReportsPage.jsx";
+import XmsExpenseReportDetailPage from "./pages/expense-management/pages/expenses/ExpenseReportDetailPage.jsx";
+import XmsReceiptLibraryPage from "./pages/expense-management/pages/receipts/ReceiptLibraryPage.jsx";
+import XmsOcrProcessingPage from "./pages/expense-management/pages/receipts/OcrProcessingPage.jsx";
+import XmsRequestAdvancePage from "./pages/expense-management/pages/cash-advance/RequestAdvancePage.jsx";
+import XmsMyAdvancesPage from "./pages/expense-management/pages/cash-advance/MyAdvancesPage.jsx";
+import XmsSettlementPage from "./pages/expense-management/pages/cash-advance/SettlementPage.jsx";
+import XmsPendingApprovalsPage from "./pages/expense-management/pages/approvals/PendingApprovalsPage.jsx";
+import XmsApprovedApprovalsPage from "./pages/expense-management/pages/approvals/ApprovedApprovalsPage.jsx";
+import XmsRejectedApprovalsPage from "./pages/expense-management/pages/approvals/RejectedApprovalsPage.jsx";
+import XmsVerificationPage from "./pages/expense-management/pages/finance/VerificationPage.jsx";
+import XmsReimbursementsPage from "./pages/expense-management/pages/finance/ReimbursementsPage.jsx";
+import XmsPaymentStatusPage from "./pages/expense-management/pages/finance/PaymentStatusPage.jsx";
+import XmsBillableExpensesPage from "./pages/expense-management/pages/client-billing/BillableExpensesPage.jsx";
+import XmsInvoiceHandoffPage from "./pages/expense-management/pages/client-billing/InvoiceHandoffPage.jsx";
+import XmsInvoiceStatusPage from "./pages/expense-management/pages/client-billing/InvoiceStatusPage.jsx";
+import XmsExpenseCategoriesPage from "./pages/expense-management/pages/masters/ExpenseCategoriesPage.jsx";
+import XmsGlAccountsPage from "./pages/expense-management/pages/masters/GlAccountsPage.jsx";
+import XmsCostCentersPage from "./pages/expense-management/pages/masters/CostCentersPage.jsx";
+import XmsCostCenterBudgetPage from "./pages/expense-management/pages/masters/CostCenterBudgetPage.jsx";
+import XmsProjectsMasterPage from "./pages/expense-management/pages/masters/ProjectsMasterPage.jsx";
+import XmsClientsMasterPage from "./pages/expense-management/pages/masters/ClientsMasterPage.jsx";
+import XmsCurrencyManagementPage from "./pages/expense-management/pages/masters/CurrencyManagementPage.jsx";
+import XmsTaxConfigurationPage from "./pages/expense-management/pages/masters/TaxConfigurationPage.jsx";
+import XmsPoliciesPage from "./pages/expense-management/pages/policies/PoliciesPage.jsx";
+import XmsReportsPage from "./pages/expense-management/pages/reports/ReportsPage.jsx";
+import XmsNotificationsPage from "./pages/expense-management/pages/activity/NotificationsPage.jsx";
+import XmsAuditLogsPage from "./pages/expense-management/pages/activity/AuditLogsPage.jsx";
+import XmsSettingsPage from "./pages/expense-management/pages/settings/SettingsPage.jsx";
+
 // ✅ User Management
 import CreateUser from "./pages/UserManagement/admin/userManagement/CreateUser";
 import EditUser from "./pages/UserManagement/admin/userManagement/EditUser";
@@ -1135,14 +1180,6 @@ const AppRoutes = () => {
             }
           />          {/* AI Screening (AIRS) Routes */}
           <Route
-            path="/airs/dashboard"
-            element={
-              <ProtectedRoute roles={["General"]}>
-                <AirsDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/airs/jds"
             element={
               <ProtectedRoute roles={["General"]}>
@@ -1166,10 +1203,15 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+          {/* NOTE: ProtectedRoute's prop is `allowedRoles` — the `roles={...}`
+              prop used by the other /airs/* routes is silently ignored by
+              React, so those routes have NO route-level role enforcement.
+              Campaign routes below use the working prop, mirroring the
+              backend's require_roles(...) on the corresponding endpoints. */}
           <Route
             path="/airs/campaigns"
             element={
-              <ProtectedRoute roles={["General"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <Campaigns />
               </ProtectedRoute>
             }
@@ -1177,7 +1219,7 @@ const AppRoutes = () => {
           <Route
             path="/airs/campaigns/:id"
             element={
-              <ProtectedRoute roles={["General"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <CampaignDetails />
               </ProtectedRoute>
             }
@@ -1191,6 +1233,22 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path="/airs/resume-intake/new"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <IntakeFlowPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/resume-intake/review/:candidateId"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <ReviewPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/airs/candidates"
             element={
               <ProtectedRoute roles={["General"]}>
@@ -1199,10 +1257,26 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path="/airs/candidates/:candidateId"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <CandidateScorePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/airs/pipeline"
             element={
               <ProtectedRoute roles={["General"]}>
                 <PipelineBoardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/pipeline/candidates/:candidateId"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <PipelineCandidateScorecardPage />
               </ProtectedRoute>
             }
           />
@@ -1254,6 +1328,37 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/airs/skill-ontology/unknown/:unknownSkillId"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <UnknownSkillDetailPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Prompt Templates — HR_ADMIN only. Uses ProtectedRoute's working
+              `allowedRoles` prop (see the note on the Campaign routes above),
+              so this module has real route-level RBAC enforcement. Create/Edit
+              are modals opened from the list/view pages (see
+              AddPromptTemplateModal/EditPromptTemplateModal), matching the
+              skill-ontology module's pattern — only List and View are routed. */}
+          <Route
+            path="/airs/prompt-templates"
+            element={
+              <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
+                <PromptTemplatesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/prompt-templates/:id/view"
+            element={
+              <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
+                <PromptTemplateViewPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* employee exit routes*/}
 
@@ -1261,6 +1366,51 @@ const AppRoutes = () => {
             <Route path="/employee-exit" element={<EmployeeExitDashboard />} />
             <Route path="/employee-exit/:exit_uuid" element={<ExitDetailsPage />} />
           </Route>
+
+          {/* Expense Management (XMS) */}
+          <Route path="/expense-management/dashboard" element={<ProtectedRoute allowedRoles={["General", "Manager", "Finance", "Admin", "Super_Admin"]}><XmsDashboardPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/expenses/create" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsCreateExpensePage /></ProtectedRoute>} />
+          <Route path="/expense-management/expenses/my" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsMyExpensesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/expenses/reports/:reportId" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsExpenseReportDetailPage /></ProtectedRoute>} />
+          <Route path="/expense-management/expenses/all" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsAllExpensesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/expenses/reports" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsExpenseReportsPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/receipts/library" element={<ProtectedRoute allowedRoles={["General"]}><XmsReceiptLibraryPage /></ProtectedRoute>} />
+          <Route path="/expense-management/receipts/ocr-processing" element={<ProtectedRoute allowedRoles={["General"]}><XmsOcrProcessingPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/cash-advance/request" element={<ProtectedRoute allowedRoles={["General"]}><XmsRequestAdvancePage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/my" element={<ProtectedRoute allowedRoles={["General"]}><XmsMyAdvancesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/settlement" element={<ProtectedRoute allowedRoles={["General"]}><XmsSettlementPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/approvals/pending" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsPendingApprovalsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/approvals/approved" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsApprovedApprovalsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/approvals/rejected" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsRejectedApprovalsPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/finance/verification" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsVerificationPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/reimbursements" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsReimbursementsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/payment-status" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsPaymentStatusPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/client-billing/billable-expenses" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsBillableExpensesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/client-billing/invoice-handoff" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsInvoiceHandoffPage /></ProtectedRoute>} />
+          <Route path="/expense-management/client-billing/invoice-status" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsInvoiceStatusPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/masters/expense-categories" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsExpenseCategoriesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/masters/gl-accounts" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsGlAccountsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/masters/cost-centers" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsCostCentersPage /></ProtectedRoute>} />
+          <Route path="/expense-management/masters/cost-center-budgets" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsCostCenterBudgetPage /></ProtectedRoute>} />
+          <Route path="/expense-management/masters/projects" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsProjectsMasterPage /></ProtectedRoute>} />
+          <Route path="/expense-management/masters/clients" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsClientsMasterPage /></ProtectedRoute>} />
+          <Route path="/expense-management/masters/currency-management" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsCurrencyManagementPage /></ProtectedRoute>} />
+          <Route path="/expense-management/masters/tax-configuration" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsTaxConfigurationPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/policies" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsPoliciesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/reports" element={<ProtectedRoute allowedRoles={["Manager", "Finance", "Admin", "Super_Admin"]}><XmsReportsPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/activity/notifications" element={<ProtectedRoute allowedRoles={["General", "Manager", "Finance", "Admin", "Super_Admin"]}><XmsNotificationsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/activity/audit-logs" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsAuditLogsPage /></ProtectedRoute>} />
+
+          <Route path="/expense-management/settings" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsSettingsPage /></ProtectedRoute>} />
         </Route>
       </Routes>
       <SaveLastPath />

@@ -1,38 +1,42 @@
-import { useEffect, useMemo, useState } from "react";
-import { MOCK_CANDIDATES } from "../mock/candidateMockData";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CANDIDATE_PAGE_SIZE } from "../constants/candidateConstants";
 import { filterCandidates, sortCandidates, paginate, computeCandidateStats } from "../utils/candidateUtils.jsx";
+import { getCampaignCandidates } from "../../campaigns/services/campaignservice";
+import { mapCampaignCandidateList } from "../utils/mapCampaignCandidateList";
 
-const STORAGE_KEY = "airs_candidates_pool";
-
-const readStored = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : MOCK_CANDIDATES;
-  } catch {
-    return MOCK_CANDIDATES;
-  }
-};
-
-const persist = (candidates) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(candidates));
-  } catch {
-    // Ignore storage quota errors.
-  }
-};
-
-export default function useCandidateRanking() {
-  const [candidates, setCandidates] = useState(readStored);
+export default function useCandidateRanking(campaignId) {
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("All");
   const [sortValue, setSortValue] = useState("composite:desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const [detailCandidateId, setDetailCandidateId] = useState(null);
+
+  const fetchCandidates = useCallback(async () => {
+    if (!campaignId) {
+      setCandidates([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await getCampaignCandidates(campaignId);
+      const list = response && response.data !== undefined ? response.data : response;
+      setCandidates(mapCampaignCandidateList(list));
+    } catch (err) {
+      setError(err);
+      setCandidates([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [campaignId]);
 
   useEffect(() => {
-    persist(candidates);
-  }, [candidates]);
+    fetchCandidates();
+  }, [fetchCandidates]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -50,19 +54,8 @@ export default function useCandidateRanking() {
 
   const stats = useMemo(() => computeCandidateStats(candidates), [candidates]);
 
-  const detailCandidate = useMemo(
-    () => candidates.find((c) => c.id === detailCandidateId) || null,
-    [candidates, detailCandidateId]
-  );
-
   const toggleStar = (id) => {
     setCandidates((prev) => prev.map((c) => (c.id === id ? { ...c, starred: !c.starred } : c)));
-  };
-
-  const addComment = (candidateId, text) => {
-    setCandidates((prev) =>
-      prev.map((c) => (c.id === candidateId ? { ...c, comments: [...c.comments, { author: "You", text }] } : c))
-    );
   };
 
   return {
@@ -79,9 +72,8 @@ export default function useCandidateRanking() {
     setCurrentPage,
     totalPages,
     toggleStar,
-    addComment,
-    detailCandidate,
-    openCandidate: setDetailCandidateId,
-    closeCandidate: () => setDetailCandidateId(null),
+    loading,
+    error,
+    refetch: fetchCandidates,
   };
 }

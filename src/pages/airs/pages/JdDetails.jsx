@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAirsStore } from "./airsStore";
-import { getJDById, exportSingleJD, getJDSkills, getJDUnknownSkills } from "../service/jdservice";
+import { getJDById, exportSingleJD, downloadJDById, getJDSkills, getJDUnknownSkills } from "../service/jdservice";
+import { useAuth } from "../../../contexts/AuthContext";
 import {
   ArrowLeft,
   Briefcase,
   Download,
   Clock,
-  Sparkles,
   GitBranch,
+  GitMerge,
   History,
   Activity,
   Layers,
@@ -23,17 +24,25 @@ import {
   Eye,
   FileText,
   Search,
-  SlidersHorizontal,
   Calendar
 } from "lucide-react";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/ui/Modal";
+import SkillActionModal from "../../../components/Modal/modal";
 import FormInput from "../../../components/forms/FormInput";
-import NewCampaignForm from "../modals/NewCampaignForm";
-import { createCampaign, getAllCampaignsHrAdmin } from "../service/campaignservice";
+import NewCampaignForm from "../campaigns/components/NewCampaignForm";
+import { createCampaign, getAllCampaigns, getPipelineSummary, formatApiError } from "../campaigns/services/campaignservice";
 import Pagination from "../../../components/Pagination/pagination";
+import GenericTable from "../../../components/Table/table";
+import {
+  CreateSkillModalBody,
+  MapSkillModalBody,
+  DeleteSkillModalBody,
+  SuggestionTabsSection,
+} from "../skill-ontology/UnknownSkillDetailPage";
+import { bulkApproveUnknownSkills, bulkDeleteUnknownSkills } from "../skill-ontology/services/skillOntologyService";
 
 const DEFAULT_CAMPAIGN_FORM = {
   name: "",
@@ -44,14 +53,41 @@ const DEFAULT_CAMPAIGN_FORM = {
   weight_ai: 30,
   semantic_threshold: 0.65,
   ai_threshold: 50,
+  deterministic_threshold: 70,
   hiring_manager_id: "",
   recruiter_id: "",
+  prompt_template_id: "",
+};
+
+const STATUS_BADGE = {
+  ACTIVE: "bg-emerald-50 text-emerald-700",
+  PAUSED: "bg-amber-50 text-amber-700",
+  CLOSED: "bg-slate-100 text-slate-600",
+  DRAFT: "bg-slate-100 text-slate-700",
+};
+
+// Title-case a status enum for display, e.g. "ACTIVE" -> "Active"
+const statusLabel = (s) =>
+  s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "—";
+
+// Reduce a pipeline-summary payload into the three headline counts the card shows.
+const deriveCampaignStats = (summary) => {
+  const stageCount = (key) =>
+    (summary?.stages || []).find((s) => s.stage === key)?.count ?? 0;
+  return {
+    candidates: summary?.total_candidates ?? 0,
+    shortlisted: stageCount("SHORTLISTED"),
+    selected: stageCount("SELECTED"),
+  };
 };
 
 export default function JdDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { jds, campaigns, updateJd, restoreJdVersion, addCampaign } = useAirsStore();
+  const { hasRole } = useAuth();
+  const isHRAdmin = hasRole(["HR_ADMIN"]);
+  const canViewPipeline = hasRole(["HR_ADMIN", "RECRUITER"]);
 
   const jd = jds.find((j) => j.id === id);
 
@@ -78,6 +114,53 @@ export default function JdDetails() {
   }, [id]);
 
   const [isExporting, setIsExporting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadJD = async () => {
+    try {
+      setIsDownloading(true);
+
+      const response = await downloadJDById(currentJd.id);
+
+      const blob = new Blob([response.data], {
+        type: response.headers["content-type"] || "application/octet-stream",
+      });
+
+      const url = window.URL.createObjectURL(blob);
+
+      let filename = "Job_Description";
+
+      const disposition = response.headers["content-disposition"];
+
+      if (disposition) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+
+        if (match) {
+          filename = match[1];
+        }
+      }
+
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = filename;
+
+      document.body.appendChild(link);
+
+      link.click();
+
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Job Description downloaded successfully.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to download Job Description.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const handleExportJD = async () => {
     try {
@@ -157,10 +240,42 @@ export default function JdDetails() {
     return Math.ceil(filteredCampaigns.length / campaignsPerPage) || 1;
   }, [filteredCampaigns]);
 
+  // Real candidate metrics per card come from the pipeline-summary endpoint —
+  // fetched only for the campaigns visible on the current page, and cached by
+  // id so paging back and forth doesn't re-hit the API.
+  //   value === undefined -> not fetched yet (loading placeholder)
+  //   value === null       -> unavailable (e.g. role can't see the pipeline)
+  //   value === object     -> real { candidates, shortlisted, selected }
+  const [campaignPipelineStats, setCampaignPipelineStats] = useState({});
+  useEffect(() => {
+    if (!canViewPipeline) return;
+    const missing = paginatedCampaigns
+      .map((c) => c.id)
+      .filter((cid) => cid && !(cid in campaignPipelineStats));
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(missing.map(async (cid) => {
+        try {
+          const res = await getPipelineSummary(cid);
+          return [cid, deriveCampaignStats(res?.data ?? res)];
+        } catch {
+          return [cid, null];
+        }
+      }));
+      if (!cancelled) {
+        setCampaignPipelineStats((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [paginatedCampaigns, campaignPipelineStats, canViewPipeline]);
+
   const fetchDbCampaigns = async () => {
     setIsLoadingCampaigns(true);
     try {
-      const res = await getAllCampaignsHrAdmin();
+      const res = await getAllCampaigns({jd_id: id, show_closed: true});
       if (res?.success && res.data) {
         setDbCampaigns(res.data);
       }
@@ -179,6 +294,85 @@ export default function JdDetails() {
   const [isLoadingSkills, setIsLoadingSkills] = useState(false);
   const [isLoadingUnknownSkills, setIsLoadingUnknownSkills] = useState(false);
 
+  // Unknown Skill resolution actions — Create / Map / Delete — reuse the same
+  // modal bodies, endpoints, and suggestion-tab UI as the Skill Ontology
+  // Unknown Skill detail page.
+  const [unknownSkillModal, setUnknownSkillModal] = useState(null); // "create" | "suggestions" | "confirmMap" | "delete" | null
+  const [activeUnknownSkill, setActiveUnknownSkill] = useState(null);
+  const [unknownSkillMapTarget, setUnknownSkillMapTarget] = useState(null);
+
+  const closeUnknownSkillModal = () => {
+    setUnknownSkillModal(null);
+    setActiveUnknownSkill(null);
+    setUnknownSkillMapTarget(null);
+  };
+
+  const handleUnknownSkillResolved = () => {
+    closeUnknownSkillModal();
+    fetchJdUnknownSkills();
+  };
+
+  // Bulk Approve / Reject — same bulk endpoints as the Skill Ontology Unknown
+  // Skills table, applied across the full unknown-skills list for this JD
+  // (not just the current page), keyed by unknown_skill_id.
+  const [selectedUnknownSkillIds, setSelectedUnknownSkillIds] = useState(new Set());
+  const [bulkConfirmAction, setBulkConfirmAction] = useState(null); // "approve" | "delete" | null
+  const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
+
+  useEffect(() => {
+    setSelectedUnknownSkillIds((prev) => {
+      const visibleIds = new Set(jdUnknownSkillsData.map((s) => s.unknown_skill_id));
+      const next = new Set([...prev].filter((id) => visibleIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [jdUnknownSkillsData]);
+
+  const allUnknownSkillsSelected =
+    jdUnknownSkillsData.length > 0 &&
+    jdUnknownSkillsData.every((s) => selectedUnknownSkillIds.has(s.unknown_skill_id));
+
+  const toggleSelectAllUnknownSkills = () => {
+    setSelectedUnknownSkillIds(
+      allUnknownSkillsSelected ? new Set() : new Set(jdUnknownSkillsData.map((s) => s.unknown_skill_id))
+    );
+  };
+
+  const toggleUnknownSkillSelection = (unknownSkillId) => {
+    setSelectedUnknownSkillIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(unknownSkillId)) next.delete(unknownSkillId);
+      else next.add(unknownSkillId);
+      return next;
+    });
+  };
+
+  const closeBulkConfirm = () => {
+    if (isBulkSubmitting) return;
+    setBulkConfirmAction(null);
+  };
+
+  const handleConfirmBulkUnknownSkillAction = async () => {
+    const ids = Array.from(selectedUnknownSkillIds);
+    setIsBulkSubmitting(true);
+    try {
+      const action = bulkConfirmAction === "approve" ? bulkApproveUnknownSkills : bulkDeleteUnknownSkills;
+      const res = await action(ids);
+      const { message, failed = 0, results = [] } = res?.data || {};
+      toast.success(message || "Bulk action completed.");
+      if (failed > 0) {
+        const firstFailure = results.find((r) => !r.success);
+        toast.error(`${failed} of ${ids.length} failed${firstFailure ? `: ${firstFailure.message}` : "."}`);
+      }
+      setSelectedUnknownSkillIds(new Set());
+      setBulkConfirmAction(null);
+      fetchJdUnknownSkills();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Bulk action failed.");
+    } finally {
+      setIsBulkSubmitting(false);
+    }
+  };
+
   // Pagination state — JD Skills
   const [skillsCurrentPage, setSkillsCurrentPage] = useState(1);
   const skillsTotalPages = Math.max(1, Math.ceil(jdSkillsData.length / SKILLS_PAGE_SIZE));
@@ -194,6 +388,185 @@ export default function JdDetails() {
     (unknownSkillsCurrentPage - 1) * SKILLS_PAGE_SIZE,
     unknownSkillsCurrentPage * SKILLS_PAGE_SIZE
   );
+
+  const jdSkillsHeaders = [
+    <div key="canonical" className="w-full flex justify-start select-none">Canonical Skill</div>,
+    <div key="tier" className="w-full flex justify-center select-none">Match Tier</div>,
+    <div key="confidence" className="w-full flex justify-center select-none">Confidence</div>,
+    <div key="mandatory" className="w-full flex justify-center select-none">Mandatory</div>,
+    <div key="status" className="w-full flex justify-center select-none">Status</div>,
+    <div key="createdAt" className="w-full flex justify-center select-none">Created Date</div>
+  ];
+
+  const jdSkillsColumns = [
+    "canonical_name",
+    "match_tier",
+    "confidence",
+    "mandatory",
+    "status",
+    "created_at"
+  ];
+
+  const jdSkillsRows = useMemo(() => {
+    return paginatedSkills.map((sk) => {
+      return {
+        canonical_name: (
+          <div className="w-full flex justify-start font-bold text-slate-900">
+            {sk.canonical_name}
+          </div>
+        ),
+        match_tier: (
+          <div className="w-full flex justify-center">
+            <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold border border-blue-100 text-[9px]">
+              {sk.match_tier}
+            </span>
+          </div>
+        ),
+        confidence: (
+          <div className="w-full flex justify-center font-bold text-slate-700">
+            {Math.round((sk.confidence || 0) * 100)}%
+          </div>
+        ),
+        mandatory: (
+          <div className="w-full flex justify-center">
+            <span
+              className={`text-[9px] px-2 py-0.5 rounded font-bold border ${
+                sk.mandatory
+                  ? "bg-blue-50 text-blue-700 border-blue-100"
+                  : "bg-slate-100 text-slate-500 border-slate-200"
+              }`}
+            >
+              {sk.mandatory ? "True" : "False"}
+            </span>
+          </div>
+        ),
+        status: (
+          <div className="w-full flex justify-center">
+            <span className="text-[9px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-bold border border-emerald-100">
+              {sk.verification_status}
+            </span>
+          </div>
+        ),
+        created_at: (
+          <div className="w-full flex justify-center text-slate-500">
+            {sk.created_at ? sk.created_at.split("T")[0] : ""}
+          </div>
+        ),
+        rowClass: "hover:bg-slate-50/50 transition",
+      };
+    });
+  }, [paginatedSkills, skillsCurrentPage, jdSkillsData]);
+
+  const jdUnknownSkillsHeaders = [
+    <div key="select" className="w-full flex justify-center select-none">
+      <input
+        type="checkbox"
+        checked={allUnknownSkillsSelected}
+        onChange={toggleSelectAllUnknownSkills}
+        className="h-3.5 w-3.5 cursor-pointer accent-indigo-600"
+      />
+    </div>,
+    <div key="rawSkill" className="w-full flex justify-start select-none">Raw Skill</div>,
+    <div key="mandatory" className="w-full flex justify-center select-none">Mandatory</div>,
+    <div key="status" className="w-full flex justify-center select-none">Status</div>,
+    <div key="createdAt" className="w-full flex justify-center select-none">Created Date</div>,
+    <div key="action" className="w-full flex justify-center select-none">Action</div>
+  ];
+
+  const jdUnknownSkillsColumns = [
+    "select",
+    "raw_text",
+    "mandatory",
+    "status",
+    "created_at",
+    "action"
+  ];
+
+  const jdUnknownSkillsRows = useMemo(() => {
+    return paginatedUnknownSkills.map((sk) => {
+      return {
+        select: (
+          <div className="w-full flex justify-center">
+            <input
+              type="checkbox"
+              checked={selectedUnknownSkillIds.has(sk.unknown_skill_id)}
+              onChange={() => toggleUnknownSkillSelection(sk.unknown_skill_id)}
+              className="h-3.5 w-3.5 cursor-pointer accent-indigo-600"
+            />
+          </div>
+        ),
+        raw_text: (
+          <div className="w-full flex justify-start font-bold text-slate-900">
+            {sk.raw_text}
+          </div>
+        ),
+        mandatory: (
+          <div className="w-full flex justify-center">
+            <span
+              className={`text-[9px] px-2 py-0.5 rounded font-bold border ${
+                sk.mandatory
+                  ? "bg-blue-50 text-blue-700 border-blue-100"
+                  : "bg-slate-100 text-slate-500 border-slate-200"
+              }`}
+            >
+              {sk.mandatory ? "True" : "False"}
+            </span>
+          </div>
+        ),
+        status: (
+          <div className="w-full flex justify-center">
+            <span className="text-[9px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-bold border border-amber-100">
+              {sk.status}
+            </span>
+          </div>
+        ),
+        created_at: (
+          <div className="w-full flex justify-center text-slate-500">
+            {sk.created_at ? sk.created_at.split("T")[0] : ""}
+          </div>
+        ),
+        action: (
+          <div className="w-full flex justify-center gap-1.5">
+            <Button
+              variant="outline"
+              size="small"
+              title="Create New Canonical Skill"
+              onClick={() => {
+                setActiveUnknownSkill(sk);
+                setUnknownSkillModal("create");
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="small"
+              title="Map to Existing Skill"
+              onClick={() => {
+                setActiveUnknownSkill(sk);
+                setUnknownSkillMapTarget(null);
+                setUnknownSkillModal("suggestions");
+              }}
+            >
+              <GitMerge className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="danger"
+              size="small"
+              title="Delete Unknown Skill"
+              onClick={() => {
+                setActiveUnknownSkill(sk);
+                setUnknownSkillModal("delete");
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ),
+        rowClass: "hover:bg-slate-50/50 transition",
+      };
+    });
+  }, [paginatedUnknownSkills, unknownSkillsCurrentPage, jdUnknownSkillsData, selectedUnknownSkillIds]);
 
   const fetchJdSkills = async () => {
     setIsLoadingSkills(true);
@@ -281,6 +654,7 @@ export default function JdDetails() {
   const education = currentJd.education || (currentJd.education_criteria ? `${currentJd.education_criteria.degree || ""} in ${currentJd.education_criteria.field || ""}` : "Not Specified");
   const source = currentJd.source || (currentJd.source_format === "TEXT" ? "Manual" : currentJd.source_format === "PDF" ? "PDF Upload" : currentJd.source_format === "DOCX" ? "DOCX Upload" : currentJd.source_format || "Manual");
   const status = currentJd.status || currentJd.is_verified || (currentJd.is_active_version ? "Ready" : "Closed");
+  const isJdCampaignEligible = currentJd.is_active_version && (currentJd.is_verified || "").toUpperCase() === "VERIFIED";
   const createdBy = currentJd.createdBy || currentJd.created_by || "System";
   const createdDate = currentJd.createdDate || (currentJd.created_at ? currentJd.created_at.split('T')[0] : "");
   const updatedDate = currentJd.updatedDate || (currentJd.updated_at ? currentJd.updated_at.split('T')[0] : createdDate);
@@ -419,6 +793,10 @@ export default function JdDetails() {
       toast.error("Please enter a recruiter ID.");
       return;
     }
+    if (!String(campaignForm.prompt_template_id).trim()) {
+      toast.error("Please select a Resume Parsing Prompt.");
+      return;
+    }
     if (campaignForm.max_candidates !== "" && campaignForm.max_candidates !== null && Number(campaignForm.max_candidates) <= 0) {
       toast.error("Max candidates must be greater than 0.");
       return;
@@ -439,8 +817,10 @@ export default function JdDetails() {
       weight_ai: Number(campaignForm.weight_ai),
       semantic_threshold: Number(campaignForm.semantic_threshold),
       ai_threshold: Number(campaignForm.ai_threshold),
+      deterministic_threshold: Number(campaignForm.deterministic_threshold),
       hiring_manager_id: campaignForm.hiring_manager_id.trim(),
-      recruiter_id: campaignForm.recruiter_id.trim()
+      recruiter_id: campaignForm.recruiter_id.trim(),
+      prompt_template_id: String(campaignForm.prompt_template_id || "").trim(),
     };
 
     setIsSubmittingCampaign(true);
@@ -465,7 +845,7 @@ export default function JdDetails() {
       setCampaignForm(DEFAULT_CAMPAIGN_FORM);
       fetchDbCampaigns();
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to initiate campaign.");
+      toast.error(formatApiError(err, "Failed to initiate campaign."));
     } finally {
       setIsSubmittingCampaign(false);
     }
@@ -578,7 +958,7 @@ export default function JdDetails() {
             </div>
           </div> */}
           <Button
-            variant="secondary"
+            variant="primary"
             size="medium"
             onClick={handleExportJD}
             title="Export JD"
@@ -588,6 +968,19 @@ export default function JdDetails() {
           >
             <Download className="h-4 w-4" /> Export JD
           </Button>
+          {isHRAdmin && (
+            <Button
+              variant="secondary"
+              size="medium"
+              onClick={handleDownloadJD}
+              title="Download JD"
+              disabled={isDownloading}
+              loading={isDownloading}
+              loadingText="Downloading..."
+            >
+              <Download className="h-4 w-4" /> Download JD
+            </Button>
+          )}
         </div>
       </div>
 
@@ -823,96 +1216,12 @@ export default function JdDetails() {
                 No JD skills found.
               </div>
             ) : (
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                    <th className="px-6 py-4">Canonical Skill</th>
-                    <th className="px-6 py-4">Match Tier</th>
-                    <th className="px-6 py-4 text-center">Weight</th>
-                    <th className="px-6 py-4 text-center">Confidence</th>
-                    <th className="px-6 py-4 text-center">Mandatory</th>
-                    <th className="px-6 py-4 text-center">Status</th>
-                    <th className="px-6 py-4 text-center">Created Date</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-150 font-medium">
-                  {paginatedSkills.map((sk, pageIdx) => {
-                    const globalIdx = (skillsCurrentPage - 1) * SKILLS_PAGE_SIZE + pageIdx;
-                    return (
-                    <tr key={sk.id || globalIdx} className="hover:bg-slate-50/50 transition">
-                      <td className="px-6 py-4 font-bold text-slate-900">{sk.canonical_name}</td>
-                      <td className="px-6 py-4">
-                        <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold border border-blue-100 text-[9px]">
-                          {sk.match_tier}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center text-slate-800">
-                        {editingSkillIdx === globalIdx ? (
-                          <input
-                            type="number"
-                            value={editedSkillWeight}
-                            onChange={(e) => setEditedSkillWeight(e.target.value)}
-                            className="w-12 px-1 py-0.5 border rounded text-center text-xs"
-                          />
-                        ) : (
-                          `${sk.weight}%`
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-center font-bold text-slate-700">
-                        {Math.round((sk.confidence || 0) * 100)}%
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <input
-                          type="checkbox"
-                          checked={sk.mandatory}
-                          onChange={() => {
-                            const updated = [...jdSkillsData];
-                            updated[globalIdx] = { ...updated[globalIdx], mandatory: !updated[globalIdx].mandatory };
-                            setJdSkillsData(updated);
-                          }}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="text-[9px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-bold border border-emerald-100">
-                          {sk.verification_status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center text-slate-500">
-                        {sk.created_at ? sk.created_at.split("T")[0] : ""}
-                      </td>
-                      <td className="px-6 py-4 text-right flex items-center justify-end">
-                        {editingSkillIdx === globalIdx ? (
-                          <button
-                            onClick={() => {
-                              const updated = [...jdSkillsData];
-                              updated[globalIdx].weight = Number(editedSkillWeight);
-                              setJdSkillsData(updated);
-                              setEditingSkillIdx(null);
-                              toast.success("Skill weight updated locally.");
-                            }}
-                            className="p-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded transition"
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setEditingSkillIdx(globalIdx);
-                              setEditedSkillWeight(sk.weight);
-                            }}
-                            className="p-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded transition"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <GenericTable
+                headers={jdSkillsHeaders}
+                columns={jdSkillsColumns}
+                rows={jdSkillsRows}
+                loading={isLoadingSkills}
+              />
             )}
           </div>
           <Pagination
@@ -934,6 +1243,25 @@ export default function JdDetails() {
             </div>
           </div>
 
+          {selectedUnknownSkillIds.size > 0 && (
+            <div className="flex items-center justify-between px-5 py-2.5 border-b border-blue-100 bg-blue-50">
+              <span className="text-[12.5px] font-semibold text-blue-700">{selectedUnknownSkillIds.size} selected</span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="small" onClick={() => setSelectedUnknownSkillIds(new Set())}>
+                  Clear
+                </Button>
+                <Button variant="danger" size="small" onClick={() => setBulkConfirmAction("delete")}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Reject Selected
+                </Button>
+                <Button variant="primary" size="small" onClick={() => setBulkConfirmAction("approve")}>
+                  <Check className="h-3.5 w-3.5" />
+                  Approve Selected
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             {isLoadingUnknownSkills ? (
               <div className="h-40 flex items-center justify-center">
@@ -944,55 +1272,12 @@ export default function JdDetails() {
                 No JD unknown skills found.
               </div>
             ) : (
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                    <th className="px-6 py-4">Raw Skill</th>
-                    <th className="px-6 py-4 text-center">Mandatory</th>
-                    <th className="px-6 py-4 text-center">Status</th>
-                    <th className="px-6 py-4 text-center">Created Date</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-150 font-medium">
-                  {paginatedUnknownSkills.map((sk, pageIdx) => {
-                    const globalIdx = (unknownSkillsCurrentPage - 1) * SKILLS_PAGE_SIZE + pageIdx;
-                    return (
-                    <tr key={sk.id || globalIdx} className="hover:bg-slate-50/50 transition">
-                      <td className="px-6 py-4 font-bold text-slate-900">{sk.raw_text}</td>
-                      <td className="px-6 py-4 text-center">
-                        <input
-                          type="checkbox"
-                          checked={sk.mandatory}
-                          onChange={() => {
-                            const updated = [...jdUnknownSkillsData];
-                            updated[globalIdx] = { ...updated[globalIdx], mandatory: !updated[globalIdx].mandatory };
-                            setJdUnknownSkillsData(updated);
-                          }}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="text-[9px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-bold border border-amber-100">
-                          {sk.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center text-slate-500">
-                        {sk.created_at ? sk.created_at.split("T")[0] : ""}
-                      </td>
-                      <td className="px-6 py-4 text-right flex items-center justify-end">
-                        <button
-                          onClick={() => setEditingSkillIdx(editingSkillIdx === globalIdx ? null : globalIdx)}
-                          className="p-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded transition"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <GenericTable
+                headers={jdUnknownSkillsHeaders}
+                columns={jdUnknownSkillsColumns}
+                rows={jdUnknownSkillsRows}
+                loading={isLoadingUnknownSkills}
+              />
             )}
           </div>
           <Pagination
@@ -1027,7 +1312,7 @@ export default function JdDetails() {
                     setCampaignSearchQuery(e.target.value);
                     setCampaignCurrentPage(1); // Reset page on search
                   }}
-                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white shadow-sm"
+                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white shadow-sm"
                 />
               </div>
             </div>
@@ -1037,6 +1322,10 @@ export default function JdDetails() {
               <Button
                 size="small"
                 variant="primary"
+                disabled={!isJdCampaignEligible}
+                title={!isJdCampaignEligible
+                  ?"Campaigns require a verified,active JD - resolve unknown skills first."
+                  :undefined}
                 onClick={() => {
                   setCampaignForm(DEFAULT_CAMPAIGN_FORM);
                   setLinkCampaignModalOpen(true);
@@ -1045,9 +1334,7 @@ export default function JdDetails() {
               >
                 <Plus className="h-3.5 w-3.5" /> New campaign
               </Button>
-              <button className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 transition-all shadow-sm">
-                <SlidersHorizontal className="h-4 w-4" /> Filters
-              </button>
+              
             </div>
           </div>
 
@@ -1066,84 +1353,72 @@ export default function JdDetails() {
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {paginatedCampaigns.map((c, idx) => {
-                  // Generate some realistic looking metrics deterministically from ID
-                  const hash = (c.id || "").split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) || idx;
-                  const maxCandidates = c.max_candidates || 5;
+                  const status = (c.status || "").toUpperCase();
+                  const managerName = c.hiring_manager || "Unassigned";
+                  const initials = String(managerName).substring(0, 2).toUpperCase();
 
-                  // selected is progress towards the target maxCandidates
-                  const selected = Math.max(1, Math.floor(maxCandidates * (0.4 + (hash % 5) * 0.12)));
-                  const shortlisted = selected * 2 + (hash % 3) + 2;
-                  const candidates = shortlisted * 2 + (hash % 4) + 4;
-                  const progressPercent = Math.min(100, Math.round((selected / maxCandidates) * 100));
-                  const displayId = `CMP-${200 + (hash % 50)}`;
-
-                  // Initials for avatar
-                  const managerName = c.hiring_manager || "Recruiter";
-                  const initials = managerName.substring(0, 2).toUpperCase();
-
-                  // Format Created date
-                  const createdDate = c.created_at ? new Date(c.created_at).toISOString().split('T')[0] : "2026-07-06";
-
-                  // Format Deadline
-                  const deadlineText = c.deadline ? `Due ${new Date(c.deadline).toISOString().split('T')[0]}` : `Due 2026-07-16`;
+                  const stats = canViewPipeline ? campaignPipelineStats[c.id] : null;
+                  const hasStats = stats != null;
+                  const progressPercent = hasStats
+                    ? c.max_candidates
+                      ? Math.min(100, Math.round((stats.selected / c.max_candidates) * 100))
+                      : stats.candidates
+                        ? Math.min(100, Math.round((stats.selected / stats.candidates) * 100))
+                        : 0
+                    : 0;
 
                   return (
                     <div
                       key={c.id || idx}
                       onClick={() => c.id && navigate(`/airs/campaigns/${c.id}`)}
-                      className="bg-white border border-slate-200 rounded-3xl px-6 py-4 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:border-indigo-200 transition"
+                      className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col gap-4 cursor-pointer hover:border-blue-300 transition"
                     >
+                      {/* Title + status */}
                       <div>
-                        {/* Top row */}
-                        <div className="flex justify-between items-center mb-2.5">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${(c.status || "").toUpperCase() === "ACTIVE"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-slate-50 text-slate-600"
-                            }`}>
-                            {(c.status || "").toUpperCase() === "ACTIVE" ? "Active" : c.status || "Active"}
+                        <div className="flex justify-between items-center gap-2">
+                          <h4 className="text-base font-bold text-slate-900 leading-snug truncate">{c.name}</h4>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold shrink-0 ${STATUS_BADGE[status] || "bg-slate-50 text-slate-600"}`}>
+                            {statusLabel(status)}
                           </span>
-                          <span className="text-xs text-slate-400 font-medium">{displayId}</span>
                         </div>
-
-                        {/* Title */}
-                        <h4 className="text-base font-bold text-slate-900 leading-snug mt-2.5 mb-0.5">
-                          {c.name}
-                        </h4>
-
-                        {/* Subtitle */}
-                        <p className="text-xs text-slate-500 font-medium mb-3.5">
-                          {c.jd_title || "Engineering"} · {maxCandidates} openings
+                        <p className="text-xs text-slate-500 font-medium mt-1">
+                          {c.jd_title || "—"}
+                          {c.max_candidates != null && ` · ${c.max_candidates} opening${c.max_candidates === 1 ? "" : "s"}`}
                         </p>
-
-                        {/* Candidate stats */}
-                        <div className="flex justify-between items-center text-xs text-slate-400 font-semibold mb-1.5">
-                          <span>{candidates} candidates</span>
-                          <span>{shortlisted} shortlisted</span>
-                          <span>{selected} selected</span>
-                        </div>
-
-                        {/* Progress bar */}
-                        <div className="w-full bg-slate-100 rounded-full h-2.5 mb-3.5 overflow-hidden">
-                          <div
-                            className="bg-indigo-650 h-2.5 rounded-full transition-all duration-500"
-                            style={{ width: `${progressPercent}%` }}
-                          />
-                        </div>
                       </div>
 
-                      {/* Divider */}
-                      <div className="border-t border-slate-150 my-1" />
+                      {/* Candidate stats — real pipeline data */}
+                      {stats === undefined ? (<div className="h-4 w-full bg-slate-100 rounded animate-pulse" />
+                      ) : hasStats ? (<div>
+                          <div className="flex justify-between text-xs text-slate-500 font-semibold">
+                            <span>{stats.candidates} candidates</span>
+                            <span>{stats.shortlisted} shortlisted</span>
+                            <span>{stats.selected} selected</span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-2 mt-2 overflow-hidden">
+                            <div
+                              className="h-2 rounded-full bg-blue-600 transition-all duration-500"
+                              style={{ width: `${progressPercent}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : (<p className="text-[11px] text-slate-400 font-medium">
+                          Pipeline metrics unavailable
+                        </p>
+                      )}
 
                       {/* Footer */}
-                      <div className="flex justify-between items-center pt-2.5">
-                        <div className="flex items-center gap-2.5">
-                          <div className="h-7 w-7 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px] uppercase shadow-sm flex-shrink-0">
+                      <div className="border-t border-slate-100 pt-3 flex justify-between items-center">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="h-7 w-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] uppercase shrink-0">
                             {initials}
                           </div>
-                          <span className="text-xs font-bold text-slate-700">{managerName}</span>
+                          <span className="text-xs font-bold text-slate-700 truncate">{managerName}</span>
                         </div>
-                        <span className="text-xs text-slate-450 font-semibold">
-                          {deadlineText}
+                        <span className="text-[11px] text-slate-400 font-semibold shrink-0">
+                          {c.deadline
+                            ? `Due ${new Date(c.deadline).toLocaleDateString(undefined, { month: "short", day: "2-digit", year: "numeric" })}`
+                            : "No deadline"}
                         </span>
                       </div>
                     </div>
@@ -1151,42 +1426,14 @@ export default function JdDetails() {
                 })}
               </div>
 
-              {/* Pagination controls */}
-              {filteredCampaigns.length > campaignsPerPage && (
-                <div className="flex justify-between items-center border-t border-slate-100 pt-5 mt-6 text-xs text-slate-500 font-medium">
-                  <div>
-                    Showing <span className="font-semibold text-slate-700">{(campaignCurrentPage - 1) * campaignsPerPage + 1}</span> to <span className="font-semibold text-slate-700">{Math.min(campaignCurrentPage * campaignsPerPage, filteredCampaigns.length)}</span> of <span className="font-semibold text-slate-700">{filteredCampaigns.length}</span> campaigns
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setCampaignCurrentPage(prev => Math.max(prev - 1, 1))}
-                      disabled={campaignCurrentPage === 1}
-                      className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-sm flex items-center gap-1 text-slate-600 font-semibold"
-                    >
-                      Previous
-                    </button>
-                    {Array.from({ length: totalCampaignPages }, (_, i) => i + 1).map((pageNum) => (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCampaignCurrentPage(pageNum)}
-                        className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold transition-all shadow-sm ${campaignCurrentPage === pageNum
-                          ? "bg-[#0A0082] text-white"
-                          : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                          }`}
-                      >
-                        {pageNum}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => setCampaignCurrentPage(prev => Math.min(prev + 1, totalCampaignPages))}
-                      disabled={campaignCurrentPage === totalCampaignPages}
-                      className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all shadow-sm flex items-center gap-1 text-slate-600 font-semibold"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
+              {/* Pagination */}
+              <Pagination
+                currentPage={campaignCurrentPage}
+                totalPages={totalCampaignPages}
+                onPrevious={() => setCampaignCurrentPage((p) => Math.max(p - 1, 1))}
+                onNext={() => setCampaignCurrentPage((p) => Math.min(p + 1, totalCampaignPages))}
+                className="mt-6"
+              />
             </>
           )}
         </div>
@@ -1302,7 +1549,7 @@ export default function JdDetails() {
         isOpen={linkCampaignModalOpen}
         onClose={() => setLinkCampaignModalOpen(false)}
         title="Initiate Recruitment Campaign"
-        width="520px"
+        width="640px"
         height="90vh"
       >
         <NewCampaignForm
@@ -1313,6 +1560,124 @@ export default function JdDetails() {
           isSubmittingCampaign={isSubmittingCampaign}
           handleInitiateCampaign={handleInitiateCampaign}
         />
+      </Modal>
+
+      {/* Create New Canonical Skill — from a JD Unknown Skill */}
+      <SkillActionModal
+        isOpen={unknownSkillModal === "create"}
+        onClose={closeUnknownSkillModal}
+        title="Create New Canonical Skill"
+        subtitle={activeUnknownSkill ? `Resolving: "${activeUnknownSkill.raw_text}"` : ""}
+        size="2xl"
+        animation="zoom"
+        titleIcon={<Plus className="h-5 w-5" />}
+        maxHeight="max-h-[90vh]"
+      >
+        {activeUnknownSkill && (
+          <CreateSkillModalBody
+            rawSkill={activeUnknownSkill.raw_text}
+            unknownSkillId={activeUnknownSkill.unknown_skill_id}
+            onClose={closeUnknownSkillModal}
+            onCreated={handleUnknownSkillResolved}
+          />
+        )}
+      </SkillActionModal>
+
+      {/* Map to Existing Skill — suggestion tabs */}
+      <SkillActionModal
+        isOpen={unknownSkillModal === "suggestions"}
+        onClose={closeUnknownSkillModal}
+        title="Map to Existing Skill"
+        subtitle={activeUnknownSkill ? `Resolving: "${activeUnknownSkill.raw_text}"` : ""}
+        size="4xl"
+        animation="zoom"
+        titleIcon={<GitMerge className="h-5 w-5" />}
+        maxHeight="max-h-[90vh]"
+      >
+        {activeUnknownSkill && (
+          <SuggestionTabsSection
+            unknownSkillId={activeUnknownSkill.unknown_skill_id}
+            onMapClick={(row) => {
+              setUnknownSkillMapTarget(row);
+              setUnknownSkillModal("confirmMap");
+            }}
+          />
+        )}
+      </SkillActionModal>
+
+      {/* Map to Existing Skill — confirm */}
+      <SkillActionModal
+        isOpen={unknownSkillModal === "confirmMap"}
+        onClose={() => setUnknownSkillModal("suggestions")}
+        title="Map to Existing Skill"
+        subtitle={activeUnknownSkill ? `Resolving: "${activeUnknownSkill.raw_text}"` : ""}
+        size="2xl"
+        animation="zoom"
+        titleIcon={<GitMerge className="h-5 w-5" />}
+        maxHeight="max-h-[90vh]"
+      >
+        {activeUnknownSkill && (
+          <MapSkillModalBody
+            rawSkill={activeUnknownSkill.raw_text}
+            unknownSkillId={activeUnknownSkill.unknown_skill_id}
+            target={unknownSkillMapTarget}
+            onClose={() => setUnknownSkillModal("suggestions")}
+            onMapped={handleUnknownSkillResolved}
+          />
+        )}
+      </SkillActionModal>
+
+      {/* Delete Unknown Skill */}
+      <SkillActionModal
+        isOpen={unknownSkillModal === "delete"}
+        onClose={closeUnknownSkillModal}
+        title="Delete Unknown Skill"
+        size="sm"
+        animation="zoom"
+        titleIcon={<Trash2 className="h-5 w-5 text-rose-500" />}
+        maxHeight="max-h-[90vh]"
+      >
+        {activeUnknownSkill && (
+          <DeleteSkillModalBody
+            rawSkill={activeUnknownSkill.raw_text}
+            unknownSkillId={activeUnknownSkill.unknown_skill_id}
+            onClose={closeUnknownSkillModal}
+            onDeleted={handleUnknownSkillResolved}
+          />
+        )}
+      </SkillActionModal>
+
+      {/* Bulk Approve / Reject — JD Unknown Skills */}
+      <Modal
+        isOpen={!!bulkConfirmAction}
+        onClose={closeBulkConfirm}
+        title={bulkConfirmAction === "approve" ? "Approve Selected Skills" : "Reject Selected Skills"}
+        width="460px"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-100">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <p className="text-[12px] text-amber-700">
+              {bulkConfirmAction === "approve"
+                ? `This creates a new canonical skill for each of the ${selectedUnknownSkillIds.size} selected unknown skill${selectedUnknownSkillIds.size > 1 ? "s" : ""}.`
+                : `This permanently deletes the ${selectedUnknownSkillIds.size} selected unknown skill${selectedUnknownSkillIds.size > 1 ? "s" : ""}. This action cannot be undone.`}
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" size="small" onClick={closeBulkConfirm} disabled={isBulkSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              variant={bulkConfirmAction === "approve" ? "primary" : "danger"}
+              size="small"
+              loading={isBulkSubmitting}
+              onClick={handleConfirmBulkUnknownSkillAction}
+            >
+              Confirm
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* Restore Confirmation Dialog */}

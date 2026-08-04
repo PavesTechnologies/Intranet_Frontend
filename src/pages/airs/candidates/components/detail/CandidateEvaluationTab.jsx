@@ -1,10 +1,14 @@
 import React from "react";
 import { CheckCircle2, AlertTriangle } from "lucide-react";
 import ScoreRing from "../ScoreRing";
+import HierarchyMatchResults from "./HierarchyMatchResults";
+import NoVerifiedSkillsBanner from "./NoVerifiedSkillsBanner";
 
-export default function CandidateEvaluationTab({ candidate }) {
+export default function CandidateEvaluationTab({ candidate, onAddManualSkill }) {
   return (
     <>
+      <NoVerifiedSkillsBanner candidate={candidate} onAddManualSkill={onAddManualSkill} />
+
       <div className="flex gap-4 justify-around p-4 rounded-xl bg-slate-50">
         <div className="text-center">
           <ScoreRing value={candidate.ats} size={54} color="#2563EB" />
@@ -23,6 +27,12 @@ export default function CandidateEvaluationTab({ candidate }) {
           <div className="text-[11px] mt-1.5 text-slate-400">Risk</div>
         </div>
       </div>
+
+      <HierarchyMatchResults
+        scoreBreakdown={candidate.scoreBreakdown}
+        manualSkills={candidate.manualSkills}
+        additionalSkills={candidate.additionalSkills}
+      />
 
       <div>
         <div className="text-[12px] font-semibold mb-1.5 text-emerald-600">Strengths</div>

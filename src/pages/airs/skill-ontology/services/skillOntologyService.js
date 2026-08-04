@@ -1,27 +1,15 @@
-// Service layer for the Skill Ontology module.
-//
-// HYBRID MODE: getSkills / getSkill / createSkill / updateSkill /
-// updateSkillStatus / getCategories / searchParents / validateImportFile /
-// importSkills / getImportErrorReport / exportSkills / getSkillHierarchy /
-// getSkillChildren call the real backend (every GET/POST/PATCH endpoint
-// provided so far). Everything else (aliases, similar-skill resolution,
-// merge, recent activity, seeding) still operates against the in-memory/
-// localStorage-backed mock dataset in mock/skillOntologyMockData.js, since no
-// real endpoint exists for those yet.
-//
-// Real calls follow the same convention as src/pages/airs/service/campaignservice.js:
-// same BASE_URL source, same inline Authorization header, same try/catch/throw shape.
+// Service layer for the Skill Ontology module. Every call here hits the real
+// backend — same convention as src/pages/airs/service/campaignservice.js:
+// same BASE_URL source, same inline Authorization header, same
+// try/catch/throw shape.
 
 import api from "../../../../api/axiosInstance";
-import { loadMockSkills, persistMockSkills, buildActivityForSkill } from "../mock/skillOntologyMockData";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
 });
-
-const delay = (ms = 350) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const ok = (data) => ({ success: true, data });
 
@@ -86,10 +74,192 @@ const mapApiSkillToInternal = (raw) => ({
 
 // ── Real endpoints ──────────────────────────────────────────────────────
 
+// Raw/unrecognized skill mentions — a distinct resource from canonical
+// skills (note the different path: /skills/unknown, not /skill-ontology).
+// Field names are defensive since the exact response shape wasn't specified.
+const mapUnknownSkill = (raw) => ({
+  id: raw.id,
+  rawSkill: raw.raw_skill ?? raw.rawSkill ?? raw.raw_text ?? "",
+  normalizedKey: raw.normalized_key ?? raw.normalizedKey ?? "",
+  frequency: raw.frequency ?? raw.occurrence_count ?? raw.count ?? 0,
+  firstSeen: raw.first_seen ?? raw.firstSeen ?? null,
+  lastSeen: raw.last_seen ?? raw.lastSeen ?? null,
+  status: raw.status ?? "PENDING",
+});
+
+export const getUnknownSkills = async (params = {}) => {
+  const url = `${BASE_URL}/skills/unknown`;
+  const query = { page: params.page, page_size: params.page_size, search: params.search };
+  // Own query-key prefix ("GET .../skills/unknown ...") — never collides with
+  // getSkills' ("GET .../skill-ontology ...") or getCategories' ("categories")
+  // keys, so the two tabs' in-flight requests can never be mistaken for one another.
+  const key = `GET ${url} ${JSON.stringify(query)}`;
+
+  return dedupedRequest(key, async () => {
+    try {
+      console.log("[skillOntologyService] GET", url, query);
+      const response = await api.get(url, { params: query, headers: authHeaders() });
+      const payload = response.data?.data || {};
+      const items = payload.items || (Array.isArray(payload) ? payload : []);
+      return ok({
+        items: items.map(mapUnknownSkill),
+        total: payload.total ?? items.length,
+      });
+    } catch (error) {
+      console.error("Error fetching unknown skills:", error);
+      throw error;
+    }
+  });
+};
+
 // Accepts: page, page_size, search, category, confidence, is_active.
 // Note: this module's Source filter dropdown has no server-side equivalent
 // in the given API, so "source" is never sent — the dropdown stays in the UI
 // per "don't change component structure" but doesn't currently narrow results.
+// Unknown Skill Suggestions (HR_ADMIN verification workflow) — four
+// independent match-suggestion feeds for one raw/unknown skill. Each tab is
+// fetched lazily and cached by useUnknownSkillSuggestions, so this layer only
+// owns the network call + response mapping, keyed per suggestion type so the
+// four tabs' in-flight requests/dedup keys never collide with one another.
+const SUGGESTION_ENDPOINT_BY_TYPE = {
+  rapidfuzz_canonical: "rapidfuzz-canonical",
+  semantic_canonical: "semantic-canonical",
+  rapidfuzz_alias: "rapidfuzz-alias",
+  semantic_alias: "semantic-alias",
+};
+
+const isAliasSuggestionType = (type) => type === "rapidfuzz_alias" || type === "semantic_alias";
+
+// Field names are defensive (snake_case/camelCase) since the exact response
+// shape wasn't specified beyond "same envelope as other skill-ontology
+// endpoints". Values are surfaced exactly as returned — no re-sorting or
+// re-scoring here.
+const mapSuggestion = (raw, isAlias) => ({
+  skillId: raw.skill_id ?? raw.id ?? raw.canonical_skill_id ?? raw.canonicalSkillId ?? "",
+  skillName: raw.skill_name ?? raw.skillName ?? raw.canonical_name ?? raw.canonicalName ?? "",
+  ...(isAlias ? { alias: raw.matched_alias ?? raw.alias ?? raw.matchedAlias ?? "" } : {}),
+  similarity: raw.similarity ?? raw.similarity_score ?? raw.similarityScore ?? raw.score ?? 0,
+});
+
+// params.limit / params.threshold are optional — omitted entirely when not
+// provided so the backend applies its own default configuration.
+// HR_ADMIN-only hard delete of a raw/unknown skill mention. payload (reason,
+// comments) is sent as the DELETE body for the audit trail the confirmation
+// modal collects; the backend only strictly requires the id in the path.
+export const deleteUnknownSkill = async (unknownSkillId, payload = {}) => {
+  try {
+    console.log("[skillOntologyService] DELETE", `${BASE_URL}/skills/unknown/${unknownSkillId}`, payload);
+    const response = await api.delete(`${BASE_URL}/skills/unknown/${unknownSkillId}`, {
+      headers: authHeaders(),
+      data: payload,
+    });
+    return ok({ message: response.data?.message, ...(response.data?.data || {}) });
+  } catch (error) {
+    console.error("Error deleting unknown skill:", error);
+    throw error;
+  }
+};
+
+// HR_ADMIN-only bulk approve — creates a canonical skill for each selected
+// unknown skill in one call. Response carries a per-item results array
+// (partial success is normal: some ids can succeed while others fail), plus
+// aggregate succeeded/failed counts the caller surfaces in its confirmation
+// summary.
+export const bulkApproveUnknownSkills = async (unknownSkillIds) => {
+  try {
+    const url = `${BASE_URL}/skills/unknown/bulk-approve`;
+    const body = { unknown_skill_ids: unknownSkillIds };
+    console.log("[skillOntologyService] POST", url, body);
+    const response = await api.post(url, body, { headers: authHeaders() });
+    return ok({ message: response.data?.message, ...(response.data?.data || {}) });
+  } catch (error) {
+    console.error("Error bulk approving unknown skills:", error);
+    throw error;
+  }
+};
+
+// HR_ADMIN-only bulk hard-delete — same per-item results/succeeded/failed
+// shape as bulkApproveUnknownSkills above.
+export const bulkDeleteUnknownSkills = async (unknownSkillIds) => {
+  try {
+    const url = `${BASE_URL}/skills/unknown/bulk-delete`;
+    const body = { unknown_skill_ids: unknownSkillIds };
+    console.log("[skillOntologyService] POST", url, body);
+    const response = await api.post(url, body, { headers: authHeaders() });
+    return ok({ message: response.data?.message, ...(response.data?.data || {}) });
+  } catch (error) {
+    console.error("Error bulk deleting unknown skills:", error);
+    throw error;
+  }
+};
+
+// HR_ADMIN-only resolution of a raw/unknown skill mention — maps it onto an
+// existing canonical skill (or records it as a new alias of one), per the
+// chosen `type`. Both ids are supplied by the caller (path param +
+// canonical_skill_id from the suggestion the user picked); this layer only
+// owns the request shape + response envelope.
+export const resolveUnknownSkill = async (unknownSkillId, payload) => {
+  try {
+    const url = `${BASE_URL}/unknown-skills/${unknownSkillId}/resolve`;
+    const body = {
+      canonical_skill_id: payload.canonical_skill_id,
+      canonical_name: payload.canonical_name,
+      type: payload.type,
+    };
+    console.log("[skillOntologyService] POST", url, body);
+    const response = await api.post(url, body, { headers: authHeaders() });
+    return ok({ message: response.data?.message, ...(response.data?.data || {}) });
+  } catch (error) {
+    console.error("Error resolving unknown skill:", error);
+    throw error;
+  }
+};
+
+// HR_ADMIN-only — creates a brand new canonical skill directly from a raw/
+// unknown skill mention (as opposed to mapping it onto one that already
+// exists via resolveUnknownSkill above). Field mapping mirrors createSkill's
+// convention so SkillForm/validateSkillForm can be reused as-is.
+export const createCanonicalSkillFromUnknown = async (unknownSkillId, payload) => {
+  try {
+    const url = `${BASE_URL}/skills/unknown/${unknownSkillId}/create-canonical`;
+    const body = {
+      canonical_name: payload.canonical_name,
+      category: payload.category,
+      aliases: payload.aliases,
+      parent_skill_id: payload.parent_skill_id || null,
+      confidence: payload.confidence?.toLowerCase(),
+    };
+    console.log("[skillOntologyService] POST", url, body);
+    const response = await api.post(url, body, { headers: authHeaders() });
+    return ok({ message: response.data?.message, ...(response.data?.data || {}) });
+  } catch (error) {
+    console.error("Error creating canonical skill from unknown skill:", error);
+    throw error;
+  }
+};
+
+export const getUnknownSkillSuggestions = async (unknownSkillId, suggestionType, params = {}) => {
+  const endpoint = SUGGESTION_ENDPOINT_BY_TYPE[suggestionType];
+  const url = `${BASE_URL}/unknown-skills/${unknownSkillId}/suggestions/${endpoint}`;
+  const query = {};
+  if (params.limit !== undefined) query.limit = params.limit;
+  if (params.threshold !== undefined) query.threshold = params.threshold;
+  const key = `GET ${url} ${JSON.stringify(query)}`;
+
+  return dedupedRequest(key, async () => {
+    try {
+      console.log("[skillOntologyService] GET", url, query);
+      const response = await api.get(url, { params: query, headers: authHeaders() });
+      const items = response.data?.data || [];
+      const isAlias = isAliasSuggestionType(suggestionType);
+      return ok(items.map((raw) => mapSuggestion(raw, isAlias)));
+    } catch (error) {
+      console.error(`Error fetching ${suggestionType} suggestions:`, error);
+      throw error;
+    }
+  });
+};
+
 export const getSkills = async (params = {}) => {
   // Built fresh from the caller's params every call — never mutated in place
   // and never shared with getCategories' request below, so filter state from
@@ -101,6 +271,7 @@ export const getSkills = async (params = {}) => {
     search: params.search,
     category: params.category,
     confidence: params.confidence,
+    source: params.source,
     is_active: params.is_active,
   };
   // Query key = url + exact filters. Two callers requesting the identical
@@ -155,18 +326,28 @@ export const createSkill = async (payload) => {
   }
 };
 
+// The PATCH endpoint's alias fields are additive/subtractive, not a full
+// replacement: "aliases" adds/ensures the listed names are present, while
+// actually removing an existing alias requires it to be listed in
+// "remove_aliases" with "confirm_alias_removal: true" alongside it — sending
+// a shorter "aliases" array on its own does not remove anything. Callers pass
+// the aliases the user removed via payload.remove_aliases so this can attach
+// both fields whenever a removal is intended.
 export const updateSkill = async (skillId, payload) => {
   try {
+    const removeAliases = payload.remove_aliases || [];
+    const body = {
+      canonical_name: payload.canonical_name,
+      category: payload.category,
+      aliases: payload.aliases,
+      ...(removeAliases.length > 0 ? { remove_aliases: removeAliases, confirm_alias_removal: true } : {}),
+      parent_skill_id: payload.parent_skill_id || null,
+      confidence: payload.confidence?.toLowerCase(),
+      is_active: payload.status ? payload.status === "ACTIVE" : undefined,
+    };
     const response = await api.patch(
       `${BASE_URL}/skill-ontology/${skillId}`,
-      {
-        canonical_name: payload.canonical_name,
-        category: payload.category,
-        aliases: payload.aliases,
-        parent_skill_id: payload.parent_skill_id || null,
-        confidence: payload.confidence?.toLowerCase(),
-        is_active: payload.status ? payload.status === "ACTIVE" : undefined,
-      },
+      body,
       { headers: authHeaders() }
     );
     return ok(mapApiSkillToInternal(response.data?.data || {}));
@@ -336,6 +517,7 @@ export const exportSkills = async (params = {}) => {
         search: params.search,
         category: params.category,
         confidence: params.confidence,
+        source: params.source,
         is_active: params.is_active,
       },
       headers: authHeaders(),
@@ -348,71 +530,46 @@ export const exportSkills = async (params = {}) => {
   }
 };
 
-// ── Still mock (no real endpoint provided yet) ──────────────────────────
+// Aliases may come back from the backend either as plain strings or as
+// { id, name } objects (see useSkillDetail's own aliasName helper) — these
+// two normalise either shape so add/remove below compare correctly instead
+// of an object reference against a string always failing to match.
+const aliasName = (a) => (a && typeof a === "object" ? a.name : a);
+const isTargetAlias = (a, target) => (a && typeof a === "object" ? a.id === target : a === target);
 
-export const seedOntology = async () => {
-  await delay();
-  localStorage.removeItem("airs_skill_ontology_mock_v1");
-  const skills = loadMockSkills();
-  return ok({ count: skills.length });
-};
-
+// Alias add/remove has no dedicated endpoint — both go through the generic
+// updateSkill PATCH with the full aliases array, so the current skill is
+// fetched first to avoid clobbering its other fields. The PATCH body always
+// sends plain name strings (matching what the Edit Skill form sends), even
+// when the GET response returned { id, name } objects.
 export const addAlias = async (skillId, alias) => {
-  await delay();
-  const all = loadMockSkills();
-  persistMockSkills(
-    all.map((s) => (s.id === skillId && !s.aliases.includes(alias) ? { ...s, aliases: [...s.aliases, alias] } : s))
-  );
-  return ok({ id: skillId, alias });
+  const current = await getSkill(skillId);
+  const skill = current?.data || current;
+  const names = skill.aliases.map(aliasName);
+  const aliases = names.includes(alias) ? names : [...names, alias];
+  return updateSkill(skillId, {
+    canonical_name: skill.canonicalName,
+    category: skill.category,
+    aliases,
+    parent_skill_id: skill.parentSkillId,
+    confidence: skill.confidence,
+    status: skill.status,
+  });
 };
 
-export const removeAlias = async (skillId, aliasId) => {
-  await delay();
-  const all = loadMockSkills();
-  persistMockSkills(all.map((s) => (s.id === skillId ? { ...s, aliases: s.aliases.filter((a) => a !== aliasId) } : s)));
-  return ok({ id: skillId });
-};
-
-export const getSkillActivity = async (skillId) => {
-  await delay();
-  const all = loadMockSkills();
-  const skill = all.find((s) => s.id === skillId);
-  if (!skill) return ok({ events: [] });
-  return ok({ events: buildActivityForSkill(skill) });
-};
-
-export const getSimilarSkills = async (skillId) => {
-  await delay();
-  const all = loadMockSkills();
-  const skill = all.find((s) => s.id === skillId);
-  if (!skill) return ok([]);
-  const candidates = all.filter((s) => s.id !== skillId && s.category === skill.category).slice(0, 3);
-  return ok(candidates.map((c, i) => ({ ...c, similarity: 0.92 - i * 0.12 })));
-};
-
-export const mergeSkills = async (sourceSkillId, targetSkillId) => {
-  await delay();
-  const all = loadMockSkills();
-  const source = all.find((s) => s.id === sourceSkillId);
-  const updated = all
-    .filter((s) => s.id !== sourceSkillId)
-    .map((s) =>
-      s.id === targetSkillId && source
-        ? { ...s, aliases: [...new Set([...s.aliases, source.canonicalName, ...source.aliases])] }
-        : s
-    );
-  persistMockSkills(updated);
-  return ok({ mergedInto: targetSkillId });
-};
-
-export const addAsAlias = async (sourceSkillId, ofSkillId) => {
-  await delay();
-  const all = loadMockSkills();
-  const source = all.find((s) => s.id === sourceSkillId);
-  const updated = all
-    .filter((s) => s.id !== sourceSkillId)
-    .map((s) => (s.id === ofSkillId && source ? { ...s, aliases: [...new Set([...s.aliases, source.canonicalName])] } : s));
-  persistMockSkills(updated);
-  return ok({ addedTo: ofSkillId });
+export const removeAlias = async (skillId, alias) => {
+  const current = await getSkill(skillId);
+  const skill = current?.data || current;
+  const removedNames = skill.aliases.filter((a) => isTargetAlias(a, alias)).map(aliasName);
+  const aliases = skill.aliases.filter((a) => !isTargetAlias(a, alias)).map(aliasName);
+  return updateSkill(skillId, {
+    canonical_name: skill.canonicalName,
+    category: skill.category,
+    aliases,
+    remove_aliases: removedNames,
+    parent_skill_id: skill.parentSkillId,
+    confidence: skill.confidence,
+    status: skill.status,
+  });
 };
 

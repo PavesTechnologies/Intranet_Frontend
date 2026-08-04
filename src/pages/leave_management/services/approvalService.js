@@ -16,15 +16,19 @@ export const approvalService = {
     return response.data;
   },
 
+  getPendingApprovalsForHr: async () => {
+    const response = await api.get(`${BASE_URL}/api/approvals/pending/maker`, {
+      headers: getAuthHeader(),
+    });
+    return response.data;
+  },
+
   approveRequest: async (requestId, comment) => {
     const response = await api.post(
       `${BASE_URL}/api/approvals/${requestId}/approve`,
       { comment },
       { headers: getAuthHeader() },
     );
-    {
-      startJob(response.data.data.jobId);
-    }
     return response.data;
   },
 

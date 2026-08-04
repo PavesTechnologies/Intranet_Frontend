@@ -1,6 +1,10 @@
+import { toast } from "react-toastify";
 import api from "../../../api/axiosInstance";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
+
+const getErrorMessage = (error, fallback) =>
+    error?.response?.data?.message || error?.response?.data?.detail || fallback;
 
 export const getAllJDs = async (params) => {
     try {
@@ -9,9 +13,11 @@ export const getAllJDs = async (params) => {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
         });
+        toast.success(response.data?.message || "Job descriptions fetched successfully.");
         return response.data;
     } catch (error) {
         console.error("Error fetching JDs:", error);
+        toast.error(getErrorMessage(error, "Failed to fetch job descriptions."));
         throw error
     }
 };
@@ -23,9 +29,11 @@ export const createJD = async (payload) => {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
         });
+        toast.success(response.data?.message || "Job description created successfully.");
         return response.data;
     } catch (error) {
         console.error("Error creating JD:", error);
+        toast.error(getErrorMessage(error, "Failed to create job description."));
         throw error;
     }
 };
@@ -44,9 +52,11 @@ export const createJDFromFile = async (file, fields = {}) => {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
         });
+        toast.success(response.data?.message || "Job description created from file successfully.");
         return response.data;
     } catch (error) {
         console.error("Error creating JD from file:", error);
+        toast.error(getErrorMessage(error, "Failed to create job description from file."));
         throw error;
     }
 };
@@ -58,9 +68,11 @@ export const getJDById = async (jdId) => {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
         });
+        toast.success(response.data?.message || "Job description fetched successfully.");
         return response.data;
     } catch (error) {
         console.error("Error fetching JD:", error);
+        toast.error(getErrorMessage(error, "Failed to fetch job description."));
         throw error
     }
 };
@@ -72,9 +84,11 @@ export const deleteJDById = async (jdId) => {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
         });
+        toast.success(response.data?.message || "Job description deleted successfully.");
         return response.data;
     } catch (error) {
         console.error("Error deleting JD: ", error);
+        toast.error(getErrorMessage(error, "Failed to delete job description."));
         throw error
     }
 };
@@ -86,9 +100,11 @@ export const updateJDById = async (jdId, updatedData) => {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
         });
+        toast.success(response.data?.message || "Job description updated successfully.");
         return response.data;
     } catch (error) {
         console.error("Error updating JD:", error);
+        toast.error(getErrorMessage(error, "Failed to update job description."));
         throw error;
     }
 };
@@ -107,9 +123,11 @@ export const updateJDFromFile = async (jdId, file, fields = {}) => {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
         });
+        toast.success(response.data?.message || "Job description updated from file successfully.");
         return response.data;
     } catch (error) {
         console.error("Error updating JD from file:", error);
+        toast.error(getErrorMessage(error, "Failed to update job description from file."));
         throw error;
     }
 };
@@ -122,9 +140,11 @@ export const viewJDFile = async (jdId) => {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
         });
+        toast.success("Job description file loaded successfully.");
         return response;
     } catch (error) {
         console.error("Error viewing JD file:", error);
+        toast.error(getErrorMessage(error, "Failed to view job description file."));
         throw error;
     }
 };
@@ -137,9 +157,11 @@ export const exportSingleJD = async (jdId) => {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
         });
+        toast.success("Job description exported successfully.");
         return response;
     } catch (error) {
         console.error("Error exporting JD:", error);
+        toast.error(getErrorMessage(error, "Failed to export job description."));
         throw error;
     }
 };
@@ -156,10 +178,27 @@ export const exportJDs = async (params) => {
                 },
             }
         );
-
+        toast.success("Job descriptions exported successfully.");
         return response;
     } catch (error) {
         console.error("Error exporting JDs:", error);
+        toast.error(getErrorMessage(error, "Failed to export job descriptions."));
+        throw error;
+    }
+};
+
+export const downloadJDById = async (jdId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/jd/${jdId}/download`, {
+            responseType: "blob",
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response;
+    } catch (error) {
+        console.error("Error downloading JD:", error);
+        toast.error(getErrorMessage(error, "Failed to download job description."));
         throw error;
     }
 };
@@ -171,9 +210,27 @@ export const getMyJDUploads = async () => {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
         });
+        toast.success(response.data?.message || "JD uploads fetched successfully.");
         return response.data;
     } catch (error) {
         console.error("Error fetching JD uploads:", error);
+        toast.error(getErrorMessage(error, "Failed to fetch JD uploads."));
+        throw error;
+    }
+};
+
+export const deleteJDProcessingTask = async (taskId) => {
+    try {
+        const response = await api.delete(`${BASE_URL}/dead-letter-queue/${taskId}`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        toast.success(response.data?.message || "Processing task deleted successfully.");
+        return response.data;
+    } catch (error) {
+        console.error("Error deleting JD processing task:", error);
+        toast.error(getErrorMessage(error, "Failed to delete processing task."));
         throw error;
     }
 };
@@ -185,9 +242,11 @@ export const getJDSkills = async (jdId) => {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
         });
+        toast.success(response.data?.message || "JD skills fetched successfully.");
         return response.data;
     } catch (error) {
         console.error("Error fetching JD skills:", error);
+        toast.error(getErrorMessage(error, "Failed to fetch JD skills."));
         throw error;
     }
 };
@@ -199,9 +258,11 @@ export const getJDUnknownSkills = async (jdId) => {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
         });
+        toast.success(response.data?.message || "JD unknown skills fetched successfully.");
         return response.data;
     } catch (error) {
         console.error("Error fetching JD unknown skills:", error);
+        toast.error(getErrorMessage(error, "Failed to fetch JD unknown skills."));
         throw error;
     }
 };

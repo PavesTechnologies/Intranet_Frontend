@@ -48,6 +48,15 @@ export const STATUS_FORM_OPTIONS = [
   { label: "Inactive", value: SKILL_STATUS.INACTIVE },
 ];
 
+// List filter — three-way, because "Active only", "Inactive only" and "both"
+// are three distinct backend states (is_active=true / false / omitted) that a
+// two-state toggle cannot express.
+export const STATUS_FILTER_OPTIONS = [
+  { label: "All Statuses", value: "All" },
+  { label: "Active", value: SKILL_STATUS.ACTIVE },
+  { label: "Inactive", value: SKILL_STATUS.INACTIVE },
+];
+
 export const EMBEDDING_STATUS = {
   GENERATED: "GENERATED",
   PENDING: "PENDING",
@@ -58,12 +67,6 @@ export const EMBEDDING_STATUS_LABEL = {
   GENERATED: "Generated",
   PENDING: "Pending",
   OUTDATED: "Outdated",
-};
-
-export const SIMILAR_SKILL_ACTIONS = {
-  KEEP_NEW: "keep_new",
-  MERGE_EXISTING: "merge_existing",
-  ADD_AS_ALIAS: "add_as_alias",
 };
 
 export const SKILL_ONTOLOGY_PAGE_SIZE = 10;
