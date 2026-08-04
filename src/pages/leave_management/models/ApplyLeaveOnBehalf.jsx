@@ -242,6 +242,7 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
               defaultDate={startDate ? new Date(startDate) : null}
               onChange={handleStartDateChange}
               disabledDays={[{ dayOfWeek: [0, 6] }, ...holidays]}
+              year={year}
             />
             <DateRangePicker
               label="End Date"
@@ -253,6 +254,7 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
                 startDate ? { before: new Date(startDate) } : {},
               ]}
               align="right"
+              year={year}
             />
             <div className="col-span-2 flex items-center justify-between pt-2 border-t border-gray-200">
               <span className="flex items-center gap-1 text-xs font-bold text-indigo-600">
