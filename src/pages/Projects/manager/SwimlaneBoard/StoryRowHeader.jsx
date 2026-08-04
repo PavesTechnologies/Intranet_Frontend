@@ -2,7 +2,7 @@
    Story row header  (collapsible, coloured left border)
 ───────────────────────────────────────────────────────── */
 
-import Avatar from "../Board/Avatar";
+import Avatar from "../../../../components/Board/Avatar";
 import {
   ChevronDown,
   ChevronRight,

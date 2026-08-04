@@ -17,8 +17,8 @@ import SprintColumn from "./Sprint/SprintColumn";
 import CreateSprintModal from "./Sprint/CreateSprintModal";
 import CreateIssueForm from "./CreateIssue/CreateIssueForm";
 import TaskCard from "./Sprint/TaskCard";
-import EditTaskForm from "./Backlog/EditTaskForm";
-import EditStoryForm from "./Backlog/EditStoryForm";
+import EditTaskForm from "../../../components/Backlog/EditTaskForm";
+import EditStoryForm from "../../../components/Backlog/EditStoryForm";
 import RightSidePanel from "./Sprint/RightSidePanel";
 import SprintDetailsPanel from "./Sprint/SprintDetailsPanel";
 import SprintPendingModal from "./Sprint/SprintPendingModal";
@@ -557,6 +557,8 @@ const handleSprintStatus = async (sprintId, action) => {
                   allStories={stories}
                   sprints={activeAndPlanningSprints}
                   permissions={permissions}
+                  projectId={projectId}
+                  navigate={navigate}
                   onSelectParentStory={handleAssignTaskToStory}
                   onSelectEpic={handleAssignEpicToStory}
                   onDropStory={handleDropStory}
@@ -627,6 +629,8 @@ const handleSprintStatus = async (sprintId, action) => {
                           allStories={stories}
                           sprints={sprints}
                           permissions={permissions}
+                          projectId={projectId}
+                          navigate={navigate}
                           onDropStory={handleDropStory}
                           onSelectParentStory={handleAssignTaskToStory}
                           onSelectEpic={handleAssignEpicToStory}

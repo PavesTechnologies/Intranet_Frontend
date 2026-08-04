@@ -21,6 +21,7 @@ import AddHolidaysModal from "./models/AddHolidaysModal";
 import EffectiveDeactivationDate from "./models/EffectiveDeactivationDate";
 import CarryForwardTrigger from "./models/CarryForwardTrigger";
 import ApplyLeaveOnBehalf from "./models/ApplyLeaveOnBehalf";
+import PendingApprovalsQueueView from "./models/PendingApprovalsQueueView";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { useAuth } from "../../contexts/AuthContext";
 import GenericTable from "../../components/Table/table";
@@ -106,6 +107,11 @@ const HRManageTools = ({ employeeId }) => {
       id: "holidaySettings",
       label: "Holiday Management",
       // icon: <CalendarDays size={16} />,
+    },
+    {
+      id: "pendingApprovals",
+      label: "Pending Approvals",
+      // icon: <ClipboardCheck size={16} />,
     },
   ];
 
@@ -295,6 +301,18 @@ const HRManageTools = ({ employeeId }) => {
                   onClick={() => navigate(`/edit-holidays`)}
                 />
               )}
+            </motion.div>
+          )}
+
+          {/* TAB 4: PENDING APPROVALS (read-only) */}
+          {activeTab === "pendingApprovals" && (
+            <motion.div
+              key="pendingApprovals"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <PendingApprovalsQueueView />
             </motion.div>
           )}
         </AnimatePresence>

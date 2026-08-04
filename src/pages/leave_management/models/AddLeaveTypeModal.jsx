@@ -54,8 +54,28 @@ const GENDERS = [
 ];
 
 export function GenderDropdown({ value, onChange }) {
-  return <FilterListbox options={GENDERS} value={value} onChange={onChange} />;
+  return (
+    <FilterListbox
+      options={GENDERS}
+      value={value}
+      onChange={onChange}
+      placeholder="Select Gender"
+    />
+  );
 }
+
+const FIELD_LABEL_OVERRIDES = {
+  waitingPeriodDays: "Probation Period",
+  pastDateLimitDays: "Backdated Leaves",
+};
+
+const formatFieldLabel = (key) => {
+  if (FIELD_LABEL_OVERRIDES[key]) return FIELD_LABEL_OVERRIDES[key];
+  return key
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (str) => str.toUpperCase())
+    .trim();
+};
 
 const defaultForm = {
   leaveTypeId: "",
@@ -81,6 +101,7 @@ const defaultForm = {
   coolDownPeriod: "",
   gender: "",
   maxNoOfTimes: "",
+  documentSubmissionThresholdDays: "",
   // deactivationEffectiveDate: "",
 };
 
@@ -161,6 +182,9 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
             gender: formData.gender,
             effectiveStartDate: formData.effectiveStartDate,
             maxNoOfTimes: Number(formData.maxNoOfTimes) || 0,
+            description: formData.description || "", // Optional field for gender-based
+            thresholdForDocs:
+              Number(formData.documentSubmissionThresholdDays) || 0,
           },
         }
         : {
@@ -168,7 +192,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
           leaveType: {
             leaveTypeId: editData.leaveTypeId,
             leaveName: formData.leaveName,
-            description: formData.description,
+            description: formData.description || "", // Optional field for regular leave types
             accrualFrequency: formData.accrualFrequency,
             maxDaysPerYear: Number(formData.maxDaysPerYear) || 0,
             maxCarryForward: Number(formData.maxCarryForward) || 0,
@@ -185,6 +209,8 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
             requiresDocumentation: formData.requiresDocumentation,
             active: formData.active,
             effectiveStartDate: formData.effectiveStartDate,
+            thresholdForDocs:
+              Number(formData.documentSubmissionThresholdDays) || 0,
           },
         };
     } else {
@@ -206,11 +232,14 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
           gender: formData.gender,
           effectiveStartDate: formData.effectiveStartDate,
           maxNoOfTimes: Number(formData.maxNoOfTimes) || 0,
+          description: formData.description || "", // Optional field for gender-based
+          thresholdForDocs:
+            Number(formData.documentSubmissionThresholdDays) || 0,
         }
         : {
           // Regular Add Payload
           leaveName: formData.leaveName,
-          description: formData.description,
+          description: formData.description || "", // Optional field for regular leave types      
           accrualFrequency: formData.accrualFrequency,
           maxDaysPerYear: Number(formData.maxDaysPerYear) || 0,
           maxCarryForward: Number(formData.maxCarryForward) || 0,
@@ -224,8 +253,11 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
           allowNegativeBalance: formData.allowNegativeBalance,
           noticePeriodRestriction: formData.noticePeriodRestriction,
           weekendsAndHolidaysAllowed: formData.weekendsAndHolidaysAllowed,
+          requiresDocumentation: formData.requiresDocumentation,
           active: formData.active,
           effectiveStartDate: formData.effectiveStartDate,
+          thresholdForDocs:
+            Number(formData.documentSubmissionThresholdDays) || 0,
         };
     }
 
@@ -309,7 +341,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5">
           {/* Leave Name Dropdown */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 placeholder:text-gray-400">
               Leave Name *
             </label>
             {loadinglables ? (
@@ -321,6 +353,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
                   label: item.label,
                 }))}
                 value={formData.leaveName}
+                placeholder="Select Leave Name"
                 onChange={(selectedName) =>
                   setFormData((prev) => ({ ...prev, leaveName: selectedName }))
                 }
@@ -407,7 +440,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
               ].map((key) => (
                 <div key={key}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {key.replace(/([A-Z])/g, " $1")}
+                    {formatFieldLabel(key)}
                   </label>
                   <input
                     name={key}
@@ -433,7 +466,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
               ].map((key) => (
                 <div key={key}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {key.replace(/([A-Z])/g, " $1")}
+                    {formatFieldLabel(key)}
                   </label>
                   <input
                     name={key}
@@ -455,6 +488,8 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
             </label>
             <textarea
               name="description"
+              type="text"
+              maxLength={50}
               rows={2}
               value={formData.description}
               onChange={handleChange}
@@ -473,22 +508,40 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
                 "weekendsAndHolidaysAllowed",
                 "active",
               ].map((key) => (
-                <div key={key} className="flex items-center gap-2">
-                  <input
-                    id={key}
-                    type="checkbox"
-                    name={key}
-                    checked={formData[key]}
-                    onChange={handleChange}
-                    className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                  />
-                  <label
-                    htmlFor={key}
-                    className="text-sm font-medium text-gray-700"
-                  >
-                    {key.replace(/([A-Z])/g, " $1")}
-                  </label>
-                </div>
+                <React.Fragment key={key}>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id={key}
+                      type="checkbox"
+                      name={key}
+                      checked={formData[key]}
+                      onChange={handleChange}
+                      className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    />
+                    <label
+                      htmlFor={key}
+                      className="text-sm font-medium text-gray-700"
+                    >
+                      {formatFieldLabel(key)}
+                    </label>
+                  </div>
+                  {key === "requiresDocumentation" &&
+                    formData.requiresDocumentation && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Document Submission Threshold (Days)
+                        </label>
+                        <input
+                          name="documentSubmissionThresholdDays"
+                          type="number"
+                          min="0"
+                          value={formData.documentSubmissionThresholdDays}
+                          onChange={handleChange}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                        />
+                      </div>
+                    )}
+                </React.Fragment>
               ))}
             </div>
           ) : (
@@ -501,22 +554,40 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
                 "weekendsAndHolidaysAllowed",
                 "active",
               ].map((key) => (
-                <div key={key} className="flex items-center gap-2">
-                  <input
-                    id={key}
-                    type="checkbox"
-                    name={key}
-                    checked={formData[key]}
-                    onChange={handleChange}
-                    className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                  />
-                  <label
-                    htmlFor={key}
-                    className="text-sm font-medium text-gray-700"
-                  >
-                    {key.replace(/([A-Z])/g, " $1")}
-                  </label>
-                </div>
+                <React.Fragment key={key}>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id={key}
+                      type="checkbox"
+                      name={key}
+                      checked={formData[key]}
+                      onChange={handleChange}
+                      className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    />
+                    <label
+                      htmlFor={key}
+                      className="text-sm font-medium text-gray-700"
+                    >
+                      {formatFieldLabel(key)}
+                    </label>
+                  </div>
+                  {key === "requiresDocumentation" &&
+                    formData.requiresDocumentation && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Document Submission Threshold (Days)
+                        </label>
+                        <input
+                          name="documentSubmissionThresholdDays"
+                          type="number"
+                          min="0"
+                          value={formData.documentSubmissionThresholdDays}
+                          onChange={handleChange}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                        />
+                      </div>
+                    )}
+                </React.Fragment>
               ))}
             </div>
           )}

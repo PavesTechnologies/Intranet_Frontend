@@ -68,33 +68,43 @@ export default function useIntakeFlow() {
   };
 
   const beginPolling = (resumeId, taskId) => {
-    clearInterval(pollRef.current);
+    clearTimeout(pollRef.current);
+    let isFetching = false;
 
     const poll = async () => {
+      if (isFetching) return;
+      isFetching = true;
+      let isTerminal = false;
+
       try {
         const res = await pipelineStatus(taskId);
         const data = res?.data;
-        if (!data) return;
+        if (data) {
+          setStatus(data);
+          setStatusError(null);
 
-        setStatus(data);
-        setStatusError(null);
-
-        const overall = String(data.overall_status || "").toUpperCase();
-        if (TERMINAL_STATUSES.includes(overall)) {
-          clearInterval(pollRef.current);
-          const outcome = overall === "SUCCESS" ? "SUCCESS" : "FAILURE";
-          finalizeMockIntake(resumeId, outcome);
-          setResume(getResumeById(resumeId));
-          if (outcome === "SUCCESS") toast.success("Resume parsed successfully.");
-          else toast.error("Resume parsing failed. See the processing screen for details.");
+          const overall = String(data.overall_status || "").toUpperCase();
+          if (TERMINAL_STATUSES.includes(overall)) {
+            isTerminal = true;
+            const outcome = overall === "SUCCESS" ? "SUCCESS" : "FAILURE";
+            finalizeMockIntake(resumeId, outcome);
+            setResume(getResumeById(resumeId));
+            if (outcome === "SUCCESS") toast.success("Resume parsed successfully.");
+            else toast.error("Resume parsing failed. See the processing screen for details.");
+          }
         }
       } catch (err) {
         setStatusError(extractErrorMessage(err, "Failed to fetch processing status."));
+      } finally {
+        isFetching = false;
+        if (!isTerminal) {
+          clearTimeout(pollRef.current);
+          pollRef.current = setTimeout(poll, STATUS_POLL_INTERVAL_MS);
+        }
       }
     };
 
     poll();
-    pollRef.current = setInterval(poll, STATUS_POLL_INTERVAL_MS);
   };
 
   // Re-checks the current task's status — used when the last poll failed to

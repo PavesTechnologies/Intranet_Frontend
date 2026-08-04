@@ -1,6 +1,8 @@
 // src/pages/Projects/MyWork/MyWorkPage.jsx
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useAuth } from "../../../contexts/AuthContext";
+import { ROLES } from "../../../config/sidebarConfig";
+import api from "../../../api/axiosInstance";
 import { RefreshCw, CheckCheck } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -8,20 +10,18 @@ import { useMyWorkData, useUpdateStatus, useMarkDone, MY_WORK_KEY } from "./hook
 import { useMyWorkStore } from "./hooks/myWorkStore";
 import { applyFilters } from "./utils/myWorkUtils";
 import { ArrowLeft } from "lucide-react";
-import SnapshotBar      from "./components/SnapshotBar";
-import FilterBar        from "./components/FilterBar";
-import ProjectGroup     from "./components/ProjectGroup";
-import TestWorkSection  from "./components/TestWorkSection";
-import ManagerSection   from "./components/ManagerSection";
-import CompletedSection from "./components/CompletedSection";
-import ItemDetailPanel  from "./components/ItemDetailPanel";
+import SnapshotBar      from "../../../components/MyWork/SnapshotBar";
+import FilterBar        from "../../../components/MyWork/FilterBar";
+import ProjectGroup     from "../../../components/MyWork/ProjectGroup";
+import TestWorkSection  from "../../../components/MyWork/TestWorkSection";
+import CompletedSection from "../../../components/MyWork/CompletedSection";
+import ItemDetailPanel  from "../../../components/MyWork/ItemDetailPanel";
 import { MyWorkPageSkeleton } from "./skeletons/MyWorkSkeletons";
 import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button/Button";
 export default function MyWorkPage() {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
   const userId   = user?.id || user?.user_id;
-  const isManager = user?.roles?.includes("Manager") || user?.roles?.includes("Admin");
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -35,6 +35,31 @@ export default function MyWorkPage() {
   // ── UI state ────────────────────────────────────────────────────────────────
   const [selectedItem, setSelectedItem] = useState(null);
   const store = useMyWorkStore();
+
+  // Default the view to match the user's role: Project_Manager → "As Project
+  // Manager", General (or anything else) → "As Member". The toggle itself
+  // stays visible and switchable for every user regardless of role.
+  useEffect(() => {
+    store.setViewMode(hasRole([ROLES.PROJECT_MANAGER]) ? "manager" : "member");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Which projects is this user the owner/PM of? ─────────────────────────────
+  // Cross-referenced against the project groups in /api/my-work so a project
+  // shows under "As Project Manager" only when the user actually owns it there,
+  // and under "As Member" otherwise — a project's own role, not a global one.
+  const [ownerProjectIds, setOwnerProjectIds] = useState(new Set());
+  useEffect(() => {
+    if (!userId) return;
+    api
+      .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/owner/${userId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      })
+      .then((res) => {
+        setOwnerProjectIds(new Set((res.data || []).map((p) => p.id)));
+      })
+      .catch(() => setOwnerProjectIds(new Set()));
+  }, [userId]);
 
   // ── Client-side filtering (instant — no network) ─────────────────────────────
   const filteredData = useMemo(() => applyFilters(data, {
@@ -81,7 +106,24 @@ export default function MyWorkPage() {
     </div>
   );
 
-  const projects = filteredData?.projects || [];
+  // Toggle is available to every user, manager or general. Each project group
+  // from /api/my-work is routed to "manager" or "member" based on whether this
+  // user actually owns that specific project (per /api/projects/owner/{id}) —
+  // so a PM on Project A but plain member on Project B sees A under "As
+  // Project Manager" and B under "As Member", not one bucket for everything.
+  const isManagerView = store.viewMode === "manager";
+
+  // Unfiltered split — used for the "Projects" filter dropdown options so they
+  // don't shrink as other filters are applied.
+  const rawProjects        = data?.projects || [];
+  const rawManagerProjects = rawProjects.filter((g) => ownerProjectIds.has(g.projectId));
+  const rawMemberProjects  = rawProjects.filter((g) => !ownerProjectIds.has(g.projectId));
+
+  // Filtered split — used for the actual rendered list.
+  const allProjects     = filteredData?.projects || [];
+  const managerProjects = allProjects.filter((g) => ownerProjectIds.has(g.projectId));
+  const memberProjects  = allProjects.filter((g) => !ownerProjectIds.has(g.projectId));
+  const projects         = isManagerView ? managerProjects : memberProjects;
   const isEmpty  = !isLoading && projects.length === 0 && !store.activeChip
     && !store.selectedProjects.length && !store.selectedTypes.length;
 
@@ -95,7 +137,9 @@ export default function MyWorkPage() {
           <div>
             <h1 className="text-xl font-bold text-slate-900">My Work</h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              Everything assigned to you across all projects
+              {isManagerView
+                ? "Items you're accountable for as project manager"
+                : "Everything assigned to you across all projects"}
             </p>
             
           </div>
@@ -123,8 +167,8 @@ export default function MyWorkPage() {
         <SnapshotBar snapshot={filteredData} />
 
         {/* ── Filter bar ────────────────────────────────────────────────────── */}
-        <FilterBar projects={data?.projects} />
-      
+        <FilterBar projects={isManagerView ? rawManagerProjects : rawMemberProjects} />
+
 
         {/* ── Empty state (no work assigned at all) ─────────────────────────── */}
         {isEmpty ? (
@@ -134,7 +178,9 @@ export default function MyWorkPage() {
               You're all caught up!
             </h3>
             <p className="text-sm text-slate-400">
-              No active work items assigned to you right now.
+              {isManagerView
+                ? "No items you're accountable for right now."
+                : "No active work items assigned to you right now."}
             </p>
           </div>
         ) : (
@@ -146,7 +192,8 @@ export default function MyWorkPage() {
               </div>
             )}
 
-            {/* ── Project groups ────────────────────────────────────────────── */}
+            {/* ── Project groups (owned-by-me projects in manager view, the
+                 rest in member view) ─────────────────────────────────────── */}
             {projects.map((group) => (
               <ProjectGroup
                 key={group.projectId}
@@ -157,21 +204,17 @@ export default function MyWorkPage() {
               />
             ))}
 
-            {/* ── Test work section (QA users) ──────────────────────────────── */}
-            {data?.testWork?.length > 0 && (
-              <TestWorkSection testWork={data.testWork} />
-            )}
+            {!isManagerView && (
+              <>
+                {/* ── Test work section (QA users) ────────────────────────── */}
+                {data?.testWork?.length > 0 && (
+                  <TestWorkSection testWork={data.testWork} />
+                )}
 
-            {/* ── Manager accountability section ────────────────────────────── */}
-            {isManager && data?.managerItems?.length > 0 && (
-              <ManagerSection
-                items={data.managerItems}
-                onCardClick={handleCardClick}
-              />
+                {/* ── Completed toggle ────────────────────────────────────── */}
+                <CompletedSection userId={userId} />
+              </>
             )}
-
-            {/* ── Completed toggle ──────────────────────────────────────────── */}
-            <CompletedSection userId={userId} />
           </>
         )}
       </div>

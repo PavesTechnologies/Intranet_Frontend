@@ -84,7 +84,7 @@ export default function BulkUploadPanel({ onUploaded, bare = false }) {
       setFile(null);
       setConsent(false);
       setErrors({});
-      onUploaded?.();
+      onUploaded?.(res?.data);
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to submit bulk upload. Please try again.");
     } finally {

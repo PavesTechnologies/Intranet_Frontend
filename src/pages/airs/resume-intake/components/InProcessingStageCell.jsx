@@ -12,7 +12,7 @@ const TIMELINE_POLL_INTERVAL_MS = 4000;
 // backed by GET /resumes/{resume_id}/timeline. Resumes still PENDING have no
 // stage yet (a stage only appears in the response once it has actually run),
 // so this renders nothing until the row moves to PARSING.
-export default function InProcessingStageCell({ resumeId, parseStatus }) {
+export default function InProcessingStageCell({ resumeId, parseStatus, initialStage }) {
   const [timeline, setTimeline] = useState(null);
 
   useEffect(() => {
@@ -22,36 +22,55 @@ export default function InProcessingStageCell({ resumeId, parseStatus }) {
     }
 
     let cancelled = false;
+    let isFetching = false;
+    let timerId = null;
 
     const fetchTimeline = async () => {
+      if (isFetching || cancelled) return;
+      isFetching = true;
+      let isTerminal = false;
+
       try {
         const res = await resumeTimeline(resumeId);
-        if (!cancelled) setTimeline(res?.data || null);
+        if (!cancelled && res?.data) {
+          setTimeline(res.data);
+          const st = String(res.data.overall_status || "").toUpperCase();
+          const pct = res.data.progress_percent ?? 0;
+          if (st === "SUCCESS" || st === "FAILED" || st === "FAILURE" || pct >= 100) {
+            isTerminal = true;
+          }
+        }
       } catch (err) {
         // A transient timeline-fetch failure leaves the last known stage
         // showing rather than blanking the row.
+      } finally {
+        isFetching = false;
+        if (!cancelled && !isTerminal) {
+          clearTimeout(timerId);
+          timerId = setTimeout(fetchTimeline, TIMELINE_POLL_INTERVAL_MS);
+        }
       }
     };
 
     fetchTimeline();
-    const intervalId = setInterval(fetchTimeline, TIMELINE_POLL_INTERVAL_MS);
 
     return () => {
       cancelled = true;
-      clearInterval(intervalId);
+      clearTimeout(timerId);
     };
   }, [resumeId, parseStatus]);
 
   if (parseStatus !== "PARSING") return null;
 
-  if (!timeline) {
+  // Show the initialStage passed from the resume list immediately while
+  // the timeline response is still in-flight, so the cell never appears blank.
+  const liveStage = timeline?.current_stage || initialStage || null;
+  const pct = Math.min(100, Math.round(timeline?.progress_percent ?? 0));
+  const stageLabel = liveStage ? STAGE_LABELS[liveStage] || liveStage : "Queued";
+
+  if (!timeline && !initialStage) {
     return <span className="text-[10px] text-slate-400 mt-1">Starting…</span>;
   }
-
-  const pct = Math.min(100, Math.round(timeline.progress_percent ?? 0));
-  const stageLabel = timeline.current_stage
-    ? STAGE_LABELS[timeline.current_stage] || timeline.current_stage
-    : "Queued";
 
   return (
     <div className="w-40 flex flex-col justify-center text-left mt-1.5">
