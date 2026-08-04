@@ -30,6 +30,7 @@
     "country-state-city": "^3.2.1",
     "date-fns": "^4.1.0",
     "docx": "^9.5.1",
+    "docx-preview": "^0.4.0",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "framer-motion": "^12.23.24",
@@ -57,6 +58,7 @@
     "react-icons": "^5.5.0",
     "react-paginate": "^8.3.0",
     "react-pagination": "^1.0.0",
+    "react-pdf": "^10.4.1",
     "react-phone-input-2": "^2.15.1",
     "react-router-dom": "^7.7.0",
     "react-select": "^5.10.2",
@@ -67,6 +69,7 @@
     "sockjs-client": "^1.6.1",
     "stompjs": "^2.3.3",
     "svg-pathdata": "^8.0.0",
+    "world-countries": "^5.1.0",
     "xlsx": "^0.18.5",
     "yup": "^1.7.1",
     "zustand": "^5.0.11"

@@ -45,7 +45,7 @@ function EmployeeCard({ employee }) {
       </div>
 
       {/* Name */}
-      <span className="text-[10px] font-semibold text-gray-600 w-[50px] line-clamp-2 text-center leading-tight">
+      <span className="text-[10px] font-semibold text-gray-600 w-[80px] line-clamp-2 text-center leading-tight">
         {employee.employeeName}
       </span>
     </div>

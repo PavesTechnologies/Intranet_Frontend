@@ -21,6 +21,7 @@ import AddHolidaysModal from "./models/AddHolidaysModal";
 import EffectiveDeactivationDate from "./models/EffectiveDeactivationDate";
 import CarryForwardTrigger from "./models/CarryForwardTrigger";
 import ApplyLeaveOnBehalf from "./models/ApplyLeaveOnBehalf";
+import PendingApprovalsQueueView from "./models/PendingApprovalsQueueView";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { useAuth } from "../../contexts/AuthContext";
 import GenericTable from "../../components/Table/table";
@@ -45,6 +46,8 @@ const HRManageTools = ({ employeeId }) => {
   const [isCarryModalOpen, setIsCarryModalOpen] = useState(false);
   const [OnBehalfOpen, setOnBehalfOpen] = useState(false);
   const user = useAuth().user;
+
+  const permissions = user.roles?.includes("Admin") || user.roles?.includes("Super_Admin");
 
 
   const navigate = useNavigate();
@@ -71,17 +74,17 @@ const HRManageTools = ({ employeeId }) => {
   const executeDelete = async () => {
     setIsDeleting(true);
     try {
-      await api.delete(
+      const res = await api.delete(
         `${BASE_URL}/api/leave/delete-leave-type/${selectedLeaveTypeIdToDelete}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           data: { deactivationEffectiveDate: effectiveDeactivationDate },
         },
       );
-      toast.success("Leave type deleted successfully");
+      toast.success(res.data?.message || "Leave type deleted successfully");
       fetchLeaveTypes();
     } catch (error) {
-      toast.error("Failed to delete leave type");
+      toast.error(error.response?.data?.message || "Failed to delete leave type");
     } finally {
       setIsDeleting(false);
       setIsEffectiveModalOpen(false);
@@ -93,17 +96,22 @@ const HRManageTools = ({ employeeId }) => {
     {
       id: "leaveTypes",
       label: "Leave Configuration",
-      icon: <Settings size={16} />,
+      // icon: <Settings size={16} />,
     },
-    {
+    !permissions && {
       id: "employeeActions",
       label: "Employee Management",
-      icon: <Users size={16} />,
+      // icon: <Users size={16} />,
     },
     {
       id: "holidaySettings",
       label: "Holiday Management",
-      icon: <CalendarDays size={16} />,
+      // icon: <CalendarDays size={16} />,
+    },
+    {
+      id: "pendingApprovals",
+      label: "Pending Approvals",
+      // icon: <ClipboardCheck size={16} />,
     },
   ];
 
@@ -187,16 +195,15 @@ const HRManageTools = ({ employeeId }) => {
                   >
                     Leave Policies
                   </Button>
-                  {(user?.roles?.includes("Admin") ||
-                    user?.roles?.includes("Super_Admin")) && (
-                      <Button
-                        onClick={() => navigate("/approval-rules")}
-                        variant="primary"
-                        size="medium"
-                      >
-                        Approval Rules
-                      </Button>
-                    )}
+                  {permissions && (
+                    <Button
+                      onClick={() => navigate("/approval-rules")}
+                      variant="primary"
+                      size="medium"
+                    >
+                      Approval Rules
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -244,12 +251,12 @@ const HRManageTools = ({ employeeId }) => {
               exit={{ opacity: 0, y: -10 }}
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
             >
-              <AdminCard
+              {/* <AdminCard
                 title="Onboard Employee"
                 desc="Create new system credentials and profiles."
                 icon={<Users className="text-blue-500" />}
                 onClick={() => setIsAddEmployeeModalOpen(true)}
-              />
+              /> */}
               <AdminCard
                 title="Leave Balances"
                 desc="Manually adjust or review employee quotas."
@@ -286,12 +293,26 @@ const HRManageTools = ({ employeeId }) => {
                 icon={<CalendarDays className="text-red-500" />}
                 onClick={() => setIsAddHolidaysModalOpen(true)}
               />
-              <AdminCard
-                title="Modify Calendar"
-                desc="Edit or remove existing holiday dates."
-                icon={<Pencil className="text-gray-500" />}
-                onClick={() => navigate(`/edit-holidays`)}
-              />
+              {!permissions && (
+                <AdminCard
+                  title="Modify Calendar"
+                  desc="Edit or remove existing holiday dates."
+                  icon={<Pencil className="text-gray-500" />}
+                  onClick={() => navigate(`/edit-holidays`)}
+                />
+              )}
+            </motion.div>
+          )}
+
+          {/* TAB 4: PENDING APPROVALS (read-only) */}
+          {activeTab === "pendingApprovals" && (
+            <motion.div
+              key="pendingApprovals"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <PendingApprovalsQueueView />
             </motion.div>
           )}
         </AnimatePresence>
@@ -424,7 +445,7 @@ const LeaveTable = ({ title, data, onEdit, onDelete }) => {
       <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm bg-white">
         <table className="w-full text-sm text-left border-collapse">
           <thead>
-            <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-xs font-semibold uppercase tracking-wider">
+            <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-xs font-semibold tracking-wider">
               {headers.map((h, i) => (
                 <th
                   key={h}

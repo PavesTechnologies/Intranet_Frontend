@@ -235,3 +235,10 @@
 }
 
 /* For caleder css  */
+
+/* Approval list: smooth reveal when an employee row is expanded */
+@keyframes tsReveal {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ts-reveal { animation: tsReveal 0.22s ease-out; }

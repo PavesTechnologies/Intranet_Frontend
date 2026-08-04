@@ -347,20 +347,21 @@ const LeaveHistory = ({ employeeId, year }) => {
                   <td className="p-3">{leave.daysRequested}</td>
                   <td className="p-3">
                     <span
-                      className={`px-2 py-1 text-white rounded-full text-xs ${
-                        leave.status === "APPROVED"
+                      className={`px-2 py-1 text-white rounded-full text-xs ${leave.status === "APPROVED"
                           ? "bg-green-500"
                           : leave.status === "REJECTED"
                             ? "bg-red-500"
                             : "bg-gray-500"
-                      }`}
+                        }`}
                     >
                       {leave.status}
                     </span>
                   </td>
                   <td className="p-3">{leave.reason || "-"}</td>
                   <td className="p-3">{leave.managerComment || "-"}</td>
-                  <td className="p-3">{leave.approvedBy?.fullName || "-"}</td>
+                  <td className="p-3">
+                    {!leave.approvedBy || leave.approvedBy.toLowerCase() === "unknown" ? "-" : leave.approvedBy}
+                  </td>
                   <td className="p-3">
                     {leave.status === "APPROVED" && (
                       <button onClick={() => handleModalOpen(leave.leaveId)}>

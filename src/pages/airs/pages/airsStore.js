@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { MOCK_JDS, MOCK_CAMPAIGNS } from "./mockData";
 
 // Sync utility with LocalStorage
 const getStoredData = (key, defaultValue) => {
@@ -20,15 +19,9 @@ const setStoredData = (key, data) => {
 };
 
 export const useAirsStore = create((set, get) => ({
-  jds: getStoredData("airs_jds", MOCK_JDS),
-  campaigns: getStoredData("airs_campaigns", MOCK_CAMPAIGNS),
-  recentActivities: getStoredData("airs_activities", [
-    { id: 1, type: "parse_success", text: "JD for Senior React Engineer parsed successfully.", date: "2026-06-30 14:15", user: "AIRS Parser Engine" },
-    { id: 2, type: "skill_verified", text: "Sarah Connor verified mandatory skill 'Spring Boot' on JD-0002.", date: "2026-06-30 11:30", user: "Sarah Connor" },
-    { id: 3, type: "campaign_linked", text: "Campaign 'High-Priority React Core Team' linked to JD-0001.", date: "2026-06-29 16:45", user: "John Doe" },
-    { id: 4, type: "version_restore", text: "John Doe restored JD-0003 to Version 2.", date: "2026-06-29 09:15", user: "John Doe" },
-    { id: 5, type: "parse_failed", text: "Parser Alert: Failed to parse JD-0013. Incorrect file structure.", date: "2026-06-28 15:20", user: "AIRS Parser Engine" }
-  ]),
+  jds: getStoredData("airs_jds", []),
+  campaigns: getStoredData("airs_campaigns", []),
+  recentActivities: getStoredData("airs_activities", []),
 
   addActivity: (activity) => {
     const newActivity = {
