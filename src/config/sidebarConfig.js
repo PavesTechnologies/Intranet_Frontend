@@ -1,3 +1,6 @@
+// RBAC temporarily disabled for AP module development — restore this import to re-enable AP role checks
+// import { AP_ALL_ROLES, AP_APPROVER_PLUS_ROLES, AP_ROLES } from "../pages/accounts-payable/constants/apRoles";
+
 /**
  * Canonical role identifiers.
  * hasRole() in AuthContext is case-insensitive (uppercases before comparing),
@@ -105,4 +108,22 @@ export const EO_SUBMENU = [
   //   to: "/employee-exit",
   //   allowedRoles: MANAGEMENT_ROLES,
   // },
+];
+
+/**
+ * Accounts Payable flyout submenu config.
+ * Same shape/rules as EO_SUBMENU — filtered by filterMenuByRole() before rendering.
+ */
+// RBAC disabled for AP module development: allowedRoles keys commented out below so every
+// item is visible to all authenticated users. Restore the commented allowedRoles + the import
+// above to re-enable per-item role gating.
+export const AP_SUBMENU = [
+  { label: "Dashboard", to: "/accounts-payable/dashboard" /* , allowedRoles: AP_ALL_ROLES */ },
+  { label: "Vendors", to: "/accounts-payable/vendors" /* , allowedRoles: AP_ALL_ROLES */ },
+  { label: "Invoices", to: "/accounts-payable/invoices" /* , allowedRoles: AP_ALL_ROLES */ },
+  { label: "Pending Approvals", to: "/accounts-payable/approvals/pending" /* , allowedRoles: AP_APPROVER_PLUS_ROLES */ },
+  { label: "Payment Queue", to: "/accounts-payable/payments/queue" /* , allowedRoles: AP_ALL_ROLES */ },
+  { label: "Exception Center", to: "/accounts-payable/exceptions" /* , allowedRoles: AP_ALL_ROLES */ },
+  { label: "Reports", to: "/accounts-payable/reports" /* , allowedRoles: AP_ALL_ROLES */ },
+  { label: "Administration", to: "/accounts-payable/admin/tax-rules" /* , allowedRoles: [AP_ROLES.AP_ADMIN] */ },
 ];

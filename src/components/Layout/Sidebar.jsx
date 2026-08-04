@@ -13,11 +13,12 @@ import {
   UserCog2,
   AlertCircle,
   Briefcase,
-  ScanSearch
+  ScanSearch,
+  Wallet
 } from "lucide-react";
 
 import { useAuth } from "../../contexts/AuthContext";
-import { EO_SUBMENU } from "../../config/sidebarConfig";
+import { EO_SUBMENU, AP_SUBMENU } from "../../config/sidebarConfig";
 import { filterMenuByRole } from "../../utils/sidebarPermissions";
 // import AIRSLogo from "../icons/AIRSLogo";
 
@@ -127,6 +128,9 @@ const Sidebar = ({ isCollapsed }) => {
   // Role-filtered EO submenu — recomputed whenever the component re-renders with a new user
   const filteredEoSubmenu = filterMenuByRole(EO_SUBMENU, hasRole);
 
+  // Role-filtered Accounts Payable submenu
+  const filteredApSubmenu = filterMenuByRole(AP_SUBMENU, hasRole);
+
   // Role checks
   const isAdmin = hasRole(["ADMIN", "SUPER_ADMIN"]);
   const isRM = hasRole(["RESOURCE_MANAGER"]);
@@ -150,6 +154,10 @@ const Sidebar = ({ isCollapsed }) => {
   const [airsHovered, setAirsHovered] = useState(false);
   const airsRef = useRef(null);
 
+  // State for Accounts Payable Hover
+  const [apHovered, setApHovered] = useState(false);
+  const apRef = useRef(null);
+
   const [submenuTop, setSubmenuTop] = useState(0);
   const hoverTimeout = useRef(null);
   const [childMenu, setChildMenu] = useState(null);
@@ -163,6 +171,7 @@ const Sidebar = ({ isCollapsed }) => {
     setRmHovered(false);
     setEoHovered(false);
     setAirsHovered(false);
+    setApHovered(false);
     setChildMenu(null);
   };
 
@@ -273,6 +282,23 @@ const Sidebar = ({ isCollapsed }) => {
     }, 200);
   };
 
+  // --- Handlers for Accounts Payable ---
+  const handleApMouseEnter = () => {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    closeAllSubmenus();
+    if (apRef.current) {
+      const rect = apRef.current.getBoundingClientRect();
+      setSubmenuTop(rect.top);
+    }
+    setApHovered(true);
+  };
+
+  const handleApMouseLeave = () => {
+    hoverTimeout.current = setTimeout(() => {
+      setApHovered(false);
+    }, 200);
+  };
+
   const resourceManagementItems = isAdmin
     ? resourceManagementSubmenu
     : isDM
@@ -284,6 +310,7 @@ const Sidebar = ({ isCollapsed }) => {
     setRmHovered(false);
     setEoHovered(false);
     setAirsHovered(false);
+    setApHovered(false);
   }, [location.pathname]);
 
 
@@ -636,6 +663,62 @@ const Sidebar = ({ isCollapsed }) => {
                     </ul>
                   )}
                 </>
+              )}
+            </li>
+          )}
+
+          {/* Accounts Payable (With Pop Label/Submenu) */}
+          {filteredApSubmenu.length > 0 && (
+            <li
+              ref={apRef}
+              className="relative"
+              onMouseEnter={handleApMouseEnter}
+              onMouseLeave={handleApMouseLeave}
+            >
+              <div
+                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/accounts-payable")
+                  ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
+                  : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
+                  }`}
+              >
+                <Wallet className="h-5 w-5 shrink-0" />
+
+                {!isCollapsed && (
+                  <>
+                    <span className="flex-1">Accounts Payable</span>
+                    <ChevronRight
+                      className={`h-4 w-4 transition-all duration-300 ${apHovered ? "translate-x-1" : ""
+                        }`}
+                    />
+                  </>
+                )}
+              </div>
+
+              {apHovered && (
+                <ul
+                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
+                    }`}
+                  style={{ top: `${submenuTop}px` }}
+                  onMouseEnter={handleApMouseEnter}
+                  onMouseLeave={handleApMouseLeave}
+                >
+                  {filteredApSubmenu.map((item) => (
+                    <li key={item.label} className="group relative">
+                      <NavLink
+                        to={item.to}
+                        end
+                        className={({ isActive }) =>
+                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
+                            ? "bg-blue-100 text-[#0a174e] font-semibold"
+                            : "hover:bg-[#263383] hover:text-white"
+                          }`
+                        }
+                      >
+                        <span>{item.label}</span>
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
               )}
             </li>
           )}
