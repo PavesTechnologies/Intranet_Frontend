@@ -17,11 +17,12 @@ import SprintColumn from "./Sprint/SprintColumn";
 import CreateSprintModal from "./Sprint/CreateSprintModal";
 import CreateIssueForm from "./CreateIssue/CreateIssueForm";
 import TaskCard from "./Sprint/TaskCard";
-import EditTaskForm from "./Backlog/EditTaskForm";
-import EditStoryForm from "./Backlog/EditStoryForm";
+import EditTaskForm from "../../../components/Backlog/EditTaskForm";
+import EditStoryForm from "../../../components/Backlog/EditStoryForm";
 import RightSidePanel from "./Sprint/RightSidePanel";
 import SprintDetailsPanel from "./Sprint/SprintDetailsPanel";
 import SprintPendingModal from "./Sprint/SprintPendingModal";
+import ExcelImportPanel from "./Backlog/ExcelImportPanel";
 import { ca } from "date-fns/locale";
 import { useLocation } from "react-router-dom";
 
@@ -514,6 +515,17 @@ const handleSprintStatus = async (sprintId, action) => {
             >
               <Plus size={16} /> Create Issue
             </Button>
+
+            <ExcelImportPanel
+              projectId={projectId}
+              projectName={projectName}
+              disabled={!permissions?.canEdit}
+              onImported={() => {
+                fetchStories();
+                fetchTasks();
+                fetchEpics();
+              }}
+            />
           </div>
         </div>
 
@@ -557,6 +569,8 @@ const handleSprintStatus = async (sprintId, action) => {
                   allStories={stories}
                   sprints={activeAndPlanningSprints}
                   permissions={permissions}
+                  projectId={projectId}
+                  navigate={navigate}
                   onSelectParentStory={handleAssignTaskToStory}
                   onSelectEpic={handleAssignEpicToStory}
                   onDropStory={handleDropStory}
@@ -627,6 +641,8 @@ const handleSprintStatus = async (sprintId, action) => {
                           allStories={stories}
                           sprints={sprints}
                           permissions={permissions}
+                          projectId={projectId}
+                          navigate={navigate}
                           onDropStory={handleDropStory}
                           onSelectParentStory={handleAssignTaskToStory}
                           onSelectEpic={handleAssignEpicToStory}

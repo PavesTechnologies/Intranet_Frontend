@@ -2,12 +2,12 @@
 export function preloadAllWidgets() {
   if (typeof window === "undefined") return;
   const imports = [
-    () => import("./widgets/ScopeAndProgress"),
-    () => import("./widgets/StatusOverview"),
-    () => import("./widgets/PriorityDistribution"),
-    () => import("./widgets/TypesOfWork"),
-    () => import("./widgets/TeamWorkload"),
-    () => import("./widgets/EpicProgress"),
+    () => import("../../../components/Summary/widgets/ScopeAndProgress"),
+    () => import("../../../components/Summary/widgets/StatusOverview"),
+    () => import("../../../components/Summary/widgets/PriorityDistribution"),
+    () => import("../../../components/Summary/widgets/TypesOfWork"),
+    () => import("../../../components/Summary/widgets/TeamWorkload"),
+    () => import("../../../components/Summary/widgets/EpicProgress"),
   ];
   const runner = () => {
     imports.forEach(fn => fn().catch(() => {}));

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import api from "../../../../api/axiosInstance";
-import EditStoryForm from "../Backlog/EditStoryForm";
+import EditStoryForm from "../../../../components/Backlog/EditStoryForm";
 
 const StoryDetailsPanel = ({ storyId, projectId, onClose, onUpdated }) => {
   const [loading, setLoading] = useState(false);
