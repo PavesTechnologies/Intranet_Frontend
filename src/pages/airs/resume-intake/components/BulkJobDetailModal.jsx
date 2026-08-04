@@ -15,18 +15,21 @@ import {
   User,
   ShieldAlert,
   Loader2,
+  RotateCcw,
 } from "lucide-react";
 import Modal from "../../../../components/ui/Modal";
 import PipelineCandidateScorecardPage from "../../pipeline/PipelineCandidateScorecardPage";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
+import { useAuth } from "../../../../contexts/AuthContext";
 import {
   getBulkUploadProgress,
   getBulkUploadFiles,
   getBulkUploadFileLog,
   getBulkUploadFileDetail,
   getBulkUploadFileTimeline,
+  replayBulkUploadFile,
 } from "../../service/resumeIntake";
 import { STAGE_LABELS } from "../intake/constants/intakeConstants";
 import { formatResumeDate } from "../utils/resumeIntakeUtils";
@@ -111,6 +114,21 @@ export default function BulkJobDetailModal({ job, isOpen, onClose }) {
   // untouched (same tab, same poll) when the popup is closed.
   const [scorecardCandidate, setScorecardCandidate] = useState(null);
 
+  // Same reasoning as ResumeUploadHistoryList: HR_ADMIN can't access this
+  // screen at all, so the replay action is gated to RECRUITER (verify with
+  // backend that RECRUITER is authorized to call /bulk-uploads/{jobId}/files/{fileId}/replay).
+  const { hasRole } = useAuth();
+  const isRecruiter = hasRole(["RECRUITER"]);
+
+  // File id currently being replayed via the "Replay" action
+  const [replayingFileId, setReplayingFileId] = useState(null);
+
+  // Bumped after a successful file replay to force an immediate refetch —
+  // the poll below stops once the job reaches a terminal status, so without
+  // this, replaying one file inside an already-PARTIAL_FAILURE job would
+  // leave the UI stale until the modal is reopened.
+  const [refreshToken, setRefreshToken] = useState(0);
+
   const jobId = job?.bulk_upload_job_id || job?.id || job?.task_id;
 
   useEffect(() => {
@@ -172,7 +190,7 @@ export default function BulkJobDetailModal({ job, isOpen, onClose }) {
       cancelled = true;
       clearTimeout(timerId);
     };
-  }, [isOpen, jobId]);
+  }, [isOpen, jobId, refreshToken]);
 
   const handleInspectFile = async (fileId) => {
     if (!jobId || !fileId) return;
@@ -229,6 +247,26 @@ export default function BulkJobDetailModal({ job, isOpen, onClose }) {
     }
   };
 
+  // HR_ADMIN-only manual replay for a single FAILED file. Forces an
+  // immediate refetch (and resumes polling) afterward, since the batch poll
+  // above may have already stopped if the job itself reached a terminal
+  // status before this one file got replayed.
+  const handleReplayFile = async (f) => {
+    const fileId = f.id || f.file_id;
+    if (!jobId || !fileId) return;
+
+    setReplayingFileId(fileId);
+    try {
+      await replayBulkUploadFile(jobId, fileId);
+      toast.success("Replay queued for this file.");
+      setRefreshToken((t) => t + 1);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to replay this file.");
+    } finally {
+      setReplayingFileId(null);
+    }
+  };
+
   if (!isOpen || !job) return null;
 
   const pct = Math.min(100, Math.round(progress?.percent_complete ?? 0));
@@ -278,15 +316,31 @@ export default function BulkJobDetailModal({ job, isOpen, onClose }) {
       // A file that fails before AI extraction succeeds (or is still
       // queued/running) never gets a Resume/candidate row at all — nothing
       // for "View Candidate" to resolve yet, so fall back to the stage timeline.
+      const isReplaying = replayingFileId === (f.id || f.file_id);
       action = (
-        <Button
-          variant="ghost"
-          size="small"
-          onClick={() => handleInspectFile(f.id || f.file_id)}
-          className="!text-blue-600 hover:!text-blue-700 hover:bg-blue-50 text-xs"
-        >
-          Inspect Timeline <ChevronRight size={14} className="ml-1" />
-        </Button>
+        <div className="flex items-center gap-1 justify-center">
+          <Button
+            variant="ghost"
+            size="small"
+            onClick={() => handleInspectFile(f.id || f.file_id)}
+            className="!text-blue-600 hover:!text-blue-700 hover:bg-blue-50 text-xs"
+          >
+            Inspect Timeline <ChevronRight size={14} className="ml-1" />
+          </Button>
+          {isRecruiter && st === "FAILED" && (
+            <Button
+              variant="ghost"
+              size="small"
+              onClick={() => handleReplayFile(f)}
+              disabled={isReplaying}
+              className="!text-amber-600 hover:!text-amber-700 hover:bg-amber-50 text-xs"
+            >
+              {isReplaying ? "Replaying..." : (
+                <>Replay <RotateCcw size={14} className="ml-1" /></>
+              )}
+            </Button>
+          )}
+        </div>
       );
     }
 
