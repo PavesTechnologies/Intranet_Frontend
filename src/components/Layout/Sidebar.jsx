@@ -97,29 +97,19 @@ const Sidebar = ({ isCollapsed }) => {
     if (!isAllowed) return false;
 
     // Special logic for Projects to handle the "General" role commonality
-    if (item.name === "Projects") {
-      const userRoles = user?.roles?.map((r) => r.toUpperCase()) || [];
-      // Roles that should not see Projects by default
-      const forbiddenRoles = [
-        "ADMIN",
-        "Super_Admin",
-        "HR",
-        "HR_MANAGER",
-        "RESOURCE_MANAGER",
-        "DELIVERY_MANAGER",
-        "REPORTING_MANAGER",
-      ];
-      // Roles that override the forbidden roles
-      const strongRoles = ["PROJECT_MANAGER", "TESTER"];
+   if (item.name === "Projects") {
+  const userRoles = user?.roles?.map((r) => r.toUpperCase()) || [];
 
-      // If user has a professional project role, always show it
-      if (userRoles.some((r) => strongRoles.includes(r))) return true;
-
-      // If user has any forbidden role (and no strong role), hide it
-      if (userRoles.some((r) => forbiddenRoles.includes(r))) return false;
-    }
-
+  // Show Projects if user has GENERAL or PROJECT_MANAGER
+  if (
+    userRoles.includes("GENERAL") ||
+    userRoles.includes("PROJECT_MANAGER")
+  ) {
     return true;
+  }
+
+  return false;
+}
   });
 
   // Role-filtered EO submenu — recomputed whenever the component re-renders with a new user

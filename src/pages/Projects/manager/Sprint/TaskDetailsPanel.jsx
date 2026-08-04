@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import api from "../../../../api/axiosInstance";
-import EditTaskForm from "../Backlog/EditTaskForm";
+import EditTaskForm from "../../../../components/Backlog/EditTaskForm";
 
 const TaskDetailsPanel = ({ taskId, projectId, onClose, onUpdated }) => {
   const [loading, setLoading] = useState(false);

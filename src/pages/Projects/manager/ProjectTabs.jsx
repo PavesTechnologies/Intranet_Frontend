@@ -9,7 +9,7 @@ import Board from "../../Projects/manager/Board.jsx";
 import Navbar from "../../../components/Navbar/Navbar";
 import TestManagement from "../Testmanagement/TestManagementHome";
 import RiskRegisterPage from "./riskManagement/RiskRegisterPage";
-import RiskHealthModal from "./riskManagement/RiskHealthModal.jsx";
+import RiskHealthModal from "../../../components/RiskManagement/RiskHealthModal.jsx";
 import RoleExpectations from "../../resource_management/models/RoleExpectations.jsx";
 
 const ProjectDemandManagement  = lazy(() => import("./ProjectDemandManagement"));

@@ -26,14 +26,14 @@ import {
 } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { showStatusToast } from "../../../components/toastfy/toast";
-import EditTaskForm from "./Backlog/EditTaskForm";
+import EditTaskForm from "../../../components/Backlog/EditTaskForm";
 import RightSidePanel from "./Sprint/RightSidePanel";
-import CreateTaskForm from "./Backlog/CreateTask";
-import { BASE, WIP_WARNING_THRESHOLD, PALETTE, STATUS_PALETTES, getStatusColors } from "./Board/constants";
-import { CreateTaskModal } from "./Board/CreateTaskModal";
-import { DeleteStatusModal } from "./Board/DeleteStatusModal";
-import TaskCard from "./Board/TaskCard";
-import { Avatar } from "./Board/TaskCard";
+import CreateTaskForm from "../../../components/Backlog/CreateTask";
+import { BASE, WIP_WARNING_THRESHOLD, PALETTE, STATUS_PALETTES, getStatusColors } from "../../../components/Board/constants";
+import { CreateTaskModal } from "../../../components/Board/CreateTaskModal";
+import { DeleteStatusModal } from "../../../components/Board/DeleteStatusModal";
+import TaskCard from "../../../components/Board/TaskCard";
+import { Avatar } from "../../../components/Board/TaskCard";
 import SwimlaneBoard from "./SwimlaneBoard";
 import Button from "../../../components/Button/Button";
 

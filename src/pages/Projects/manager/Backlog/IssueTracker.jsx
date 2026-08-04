@@ -15,9 +15,9 @@ import {
   Search,
   RotateCcw,
 } from "lucide-react";
-import EditStoryForm from "./EditStoryForm";
-import EditTaskForm from "./EditTaskForm";
-import EditEpicForm from "./EditEpicForm";
+import EditStoryForm from "../../../../components/Backlog/EditStoryForm";
+import EditTaskForm from "../../../../components/Backlog/EditTaskForm";
+import EditEpicForm from "../../../../components/Backlog/EditEpicForm";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Button from "../../../../components/Button/Button";
 import RiskBadge from "../RiskBadge";

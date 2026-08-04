@@ -15,6 +15,9 @@ export const useMyWorkStore = create(
       selectedTypes:      [],   // [] = all types
       selectedPriorities: [],   // [] = all priorities
 
+      // ── View mode — "member" (assigned to me) vs "manager" (accountable for) ─
+      viewMode: "member",
+
       // ── Active snapshot chip ─────────────────────────────────────────────
       activeChip: null,         // null | "overdue" | "dueToday" | "dueThisWeek" | "blocked"
 
@@ -25,12 +28,13 @@ export const useMyWorkStore = create(
       completedOpen: false,
 
       // ── Manager section open ─────────────────────────────────────────────
-      managerSectionOpen: false,
+      managerSectionOpen: true,
 
       // ── Actions ──────────────────────────────────────────────────────────
       setSelectedProjects:   (v) => set({ selectedProjects: v }),
       setSelectedTypes:      (v) => set({ selectedTypes: v }),
       setSelectedPriorities: (v) => set({ selectedPriorities: v }),
+      setViewMode:           (v) => set({ viewMode: v }),
 
       setActiveChip: (chip) =>
         set({ activeChip: get().activeChip === chip ? null : chip }),
