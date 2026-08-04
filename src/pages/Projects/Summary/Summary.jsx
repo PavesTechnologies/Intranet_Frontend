@@ -7,21 +7,21 @@ import { motion } from "framer-motion";
 import { preloadAllWidgets } from "./preloadWidgets";
 
 // Skeletons
-import HeaderSkeleton from "./skeletons/HeaderSkeleton";
-import ScopeSkeleton from "./skeletons/ScopeSkeleton";
-import StatusSkeleton from "./skeletons/StatusSkeleton";
-import ChartCardSkeleton from "./skeletons/ChartCardSkeleton";
-import ListCardSkeleton from "./skeletons/ListCardSkeleton";
+import HeaderSkeleton from "../../../components/Summary/skeletons/HeaderSkeleton";
+import ScopeSkeleton from "../../../components/Summary/skeletons/ScopeSkeleton";
+import StatusSkeleton from "../../../components/Summary/skeletons/StatusSkeleton";
+import ChartCardSkeleton from "../../../components/Summary/skeletons/ChartCardSkeleton";
+import ListCardSkeleton from "../../../components/Summary/skeletons/ListCardSkeleton";
 
 // Lazy load heavy widgets
-const ScopeAndProgress = lazy(() => import("./widgets/ScopeAndProgress"));
-const StatusOverview = lazy(() => import("./widgets/StatusOverview"));
-const TypesOfWork = lazy(() => import("./widgets/TypesOfWork"));
-const TeamWorkload = lazy(() => import("./widgets/TeamWorkload"));
+const ScopeAndProgress = lazy(() => import("../../../components/Summary/widgets/ScopeAndProgress"));
+const StatusOverview = lazy(() => import("../../../components/Summary/widgets/StatusOverview"));
+const TypesOfWork = lazy(() => import("../../../components/Summary/widgets/TypesOfWork"));
+const TeamWorkload = lazy(() => import("../../../components/Summary/widgets/TeamWorkload"));
 const PriorityDistribution = lazy(
-  () => import("./widgets/PriorityDistribution"),
+  () => import("../../../components/Summary/widgets/PriorityDistribution"),
 );
-const EpicProgress = lazy(() => import("./widgets/EpicProgress"));
+const EpicProgress = lazy(() => import("../../../components/Summary/widgets/EpicProgress"));
 
 const Summary = ({ projectId, projectName }) => {
   const [projectData, setProjectData] = useState({
