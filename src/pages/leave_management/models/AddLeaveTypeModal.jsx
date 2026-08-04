@@ -54,7 +54,14 @@ const GENDERS = [
 ];
 
 export function GenderDropdown({ value, onChange }) {
-  return <FilterListbox options={GENDERS} value={value} onChange={onChange} />;
+  return (
+    <FilterListbox
+      options={GENDERS}
+      value={value}
+      onChange={onChange}
+      placeholder="Select Gender"
+    />
+  );
 }
 
 const FIELD_LABEL_OVERRIDES = {
@@ -334,7 +341,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5">
           {/* Leave Name Dropdown */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 placeholder:text-gray-400">
               Leave Name *
             </label>
             {loadinglables ? (
@@ -346,6 +353,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
                   label: item.label,
                 }))}
                 value={formData.leaveName}
+                placeholder="Select Leave Name"
                 onChange={(selectedName) =>
                   setFormData((prev) => ({ ...prev, leaveName: selectedName }))
                 }
