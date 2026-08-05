@@ -442,13 +442,7 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
         const res = await getCampaignCandidates(campaignId);
         if (cancelled) return;
         const data = unwrap(res);
-        // candidates endpoint returns a paginated envelope ({ items, total, ... }),
-        // not a bare array — same shape as getBulkUploadsForCampaign above
-        const items = Array.isArray(data) ? data : (data?.items || []);
-        // TEMP DEBUG - remove once candidates render correctly
-        console.log("[CandidatesTab] unwrapped data:", data);
-        console.log("[CandidatesTab] extracted items:", items);
-        setCandidates(items);
+        setCandidates((Array.isArray(data) ? data : data?.items) || []);
       } catch {
         if (cancelled) return;
         toast.error("Failed to load campaign candidates.");
