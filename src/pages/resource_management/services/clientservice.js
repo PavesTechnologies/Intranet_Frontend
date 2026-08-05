@@ -15,7 +15,7 @@ export const getAdminKPI = async () => {
     });
     return response.data;
   } catch (error) {
-    console.log(error);
+    // console.log(error);
     console.error("KPI Fetch Error:", error);
     throw error;
   }

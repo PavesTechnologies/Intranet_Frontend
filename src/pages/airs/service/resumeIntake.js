@@ -89,6 +89,39 @@ export const getResumeById = async (resumeId) => {
     }
 };
 
+// HR_ADMIN-only manual retry for a single FAILED individually-uploaded resume
+// that hasn't been moved to the dead-letter queue yet (see replayResumeDlqEntry
+// for the DLQ'd case).
+export const retryResume = async (resumeId) => {
+    try {
+        const response = await api.post(`${BASE_URL}/resumes/${resumeId}/retry`, null, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error retrying resume:", error);
+        throw error;
+    }
+};
+
+// HR_ADMIN-only manual replay for a resume's dead-lettered task, by DLQ entry
+// id (getResumeById's `failure.dlq_id`, once failure.moved_to_dlq is true).
+export const replayResumeDlqEntry = async (dlqId) => {
+    try {
+        const response = await api.post(`${BASE_URL}/resumes/dead-letter-queue/${dlqId}/replay`, null, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error replaying resume DLQ entry:", error);
+        throw error;
+    }
+};
+
 export const bulkUpload = async (formData) => {
     try {
         const response = await api.post(`${BASE_URL}/bulk-uploads`, formData, {
@@ -215,6 +248,21 @@ export const getBulkUploadFileTimeline = async (bulkUploadJobId, fileId) => {
         return response.data;
     } catch (error) {
         console.error("Error fetching bulk upload file timeline:", error);
+        throw error;
+    }
+};
+
+// HR_ADMIN-only manual replay for a single FAILED file inside a bulk ZIP job.
+export const replayBulkUploadFile = async (bulkUploadJobId, fileId) => {
+    try {
+        const response = await api.post(`${BASE_URL}/bulk-uploads/${bulkUploadJobId}/files/${fileId}/replay`, null, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error replaying bulk upload file:", error);
         throw error;
     }
 };

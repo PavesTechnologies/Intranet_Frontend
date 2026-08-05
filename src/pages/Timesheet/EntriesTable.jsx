@@ -675,7 +675,7 @@ const EntriesTable = ({
                                
                 {showActions && (
                   <td className={actionCellClass}>
-                    {console.log("Status from entries table: ", status)}       
+                    {/* console.log("Status from entries table: ", status) */}
                                
                     {(status?.toLowerCase() === "draft" ||
                       status?.toLowerCase() === "submitted" ||

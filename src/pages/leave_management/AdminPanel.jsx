@@ -74,7 +74,7 @@ const AdminPanel = ({ employeeId }) => {
       .then((res) => {
         // const arr = Array.isArray(res.data) ? res.data : res.data?.data || [];
         setLeaveTypes(res.data?.regular || []);
-        console.log("Fetched Leave Types:", res.data?.regular || []);
+        // console.log("Fetched Leave Types:", res.data?.regular || []);
         // setAdminLeaveRequests(arr.map(toLeaveRequest));
       })
       .catch((err) => console.error("Failed to fetch leave types:", err));
@@ -130,7 +130,7 @@ const AdminPanel = ({ employeeId }) => {
 
   // Subscribe to WebSocket for real-time updates
   // In AdminPanel.js
-  console.log("leavered", leaveApprovalRef.current);
+  // console.log("leavered", leaveApprovalRef.current);
 
   useEffect(() => {
     const sub1 = subscribe("leave-updated", () => {
@@ -149,7 +149,7 @@ const AdminPanel = ({ employeeId }) => {
     if (refreshCooldown.current) return; // ⛔ already refreshing
     refreshCooldown.current = true;
     fetchRevokeRequests();
-    console.log("WS EVENT → refreshing admin data");
+    // console.log("WS EVENT → refreshing admin data");
     leaveApprovalRef.current?.refreshData();
 
     setTimeout(() => {

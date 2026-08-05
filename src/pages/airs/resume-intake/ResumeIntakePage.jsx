@@ -171,7 +171,14 @@ export default function ResumeIntakePage() {
 
       {activeListTab === "history" ? (
         <>
-          <ResumeUploadHistoryList files={files} isLoading={isLoading} />
+          <ResumeUploadHistoryList
+            files={files}
+            isLoading={isLoading}
+            onRetried={() => {
+              refreshResumes?.();
+              refreshInProcessing?.();
+            }}
+          />
 
           {totalResults > 0 && (
             <Pagination

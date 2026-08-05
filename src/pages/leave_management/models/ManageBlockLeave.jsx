@@ -3,7 +3,7 @@ import BlockLeaveSection from "./BlockLeaveSection";
 
 export default function ManageBlockLeave() {
     const { employeeId } = useParams();
-    console.log("Employee ID from params:", employeeId);
+    // console.log("Employee ID from params:", employeeId);
     return (
         <div className="w-full mt-2">
             <BlockLeaveSection employeeId={employeeId} />

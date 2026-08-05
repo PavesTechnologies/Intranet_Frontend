@@ -538,8 +538,8 @@ const RMSProjectDetails = () => {
     try {
       const res = await getProficiencyLevels();
 
-      console.log("RAW RESPONSE:", res); // 🔴 MUST LOG
-      console.log("DATA ARRAY:", res.data.data); // 🔴 MUST LOG
+      // console.log("RAW RESPONSE:", res); // 🔴 MUST LOG
+      // console.log("DATA ARRAY:", res.data.data); // 🔴 MUST LOG
 
       setProficiencyLevels(res.data.data);
     } catch (err) {
@@ -600,12 +600,12 @@ const RMSProjectDetails = () => {
           },
         },
       );
-      console.log("Exisiting Contacts:", existingContactIds); // Debug log
+      // console.log("Exisiting Contacts:", existingContactIds); // Debug log
       const validated = (clientRes.data.data || []).map((contact) => ({
         ...contact,
         isAlreadyMapped: existingContactIds.includes(contact.contactId),
       }));
-      console.log("Validated: ", validated);
+      // console.log("Validated: ", validated);
 
       setClientEscalations(validated);
       setSelectedClientEscalations([]);
@@ -748,7 +748,7 @@ const RMSProjectDetails = () => {
   useEffect(() => {
     fetchDetail();
     checkDemand();
-    console.log("Project Details: ", project);
+    // console.log("Project Details: ", project);
   }, [projectId]);
 
   useEffect(() => {
@@ -766,7 +766,7 @@ const RMSProjectDetails = () => {
     if (activeTab === "pre-requisites") {
       fetchProjectCompliance();
     }
-    console.log("Catogories:", categories);
+    // console.log("Catogories:", categories);
   }, [activeTab, projectId]);
 
   useEffect(() => {
@@ -900,7 +900,7 @@ const RMSProjectDetails = () => {
           {/* <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full lg:w-auto">
             <button
               onClick={() => {
-                console.log("Deliverable Role button clicked");
+                // console.log("Deliverable Role button clicked");
                 setOpenDeliverableRoleModal(true);
               }}
               className="bg-white border border-[#263383] text-[#263383] px-4 py-2 rounded-lg text-xs font-semibold hover:bg-[#263383] hover:text-white transition"

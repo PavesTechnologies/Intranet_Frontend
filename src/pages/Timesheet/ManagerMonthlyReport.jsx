@@ -2005,7 +2005,7 @@ const ManagerMonthlyReport = () => {
         {/* 4️⃣ SECTION 4: Employee Monthly Overview (KPI #4) */}
         {/* This section will only render if apiData.userEntriesSummary is populated */}
         {employeeMonthlyData && employeeMonthlyData.length > 0 ? (
-          (console.log("Employee Monthly Data:", employeeMonthlyData),
+          // console.log("Employee Monthly Data:", employeeMonthlyData)
           (
             <div
               ref={employeeOverviewRef}
@@ -2047,7 +2047,7 @@ const ManagerMonthlyReport = () => {
                 ))}
               </div>
             </div>
-          ))
+          )
         ) : (
           <div
             ref={employeeOverviewRef}

@@ -12,18 +12,15 @@ const EmployeePanel = () => {
     return localStorage.getItem('employeePanelActiveView') || 'employee';
   });
 
-  let roles = employee.user?.roles || '';
-  if (!Array.isArray(roles)) {
-    roles = roles.split(',').map((r) => r.trim());
-  }
+  const { hasRole } = employee;
 
   const employeeId = employee.user?.user_id;
 
-  const isAdmin = roles.includes('Super_Admin');
-  const permission = roles.includes('Super_Admin') || roles.includes('Admin');
-  const isManager = roles.includes('Reporting_Manager') || isAdmin;
-  const isHR = roles.includes('HR') || isAdmin;
-  const isHRAdministrator = roles.includes('Hr_Manager') || isAdmin;
+  const isAdmin = hasRole(['Super_Admin']);
+  const permission = hasRole(['Super_Admin', 'Admin']);
+  const isManager = hasRole(['Reporting_Manager']) || isAdmin;
+  const isHR = hasRole(['HR']) || isAdmin;
+  const isHRAdministrator = hasRole(['Hr_Manager']) || isAdmin || permission;
 
   // Default view logic
   useEffect(() => {
@@ -95,18 +92,16 @@ const EmployeePanel = () => {
             )}
 
             {/* HR Admin View */}
-            {!permission && (
-              isHRAdministrator && (
-                <button
-                  onClick={() => handleViewChange('hr_manager')}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${activeView === 'hr_manager'
-                    ? 'bg-indigo-600 text-white shadow'
-                    : 'text-gray-700 hover:bg-white'
-                    }`}
-                >
-                  HR-Admin View
-                </button>
-              )
+            {isHRAdministrator && (
+              <button
+                onClick={() => handleViewChange('hr_manager')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${activeView === 'hr_manager'
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'text-gray-700 hover:bg-white'
+                  }`}
+              >
+                HR-Admin View
+              </button>
             )}
 
             {/* HR Tools View */}

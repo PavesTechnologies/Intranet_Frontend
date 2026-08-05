@@ -430,14 +430,14 @@ const UserIssueTracker = () => {
                         </button>
 
                         <button
-                          onClick={() => console.log("Edit issue", issue.id)}
+                          // onClick={() => console.log("Edit issue", issue.id)}
                           className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
                         >
                           <EditIcon size={18} className="text-indigo-600" />
                         </button>
 
                         <button
-                          onClick={() => console.log("Delete issue", issue.id)}
+                          // onClick={() => console.log("Delete issue", issue.id)}
                           className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
                         >
                           <DeleteIcon size={18} className="text-red-600" />

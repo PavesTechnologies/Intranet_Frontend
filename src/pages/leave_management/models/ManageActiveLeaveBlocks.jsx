@@ -355,7 +355,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
       const rawBlocks = Array.isArray(blocksRes?.data?.data)
         ? blocksRes.data.data
         : [];
-      console.log("Fetched raw blocks:", rawBlocks);
+      // console.log("Fetched raw blocks:", rawBlocks);
 
       // Preload members for all projects in blocks
       const uniqueProjectIds = Array.from(
@@ -942,7 +942,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
                   </tr>
                 ) : (
                   filteredBlocks.map((b) => {
-                    console.log("Rendering block:", b);
+                    // console.log("Rendering block:", b);
                     const projectLabel =
                       projects.find((p) => String(p.id) === String(b.projectId))
                         ?.name || b.projectName;

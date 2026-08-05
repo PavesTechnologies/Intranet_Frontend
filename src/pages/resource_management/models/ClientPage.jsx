@@ -249,7 +249,7 @@ const ProjectAssets = ({ assets, loading }) => {
 };
 
 const ProjectEscalation = ({ data, loading }) => {
-  console.log("Escalation Data:", data);
+  // console.log("Escalation Data:", data);
   if (loading) {
     return (
       <div className="text-sm text-gray-500">Loading escalation matrix...</div>
@@ -623,7 +623,7 @@ const ClientPage = () => {
 
   const handleComplianceCreate = async (data) => {
     setLoading(true);
-    console.log("Creating compliance with data:", data);
+    // console.log("Creating compliance with data:", data);
     try {
       const res = await createClientCompliance(data);
       notify.success(res.message || "Compliance created successfully");

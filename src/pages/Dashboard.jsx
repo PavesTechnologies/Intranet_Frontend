@@ -265,7 +265,7 @@ export default function Dashboard() {
   // dates or leave type) can change days consumed, same as approve/reject.
   const handleLeaveBalanceUpdate = useCallback(
     (data) => {
-      console.log("🔄 Leave balance affected by:", data?.type, "— refetching");
+      // console.log("🔄 Leave balance affected by:", data?.type, "— refetching");
       fetchLeaveBalanceData();
     },
     [fetchLeaveBalanceData],

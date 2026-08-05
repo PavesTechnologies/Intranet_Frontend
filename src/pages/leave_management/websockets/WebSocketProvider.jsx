@@ -86,7 +86,7 @@ export default function WebSocketProvider({ children }) {
       if (clientRef.current?.active) {
         clientRef.current.deactivate();
         clientRef.current = null;
-        console.log("🔌 Previous WebSocket deactivated (no token)");
+        // console.log("🔌 Previous WebSocket deactivated (no token)");
       }
       return;
     }
@@ -144,13 +144,13 @@ export default function WebSocketProvider({ children }) {
       //     matching backend's sendToUser(managerId, "/queue/leave-requests", event).
       // ─────────────────────────────────────────────────────────────────
       onConnect: () => {
-        console.log("✅ WebSocket connected");
+        // console.log("✅ WebSocket connected");
 
         // ── Personal: approve / reject ─────────────────────────────────────
         // Backend: template.convertAndSendToUser(employeeId, "/queue/data-updated", event)
         client.subscribe("/user/queue/data-updated", (msg) => {
           const data = parseBody(msg.body);
-          console.log("📩 Personal update:", data.type);
+          // console.log("📩 Personal update:", data.type);
           emitEvent("employee-update", data);
           // ↑ useLeaveWebSocket("employee-update", ["LEAVE_APPROVED","LEAVE_REJECTED"])
           //   in PendingLeaveRequests will now fire correctly
@@ -162,7 +162,7 @@ export default function WebSocketProvider({ children }) {
         // replaces the old /topic/manager/leave-requests broadcast.
         client.subscribe("/user/queue/leave-requests", (msg) => {
           const data = parseBody(msg.body);
-          console.log("📢 Manager update:", data.type);
+          // console.log("📢 Manager update:", data.type);
           emitEvent("manager-update", data);
           // ↑ useLeaveWebSocket("manager-update", ["LEAVE_APPLIED","LEAVE_CANCELLED","LEAVE_UPDATED"])
           //   in HandleLeaveRequestAndApprovals will fire correctly
@@ -172,7 +172,7 @@ export default function WebSocketProvider({ children }) {
         // Backend: template.convertAndSendToUser(managerId, "/queue/comp-off-balance", event)
         client.subscribe("/user/queue/comp-off-balance", (msg) => {
           const data = parseBody(msg.body);
-          console.log("📢 Manager update:", data.type);
+          // console.log("📢 Manager update:", data.type);
           emitEvent("manager-update", data);
           // ↑ useLeaveWebSocket("manager-update", ["COMPOFF_REQUESTED","COMPOFF_UPDATED","COMPOFF_REQUEST_CANCELLED"])
           //   in HandleLeaveRequestAndApprovals will fire correctly
@@ -182,7 +182,7 @@ export default function WebSocketProvider({ children }) {
         // Backend: template.convertAndSendToUser(employeeId, "/queue/comp-off-balance", event)
         client.subscribe("/user/queue/comp-off-balance-updates", (msg) => {
           const data = parseBody(msg.body);
-          console.log("📢 Employee update:", data.type);
+          // console.log("📢 Employee update:", data.type);
           emitEvent("employee-update", data);
           // ↑ useLeaveWebSocket("employee-update", ["COMPOFF_APPROVED","COMPOFF_REJECTED"])
           //   in CompOffBalanceRequests will fire correctly
@@ -243,7 +243,7 @@ export default function WebSocketProvider({ children }) {
       },
 
       onDisconnect: () => {
-        console.log("🔌 WebSocket disconnected — will auto-reconnect");
+        // console.log("🔌 WebSocket disconnected — will auto-reconnect");
       },
 
       onWebSocketError: (error) => {
@@ -261,7 +261,7 @@ export default function WebSocketProvider({ children }) {
       if (clientRef.current?.active) {
         clientRef.current.deactivate();
         clientRef.current = null;
-        console.log("🔌 WebSocket deactivated (token changed or unmount)");
+        // console.log("🔌 WebSocket deactivated (token changed or unmount)");
       }
     };
   }, [token]); // ← Re-runs when token changes = handles user switch correctly

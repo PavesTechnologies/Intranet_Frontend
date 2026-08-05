@@ -6,7 +6,7 @@ import { useParams } from "react-router-dom";
 
 function ProjectStatusReportWrapper() {
   const { projectId } = useParams();
-  console.log("Wrapper loaded with projectId:", projectId);
+  // console.log("Wrapper loaded with projectId:", projectId);
   const [projectData, setProjectData] = useState(null);
   const authToken = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${authToken}` };

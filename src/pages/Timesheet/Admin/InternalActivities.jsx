@@ -26,7 +26,7 @@ const InternalActivities = () => {
       );
       setInternalActivities(res.data);
     } catch (err) {
-      console.log("failed to fetch internal activities: ", err);
+      // console.log("failed to fetch internal activities: ", err);
       toast.error(
         err?.response?.data || "Failed to fetch internal activities.",
       );
@@ -55,7 +55,7 @@ const InternalActivities = () => {
       fetchInternalActivities();
       toast.success(res?.data || "Task added successfully");
     } catch (err) {
-      console.log("failed to add task: ", err);
+      // console.log("failed to add task: ", err);
       toast.error(err?.response?.data || "Failed to add task.");
     } finally {
       setLoading(false);
@@ -95,7 +95,7 @@ const InternalActivities = () => {
       fetchInternalActivities();
       toast.success(res?.data || "Task updated successfully");
     } catch (err) {
-      console.log("failed to update task: ", err);
+      // console.log("failed to update task: ", err);
       toast.error(err?.response?.data || "Failed to update task.");
     } finally {
       setLoading(false);
@@ -124,7 +124,7 @@ const InternalActivities = () => {
       fetchInternalActivities();
       toast.success(res?.data || "Task deleted successfully");
     } catch (err) {
-      console.log("failed to delete task: ", err);
+      // console.log("failed to delete task: ", err);
       toast.error(err?.response?.data || "Failed to delete task.");
     } finally {
       setLoading(false);
