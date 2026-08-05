@@ -239,6 +239,14 @@ import LeaveBalanceJobProgress from "./pages/leave_management/models/LeaveBalanc
 import EmployeeExitDashboard from "./pages/employee-exit/EmployeeExitDashboard.jsx";
 import ExitDetailsPage from "./pages/employee-exit/ExitDetailsPage.jsx";
 
+import AccountReceivableLayout from "./pages/account_receivable/AccountReceivableLayout.jsx";
+import AccountReceivableDashboard from "./pages/account_receivable/Dashboard.jsx";
+import Overview from "./pages/account_receivable/Overview.jsx";
+import BillingConfigurations from "./pages/account_receivable/BillingConfigurations.jsx";
+import ConfigurationHistory from "./pages/account_receivable/ConfigurationHistory.jsx";
+import BillingDataAcquisition from "./pages/account_receivable/BillingDataAcquisition.jsx";
+import NewConfigurationWizard from "./pages/account_receivable/NewConfigurationWizard.jsx";
+
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
 import OnboardingDashboard from "./pages/employee-onboarding/onboarding-task/OnboardingDashboard.jsx";
@@ -411,6 +419,39 @@ const AppRoutes = () => {
             element={<MonthlyTSReport />}
           />
           <Route path="/timesheets/history" element={<TimesheetHistory />} />
+          {/* Account Receivable */}
+          <Route path="/account-receivable/*" element={<AccountReceivableLayout />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<AccountReceivableDashboard />} />
+            <Route
+              path="project-billing-setup"
+              element={<Navigate to="overview" replace />}
+            />
+            <Route
+              path="project-billing-setup/overview"
+              element={<Overview />}
+            />
+            <Route
+              path="project-billing-setup/configurations"
+              element={<BillingConfigurations />}
+            />
+            <Route
+              path="project-billing-setup/configurations/new"
+              element={<NewConfigurationWizard />}
+            />
+            <Route
+              path="project-billing-setup/configurations/:configId"
+              element={<NewConfigurationWizard />}
+            />
+            <Route
+              path="project-billing-setup/history"
+              element={<ConfigurationHistory />}
+            />
+            <Route
+              path="billing-data-acquisition"
+              element={<BillingDataAcquisition />}
+            />
+          </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile/edit" element={<EditProfile />} />
