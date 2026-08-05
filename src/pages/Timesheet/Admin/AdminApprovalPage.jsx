@@ -76,7 +76,7 @@ const AdminApprovalPage = () => {
       );
       setEmailOptions(res.data);
     } catch (err) {
-      console.log("failed to fetch users email: ", err);
+      // console.log("failed to fetch users email: ", err);
       toast.error(err?.response?.data || "Failed to fetch users email.");
     }
   };
@@ -86,10 +86,10 @@ const AdminApprovalPage = () => {
       const res = await api.get(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/emailSettings`,
       );
-      console.log(res);
+      // console.log(res);
       setEmailData(res.data[0]);
     } catch (err) {
-      console.log(err);
+      // console.log(err);
       toast.error(err?.response?.data || "Failed to fetch email address.");
     }
   };

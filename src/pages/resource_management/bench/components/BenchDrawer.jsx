@@ -14,7 +14,7 @@ const formatCurrency = (value) => {
 const cardIconWrapperClass = "absolute -right-4 -top-4 h-24 w-24 rounded-full bg-gradient-to-br opacity-20 transition-all group-hover:scale-110";
 
 const BenchDrawer = ({ open, resource, onClose, onAllocate, onMoveToPool, liveMatches, loadingMatches, activeTab = "bench" }) => {
-  console.log("Resource from Bench Drawer: ", resource);
+  // console.log("Resource from Bench Drawer: ", resource);
 
   if (!open || !resource) return null;
 

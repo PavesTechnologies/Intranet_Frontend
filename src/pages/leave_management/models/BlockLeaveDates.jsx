@@ -215,7 +215,7 @@ const MultiSelect = ({
 };
 
 export default function BlockLeaveDates({ employeeId }) {
-  console.log("BlockLeaveDates Employee ID:", employeeId);
+  // console.log("BlockLeaveDates Employee ID:", employeeId);
   // Data state
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
@@ -285,7 +285,7 @@ export default function BlockLeaveDates({ employeeId }) {
     const fetchHolidays = async () => {
       try {
         const year = new Date().getFullYear();
-        console.log("yeaer", year);
+        // console.log("yeaer", year);
         const res = await api.get(
           `${BASE_URL}/api/holidays/by-location/${year}`,
           {

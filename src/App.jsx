@@ -280,12 +280,12 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     const hasRole = user?.roles?.some((role) =>
       normalizedAllowedRoles.includes(role.toUpperCase())
     );
-    console.log("ProtectedRoute check:", {
-      isAuthenticated,
-      user,
-      allowedRoles,
-      match: hasRole,
-    });
+    // console.log("ProtectedRoute check:", {
+      // isAuthenticated,
+      // user,
+      // allowedRoles,
+      // match: hasRole,
+    // });
 
     if (!hasRole) {
       return <Navigate to="/unauthorized" replace />;

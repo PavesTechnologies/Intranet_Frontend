@@ -38,10 +38,10 @@ const EmployeePanel = () => {
   //   ? JSON.parse(localStorage.getItem("user"))
   //   : null;
 
-  console.log("employee", employee);
+  // console.log("employee", employee);
 
   const employeeId = employee.user?.user_id;
-  console.log("EmployeeId", employeeId);
+  // console.log("EmployeeId", employeeId);
 
   const isManager =
     roles.includes("manager") ||

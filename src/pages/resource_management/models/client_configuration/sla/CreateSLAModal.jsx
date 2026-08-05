@@ -22,7 +22,7 @@ const CreateSLAModal = ({ open, onClose }) => {
 
   const handleSave = () => {
     // 🔹 MOCK SAVE (for now)
-    console.log("SLA Configuration Saved:", formData);
+    // console.log("SLA Configuration Saved:", formData);
 
     // Later:
     // - validate

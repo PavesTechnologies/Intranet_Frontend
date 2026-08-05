@@ -192,7 +192,7 @@ const CreateSprintModal = ({
       onClose(); // ← close immediately, toast will show on top of nothing
 
     } catch (err) {
-      console.log('[sprint-modal] handleSubmit - caught error', { err: err?.response?.data || err?.message, ts: Date.now() });
+      // console.log('[sprint-modal] handleSubmit - caught error', { err: err?.response?.data || err?.message, ts: Date.now() });
 
       showStatusToast(err.response?.data?.message || "Error saving sprint", "error");
     }

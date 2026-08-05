@@ -398,7 +398,7 @@ const EmployeeDashboard = ({ employeeId }) => {
       console.error("Failed to fetch comp-off requests:", err);
     } finally {
       setTimeout(() => { inFlightRef.current = false; }, 300);
-      console.log("RefreshKey after fetch:", refreshKey);
+      // console.log("RefreshKey after fetch:", refreshKey);
     }
   }, [BASE_URL, employeeId]); // stable — only changes if employeeId/BASE_URL changes
 

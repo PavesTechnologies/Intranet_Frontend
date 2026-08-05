@@ -76,7 +76,7 @@ export default function EditProfile() {
 
     try {
       setSaving(true);
-      console.log("Payload:", payload);
+      // console.log("Payload:", payload);
       const response = await api.put(
         `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/general_user/profile`,
         payload,
@@ -84,7 +84,7 @@ export default function EditProfile() {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         },
       );
-      console.log("Response:", response.data);
+      // console.log("Response:", response.data);
       showStatusToast("Profile updated!", "success");
       navigate("/profile");
     } catch (err) {
