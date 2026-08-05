@@ -441,7 +441,8 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
       try {
         const res = await getCampaignCandidates(campaignId);
         if (cancelled) return;
-        setCandidates(unwrap(res) || []);
+        const data = unwrap(res);
+        setCandidates((Array.isArray(data) ? data : data?.items) || []);
       } catch {
         if (cancelled) return;
         toast.error("Failed to load campaign candidates.");
