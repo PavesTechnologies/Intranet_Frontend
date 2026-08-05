@@ -12,18 +12,15 @@ const EmployeePanel = () => {
     return localStorage.getItem('employeePanelActiveView') || 'employee';
   });
 
-  let roles = employee.user?.roles || '';
-  if (!Array.isArray(roles)) {
-    roles = roles.split(',').map((r) => r.trim());
-  }
+  const { hasRole } = employee;
 
   const employeeId = employee.user?.user_id;
 
-  const isAdmin = roles.includes('Super_Admin');
-  const permission = roles.includes('Super_Admin') || roles.includes('Admin');
-  const isManager = roles.includes('Reporting_Manager') || isAdmin;
-  const isHR = roles.includes('HR') || isAdmin;
-  const isHRAdministrator = roles.includes('Hr_Manager') || isAdmin;
+  const isAdmin = hasRole(['Super_Admin']);
+  const permission = hasRole(['Super_Admin', 'Admin']);
+  const isManager = hasRole(['Reporting_Manager']) || isAdmin;
+  const isHR = hasRole(['HR']) || isAdmin;
+  const isHRAdministrator = hasRole(['Hr_Manager']) || isAdmin || permission;
 
   // Default view logic
   useEffect(() => {
