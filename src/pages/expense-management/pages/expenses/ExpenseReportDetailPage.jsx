@@ -708,11 +708,23 @@ function LineItemDrawer({
     const newFiles = [];
     let hasDuplicate = false; 
 
+    const allowedExtensions = ["pdf", "png", "jpg", "jpeg"];
+
     for (const file of Array.from(files)) {
-      const isDuplicate = pendingFiles.some(
+      const ext = file.name.split(".").pop().toLowerCase();
+      if (!allowedExtensions.includes(ext)) {
+        showStatusToast("Only PDF, PNG, JPG, and JPEG files are allowed.", "error");
+        continue;
+      }
+
+      const isPendingDuplicate = pendingFiles.some(
         (pf) => pf.name === file.name && pf.size === file.size
       );
-      if (isDuplicate) {
+      const isUploadedDuplicate = receipts.some(
+        (r) => r.fileName === file.name && r.fileSize === file.size
+      );
+
+      if (isPendingDuplicate || isUploadedDuplicate) {
         hasDuplicate = true;
       } else {
         newFiles.push({
@@ -830,8 +842,25 @@ function LineItemDrawer({
       let res;
       if (savedLineItem) {
         res = await lineItemService.update(reportId, savedLineItem.lineItemId, payload);
+        const lineItemId = savedLineItem.lineItemId;
+
+        if (lineItemId && pendingFiles.length > 0) {
+          for (const pf of pendingFiles) {
+            const formDataUpload = new FormData();
+            formDataUpload.append("file", pf.file);
+            try {
+              await receiptService.upload(lineItemId, formDataUpload);
+            } catch (uploadErr) {
+              console.error(`Failed to upload ${pf.name}:`, uploadErr);
+              showStatusToast(`Failed to upload ${pf.name}`, "error");
+            }
+          }
+          setPendingFiles([]);
+        }
+
         showStatusToast("Line item updated successfully!", "success");
-        setSavedLineItem(res.data?.data || res.data || { ...payload, lineItemId: savedLineItem?.lineItemId });
+        setSavedLineItem(res.data?.data || res.data || { ...payload, lineItemId });
+        fetchReceipts();
         onSaved?.();
       } else {
         res = await lineItemService.create(reportId, payload);
@@ -1145,6 +1174,87 @@ function LineItemDrawer({
                   ))}
                 </div>
               )}
+
+              {/* Add More Receipts Section */}
+              <div className="mt-4 space-y-3">
+                <p className="text-xs font-semibold text-gray-700">Add More Receipts</p>
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    handleFileChange(e.dataTransfer.files);
+                  }}
+                  onClick={() => inputRef.current?.click()}
+                  className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed p-5 text-center cursor-pointer transition ${
+                    isDragging ? "border-[#0A0082] bg-indigo-50" : "border-gray-300 bg-gray-50 hover:bg-gray-100"
+                  }`}
+                >
+                  <UploadCloud className={isDragging ? "text-[#0A0082]" : "text-gray-400"} size={22} />
+                  <p className="text-xs font-medium text-gray-600">
+                    Drag &amp; drop a receipt, or <span className="text-[#0A0082] font-semibold">browse</span>
+                  </p>
+                  <p className="text-[10px] text-gray-400">PDF, PNG, JPG up to 10MB</p>
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    className="hidden"
+                    onChange={(e) => {
+                      handleFileChange(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+
+                {pendingFiles.length > 0 && (
+                  <div className="space-y-2">
+                    {pendingFiles.map((pf) => (
+                      <div
+                        key={pf.id}
+                        className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-2.5 hover:border-gray-300 hover:shadow-sm transition"
+                      >
+                        <div className="shrink-0 p-2 rounded-lg bg-blue-50 text-blue-600">
+                          {isImageFile(pf.name) ? <ImageIcon size={16} /> : <FileText size={16} />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-gray-800 truncate">{pf.name}</p>
+                          <p className="text-[10px] text-gray-400">
+                            {formatFileSize(pf.size)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="icon"
+                            title="View Receipt"
+                            className="h-7 w-7 p-0 text-gray-600 hover:bg-gray-100 rounded-md"
+                            onClick={() => handleViewReceipt(pf)}
+                          >
+                            <Eye size={14} />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="icon"
+                            title="Remove File"
+                            className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 rounded-md"
+                            onClick={() => setPendingFiles((prev) => prev.filter((item) => item.id !== pf.id))}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
