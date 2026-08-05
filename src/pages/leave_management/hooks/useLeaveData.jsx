@@ -56,7 +56,7 @@ const useLeaveData = (employeeId, refreshKey, year) => {
 
   useLeaveWebSocket(
     "employee-update",
-    ["LEAVE_UPDATED", "LEAVE_CANCELLED", "LEAVE_APPROVED", "LEAVE_REJECTED"],
+    ["LEAVE_UPDATED", "LEAVE_CANCELLED", "LEAVE_APPROVED", "LEAVE_REJECTED", "REVOKE_APPROVED", "REVOKE_REJECTED"],
     fetchLeaveData
   )
 

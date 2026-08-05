@@ -71,15 +71,6 @@ export interface CampaignUpdateRequest {
   confirm_scoring_change?: boolean;
 }
 
-export interface CampaignDuplicateRequest {
-  name: string;
-  jd_id: string;
-  hiring_manager_id?: string | null;
-  recruiter_id?: string | null;
-  max_candidates?: number | null;
-  deadline?: string | null;
-}
-
 export interface CampaignCloseRequest {
   closure_reason: CampaignClosureReason;
 }
@@ -178,42 +169,6 @@ export interface CampaignWeightPresetCreateRequest {
 
 export type CampaignWeightPresetUpdateRequest = CampaignWeightPresetCreateRequest;
 
-export interface ScoreDistributionResponse {
-  has_processed_candidates: boolean;
-  message: string | null;
-  average_composite_score: number | null;
-  median_composite_score: number | null;
-  highest_composite_score: number | null;
-  lowest_composite_score: number | null;
-  passed_all_layers_count: number;
-  rejected_deterministic_count: number;
-  rejected_semantic_count: number;
-  rejected_ai_count: number;
-}
-
-export interface CampaignComparisonColumn {
-  campaign_id: string;
-  campaign_name: string;
-  status: string;
-  jd_title: string;
-  weight_deterministic: number;
-  weight_semantic: number;
-  weight_ai: number;
-  semantic_threshold: number;
-  ai_threshold: number;
-  total_candidates: number;
-  score_distribution: ScoreDistributionResponse;
-}
-
-export interface CampaignComparisonResponse {
-  campaigns: CampaignComparisonColumn[];
-  consistent_fields: Record<string, boolean>;
-}
-
-export interface CopyScoringConfigRequest {
-  target_campaign_ids: string[];
-}
-
 export interface CampaignScoringConfigurationResponse {
   weight_deterministic: number;
   weight_semantic: number;
@@ -226,11 +181,6 @@ export interface CampaignScoringConfigurationResponse {
   layers: { layer: string; weight: number; threshold: number | null; description: string }[];
   defaults: CampaignScoringDefaultsResponse;
   warning: string | null;
-}
-
-export interface CopyScoringConfigResponse {
-  source_campaign_id: string;
-  results: CampaignScoringConfigurationResponse[];
 }
 
 export interface CampaignScoringDefaultsResponse {
@@ -249,22 +199,6 @@ export interface PlatformDefaultWeightsUpdateRequest {
   ai_threshold: number;
 }
 
-export interface WeightChangeReportRow {
-  campaign_id: string;
-  campaign_name: string;
-  campaign_status: string;
-  change_date: string;
-  changed_by: string;
-  previous_weights: Record<string, number>;
-  new_weights: Record<string, number>;
-  candidates_processed_with_this_config: number;
-}
-
-export interface WeightChangeReportResponse {
-  rows: WeightChangeReportRow[];
-  total_count: number;
-}
-
 export interface ProcessingStatusSummaryResponse {
   queued_count: number;
   running_count: number;
@@ -280,7 +214,11 @@ export interface DeadLetterQueueEntryResponse {
   final_error_message: string;
   retry_count: number;
   moved_to_dlq_at: string;
+  last_attempted_at: string | null;
   campaign_candidate_id: string | null;
+  replay_supported: boolean;
+  replayed_at: string | null;
+  resolution_notes: string | null;
 }
 
 export interface CampaignDetailResponse {

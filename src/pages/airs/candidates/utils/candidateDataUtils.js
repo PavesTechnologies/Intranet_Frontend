@@ -27,3 +27,9 @@ export function initialsFromName(name) {
   if (!parts.length) return DASH;
   return parts.map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 }
+
+export const formatDateTime = (iso) => {
+  if (isEmpty(iso)) return DASH;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? DASH : d.toLocaleString();
+};

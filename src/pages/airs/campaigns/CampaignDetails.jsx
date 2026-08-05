@@ -3,10 +3,10 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
   ArrowLeft, Users, Activity, AlertTriangle, Lock, Target,
-  UserCog, FileText, ArrowRight, Filter, ChevronDown, Clock, Edit2,
-  ExternalLink, ListChecks, PauseCircle, PlayCircle, XCircle,
-  RotateCcw, Copy, Inbox, AlertOctagon, Hourglass, PieChart, Download,
-  CalendarClock, Send, Flag, SkipForward, Lightbulb, FileUp
+  UserCog, FileText, ArrowRight, Filter, ChevronDown, Clock,
+  ExternalLink, ListChecks,
+  RotateCcw, Inbox, AlertOctagon, Hourglass, PieChart,
+  Send, Flag, SkipForward, Lightbulb, FileUp
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import FilterListbox from "../../../components/filter/FilterListbox";
@@ -17,36 +17,18 @@ import { mapCampaignCandidateList } from "../candidates/utils/mapCampaignCandida
 import { paginate } from "../candidates/utils/candidateUtils.jsx";
 import { CANDIDATE_PAGE_SIZE } from "../candidates/constants/candidateConstants";
 import EditCampaignModal from "./components/EditCampaignModal";
-import PauseCampaignModal from "./components/PauseCampaignModal";
-import ResumeCampaignModal from "./components/ResumeCampaignModal";
-import CloseCampaignModal from "./components/CloseCampaignModal";
 import ReopenCampaignModal from "./components/ReopenCampaignModal";
-import DuplicateCampaignModal from "./components/DuplicateCampaignModal";
 import useCampaignPermissions from "./hooks/useCampaignPermissions";
 import {
   getCampaignDetails, getPipelineSummary, getCampaignTimeline,
   getCampaignCandidates, getProcessingStatus, getDeadLetterQueue,
-  getProcessingQueue, replayDeadLetterTasks, updateCampaign,
+  getProcessingQueue, replayDeadLetterTasks,
   getStalledCandidates, reprocessStalledCandidate, escalateStalledCandidate,
   overrideCandidateStage, flagCandidateForReview,
-  getRejectionAnalytics, exportRejectionAnalytics, exportCampaignSummary,
+  getRejectionAnalytics,
   getBulkUploadsForCampaign,
+  formatApiError,
 } from "./services/campaignservice";
-
-// Shared blob-download helper for the XLSX export buttons
-const downloadBlob = (blobData, filename) => {
-  const blob = new Blob([blobData], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-};
 
 // Colour per pipeline stage (used for the funnel bars)
 const STAGE_COLORS = {
@@ -56,16 +38,6 @@ const STAGE_COLORS = {
 };
 const stageLabel = (s) =>
   s.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
-
-const TIMELINE_EVENT_TYPES = [
-  { value: "", label: "All Events" },
-  { value: "CAMPAIGN_CREATED", label: "Campaign Created" },
-  { value: "THRESHOLD_UPDATED", label: "Threshold Updated" },
-  { value: "CAMPAIGN_SCORING_CONFIG_CHANGED", label: "Scoring Config Changed" },
-  { value: "BULK_UPLOAD_COMPLETED", label: "Bulk Upload Completed" },
-  { value: "CANDIDATE_SHORTLISTED", label: "Candidate Shortlisted" },
-  { value: "STATUS_CHANGED", label: "Status Changed" },
-];
 
 // service returns the raw APIResponse ({ success, message, data }); pull out data
 const unwrap = (res) => (res && res.data !== undefined ? res.data : res);
@@ -81,42 +53,12 @@ export default function CampaignDetails() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("details");
   const [editOpen, setEditOpen] = useState(false);
-  // E03 lifecycle actions — only one of these is ever open at a time
-  const [lifecycleModal, setLifecycleModal] = useState(null); // null | "pause" | "resume" | "close" | "reopen" | "duplicate"
-  // S01-T01: set when a funnel stage bar is clicked — pre-filters the Candidates tab
+  // lifecycle actions — only one of these is ever open at a time
+  const [lifecycleModal, setLifecycleModal] = useState(null); // null | "pause" | "resume" | "close" | "reopen"
+  // set when a funnel stage bar is clicked — pre-filters the Candidates tab
   const [candidateStageFilter, setCandidateStageFilter] = useState("");
-  // E04-S06: summary export + weekly-report toggle
-  const [exportingSummary, setExportingSummary] = useState(false);
-  const [togglingReport, setTogglingReport] = useState(false);
 
-  const handleExportSummary = async () => {
-    setExportingSummary(true);
-    try {
-      const blobData = await exportCampaignSummary(id);
-      downloadBlob(blobData, `Campaign_Summary_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    } catch {
-      toast.error("Failed to export campaign summary.");
-    } finally {
-      setExportingSummary(false);
-    }
-  };
-
-  const handleToggleWeeklyReport = async (current) => {
-    setTogglingReport(true);
-    try {
-      await updateCampaign(id, { report_scheduled: !current });
-      toast.success(!current
-        ? "Weekly report scheduled. Email delivery will activate once email integration lands."
-        : "Weekly report unscheduled.");
-      loadDetail();
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to update weekly report schedule.");
-    } finally {
-      setTogglingReport(false);
-    }
-  };
-
-  // S06-T01 — load full campaign profile
+  // — load full campaign profile
   const loadDetail = useCallback(async () => {
     try {
       const res = await getCampaignDetails(id);
@@ -131,15 +73,13 @@ export default function CampaignDetails() {
   useEffect(() => { loadDetail(); }, [loadDetail]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
+    return (<div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner text="Loading campaign..." />
       </div>
     );
   }
   if (!detail) {
-    return (
-      <div className="p-8 min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
+    return (<div className="p-8 min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
         <AlertTriangle className="h-12 w-12 text-rose-500 mb-4" />
         <h2 className="text-lg font-bold text-slate-800">Campaign Not Found</h2>
         <Button variant="primary" size="small" className="mt-4" onClick={() => navigate("/airs/campaigns")}>
@@ -158,14 +98,14 @@ export default function CampaignDetails() {
   const status = (info.status || "").toUpperCase();
   const isClosed = status === "CLOSED";
   const isActive = status === "ACTIVE";
-  const canEdit = canManageCampaigns && !isClosed;   // S07-T03: closed = read-only
+  const canEdit = canManageCampaigns && !isClosed;   // closed = read-only
 
   // Pipeline/Processing tabs: HR_ADMIN + RECRUITER (matches the backend's
   // require_roles on pipeline-summary / processing-status / dead-letter-queue).
   // scoring != null is kept as a data-presence AND — the backend also omits
   // the scoring section for roles it hides it from, so both must agree.
   const canSeePipeline = canViewPipeline && scoring != null;
-  const canSeeTimeline = canViewTimeline;            // S06-T03: HR_ADMIN only
+  const canSeeTimeline = canViewTimeline;            // HR_ADMIN only
 
   const tabs = [
     { id: "details", label: "Details", icon: FileText, show: true },
@@ -184,8 +124,7 @@ export default function CampaignDetails() {
     CLOSED: "bg-slate-100 text-slate-600 border-slate-200",
   }[status] || "bg-slate-50 text-slate-600 border-slate-200";
 
-  return (
-    <div className="bg-[#F8FAFC] text-slate-900 font-sans min-h-screen p-6">
+  return (<div className="bg-[#F8FAFC] text-slate-900 font-sans min-h-screen p-6">
       {/* Header */}
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm mb-6 flex flex-col md:flex-row justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -196,68 +135,33 @@ export default function CampaignDetails() {
             <ArrowLeft size={18} />
           </button>
           <div>
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${statusStyle}`}>
-              {status}
-            </span>
-            <h1 className="text-xl font-bold text-slate-900 mt-1">{info.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-slate-900">{info.name}</h1>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${statusStyle}`}>
+                {status}
+              </span>
+            </div>
             <p className="text-xs text-slate-500 mt-0.5">
               Created by {info.created_by_name || "System"} on {fmtDate(info.created_at)}
             </p>
           </div>
         </div>
-        {canManageCampaigns && (
-          <div className="flex items-start flex-wrap gap-2">
-            {isActive && (
-              <Button variant="outline" size="medium" onClick={() => setLifecycleModal("pause")}>
-                <PauseCircle className="h-4 w-4" /> Pause
-              </Button>
-            )}
-            {status === "PAUSED" && (
-              <Button variant="outline" size="medium" onClick={() => setLifecycleModal("resume")}>
-                <PlayCircle className="h-4 w-4" /> Resume
-              </Button>
-            )}
-            {!isClosed && (
-              <Button variant="danger" size="medium" onClick={() => setLifecycleModal("close")}>
-                <XCircle className="h-4 w-4" /> Close
-              </Button>
-            )}
-            {isClosed && (
-              <Button variant="outline" size="medium" onClick={() => setLifecycleModal("reopen")}>
+        {canManageCampaigns && (<div className="flex items-start flex-wrap gap-2">
+            {/* Pause/Resume/Close live inside Edit Campaign as a Status dropdown;
+                Reopen stays here since closed campaigns are read-only. */}
+            {isClosed ? (<Button variant="outline" size="medium" onClick={() => setLifecycleModal("reopen")}>
                 <RotateCcw className="h-4 w-4" /> Reopen
               </Button>
-            )}
-            <Button variant="outline" size="medium" onClick={() => setLifecycleModal("duplicate")}>
-              <Copy className="h-4 w-4" /> Duplicate
-            </Button>
-            <Button
-              variant="outline" size="medium"
-              onClick={handleExportSummary}
-              loading={exportingSummary} loadingText="Exporting..."
-            >
-              <Download className="h-4 w-4" /> Summary
-            </Button>
-            <Button
-              variant={info.report_scheduled ? "success" : "outline"}
-              size="medium"
-              onClick={() => handleToggleWeeklyReport(info.report_scheduled)}
-              loading={togglingReport} loadingText="Saving..."
-              title="Weekly summary report to HR admin + hiring manager (email delivery pending integration)"
-            >
-              <CalendarClock className="h-4 w-4" /> Weekly Report: {info.report_scheduled ? "On" : "Off"}
-            </Button>
-            {canEdit && (
-              <Button variant="secondary" size="medium" onClick={() => setEditOpen(true)}>
-                <Edit2 className="h-4 w-4" /> Edit Campaign
+            ) : (<Button variant="primary" size="medium" onClick={() => setEditOpen(true)}>
+                Edit Campaign
               </Button>
             )}
           </div>
         )}
       </div>
 
-      {/* S07-T03: closed read-only banner */}
-      {isClosed && (
-        <div className="mb-6 flex items-center gap-3 bg-slate-100 border border-slate-200 rounded-xl px-5 py-3">
+      {/* closed read-only banner */}
+      {isClosed && (<div className="mb-6 flex items-center gap-3 bg-slate-100 border border-slate-200 rounded-xl px-5 py-3">
           <Lock className="h-4 w-4 text-slate-500" />
           <p className="text-xs font-semibold text-slate-600">
             This campaign is <b>closed</b> and read-only. Reopen the campaign to make changes.
@@ -267,32 +171,27 @@ export default function CampaignDetails() {
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-6 gap-6">
-        {tabs.map((t) => (
-          <button
+        {tabs.map((t) => (<button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
             className={`flex items-center gap-2 pb-3 text-xs font-bold border-b-2 transition ${
               activeTab === t.id ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"
             }`}
           >
-            <t.icon className="h-4 w-4" /> {t.label}
+            {t.label}
           </button>
         ))}
       </div>
 
-      {activeTab === "details" && (
-        <DetailsTab info={info} jd={jd} scoring={scoring} limits={limits} hm={hm} />
+      {activeTab === "details" && (<DetailsTab info={info} jd={jd} scoring={scoring} limits={limits} hm={hm} />
       )}
-      {activeTab === "candidates" && (
-        <CandidatesTab
+      {activeTab === "candidates" && (<CandidatesTab
           campaignId={id}
-          canViewPipeline={canViewPipeline}
           stageFilter={candidateStageFilter}
           onStageFilterChange={setCandidateStageFilter}
         />
       )}
-      {activeTab === "pipeline" && (
-        <PipelineTab
+      {activeTab === "pipeline" && (<PipelineTab
           campaignId={id}
           isActive={isActive}
           onViewCandidates={() => navigate(`/airs/candidates?campaign=${id}`)}
@@ -302,23 +201,19 @@ export default function CampaignDetails() {
           }}
         />
       )}
-      {activeTab === "processing" && (
-        <ProcessingTab campaignId={id} canManageCampaigns={canManageCampaigns} />
+      {activeTab === "processing" && (<ProcessingTab campaignId={id} canManageCampaigns={canManageCampaigns} />
       )}
       {activeTab === "uploads" && <UploadsTab campaignId={id} />}
       {activeTab === "stalled" && canManageCampaigns && <StalledTab campaignId={id} />}
-      {activeTab === "rejections" && (
-        <RejectionsTab
+      {activeTab === "rejections" && (<RejectionsTab
           campaignId={id}
-          canManageCampaigns={canManageCampaigns}
           jdId={jd.jd_id}
           onAdjustThreshold={canEdit ? () => setEditOpen(true) : null}
         />
       )}
       {activeTab === "timeline" && <TimelineTab campaignId={id} />}
 
-      {canEdit && (
-        <EditCampaignModal
+      {canEdit && (<EditCampaignModal
           isOpen={editOpen}
           onClose={() => setEditOpen(false)}
           campaignId={id}
@@ -327,40 +222,12 @@ export default function CampaignDetails() {
         />
       )}
 
-      {canManageCampaigns && (
-        <>
-          <PauseCampaignModal
-            isOpen={lifecycleModal === "pause"}
-            onClose={() => setLifecycleModal(null)}
-            campaignId={id}
-            onPaused={() => { setLifecycleModal(null); setLoading(true); loadDetail(); }}
-          />
-          <ResumeCampaignModal
-            isOpen={lifecycleModal === "resume"}
-            onClose={() => setLifecycleModal(null)}
-            campaignId={id}
-            onResumed={() => { setLifecycleModal(null); setLoading(true); loadDetail(); }}
-          />
-          <CloseCampaignModal
-            isOpen={lifecycleModal === "close"}
-            onClose={() => setLifecycleModal(null)}
-            campaignId={id}
-            onClosed={() => { setLifecycleModal(null); setLoading(true); loadDetail(); }}
-          />
+      {canManageCampaigns && (<>
           <ReopenCampaignModal
             isOpen={lifecycleModal === "reopen"}
             onClose={() => setLifecycleModal(null)}
             campaignId={id}
             onReopened={() => { setLifecycleModal(null); setLoading(true); loadDetail(); }}
-          />
-          <DuplicateCampaignModal
-            isOpen={lifecycleModal === "duplicate"}
-            onClose={() => setLifecycleModal(null)}
-            sourceCampaign={info.name ? { id, name: info.name } : null}
-            onDuplicated={(created) => {
-              setLifecycleModal(null);
-              if (created?.id) navigate(`/airs/campaigns/${created.id}`);
-            }}
           />
         </>
       )}
@@ -368,105 +235,198 @@ export default function CampaignDetails() {
   );
 }
 
-/* ---------------- Details Tab (S06-T01) ---------------- */
-function Section({ title, icon: Icon, children }) {
-  return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm h-fit">
-      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest border-b pb-2 mb-3 flex items-center gap-2">
-        {Icon && <Icon className="h-4 w-4 text-blue-600" />} {title}
-      </h3>
-      <div className="space-y-3">{children}</div>
+/* ---------------- Details Tab ---------------- */
+// h-full + flex-col: siblings in a row match the tallest card instead of
+// shrink-wrapping to their content and leaving ragged whitespace beneath.
+function Card({ title, icon: Icon, children, className = "" }) {
+  return (<div className={`bg-white border border-slate-200 rounded-xl shadow-sm h-full flex flex-col overflow-hidden ${className}`}>
+      <div className="flex items-center gap-2 px-5 py-3.5 border-b border-slate-100 bg-slate-50/60">
+        {Icon && <Icon className="h-4 w-4 text-blue-600" />}
+        <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-widest">{title}</h3>
+      </div>
+      <div className="p-5 flex-1">{children}</div>
     </div>
   );
 }
 
-function Field({ label, value }) {
-  return (
-    <div>
-      <span className="text-[10px] uppercase font-bold text-slate-400 block">{label}</span>
-      <span className="text-xs font-bold text-slate-800">{value ?? "—"}</span>
+function Row({ label, value, className = "" }) {
+  return (<div className={`min-w-0 ${className}`}>
+      <dt className="text-[10px] uppercase font-bold tracking-wide text-slate-400">{label}</dt>
+      <dd className="text-xs font-bold text-slate-800 mt-0.5 break-words">{value ?? "—"}</dd>
     </div>
   );
 }
+
+// Summary strip cell — cells sit flush against each other (divide-x, no
+// gutters) so the strip reads as one continuous band.
+function GlanceCell({ label, children }) {
+  return (<div className="px-5 py-4 flex-1 min-w-0">
+      <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400 mb-1.5">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+const STATUS_PILL = {
+  ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  PAUSED: "bg-amber-50 text-amber-700 border-amber-200",
+  CLOSED: "bg-slate-100 text-slate-600 border-slate-300",
+};
+
+// Same palette the rejection-analytics chart uses, so a layer reads as the
+// same colour everywhere in the module.
+const SCORING_LAYERS = [
+  { key: "weight_deterministic", label: "Deterministic", color: "#6366F1" },
+  { key: "weight_semantic", label: "Semantic", color: "#0EA5E9" },
+  { key: "weight_ai", label: "AI", color: "#8B5CF6" },
+];
 
 function DetailsTab({ info, jd, scoring, limits, hm }) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <Section title="Campaign Info" icon={FileText}>
-        <Field label="Name" value={info.name} />
-        <Field label="Status" value={(info.status || "").toUpperCase()} />
-        <Field label="Created By" value={info.created_by_name} />
-        <Field label="Created At" value={fmtDate(info.created_at)} />
-        <Field label="Updated At" value={fmtDate(info.updated_at)} />
-      </Section>
+  const status = (info.status || "").toUpperCase();
 
-      <Section title="JD Configuration" icon={FileText}>
-        <div>
-          <span className="text-[10px] uppercase font-bold text-slate-400 block">Linked JD</span>
-          {jd.jd_id ? (
-            <Link
+  const max = limits.max_candidates;
+  const current = limits.current_candidate_count ?? 0;
+  const capPct = max ? Math.min(100, Math.round((current / max) * 100)) : null;
+  // full cap is the state that actually blocks new uploads, so it gets the
+  // strongest colour rather than being buried in plain text
+  const capTone = capPct == null ? "bg-slate-300"
+    : capPct >= 100 ? "bg-rose-500"
+      : capPct >= 80 ? "bg-amber-500"
+        : "bg-indigo-500";
+
+  const weightTotal = scoring
+    ? SCORING_LAYERS.reduce((sum, l) => sum + Number(scoring[l.key] || 0), 0)
+    : 0;
+
+  return (<div className="space-y-5">
+      {/* At-a-glance strip — the four numbers worth knowing before reading
+          anything else. Flush cells, full width, no empty slots. */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+        <GlanceCell label="Status">
+          <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${STATUS_PILL[status] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
+            {status || "—"}
+          </span>
+        </GlanceCell>
+
+        <GlanceCell label="Candidates">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-lg font-black text-slate-900 tabular-nums leading-none">{current}</span>
+            <span className="text-[11px] font-bold text-slate-400">
+              {max == null ? "of unlimited" : `of ${max}`}
+            </span>
+          </div>
+          {capPct != null && (<div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+              <div className={`h-1.5 rounded-full ${capTone} transition-all duration-500`} style={{ width: `${capPct}%` }} />
+            </div>
+          )}
+        </GlanceCell>
+
+        <GlanceCell label="Deadline">
+          <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            {limits.deadline ? fmtDate(limits.deadline) : "None set"}
+          </p>
+        </GlanceCell>
+
+        <GlanceCell label="Job Description">
+          {jd.jd_id ? (<Link
               to={`/airs/jds/${jd.jd_id}`}
               className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
             >
-              {jd.jd_title} <ExternalLink className="h-3 w-3" />
+              <span className="truncate">{jd.jd_title}</span>
+              <ExternalLink className="h-3 w-3 shrink-0" />
             </Link>
-          ) : (
-            <span className="text-xs font-bold text-slate-800">{jd.jd_title ?? "—"}</span>
+          ) : (<p className="text-xs font-bold text-slate-800 truncate">{jd.jd_title ?? "—"}</p>
           )}
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            v{jd.version_number ?? "—"} · {jd.jurisdiction ?? "—"} · {jd.mandatory_skill_count ?? 0} mandatory skills
+          </p>
+        </GlanceCell>
+      </div>
+
+      {/* Two equal-height cards. Scoring is null for HIRING_MANAGER, in which
+          case the left card takes the full width instead of leaving a hole. */}
+      <div className={`grid grid-cols-1 gap-5 ${scoring ? "lg:grid-cols-5" : ""}`}>
+        <div className={scoring ? "lg:col-span-3" : ""}>
+          <Card title="Campaign" icon={FileText}>
+            {/* Name and the two people sit on the top row as the identity of
+                the campaign; timestamps are metadata and go below, three to a
+                row so nothing is left orphaned in a half-empty column.
+                Jurisdiction lives in the summary strip above, not repeated. */}
+            <dl className="space-y-4">
+              <Row label="Name" value={info.name} />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                {hm && (<div className="min-w-0">
+                    <dt className="text-[10px] uppercase font-bold tracking-wide text-slate-400 flex items-center gap-1">
+                      <UserCog className="h-3 w-3" /> Hiring Manager
+                    </dt>
+                    <dd className="mt-1.5 flex items-center gap-2.5 min-w-0">
+                      <span className="h-8 w-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                        {(hm.full_name || "?").trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase()}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-xs font-bold text-slate-800 truncate">{hm.full_name}</span>
+                        <span className="block text-[11px] text-slate-500 truncate">{hm.email}</span>
+                      </span>
+                    </dd>
+                  </div>
+                )}
+                <Row label="Created By" value={info.created_by_name} />
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                <Row label="Created At" value={fmtDate(info.created_at)} />
+                <Row label="Last Updated" value={fmtDate(info.updated_at)} />
+              </div>
+            </dl>
+          </Card>
         </div>
-        <Field label="Version" value={jd.version_number} />
-        <Field label="Jurisdiction" value={jd.jurisdiction} />
-        <Field label="Mandatory Skills" value={jd.mandatory_skill_count} />
-      </Section>
 
-      {/* Rendered only when backend supplied it (null for HIRING_MANAGER) */}
-      {scoring && (
-        <Section title="Scoring Configuration" icon={Target}>
-          <Field label="Deterministic Weight" value={asPct(scoring.weight_deterministic)} />
-          <Field label="Semantic Weight" value={asPct(scoring.weight_semantic)} />
-          <Field label="AI Weight" value={asPct(scoring.weight_ai)} />
-          <Field label="Semantic Threshold" value={scoring.semantic_threshold} />
-          <Field label="AI Threshold" value={scoring.ai_threshold} />
-        </Section>
-      )}
+        {scoring && (<div className="lg:col-span-2">
+            <Card title="Scoring Configuration" icon={Target}>
+              {/* Three weights are one distribution, so they read as one bar
+                  rather than three unrelated numbers. */}
+              <div className="flex h-2.5 rounded-full overflow-hidden bg-slate-100">
+                {SCORING_LAYERS.map((l) => {
+                  const w = Number(scoring[l.key] || 0);
+                  return (<div
+                      key={l.key}
+                      className="h-2.5 transition-all duration-500"
+                      style={{ width: weightTotal ? `${(w / weightTotal) * 100}%` : "0%", backgroundColor: l.color }}
+                      title={`${l.label}: ${asPct(w)}`}
+                    />
+                  );
+                })}
+              </div>
+              <dl className="mt-3 space-y-2">
+                {SCORING_LAYERS.map((l) => (<div key={l.key} className="flex items-center justify-between gap-2">
+                    <dt className="text-[11px] font-semibold text-slate-600 flex items-center gap-2 min-w-0">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: l.color }} />
+                      <span className="truncate">{l.label}</span>
+                    </dt>
+                    <dd className="text-xs font-bold text-slate-900 tabular-nums">{asPct(scoring[l.key])}</dd>
+                  </div>
+                ))}
+              </dl>
 
-      <Section title="Pipeline Limits" icon={Users}>
-        <Field
-          label="Max Candidates"
-          value={limits.max_candidates == null ? "Unlimited" : `${limits.current_candidate_count} / ${limits.max_candidates}`}
-        />
-        <Field label="Current Candidates" value={limits.current_candidate_count} />
-        <Field label="Deadline" value={limits.deadline ? fmtDate(limits.deadline) : "None"} />
-      </Section>
-
-      {hm && (
-        <Section title="Assigned Hiring Manager" icon={UserCog}>
-          <Field label="Name" value={hm.full_name} />
-          <Field label="Email" value={hm.email} />
-        </Section>
-      )}
+              <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-3 gap-3">
+                <Row label="Det. Cutoff" value={scoring.deterministic_threshold ?? "—"} />
+                <Row label="Sem. Cutoff" value={scoring.semantic_threshold} />
+                <Row label="AI Cutoff" value={scoring.ai_threshold} />
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 /* ---------------- Candidates Tab ---------------- */
-// Small stat tile for the candidate KPI row
-function StatTile({ label, value, suffix = "", tone = "text-slate-900", dot = "bg-slate-300" }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="flex items-center gap-1.5 mb-1">
-        <span className={`h-2 w-2 rounded-full ${dot}`} />
-        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 truncate">{label}</p>
-      </div>
-      <p className={`text-xl font-black tabular-nums ${tone}`}>{value}{suffix}</p>
-    </div>
-  );
-}
-
-function CandidatesTab({ campaignId, canViewPipeline, stageFilter = "", onStageFilterChange }) {
+function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const navigate = useNavigate();
   const [candidates, setCandidates] = useState(null);
-  const [summary, setSummary] = useState(null);   // pipeline-summary → KPI numbers
   const [loading, setLoading] = useState(true);
   const [starredIds, setStarredIds] = useState(() => new Set());
   const [currentPage, setCurrentPage] = useState(1);
@@ -478,37 +438,32 @@ function CandidatesTab({ campaignId, canViewPipeline, stageFilter = "", onStageF
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // Candidate list and the pipeline summary come from two endpoints — fetch
-      // in parallel and don't let a missing summary block the list from
-      // rendering. The summary call is skipped outright for roles the backend
-      // would 403 (HIRING_MANAGER) — the KPI row just shows the total.
-      const [candRes, sumRes] = await Promise.allSettled([
-        getCampaignCandidates(campaignId),
-        canViewPipeline ? getPipelineSummary(campaignId) : Promise.reject(new Error("skipped")),
-      ]);
-      if (cancelled) return;
-      if (candRes.status === "fulfilled") {
-        setCandidates(unwrap(candRes.value) || []);
-      } else {
+      try {
+        const res = await getCampaignCandidates(campaignId);
+        if (cancelled) return;
+        setCandidates(unwrap(res) || []);
+      } catch {
+        if (cancelled) return;
         toast.error("Failed to load campaign candidates.");
         setCandidates([]);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      if (sumRes.status === "fulfilled") setSummary(unwrap(sumRes.value));
-      setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [campaignId, canViewPipeline]);
+  }, [campaignId]);
 
   if (loading) {
     return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading candidates..." /></div>;
   }
 
+  // same row shape the standalone candidates screen renders, so CandidateTable
+  // and the star/pagination helpers work unchanged here
   const allCandidates = mapCampaignCandidateList(candidates || []).map((c) => ({
     ...c,
     starred: starredIds.has(c.id),
   }));
-
-  // S01-T01: stage filter — set by clicking a funnel bar, changeable here too
+  // stage filter — set by clicking a funnel bar, changeable here too
   const list = stageFilter
     ? allCandidates.filter((c) => (c.stage || "").toUpperCase() === stageFilter)
     : allCandidates;
@@ -531,30 +486,7 @@ function CandidatesTab({ campaignId, canViewPipeline, stageFilter = "", onStageF
     });
   };
 
-  // KPI numbers from the pipeline summary (falls back to list length for total)
-  const stageCount = (key) => (summary?.stages || []).find((s) => s.stage === key)?.count ?? 0;
-  const total = summary?.total_candidates ?? allCandidates.length;
-  const shortlisted = stageCount("SHORTLISTED");
-  const selected = stageCount("SELECTED");
-  const rejected = stageCount("REJECTED");
-  const inReview = stageCount("SCREENING") + stageCount("HM_REVIEW") + stageCount("INTERVIEW");
-  const selectionRate = total ? Math.round((selected / total) * 100) : 0;
-
-  const kpis = [
-    { label: "Candidates", value: total, dot: "bg-indigo-500", tone: "text-slate-900" },
-    ...(summary
-      ? [
-        { label: "In Review", value: inReview, dot: "bg-amber-500", tone: "text-amber-600" },
-        { label: "Shortlisted", value: shortlisted, dot: "bg-sky-500", tone: "text-sky-600" },
-        { label: "Selected", value: selected, dot: "bg-emerald-500", tone: "text-emerald-600" },
-        { label: "Rejected", value: rejected, dot: "bg-rose-500", tone: "text-rose-600" },
-        { label: "Selection Rate", value: selectionRate, suffix: "%", dot: "bg-violet-500", tone: "text-violet-600" },
-      ]
-      : []),
-  ];
-
-  return (
-    <div className="space-y-4">
+  return (<div className="space-y-4">
       <div className="flex justify-between items-end flex-wrap gap-2">
         <div>
           <h3 className="text-sm font-bold text-slate-900">Candidates</h3>
@@ -564,18 +496,10 @@ function CandidatesTab({ campaignId, canViewPipeline, stageFilter = "", onStageF
               : `${list.length} candidate${list.length === 1 ? "" : "s"} sourced for this campaign`}
           </p>
         </div>
-        {onStageFilterChange && allCandidates.length > 0 && (
-          <div className="w-44">
+        {onStageFilterChange && allCandidates.length > 0 && (<div className="w-44">
             <FilterListbox options={stageOptions} value={stageFilter} onChange={onStageFilterChange} />
           </div>
         )}
-      </div>
-
-      {/* KPI row — numbers sourced from the pipeline-summary endpoint */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {kpis.map((k) => (
-          <StatTile key={k.label} {...k} />
-        ))}
       </div>
 
       <CandidateTable
@@ -584,8 +508,7 @@ function CandidatesTab({ campaignId, canViewPipeline, stageFilter = "", onStageF
         onToggleStar={toggleStar}
       />
 
-      {list.length > 0 && (
-        <Pagination
+      {list.length > 0 && (<Pagination
           currentPage={safePage}
           totalPages={totalPages}
           onPrevious={() => setCurrentPage(safePage - 1)}
@@ -596,7 +519,7 @@ function CandidatesTab({ campaignId, canViewPipeline, stageFilter = "", onStageF
   );
 }
 
-/* ---------------- Pipeline Tab (S06-T02) ---------------- */
+/* ---------------- Pipeline Tab ---------------- */
 function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -614,7 +537,7 @@ function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // S06-T02: refresh in real time while the campaign is active — poll every 10s
+  // refresh in real time while the campaign is active — poll every 10s
   useEffect(() => {
     if (!isActive) return;
     const t = setInterval(load, 10000);
@@ -629,8 +552,7 @@ function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick }) {
   const stages = summary.stages || [];
   const maxCount = Math.max(1, ...stages.map((s) => s.count));
 
-  return (
-    <div className="space-y-6">
+  return (<div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h3 className="text-sm font-bold text-slate-900">Pipeline Funnel</h3>
@@ -645,8 +567,7 @@ function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick }) {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
-        {stages.map((s) => (
-          // S01-T01: each stage bar is clickable → Candidates tab filtered to that stage
+        {stages.map((s) => (// each stage bar is clickable → Candidates tab filtered to that stage
           <button
             key={s.stage}
             type="button"
@@ -657,8 +578,7 @@ function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick }) {
             <div className="flex justify-between items-center text-xs mb-1">
               <span className="font-bold text-slate-700 group-hover:text-indigo-700">{stageLabel(s.stage)}</span>
               <div className="flex items-center gap-3">
-                {s.drop_off_pct != null && (
-                  <span className="text-[10px] font-semibold text-rose-500">
+                {s.drop_off_pct != null && (<span className="text-[10px] font-semibold text-rose-500">
                     ▼ {Math.round(s.drop_off_pct)}% drop-off
                   </span>
                 )}
@@ -678,7 +598,7 @@ function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick }) {
   );
 }
 
-/* ---------------- Processing Tab (E04-S01-T02) ---------------- */
+/* ---------------- Processing Tab ---------------- */
 const TASK_STATUS_TONE = {
   queued_count: { label: "Queued", dot: "bg-slate-400" },
   running_count: { label: "Running", dot: "bg-blue-500" },
@@ -738,7 +658,7 @@ function ProcessingTab({ campaignId, canManageCampaigns }) {
       setSelectedIds([]);
       load();
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to replay tasks.");
+      toast.error(formatApiError(err, "Failed to replay tasks."));
     } finally {
       setReplaying(false);
     }
@@ -750,8 +670,7 @@ function ProcessingTab({ campaignId, canManageCampaigns }) {
 
   const estimate = queue?.estimated_completion || status?.estimated_completion;
 
-  return (
-    <div className="space-y-5">
+  return (<div className="space-y-5">
       <div>
         <h3 className="text-sm font-bold text-slate-900">Processing Queue</h3>
         <p className="text-[11px] text-slate-500">
@@ -759,9 +678,8 @@ function ProcessingTab({ campaignId, canManageCampaigns }) {
         </p>
       </div>
 
-      {/* S03-T03 — completion estimate */}
-      {estimate && (
-        <div className={`px-4 py-3 rounded-xl border text-xs font-semibold ${
+      {/* — completion estimate */}
+      {estimate && (<div className={`px-4 py-3 rounded-xl border text-xs font-semibold ${
           estimate.estimate_available
             ? "bg-indigo-50 border-indigo-100 text-indigo-700"
             : "bg-slate-50 border-slate-200 text-slate-500"
@@ -772,11 +690,9 @@ function ProcessingTab({ campaignId, canManageCampaigns }) {
         </div>
       )}
 
-      {/* S03-T01 — circuit breaker states (HR_ADMIN) */}
-      {queue?.circuit_breakers && (
-        <div className="flex flex-wrap gap-2">
-          {queue.circuit_breakers.map((b) => (
-            <span
+      {/* — circuit breaker states (HR_ADMIN) */}
+      {queue?.circuit_breakers && (<div className="flex flex-wrap gap-2">
+          {queue.circuit_breakers.map((b) => (<span
               key={b.service_name}
               className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase ${BREAKER_TONE[b.state] || "bg-slate-100 text-slate-600"}`}
               title={b.state === "OPEN"
@@ -789,26 +705,22 @@ function ProcessingTab({ campaignId, canManageCampaigns }) {
         </div>
       )}
 
-      {/* S03-T01 — per-task-type breakdown (HR_ADMIN); overall cards otherwise */}
-      {queue?.task_types?.length ? (
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
+      {/* — per-task-type breakdown (HR_ADMIN); overall cards otherwise */}
+      {queue?.task_types?.length ? (<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
           <table className="min-w-full text-xs">
             <thead>
               <tr className="border-b border-slate-100">
                 <th className="text-left p-3 font-bold text-slate-400 uppercase text-[10px]">Task Type</th>
-                {QUEUE_STATUS_COLUMNS.map((s) => (
-                  <th key={s} className="text-right p-3 font-bold text-slate-400 uppercase text-[10px]">{s}</th>
+                {QUEUE_STATUS_COLUMNS.map((s) => (<th key={s} className="text-right p-3 font-bold text-slate-400 uppercase text-[10px]">{s}</th>
                 ))}
                 <th className="text-right p-3 font-bold text-slate-400 uppercase text-[10px]">Avg Duration</th>
                 <th className="text-right p-3 font-bold text-slate-400 uppercase text-[10px]">LLM Tokens</th>
               </tr>
             </thead>
             <tbody>
-              {queue.task_types.map((t) => (
-                <tr key={t.task_type} className="border-b border-slate-50">
+              {queue.task_types.map((t) => (<tr key={t.task_type} className="border-b border-slate-50">
                   <td className="p-3 font-bold text-slate-800 whitespace-nowrap">{t.task_type.replace(/_/g, " ")}</td>
-                  {QUEUE_STATUS_COLUMNS.map((s) => (
-                    <td key={s} className="p-3 text-right tabular-nums text-slate-600">
+                  {QUEUE_STATUS_COLUMNS.map((s) => (<td key={s} className="p-3 text-right tabular-nums text-slate-600">
                       {t.status_counts[s] || 0}
                     </td>
                   ))}
@@ -823,10 +735,8 @@ function ProcessingTab({ campaignId, canManageCampaigns }) {
             </tbody>
           </table>
         </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {Object.entries(TASK_STATUS_TONE).map(([key, meta]) => (
-            <div key={key} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      ) : (<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {Object.entries(TASK_STATUS_TONE).map(([key, meta]) => (<div key={key} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
               <div className="flex items-center gap-1.5 mb-1">
                 <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{meta.label}</p>
@@ -837,14 +747,13 @@ function ProcessingTab({ campaignId, canManageCampaigns }) {
         </div>
       )}
 
-      {/* S03-T02 — DLQ with multi-select replay (replay = HR_ADMIN only) */}
+      {/* — DLQ with multi-select replay (replay = HR_ADMIN only) */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-xs font-bold text-rose-600 flex items-center gap-1.5">
             <AlertOctagon className="h-3.5 w-3.5" /> Dead Letter Queue ({dlq.length})
           </h3>
-          {canManageCampaigns && dlq.length > 0 && (
-            <Button
+          {canManageCampaigns && dlq.length > 0 && (<Button
               variant="danger" size="small" onClick={handleReplay}
               loading={replaying} loadingText="Replaying..."
               disabled={selectedIds.length === 0}
@@ -853,19 +762,15 @@ function ProcessingTab({ campaignId, canManageCampaigns }) {
             </Button>
           )}
         </div>
-        {dlq.length === 0 ? (
-          <p className="text-xs text-slate-400 text-center py-6">No dead-lettered tasks for this campaign.</p>
-        ) : (
-          <div className="space-y-2">
+        {dlq.length === 0 ? (<p className="text-xs text-slate-400 text-center py-6">No dead-lettered tasks for this campaign.</p>
+        ) : (<div className="space-y-2">
             {dlq.map((entry) => {
               const replayable = canManageCampaigns && entry.replay_supported && !entry.replayed_at;
-              return (
-                <label
+              return (<label
                   key={entry.id}
                   className={`flex gap-3 p-2.5 rounded-xl border ${replayable ? "cursor-pointer bg-rose-50/50 border-rose-100" : "bg-slate-50 border-slate-100"}`}
                 >
-                  {canManageCampaigns && (
-                    <input
+                  {canManageCampaigns && (<input
                       type="checkbox" className="mt-1 accent-rose-600"
                       disabled={!replayable}
                       checked={selectedIds.includes(entry.id)}
@@ -881,14 +786,11 @@ function ProcessingTab({ campaignId, canManageCampaigns }) {
                       </span>
                     </div>
                     <p className="text-xs text-rose-700 mt-1 truncate">{entry.final_error_message}</p>
-                    {entry.replayed_at && (
-                      <p className="text-[10px] text-emerald-600 mt-0.5">Replayed {fmtDate(entry.replayed_at)}</p>
+                    {entry.replayed_at && (<p className="text-[10px] text-emerald-600 mt-0.5">Replayed {fmtDate(entry.replayed_at)}</p>
                     )}
-                    {entry.resolution_notes && (
-                      <p className="text-[10px] text-slate-500 mt-0.5">{entry.resolution_notes}</p>
+                    {entry.resolution_notes && (<p className="text-[10px] text-slate-500 mt-0.5">{entry.resolution_notes}</p>
                     )}
-                    {!entry.replay_supported && !entry.replayed_at && (
-                      <p className="text-[10px] text-slate-400 mt-0.5">
+                    {!entry.replay_supported && !entry.replayed_at && (<p className="text-[10px] text-slate-400 mt-0.5">
                         Replay for this task type is handled from the bulk-upload screen.
                       </p>
                     )}
@@ -903,7 +805,7 @@ function ProcessingTab({ campaignId, canManageCampaigns }) {
   );
 }
 
-/* ---------------- Bulk Uploads Tab (E04-S02-T01) ---------------- */
+/* ---------------- Bulk Uploads Tab ---------------- */
 const UPLOAD_STATUS_BADGE = {
   PENDING: "bg-slate-100 text-slate-600",
   EXTRACTING: "bg-blue-50 text-blue-700",
@@ -948,8 +850,7 @@ function UploadsTab({ campaignId }) {
     return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading bulk uploads..." /></div>;
   }
 
-  return (
-    <div className="space-y-4">
+  return (<div className="space-y-4">
       <div className="flex justify-between items-end flex-wrap gap-2">
         <div>
           <h3 className="text-sm font-bold text-slate-900">Bulk Uploads</h3>
@@ -957,8 +858,7 @@ function UploadsTab({ campaignId }) {
             {total} upload{total === 1 ? "" : "s"} for this campaign · showing the {Math.min(10, jobs.length)} most recent
           </p>
         </div>
-        {total > 0 && (
-          <button
+        {total > 0 && (<button
             type="button"
             onClick={() => navigate("/airs/resume-intake")}
             className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center gap-1"
@@ -968,20 +868,17 @@ function UploadsTab({ campaignId }) {
         )}
       </div>
 
-      {jobs.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-8 shadow-sm text-center">
+      {jobs.length === 0 ? (<div className="bg-white border border-slate-200 rounded-xl p-8 shadow-sm text-center">
           <p className="text-xs font-bold text-slate-700">No bulk uploads yet</p>
           <p className="text-[11px] text-slate-400 mt-1">ZIP uploads for this campaign will appear here.</p>
         </div>
-      ) : (
-        <div className="space-y-2">
+      ) : (<div className="space-y-2">
           {jobs.map((job) => {
             const resolved = (job.processed_count || 0) + (job.failed_count || 0) + (job.duplicate_count || 0);
             const pct = job.total_files ? Math.round((resolved / job.total_files) * 100) : 0;
             const hasError = ["FAILED", "PARTIAL_FAILURE"].includes(job.status);
             const isExpanded = expandedId === job.id;
-            return (
-              <div key={job.id} className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
+            return (<div key={job.id} className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
                 <button
                   type="button"
                   onClick={() => hasError && setExpandedId(isExpanded ? null : job.id)}
@@ -994,8 +891,7 @@ function UploadsTab({ campaignId }) {
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${UPLOAD_STATUS_BADGE[job.status] || "bg-slate-100 text-slate-600"}`}>
                         {job.status.replace(/_/g, " ")}
                       </span>
-                      {hasError && (
-                        <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                      {hasError && (<ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                       )}
                     </div>
                     <span className="text-[10px] text-slate-400">
@@ -1011,8 +907,7 @@ function UploadsTab({ campaignId }) {
                     {job.queued_count > 0 && <span>{job.queued_count} queued</span>}
                   </div>
 
-                  {job.status === "PROCESSING" && (
-                    <div className="mt-2">
+                  {job.status === "PROCESSING" && (<div className="mt-2">
                       <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
                         <span>Processing…</span>
                         <span className="tabular-nums">{pct}%</span>
@@ -1027,8 +922,7 @@ function UploadsTab({ campaignId }) {
                   )}
                 </button>
 
-                {isExpanded && hasError && (
-                  <div className="mt-2.5 pt-2.5 border-t border-slate-100">
+                {isExpanded && hasError && (<div className="mt-2.5 pt-2.5 border-t border-slate-100">
                     <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Error Summary</p>
                     <p className="text-xs text-rose-700">
                       {job.error_summary || "No error summary recorded — check the file-level detail on the uploads screen."}
@@ -1044,7 +938,7 @@ function UploadsTab({ campaignId }) {
   );
 }
 
-/* ---------------- Stalled Candidates Tab (E04-S04) ---------------- */
+/* ---------------- Stalled Candidates Tab ---------------- */
 const STALL_REASON_LABEL = {
   AI_EVALUATION_FAILED: { text: "AI evaluation failed", tone: "bg-rose-50 text-rose-700" },
   SCREENING_OVERDUE: { text: "Screening overdue", tone: "bg-amber-50 text-amber-700" },
@@ -1084,7 +978,7 @@ function StalledTab({ campaignId }) {
       setLoading(true);
       load();
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Action failed.");
+      toast.error(formatApiError(err, "Action failed."));
     } finally {
       setSubmitting(false);
     }
@@ -1102,8 +996,7 @@ function StalledTab({ campaignId }) {
   const items = data?.items || [];
   const slas = data?.sla_config || {};
 
-  return (
-    <div className="space-y-4">
+  return (<div className="space-y-4">
       <div>
         <h3 className="text-sm font-bold text-slate-900">Stalled Candidates</h3>
         <p className="text-[11px] text-slate-500">
@@ -1111,18 +1004,15 @@ function StalledTab({ campaignId }) {
         </p>
       </div>
 
-      {items.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-8 shadow-sm text-center">
+      {items.length === 0 ? (<div className="bg-white border border-slate-200 rounded-xl p-8 shadow-sm text-center">
           <p className="text-xs font-bold text-slate-700">No stalled candidates</p>
           <p className="text-[11px] text-slate-400 mt-1">Every candidate is progressing within the configured SLAs.</p>
         </div>
-      ) : (
-        <div className="space-y-2">
+      ) : (<div className="space-y-2">
           {items.map((item) => {
             const reasonMeta = STALL_REASON_LABEL[item.stall_reason] || { text: item.stall_reason, tone: "bg-slate-100 text-slate-600" };
             const isFormOpen = (a) => actionForm?.id === item.campaign_candidate_id && actionForm?.action === a;
-            return (
-              <div key={item.campaign_candidate_id} className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
+            return (<div key={item.campaign_candidate_id} className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
                 <div className="flex flex-wrap justify-between items-center gap-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -1142,19 +1032,15 @@ function StalledTab({ campaignId }) {
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                    {item.has_dead_letter_tasks && (
-                      <Button variant="outline" size="small" disabled={submitting}
-                        onClick={() => runAction(
-                          () => reprocessStalledCandidate(campaignId, item.campaign_candidate_id),
+                    {item.has_dead_letter_tasks && (<Button variant="outline" size="small" disabled={submitting}
+                        onClick={() => runAction(() => reprocessStalledCandidate(campaignId, item.campaign_candidate_id),
                           "Re-process triggered.",
                         )}>
                         <RotateCcw className="h-3 w-3" /> Re-Process
                       </Button>
                     )}
-                    {item.pipeline_stage === "HM_REVIEW" && (
-                      <Button variant="outline" size="small" disabled={submitting}
-                        onClick={() => runAction(
-                          () => escalateStalledCandidate(campaignId, item.campaign_candidate_id),
+                    {item.pipeline_stage === "HM_REVIEW" && (<Button variant="outline" size="small" disabled={submitting}
+                        onClick={() => runAction(() => escalateStalledCandidate(campaignId, item.campaign_candidate_id),
                           "Escalation recorded.",
                         )}>
                         <Send className="h-3 w-3" /> Escalate to HM
@@ -1171,8 +1057,7 @@ function StalledTab({ campaignId }) {
                   </div>
                 </div>
 
-                {(isFormOpen("override") || isFormOpen("flag")) && (
-                  <div className="mt-3 pt-3 border-t border-slate-100 flex gap-2 items-end flex-wrap">
+                {(isFormOpen("override") || isFormOpen("flag")) && (<div className="mt-3 pt-3 border-t border-slate-100 flex gap-2 items-end flex-wrap">
                     <div className="flex-1 min-w-[220px]">
                       <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
                         {isFormOpen("override")
@@ -1190,8 +1075,7 @@ function StalledTab({ campaignId }) {
                       variant={isFormOpen("flag") ? "danger" : "primary"} size="small"
                       loading={submitting} loadingText="Saving..."
                       disabled={!reason.trim()}
-                      onClick={() => runAction(
-                        isFormOpen("override")
+                      onClick={() => runAction(isFormOpen("override")
                           ? () => overrideCandidateStage(campaignId, item.campaign_candidate_id, reason.trim())
                           : () => flagCandidateForReview(campaignId, item.campaign_candidate_id, reason.trim()),
                         isFormOpen("override") ? "Stage overridden." : "Flagged for review.",
@@ -1210,16 +1094,15 @@ function StalledTab({ campaignId }) {
   );
 }
 
-/* ---------------- Rejection Analytics Tab (E04-S05) ---------------- */
+/* ---------------- Rejection Analytics Tab ---------------- */
 const REJECTION_LAYER_COLOR = {
   DETERMINISTIC: "#6366F1", SEMANTIC: "#0EA5E9", AI: "#8B5CF6",
   MANUAL: "#F59E0B", FRAUD: "#F43F5E",
 };
 
-function RejectionsTab({ campaignId, canManageCampaigns, jdId, onAdjustThreshold }) {
+function RejectionsTab({ campaignId, jdId, onAdjustThreshold }) {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -1240,18 +1123,6 @@ function RejectionsTab({ campaignId, canManageCampaigns, jdId, onAdjustThreshold
     return () => clearInterval(t);
   }, [load]);
 
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      const blobData = await exportRejectionAnalytics(campaignId);
-      downloadBlob(blobData, `Rejection_Analytics_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    } catch {
-      toast.error("Failed to export rejection analytics.");
-    } finally {
-      setExporting(false);
-    }
-  };
-
   if (loading) {
     return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading rejection analytics..." /></div>;
   }
@@ -1260,8 +1131,7 @@ function RejectionsTab({ campaignId, canManageCampaigns, jdId, onAdjustThreshold
   const layers = ["DETERMINISTIC", "SEMANTIC", "AI", "MANUAL", "FRAUD"];
   const maxCount = Math.max(1, ...layers.map((l) => analytics.layer_breakdown[l] || 0));
 
-  return (
-    <div className="space-y-5">
+  return (<div className="space-y-5">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <div>
           <h3 className="text-sm font-bold text-slate-900">Rejection Analytics</h3>
@@ -1269,34 +1139,25 @@ function RejectionsTab({ campaignId, canManageCampaigns, jdId, onAdjustThreshold
             {analytics.total_rejections} rejection(s) across {analytics.total_candidates} candidate(s) · auto-refreshes every 60s
           </p>
         </div>
-        {canManageCampaigns && (
-          <Button variant="outline" size="small" onClick={handleExport} loading={exporting} loadingText="Exporting...">
-            <Download className="h-3.5 w-3.5" /> Export Report
-          </Button>
-        )}
       </div>
 
-      {/* recommendations panel (S05-T02) */}
-      {analytics.recommendations?.length > 0 && (
-        <div className="space-y-2">
-          {analytics.recommendations.map((rec) => (
-            <div key={rec.condition} className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-100">
+      {/* recommendations panel */}
+      {analytics.recommendations?.length > 0 && (<div className="space-y-2">
+          {analytics.recommendations.map((rec) => (<div key={rec.condition} className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-100">
               <Lightbulb className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
               <div className="flex-1 text-[11.5px] text-amber-800">
                 <span className="font-bold">{rec.layer} rejection rate {rec.rate_pct}%</span>
                 {" "}(threshold {rec.threshold_pct}%) — {rec.recommendation}
-                {/* S05-T02: direct action link per recommendation */}
+                {/* direct action link per recommendation */}
                 <div className="mt-1.5">
-                  {rec.action === "REVIEW_JD_SKILLS" && jdId && (
-                    <Link
+                  {rec.action === "REVIEW_JD_SKILLS" && jdId && (<Link
                       to={`/airs/jds/${jdId}`}
                       className="text-[11px] font-bold text-amber-900 underline hover:text-amber-700 inline-flex items-center gap-1"
                     >
                       Review JD Skills <ExternalLink className="h-3 w-3" />
                     </Link>
                   )}
-                  {rec.action === "ADJUST_THRESHOLD" && onAdjustThreshold && (
-                    <button
+                  {rec.action === "ADJUST_THRESHOLD" && onAdjustThreshold && (<button
                       type="button"
                       onClick={onAdjustThreshold}
                       className="text-[11px] font-bold text-amber-900 underline hover:text-amber-700"
@@ -1304,8 +1165,7 @@ function RejectionsTab({ campaignId, canManageCampaigns, jdId, onAdjustThreshold
                       Adjust Threshold
                     </button>
                   )}
-                  {rec.action === "REVIEW_PROMPT" && (
-                    <span className="text-[10px] text-amber-600 italic" title="Prompt version management UI is owned by the AI module and not yet available">
+                  {rec.action === "REVIEW_PROMPT" && (<span className="text-[10px] text-amber-600 italic" title="Prompt version management UI is owned by the AI module and not yet available">
                       Review Prompt — prompt management screen pending
                     </span>
                   )}
@@ -1315,20 +1175,18 @@ function RejectionsTab({ campaignId, canManageCampaigns, jdId, onAdjustThreshold
           ))}
         </div>
       )}
-      {!analytics.analytics_ready && (
-        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11.5px] text-slate-500">
+      {!analytics.analytics_ready && (<div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11.5px] text-slate-500">
           Recommendations appear once at least {analytics.min_candidates_required} candidates have been processed
           (currently {analytics.total_candidates}).
         </div>
       )}
 
-      {/* layer breakdown chart (S05-T01) */}
+      {/* layer breakdown chart */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
         <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Rejections by Layer</h4>
         {layers.map((layer) => {
           const count = analytics.layer_breakdown[layer] || 0;
-          return (
-            <div key={layer}>
+          return (<div key={layer}>
               <div className="flex justify-between items-center text-xs mb-1">
                 <span className="font-bold text-slate-700">{layer}</span>
                 <span className="font-black text-slate-900 tabular-nums">{count}</span>
@@ -1345,8 +1203,7 @@ function RejectionsTab({ campaignId, canManageCampaigns, jdId, onAdjustThreshold
       </div>
 
       {/* top missing mandatory skill highlight */}
-      {analytics.top_missing_skill && (
-        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-indigo-50 border border-indigo-100">
+      {analytics.top_missing_skill && (<div className="flex items-start gap-2.5 p-3 rounded-xl bg-indigo-50 border border-indigo-100">
           <Target className="h-4 w-4 text-indigo-600 mt-0.5 shrink-0" />
           <p className="text-[11.5px] text-indigo-800">
             Most common missing mandatory skill: <b>{analytics.top_missing_skill.canonical_name}</b> — missing for{" "}
@@ -1356,7 +1213,7 @@ function RejectionsTab({ campaignId, canManageCampaigns, jdId, onAdjustThreshold
         </div>
       )}
 
-      {/* top reasons table (S05-T01) */}
+      {/* top reasons table */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
         <table className="min-w-full text-xs">
           <thead>
@@ -1367,11 +1224,8 @@ function RejectionsTab({ campaignId, canManageCampaigns, jdId, onAdjustThreshold
             </tr>
           </thead>
           <tbody>
-            {analytics.top_reasons.length === 0 ? (
-              <tr><td colSpan={3} className="p-6 text-center text-slate-400 text-xs">No rejections recorded yet.</td></tr>
-            ) : (
-              analytics.top_reasons.map((r) => (
-                <tr key={r.reason} className="border-b border-slate-50">
+            {analytics.top_reasons.length === 0 ? (<tr><td colSpan={3} className="p-6 text-center text-slate-400 text-xs">No rejections recorded yet.</td></tr>
+            ) : (analytics.top_reasons.map((r) => (<tr key={r.reason} className="border-b border-slate-50">
                   <td className="p-3 font-semibold text-slate-700">{r.reason}</td>
                   <td className="p-3 text-right tabular-nums text-slate-600">{r.count}</td>
                   <td className="p-3 text-right tabular-nums text-slate-600">{r.percentage}%</td>
@@ -1385,12 +1239,13 @@ function RejectionsTab({ campaignId, canManageCampaigns, jdId, onAdjustThreshold
   );
 }
 
-/* ---------------- Timeline Tab (S06-T03) ---------------- */
+/* ---------------- Timeline Tab ---------------- */
 function TimelineTab({ campaignId }) {
   const [events, setEvents] = useState([]);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
   const [eventType, setEventType] = useState("");
+  const [availableTypes, setAvailableTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const LIMIT = 20;
 
@@ -1406,6 +1261,9 @@ function TimelineTab({ campaignId }) {
       setEvents((prev) => (reset ? list : [...prev, ...list]));
       setTotal(data.total_events || 0);
       setOffset(off + list.length);
+      // server-computed from the FULL unfiltered timeline, so the dropdown
+      // only ever offers types that actually exist for this campaign
+      if (data.available_event_types) setAvailableTypes(data.available_event_types);
     } catch {
       toast.error("Failed to load timeline.");
     } finally {
@@ -1413,13 +1271,17 @@ function TimelineTab({ campaignId }) {
     }
   }, [campaignId, offset, eventType]);
 
+  const eventTypeOptions = [
+    { value: "", label: "All Events" },
+    ...availableTypes.map((t) => ({ value: t, label: stageLabel(t) })),
+  ];
+
   // Reload from scratch whenever the event-type filter changes
   useEffect(() => { load(true); /* eslint-disable-next-line */ }, [eventType]);
 
   const hasMore = events.length < total;
 
-  return (
-    <div className="space-y-4">
+  return (<div className="space-y-4">
       <div className="flex justify-between items-center">
         <div>
           <h3 className="text-sm font-bold text-slate-900">Activity Timeline</h3>
@@ -1430,18 +1292,15 @@ function TimelineTab({ campaignId }) {
         <div className="w-56 flex items-center gap-2">
           <Filter className="h-4 w-4 text-slate-400" />
           <div className="flex-1">
-            <FilterListbox options={TIMELINE_EVENT_TYPES} value={eventType} onChange={setEventType} />
+            <FilterListbox options={eventTypeOptions} value={eventType} onChange={setEventType} />
           </div>
         </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        {events.length === 0 && !loading ? (
-          <p className="text-xs text-slate-400 text-center py-8">No activity recorded.</p>
-        ) : (
-          <div className="space-y-6 relative border-l border-slate-200 pl-6 ml-2">
-            {events.map((ev, idx) => (
-              <div key={idx} className="relative">
+        {events.length === 0 && !loading ? (<p className="text-xs text-slate-400 text-center py-8">No activity recorded.</p>
+        ) : (<div className="space-y-6 relative border-l border-slate-200 pl-6 ml-2">
+            {events.map((ev, idx) => (<div key={idx} className="relative">
                 <span className="absolute -left-[30px] top-1 w-3.5 h-3.5 rounded-full border-2 border-blue-500 bg-blue-50" />
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="bg-indigo-50 text-indigo-700 text-[9px] font-bold px-2 py-0.5 rounded border border-indigo-100 uppercase">
@@ -1460,8 +1319,7 @@ function TimelineTab({ campaignId }) {
 
         {loading && <div className="py-4 flex justify-center"><LoadingSpinner text="Loading..." /></div>}
 
-        {hasMore && !loading && (
-          <div className="flex justify-center mt-6">
+        {hasMore && !loading && (<div className="flex justify-center mt-6">
             <Button variant="outline" size="small" onClick={() => load(false)}>
               Load More <ChevronDown className="h-3.5 w-3.5" />
             </Button>

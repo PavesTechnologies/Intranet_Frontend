@@ -12,18 +12,15 @@ const EmployeePanel = () => {
     return localStorage.getItem('employeePanelActiveView') || 'employee';
   });
 
-  let roles = employee.user?.roles || '';
-  if (!Array.isArray(roles)) {
-    roles = roles.split(',').map((r) => r.trim());
-  }
+  const { hasRole } = employee;
 
   const employeeId = employee.user?.user_id;
 
-  const isAdmin = roles.includes('Super_Admin');
-  const permission = roles.includes('Super_Admin') || roles.includes('Admin');
-  const isManager = roles.includes('Reporting_Manager') || isAdmin;
-  const isHR = roles.includes('HR') || isAdmin;
-  const isHRAdministrator = roles.includes('Hr_Manager') || isAdmin;
+  const isAdmin = hasRole(['Super_Admin']);
+  const permission = hasRole(['Super_Admin', 'Admin']);
+  const isManager = hasRole(['Reporting_Manager']) || isAdmin;
+  const isHR = hasRole(['HR']) || isAdmin;
+  const isHRAdministrator = hasRole(['Hr_Manager']) || isAdmin || permission;
 
   // Default view logic
   useEffect(() => {
@@ -33,7 +30,7 @@ const EmployeePanel = () => {
         savedView === 'employee' ||
         (savedView === 'admin' && isManager) ||
         (savedView === 'hr' && isHR) ||
-        (savedView === 'hr-admin' && isHRAdministrator);
+        (savedView === 'hr_manager' && isHRAdministrator);
 
       if (isAuthorized) {
         setActiveView(savedView);
@@ -44,7 +41,7 @@ const EmployeePanel = () => {
     if (isAdmin) {
       setActiveView('employee'); // super admin starts on employee view, can switch to any
     } else if (isHRAdministrator && !isManager) {
-      setActiveView('hr-admin');
+      setActiveView('hr_manager');
     } else if (isManager) {
       setActiveView('admin');
     } else if (isHR) {
@@ -59,7 +56,7 @@ const EmployeePanel = () => {
   const handleViewChange = (view) => {
     if (view === 'admin' && !isManager) return;
     if (view === 'hr' && !isHR) return;
-    if (view === 'hr-admin' && !isHRAdministrator) return;
+    if (view === 'hr_manager' && !isHRAdministrator) return;
     setActiveView(view);
     localStorage.setItem('employeePanelActiveView', view);
   };
@@ -98,8 +95,8 @@ const EmployeePanel = () => {
             {!permission && (
               isHRAdministrator && (
                 <button
-                  onClick={() => handleViewChange('hr-admin')}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${activeView === 'hr-admin'
+                  onClick={() => handleViewChange('hr_manager')}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${activeView === 'hr_manager'
                     ? 'bg-indigo-600 text-white shadow'
                     : 'text-gray-700 hover:bg-white'
                     }`}
@@ -143,7 +140,7 @@ const EmployeePanel = () => {
         {activeView === 'hr' && isHR && (
           <HRManageTools employeeId={employeeId} />
         )}
-        {activeView === 'hr-admin' && isHRAdministrator && (
+        {activeView === 'hr_manager' && isHRAdministrator && (
           <HRAdminPanel />
         )}
       </div>

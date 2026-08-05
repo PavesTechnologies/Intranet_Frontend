@@ -68,33 +68,43 @@ export default function useIntakeFlow() {
   };
 
   const beginPolling = (resumeId, taskId) => {
-    clearInterval(pollRef.current);
+    clearTimeout(pollRef.current);
+    let isFetching = false;
 
     const poll = async () => {
+      if (isFetching) return;
+      isFetching = true;
+      let isTerminal = false;
+
       try {
         const res = await pipelineStatus(taskId);
         const data = res?.data;
-        if (!data) return;
+        if (data) {
+          setStatus(data);
+          setStatusError(null);
 
-        setStatus(data);
-        setStatusError(null);
-
-        const overall = String(data.overall_status || "").toUpperCase();
-        if (TERMINAL_STATUSES.includes(overall)) {
-          clearInterval(pollRef.current);
-          const outcome = overall === "SUCCESS" ? "SUCCESS" : "FAILURE";
-          finalizeMockIntake(resumeId, outcome);
-          setResume(getResumeById(resumeId));
-          if (outcome === "SUCCESS") toast.success("Resume parsed successfully.");
-          else toast.error("Resume parsing failed. See the processing screen for details.");
+          const overall = String(data.overall_status || "").toUpperCase();
+          if (TERMINAL_STATUSES.includes(overall)) {
+            isTerminal = true;
+            const outcome = overall === "SUCCESS" ? "SUCCESS" : "FAILURE";
+            finalizeMockIntake(resumeId, outcome);
+            setResume(getResumeById(resumeId));
+            if (outcome === "SUCCESS") toast.success("Resume parsed successfully.");
+            else toast.error("Resume parsing failed. See the processing screen for details.");
+          }
         }
       } catch (err) {
         setStatusError(extractErrorMessage(err, "Failed to fetch processing status."));
+      } finally {
+        isFetching = false;
+        if (!isTerminal) {
+          clearTimeout(pollRef.current);
+          pollRef.current = setTimeout(poll, STATUS_POLL_INTERVAL_MS);
+        }
       }
     };
 
     poll();
-    pollRef.current = setInterval(poll, STATUS_POLL_INTERVAL_MS);
   };
 
   // Re-checks the current task's status — used when the last poll failed to
@@ -103,6 +113,42 @@ export default function useIntakeFlow() {
   const retryStatusCheck = () => {
     if (!status?.task_id || !resume?.resume_id) return;
     beginPolling(resume.resume_id, status.task_id);
+  };
+
+  const loadExistingResume = (existingResume) => {
+    if (!existingResume) return;
+    const resumeId = existingResume.id || existingResume.resume_id;
+    const taskId = existingResume.task_id || existingResume.task_id_ref || resumeId;
+    const loadedResume = {
+      resume_id: resumeId,
+      candidate_id: existingResume.candidate_id || existingResume.campaign_candidate_id,
+      candidate_name: existingResume.candidate_full_name || existingResume.candidate_name || "Candidate",
+      candidate_email_masked: maskEmail(existingResume.candidate_email || ""),
+      file_format: existingResume.file_format || "PDF",
+      version_number: existingResume.version_number || 1,
+      parse_status: existingResume.parse_status || "PARSING",
+      parse_confidence_score: existingResume.parse_confidence_score || null,
+      parser_version: existingResume.parser_version || "—",
+      parse_duration_ms: existingResume.parse_duration_ms || null,
+      created_at: existingResume.created_at || new Date().toISOString(),
+      campaign_name: existingResume.campaign_name || "—",
+      pipeline_stage: existingResume.pipeline_stage,
+    };
+
+    const initialStatus = {
+      task_id: taskId,
+      overall_status: existingResume.parse_status === "PENDING" ? "QUEUED" : "RUNNING",
+      current_stage: null,
+      stages: buildStages(),
+      error_message: null,
+    };
+
+    registerMockIntake(loadedResume, initialStatus);
+    setResume(loadedResume);
+    setStatus(initialStatus);
+    setStatusError(null);
+    setStep("processing");
+    beginPolling(resumeId, taskId);
   };
 
   const goToReview = () => setStep("review");
@@ -125,6 +171,7 @@ export default function useIntakeFlow() {
     parsedJson,
     candidateSkills,
     submit,
+    loadExistingResume,
     goToReview,
     retryStatusCheck,
     reset,

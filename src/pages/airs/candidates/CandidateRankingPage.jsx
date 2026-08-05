@@ -89,6 +89,7 @@ export default function CandidateRankingPage() {
           candidates={candidates}
           onView={(c) => navigate(`/airs/candidates/${c.id}`)}
           onToggleStar={toggleStar}
+          onDeleted={refetch}
         />
       </div>
 

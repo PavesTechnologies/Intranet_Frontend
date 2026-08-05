@@ -19,7 +19,7 @@ export default function CandidateHeader({ candidate, onBack }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[15px] font-bold text-slate-900">{candidate.name}</span>
-            {renderStageBadge(candidate.stage)}
+            {/* {renderStageBadge(candidate.stage)} */}
           </div>
           <div className="text-[12px] flex items-center gap-3 flex-wrap text-slate-400">
             <span className="flex items-center gap-1">
@@ -36,11 +36,10 @@ export default function CandidateHeader({ candidate, onBack }) {
             </span>
           </div>
         </div>
-        <div className="flex gap-3 shrink-0">
-          <ScoreRing value={candidate.deterministic} size={40} color="#DC2626" />
-          <ScoreRing value={candidate.semantic} size={40} color="#7C3AED" />
-          <ScoreRing value={candidate.ats} size={40} color="#2563EB" />
-          <ScoreRing value={candidate.composite} size={40} color="#16A34A" />
+        <div className="flex gap-4 shrink-0">
+          <ScoreRing value={candidate.deterministic} size={40} color="#DC2626" label="DF" />
+          <ScoreRing value={candidate.semantic} size={40} color="#7C3AED" label="SF" />
+          <ScoreRing value={candidate.ats} size={40} color="#2563EB" label="AI" />
         </div>
       </div>
     </div>

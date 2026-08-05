@@ -3,6 +3,27 @@ import api from "../../../../api/axiosInstance";
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 const UMS_BASE_URL = window.__APP_CONFIG__.USER_MANAGEMENT_URL;
 
+// Turns any backend error into a toast-ready string. FastAPI 422 validation
+// errors arrive as detail: [{loc, msg, type}, ...] — rendering that object
+// directly shows "[object Object]", so flatten it to "field: message".
+export const formatApiError = (error, fallback = "Something went wrong.") => {
+    const data = error?.response?.data;
+    if (typeof data?.message === "string" && data.message) return data.message;
+    const detail = data?.detail;
+    if (typeof detail === "string" && detail) return detail;
+    if (Array.isArray(detail) && detail.length) {
+        return detail
+            .slice(0, 3)
+            .map((d) => {
+                const field = Array.isArray(d?.loc) ? d.loc[d.loc.length - 1] : null;
+                const msg = d?.msg || "Invalid value";
+                return field && field !== "body" ? `${field}: ${msg}` : msg;
+            })
+            .join(" · ");
+    }
+    return fallback;
+};
+
 export const createCampaign = async (campaignData) => {
     try {
         const response = await api.post(`${BASE_URL}/campaigns`, campaignData, {
@@ -17,9 +38,13 @@ export const createCampaign = async (campaignData) => {
     }
 };
 
-export const getAllCampaignsHrAdmin = async () => {
+export const getAllCampaignsHrAdmin = async ({ show_closed = false, search, status, page = 1 } = {}) => {
     try {
+        const params = { show_closed, page };
+        if (search) params.search = search;
+        if (status) params.status = status;
         const response = await api.get(`${BASE_URL}/campaigns/hr_admin`, {
+            params,
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
@@ -31,9 +56,15 @@ export const getAllCampaignsHrAdmin = async () => {
     }
 };
 
-export const getAllCampaigns = async () => {
+export const getAllCampaigns = async (filters = {}) => {
     try {
-        const response = await api.get(`${BASE_URL}/campaigns/all`, {
+        const params = {};
+        if (filters.jd_id) params.jd_id = filters.jd_id;
+        if (filters.status) params.status = filters.status;
+        if (filters.search) params.search = filters.search;
+        if (filters.show_closed != null) params.show_closed = filters.show_closed;
+        const response = await api.get(`${BASE_URL}/campaigns/all`,{
+            params,
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
@@ -45,9 +76,10 @@ export const getAllCampaigns = async () => {
     }
 };
 
-export const getCampaignsByHiringManager = async () => {
+export const getCampaignsByHiringManager = async ({ show_closed = false } = {}) => {
     try {
         const response = await api.get(`${BASE_URL}/campaigns/hiring_manager`, {
+            params: { show_closed },
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
@@ -119,20 +151,6 @@ export const updateCampaign = async (campaignId, payload) => {
 };
 
 
-export const getCampaignById = async (campaignId) => {
-    try {
-        const response = await api.get(`${BASE_URL}/campaigns/${campaignId}`, {
-            headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-            }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching campaign:", error);
-        throw error;
-    }
-};
-
 export const getCampaignCandidates = async (campaignId) => {
     try {
         const response = await api.get(`${BASE_URL}/campaign-candidates/campaign/${campaignId}`, {
@@ -161,24 +179,6 @@ export const getNameByRoles = async (roleName) => {
     }
 };
 
-export const getActiveCampaigns = async () => {
-    try {
-        const response = await api.get(`${BASE_URL}/campaigns/active`, {
-            headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-            }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching active campaigns:", error);
-        throw error;
-    }
-};
-
-// ── E03-S01/S02 — Pause / Resume ─────────────────────────────────────────
-// No dedicated pause/resume endpoints exist — the transition happens through
-// the same PATCH used for editing, with status: "PAUSED" | "ACTIVE".
-
 export const getPauseSummary = async (campaignId) => {
     try {
         const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/pause-summary`, {
@@ -190,8 +190,6 @@ export const getPauseSummary = async (campaignId) => {
         throw error;
     }
 };
-
-export const pauseCampaign = async (campaignId) => updateCampaign(campaignId, { status: "PAUSED" });
 
 export const getResumeSummary = async (campaignId) => {
     try {
@@ -205,9 +203,7 @@ export const getResumeSummary = async (campaignId) => {
     }
 };
 
-export const resumeCampaign = async (campaignId) => updateCampaign(campaignId, { status: "ACTIVE" });
-
-// ── E03-S03 — Close a Campaign Manually ──────────────────────────────────
+// ── Close a Campaign Manually ──────────────────────────────────
 
 export const getClosureSummary = async (campaignId) => {
     try {
@@ -223,8 +219,7 @@ export const getClosureSummary = async (campaignId) => {
 
 export const closeCampaign = async (campaignId, closureReason) => {
     try {
-        const response = await api.post(
-            `${BASE_URL}/campaigns/${campaignId}/close`,
+        const response = await api.post(`${BASE_URL}/campaigns/${campaignId}/close`,
             { closure_reason: closureReason },
             { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
         );
@@ -235,7 +230,7 @@ export const closeCampaign = async (campaignId, closureReason) => {
     }
 };
 
-// ── E03-S04 — Reopen a Closed Campaign ───────────────────────────────────
+// ── Reopen a Closed Campaign ───────────────────────────────────
 
 export const getReopenReadiness = async (campaignId) => {
     try {
@@ -261,21 +256,7 @@ export const reopenCampaign = async (campaignId) => {
     }
 };
 
-// ── E03-S06 — Duplicate a Campaign Configuration ─────────────────────────
-
-export const duplicateCampaign = async (campaignId, payload) => {
-    try {
-        const response = await api.post(`${BASE_URL}/campaigns/${campaignId}/duplicate`, payload, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error duplicating campaign:", error);
-        throw error;
-    }
-};
-
-// ── E02-S03 — Scoring Weight Presets ─────────────────────────────────────
+// ── Scoring Weight Presets ─────────────────────────────────────
 
 export const getWeightPresets = async () => {
     try {
@@ -325,73 +306,7 @@ export const deleteWeightPreset = async (presetId) => {
     }
 };
 
-// ── E02-S04 — Compare Weight Configurations Across Campaigns ────────────
-
-export const compareCampaigns = async (campaignIds) => {
-    try {
-        const params = new URLSearchParams();
-        campaignIds.forEach((id) => params.append("campaign_ids", id));
-        const response = await api.get(`${BASE_URL}/campaigns/compare?${params.toString()}`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error comparing campaigns:", error);
-        throw error;
-    }
-};
-
-export const copyScoringConfig = async (sourceCampaignId, targetCampaignIds) => {
-    try {
-        const response = await api.post(
-            `${BASE_URL}/campaigns/${sourceCampaignId}/scoring-config/copy`,
-            { target_campaign_ids: targetCampaignIds },
-            { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-        );
-        return response.data;
-    } catch (error) {
-        console.error("Error copying scoring configuration:", error);
-        throw error;
-    }
-};
-
-// ── E02-S01/S02/S05 — Scoring configuration ──────────────────────────────
-
-export const getScoringConfig = async (campaignId) => {
-    try {
-        const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/scoring-config`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching scoring configuration:", error);
-        throw error;
-    }
-};
-
-export const getScoringHistory = async (campaignId) => {
-    try {
-        const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/scoring-history`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching scoring history:", error);
-        throw error;
-    }
-};
-
-export const updateScoringConfig = async (campaignId, payload) => {
-    try {
-        const response = await api.put(`${BASE_URL}/campaigns/${campaignId}/scoring-config`, payload, {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error updating scoring configuration:", error);
-        throw error;
-    }
-};
+// ── Scoring configuration ──────────────────────────────
 
 export const resetScoringConfig = async (campaignId) => {
     try {
@@ -405,7 +320,7 @@ export const resetScoringConfig = async (campaignId) => {
     }
 };
 
-// ── E02-S05 — Platform default weights + weight change report ───────────
+// ── Platform default weights + weight change report ───────────
 
 export const updatePlatformDefaultWeights = async (payload) => {
     try {
@@ -419,62 +334,21 @@ export const updatePlatformDefaultWeights = async (payload) => {
     }
 };
 
-// No standalone "get current platform defaults" endpoint exists on the
-// backend — the only place default weights are ever returned is embedded as
-// `.defaults` on a campaign's own GET /{id}/scoring-config response. This
-// reads them off the first accessible active campaign as a best-effort seed
-// for the platform-defaults form; returns null (blank form) if there isn't
-// one, e.g. a brand-new org with no campaigns yet.
+// Org-wide default weights/thresholds from platform_config; returns null on
+// failure so the settings form falls back to its static defaults.
 export const getPlatformScoringDefaults = async () => {
     try {
-        const activeRes = await getActiveCampaigns();
-        const activeCampaigns = Array.isArray(activeRes) ? activeRes : (activeRes?.data || []);
-        if (!activeCampaigns.length) return null;
-        const config = await getScoringConfig(activeCampaigns[0].id);
-        const data = config?.data || config;
-        return data?.defaults || null;
+        const response = await api.get(`${BASE_URL}/campaigns/platform-defaults/scoring`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        });
+        return response.data?.data || null;
     } catch (error) {
         console.error("Error fetching platform scoring defaults:", error);
         return null;
     }
 };
 
-export const getWeightChangeReport = async ({ date_from, date_to, campaign_status } = {}) => {
-    try {
-        const params = {};
-        if (date_from) params.date_from = date_from;
-        if (date_to) params.date_to = date_to;
-        if (campaign_status) params.campaign_status = campaign_status;
-        const response = await api.get(`${BASE_URL}/campaigns/reports/weight-changes`, {
-            params,
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching weight change report:", error);
-        throw error;
-    }
-};
-
-export const exportWeightChangeReport = async ({ date_from, date_to, campaign_status } = {}) => {
-    try {
-        const params = {};
-        if (date_from) params.date_from = date_from;
-        if (date_to) params.date_to = date_to;
-        if (campaign_status) params.campaign_status = campaign_status;
-        const response = await api.get(`${BASE_URL}/campaigns/reports/weight-changes/export`, {
-            params,
-            responseType: "blob",
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error exporting weight change report:", error);
-        throw error;
-    }
-};
-
-// ── E04-S01 — Processing status + dead letter queue ──────────────────────
+// ── Processing status + dead letter queue ──────────────────────
 
 export const getProcessingStatus = async (campaignId) => {
     try {
@@ -500,7 +374,7 @@ export const getDeadLetterQueue = async (campaignId) => {
     }
 };
 
-// ── E04-S03 — Processing queue breakdown + DLQ replay ────────────────────
+// ── Processing queue breakdown + DLQ replay ────────────────────
 
 export const getProcessingQueue = async (campaignId) => {
     try {
@@ -516,8 +390,7 @@ export const getProcessingQueue = async (campaignId) => {
 
 export const replayDeadLetterTasks = async (campaignId, dlqIds) => {
     try {
-        const response = await api.post(
-            `${BASE_URL}/campaigns/${campaignId}/dead-letter-queue/replay`,
+        const response = await api.post(`${BASE_URL}/campaigns/${campaignId}/dead-letter-queue/replay`,
             { dlq_ids: dlqIds },
             { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
         );
@@ -528,7 +401,7 @@ export const replayDeadLetterTasks = async (campaignId, dlqIds) => {
     }
 };
 
-// ── E04-S04 — Stalled candidates ─────────────────────────────────────────
+// ── Stalled candidates ─────────────────────────────────────────
 
 export const getStalledCandidates = async (campaignId) => {
     try {
@@ -544,8 +417,7 @@ export const getStalledCandidates = async (campaignId) => {
 
 export const reprocessStalledCandidate = async (campaignId, campaignCandidateId) => {
     try {
-        const response = await api.post(
-            `${BASE_URL}/campaigns/${campaignId}/stalled-candidates/${campaignCandidateId}/reprocess`,
+        const response = await api.post(`${BASE_URL}/campaigns/${campaignId}/stalled-candidates/${campaignCandidateId}/reprocess`,
             {},
             { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
         );
@@ -558,8 +430,7 @@ export const reprocessStalledCandidate = async (campaignId, campaignCandidateId)
 
 export const escalateStalledCandidate = async (campaignId, campaignCandidateId, note) => {
     try {
-        const response = await api.post(
-            `${BASE_URL}/campaigns/${campaignId}/stalled-candidates/${campaignCandidateId}/escalate`,
+        const response = await api.post(`${BASE_URL}/campaigns/${campaignId}/stalled-candidates/${campaignCandidateId}/escalate`,
             { note: note || null },
             { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
         );
@@ -572,8 +443,7 @@ export const escalateStalledCandidate = async (campaignId, campaignCandidateId, 
 
 export const overrideCandidateStage = async (campaignId, campaignCandidateId, reason, targetStage) => {
     try {
-        const response = await api.post(
-            `${BASE_URL}/campaigns/${campaignId}/stalled-candidates/${campaignCandidateId}/override-stage`,
+        const response = await api.post(`${BASE_URL}/campaigns/${campaignId}/stalled-candidates/${campaignCandidateId}/override-stage`,
             { reason, target_stage: targetStage || null },
             { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
         );
@@ -586,8 +456,7 @@ export const overrideCandidateStage = async (campaignId, campaignCandidateId, re
 
 export const flagCandidateForReview = async (campaignId, campaignCandidateId, reason) => {
     try {
-        const response = await api.post(
-            `${BASE_URL}/campaigns/${campaignId}/stalled-candidates/${campaignCandidateId}/flag-review`,
+        const response = await api.post(`${BASE_URL}/campaigns/${campaignId}/stalled-candidates/${campaignCandidateId}/flag-review`,
             { reason },
             { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
         );
@@ -598,7 +467,7 @@ export const flagCandidateForReview = async (campaignId, campaignCandidateId, re
     }
 };
 
-// ── E04-S02-T01 — Bulk uploads for one campaign (campaign detail section) ─
+// ── Bulk uploads for one campaign (campaign detail section) ─
 
 export const getBulkUploadsForCampaign = async (campaignId, { page = 1, size = 10 } = {}) => {
     try {
@@ -613,7 +482,7 @@ export const getBulkUploadsForCampaign = async (campaignId, { page = 1, size = 1
     }
 };
 
-// ── E04-S05/S06 — Rejection analytics + summary export ──────────────────
+// ── /Rejection analytics + summary export ──────────────────
 
 export const getRejectionAnalytics = async (campaignId) => {
     try {
@@ -627,28 +496,4 @@ export const getRejectionAnalytics = async (campaignId) => {
     }
 };
 
-export const exportRejectionAnalytics = async (campaignId) => {
-    try {
-        const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/rejection-analytics/export`, {
-            responseType: "blob",
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error exporting rejection analytics:", error);
-        throw error;
-    }
-};
 
-export const exportCampaignSummary = async (campaignId) => {
-    try {
-        const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/summary-report/export`, {
-            responseType: "blob",
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error exporting campaign summary:", error);
-        throw error;
-    }
-};

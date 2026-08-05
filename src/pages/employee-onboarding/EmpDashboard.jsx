@@ -13,6 +13,7 @@ import {
 } from "./components/offerStatus";
 import { fetchOfferDetailsList } from "./components/fetchOfferDetails";
 import { PageCard } from "../../components/Cards/PageCard";
+import PageHeader from "../../components/ui/PageHeader";
 import GroupedKPISection from "./components/GroupedKPISection";
 
 const CATEGORY_GROUPS = [
@@ -154,44 +155,41 @@ export default function EmployeeOnboardingDashboard() {
   const hasActiveFilters = searchTerm !== "" || statusFilter !== "ALL";
 
   return (
-    <div className="min-h-screen bg-slate-50/50 p-6 space-y-8 font-sans transition-colors duration-300">
+    <div className="min-h-screen bg-slate-50/50 p-6 space-y-4 font-sans transition-colors duration-300">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 px-2">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-            {viewRole === "HR" ? "Employee Onboarding" : "Manager Approval Portal"}
-          </h1>
-          <p className="text-sm font-medium text-slate-500 mt-1">
-            {viewRole === "HR"
-              ? "Manage offer letters and onboarding workflow"
-              : "Review and action pending offer letters"}
-          </p>
-        </div>
-
-        {/* THE TOGGLE: Only shows if user has BOTH HR and (Manager or Admin) roles */}
-        {isHR && hasApprovalPrivileges && (
-          <div className="flex bg-slate-200/50 p-1 rounded-xl shadow-sm border border-slate-200/50">
-            <Button
-              onClick={() => setViewRole("HR")}
-              variant={viewRole === "HR" ? "outline" : "ghost"}
-              size="medium"
-              className={`${viewRole === "HR" ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200 border-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 border-transparent shadow-none"
-                }`}
-            >
-              HR View
-            </Button>
-            <Button
-              onClick={() => setViewRole("ADMIN")}
-              variant={viewRole === "ADMIN" ? "outline" : "ghost"}
-              size="medium"
-              className={`${viewRole === "ADMIN" ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200 border-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 border-transparent shadow-none"
-                }`}
-            >
-              Admin View
-            </Button>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        title={viewRole === "HR" ? "Employee Onboarding" : "Manager Approval Portal"}
+        subtitle={
+          viewRole === "HR"
+            ? "Manage offer letters and onboarding workflow"
+            : "Review and action pending offer letters"
+        }
+        actions={
+          /* THE TOGGLE: Only shows if user has BOTH HR and (Manager or Admin) roles */
+          isHR && hasApprovalPrivileges ? (
+            <div className="flex bg-slate-200/50 p-1 rounded-xl shadow-sm border border-slate-200/50">
+              <Button
+                onClick={() => setViewRole("HR")}
+                variant={viewRole === "HR" ? "outline" : "ghost"}
+                size="medium"
+                className={`${viewRole === "HR" ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200 border-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 border-transparent shadow-none"
+                  }`}
+              >
+                HR View
+              </Button>
+              <Button
+                onClick={() => setViewRole("ADMIN")}
+                variant={viewRole === "ADMIN" ? "outline" : "ghost"}
+                size="medium"
+                className={`${viewRole === "ADMIN" ? "bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200 border-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 border-transparent shadow-none"
+                  }`}
+              >
+                Admin View
+              </Button>
+            </div>
+          ) : null
+        }
+      />
 
       {/* CONTENT AREA */}
       {viewRole === "ADMIN" ? (

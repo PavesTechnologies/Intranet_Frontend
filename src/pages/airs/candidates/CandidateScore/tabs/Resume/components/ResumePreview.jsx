@@ -1,59 +1,219 @@
-import React, { useState } from "react";
-import { ChevronLeft, ChevronRight, FileText, Download } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { ChevronLeft, ChevronRight, FileText, Download, Loader2, RefreshCw, AlertCircle } from "lucide-react";
+import { Document, Page, pdfjs } from "react-pdf";
+import { renderAsync } from "docx-preview";
+import { saveAs } from "file-saver";
 import Button from "@/components/Button/Button";
 
-// Mock PDF viewer — renders the parsed mock page text inside a paper-style
-// frame. No real PDF rendering / backend file fetch is involved.
-export default function ResumePreview({ file, previewPages }) {
-  const [page, setPage] = useState(0);
-  const totalPages = previewPages.length;
+// Set up the PDF.js worker using unpkg CDN matching the current version of pdfjs
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+export default function ResumePreview({ file, onExpired }) {
+  const [numPages, setNumPages] = useState(file.pageCount || 1);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [docxBlob, setDocxBlob] = useState(null);
+  const docxContainerRef = useRef(null);
+
+  const isPdf = file.format?.toUpperCase() === "PDF" || file.name?.toLowerCase().endsWith(".pdf");
+  const isDocx = file.format?.toUpperCase() === "DOCX" || file.name?.toLowerCase().endsWith(".docx");
+
+  // Reset loading and error when URL changes
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    setDocxBlob(null);
+    setPageNumber(1);
+  }, [file.url]);
+
+  // Handle DOCX loading and fetching
+  useEffect(() => {
+    if (!isDocx || !file.url) return;
+
+    let active = true;
+    setLoading(true);
+    setError(null);
+
+    fetch(file.url)
+      .then((res) => {
+        if (!res.ok) {
+          if (res.status === 403 || res.status === 401) {
+            onExpired?.();
+          }
+          throw new Error(`Failed to load document (${res.status})`);
+        }
+        return res.blob();
+      })
+      .then((blob) => {
+        if (active) {
+          setDocxBlob(blob);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          setError(err.message || "Failed to load DOCX document");
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [file.url, isDocx, onExpired]);
+
+  // Render DOCX blob
+  useEffect(() => {
+    if (docxBlob && docxContainerRef.current) {
+      docxContainerRef.current.innerHTML = "";
+      renderAsync(docxBlob, docxContainerRef.current)
+        .catch((err) => {
+          console.error("DOCX rendering error:", err);
+          setError("Failed to render DOCX preview content");
+        });
+    }
+  }, [docxBlob]);
+
+  // Handle PDF callbacks
+  const onDocumentLoadSuccess = ({ numPages }) => {
+    setNumPages(numPages);
+    setLoading(false);
+  };
+
+  const onDocumentLoadError = (err) => {
+    console.error("PDF load error:", err);
+    onExpired?.();
+    setError("Failed to load PDF. The preview link may have expired. Retrying...");
+    setLoading(false);
+  };
+
+  const handleDownload = async () => {
+    try {
+      const res = await fetch(file.url);
+      if (!res.ok) {
+        if (res.status === 403 || res.status === 401) {
+          onExpired?.();
+        }
+        throw new Error("Expired or failed download");
+      }
+      const blob = await res.blob();
+      saveAs(blob, file.name);
+    } catch (err) {
+      console.error("Download failed:", err);
+      // Fallback: Open in new tab
+      window.open(file.url, "_blank");
+    }
+  };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col h-full min-h-[600px]">
+      {/* File Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 bg-slate-50">
         <div className="flex items-center gap-2 min-w-0">
-          <FileText size={15} className="text-rose-500 shrink-0" />
-          <span className="text-[12.5px] font-semibold text-slate-900 truncate">{file.name}</span>
+          <FileText size={16} className={isPdf ? "text-rose-500 shrink-0" : "text-blue-500 shrink-0"} />
+          <span className="text-[12.5px] font-semibold text-slate-900 truncate" title={file.name}>
+            {file.name}
+          </span>
         </div>
-        <Button variant="ghost" size="small">
+        <Button variant="ghost" size="small" onClick={handleDownload}>
           <Download className="h-4 w-4 mr-1" /> Download
         </Button>
       </div>
 
-      <div className="p-6 bg-slate-100">
-        <div className="mx-auto max-w-[420px] aspect-[3/4] bg-white shadow-md rounded-sm p-5 overflow-y-auto">
-          <div className="font-mono text-[10.5px] leading-relaxed text-slate-800 whitespace-pre-wrap">
-            {previewPages[page].join("\n")}
+      {/* Main Preview Container */}
+      <div className="flex-1 flex min-h-[500px] bg-slate-100 relative">
+        {loading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50/80 z-10">
+            <Loader2 className="animate-spin text-indigo-600 mb-2" size={28} />
+            <span className="text-[12px] text-slate-500 font-medium">Loading resume preview...</span>
           </div>
-        </div>
+        )}
+
+        {error && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-slate-50/90 z-10 text-center">
+            <AlertCircle className="text-rose-500 mb-2" size={32} />
+            <span className="text-[13px] font-semibold text-slate-800 mb-1">Preview Loading Failed</span>
+            <p className="text-[11.5px] text-slate-500 max-w-[280px] mb-4">{error}</p>
+            <button
+              onClick={() => {
+                setLoading(true);
+                setError(null);
+                onExpired?.();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[12px] font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+            >
+              <RefreshCw size={13} /> Reload Preview
+            </button>
+          </div>
+        )}
+
+        {/* PDF Layout */}
+        {isPdf && !error && (
+          <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto max-h-[550px]">
+            <div className="shadow-lg border border-slate-200 bg-white rounded-sm">
+              <Document
+                file={file.url}
+                onLoadSuccess={onDocumentLoadSuccess}
+                onLoadError={onDocumentLoadError}
+                loading={null}
+              >
+                <Page
+                  pageNumber={pageNumber}
+                  width={350}
+                  renderTextLayer={false}
+                  renderAnnotationLayer={false}
+                />
+              </Document>
+            </div>
+          </div>
+        )}
+
+        {/* DOCX Layout */}
+        {isDocx && !error && (
+          <div className="flex-1 p-6 overflow-y-auto max-h-[550px] flex justify-center">
+            <div
+              ref={docxContainerRef}
+              className="bg-white shadow-lg border border-slate-200 p-8 w-full max-w-[500px] h-fit min-h-[400px] docx-preview-container text-slate-800"
+            />
+          </div>
+        )}
       </div>
 
-      <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-200">
-        <span className="text-[11px] text-slate-400">
-          {file.sizeKb} KB · {file.pageCount} page{file.pageCount === 1 ? "" : "s"} · Uploaded {file.uploadedOn}
-        </span>
-        {totalPages > 1 && (
+      {/* Footer Navigation (only for PDF) */}
+      {isPdf && !error && numPages > 1 && (
+        <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-200 bg-slate-50 select-none">
+          <span className="text-[11px] text-slate-500 font-medium">
+            {file.sizeKb} KB · {numPages} pages
+          </span>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="p-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none"
+              onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
+              disabled={pageNumber === 1}
+              className="p-1 rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40 disabled:pointer-events-none transition-colors"
             >
               <ChevronLeft size={14} />
             </button>
-            <span className="text-[11px] text-slate-500">
-              Page {page + 1} of {totalPages}
+            <span className="text-[11px] text-slate-600 font-semibold">
+              Page {pageNumber} of {numPages}
             </span>
             <button
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page === totalPages - 1}
-              className="p-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none"
+              onClick={() => setPageNumber((p) => Math.min(numPages, p + 1))}
+              disabled={pageNumber === numPages}
+              className="p-1 rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40 disabled:pointer-events-none transition-colors"
             >
               <ChevronRight size={14} />
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Footer for DOCX or single-page PDF */}
+      {(!isPdf || numPages <= 1) && !error && (
+        <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 font-medium">
+          {file.sizeKb} KB · Continuous flow
+        </div>
+      )}
     </div>
   );
 }

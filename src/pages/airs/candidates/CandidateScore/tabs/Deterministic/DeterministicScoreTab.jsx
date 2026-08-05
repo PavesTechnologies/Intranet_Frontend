@@ -1,36 +1,91 @@
-import React from "react";
-import HierarchyMatchResults from "../../../components/detail/HierarchyMatchResults";
-import { getDeterministicMock } from "./deterministicMock";
-import ScoreCard from "./components/ScoreCard";
+import React, { useState } from "react";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import ErrorState from "@/pages/airs/skill-ontology/components/ErrorState";
+import useDeterministicScore from "../../../hooks/useDeterministicScore";
+import SummaryCard from "./components/SummaryCard";
+import SkillsTabNav from "./components/SkillsTabNav";
+import SkillsTable from "./components/SkillsTable";
+import MissingSkillsList from "./components/MissingSkillsList";
+import AdditionalSkillsList from "./components/AdditionalSkillsList";
+import PaginatedSkillsSection from "./components/PaginatedSkillsSection";
 import ValidationSection from "./components/ValidationSection";
 import ScoreCalculation from "./components/ScoreCalculation";
-import ScoreBreakdownJsonViewer from "./components/ScoreBreakdownJsonViewer";
+import ConfigurationCard from "./components/ConfigurationCard";
 
-// M07 — Deterministic Score tab. Sections B–E (Hierarchy Match Results,
-// Mandatory/Preferred Skills tables, Additional Candidate Skills) reuse the
-// existing HierarchyMatchResults component as-is rather than re-implementing
-// the same score_breakdown rendering twice.
+// Deterministic Score tab — GET /airs/campaign-candidates/{campaign_candidate_id}/deterministic.
 export default function DeterministicScoreTab({ candidate }) {
-  const deterministic = getDeterministicMock(candidate);
+  const { breakdown, loading, error, refetch } = useDeterministicScore(candidate?.id);
+  const [skillsTab, setSkillsTab] = useState("mandatory");
+
+  if (loading) {
+    return (
+      <div className="py-12 flex items-center justify-center">
+        <LoadingSpinner text="Loading deterministic score..." />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        title="Couldn't load deterministic score"
+        message="We couldn't load this candidate's deterministic score breakdown. Please try again."
+        onRetry={refetch}
+      />
+    );
+  }
+
+  if (!breakdown) {
+    return <ErrorState title="No data available" message="No deterministic score breakdown found for this candidate." />;
+  }
 
   return (
-    <div className="space-y-4">
-      <ScoreCard scoreCard={deterministic.scoreCard} />
+    <div className="space-y-5">
+      <SummaryCard summary={breakdown.summary} />
 
-      <HierarchyMatchResults
-        scoreBreakdown={deterministic.hierarchy}
-        manualSkills={deterministic.manualSkills}
-        additionalSkills={deterministic.additionalSkills}
-      />
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+        <SkillsTabNav
+          activeTab={skillsTab}
+          onChange={setSkillsTab}
+          counts={{
+            mandatory: breakdown.mandatorySkills.length,
+            preferred: breakdown.preferredSkills.length,
+            missing: breakdown.missingMandatorySkills.length,
+            additional: breakdown.additionalCandidateSkills.length,
+          }}
+        />
+        <div className="mt-4">
+          {skillsTab === "mandatory" && (
+            <PaginatedSkillsSection items={breakdown.mandatorySkills}>
+              {(pageItems) => <SkillsTable items={pageItems} variant="mandatory" />}
+            </PaginatedSkillsSection>
+          )}
+          {skillsTab === "preferred" && (
+            <PaginatedSkillsSection items={breakdown.preferredSkills}>
+              {(pageItems) => <SkillsTable items={pageItems} variant="preferred" />}
+            </PaginatedSkillsSection>
+          )}
+          {skillsTab === "missing" && (
+            <PaginatedSkillsSection items={breakdown.missingMandatorySkills}>
+              {(pageItems) => <MissingSkillsList items={pageItems} />}
+            </PaginatedSkillsSection>
+          )}
+          {skillsTab === "additional" && (
+            <PaginatedSkillsSection items={breakdown.additionalCandidateSkills}>
+              {(pageItems) => <AdditionalSkillsList items={pageItems} />}
+            </PaginatedSkillsSection>
+          )}
+        </div>
+      </div>
 
       <ValidationSection
-        experienceValidation={deterministic.experienceValidation}
-        educationValidation={deterministic.educationValidation}
+        experienceValidation={breakdown.experienceValidation}
+        educationValidation={breakdown.educationValidation}
       />
 
-      <ScoreCalculation scoreCalculation={deterministic.scoreCalculation} />
+      <ScoreCalculation scoreCalculation={breakdown.scoreCalculation} configuration={breakdown.configuration} />
 
-      <ScoreBreakdownJsonViewer json={deterministic.rawJson} />
+      <ConfigurationCard configuration={breakdown.configuration} />
     </div>
   );
 }

@@ -11,7 +11,8 @@ import FilterListbox from "../../../components/filter/FilterListbox";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import CancellationModal from "../../leave_management/models/CancellationModal";
 import RejectWithSelectionModal from "../RejectWithSelectionModal";
-import { ChevronDown, ChevronUp, MoreVertical, X } from "lucide-react";
+import BulkApprovalBar from "../components/BulkApprovalBar";
+import { ChevronDown, ChevronUp, MoreVertical, X, CheckCircle2, Plus, Minus } from "lucide-react";
 
 const ReportingManagerApprovalTable = ({
   loading,
@@ -31,6 +32,18 @@ const ReportingManagerApprovalTable = ({
 
   // ✅ Per-user expand/collapse state — collapsed by default
   const [expandedUsers, setExpandedUsers] = useState({});
+  // UI-only: track which weeks are collapsed inside an employee (default expanded).
+  const [expandedWeeks, setExpandedWeeks] = useState({});
+  const toggleWeekCollapse = (key) =>
+    setExpandedWeeks((prev) => ({ ...prev, [key]: !prev[key] }));
+  const setAllWeeksExpanded = (user, expanded) =>
+    setExpandedWeeks((prev) => {
+      const next = { ...prev };
+      (user.weeklySummary || []).forEach((w) => {
+        next[`${user.userId}-${w.weekId}`] = expanded;
+      });
+      return next;
+    });
   const toggleUser = (userId) =>
     setExpandedUsers((prev) => ({ ...prev, [userId]: !prev[userId] }));
 
@@ -327,6 +340,110 @@ const ReportingManagerApprovalTable = ({
   );
 
   // -----------------------------
+  // Bulk multi-employee select + Approve/Reject
+  // -----------------------------
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkRejectOpen, setBulkRejectOpen] = useState(false);
+
+  const shownEmployeeIds = enrichedGroupedData.map((u) => u.userId);
+  const allSelected =
+    shownEmployeeIds.length > 0 &&
+    selectedEmployeeIds.length === shownEmployeeIds.length;
+  const someSelected = selectedEmployeeIds.length > 0 && !allSelected;
+
+  const toggleEmployeeSelect = (userId) =>
+    setSelectedEmployeeIds((prev) =>
+      prev.includes(userId)
+        ? prev.filter((id) => id !== userId)
+        : [...prev, userId],
+    );
+  const toggleSelectAll = () =>
+    setSelectedEmployeeIds(allSelected ? [] : shownEmployeeIds);
+  const clearSelection = () => setSelectedEmployeeIds([]);
+
+  // Flatten each selected employee's actionable weeks into the array the
+  // multi-user review endpoint expects: [{ userId, timesheetIds, status, comments }].
+  // UI-only loading flag for overturn (re-approve rejected) actions.
+  const [overturnBusy, setOverturnBusy] = useState(false);
+  // Re-approve (overturn) rejected timesheets directly by id. Reuses the view's
+  // approve endpoint; the backend permits only the reviewer who rejected to overturn.
+  const approveIds = async (userId, ids) => {
+    const list = (ids || []).filter(Boolean);
+    if (list.length === 0) return;
+    setOverturnBusy(true);
+    try {
+      await handleBulkReviewAdmin(userId, list, "APPROVED", "approved");
+      onRefresh?.();
+    } finally {
+      setOverturnBusy(false);
+    }
+  };
+
+  const buildBulkPayload = (status, comments) => {
+    const norm = (s) => (s || "").toUpperCase().replace(/\s+/g, "_");
+    const rows = [];
+    enrichedGroupedData
+      .filter((u) => selectedEmployeeIds.includes(u.userId))
+      .forEach((u) =>
+        (u.weeklySummary || []).forEach((w) => {
+          const ws = norm(w.weeklyStatus);
+          let ids;
+          if (status === "APPROVED") {
+            // Approve submitted/partial weeks AND overturn rejected weeks in one pass.
+            if (ws !== "SUBMITTED" && ws !== "PARTIALLY_APPROVED" && ws !== "REJECTED")
+              return;
+            ids = (w.timesheets || [])
+              .filter((t) => norm(t.status) !== "APPROVED")
+              .map((t) => t.timesheetId);
+          } else {
+            // Reject: only actionable weeks; leave already-rejected weeks as-is.
+            if (ws !== "SUBMITTED" && ws !== "PARTIALLY_APPROVED") return;
+            ids = (w.timesheets || []).map((t) => t.timesheetId);
+          }
+          if (ids.length)
+            rows.push({ userId: u.userId, timesheetIds: ids, status, comments });
+        }),
+      );
+    return rows;
+  };
+
+  const submitBulkReview = async (status, comments) => {
+    const payload = buildBulkPayload(status, comments);
+    if (payload.length === 0) {
+      showStatusToast(
+        `Nothing to ${status === "APPROVED" ? "approve" : "reject"} for the selected employees`,
+        "info",
+      );
+      return;
+    }
+    setBulkLoading(true);
+    try {
+      await api.post(
+        `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/timesheets/review/internal/bulk`,
+        payload,
+      );
+      showStatusToast(
+        `Selected timesheets ${status === "APPROVED" ? "approved" : "rejected"} successfully`,
+        "success",
+      );
+      clearSelection();
+      onRefresh?.();
+    } catch (err) {
+      console.error("Bulk review failed:", err);
+      showStatusToast(
+        err.response?.data?.message || "Failed to update selected timesheets",
+        "error",
+      );
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkApprove = () => submitBulkReview("APPROVED", "Approved");
+  const handleBulkReject = (reason) => submitBulkReview("REJECTED", reason);
+
+  // -----------------------------
   // Approve / Reject Logic
   // -----------------------------
   const handleStatusChange = async (timesheetId, status, comment = "") => {
@@ -584,11 +701,11 @@ const ReportingManagerApprovalTable = ({
         return (
         <div
           key={week.weekId}
-          className="bg-white border rounded-xl shadow-sm mb-6 overflow-hidden"
+          className="mb-5"
         >
           {/* Manager actions */}
           {isActionable && pendingTimesheets.length > 0 && (
-            <div className="p-4 border-t flex gap-3 justify-end items-center">
+            <div className="px-1 pb-3 flex gap-3 justify-end items-center">
               {weekLevelLoading?.[`${user.userId}-${week.weekId}`] ? (
                 <LoadingSpinner text="Processing..." />
               ) : (
@@ -651,6 +768,28 @@ const ReportingManagerApprovalTable = ({
               )}
             </div>
           )}
+          {week.weeklyStatus?.toUpperCase() === "REJECTED" && (
+            <div className="px-1 pb-3 flex gap-3 justify-end items-center">
+              <Button
+                variant="success"
+                size="medium"
+                disabled={overturnBusy}
+                title="Re-approve this rejected week"
+                onClick={() =>
+                  approveIds(
+                    user.userId,
+                    (week.timesheets || [])
+                      .filter(
+                        (t) => (t.status || "").toUpperCase() === "REJECTED",
+                      )
+                      .map((t) => t.timesheetId),
+                  )
+                }
+              >
+                Approve (Overturn)
+              </Button>
+            </div>
+          )}
           <TimesheetGroup
             weekGroup={{
               weekStart: week.startDate,
@@ -672,6 +811,11 @@ const ReportingManagerApprovalTable = ({
             refreshData={onRefresh}
             mapWorkType={(type) => type}
             projectInfo={projectInfo}
+            isCollapsed={!expandedWeeks[`${user.userId}-${week.weekId}`]}
+            onToggleCollapse={() =>
+              toggleWeekCollapse(`${user.userId}-${week.weekId}`)
+            }
+            onApproveDay={(id) => approveIds(user.userId, [id])}
           />
 
           <RejectWithSelectionModal
@@ -729,7 +873,24 @@ const ReportingManagerApprovalTable = ({
         <LoadingSpinner text="Loading Reporting Manager view..." />
       ) : (
         <>
-          <div className="flex justify-end gap-3 mb-4">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            {enrichedGroupedData.length > 0 ? (
+            <label className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium text-gray-600">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = someSelected;
+                }}
+                onChange={toggleSelectAll}
+                className="h-4 w-4 cursor-pointer accent-[#263383]"
+              />
+              Select all
+            </label>
+            ) : (
+              <div />
+            )}
+            <div className="flex justify-end gap-3">
             <Button variant="primary" size="medium" onClick={exportCSV}>
               Export CSV
             </Button>
@@ -743,29 +904,77 @@ const ReportingManagerApprovalTable = ({
             >
               <MoreVertical size={15} />
             </Button>
+            </div>
           </div>
 
+          <BulkApprovalBar
+            count={selectedEmployeeIds.length}
+            loading={bulkLoading}
+            onApprove={handleBulkApprove}
+            onReject={() => setBulkRejectOpen(true)}
+            onClear={clearSelection}
+          />
+          <CancellationModal
+            title="Reject Selected Employees"
+            subtitle="Enter a reason to reject the selected employees' timesheets."
+            isOpen={bulkRejectOpen}
+            onCancel={() => setBulkRejectOpen(false)}
+            onConfirm={async (reason) => {
+              await handleBulkReject(reason);
+              setBulkRejectOpen(false);
+            }}
+            isLoading={bulkLoading}
+            confirmText="Reject"
+          />
+
           {enrichedGroupedData.length === 0 ? (
-            <div className="text-center text-gray-500 py-10 text-lg font-medium">
-              No Approvals
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-50 text-green-500">
+                <CheckCircle2 size={30} />
+              </div>
+              <p className="text-lg font-semibold text-gray-700">All caught up</p>
+              <p className="text-sm text-gray-400">
+                No timesheets are waiting for your approval.
+              </p>
             </div>
           ) : (
             enrichedGroupedData.map((user) => {
               const isExpanded = !!expandedUsers[user.userId];
               const totalWeeks = user.weeklySummary?.length || 0;
+              const anyWeekExpanded = (user.weeklySummary || []).some(
+                (w) => expandedWeeks[`${user.userId}-${w.weekId}`]
+              );
               const pendingWeeks =
                 user.weeklySummary?.filter((w) => {
                   const s = w.weeklyStatus?.toUpperCase();
                   return s === "SUBMITTED" || s === "PARTIALLY APPROVED";
                 }).length || 0;
+              const pendingHours =
+                user.weeklySummary?.reduce((sum, w) => {
+                  const s = w.weeklyStatus?.toUpperCase();
+                  const isPending =
+                    s === "SUBMITTED" || s === "PARTIALLY APPROVED";
+                  return isPending ? sum + (Number(w.totalHours) || 0) : sum;
+                }, 0) || 0;
 
               return (
                 <div
                   key={user.userId}
-                  className="bg-white rounded-xl shadow-md border p-4"
+                  className="bg-white rounded-2xl shadow-sm border border-gray-100 border-l-4 border-l-[#263383] p-4 transition-shadow hover:shadow-md"
                 >
                   {/* ✅ Collapsible user header */}
                   <div className="flex items-center justify-between">
+                    <input
+                      type="checkbox"
+                      checked={selectedEmployeeIds.includes(user.userId)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        toggleEmployeeSelect(user.userId);
+                      }}
+                      className="mr-3 h-4 w-4 shrink-0 cursor-pointer accent-[#263383]"
+                      title="Select employee"
+                    />
                     <button
                       type="button"
                       onClick={() => toggleUser(user.userId)}
@@ -777,15 +986,31 @@ const ReportingManagerApprovalTable = ({
                       ) : (
                         <ChevronDown size={20} className="text-gray-500 shrink-0" />
                       )}
-                      <h2 className="text-xl font-bold text-gray-800 truncate">
-                        {user.userName} (ID: {user.userId})
+                      <span className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#263383] to-[#4f46e5] text-white text-sm font-bold">
+                        {(user.userName || "")
+                          .trim()
+                          .split(/\s+/)
+                          .slice(0, 2)
+                          .map((w) => w.charAt(0).toUpperCase())
+                          .join("") || "U"}
+                      </span>
+                      <h2 className="text-lg font-bold text-gray-800 truncate">
+                        {user.userName}{" "}
+                        <span className="text-sm font-medium text-gray-400">
+                          (ID: {user.userId})
+                        </span>
                       </h2>
-                      <span className="text-sm text-gray-500 shrink-0">
-                        • {totalWeeks} {totalWeeks === 1 ? "week" : "weeks"}
+                      <span className="hidden md:inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 shrink-0">
+                        {totalWeeks} {totalWeeks === 1 ? "week" : "weeks"}
                       </span>
                       {pendingWeeks > 0 && (
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300 shrink-0">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                           {pendingWeeks} pending
+                        </span>
+                      )}
+                      {pendingWeeks > 0 && pendingHours > 0 && (
+                        <span className="hidden lg:inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
+                          {pendingHours.toFixed(1)} hrs
                         </span>
                       )}
                     </button>
@@ -825,6 +1050,35 @@ const ReportingManagerApprovalTable = ({
                           >
                             Reject All Weeks
                           </Button>
+                          {isExpanded && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAllWeeksExpanded(user, !anyWeekExpanded)
+                              }
+                              title={
+                                anyWeekExpanded
+                                  ? "Collapse all weeks"
+                                  : "Expand all weeks"
+                              }
+                              aria-label={
+                                anyWeekExpanded
+                                  ? "Collapse all weeks"
+                                  : "Expand all weeks"
+                              }
+                              className={`inline-flex items-center justify-center h-8 w-8 rounded-lg border shadow-sm transition-all duration-200 hover:shadow-md hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+                                anyWeekExpanded
+                                  ? "bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100 focus:ring-amber-300"
+                                  : "bg-indigo-50 border-indigo-200 text-[#4f46e5] hover:bg-indigo-100 focus:ring-indigo-300"
+                              }`}
+                            >
+                              {anyWeekExpanded ? (
+                                <Minus size={16} />
+                              ) : (
+                                <Plus size={16} />
+                              )}
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
@@ -850,10 +1104,10 @@ const ReportingManagerApprovalTable = ({
                   />
 
                   {isExpanded && (
-                    <>
-                      <hr className="my-3 border-gray-200" />
+                    <div className="ts-reveal">
+                      <hr className="my-4 border-gray-100" />
                       {renderUserWeeks(user)}
-                    </>
+                    </div>
                   )}
                 </div>
               );

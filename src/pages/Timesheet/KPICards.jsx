@@ -1,4 +1,12 @@
 import React from "react";
+import {
+  Clock,
+  CalendarDays,
+  Scale,
+  FolderKanban,
+  Plane,
+  CalendarCheck,
+} from "lucide-react";
 
 /**
  * KPI summary cards
@@ -7,51 +15,88 @@ const KPICards = ({ kpis }) => {
   return (
     <div className="kpi-grid">
       <div className="kpi-card kpi-card-indigo">
-        <p className="kpi-label">Total Hours Logged</p>
-        <p className="kpi-value kpi-value-indigo">{kpis.monthlyTotalAdjusted.toFixed(1)} hours</p>
-        {/* <span className="kpi-meta kpi-meta-green">Goal: 160 hrs</span> */}
+        <div className="flex items-start gap-3">
+          <span className="kpi-icon kpi-icon-indigo">
+            <Clock size={20} />
+          </span>
+          <div className="min-w-0">
+            <p className="kpi-label">Total Hours Logged</p>
+            <p className="kpi-value kpi-value-indigo">
+              {kpis.monthlyTotalAdjusted.toFixed(1)} hours
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="kpi-card bg-purple-50 shadow-md rounded-xl p-5 border-l-4 border-purple-600">
-        <p className="kpi-label">Total Working Days</p>
-        <p className="kpi-value text-3xl font-bold text-purple-800 mt-1">
-          {kpis.totalWorkingDays || 0} Days
-          </p>
+      <div className="kpi-card kpi-card-purple">
+        <div className="flex items-start gap-3">
+          <span className="kpi-icon kpi-icon-purple">
+            <CalendarDays size={20} />
+          </span>
+          <div className="min-w-0">
+            <p className="kpi-label">Total Working Days</p>
+            <p className="kpi-value kpi-value-purple">
+              {kpis.totalWorkingDays || 0} Days
+            </p>
+          </div>
+        </div>
       </div>
 
-        
       <div className="kpi-card kpi-card-green">
-        <p className="kpi-label">Billable vs Non-Billable</p>
-        <p className="kpi-value kpi-value-green">
-          {kpis.monthlyBillableHours} / {kpis.monthlyNonBillableHours} hours
-        </p>
-        {/* <span className="kpi-meta kpi-meta-gray">
-          {kpis.monthlyBillableHours.toFixed(1)} Billable hrs
-        </span> */}
+        <div className="flex items-start gap-3">
+          <span className="kpi-icon kpi-icon-green">
+            <Scale size={20} />
+          </span>
+          <div className="min-w-0">
+            <p className="kpi-label">Billable vs Non-Billable</p>
+            <p className="kpi-value kpi-value-green">
+              {kpis.monthlyBillableHours} / {kpis.monthlyNonBillableHours} hours
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="kpi-card kpi-card-sky">
-        <p className="kpi-label">Current Active Projects</p>
-        <p className="kpi-value kpi-value-sky">{kpis.activeProjectsCount} Projects</p>
-        {/* <span className="kpi-meta kpi-meta-gray">Based on logged time</span> */}
+        <div className="flex items-start gap-3">
+          <span className="kpi-icon kpi-icon-sky">
+            <FolderKanban size={20} />
+          </span>
+          <div className="min-w-0">
+            <p className="kpi-label">Current Active Projects</p>
+            <p className="kpi-value kpi-value-sky">
+              {kpis.activeProjectsCount} Projects
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="kpi-card kpi-card-amber">
-        <p className="kpi-label"> Total Leaves</p>
-        <p className="kpi-value kpi-value-amber">
-          {kpis.leaves?.days || 0} Days
-        </p>
-        {/* <span className="kpi-meta kpi-meta-red">
-          {(kpis.leaves?.hours || 0).toFixed(1)} Adjusted hrs
-        </span> */}
+        <div className="flex items-start gap-3">
+          <span className="kpi-icon kpi-icon-amber">
+            <Plane size={20} />
+          </span>
+          <div className="min-w-0">
+            <p className="kpi-label">Total Leaves</p>
+            <p className="kpi-value kpi-value-amber">
+              {kpis.leaves?.days || 0} Days
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="kpi-card bg-rose-50 shadow-md rounded-xl p-5 border-l-4 border-rose-600">
-        <p className="kpi-label">Total Monthly Holidays</p>
-        <p className="kpi-value text-3xl font-bold text-rose-800 mt-1">
-          {kpis.holidays?.days || 0} Days
-          </p>
+      <div className="kpi-card kpi-card-rose">
+        <div className="flex items-start gap-3">
+          <span className="kpi-icon kpi-icon-rose">
+            <CalendarCheck size={20} />
+          </span>
+          <div className="min-w-0">
+            <p className="kpi-label">Total Monthly Holidays</p>
+            <p className="kpi-value kpi-value-rose">
+              {kpis.holidays?.days || 0} Days
+            </p>
+          </div>
         </div>
+      </div>
     </div>
   );
 };
