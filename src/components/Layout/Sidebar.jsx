@@ -20,6 +20,7 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { EO_SUBMENU, XMS_SUBMENU } from "../../config/sidebarConfig";
 import { filterMenuByRole } from "../../utils/sidebarPermissions";
+import ArModuleIcon from "../icons/ArModuleIcon";
 // import AIRSLogo from "../icons/AIRSLogo";
 
 const navigation = [
@@ -61,6 +62,29 @@ const resourceManagementSubmenu = [
     label: "Utilization & Performance",
     to: "/resource-management/bench/utilization-performance",
   },
+];
+
+const accountReceivableSubmenu = [
+  { label: "Dashboard", to: "/account-receivable/dashboard" },
+  {
+    label: "Project Billing Setup",
+    to: "/account-receivable/project-billing-setup/overview",
+    children: [
+      {
+        label: "Overview",
+        to: "/account-receivable/project-billing-setup/overview",
+      },
+      {
+        label: "Billing Configurations",
+        to: "/account-receivable/project-billing-setup/configurations",
+      },
+      {
+        label: "Configuration History",
+        to: "/account-receivable/project-billing-setup/history",
+      },
+    ],
+  },
+  { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition" },
 ];
 
 const airsSubmenu = [
@@ -165,9 +189,13 @@ const Sidebar = ({ isCollapsed }) => {
   const [airsHovered, setAirsHovered] = useState(false);
   const airsRef = useRef(null);
 
+  const [arHovered, setArHovered] = useState(false);
+  const arRef = useRef(null);
+
   const [submenuTop, setSubmenuTop] = useState(0);
   const hoverTimeout = useRef(null);
   const [childMenu, setChildMenu] = useState(null);
+  const [childMenuOwner, setChildMenuOwner] = useState(null);
   const [childTop, setChildTop] = useState(0);
   const parentHoverRef = useRef(false);
   const childHoverRef = useRef(false);
@@ -178,8 +206,10 @@ const Sidebar = ({ isCollapsed }) => {
     setRmHovered(false);
     setEoHovered(false);
     setAirsHovered(false);
+    setArHovered(false);
     setXmsHovered(false);
     setChildMenu(null);
+    setChildMenuOwner(null);
   };
 
 
@@ -200,7 +230,7 @@ const Sidebar = ({ isCollapsed }) => {
     }, 200);
   };
 
-  const handleParentHover = (item, e) => {
+  const handleParentHover = (item, e, owner = "eo") => {
     cancelClose();
 
     parentHoverRef.current = true;
@@ -209,8 +239,10 @@ const Sidebar = ({ isCollapsed }) => {
       const rect = e.currentTarget.getBoundingClientRect();
       setChildTop(rect.top);
       setChildMenu(item.children);
+      setChildMenuOwner(owner);
     } else {
       setChildMenu(null);
+      setChildMenuOwner(null);
     }
   };
 
@@ -218,6 +250,7 @@ const Sidebar = ({ isCollapsed }) => {
     setTimeout(() => {
       if (!childHoverRef.current) {
         setChildMenu(null);
+        setChildMenuOwner(null);
       }
     }, 150);
   };
@@ -234,7 +267,9 @@ const Sidebar = ({ isCollapsed }) => {
     closeTimerRef.current = setTimeout(() => {
       if (!parentHoverRef.current && !childHoverRef.current) {
         setChildMenu(null);
+        setChildMenuOwner(null);
         setEoHovered(false);
+        setArHovered(false);
         setXmsHovered(false);
       }
     }, 260); // slightly higher = smoother
@@ -306,6 +341,21 @@ const Sidebar = ({ isCollapsed }) => {
     }, 200);
   };
 
+  const handleArMouseEnter = () => {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    closeAllSubmenus();
+    if (arRef.current) {
+      const rect = arRef.current.getBoundingClientRect();
+      setSubmenuTop(rect.top);
+    }
+    setArHovered(true);
+  };
+
+  const handleArMouseLeave = () => {
+    parentHoverRef.current = false;
+    scheduleClose();
+  };
+
   const resourceManagementItems = isAdmin
     ? resourceManagementSubmenu
     : isDM
@@ -317,6 +367,7 @@ const Sidebar = ({ isCollapsed }) => {
     setRmHovered(false);
     setEoHovered(false);
     setAirsHovered(false);
+    setArHovered(false);
     setXmsHovered(false);
   }, [location.pathname]);
 
@@ -538,6 +589,7 @@ const Sidebar = ({ isCollapsed }) => {
                   }}
                   onMouseLeave={() => {
                     parentHoverRef.current = false;
+                    setChildMenuOwner(null);
                     scheduleClose();
                   }}
                 >
@@ -728,6 +780,109 @@ const Sidebar = ({ isCollapsed }) => {
               </li>
             );
           })}
+
+          <li
+            ref={arRef}
+            className="relative"
+            onMouseEnter={handleArMouseEnter}
+            onMouseLeave={handleArMouseLeave}
+          >
+            <div
+              className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/account-receivable")
+                ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
+                : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
+                }`}
+              title={isCollapsed ? "Account Receivable" : ""}
+            >
+              <ArModuleIcon className="h-5 w-5 shrink-0" />
+
+              {!isCollapsed && (
+                <>
+                  <span className="flex-1">Account Receivable</span>
+                  <ChevronRight
+                    className={`h-4 w-4 transition-all duration-300 ${arHovered ? "translate-x-1" : ""
+                      }`}
+                  />
+                </>
+              )}
+            </div>
+
+            {arHovered && (
+              <ul
+                className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
+                  }`}
+                style={{ top: `${submenuTop}px` }}
+                onMouseEnter={() => {
+                  parentHoverRef.current = true;
+                  cancelClose();
+                }}
+                onMouseLeave={() => {
+                  parentHoverRef.current = false;
+                  scheduleClose();
+                }}
+              >
+                {accountReceivableSubmenu.map((item) => (
+                  <li
+                    key={item.label}
+                    className="group relative"
+                    onMouseEnter={(e) => handleParentHover(item, e, "ar")}
+                    onMouseDown={() => handleParentLeave()}
+                  >
+                    <NavLink
+                      to={item.to}
+                      className={({ isActive }) =>
+                        `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
+                          ? "bg-blue-100 text-[#0a174e] font-semibold"
+                          : "hover:bg-[#263383] hover:text-white"
+                        }`
+                      }
+                    >
+                      <span>{item.label}</span>
+                      {item.children && (
+                        <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
+                      )}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {childMenu && childMenuOwner === "ar" && (
+              <ul
+                className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[305px]" : "left-[480px]"
+                  }`}
+                style={{ top: `${childTop - 4}px` }}
+                onMouseEnter={() => {
+                  childHoverRef.current = true;
+                  cancelClose();
+                }}
+                onMouseLeave={() => {
+                  childHoverRef.current = false;
+                  scheduleClose();
+                }}
+                onClick={() => {
+                  childHoverRef.current = false;
+                  setChildMenuOwner(null);
+                  scheduleClose();
+                }}
+              >
+                {childMenu.map((child) => (
+                  <li key={child.label} className="group relative">
+                    <NavLink
+                      to={child.to}
+                      className={({ isActive }) =>
+                        `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
+                          ? "bg-blue-100 text-[#0a174e] font-semibold"
+                          : "hover:bg-[#263383] hover:text-white"
+                        }`
+                      }
+                    >
+                      <span>{child.label}</span>
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
         </ul>
 
         {childMenu && (
