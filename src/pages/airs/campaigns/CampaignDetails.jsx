@@ -464,10 +464,14 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
     ...c,
     starred: starredIds.has(c.id),
   }));
+  // TEMP DEBUG - remove once candidates render correctly
+  console.log("[CandidatesTab] mapped candidates:", allCandidates);
   // stage filter — set by clicking a funnel bar, changeable here too
   const list = stageFilter
     ? allCandidates.filter((c) => (c.stage || "").toUpperCase() === stageFilter)
     : allCandidates;
+  // TEMP DEBUG - remove once candidates render correctly
+  console.log("[CandidatesTab] filtered candidates:", list);
 
   const stageOptions = [
     { value: "", label: "All Stages" },
@@ -477,6 +481,8 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   ];
 
   const { pageItems, totalPages, currentPage: safePage } = paginate(list, currentPage, CANDIDATE_PAGE_SIZE);
+  // TEMP DEBUG - remove once candidates render correctly
+  console.log("[CandidatesTab] rendered candidates (pageItems):", pageItems);
 
   const toggleStar = (candidateId) => {
     setStarredIds((prev) => {
