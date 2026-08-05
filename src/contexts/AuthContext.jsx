@@ -74,7 +74,9 @@ export const AuthProvider = ({ children }) => {
         },
       },
     )
-        .then((res) => console.log("Logout:", res.data))
+        .then((res) => {
+          // console.log("Logout:", res.data)
+        })
         .catch((err) => console.error("Logout failed:", err.response?.data || err.message));
     }
 
@@ -125,7 +127,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         const timer = setTimeout(() => {
-          console.log("Access token expired.");
+          // console.log("Access token expired.");
         }, timeLeft * 1000);
 
         return () => clearTimeout(timer);

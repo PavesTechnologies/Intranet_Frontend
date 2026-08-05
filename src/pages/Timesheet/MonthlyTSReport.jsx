@@ -99,7 +99,7 @@ const MonthlyTSReport = () => {
       const data = await res.data;
       setApiData(data);
     } catch (e) {
-      console.log("Error msg :", e?.response?.data);
+      // console.log("Error msg :", e?.response?.data);
       setError(e?.response?.data || "Failed to load");
     } finally {
       setLoading(false);

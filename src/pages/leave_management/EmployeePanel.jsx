@@ -92,18 +92,16 @@ const EmployeePanel = () => {
             )}
 
             {/* HR Admin View */}
-            {!permission && (
-              isHRAdministrator && (
-                <button
-                  onClick={() => handleViewChange('hr_manager')}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${activeView === 'hr_manager'
-                    ? 'bg-indigo-600 text-white shadow'
-                    : 'text-gray-700 hover:bg-white'
-                    }`}
-                >
-                  HR-Admin View
-                </button>
-              )
+            {isHRAdministrator && (
+              <button
+                onClick={() => handleViewChange('hr_manager')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${activeView === 'hr_manager'
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'text-gray-700 hover:bg-white'
+                  }`}
+              >
+                HR-Admin View
+              </button>
             )}
 
             {/* HR Tools View */}

@@ -86,14 +86,14 @@ export default function AdminOfferView() {
     });
     setOffer(getOfferWithJoiningStatus(res.data));
   };
-  console.log("OFFER:", offer);
+  // console.log("OFFER:", offer);
 
   /* ---------------- FETCH APPROVAL ---------------- */
   const fetchApproval = async () => {
     const res = await api.get(`${BASE}/offer-approval/my-actions`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
-    console.log("ADMIN APPROVAL API RAW:", res.data);
+    // console.log("ADMIN APPROVAL API RAW:", res.data);
     const found = res.data.find((i) => i.user_uuid === user_uuid);
     if (!found) { setApproval(null); return; }
     const mapped = {
@@ -104,7 +104,7 @@ export default function AdminOfferView() {
       mail: found.mail || "",
     };
     setApproval(mapped);
-    console.log("Mapped Approval:", mapped);
+    // console.log("Mapped Approval:", mapped);
   };
 
 

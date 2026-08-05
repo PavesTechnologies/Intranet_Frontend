@@ -49,11 +49,11 @@ const CommentBox = ({ entityId, entityType, currentUser }) => {
     if (!newComment.trim()) return;
 
     const userId = currentUser.user_id;
-    console.log("Submitting comment:", {
-      content: newComment,
-      userId,
-      parentId: replyingTo,
-    });
+    // console.log("Submitting comment:", {
+      // content: newComment,
+      // userId,
+      // parentId: replyingTo,
+    // });
 
     const payload = {
       content: newComment,

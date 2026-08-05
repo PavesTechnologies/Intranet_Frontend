@@ -160,7 +160,7 @@ const CustomActiveShapePieChart = ({ employeeId, refreshKey, year }) => {
               >
                 {data.map((entry, index) => {
                   let fillColor;
-                  console.log("Entry Name:", entry);
+                  // console.log("Entry Name:", entry);
                   switch (entry.name) {
                     case "Earned Leave":
                       fillColor = "#34d399";

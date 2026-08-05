@@ -328,12 +328,12 @@ export default function HrOnboardingDashboard() {
   // DEBUG – remove before shipping
   useEffect(() => {
     console.group("[HR Dashboard] data flow");
-    console.log("raw data (API):", data);
-    console.log("pageData (tracked):", pageData);
-    console.log(
-      "pageDataWithStatus (computed statuses):",
-      pageDataWithStatus.map((e) => ({ uuid: e.user_uuid, name: `${e.first_name} ${e.last_name}`, _displayStatus: e._displayStatus, rawStatus: e.status }))
-    );
+    // console.log("raw data (API):", data);
+    // console.log("pageData (tracked):", pageData);
+    // console.log(
+      // "pageDataWithStatus (computed statuses):",
+      // pageDataWithStatus.map((e) => ({ uuid: e.user_uuid, name: `${e.first_name} ${e.last_name}`, _displayStatus: e._displayStatus, rawStatus: e.status }))
+    // );
     console.groupEnd();
   }, [pageDataWithStatus]);
 
@@ -363,11 +363,11 @@ export default function HrOnboardingDashboard() {
   useEffect(() => {
     const filter = statusFilter.trim().toUpperCase();
     console.group(`[HR Dashboard] filteredData (statusFilter="${filter}")`);
-    console.log("count:", filteredData.length);
-    console.log(
-      "records:",
-      filteredData.map((e) => ({ uuid: e.user_uuid, name: `${e.first_name} ${e.last_name}`, _displayStatus: e._displayStatus }))
-    );
+    // console.log("count:", filteredData.length);
+    // console.log(
+      // "records:",
+      // filteredData.map((e) => ({ uuid: e.user_uuid, name: `${e.first_name} ${e.last_name}`, _displayStatus: e._displayStatus }))
+    // );
     console.groupEnd();
   }, [filteredData, statusFilter]);
 
@@ -378,7 +378,7 @@ export default function HrOnboardingDashboard() {
     });
 
     // DEBUG – remove before shipping
-    console.log("[HR Dashboard] KPI counts:", counts);
+    // console.log("[HR Dashboard] KPI counts:", counts);
 
     return HR_CATEGORY_GROUPS.map((group) => ({
       key: group.key,
@@ -499,9 +499,9 @@ export default function HrOnboardingDashboard() {
       showStatusToast("Joining emails sent");
       resetBulk();
     } catch (err) {
-      console.log("JOIN ERROR FULL:", err.response?.data);
-      console.log("JOIN ERROR DETAIL:", err.response?.data?.detail);
-      console.log("JOIN PAYLOAD:", payload);
+      // console.log("JOIN ERROR FULL:", err.response?.data);
+      // console.log("JOIN ERROR DETAIL:", err.response?.data?.detail);
+      // console.log("JOIN PAYLOAD:", payload);
       console.error(err);
 
       showStatusToast("Failed to send emails");
@@ -668,7 +668,7 @@ export default function HrOnboardingDashboard() {
             : emp,
         ),
       );
-      console.log("UPDATED STATUS:", updatedStatus);
+      // console.log("UPDATED STATUS:", updatedStatus);
       fetchEmployees();
 
       setEditDisabledUserIds((prev) =>
