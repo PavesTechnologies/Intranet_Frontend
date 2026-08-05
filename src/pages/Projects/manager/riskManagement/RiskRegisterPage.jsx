@@ -12,10 +12,10 @@ import {
 import api from "../../../../api/axiosInstance";
 
 import Button from "../../../../components/Button/Button";
-import CreateRiskModal from "./createRiskModal";
-import IssuesPanel from "./IssuesPanel";
-import RisksPanel from "./RisksPanel";
-import RiskDetailModal from "./RiskDetailModal";
+import CreateRiskModal from "../../../../components/RiskManagement/createRiskModal";
+import IssuesPanel from "../../../../components/RiskManagement/IssuesPanel";
+import RisksPanel from "../../../../components/RiskManagement/RisksPanel";
+import RiskDetailModal from "../../../../components/RiskManagement/RiskDetailModal";
 
 const TYPE_ICON = {
   All: <LayoutGridIcon className="w-4 h-4" />,

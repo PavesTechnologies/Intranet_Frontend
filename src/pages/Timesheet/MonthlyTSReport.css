@@ -860,3 +860,122 @@ body {
         font-size: 1.5rem;
     }
 }
+/* ============================================================
+   UI refinement (2026) — Monthly report visual polish.
+   Additive overrides only. No logic/feature changes.
+   ============================================================ */
+
+/* Canvas + main card */
+.timesheet-container {
+  background: #f3f5fb;
+}
+.timesheet-wrapper {
+  background: #ffffff;
+  box-shadow: 0 10px 40px -12px rgba(8, 21, 52, 0.12);
+  border: 1px solid #eef1f8;
+}
+
+/* Header */
+.timesheet-header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #eef1f8;
+}
+.header-content {
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.timesheet-title {
+  font-size: 1.625rem;
+  letter-spacing: -0.01em;
+}
+.employee-name {
+  font-size: 1rem;
+  color: #263383;
+}
+
+/* Section titles — compact with a brand accent bar */
+.section-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 1.1rem;
+  padding-left: 0.65rem;
+  border-left: 4px solid #263383;
+  line-height: 1.2;
+}
+
+/* KPI cards — unified rounded cards with hover lift */
+.kpi-grid {
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.kpi-card {
+  border-radius: 0.85rem;
+  padding: 1.15rem 1.25rem;
+  box-shadow: 0 1px 2px rgba(8, 21, 52, 0.04), 0 6px 16px -8px rgba(8, 21, 52, 0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(8, 21, 52, 0.06), 0 12px 24px -10px rgba(8, 21, 52, 0.18);
+}
+.kpi-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+  color: #64748b;
+}
+.kpi-value {
+  font-size: 1.6rem;
+  margin-top: 0.35rem;
+}
+
+/* Chart + section blocks become soft grouped panels */
+.donut-chart-container,
+.chart-container,
+.timesheet-section {
+  background: #ffffff;
+  border: 1px solid #eef1f8;
+  border-radius: 0.9rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 2px rgba(8, 21, 52, 0.03);
+}
+
+/* Footer total — gradient bar */
+.footer-summary {
+  background: linear-gradient(90deg, #263383 0%, #4f46e5 100%);
+  border-radius: 0.9rem;
+  margin-top: 0.5rem;
+  box-shadow: 0 12px 30px -12px rgba(38, 51, 131, 0.5);
+}
+.footer-label { font-size: 0.95rem; letter-spacing: 0.02em; }
+.footer-value { font-size: 1.35rem; }
+
+/* KPI variants for a consistent 6-card set */
+.kpi-card-purple { background-color: #faf5ff; border-left: 4px solid #7c3aed; }
+.kpi-value-purple { color: #5b21b6; }
+.kpi-card-rose { background-color: #fff1f2; border-left: 4px solid #e11d48; }
+.kpi-value-rose { color: #9f1239; }
+
+/* KPI icon chips (identity marker per tile) */
+.kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 0.7rem;
+  flex-shrink: 0;
+}
+.kpi-icon-indigo { background: #e0e7ff; color: #4f46e5; }
+.kpi-icon-purple { background: #f3e8ff; color: #7c3aed; }
+.kpi-icon-green  { background: #dcfce7; color: #16a34a; }
+.kpi-icon-sky    { background: #e0f2fe; color: #0284c7; }
+.kpi-icon-amber  { background: #fef3c7; color: #d97706; }
+.kpi-icon-rose   { background: #ffe4e6; color: #e11d48; }
+
+/* KPI value sits tight under its label in the icon layout */
+.kpi-card .kpi-value { margin-top: 0.15rem; line-height: 1.1; }

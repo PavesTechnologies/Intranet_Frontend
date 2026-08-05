@@ -13,11 +13,12 @@ import {
   UserCog2,
   AlertCircle,
   Briefcase,
-  ScanSearch
+  ScanSearch,
+  Receipt
 } from "lucide-react";
 
 import { useAuth } from "../../contexts/AuthContext";
-import { EO_SUBMENU } from "../../config/sidebarConfig";
+import { EO_SUBMENU, XMS_SUBMENU } from "../../config/sidebarConfig";
 import { filterMenuByRole } from "../../utils/sidebarPermissions";
 import ArModuleIcon from "../icons/ArModuleIcon";
 // import AIRSLogo from "../icons/AIRSLogo";
@@ -87,15 +88,28 @@ const accountReceivableSubmenu = [
 ];
 
 const airsSubmenu = [
-  { label: "Dashboard", to: "/airs/dashboard" },
   { label: "JD Management", to: "/airs/jds" },
   { label: "Campaigns", to: "/airs/campaigns" },
   { label: "Resume Intake", to: "/airs/resume-intake" },
+  { label: "Pipeline", to: "/airs/pipeline" },
   { label: "Candidates", to: "/airs/candidates" },
+  { label: "Skill Ontology", to: "/airs/skill-ontology" },
   { label: "Talent Pool", to: "/airs/talent-pool" },
   { label: "Analytics", to: "/airs/analytics" },
   { label: "Settings", to: "/airs/settings" },
 ];
+
+// HR_ADMIN gets a trimmed-down AIRS menu — only these items, plus
+// Prompt Templates below (HR_ADMIN-only, not part of the general airsSubmenu).
+const hrAdminAirsSubmenu = [
+  ...airsSubmenu.filter((item) => ["JD Management", "Skill Ontology", "Campaigns"].includes(item.label)),
+  { label: "Prompt Templates", to: "/airs/prompt-templates" },
+];
+
+// RECRUITER gets a trimmed-down AIRS menu — only these items.
+const recruiterAirsSubmenu = airsSubmenu.filter((item) =>
+  ["Campaigns", "Resume Intake", "Pipeline"].includes(item.label),
+);
 
 
 const deliveryManagerResourceManagementSubmenu =
@@ -121,33 +135,26 @@ const Sidebar = ({ isCollapsed }) => {
     if (!isAllowed) return false;
 
     // Special logic for Projects to handle the "General" role commonality
-    if (item.name === "Projects") {
-      const userRoles = user?.roles?.map((r) => r.toUpperCase()) || [];
-      // Roles that should not see Projects by default
-      const forbiddenRoles = [
-        "ADMIN",
-        "Super_Admin",
-        "HR",
-        "HR_MANAGER",
-        "RESOURCE_MANAGER",
-        "DELIVERY_MANAGER",
-        "REPORTING_MANAGER",
-      ];
-      // Roles that override the forbidden roles
-      const strongRoles = ["PROJECT_MANAGER", "TESTER"];
+   if (item.name === "Projects") {
+  const userRoles = user?.roles?.map((r) => r.toUpperCase()) || [];
 
-      // If user has a professional project role, always show it
-      if (userRoles.some((r) => strongRoles.includes(r))) return true;
-
-      // If user has any forbidden role (and no strong role), hide it
-      if (userRoles.some((r) => forbiddenRoles.includes(r))) return false;
-    }
-
+  // Show Projects if user has GENERAL or PROJECT_MANAGER
+  if (
+    userRoles.includes("GENERAL") ||
+    userRoles.includes("PROJECT_MANAGER")
+  ) {
     return true;
+  }
+
+  return false;
+}
   });
 
   // Role-filtered EO submenu — recomputed whenever the component re-renders with a new user
   const filteredEoSubmenu = filterMenuByRole(EO_SUBMENU, hasRole);
+
+  // Role-filtered Expense Management (XMS) submenu
+  const filteredXmsSubmenu = filterMenuByRole(XMS_SUBMENU, hasRole);
 
   // Role checks
   const isAdmin = hasRole(["ADMIN", "SUPER_ADMIN"]);
@@ -156,6 +163,13 @@ const Sidebar = ({ isCollapsed }) => {
   const isDM = hasRole(["DELIVERY_MANAGER"]);
   const isGeneral = hasRole(["GENERAL"]);
   const airsRBACAccess = hasRole(["HIRING_MANAGER", "HR", "HR_ADMIN", "RECRUITER"]);
+  const isHrAdmin = hasRole(["HR_ADMIN"]);
+  const isRecruiter = hasRole(["RECRUITER"]);
+  const filteredAirsSubmenu = isHrAdmin
+    ? hrAdminAirsSubmenu
+    : isRecruiter
+      ? recruiterAirsSubmenu
+      : airsSubmenu;
 
   // State for User Management Hover
   const [userHovered, setUserHovered] = useState(false);
@@ -163,6 +177,9 @@ const Sidebar = ({ isCollapsed }) => {
 
   const [eoHovered, setEoHovered] = useState(false);
   const eoRef = useRef(null);
+
+  const [xmsHovered, setXmsHovered] = useState(false);
+  const xmsRef = useRef(null);
 
   // State for Resource Management Hover (NEW)
   const [rmHovered, setRmHovered] = useState(false);
@@ -190,6 +207,7 @@ const Sidebar = ({ isCollapsed }) => {
     setEoHovered(false);
     setAirsHovered(false);
     setArHovered(false);
+    setXmsHovered(false);
     setChildMenu(null);
     setChildMenuOwner(null);
   };
@@ -252,6 +270,7 @@ const Sidebar = ({ isCollapsed }) => {
         setChildMenuOwner(null);
         setEoHovered(false);
         setArHovered(false);
+        setXmsHovered(false);
       }
     }, 260); // slightly higher = smoother
   };
@@ -286,6 +305,22 @@ const Sidebar = ({ isCollapsed }) => {
   const handleEoMouseLeave = () => {
     hoverTimeout.current = setTimeout(() => {
       setEoHovered(false);
+    }, 200);
+  };
+
+  const handleXmsMouseEnter = () => {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    closeAllSubmenus();
+    if (xmsRef.current) {
+      const rect = xmsRef.current.getBoundingClientRect();
+      setSubmenuTop(rect.top);
+    }
+    setXmsHovered(true);
+  };
+
+  const handleXmsMouseLeave = () => {
+    hoverTimeout.current = setTimeout(() => {
+      setXmsHovered(false);
     }, 200);
   };
 
@@ -333,6 +368,7 @@ const Sidebar = ({ isCollapsed }) => {
     setEoHovered(false);
     setAirsHovered(false);
     setArHovered(false);
+    setXmsHovered(false);
   }, [location.pathname]);
 
 
@@ -385,15 +421,16 @@ const Sidebar = ({ isCollapsed }) => {
           }
 
           {/* AI Screening (AIRS) Menu */}
-          {/* {airsRBACAccess && (
+          {airsRBACAccess && (
             <li
               ref={airsRef}
               className="relative"
               onMouseEnter={handleAirsMouseEnter}
               onMouseLeave={handleAirsMouseLeave}
             >
-              <div
-                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/airs")
+              <Link
+                to="/airs/jds"
+                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${location.pathname.startsWith("/airs")
                   ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
                   : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
                   }`}
@@ -410,7 +447,7 @@ const Sidebar = ({ isCollapsed }) => {
                     />
                   </>
                 )}
-              </div>
+              </Link>
 
               {airsHovered && (
                 <ul
@@ -420,7 +457,7 @@ const Sidebar = ({ isCollapsed }) => {
                   onMouseEnter={handleAirsMouseEnter}
                   onMouseLeave={handleAirsMouseLeave}
                 >
-                  {airsSubmenu.map((item) => (
+                  {filteredAirsSubmenu.map((item) => (
                     <li key={item.label} className="group relative">
                       <NavLink
                         to={item.to}
@@ -438,7 +475,7 @@ const Sidebar = ({ isCollapsed }) => {
                 </ul>
               )}
             </li>
-          )} */}
+          )}
 
           {/* Employee Onboarding (Non-General, Non-DM) */}
           {
@@ -510,29 +547,61 @@ const Sidebar = ({ isCollapsed }) => {
                   ))}
                 </ul>
               )}
-              {childMenu && childMenuOwner === "eo" && (
+            </li>
+          }
+
+          {/* Expense Management (XMS) */}
+          {
+            <li
+              ref={xmsRef}
+              className="relative"
+              onMouseEnter={handleXmsMouseEnter}
+              onMouseLeave={handleXmsMouseLeave}
+            >
+              <div
+                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/expense-management")
+                  ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
+                  : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
+                  }`}
+                title={isCollapsed ? "Expense Management" : ""}
+              >
+                <Receipt className="h-5 w-5 shrink-0" />
+
+                {!isCollapsed && (
+                  <>
+                    <span className="flex-1">Expense Management</span>
+                    <ChevronRight
+                      className={`h-4 w-4 transition-all duration-300 ${xmsHovered ? "translate-x-1" : ""
+                        }`}
+                    />
+                  </>
+                )}
+              </div>
+
+              {xmsHovered && childMenuOwner === "eo" && (
                 <ul
-                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[305px]" : "left-[480px]"
+                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
                     }`}
-                  style={{ top: `${childTop - 4}px` }}
+                  style={{ top: `${submenuTop}px` }}
                   onMouseEnter={() => {
-                    childHoverRef.current = true;
+                    parentHoverRef.current = true;
                     cancelClose();
                   }}
                   onMouseLeave={() => {
-                    childHoverRef.current = false;
-                    scheduleClose();
-                  }}
-                  onMouseDown={() => {
-                    childHoverRef.current = false;
+                    parentHoverRef.current = false;
                     setChildMenuOwner(null);
                     scheduleClose();
                   }}
                 >
-                  {childMenu.map((child) => (
-                    <li key={child.label} className="group relative">
+                  {filteredXmsSubmenu.map((item) => (
+                    <li
+                      key={item.label}
+                      onMouseEnter={(e) => handleParentHover(item, e)}
+                      onMouseDown={(e) => handleParentLeave()}
+                      className="relative group"
+                    >
                       <NavLink
-                        to={child.to}
+                        to={item.to}
                         className={({ isActive }) =>
                           `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
                             ? "bg-blue-100 text-[#0a174e] font-semibold"
@@ -540,8 +609,8 @@ const Sidebar = ({ isCollapsed }) => {
                           }`
                         }
                       >
-                        <span>{child.label}</span>
-                        {child.children && (
+                        <span>{item.label}</span>
+                        {item.children && (
                           <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
                         )}
                       </NavLink>
@@ -815,6 +884,45 @@ const Sidebar = ({ isCollapsed }) => {
             )}
           </li>
         </ul>
+
+        {childMenu && (
+          <ul
+            className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[305px]" : "left-[480px]"
+              }`}
+            style={{ top: `${childTop - 4}px` }}
+            onMouseEnter={() => {
+              childHoverRef.current = true;
+              cancelClose();
+            }}
+            onMouseLeave={() => {
+              childHoverRef.current = false;
+              scheduleClose();
+            }}
+            onMouseDown={() => {
+              childHoverRef.current = false;
+              scheduleClose();
+            }}
+          >
+            {childMenu.map((child) => (
+              <li key={child.label} className="group relative">
+                <NavLink
+                  to={child.to}
+                  className={({ isActive }) =>
+                    `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
+                      ? "bg-blue-100 text-[#0a174e] font-semibold"
+                      : "hover:bg-[#263383] hover:text-white"
+                    }`
+                  }
+                >
+                  <span>{child.label}</span>
+                  {child.children && (
+                    <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
+                  )}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        )}
       </nav>
     </aside>
   );

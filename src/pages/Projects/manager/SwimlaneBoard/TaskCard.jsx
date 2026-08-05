@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import Avatar from "../Board/Avatar";
+import Avatar from "../../../../components/Board/Avatar";
 
 /* ─────────────────────────────────────────────────────────
    Task card  — same visual style as Board.jsx task cards

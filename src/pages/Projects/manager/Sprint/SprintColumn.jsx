@@ -24,6 +24,8 @@ const SprintColumn = ({
   statuses = [],
   sprints = [],
   permissions,
+  projectId,
+  navigate,
 
   onDropStory,
   onDropTask,
@@ -276,6 +278,8 @@ const SprintColumn = ({
                       onSelectEpic={onSelectEpic}
                       onClick={() => onStoryClick(story.id)}
                       readOnly={isCompleted}
+                      projectId={projectId}
+                      navigate={navigate}
                     />
                   </div>
                 </div>
@@ -293,6 +297,8 @@ const SprintColumn = ({
                         onAddToSprint={onDropTask}
                         onClick={() => onTaskClick(task.id)}
                         readOnly={isCompleted}
+                        projectId={projectId}
+                        navigate={navigate}
                       />
                     ))}
                   </div>
@@ -318,6 +324,8 @@ const SprintColumn = ({
                       onAddToSprint={onDropTask}
                       onClick={() => onTaskClick(task.id)}
                       readOnly={isCompleted}
+                      projectId={projectId}
+                      navigate={navigate}
                     />
                   </div>
                 ))}

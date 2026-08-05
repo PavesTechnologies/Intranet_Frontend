@@ -114,7 +114,7 @@ const mappedEmployees = employeeData.map((emp) => {
 
     gender: emp.gender || "N/A",
 
-    employeeType: emp.employment_status || "Full-Time",
+    employeeType: emp.employment_type || "Full-Time",
 
     dateOfJoining: emp.joining_date || "N/A",
 

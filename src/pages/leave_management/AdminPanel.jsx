@@ -9,6 +9,7 @@ import RevokeLeaveRequests from "./models/RevokeLeaveRequests";
 import { toast } from "react-toastify";
 import { se } from "date-fns/locale";
 import { useWebSocket } from "./websockets/WebSocketProvider.jsx";
+import { useLeaveWebSocket } from "./websockets/useLeaveWebSocket";
 import { set } from "date-fns";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
@@ -117,6 +118,16 @@ const AdminPanel = ({ employeeId }) => {
   useEffect(() => {
     fetchRevokeRequests();
   }, [fetchRevokeRequests]);
+
+  // ✅ Subscribed here (not inside RevokeLeaveRequests) so the very first
+  // revoke request is caught even while the table is unmounted (it only
+  // renders once revokeRequests.length > 0).
+  useLeaveWebSocket(
+    "manager-update",
+    ["REVOKE_REQUESTED"],
+    fetchRevokeRequests,
+  );
+
   // Subscribe to WebSocket for real-time updates
   // In AdminPanel.js
   console.log("leavered", leaveApprovalRef.current);

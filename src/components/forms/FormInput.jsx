@@ -13,12 +13,13 @@ const FormInput = ({
   error = "",
   className = "",
   inputClassName = "",
+  labelClassName = "",
   requiredMark = false,
   ...rest
 }) => (
   <div className={`space-y-1 ${className}`.trim()}>
     {label && (
-      <label htmlFor={name} className={Fonts.label}>
+      <label htmlFor={name} className={labelClassName || Fonts.label}>
         {label}
         {requiredMark ? <span className="ml-1 text-red-500">*</span> : null}
       </label>
