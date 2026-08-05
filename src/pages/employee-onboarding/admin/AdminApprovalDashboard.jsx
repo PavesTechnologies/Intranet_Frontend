@@ -8,7 +8,6 @@ import {
   XCircle,
   PauseCircle,
   Clock,
-  Loader2,
 } from "lucide-react";
 import { ViewIcon } from "../../../components/icons/ActionIcons";
 import { useNavigate, Navigate } from "react-router-dom";
@@ -16,6 +15,14 @@ import api from "../../../api/axiosInstance";
 import Pagination from "../../../components/Pagination/pagination";
 import {useAuth} from "../../../contexts/AuthContext";
 import { KPICard } from "../../../components/kpi/KPI";
+import FilterCard from "../../../components/ui/FilterCard";
+import SearchInput from "../../../components/filter/Searchbar";
+import GenericTable from "../../../components/Table/table";
+import Button from "../../../components/Button/Button";
+import StatusBadge from "../../../components/status/statusbadge";
+
+const filterButtonClassName =
+  "w-full cursor-default rounded-lg border border-gray-300 bg-white py-2.5 pl-4 pr-10 text-left text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-[#0A0082]/20 focus:border-[#0A0082]";
 
 /* ============================
    ADMIN APPROVAL DASHBOARD
@@ -126,15 +133,36 @@ if (!authLoading && !isAuthorizedManager) {
   //   return <div className="p-10 text-center">Loading admin approvals...</div>;
   // }
 
+  const tableHeaders = [
+    "Candidate Name",
+    "Email",
+    "Role",
+    "Approval Status",
+    "Requested By",
+    "Action",
+  ];
+  const tableColumns = ["name", "email", "role", "status", "requestedBy", "action"];
+  const tableRows = paginatedData.map((row) => ({
+    name: `${row.first_name}${row.middle_name ? ` ${row.middle_name}` : ""} ${row.last_name}`,
+    email: row.mail,
+    role: row.designation,
+    status: <StatusBadge label={getStatus(row)} size="sm" />,
+    requestedBy: row.requested_by_name,
+    action: (
+      <Button
+        variant="outline"
+        size="small"
+        onClick={() => navigate(`/employee-onboarding/admin/offer/${row.user_uuid}`)}
+        aria-label="View offer"
+        title="View offer"
+      >
+        <ViewIcon className="h-4 w-4" />
+      </Button>
+    ),
+  }));
+
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-<div className="flex justify-between items-center">
-  
-
-  
-</div>
-
+    <div className="px-6 pb-6 space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatCard
@@ -174,90 +202,38 @@ if (!authLoading && !isAuthorizedManager) {
       </div>
 
       {/* Search & Filter */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <input
-          type="text"
-          placeholder="Search by candidate name... or Role"
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="w-full md:w-1/3 px-3 py-2 border rounded-lg"
-        />
-
-        <FilterListbox
-          options={[{value:"ALL",label:"All Status"},{value:"PENDING",label:"Pending"},{value:"APPROVED",label:"Approved"},{value:"REJECTED",label:"Rejected"},{value:"ON_HOLD",label:"On Hold"}]}
-          value={statusFilter}
-          onChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}
-        />
-      </div>
+      <FilterCard description="Narrow approval requests by candidate name, role, or status.">
+        <div className="w-full md:w-80">
+          <SearchInput
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+            placeholder="Search by candidate name... or Role"
+            className="h-[42px]"
+          />
+        </div>
+        <div className="w-full sm:w-56">
+          <FilterListbox
+            buttonClassName={filterButtonClassName}
+            options={[{value:"ALL",label:"All Status"},{value:"PENDING",label:"Pending"},{value:"APPROVED",label:"Approved"},{value:"REJECTED",label:"Rejected"},{value:"ON_HOLD",label:"On Hold"}]}
+            value={statusFilter}
+            onChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}
+          />
+        </div>
+      </FilterCard>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-indigo-900 text-white">
-            <tr>
-              <th className="px-4 py-3 text-left">Candidate Name</th>
-              <th className="px-4 py-3 text-center">Email</th>
-              <th className="px-4 py-3 text-center">Role</th>
-              <th className="px-4 py-3 text-center">Approval Status</th>
-              <th className="px-4 py-3">requested by</th>
-              <th className="px-4 py-3 text-center">Action</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan="6" className="py-10 text-center">
-                  <Loader2 className="h-6 w-6 mx-auto animate-spin text-indigo-600" />
-                </td>
-              </tr>
-            ) : filteredData.length === 0 ? (
-              <tr>
-                <td colSpan="6" className="py-10 text-center text-gray-500">
-                  No approval requests found
-                </td>
-              </tr>
-            ) : (
-              paginatedData.map((row) => (
-                <tr key={row.id} className="border-b">
-                    <td className="px-4 py-3">
-                  {row.first_name}{row.middle_name ? ` ${row.middle_name}` : ""} {row.last_name}
-                </td>
-                <td className="px-4 py-3">{row.mail}</td>
-                <td className="px-4 py-3">{row.designation}</td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={getStatus(row)} />
-                </td>
-                <td className="px-4 py-3">{row.requested_by_name}</td>
-                <td className="px-4 py-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigate(`/employee-onboarding/admin/offer/${row.user_uuid}`)
-                    }
-                    className="rounded-md bg-gray-100 p-1.5 text-gray-700 transition hover:bg-gray-200 hover:text-gray-900"
-                    aria-label="View offer"
-                    title="View offer"
-                  >
-                    <ViewIcon className="h-4 w-4" />
-                  </button>
-                </td>
-              </tr>
-              )
-            ))}
-
-            {/* {! loading && filteredData.length === 0 && (
-              <tr>
-                <td colSpan="6" className="text-center py-6 text-gray-500">
-                  No approval requests found
-                </td>
-              </tr>
-            )} */}
-          </tbody>
-        </table>
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="w-full overflow-x-auto">
+          <GenericTable
+            headers={tableHeaders}
+            rows={tableRows}
+            columns={tableColumns}
+            loading={loading}
+          />
+        </div>
       </div>
       {filteredData.length > PAGE_SIZE && (
         <Pagination
@@ -293,23 +269,5 @@ function StatCard({
         className="h-full w-full bg-white border-black/20 shadow-sm hover:shadow-xl"
       />
     </button>
-  );
-}
-
-/* ---------- STATUS BADGE ---------- */
-function StatusBadge({ status }) {
-  const styles = {
-    APPROVED: "bg-green-100 text-green-700",
-    REJECTED: "bg-red-100 text-red-700",
-    ON_HOLD: "bg-yellow-100 text-yellow-700",
-    PENDING: "bg-gray-100 text-gray-700",
-  };
-
-  return (
-    <span
-      className={`px-3 py-1 rounded-full text-sm font-medium ${styles[status]}`}
-    >
-      {status}
-    </span>
   );
 }
