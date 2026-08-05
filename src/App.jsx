@@ -419,37 +419,37 @@ const AppRoutes = () => {
             element={<MonthlyTSReport />}
           />
           <Route path="/timesheets/history" element={<TimesheetHistory />} />
-          {/* Account Receivable */}
+          {/* Account Receivable (Super Admin Only) */}
           <Route path="/account-receivable/*" element={<AccountReceivableLayout />}>
             <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<AccountReceivableDashboard />} />
+            <Route path="dashboard" element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><AccountReceivableDashboard /></ProtectedRoute>} />
             <Route
               path="project-billing-setup"
               element={<Navigate to="overview" replace />}
             />
             <Route
               path="project-billing-setup/overview"
-              element={<Overview />}
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><Overview /></ProtectedRoute>}
             />
             <Route
               path="project-billing-setup/configurations"
-              element={<BillingConfigurations />}
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingConfigurations /></ProtectedRoute>}
             />
             <Route
               path="project-billing-setup/configurations/new"
-              element={<NewConfigurationWizard />}
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><NewConfigurationWizard /></ProtectedRoute>}
             />
             <Route
               path="project-billing-setup/configurations/:configId"
-              element={<NewConfigurationWizard />}
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><NewConfigurationWizard /></ProtectedRoute>}
             />
             <Route
               path="project-billing-setup/history"
-              element={<ConfigurationHistory />}
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><ConfigurationHistory /></ProtectedRoute>}
             />
             <Route
               path="billing-data-acquisition"
-              element={<BillingDataAcquisition />}
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingDataAcquisition /></ProtectedRoute>}
             />
           </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />

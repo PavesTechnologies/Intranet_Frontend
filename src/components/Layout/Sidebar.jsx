@@ -158,6 +158,7 @@ const Sidebar = ({ isCollapsed }) => {
 
   // Role checks
   const isAdmin = hasRole(["ADMIN", "SUPER_ADMIN"]);
+  const isSuperAdmin = hasRole(["SUPER_ADMIN"]);
   const isRM = hasRole(["RESOURCE_MANAGER"]);
   const isPM = hasRole(["PROJECT_MANAGER"]);
   const isDM = hasRole(["DELIVERY_MANAGER"]);
@@ -781,6 +782,7 @@ const Sidebar = ({ isCollapsed }) => {
             );
           })}
 
+          {isSuperAdmin && (
           <li
             ref={arRef}
             className="relative"
@@ -883,6 +885,7 @@ const Sidebar = ({ isCollapsed }) => {
               </ul>
             )}
           </li>
+          )}
         </ul>
 
         {childMenu && (
