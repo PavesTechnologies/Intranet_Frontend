@@ -80,7 +80,7 @@ const employeeMap = Object.fromEntries(
 );
 
 const mappedEmployees = employeeData.map((emp) => {
-  console.log("Raw Employee Data:", emp);
+  // console.log("Raw Employee Data:", emp);
 
   return {
     ...emp,

@@ -168,7 +168,7 @@ api.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      console.log("🔄 Refreshing access token...");
+      // console.log("🔄 Refreshing access token...");
 
       // ─────────────────────────────────────
       // REFRESH TOKEN API
@@ -198,7 +198,7 @@ api.interceptors.response.use(
       originalRequest.headers.Authorization =
         `Bearer ${newAccessToken}`;
 
-      console.log("✅ Token refreshed successfully");
+      // console.log("✅ Token refreshed successfully");
 
       return api(originalRequest);
 

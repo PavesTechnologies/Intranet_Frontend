@@ -36,7 +36,7 @@ const CompOffBalanceRequests = ({ managerId }) => {
             setPendingCompOffs(
                 Array.isArray(res.data) ? res.data : res.data?.data || []
             );
-            console.log("Fetched Comp-Off requests:", res.data);
+            // console.log("Fetched Comp-Off requests:", res.data);
         } catch {
             toast.error("Failed to fetch Comp-Off requests.");
             setPendingCompOffs([]);

@@ -364,7 +364,7 @@ export default function RequestLeaveModal({
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       .then((response) => {
-        console.log(response.data.data);
+        // console.log(response.data.data);
         setBalances(response.data.data);
         setLoadingBalances(false);
       })

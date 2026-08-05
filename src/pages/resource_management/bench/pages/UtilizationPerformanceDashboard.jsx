@@ -316,14 +316,14 @@ const UtilizationPerformanceDashboard = () => {
          try {
             setIsResourceLoading(true);
             const data = await utilizationService.getRMSResources(currentPage - 1, ITEMS_PER_PAGE, startDate, endDate);
-            console.log('[Resource Capability] Raw API response:', data);
+            // console.log('[Resource Capability] Raw API response:', data);
 
             if (data && data.content) {
                 let content = data.content;
                 if (searchQuery) {
                    content = content.filter(res => res.resourceName?.toLowerCase().includes(searchQuery.toLowerCase()));
                 }
-                console.log('[Resource Capability] Transformed table rows:', content);
+                // console.log('[Resource Capability] Transformed table rows:', content);
                 setPaginatedResources(content);
                 setTotalResourcePages(data.totalPages || 1);
             } else if (Array.isArray(data)) {
@@ -331,7 +331,7 @@ const UtilizationPerformanceDashboard = () => {
                 if (searchQuery) {
                    content = content.filter(res => res.resourceName?.toLowerCase().includes(searchQuery.toLowerCase()));
                 }
-                console.log('[Resource Capability] Transformed table rows:', content);
+                // console.log('[Resource Capability] Transformed table rows:', content);
                 setPaginatedResources(content);
                 setTotalResourcePages(1);
             } else {

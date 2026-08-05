@@ -482,7 +482,7 @@ const AssetDetail = () => {
       notify.success(res.message || "Record deleted");
       await fetchData();
     } catch (err) {
-      console.log(err);
+      // console.log(err);
       notify.error(err, "Failed to delete record");
     } finally {
       setDeleteLoading(false);

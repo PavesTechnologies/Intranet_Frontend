@@ -358,7 +358,7 @@ const RoleOffSidePanel = ({
           ...form,
           reviewConfirmed: form.reviewConfirmed,
         });
-        console.log("SUBMIT RESPONSE:", response);
+        // console.log("SUBMIT RESPONSE:", response);
         if (response?.requiresConfirmation && !form.reviewConfirmed) {
           setReviewState(response);
           setForm((prev) => ({

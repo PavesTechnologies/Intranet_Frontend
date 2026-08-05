@@ -373,7 +373,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
               },
             },
           );
-          console.log("Recalculate result: ", res);
+          // console.log("Recalculate result: ", res);
         } catch (err) {
           console.error("Error approving leave request:", err);
         }
@@ -433,7 +433,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
       );
       return;
     }
-    console.log("handleDecision", { action, leaveId, comment, managerId });
+    // console.log("handleDecision", { action, leaveId, comment, managerId });
     setLoading(true);
     try {
       await api.put(
@@ -476,7 +476,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
               },
             },
           );
-          console.log("Recalculated availability result: ", res);
+          // console.log("Recalculated availability result: ", res);
         } catch (err) {
           console.error("Failed to recalculate availability", err);
         }
@@ -767,7 +767,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
             ) : (
               // State 3: Render the data rows if data exists
               paginatedRequests.map((request) => {
-                console.log("request editing ", request);
+                // console.log("request editing ", request);
                 const typeObj =
                   allLeaveTypes.find(
                     (t) => t.leaveName === request.leaveName,

@@ -106,7 +106,7 @@ const CreateUserStory = ({ onClose }) => {
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      console.log("Story created:", res.data);
+      // console.log("Story created:", res.data);
       onClose();
     } catch (error) {
       console.error("Error creating story:", error);

@@ -221,10 +221,10 @@ useEffect(() => {
           )?.education_uuid || "",
       }));
 
-    console.log(
-      "FINAL EDUCATION TYPES",
-      formattedMappings
-    );
+    // console.log(
+      // "FINAL EDUCATION TYPES",
+      // formattedMappings
+    // );
 
     setEducationTypes(
       formattedMappings
@@ -276,10 +276,10 @@ useEffect(() => {
     const latestDocs =
       hrData.identity_documents || [];
 
-    console.log(
-      "UPDATED HR DATA",
-      latestDocs
-    );
+    // console.log(
+      // "UPDATED HR DATA",
+      // latestDocs
+    // );
 
   }, [hrData]);
 
@@ -288,10 +288,10 @@ useEffect(() => {
    
     // Use pre-fetched data from parent — no API calls needed
     const data = hrData || {};
-    console.log(
-  "HR EDUCATION DOCS",
-  hrData.education_documents
-);
+    // console.log(
+  // "HR EDUCATION DOCS",
+  // hrData.education_documents
+// );
     
     /* ---- Map Education Documents ---- */
     const eduDocs =
@@ -429,10 +429,10 @@ setExperienceDocs(expDocs);
 const countryIdentityTypes = identityTypes || [];
 
 const existingDocs = data.identity_documents || [];
-console.log(
-  "LATEST DOCS",
-  existingDocs
-);
+// console.log(
+  // "LATEST DOCS",
+  // existingDocs
+// );
 
 const idDocs = countryIdentityTypes.map((typeObj, idx) => {
 
@@ -542,10 +542,10 @@ const response = await api.get(
 
       const result = response.data;
 
-console.log(
-  "EDUCATION TYPES API",
-  result
-);
+// console.log(
+  // "EDUCATION TYPES API",
+  // result
+// );
 
 // ✅ HANDLE DIFFERENT RESPONSE SHAPES
 const mappings =
@@ -554,10 +554,10 @@ const mappings =
   result.mappings ||
   result ||
   [];
-  console.log(
-  "FINAL EDUCATION TYPES",
-  mappings
-);
+  // console.log(
+  // "FINAL EDUCATION TYPES",
+  // mappings
+// );
 
 const formattedMappings =
   (Array.isArray(mappings)
@@ -586,16 +586,16 @@ const formattedMappings =
       "Upload File",
   }));
 
-console.log(
-  "FORMATTED EDUCATION TYPES",
-  formattedMappings
-);
+// console.log(
+  // "FORMATTED EDUCATION TYPES",
+  // formattedMappings
+// );
 
 setFormattedEducationTypes(formattedMappings);
-console.log(
-  "FINAL EDUCATION TYPES",
-  formattedMappings
-);
+// console.log(
+  // "FINAL EDUCATION TYPES",
+  // formattedMappings
+// );
     } catch (err) {
 
       console.error(
@@ -866,10 +866,10 @@ console.log(
           }
         );
 
-        console.log(
-          "EDUCATION MASTERS",
-          response.data
-        );
+        // console.log(
+          // "EDUCATION MASTERS",
+          // response.data
+        // );
 
         setEducationMasters(
           Array.isArray(response.data)
@@ -1482,7 +1482,7 @@ if (uploadModal.category === "experience") {
       debugEntries[key] = value instanceof File ? value.name : value;
     }
   });
-  console.log("EXPERIENCE PAYLOAD:", debugEntries);
+  // console.log("EXPERIENCE PAYLOAD:", debugEntries);
 
   let response;
 
@@ -1582,7 +1582,7 @@ if (uploadModal.category === "identity") {
 }
 
   formData.append("user_uuid", user_uuid);
-console.log("FINAL UPLOAD DATA", uploadFormData);
+// console.log("FINAL UPLOAD DATA", uploadFormData);
 
 formData.append(
   "mapping_uuid",
@@ -1612,12 +1612,12 @@ formData.append(
   // ✅ UPDATE
   if (uploadModal.docId) {
     apiUrl = `${BASE_URL}/identity/employee-document/${uploadModal.docId}`;
-    console.log("DEBUG [Identity Upload] - Action: UPDATE");
-    console.log("DEBUG [Identity Upload] - API URL:", apiUrl);
-    console.log("DEBUG [Identity Upload] - uploadModal.docId:", uploadModal.docId);
-    console.log("DEBUG [Identity Upload] - document_uuid:", uploadFormData.document_uuid || uploadModal.docId);
-    console.log("DEBUG [Identity Upload] - mapping_uuid:", uploadFormData.mapping_uuid);
-    console.log("DEBUG [Identity Upload] - selected record:", uploadFormData);
+    // console.log("DEBUG [Identity Upload] - Action: UPDATE");
+    // console.log("DEBUG [Identity Upload] - API URL:", apiUrl);
+    // console.log("DEBUG [Identity Upload] - uploadModal.docId:", uploadModal.docId);
+    // console.log("DEBUG [Identity Upload] - document_uuid:", uploadFormData.document_uuid || uploadModal.docId);
+    // console.log("DEBUG [Identity Upload] - mapping_uuid:", uploadFormData.mapping_uuid);
+    // console.log("DEBUG [Identity Upload] - selected record:", uploadFormData);
 
     response = await api.put(
       apiUrl,
@@ -1628,12 +1628,12 @@ formData.append(
   // ✅ CREATE
   else {
     apiUrl = `${BASE_URL}/employee-upload/identity-documents`;
-    console.log("DEBUG [Identity Upload] - Action: CREATE");
-    console.log("DEBUG [Identity Upload] - API URL:", apiUrl);
-    console.log("DEBUG [Identity Upload] - uploadModal.docId:", uploadModal.docId);
-    console.log("DEBUG [Identity Upload] - document_uuid: null (New Document)");
-    console.log("DEBUG [Identity Upload] - mapping_uuid:", uploadFormData.mapping_uuid);
-    console.log("DEBUG [Identity Upload] - selected record:", uploadFormData);
+    // console.log("DEBUG [Identity Upload] - Action: CREATE");
+    // console.log("DEBUG [Identity Upload] - API URL:", apiUrl);
+    // console.log("DEBUG [Identity Upload] - uploadModal.docId:", uploadModal.docId);
+    // console.log("DEBUG [Identity Upload] - document_uuid: null (New Document)");
+    // console.log("DEBUG [Identity Upload] - mapping_uuid:", uploadFormData.mapping_uuid);
+    // console.log("DEBUG [Identity Upload] - selected record:", uploadFormData);
 
     response = await api.post(
       apiUrl,
@@ -1644,7 +1644,7 @@ formData.append(
 
   const responseData = response?.data || {};
   const returnedDocumentUuid = responseData?.document_uuid || responseData?.data?.document_uuid || responseData?.identity_uuid || null;
-  console.log("DEBUG [Identity Upload] - Returned document_uuid:", returnedDocumentUuid);
+  // console.log("DEBUG [Identity Upload] - Returned document_uuid:", returnedDocumentUuid);
 
   const newFilePath = uploadFile
     ? URL.createObjectURL(uploadFile)
@@ -1927,10 +1927,10 @@ formattedEducationTypes.find(
         doc.education_name
     );
 
-  console.log(
-    "MATCHED EDUCATION",
-    selectedEducation
-  );
+  // console.log(
+    // "MATCHED EDUCATION",
+    // selectedEducation
+  // );
 
   if (selectedEducation) {
 

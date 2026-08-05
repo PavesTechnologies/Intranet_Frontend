@@ -185,7 +185,7 @@ const AssetList = () => {
         quantity: quantity,
         status: editingAsset.status || "ACTIVE",
       };
-      console.log("Update payload (JSON):", jsonPayload);
+      // console.log("Update payload (JSON):", jsonPayload);
       savePromise = updateClientAsset(editingAsset.assetId, jsonPayload);
     } else {
       // POST uses multipart/form-data (supports file upload)
@@ -199,7 +199,7 @@ const AssetList = () => {
       if (serialFile) {
         formPayload.append("serialFile", serialFile);
       }
-      console.log("Create payload (FormData):", formPayload);
+      // console.log("Create payload (FormData):", formPayload);
       savePromise = createClientAsset(formPayload, clientId, true);
     }
 

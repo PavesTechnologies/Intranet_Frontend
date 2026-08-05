@@ -60,7 +60,7 @@ const CreateEpic = ({ onClose }) => {
     api
       .post(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/epics`, payload)
       .then((res) => {
-        console.log("Epic created:", res.data);
+        // console.log("Epic created:", res.data);
         setShowSuccess(true);
         setTimeout(() => {
           setShowSuccess(false);

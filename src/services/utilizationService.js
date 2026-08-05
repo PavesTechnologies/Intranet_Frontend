@@ -45,7 +45,7 @@ export const utilizationService = {
   getUtilizationSummary: async (params = {}) => {
     try {
       const data = await getUtilization("/api/utilization/summary", params);
-      console.log('[Utilization Hub] Summary successfully internalized:', data);
+      // console.log('[Utilization Hub] Summary successfully internalized:', data);
       return data;
     } catch (error) {
       console.error('[Utilization Hub] CRITICAL: Failed to load utilization summary.');
