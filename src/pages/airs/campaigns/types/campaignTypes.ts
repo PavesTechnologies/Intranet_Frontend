@@ -214,7 +214,11 @@ export interface DeadLetterQueueEntryResponse {
   final_error_message: string;
   retry_count: number;
   moved_to_dlq_at: string;
+  last_attempted_at: string | null;
   campaign_candidate_id: string | null;
+  replay_supported: boolean;
+  replayed_at: string | null;
+  resolution_notes: string | null;
 }
 
 export interface CampaignDetailResponse {
