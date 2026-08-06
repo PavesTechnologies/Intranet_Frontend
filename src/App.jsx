@@ -23,27 +23,24 @@ import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
 
 // Accounts Payable
+import { AP_ROUTES } from "./pages/accounts-payable/constants/routes";
+import { AP_ALL_ROLES } from "./pages/accounts-payable/constants/apRoles";
 import APDashboardPage from "./pages/accounts-payable/dashboard/pages/APDashboardPage.jsx";
-// RBAC temporarily disabled for AP module development — restore this import to re-enable AP role checks
-// import { AP_ALL_ROLES, AP_CLERK_PLUS_ROLES, AP_APPROVER_PLUS_ROLES, AP_ROLES } from "./pages/accounts-payable/constants/apRoles";
-import PendingApprovalsPage from "./pages/accounts-payable/approval/pages/PendingApprovalsPage.jsx";
-import ApprovalHistoryPage from "./pages/accounts-payable/approval/pages/ApprovalHistoryPage.jsx";
-import APApprovalRulesPage from "./pages/accounts-payable/approval/pages/ApprovalRulesPage.jsx";
-import InvoiceInboxPage from "./pages/accounts-payable/invoice/pages/InvoiceInboxPage.jsx";
-import InvoiceListPage from "./pages/accounts-payable/invoice/pages/InvoiceListPage.jsx";
-import InvoiceDetailPage from "./pages/accounts-payable/invoice/pages/InvoiceDetailPage.jsx";
 import VendorListPage from "./pages/accounts-payable/vendor/pages/VendorListPage.jsx";
 import VendorDetailPage from "./pages/accounts-payable/vendor/pages/VendorDetailPage.jsx";
-import VendorRegistrationPage from "./pages/accounts-payable/vendor/pages/VendorRegistrationPage.jsx";
-import ExceptionCenterPage from "./pages/accounts-payable/exception/pages/ExceptionCenterPage.jsx";
-import APReportsPage from "./pages/accounts-payable/reports/pages/APReportsPage.jsx";
-import PaymentQueuePage from "./pages/accounts-payable/payment/pages/PaymentQueuePage.jsx";
-import PaymentProcessingPage from "./pages/accounts-payable/payment/pages/PaymentProcessingPage.jsx";
-import PaymentAllocationPage from "./pages/accounts-payable/payment/pages/PaymentAllocationPage.jsx";
+import VendorOnboardingPage from "./pages/accounts-payable/vendor/pages/VendorOnboardingPage.jsx";
+import VendorUpdatePage from "./pages/accounts-payable/vendor/pages/VendorUpdatePage.jsx";
+import InvoiceUploadPage from "./pages/accounts-payable/invoice/pages/InvoiceUploadPage.jsx";
+import InvoiceOcrReviewQueuePage from "./pages/accounts-payable/invoice/pages/InvoiceOcrReviewQueuePage.jsx";
+import InvoiceValidationQueuePage from "./pages/accounts-payable/invoice/pages/InvoiceValidationQueuePage.jsx";
+import InvoiceListPage from "./pages/accounts-payable/invoice/pages/InvoiceListPage.jsx";
+import InvoiceDetailPage from "./pages/accounts-payable/invoice/pages/InvoiceDetailPage.jsx";
+import PaymentReadyPage from "./pages/accounts-payable/payment/pages/PaymentReadyPage.jsx";
 import PaymentHistoryPage from "./pages/accounts-payable/payment/pages/PaymentHistoryPage.jsx";
-import TaxRulesPage from "./pages/accounts-payable/administration/pages/TaxRulesPage.jsx";
-import NotificationSettingsPage from "./pages/accounts-payable/administration/pages/NotificationSettingsPage.jsx";
-import APConfigurationPage from "./pages/accounts-payable/administration/pages/APConfigurationPage.jsx";
+import PaymentMarkAsPaidPage from "./pages/accounts-payable/payment/pages/PaymentMarkAsPaidPage.jsx";
+import APReportsPage from "./pages/accounts-payable/reports/pages/APReportsPage.jsx";
+import APSettingsPage from "./pages/accounts-payable/settings/pages/APSettingsPage.jsx";
+
 
 // Resource Management
 import AdminPannel from "./pages/resource_management/pages/admin/AdminPannel.jsx";
@@ -414,167 +411,129 @@ const AppRoutes = () => {
         >
           {/* Main */}
           <Route path="/dashboard" element={<Dashboard />} />
-          {/* Accounts Payable */}
+
+          {/* Accounts Payable — page skeletons only, business logic lands in later phases */}
           <Route
-            path="/accounts-payable"
+            path={AP_ROUTES.DASHBOARD}
             element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_ALL_ROLES} */>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
                 <APDashboardPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/accounts-payable/dashboard"
+            path={AP_ROUTES.VENDOR_LIST}
             element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_ALL_ROLES} */>
-                <APDashboardPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/accounts-payable/vendors"
-            element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_ALL_ROLES} */>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
                 <VendorListPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/accounts-payable/vendors/new"
+            path={AP_ROUTES.VENDOR_ONBOARD}
             element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_CLERK_PLUS_ROLES} */>
-                <VendorRegistrationPage />
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <VendorOnboardingPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/accounts-payable/vendors/:vendorId"
+            path={AP_ROUTES.VENDOR_DETAIL()}
             element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_ALL_ROLES} */>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
                 <VendorDetailPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/accounts-payable/approvals/pending"
+            path={AP_ROUTES.VENDOR_UPDATE()}
             element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_APPROVER_PLUS_ROLES} */>
-                <PendingApprovalsPage />
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <VendorUpdatePage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/accounts-payable/approvals/history"
+            path={AP_ROUTES.INVOICE_UPLOAD}
             element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_APPROVER_PLUS_ROLES} */>
-                <ApprovalHistoryPage />
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <InvoiceUploadPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/accounts-payable/approvals/rules"
+            path={AP_ROUTES.INVOICE_OCR_REVIEW}
             element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={[AP_ROLES.AP_ADMIN]} */>
-                <APApprovalRulesPage />
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <InvoiceOcrReviewQueuePage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/accounts-payable/payments/queue"
+            path={AP_ROUTES.INVOICE_VALIDATION}
             element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_CLERK_PLUS_ROLES} */>
-                <PaymentQueuePage />
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <InvoiceValidationQueuePage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/accounts-payable/payments/processing"
+            path={AP_ROUTES.INVOICE_LIST}
             element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_CLERK_PLUS_ROLES} */>
-                <PaymentProcessingPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/accounts-payable/payments/allocation"
-            element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_CLERK_PLUS_ROLES} */>
-                <PaymentAllocationPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/accounts-payable/payments/history"
-            element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_CLERK_PLUS_ROLES} */>
-                <PaymentHistoryPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/accounts-payable/invoices/inbox"
-            element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_CLERK_PLUS_ROLES} */>
-                <InvoiceInboxPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/accounts-payable/invoices"
-            element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_ALL_ROLES} */>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
                 <InvoiceListPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/accounts-payable/invoices/:invoiceId"
+            path={AP_ROUTES.INVOICE_DETAIL()}
             element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_ALL_ROLES} */>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
                 <InvoiceDetailPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/accounts-payable/exceptions"
+            path={AP_ROUTES.PAYMENT_READY}
             element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_CLERK_PLUS_ROLES} */>
-                <ExceptionCenterPage />
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <PaymentReadyPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/accounts-payable/reports"
+            path={AP_ROUTES.PAYMENT_HISTORY}
             element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={AP_ALL_ROLES} */>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <PaymentHistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.PAYMENT_MARK_PAID()}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <PaymentMarkAsPaidPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.REPORTS}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
                 <APReportsPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/accounts-payable/admin/tax-rules"
+            path={AP_ROUTES.SETTINGS}
             element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={[AP_ROLES.AP_ADMIN]} */>
-                <TaxRulesPage />
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <APSettingsPage />
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/accounts-payable/admin/notifications"
-            element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={[AP_ROLES.AP_ADMIN]} */>
-                <NotificationSettingsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/accounts-payable/admin/config"
-            element={
-              <ProtectedRoute /* RBAC disabled for AP dev: allowedRoles={[AP_ROLES.AP_ADMIN]} */>
-                <APConfigurationPage />
-              </ProtectedRoute>
-            }
-          />
+
           {/* <Route path="/projects/manager" element={<ProjectManager />} /> */}
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/timesheets" element={<TimesheetHistoryPage />} />
