@@ -52,8 +52,8 @@ const StatusOverview = ({ workItems, statuses }) => {
     setChartData(data);
   }, [workItems, statuses, totalItems]);
 
-  console.log("WORK ITEMS:", workItems);
-  console.log("STATUSES:", statuses);
+  // console.log("WORK ITEMS:", workItems);
+  // console.log("STATUSES:", statuses);
 
   const ActiveSliceShape = (props) => {
     const {

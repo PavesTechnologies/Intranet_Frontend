@@ -26,7 +26,7 @@ const SprintBoard = ({ projectId, projectName }) => {
 
   // Debug: log when modal state changes
   useEffect(() => {
-    console.log("🔄 Modal state changed:", { showPendingModal, pendingData });
+    // console.log("🔄 Modal state changed:", { showPendingModal, pendingData });
   }, [showPendingModal, pendingData]);
 
   /** ==============================
@@ -39,7 +39,7 @@ const SprintBoard = ({ projectId, projectName }) => {
         { headers },
       );
 
-      console.log("📘 Stories API Response:", res.data);
+      // console.log("📘 Stories API Response:", res.data);
       const storyList = Array.isArray(res.data)
         ? res.data
         : res.data.content || res.data.stories || [];
@@ -65,7 +65,7 @@ const SprintBoard = ({ projectId, projectName }) => {
         { headers },
       );
 
-      console.log("🏃 Sprint API Response:", res.data);
+      // console.log("🏃 Sprint API Response:", res.data);
 
       // Handle multiple possible backend response formats
       const sprintList = Array.isArray(res.data)

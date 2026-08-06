@@ -25,7 +25,7 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
           },
         },
       );
-      console.log("Recalculate result: ", res);
+      // console.log("Recalculate result: ", res);
     } catch (err) {
       console.error("Failed to calculate resource availability", err);
     }
@@ -144,7 +144,7 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
                   </td>
                   <td className="p-3">
                     {req.days <= 1 ? `${req.days} Day` : `${req.days} Days`}
-                    {console.log("Days requested:", req)}
+                    {/* console.log("Days requested:", req) */}
                   </td>
                   <td className="p-3">{req.reason}</td>
                   <td className="p-3 flex justify-center gap-2">

@@ -262,6 +262,14 @@ import LeaveBalanceJobProgress from "./pages/leave_management/models/LeaveBalanc
 import EmployeeExitDashboard from "./pages/employee-exit/EmployeeExitDashboard.jsx";
 import ExitDetailsPage from "./pages/employee-exit/ExitDetailsPage.jsx";
 
+import AccountReceivableLayout from "./pages/account_receivable/AccountReceivableLayout.jsx";
+import AccountReceivableDashboard from "./pages/account_receivable/Dashboard.jsx";
+import Overview from "./pages/account_receivable/Overview.jsx";
+import BillingConfigurations from "./pages/account_receivable/BillingConfigurations.jsx";
+import ConfigurationHistory from "./pages/account_receivable/ConfigurationHistory.jsx";
+import BillingDataAcquisition from "./pages/account_receivable/BillingDataAcquisition.jsx";
+import NewConfigurationWizard from "./pages/account_receivable/NewConfigurationWizard.jsx";
+
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
 import OnboardingDashboard from "./pages/employee-onboarding/onboarding-task/OnboardingDashboard.jsx";
@@ -295,12 +303,12 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     const hasRole = user?.roles?.some((role) =>
       normalizedAllowedRoles.includes(role.toUpperCase())
     );
-    console.log("ProtectedRoute check:", {
-      isAuthenticated,
-      user,
-      allowedRoles,
-      match: hasRole,
-    });
+    // console.log("ProtectedRoute check:", {
+      // isAuthenticated,
+      // user,
+      // allowedRoles,
+      // match: hasRole,
+    // });
 
     if (!hasRole) {
       return <Navigate to="/unauthorized" replace />;
@@ -595,6 +603,39 @@ const AppRoutes = () => {
             element={<MonthlyTSReport />}
           />
           <Route path="/timesheets/history" element={<TimesheetHistory />} />
+          {/* Account Receivable (Super Admin Only) */}
+          <Route path="/account-receivable/*" element={<AccountReceivableLayout />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><AccountReceivableDashboard /></ProtectedRoute>} />
+            <Route
+              path="project-billing-setup"
+              element={<Navigate to="overview" replace />}
+            />
+            <Route
+              path="project-billing-setup/overview"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><Overview /></ProtectedRoute>}
+            />
+            <Route
+              path="project-billing-setup/configurations"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingConfigurations /></ProtectedRoute>}
+            />
+            <Route
+              path="project-billing-setup/configurations/new"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><NewConfigurationWizard /></ProtectedRoute>}
+            />
+            <Route
+              path="project-billing-setup/configurations/:configId"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><NewConfigurationWizard /></ProtectedRoute>}
+            />
+            <Route
+              path="project-billing-setup/history"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><ConfigurationHistory /></ProtectedRoute>}
+            />
+            <Route
+              path="billing-data-acquisition"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingDataAcquisition /></ProtectedRoute>}
+            />
+          </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/profile/edit" element={<EditProfile />} />

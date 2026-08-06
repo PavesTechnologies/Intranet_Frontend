@@ -97,10 +97,10 @@ const [isDeleting, setIsDeleting] = useState(false);
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/`
     );
 
-    console.log(
-      "Employees API Response:",
-      response.data
-    );
+    // console.log(
+      // "Employees API Response:",
+      // response.data
+    // );
 
     const data = response.data;
 
@@ -138,10 +138,10 @@ const [isDeleting, setIsDeleting] = useState(false);
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/departments/`
     );
 
-    console.log(
-      "Departments API Response:",
-      response.data
-    );
+    // console.log(
+      // "Departments API Response:",
+      // response.data
+    // );
 
     const data = response.data;
 
@@ -168,10 +168,10 @@ const [isDeleting, setIsDeleting] = useState(false);
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/masters/designations/`
     );
 
-    console.log(
-      "Designations API Response:",
-      response.data
-    );
+    // console.log(
+      // "Designations API Response:",
+      // response.data
+    // );
 
     const data = response.data;
 
@@ -383,10 +383,10 @@ const handleExportPreview = async () => {
       `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/api/employees/export-preview`
     );
 
-    console.log(
-      "Export Preview Response:",
-      response.data
-    );
+    // console.log(
+      // "Export Preview Response:",
+      // response.data
+    // );
 
     const result = response.data;
 
@@ -463,9 +463,9 @@ const handleExportPreview = async () => {
   }
 };
 const downloadExcel = async () => {
-console.log(
-  "calling ums api"
-);
+// console.log(
+  // "calling ums api"
+// );
   try {
 
  
@@ -505,9 +505,9 @@ console.log(
         bookType: "xlsx",
         type: "array",
       });
-console.log(
-  "calling ums api"
-);
+// console.log(
+  // "calling ums api"
+// );
     const blob = new Blob(
       [excelBuffer],
       {

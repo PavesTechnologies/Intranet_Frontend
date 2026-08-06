@@ -171,37 +171,34 @@ export default function ExpenseCategoriesPage() {
   const fetchCategories = useCallback(async () => {
     try {
       setLoading(true);
-      const params = {
-        page: currentPage,
-        limit: ITEMS_PER_PAGE,
-        search: searchTerm,
-      };
+      const res = await expenseCategoryService.getAll();
 
-      const res = await expenseCategoryService.getAll(params);
-
-      if (res.data && typeof res.data === "object" && !Array.isArray(res.data)) {
-        const items = res.data.expenseCategories || res.data.content || res.data.data || [];
-        const total = res.data.total !== undefined ? res.data.total : (res.data.totalElements || items.length || 0);
-        setCategories(items);
-        setTotalItems(total);
-        setIsServerPaginated(true);
-      } else if (Array.isArray(res.data)) {
-        setAllCategories(res.data);
-        setIsServerPaginated(false);
-      } else {
-        setCategories([]);
-        setTotalItems(0);
+      let items = [];
+      if (res.data) {
+        if (Array.isArray(res.data)) {
+          items = res.data;
+        } else if (res.data.data && Array.isArray(res.data.data)) {
+          items = res.data.data;
+        } else {
+          items = res.data.expenseCategories || res.data.content || [];
+        }
       }
+
+      setAllCategories(items);
+      setIsServerPaginated(false);
+      setCategories([]);
+      setTotalItems(0);
     } catch (err) {
       console.error("Failed to fetch expense categories:", err);
       const errMsg = err.response?.data?.message || err.response?.data?.detail || "Failed to fetch expense categories.";
       showStatusToast(errMsg, "error");
       setCategories([]);
+      setAllCategories([]);
       setTotalItems(0);
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchTerm]);
+  }, []);
 
   useEffect(() => {
     fetchActiveGlAccounts();
@@ -223,8 +220,28 @@ export default function ExpenseCategoriesPage() {
           const q = searchTerm.toLowerCase();
           return code.includes(q) || name.includes(q) || desc.includes(q) || tax.includes(q);
         });
+
+        // Retrieve active GL Accounts list for sorting
+        const glAccounts = getGlAccountsList();
+        const glMap = new Map(glAccounts.map((acc) => [acc.glAccountId, acc]));
+
+        // Sort by GL Account ID / Code (ascending)
+        const sorted = [...filtered].sort((a, b) => {
+          const glA = glMap.get(a.glAccountId);
+          const glB = glMap.get(b.glAccountId);
+
+          const displayA = glA
+            ? `${glA.glAccountCode} - ${glA.glAccountName}`
+            : (a.glAccountId || "").toString();
+          const displayB = glB
+            ? `${glB.glAccountCode} - ${glB.glAccountName}`
+            : (b.glAccountId || "").toString();
+
+          return displayA.localeCompare(displayB, undefined, { numeric: true, sensitivity: "base" });
+        });
+
         const start = (currentPage - 1) * ITEMS_PER_PAGE;
-        return filtered.slice(start, start + ITEMS_PER_PAGE);
+        return sorted.slice(start, start + ITEMS_PER_PAGE);
       })();
 
   const totalCount = isServerPaginated
@@ -418,9 +435,8 @@ export default function ExpenseCategoriesPage() {
 
       if (displayedCategories.length === 1 && currentPage > 1) {
         setCurrentPage((prev) => prev - 1);
-      } else {
-        fetchCategories();
       }
+      fetchCategories();
     } catch (err) {
       console.error("Error deleting Expense Category:", err);
       const errMsg = err.response?.data?.message || err.response?.data?.detail || "Failed to delete Expense Category.";
@@ -504,10 +520,18 @@ export default function ExpenseCategoriesPage() {
     return rowObj;
   });
 
-  const glAccountOptions = getGlAccountsList().map((acc) => ({
-    value: acc.glAccountId,
-    label: `${acc.glAccountCode} - ${acc.glAccountName}`,
-  }));
+  const glAccountOptions = [...getGlAccountsList()]
+    .sort((a, b) => {
+      const codeA = (a.glAccountCode || "").toString();
+      const codeB = (b.glAccountCode || "").toString();
+      return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: "base" });
+    })
+    .map((acc) => ({
+      value: acc.glAccountId,
+      label: `${acc.glAccountCode} - ${acc.glAccountName}`,
+      code: acc.glAccountCode,
+      name: acc.glAccountName,
+    }));
 
   const selectedGlOption = glAccountOptions.find((opt) => opt.value === formData.glAccountId) || null;
 
@@ -666,6 +690,15 @@ export default function ExpenseCategoriesPage() {
               isSearchable
               styles={customSelectStyles}
               isDisabled={submitting}
+              filterOption={(option, rawInput) => {
+                const input = rawInput.toLowerCase();
+                const data = option.data;
+                const id = (data.value || "").toLowerCase();
+                const code = (data.code || "").toLowerCase();
+                const name = (data.name || "").toLowerCase();
+                const label = (option.label || "").toLowerCase();
+                return id.includes(input) || code.includes(input) || name.includes(input) || label.includes(input);
+              }}
             />
             {formErrors.glAccountId && (
               <span className="text-xs text-red-600 block mt-1">{formErrors.glAccountId}</span>
@@ -687,7 +720,7 @@ export default function ExpenseCategoriesPage() {
               label="Receipt Required?"
               name="receiptRequired"
               value={formData.receiptRequired}
-              onChange={(e) => handleSelectChange("receiptRequired", e.target.value === "true")}
+              onChange={(e) => handleSelectChange("receiptRequired", e.target.value)}
               options={[
                 { label: "Yes", value: true },
                 { label: "No", value: false },

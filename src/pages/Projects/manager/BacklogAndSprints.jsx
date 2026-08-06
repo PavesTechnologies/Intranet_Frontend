@@ -22,6 +22,7 @@ import EditStoryForm from "../../../components/Backlog/EditStoryForm";
 import RightSidePanel from "./Sprint/RightSidePanel";
 import SprintDetailsPanel from "./Sprint/SprintDetailsPanel";
 import SprintPendingModal from "./Sprint/SprintPendingModal";
+import ExcelImportPanel from "./Backlog/ExcelImportPanel";
 import { ca } from "date-fns/locale";
 import { useLocation } from "react-router-dom";
 
@@ -241,7 +242,7 @@ const handleSprintStatus = async (sprintId, action) => {
   // Move Task
   // =======================================
   const handleDropTask = async (taskId, sprintId) => {
-    console.log("handleDropTask called with:", sprintId);
+    // console.log("handleDropTask called with:", sprintId);
     try {
       setTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, sprintId } : t)),
@@ -514,6 +515,17 @@ const handleSprintStatus = async (sprintId, action) => {
             >
               <Plus size={16} /> Create Issue
             </Button>
+
+            <ExcelImportPanel
+              projectId={projectId}
+              projectName={projectName}
+              disabled={!permissions?.canEdit}
+              onImported={() => {
+                fetchStories();
+                fetchTasks();
+                fetchEpics();
+              }}
+            />
           </div>
         </div>
 

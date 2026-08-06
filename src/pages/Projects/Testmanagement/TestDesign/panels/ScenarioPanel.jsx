@@ -150,7 +150,7 @@ export default function ScenarioPanel({
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation(); // Prevents row click
-                            console.log("🗑️ Clicked delete on:", testCase.title); // <-- Trace log
+                            // console.log("🗑️ Clicked delete on:", testCase.title); // <-- Trace log
                             
                             if (onDeleteCase) {
                               onDeleteCase(testCase);
