@@ -55,6 +55,34 @@ export function renderDeterministicStatusBadge(status) {
   return <Badge className={`${tone} font-bold px-3 py-1 text-xs`}>{status}</Badge>;
 }
 
+const AI_EVALUATION_STATUS_TONE = {
+  COMPLETED: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  FAILED: "bg-rose-100 text-rose-800 border-rose-200",
+  IN_PROGRESS: "bg-blue-50 text-blue-700 border-blue-100",
+  PENDING: "bg-amber-50 text-amber-700 border-amber-100",
+};
+
+export function renderAiEvaluationStatusBadge(status) {
+  const tone = AI_EVALUATION_STATUS_TONE[status] || "bg-slate-100 text-slate-600 border-slate-200";
+  return <Badge className={`${tone} font-bold px-3 py-1 text-xs`}>{status || "UNKNOWN"}</Badge>;
+}
+
+const AI_RECOMMENDATION_TONE = {
+  SHORTLIST: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  INTERVIEW: "bg-emerald-50 text-emerald-700 border-emerald-100",
+  MAYBE: "bg-amber-50 text-amber-700 border-amber-100",
+  HOLD: "bg-amber-50 text-amber-700 border-amber-100",
+  REJECT: "bg-rose-100 text-rose-800 border-rose-200",
+};
+
+export function renderAiRecommendationBadge(recommendation) {
+  if (!recommendation) {
+    return <Badge className="bg-slate-100 text-slate-600 border-slate-200 font-bold px-3 py-1 text-xs">-</Badge>;
+  }
+  const tone = AI_RECOMMENDATION_TONE[recommendation] || "bg-slate-100 text-slate-600 border-slate-200";
+  return <Badge className={`${tone} font-bold px-3 py-1 text-xs`}>{recommendation.replace(/_/g, " ")}</Badge>;
+}
+
 const MATCH_TIER_TONE = {
   RELATED: "bg-blue-50 text-blue-700 border-blue-100",
   ADJACENT: "bg-indigo-50 text-indigo-700 border-indigo-100",
