@@ -1,10 +1,9 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Archive, ArrowRight, RotateCcw } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
-import Modal from "../../../../components/ui/Modal";
-import PipelineCandidateScorecardPage from "../../pipeline/PipelineCandidateScorecardPage";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { getResumeById, retryResume, replayResumeDlqEntry } from "../../service/resumeIntake";
 import { renderParseStatusBadge, renderSourceBadge, formatResumeDate } from "../utils/resumeIntakeUtils.jsx";
@@ -25,10 +24,7 @@ const progressColor = (status) => {
 };
 
 export default function ResumeUploadHistoryList({ files, isLoading, onRetried }) {
-  // Candidate whose scorecard is open as a stacked popup ({ candidateId, resume }
-  // or null), opened in-place instead of navigating away — same pattern as
-  // BulkJobDetailModal's "View Candidate" action.
-  const [scorecardCandidate, setScorecardCandidate] = useState(null);
+  const navigate = useNavigate();
 
   // HR_ADMIN can't access the Resume Intake page at all — RECRUITER is the
   // role that actually works this screen, so the retry action is gated to
@@ -162,7 +158,7 @@ export default function ResumeUploadHistoryList({ files, isLoading, onRetried })
               title="View candidate resume"
               onClick={(e) => {
                 e.stopPropagation();
-                setScorecardCandidate({ candidateId: f.candidate_id, resume: f });
+                navigate(`/airs/pipeline/candidates/${f.candidate_id}`, { state: { resume: f } });
               }}
               className="h-8 w-8 !text-blue-600 hover:!text-blue-700 hover:bg-blue-50"
             >
@@ -190,29 +186,11 @@ export default function ResumeUploadHistoryList({ files, isLoading, onRetried })
   });
 
   return (
-    <>
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 mb-6">
-        <div className="font-bold text-[14px] mb-4 text-slate-900">Resume Upload History</div>
-        <div className="overflow-x-auto">
-          <GenericTable headers={headers} rows={rows} columns={columns} loading={false} />
-        </div>
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 mb-6">
+      <div className="font-bold text-[14px] mb-4 text-slate-900">Resume Upload History</div>
+      <div className="overflow-x-auto">
+        <GenericTable headers={headers} rows={rows} columns={columns} loading={false} />
       </div>
-
-      <Modal
-        isOpen={!!scorecardCandidate}
-        onClose={() => setScorecardCandidate(null)}
-        title="Candidate Scorecard"
-        width="1100px"
-      >
-        {scorecardCandidate && (
-          <PipelineCandidateScorecardPage
-            candidateId={scorecardCandidate.candidateId}
-            resumeRow={scorecardCandidate.resume}
-            onBack={() => setScorecardCandidate(null)}
-            variant="modal"
-          />
-        )}
-      </Modal>
-    </>
+    </div>
   );
 }
