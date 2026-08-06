@@ -196,10 +196,8 @@ export const XMS_SUBMENU = [
     to: "/expense-management/masters/expense-categories",
     allowedRoles: XMS_ADMIN,
     children: [
-      { label: "Expense Categories",  to: "/expense-management/masters/expense-categories" },
-      { label: "GL Accounts",         to: "/expense-management/masters/gl-accounts" },
-      { label: "Cost Centers",        to: "/expense-management/masters/cost-centers" },
-      { label: "Cost Center Budgets", to: "/expense-management/masters/cost-center-budgets" },
+      { label: "Categories & Ledger Account", to: "/expense-management/masters/expense-categories" },
+      { label: "Cost Center & Budget Management", to: "/expense-management/masters/cost-center-management" },
       { label: "Projects",            to: "/expense-management/masters/projects" },
       { label: "Clients",             to: "/expense-management/masters/clients" },
       { label: "Currency Management", to: "/expense-management/masters/currency-management" },
