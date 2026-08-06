@@ -1,5 +1,5 @@
-// RBAC temporarily disabled for AP module development — restore this import to re-enable AP role checks
-// import { AP_ALL_ROLES, AP_APPROVER_PLUS_ROLES, AP_ROLES } from "../pages/accounts-payable/constants/apRoles";
+import { AP_ALL_ROLES } from "../pages/accounts-payable/constants/apRoles";
+import { AP_ROUTES } from "../pages/accounts-payable/constants/routes";
 
 /**
  * Canonical role identifiers.
@@ -235,18 +235,26 @@ export const XMS_SUBMENU = [
 
 /**
  * Accounts Payable flyout submenu config.
- * Same shape/rules as EO_SUBMENU — filtered by filterMenuByRole() before rendering.
+ * Same shape/filtering contract as EO_SUBMENU/XMS_SUBMENU above — filtered by
+ * filterMenuByRole() before rendering.
+ *
+ * Unlike EO/XMS, every item here shares AP_ALL_ROLES (no item is visible to "everyone") —
+ * the whole module must stay invisible to any role outside AP_ALL_ROLES, so the sidebar
+ * additionally gates the entire flyout <li> on hasRole(AP_ALL_ROLES) (see Sidebar.jsx),
+ * matching the Account Receivable module's pattern rather than EO/XMS's ungated one.
+ *
+ * Per-item role differentiation (e.g. Vendor Onboarding restricted to Admin/Vendor_Intake)
+ * is deferred to the business-logic phases — see constants/permissions.js's
+ * AP_PERMISSION_ROLES map for the intended per-capability breakdown.
  */
-// RBAC disabled for AP module development: allowedRoles keys commented out below so every
-// item is visible to all authenticated users. Restore the commented allowedRoles + the import
-// above to re-enable per-item role gating.
 export const AP_SUBMENU = [
-  { label: "Dashboard", to: "/accounts-payable/dashboard" /* , allowedRoles: AP_ALL_ROLES */ },
-  { label: "Vendors", to: "/accounts-payable/vendors" /* , allowedRoles: AP_ALL_ROLES */ },
-  { label: "Invoices", to: "/accounts-payable/invoices" /* , allowedRoles: AP_ALL_ROLES */ },
-  { label: "Pending Approvals", to: "/accounts-payable/approvals/pending" /* , allowedRoles: AP_APPROVER_PLUS_ROLES */ },
-  { label: "Payment Queue", to: "/accounts-payable/payments/queue" /* , allowedRoles: AP_ALL_ROLES */ },
-  { label: "Exception Center", to: "/accounts-payable/exceptions" /* , allowedRoles: AP_ALL_ROLES */ },
-  { label: "Reports", to: "/accounts-payable/reports" /* , allowedRoles: AP_ALL_ROLES */ },
-  { label: "Administration", to: "/accounts-payable/admin/tax-rules" /* , allowedRoles: [AP_ROLES.AP_ADMIN] */ },
+  { label: "Dashboard", to: AP_ROUTES.DASHBOARD, allowedRoles: AP_ALL_ROLES },
+  { label: "Vendor Onboarding", to: AP_ROUTES.VENDOR_ONBOARD, allowedRoles: AP_ALL_ROLES },
+  { label: "Vendors", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
+  { label: "Upload Invoice", to: AP_ROUTES.INVOICE_UPLOAD, allowedRoles: AP_ALL_ROLES },
+  { label: "OCR Review Queue", to: AP_ROUTES.INVOICE_OCR_REVIEW, allowedRoles: AP_ALL_ROLES },
+  { label: "Validation Queue", to: AP_ROUTES.INVOICE_VALIDATION, allowedRoles: AP_ALL_ROLES },
+  { label: "All Invoices", to: AP_ROUTES.INVOICE_LIST, allowedRoles: AP_ALL_ROLES },
+  { label: "Ready for Payment", to: AP_ROUTES.PAYMENT_READY, allowedRoles: AP_ALL_ROLES },
+  { label: "Payment History", to: AP_ROUTES.PAYMENT_HISTORY, allowedRoles: AP_ALL_ROLES },
 ];
