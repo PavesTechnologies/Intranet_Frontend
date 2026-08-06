@@ -246,6 +246,9 @@ import BillingConfigurations from "./pages/account_receivable/BillingConfigurati
 import ConfigurationHistory from "./pages/account_receivable/ConfigurationHistory.jsx";
 import BillingDataAcquisition from "./pages/account_receivable/BillingDataAcquisition.jsx";
 import NewConfigurationWizard from "./pages/account_receivable/NewConfigurationWizard.jsx";
+import ToolPricingPage from "./pages/account_receivable/ToolPricingPage.jsx";
+import ProjectToolAssignmentPage from "./pages/account_receivable/ProjectToolAssignmentPage.jsx";
+import ToolChargeAcquisitionPage from "./pages/account_receivable/ToolChargeAcquisitionPage.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -450,6 +453,18 @@ const AppRoutes = () => {
             <Route
               path="billing-data-acquisition"
               element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingDataAcquisition /></ProtectedRoute>}
+            />
+            <Route
+              path="billing-data-acquisition/tool-charges"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><ToolChargeAcquisitionPage /></ProtectedRoute>}
+            />
+            <Route
+              path="project-billing-setup/tool-pricing"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><ToolPricingPage /></ProtectedRoute>}
+            />
+            <Route
+              path="project-billing-setup/project-tool-assignments"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><ProjectToolAssignmentPage /></ProtectedRoute>}
             />
           </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />

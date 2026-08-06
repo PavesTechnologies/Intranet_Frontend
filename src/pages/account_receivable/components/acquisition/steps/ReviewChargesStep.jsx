@@ -36,12 +36,16 @@ export default function ReviewChargesStep({ billingContext, acquisitionResults }
 
   const tableRows = unified.map(({ chargeType, record }) => {
     const { quantity, unitPrice } = quantityAndUnitPrice(chargeType, record);
+    // Tool charge records can carry their own currency (Tool Catalog / Assignment convention)
+    // — display it when the backend provides one, falling back to the project's billing
+    // currency otherwise. Other charge types are unaffected.
+    const lineCurrency = record.currency || currency;
     return {
       chargeType: CHARGE_TYPE_LABELS[chargeType],
       description: <span className="text-left">{describeRecord(chargeType, record)}</span>,
       quantity,
-      unitPrice: formatCurrency(unitPrice, currency),
-      amount: formatCurrency(record.amount, currency),
+      unitPrice: formatCurrency(unitPrice, lineCurrency),
+      amount: formatCurrency(record.amount, lineCurrency),
       sourceSystem: SOURCE_SYSTEM_LABELS[chargeType],
       actions: (
         <Button variant="ghost" size="icon" title="View source details" onClick={() => setDetailsRow({ chargeType, record })}>

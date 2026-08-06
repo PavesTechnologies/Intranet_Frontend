@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ChevronRight, Pencil } from "lucide-react";
 
@@ -14,7 +14,6 @@ import SourceSelectionStep from "./components/steps/SourceSelectionStep";
 import EnterpriseProjectSelectionStep from "./components/steps/EnterpriseProjectSelectionStep";
 import ManualProjectCreationStep from "./components/steps/ManualProjectCreationStep";
 import BillingConfigurationStep from "./components/steps/BillingConfigurationStep";
-import ToolBillingStep from "./components/steps/ToolBillingStep";
 import BillingControlsStep from "./components/steps/BillingControlsStep";
 import ReviewActivateStep from "./components/steps/ReviewActivateStep";
 import {
@@ -69,15 +68,6 @@ const INITIAL_WIZARD_DATA = {
       gracePeriodDays: "",
     },
   },
-  toolBilling: {
-    allowToolBillingFromPMS: true,
-    enableToolBilling: false,
-    defaultProrationRule: "NONE",
-    allowOneTimeCharges: false,
-    allowRecurringCharges: false,
-    toolBillingStartDate: "",
-    toolBillingEndDate: "",
-  },
   controls: {
     taxPreference: "",
     taxRegistrationNumber: "",
@@ -98,9 +88,8 @@ const STEPS = [
   { id: 1, label: "Project Source" },
   { id: 2, label: "Project" },
   { id: 3, label: "Billing" },
-  { id: 4, label: "Tools" },
-  { id: 5, label: "Controls" },
-  { id: 6, label: "Review" },
+  { id: 4, label: "Controls" },
+  { id: 5, label: "Review" },
 ];
 
 const CONFIGURATIONS_PATH = "/account-receivable/project-billing-setup/configurations";
@@ -124,9 +113,7 @@ function isStepValid(step, data) {
     case 3:
       // TODO: re-enable required-field gating for Billing Configuration once field entry is finalized.
       return true;
-    case 4:
-      return true;
-    case 5: {
+    case 4: {
       const controls = data.controls || {};
       return Boolean(
         controls.taxPreference && controls.paymentTerms && controls.approvalWorkflow && controls.financeApprover
@@ -186,7 +173,6 @@ export default function NewConfigurationWizard() {
 
   const handleProjectInfoChange = (projectInfo) => setWizardData((prev) => ({ ...prev, projectInfo }));
   const handleBillingConfigChange = (billingConfig) => setWizardData((prev) => ({ ...prev, billingConfig }));
-  const handleToolBillingChange = (toolBilling) => setWizardData((prev) => ({ ...prev, toolBilling }));
   const handleControlsChange = (controls) => setWizardData((prev) => ({ ...prev, controls }));
 
   const handleSaveDraft = () => {
@@ -213,7 +199,9 @@ export default function NewConfigurationWizard() {
   };
 
   const isLastStep = currentStep === STEPS.length;
-  const nextDisabled = isLastStep ? activating : !isStepValid(currentStep, wizardData);
+  const nextDisabled = isLastStep
+    ? activating
+    : !isStepValid(currentStep, wizardData);
 
   const breadcrumbItems = useMemo(
     () => [
@@ -333,20 +321,12 @@ export default function NewConfigurationWizard() {
       {currentStep === 4 && (
         <PageCard>
           <PageCardContent className="p-6">
-            <ToolBillingStep value={wizardData.toolBilling} onChange={handleToolBillingChange} />
-          </PageCardContent>
-        </PageCard>
-      )}
-
-      {currentStep === 5 && (
-        <PageCard>
-          <PageCardContent className="p-6">
             <BillingControlsStep value={wizardData.controls} onChange={handleControlsChange} />
           </PageCardContent>
         </PageCard>
       )}
 
-      {currentStep === 6 && <ReviewActivateStep wizardData={wizardData} />}
+      {currentStep === 5 && <ReviewActivateStep wizardData={wizardData} />}
 
       <WizardNavigation
         isFirstStep={currentStep === 1}

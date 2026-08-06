@@ -4,7 +4,6 @@ import {
   BILLING_TYPE_LABELS,
   BILLING_MODE_LABELS,
   BILLING_FREQUENCIES,
-  PRORATION_RULE_OPTIONS,
   TAX_PREFERENCE_OPTIONS,
   PAYMENT_TERMS_OPTIONS,
   APPROVAL_WORKFLOW_OPTIONS,
@@ -47,7 +46,7 @@ function ReviewSection({ title, rows }) {
 }
 
 export default function ReviewActivateStep({ wizardData }) {
-  const { setupMode, projectInfo = {}, billingConfig = {}, toolBilling = {}, controls = {} } = wizardData;
+  const { setupMode, projectInfo = {}, billingConfig = {}, controls = {} } = wizardData;
 
   const billingTypeLabel = BILLING_TYPE_LABELS[billingConfig.billingType] || "—";
   const billingFrequencyLabel = labelFor(BILLING_FREQUENCIES, billingConfig.billingFrequency);
@@ -111,16 +110,6 @@ export default function ReviewActivateStep({ wizardData }) {
                 { label: "Auto Renewal", value: formatBoolean(billingConfig.subscription?.autoRenewal) },
               ]
             : []),
-        ]}
-      />
-
-      <ReviewSection
-        title="Tool & Software Billing"
-        rows={[
-          { label: "Tool Billing", value: formatBoolean(toolBilling.enableToolBilling) },
-          { label: "Proration Rule", value: labelFor(PRORATION_RULE_OPTIONS, toolBilling.defaultProrationRule) },
-          { label: "One-Time Charges", value: formatBoolean(toolBilling.allowOneTimeCharges) },
-          { label: "Recurring Charges", value: formatBoolean(toolBilling.allowRecurringCharges) },
         ]}
       />
 

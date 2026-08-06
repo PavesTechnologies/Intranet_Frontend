@@ -9,9 +9,13 @@ import {
   CHARGE_TYPE_LABELS,
   CHARGE_TYPE_ORDER,
   describeRecord,
+  quantityAndUnitPrice,
   computeChargeTotals,
 } from "../../../utils/chargeTypes";
 import { BILLING_TYPE_LABELS } from "../../../data/wizardOptions";
+import InvoiceSoftwareSelection from "../InvoiceSoftwareSelection";
+import GeneratedSoftwareCharges from "../GeneratedSoftwareCharges";
+import { InvoiceDraftProvider, useInvoiceDraftContext } from "../../../context/InvoiceDraftContext";
 
 function SummaryRow({ label, value, emphasize }) {
   return (
@@ -24,6 +28,11 @@ function SummaryRow({ label, value, emphasize }) {
   );
 }
 
+// Every row — Labor, Contract, Milestone, Recurring, Expense, Tool, and (Epic 4 Phase 6)
+// Software — renders through this same component using the same quantityAndUnitPrice/
+// describeRecord helpers, so a software line looks and behaves exactly like every other
+// invoice line rather than a special case. The group header (CHARGE_TYPE_LABELS) is the
+// row set's "Type"; Currency is embedded in formatCurrency's symbol per record.
 function ChargeGroup({ chargeType, records, currency }) {
   const [open, setOpen] = useState(false);
   if (!records.length) return null;
@@ -47,26 +56,63 @@ function ChargeGroup({ chargeType, records, currency }) {
 
       {open && (
         <div className="divide-y divide-slate-100 border-t border-slate-100">
-          {records.map((record, index) => (
-            <div key={record.id || index} className="flex items-center justify-between px-4 py-2 text-sm">
-              <span className="text-slate-600">{describeRecord(chargeType, record)}</span>
-              <span className="font-medium text-slate-900">{formatCurrency(record.amount, currency)}</span>
-            </div>
-          ))}
+          {records.map((record, index) => {
+            // Falls back to the project's billing currency when a record has none of its own —
+            // same convention as ReviewChargesStep.jsx's unified table.
+            const lineCurrency = record.currency || currency;
+            const { quantity, unitPrice } = quantityAndUnitPrice(chargeType, record);
+            return (
+              <div key={record.id || index} className="flex items-center justify-between px-4 py-2 text-sm">
+                <span className="text-slate-600">{describeRecord(chargeType, record)}</span>
+                <div className="flex items-center gap-4">
+                  <span className="text-xs text-slate-400">
+                    {quantity} × {formatCurrency(unitPrice, lineCurrency)}
+                  </span>
+                  <span className="font-medium text-slate-900">{formatCurrency(record.amount, lineCurrency)}</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-export default function InvoiceDraftStep({
-  billingContext,
-  selection,
-  acquisitionResults,
-  draft,
-  onOpenDraft,
-}) {
-  const { subtotal } = computeChargeTotals(acquisitionResults);
+// Renders inside InvoiceDraftProvider. Reads/writes InvoiceDraftContext directly so
+// selectedSoftwareItems / generatedSoftwareChargeLines never need prop drilling — Invoice
+// Software Selection (Phase 4) and Software Charge Generation (Phase 5) are untouched; only
+// this integration layer changed.
+function InvoiceDraftStepBody({ billingContext, selection, acquisitionResults, draft, onOpenDraft }) {
+  const { setSelectedSoftwareItems, generatedSoftwareChargeLines } = useInvoiceDraftContext();
+
+  // Normalizes SoftwareChargeLine (assetCode/assetName/calculatedAmount/currencyCode) into the
+  // same {records, amount} shape every other charge type already uses, so it flows through
+  // ChargeGroup and computeChargeTotals unchanged rather than needing parallel logic. amount
+  // and calculatedAmount are always backend values — summing them here is the same plain
+  // aggregation computeChargeTotals already does for every other charge type, not a
+  // recalculation of any line's amount.
+  const softwareRecords = generatedSoftwareChargeLines.map((line) => ({
+    id: line.assetId,
+    assetCode: line.assetCode,
+    assetName: line.assetName,
+    description: line.description,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+    billingBasis: line.billingBasis,
+    amount: line.calculatedAmount,
+    currency: line.currencyCode,
+  }));
+  const draftResults = {
+    ...acquisitionResults,
+    software: {
+      applicable: softwareRecords.length > 0,
+      records: softwareRecords,
+      amount: softwareRecords.reduce((sum, record) => sum + (Number(record.amount) || 0), 0),
+    },
+  };
+
+  const { subtotal } = computeChargeTotals(draftResults);
   const taxRate = billingContext.taxPreference === "Exempt" ? 0 : 0.18;
   const estimatedTax = draft ? draft.estimatedTax : Math.round(subtotal * taxRate);
   const estimatedGrandTotal = draft ? draft.estimatedGrandTotal : subtotal + estimatedTax;
@@ -126,18 +172,47 @@ export default function InvoiceDraftStep({
       <PageCard>
         <PageCardContent className="p-6">
           <h3 className="mb-4 text-sm font-semibold text-slate-900">Draft Details</h3>
+          <p className="mb-4 text-xs text-slate-500">
+            Includes acquired billing data alongside any software, tools, or licenses selected below — every line
+            here contributes to the Subtotal, Estimated Tax, and Estimated Grand Total above.
+          </p>
           <div className="space-y-3">
             {CHARGE_TYPE_ORDER.map((chargeType) => (
               <ChargeGroup
                 key={chargeType}
                 chargeType={chargeType}
-                records={acquisitionResults?.[chargeType]?.records || []}
+                records={draftResults?.[chargeType]?.records || []}
                 currency={billingContext.currency}
               />
             ))}
           </div>
         </PageCardContent>
       </PageCard>
+
+      <PageCard>
+        <PageCardContent className="p-6">
+          <h3 className="mb-1 text-sm font-semibold text-slate-900">Add Software / Tools / Licenses</h3>
+          <p className="mb-4 text-xs text-slate-500">
+            Select RMS-sourced software, tools, or licenses to bill on this invoice. Selected items appear as
+            Software line items in Draft Details above once generated.
+          </p>
+          <InvoiceSoftwareSelection
+            projectId={billingContext.configId}
+            periodFrom={selection.periodFrom}
+            periodTo={selection.periodTo}
+            onSelectionChange={setSelectedSoftwareItems}
+          />
+          <GeneratedSoftwareCharges />
+        </PageCardContent>
+      </PageCard>
     </div>
+  );
+}
+
+export default function InvoiceDraftStep(props) {
+  return (
+    <InvoiceDraftProvider>
+      <InvoiceDraftStepBody {...props} />
+    </InvoiceDraftProvider>
   );
 }
