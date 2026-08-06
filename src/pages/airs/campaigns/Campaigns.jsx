@@ -39,6 +39,7 @@ const DEFAULT_CAMPAIGN_FORM = {
   hiring_manager_id: "",
   recruiter_id: "",
   prompt_template_id: "",
+  ai_evaluate_prompt_id: "",
   deterministic_threshold: 70,
 };
 
@@ -350,6 +351,7 @@ export default function Campaigns() {
       hiring_manager_id: String(campaignForm.hiring_manager_id).trim(),
       recruiter_id: String(campaignForm.recruiter_id).trim(),
       prompt_template_id: String(campaignForm.prompt_template_id || "").trim(),
+      ai_evaluate_prompt_id: String(campaignForm.ai_evaluate_prompt_id || "").trim(),
     };
 
     setIsSubmitting(true);

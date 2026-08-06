@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
-import { getJdParsePromptLookup, getResumeParsePromptLookup } from "../services/promptTemplateService";
+import { getJdParsePromptLookup, getResumeParsePromptLookup, getAiEvaluatePromptLookup } from "../services/promptTemplateService";
 
 const LOOKUP_FETCHERS = {
   "jd-parse": getJdParsePromptLookup,
   "resume-parse": getResumeParsePromptLookup,
+  "ai-evaluate": getAiEvaluatePromptLookup,
 };
 
 // Shared by the Job Description (JD Parsing Prompt) and Hiring Campaign
-// (Resume Parsing Prompt) forms — fetches the active prompt templates for one
-// task type and exposes {value, label} options ready for FilterListbox, plus
-// isLoading so callers can disable the dropdown until options are ready.
+// (Resume Parsing Prompt / AI Evaluation Prompt) forms — fetches the active
+// prompt templates for one task type and exposes {value, label} options ready
+// for FilterListbox, plus isLoading so callers can disable the dropdown until
+// options are ready.
 export default function usePromptTemplateLookup(taskTypeSlug) {
   const [options, setOptions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
