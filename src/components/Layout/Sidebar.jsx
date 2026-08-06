@@ -18,9 +18,11 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "../../contexts/AuthContext";
-import { EO_SUBMENU, XMS_SUBMENU } from "../../config/sidebarConfig";
+import { EO_SUBMENU, XMS_SUBMENU, AP_SUBMENU } from "../../config/sidebarConfig";
 import { filterMenuByRole } from "../../utils/sidebarPermissions";
 import ArModuleIcon from "../icons/ArModuleIcon";
+import ApModuleIcon from "../icons/ApModuleIcon";
+import { AP_ALL_ROLES } from "../../pages/accounts-payable/constants/apRoles";
 // import AIRSLogo from "../icons/AIRSLogo";
 
 const navigation = [
@@ -156,9 +158,16 @@ const Sidebar = ({ isCollapsed }) => {
   // Role-filtered Expense Management (XMS) submenu
   const filteredXmsSubmenu = filterMenuByRole(XMS_SUBMENU, hasRole);
 
+  // Role-filtered Accounts Payable (AP) submenu
+  const filteredApSubmenu = filterMenuByRole(AP_SUBMENU, hasRole);
+
   // Role checks
   const isAdmin = hasRole(["ADMIN", "SUPER_ADMIN"]);
   const isSuperAdmin = hasRole(["SUPER_ADMIN"]);
+  // Whole-module gate: unlike EO/XMS (which have no top-level gate because at least one of
+  // their items has no allowedRoles), AP must stay fully invisible outside AP_ALL_ROLES —
+  // same requirement as Account Receivable's isSuperAdmin gate below.
+  const isApUser = hasRole(AP_ALL_ROLES);
   const isRM = hasRole(["RESOURCE_MANAGER"]);
   const isPM = hasRole(["PROJECT_MANAGER"]);
   const isDM = hasRole(["DELIVERY_MANAGER"]);
@@ -193,6 +202,9 @@ const Sidebar = ({ isCollapsed }) => {
   const [arHovered, setArHovered] = useState(false);
   const arRef = useRef(null);
 
+  const [apHovered, setApHovered] = useState(false);
+  const apRef = useRef(null);
+
   const [submenuTop, setSubmenuTop] = useState(0);
   const hoverTimeout = useRef(null);
   const [childMenu, setChildMenu] = useState(null);
@@ -209,6 +221,7 @@ const Sidebar = ({ isCollapsed }) => {
     setAirsHovered(false);
     setArHovered(false);
     setXmsHovered(false);
+    setApHovered(false);
     setChildMenu(null);
     setChildMenuOwner(null);
   };
@@ -357,6 +370,23 @@ const Sidebar = ({ isCollapsed }) => {
     scheduleClose();
   };
 
+  // --- Handlers for Accounts Payable ---
+  const handleApMouseEnter = () => {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    closeAllSubmenus();
+    if (apRef.current) {
+      const rect = apRef.current.getBoundingClientRect();
+      setSubmenuTop(rect.top);
+    }
+    setApHovered(true);
+  };
+
+  const handleApMouseLeave = () => {
+    hoverTimeout.current = setTimeout(() => {
+      setApHovered(false);
+    }, 200);
+  };
+
   const resourceManagementItems = isAdmin
     ? resourceManagementSubmenu
     : isDM
@@ -370,6 +400,7 @@ const Sidebar = ({ isCollapsed }) => {
     setAirsHovered(false);
     setArHovered(false);
     setXmsHovered(false);
+    setApHovered(false);
   }, [location.pathname]);
 
 
@@ -621,6 +652,65 @@ const Sidebar = ({ isCollapsed }) => {
               )}
             </li>
           }
+
+          {/* Accounts Payable (Admin, Vendor Intake, AP Executive, Finance Executive only) */}
+          {isApUser && (
+          <li
+            ref={apRef}
+            className="relative"
+            onMouseEnter={handleApMouseEnter}
+            onMouseLeave={handleApMouseLeave}
+          >
+            <div
+              className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/accounts-payable")
+                ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
+                : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
+                }`}
+              title={isCollapsed ? "Account Payable" : ""}
+            >
+              <ApModuleIcon className="h-5 w-5 shrink-0" />
+
+              {!isCollapsed && (
+                <>
+                  <span className="flex-1">Account Payable</span>
+                  <ChevronRight
+                    className={`h-4 w-4 transition-all duration-300 ${apHovered ? "translate-x-1" : ""
+                      }`}
+                  />
+                </>
+              )}
+            </div>
+
+            {apHovered && (
+              <ul
+                className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
+                  }`}
+                style={{ top: `${submenuTop}px` }}
+                onMouseEnter={handleApMouseEnter}
+                onMouseLeave={handleApMouseLeave}
+              >
+                {filteredApSubmenu.map((item) => (
+                  <li key={item.label} className="group relative">
+                    <NavLink
+                      to={item.to}
+                      className={({ isActive }) =>
+                        `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
+                          ? "bg-blue-100 text-[#0a174e] font-semibold"
+                          : "hover:bg-[#263383] hover:text-white"
+                        }`
+                      }
+                    >
+                      <span>{item.label}</span>
+                      {item.children && (
+                        <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
+                      )}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+          )}
 
           {/* User Management (Admin Only) */}
           {isAdmin && (
