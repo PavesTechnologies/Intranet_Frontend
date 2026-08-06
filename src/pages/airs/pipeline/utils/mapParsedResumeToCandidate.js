@@ -135,6 +135,7 @@ export function mapParsedResumeToCandidate(raw, fallback = {}) {
       startDate: w.start_date ?? null,
       endDate: w.end_date ?? null,
       isCurrent: !!w.is_current,
+      duration: textOrDash(w.duration_text),
       highlights: (w.description ?? "")
         .split("\n")
         .map((line) => line.trim())
