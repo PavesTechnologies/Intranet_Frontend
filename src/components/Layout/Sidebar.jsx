@@ -135,19 +135,19 @@ const Sidebar = ({ isCollapsed }) => {
     if (!isAllowed) return false;
 
     // Special logic for Projects to handle the "General" role commonality
-   if (item.name === "Projects") {
-  const userRoles = user?.roles?.map((r) => r.toUpperCase()) || [];
+    if (item.name === "Projects") {
+      const userRoles = user?.roles?.map((r) => r.toUpperCase()) || [];
 
-  // Show Projects if user has GENERAL or PROJECT_MANAGER
-  if (
-    userRoles.includes("GENERAL") ||
-    userRoles.includes("PROJECT_MANAGER")
-  ) {
-    return true;
-  }
+      // Show Projects if user has GENERAL or PROJECT_MANAGER
+      if (
+        userRoles.includes("GENERAL") ||
+        userRoles.includes("PROJECT_MANAGER")
+      ) {
+        return true;
+      }
 
-  return false;
-}
+      return false;
+    }
   });
 
   // Role-filtered EO submenu — recomputed whenever the component re-renders with a new user
@@ -157,12 +157,15 @@ const Sidebar = ({ isCollapsed }) => {
   const filteredXmsSubmenu = filterMenuByRole(XMS_SUBMENU, hasRole);
 
   // Role checks
-  const isAdmin = hasRole(["ADMIN", "SUPER_ADMIN"]);
+  const isAdmin = hasRole(["ADMIN"]);
   const isSuperAdmin = hasRole(["SUPER_ADMIN"]);
   const isRM = hasRole(["RESOURCE_MANAGER"]);
   const isPM = hasRole(["PROJECT_MANAGER"]);
   const isDM = hasRole(["DELIVERY_MANAGER"]);
   const isGeneral = hasRole(["GENERAL"]);
+  // Admin with no Resource Manager / Delivery Manager role — skip the
+  // Resource Management submenu and jump straight to Client Management.
+  const isAdminOnly = isAdmin && !isRM && !isDM;
   const airsRBACAccess = hasRole(["HIRING_MANAGER", "HR", "HR_ADMIN", "RECRUITER"]);
   const isHrAdmin = hasRole(["HR_ADMIN"]);
   const isRecruiter = hasRole(["RECRUITER"]);
@@ -214,13 +217,30 @@ const Sidebar = ({ isCollapsed }) => {
   };
 
 
+  // Keeps a hover flyout on-screen: anchors to the trigger's top when there's
+  // room below, otherwise anchors its bottom to the viewport (flips upward).
+  const MENU_ITEM_HEIGHT = 40;
+  const MENU_VERTICAL_PADDING = 20;
+  const VIEWPORT_MARGIN = 8;
+
+  const computeSubmenuTop = (triggerRect, itemCount) => {
+    const menuHeight = itemCount * MENU_ITEM_HEIGHT + MENU_VERTICAL_PADDING;
+    const spaceBelow = window.innerHeight - triggerRect.top;
+
+    if (spaceBelow >= menuHeight + VIEWPORT_MARGIN) {
+      return triggerRect.top;
+    }
+
+    return Math.max(VIEWPORT_MARGIN, window.innerHeight - menuHeight - VIEWPORT_MARGIN);
+  };
+
   // --- Handlers for User Management ---
   const handleUserMouseEnter = () => {
     if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
     closeAllSubmenus();
     if (userManagementRef.current) {
       const rect = userManagementRef.current.getBoundingClientRect();
-      setSubmenuTop(rect.top);
+      setSubmenuTop(computeSubmenuTop(rect, userManagementSubmenu.length));
     }
     setUserHovered(true);
   };
@@ -238,7 +258,7 @@ const Sidebar = ({ isCollapsed }) => {
 
     if (item.children) {
       const rect = e.currentTarget.getBoundingClientRect();
-      setChildTop(rect.top);
+      setChildTop(computeSubmenuTop(rect, item.children.length) + 4);
       setChildMenu(item.children);
       setChildMenuOwner(owner);
     } else {
@@ -282,7 +302,7 @@ const Sidebar = ({ isCollapsed }) => {
     closeAllSubmenus();
     if (rmRef.current) {
       const rect = rmRef.current.getBoundingClientRect();
-      setSubmenuTop(rect.top);
+      setSubmenuTop(computeSubmenuTop(rect, resourceManagementItems.length));
     }
     setRmHovered(true);
   };
@@ -298,15 +318,14 @@ const Sidebar = ({ isCollapsed }) => {
     closeAllSubmenus();
     if (eoRef.current) {
       const rect = eoRef.current.getBoundingClientRect();
-      setSubmenuTop(rect.top);
+      setSubmenuTop(computeSubmenuTop(rect, filteredEoSubmenu.length));
     }
     setEoHovered(true);
   };
 
   const handleEoMouseLeave = () => {
-    hoverTimeout.current = setTimeout(() => {
-      setEoHovered(false);
-    }, 200);
+    parentHoverRef.current = false;
+    scheduleClose();
   };
 
   const handleXmsMouseEnter = () => {
@@ -314,15 +333,14 @@ const Sidebar = ({ isCollapsed }) => {
     closeAllSubmenus();
     if (xmsRef.current) {
       const rect = xmsRef.current.getBoundingClientRect();
-      setSubmenuTop(rect.top);
+      setSubmenuTop(computeSubmenuTop(rect, filteredXmsSubmenu.length));
     }
     setXmsHovered(true);
   };
 
   const handleXmsMouseLeave = () => {
-    hoverTimeout.current = setTimeout(() => {
-      setXmsHovered(false);
-    }, 200);
+    parentHoverRef.current = false;
+    scheduleClose();
   };
 
   // --- Handlers for AI Screening ---
@@ -331,7 +349,7 @@ const Sidebar = ({ isCollapsed }) => {
     closeAllSubmenus();
     if (airsRef.current) {
       const rect = airsRef.current.getBoundingClientRect();
-      setSubmenuTop(rect.top);
+      setSubmenuTop(computeSubmenuTop(rect, filteredAirsSubmenu.length));
     }
     setAirsHovered(true);
   };
@@ -347,7 +365,7 @@ const Sidebar = ({ isCollapsed }) => {
     closeAllSubmenus();
     if (arRef.current) {
       const rect = arRef.current.getBoundingClientRect();
-      setSubmenuTop(rect.top);
+      setSubmenuTop(computeSubmenuTop(rect, accountReceivableSubmenu.length));
     }
     setArHovered(true);
   };
@@ -686,11 +704,11 @@ const Sidebar = ({ isCollapsed }) => {
             <li
               ref={rmRef}
               className="relative"
-              onMouseEnter={handleRmMouseEnter}
-              onMouseLeave={handleRmMouseLeave}
+              onMouseEnter={isAdminOnly ? undefined : handleRmMouseEnter}
+              onMouseLeave={isAdminOnly ? undefined : handleRmMouseLeave}
             >
-              {/* If Admin → Direct Link */}
-              {false ? (
+              {/* Admin-only user → Direct Link to Client Management, no submenu */}
+              {isAdminOnly ? (
                 <Link
                   to="/resource-management"
                   onMouseEnter={closeAllSubmenus}
@@ -783,108 +801,108 @@ const Sidebar = ({ isCollapsed }) => {
           })}
 
           {isSuperAdmin && (
-          <li
-            ref={arRef}
-            className="relative"
-            onMouseEnter={handleArMouseEnter}
-            onMouseLeave={handleArMouseLeave}
-          >
-            <div
-              className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/account-receivable")
-                ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
-                : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
-                }`}
-              title={isCollapsed ? "Account Receivable" : ""}
+            <li
+              ref={arRef}
+              className="relative"
+              onMouseEnter={handleArMouseEnter}
+              onMouseLeave={handleArMouseLeave}
             >
-              <ArModuleIcon className="h-5 w-5 shrink-0" />
+              <div
+                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/account-receivable")
+                  ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
+                  : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
+                  }`}
+                title={isCollapsed ? "Account Receivable" : ""}
+              >
+                <ArModuleIcon className="h-5 w-5 shrink-0" />
 
-              {!isCollapsed && (
-                <>
-                  <span className="flex-1">Account Receivable</span>
-                  <ChevronRight
-                    className={`h-4 w-4 transition-all duration-300 ${arHovered ? "translate-x-1" : ""
-                      }`}
-                  />
-                </>
+                {!isCollapsed && (
+                  <>
+                    <span className="flex-1">Account Receivable</span>
+                    <ChevronRight
+                      className={`h-4 w-4 transition-all duration-300 ${arHovered ? "translate-x-1" : ""
+                        }`}
+                    />
+                  </>
+                )}
+              </div>
+
+              {arHovered && (
+                <ul
+                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
+                    }`}
+                  style={{ top: `${submenuTop}px` }}
+                  onMouseEnter={() => {
+                    parentHoverRef.current = true;
+                    cancelClose();
+                  }}
+                  onMouseLeave={() => {
+                    parentHoverRef.current = false;
+                    scheduleClose();
+                  }}
+                >
+                  {accountReceivableSubmenu.map((item) => (
+                    <li
+                      key={item.label}
+                      className="group relative"
+                      onMouseEnter={(e) => handleParentHover(item, e, "ar")}
+                      onMouseDown={() => handleParentLeave()}
+                    >
+                      <NavLink
+                        to={item.to}
+                        className={({ isActive }) =>
+                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
+                            ? "bg-blue-100 text-[#0a174e] font-semibold"
+                            : "hover:bg-[#263383] hover:text-white"
+                          }`
+                        }
+                      >
+                        <span>{item.label}</span>
+                        {item.children && (
+                          <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
+                        )}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
               )}
-            </div>
-
-            {arHovered && (
-              <ul
-                className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
-                  }`}
-                style={{ top: `${submenuTop}px` }}
-                onMouseEnter={() => {
-                  parentHoverRef.current = true;
-                  cancelClose();
-                }}
-                onMouseLeave={() => {
-                  parentHoverRef.current = false;
-                  scheduleClose();
-                }}
-              >
-                {accountReceivableSubmenu.map((item) => (
-                  <li
-                    key={item.label}
-                    className="group relative"
-                    onMouseEnter={(e) => handleParentHover(item, e, "ar")}
-                    onMouseDown={() => handleParentLeave()}
-                  >
-                    <NavLink
-                      to={item.to}
-                      className={({ isActive }) =>
-                        `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
-                          ? "bg-blue-100 text-[#0a174e] font-semibold"
-                          : "hover:bg-[#263383] hover:text-white"
-                        }`
-                      }
-                    >
-                      <span>{item.label}</span>
-                      {item.children && (
-                        <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
-                      )}
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {childMenu && childMenuOwner === "ar" && (
-              <ul
-                className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[305px]" : "left-[480px]"
-                  }`}
-                style={{ top: `${childTop - 4}px` }}
-                onMouseEnter={() => {
-                  childHoverRef.current = true;
-                  cancelClose();
-                }}
-                onMouseLeave={() => {
-                  childHoverRef.current = false;
-                  scheduleClose();
-                }}
-                onClick={() => {
-                  childHoverRef.current = false;
-                  setChildMenuOwner(null);
-                  scheduleClose();
-                }}
-              >
-                {childMenu.map((child) => (
-                  <li key={child.label} className="group relative">
-                    <NavLink
-                      to={child.to}
-                      className={({ isActive }) =>
-                        `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
-                          ? "bg-blue-100 text-[#0a174e] font-semibold"
-                          : "hover:bg-[#263383] hover:text-white"
-                        }`
-                      }
-                    >
-                      <span>{child.label}</span>
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
+              {childMenu && childMenuOwner === "ar" && (
+                <ul
+                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[305px]" : "left-[480px]"
+                    }`}
+                  style={{ top: `${childTop - 4}px` }}
+                  onMouseEnter={() => {
+                    childHoverRef.current = true;
+                    cancelClose();
+                  }}
+                  onMouseLeave={() => {
+                    childHoverRef.current = false;
+                    scheduleClose();
+                  }}
+                  onClick={() => {
+                    childHoverRef.current = false;
+                    setChildMenuOwner(null);
+                    scheduleClose();
+                  }}
+                >
+                  {childMenu.map((child) => (
+                    <li key={child.label} className="group relative">
+                      <NavLink
+                        to={child.to}
+                        className={({ isActive }) =>
+                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
+                            ? "bg-blue-100 text-[#0a174e] font-semibold"
+                            : "hover:bg-[#263383] hover:text-white"
+                          }`
+                        }
+                      >
+                        <span>{child.label}</span>
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
           )}
         </ul>
 
