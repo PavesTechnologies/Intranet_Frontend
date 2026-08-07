@@ -46,7 +46,7 @@ export default function ResumeTab({ candidate, onExpired }) {
               <div key={i} className="rounded-lg bg-slate-50 border border-slate-200 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[12.5px] font-semibold text-slate-900">{exp.title}</span>
-                  <span className="text-[11px] text-slate-400 shrink-0">{exp.durationYears} yrs</span>
+                  <span className="text-[11px] text-slate-400 shrink-0">{exp.durationLabel}</span>
                 </div>
                 <div className="text-[11.5px] text-slate-500 mb-1.5">{exp.company}</div>
                 <ul className="text-[11.5px] text-slate-700 list-disc pl-4 space-y-0.5">
@@ -89,21 +89,21 @@ export default function ResumeTab({ candidate, onExpired }) {
           {resume.projects.length === 0 ? (
             <div className="text-[12px] text-slate-400">Not extracted from this resume yet.</div>
           ) : (
-          <div className="space-y-2.5">
-            {resume.projects.map((p) => (
-              <div key={p.name} className="rounded-lg bg-slate-50 border border-slate-200 p-3">
-                <div className="text-[12.5px] font-semibold text-slate-900">{p.name}</div>
-                <p className="text-[11.5px] text-slate-600 mt-0.5">{p.description}</p>
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {p.tech.map((t) => (
-                    <Badge key={t} className="bg-indigo-50 text-indigo-700 border-indigo-100 font-medium px-2 py-0.5 text-[10.5px]">
-                      {t}
-                    </Badge>
-                  ))}
+            <div className="space-y-2.5">
+              {resume.projects.map((p) => (
+                <div key={p.name} className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+                  <div className="text-[12.5px] font-semibold text-slate-900">{p.name}</div>
+                  <p className="text-[11.5px] text-slate-600 mt-0.5">{p.description}</p>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {p.tech.map((t) => (
+                      <Badge key={t} className="bg-indigo-50 text-indigo-700 border-indigo-100 font-medium px-2 py-0.5 text-[10.5px]">
+                        {t}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
           )}
         </SectionCard>
       </div>

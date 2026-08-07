@@ -4,7 +4,6 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorState from "@/pages/airs/skill-ontology/components/ErrorState";
 import useSemanticScore from "../../../hooks/useSemanticScore";
 import SemanticSummaryCard from "./components/SemanticSummaryCard";
-import SimilarityBar from "./components/SimilarityBar";
 import SkillChipGroup from "./components/SkillChipGroup";
 import { textOrDash } from "../../../utils/candidateDataUtils";
 
@@ -36,15 +35,17 @@ export default function SemanticScoreTab({ candidate }) {
 
   return (
     <div className="space-y-4">
-      <SemanticSummaryCard summary={breakdown.summary} semanticPassed={breakdown.semanticPassed} />
+      <SemanticSummaryCard
+        summary={breakdown.summary}
+        semanticPassed={breakdown.semanticPassed}
+        overallSimilarity={breakdown.overallSimilarity}
+      />
 
-      <SimilarityBar value={breakdown.overallSimilarity} />
-
-      <SkillChipGroup title="Matching Skills" items={breakdown.matchingSkills} tone="matching" />
+      <SkillChipGroup title="Matching Skills" items={breakdown.matchingSkills} tone="matching" paginate={false} />
 
       <SkillChipGroup title="Missing Skills" items={breakdown.missingSkills} tone="missing" />
 
-      <SkillChipGroup title="Matched Keywords" items={breakdown.matchedKeywords} tone="neutral" />
+      <SkillChipGroup title="Matched Keywords" items={breakdown.matchedKeywords} tone="neutral" paginate={false} />
 
       <div className="p-4 rounded-xl bg-indigo-50">
         <div className="flex items-center gap-1.5 text-[12px] font-bold mb-1.5 text-indigo-700">

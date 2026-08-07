@@ -11,11 +11,12 @@ import TestManagement from "../Testmanagement/TestManagementHome";
 import RiskRegisterPage from "./riskManagement/RiskRegisterPage";
 import RiskHealthModal from "../../../components/RiskManagement/RiskHealthModal.jsx";
 import RoleExpectations from "../../resource_management/models/RoleExpectations.jsx";
+import { useAuth } from "../../../contexts/AuthContext";
 
-const ProjectDemandManagement  = lazy(() => import("./ProjectDemandManagement"));
-const ProjectConfigurations    = lazy(() => import("./project/ProjectConfigurations"));
+const ProjectDemandManagement = lazy(() => import("./ProjectDemandManagement"));
+const ProjectConfigurations = lazy(() => import("./project/ProjectConfigurations"));
 const ProjectRoleOffManagement = lazy(() => import("./ProjectRoleOffManagement"));
-const SprintAnalyticsPage      = lazy(() => import("./Analytics/index.jsx"));
+const SprintAnalyticsPage = lazy(() => import("./Analytics/index.jsx"));
 
 const SkeletonBlock = ({ className }) => (
   <div className={`animate-pulse bg-slate-100 rounded ${className}`} />
@@ -38,14 +39,14 @@ const TabSkeleton = () => (
 // ─── Analytics Dropdown ──────────────────────────────────────────────────────
 const ANALYTICS_TABS = [
   { name: "Burndown", tab: "analytics-burndown" },
-  { name: "Burnup",   tab: "analytics-burnup"   },
+  { name: "Burnup", tab: "analytics-burnup" },
 ];
 
 const AnalyticsDropdown = ({ selectedTab, onSelect }) => {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef(null);
-  const openTimer  = useRef(null);
-  const menuRef    = useRef(null);
+  const openTimer = useRef(null);
+  const menuRef = useRef(null);
 
   const isActive = ANALYTICS_TABS.some((t) => t.tab === selectedTab);
 
@@ -144,10 +145,10 @@ const AnalyticsDropdown = ({ selectedTab, onSelect }) => {
 
 // ─── Resource Management Dropdown ───────────────────────────────────────────
 const RESOURCE_TABS = [
-  { name: "Configurations", tab: "configurations"     },
+  { name: "Configurations", tab: "configurations" },
   { name: "Deliverable Roles", tab: "deliverable-roles" },
-  { name: "Demand",         tab: "demand-management"  },
-  { name: "Roll-Off",        tab: "roleoff-management" },
+  { name: "Demand", tab: "demand-management" },
+  { name: "Roll-Off", tab: "roleoff-management" },
 ];
 
 const ResourceDropdown = ({ selectedTab, onSelect }) => {
@@ -257,9 +258,11 @@ const ProjectTabs = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
+  const { user } = useAuth();
+  const isProjectManager = user?.roles?.includes("Project_Manager");
 
-  const [projectName,   setProjectName]   = useState("");
-  const [notFound,      setNotFound]      = useState(false);
+  const [projectName, setProjectName] = useState("");
+  const [notFound, setNotFound] = useState(false);
   const [showRiskModal, setShowRiskModal] = useState(false);
 
   const getSelectedTabFromLocation = useCallback(() => {
@@ -292,10 +295,10 @@ const ProjectTabs = () => {
 
   useEffect(() => {
     if (!projectId) return;
-    const key      = `risk_modal_seen_${projectId}`;
+    const key = `risk_modal_seen_${projectId}`;
     const lastSeen = localStorage.getItem(key);
-    const now      = Date.now();
-    const ONE_DAY  = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const ONE_DAY = 24 * 60 * 60 * 1000;
     if (!lastSeen || now - parseInt(lastSeen, 10) > ONE_DAY) {
       setShowRiskModal(true);
       localStorage.setItem(key, String(now));
@@ -367,15 +370,15 @@ const ProjectTabs = () => {
   };
 
   const PRIMARY_TABS = [
-    { name: "Summary", tab: "summary"         },
-    { name: "Backlog", tab: "backlog"         },
-    { name: "Board",   tab: "board"           },
-    { name: "Risk",    tab: "risk-management" },
+    { name: "Summary", tab: "summary" },
+    { name: "Backlog", tab: "backlog" },
+    { name: "Board", tab: "board" },
+    { name: "Risk", tab: "risk-management" },
     // { name: "Test",    tab: "test-management" },
   ];
 
   if (!projectId) return <div className="p-6 text-slate-400">No project selected.</div>;
-  if (notFound)   return <div className="p-6 text-red-500">Project not found.</div>;
+  if (notFound) return <div className="p-6 text-red-500">Project not found.</div>;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -424,9 +427,12 @@ const ProjectTabs = () => {
 
           <AnalyticsDropdown selectedTab={selectedTab} onSelect={goToTab} />
 
-          <div className="mx-1 h-4 w-px bg-slate-200 shrink-0" />
-
-          <ResourceDropdown selectedTab={selectedTab} onSelect={goToTab} />
+          {isProjectManager && (
+            <>
+              <div className="mx-1 h-4 w-px bg-slate-200 shrink-0" />
+              <ResourceDropdown selectedTab={selectedTab} onSelect={goToTab} />
+            </>
+          )}
 
         </div>
       </nav>
