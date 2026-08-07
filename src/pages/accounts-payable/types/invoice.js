@@ -1,5 +1,6 @@
 import { INVOICE_STATUS } from "../constants/invoiceStatus";
 import { INVOICE_TYPES } from "../constants/invoiceTypes";
+import { ISSUE_SEVERITY, ISSUE_SOURCE, ISSUE_STATUS } from "../constants/invoiceIssues";
 
 /**
  * @typedef {Object} OcrExtractedFields
@@ -21,12 +22,105 @@ import { INVOICE_TYPES } from "../constants/invoiceTypes";
  */
 
 /**
+ * @typedef {Object} InvoiceLine
+ * @property {string} id
+ * @property {number} lineNumber
+ * @property {string} description
+ * @property {number} quantity
+ * @property {number} unitPrice
+ * @property {number} taxAmount
+ * @property {number} lineAmount
+ */
+
+/**
+ * @typedef {Object} InvoiceAttachment
+ * @property {string} id
+ * @property {string} fileName
+ * @property {string} fileType - e.g. "PDF", "PNG", "JPG"
+ * @property {string} uploadedAt - ISO date string
+ * @property {string} fileUrl - opaque reference; do not assume it is a working download URL
+ *   until a real file-storage backend exists (see invoiceService.js)
+ */
+
+/**
+ * @typedef {Object} InvoiceIssue
+ * @property {string} id
+ * @property {string} issueSource - one of ISSUE_SOURCE (see constants/invoiceIssues.js)
+ * @property {string} issueType - short machine-ish label, e.g. "GSTIN_MISMATCH"
+ * @property {string} severity - one of ISSUE_SEVERITY
+ * @property {string} result - one of CHECK_RESULT, the outcome that raised this issue
+ * @property {string} description - human-readable finding, e.g. "Vendor GSTIN does not match extracted GSTIN"
+ * @property {string} status - one of ISSUE_STATUS
+ * @property {string} resolvedBy - empty until resolved
+ * @property {string} resolvedAt - ISO date string, empty until resolved
+ */
+
+/**
+ * @typedef {Object} InvoiceVendorSummary
+ * @property {string} id
+ * @property {string} name
+ * @property {string} gstin
+ * @property {string} email
+ */
+
+/**
+ * @typedef {Object} InvoiceCurrency
+ * @property {string} code - e.g. "INR"
+ * @property {string} symbol - e.g. "₹"
+ */
+
+/**
+ * @typedef {Object} PurchaseOrderSummary
+ * @property {string} id
+ * @property {string} poNumber
+ * @property {number} poAmount
+ */
+
+/**
+ * @typedef {Object} GoodsReceiptSummary
+ * @property {string} id
+ * @property {string} grnNumber
+ */
+
+/**
+ * @typedef {Object} InvoiceApprovalInfo
+ * @property {boolean} required - false when this workflow has no approval gate for the invoice
+ * @property {string} approvedBy - empty when not yet approved
+ * @property {string} approvedAt - ISO date string, empty when not yet approved
+ */
+
+/**
+ * @typedef {Object} InvoicePaymentRecord
+ * @property {string} id
+ * @property {string} paidAt - ISO date string
+ * @property {number} amount
+ * @property {string} method
+ * @property {string} referenceNumber
+ */
+
+/**
  * @typedef {Object} Invoice
  * @property {string} id
- * @property {string} vendorId
+ * @property {string} invoiceNumber
  * @property {string} invoiceType - one of INVOICE_TYPES (see constants/invoiceTypes.js)
  * @property {string} status - one of INVOICE_STATUS (see constants/invoiceStatus.js)
- * @property {string} fileUrl - uploaded invoice document
+ * @property {string} invoiceDate - ISO date string
+ * @property {string} dueDate - ISO date string
+ * @property {InvoiceVendorSummary} vendor
+ * @property {InvoiceCurrency} currency
+ * @property {PurchaseOrderSummary|null} purchaseOrder - null for NON_PO invoices
+ * @property {GoodsReceiptSummary|null} goodsReceipt - null for NON_PO invoices
+ * @property {string} paymentTerms
+ * @property {number} grossAmount
+ * @property {number} discountAmount
+ * @property {number} taxAmount
+ * @property {number} netAmount
+ * @property {number} amountPaid
+ * @property {InvoiceLine[]} invoiceLines
+ * @property {InvoiceAttachment[]} attachments
+ * @property {InvoiceIssue[]} issues
+ * @property {InvoiceApprovalInfo} approval
+ * @property {InvoicePaymentRecord[]} payments
  * @property {OcrExtractedFields} ocrFields
  * @property {ValidationChecklist} validation
  * @property {string} uploadedBy
@@ -37,10 +131,26 @@ import { INVOICE_TYPES } from "../constants/invoiceTypes";
 export function createEmptyInvoice() {
   return {
     id: "",
-    vendorId: "",
+    invoiceNumber: "",
     invoiceType: INVOICE_TYPES.TAX_INVOICE,
     status: INVOICE_STATUS.UPLOADED,
-    fileUrl: "",
+    invoiceDate: "",
+    dueDate: "",
+    vendor: null,
+    currency: { code: "INR", symbol: "₹" },
+    purchaseOrder: null,
+    goodsReceipt: null,
+    paymentTerms: "",
+    grossAmount: 0,
+    discountAmount: 0,
+    taxAmount: 0,
+    netAmount: 0,
+    amountPaid: 0,
+    invoiceLines: [],
+    attachments: [],
+    issues: [],
+    approval: { required: false, approvedBy: "", approvedAt: "" },
+    payments: [],
     ocrFields: {
       invoiceNumber: "",
       invoiceDate: "",
@@ -53,5 +163,20 @@ export function createEmptyInvoice() {
     validation: { vendorMatched: false, amountMatched: false, duplicateChecked: false, notes: "" },
     uploadedBy: "",
     uploadedAt: "",
+  };
+}
+
+/** @returns {InvoiceIssue} a blank issue record, used by mocks/tests rather than components directly */
+export function createEmptyInvoiceIssue() {
+  return {
+    id: "",
+    issueSource: ISSUE_SOURCE.OCR,
+    issueType: "",
+    severity: ISSUE_SEVERITY.INFO,
+    result: "",
+    description: "",
+    status: ISSUE_STATUS.OPEN,
+    resolvedBy: "",
+    resolvedAt: "",
   };
 }
