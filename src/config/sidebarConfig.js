@@ -243,18 +243,20 @@ export const XMS_SUBMENU = [
  * additionally gates the entire flyout <li> on hasRole(AP_ALL_ROLES) (see Sidebar.jsx),
  * matching the Account Receivable module's pattern rather than EO/XMS's ungated one.
  *
- * Per-item role differentiation (e.g. Vendor Onboarding restricted to Admin/Vendor_Intake)
+ * Deliberately 4 flat items, not 9 — each links to that area's primary list/overview page,
+ * which carries its own "create new" action as a page-level button (e.g. VendorListPage's
+ * "Register Vendor", InvoiceListPage's "Upload Invoice") rather than as a separate sidebar
+ * entry. Sub-views reached from within a page (Vendor Onboarding/Detail/Update, OCR Review
+ * Queue, Validation Queue, Payment History, Mark as Paid) still have their own routes from
+ * Phase 2 — they're just no longer direct sidebar destinations.
+ *
+ * Per-item role differentiation (e.g. Vendor Management restricted to Admin/Vendor_Intake)
  * is deferred to the business-logic phases — see constants/permissions.js's
  * AP_PERMISSION_ROLES map for the intended per-capability breakdown.
  */
 export const AP_SUBMENU = [
   { label: "Dashboard", to: AP_ROUTES.DASHBOARD, allowedRoles: AP_ALL_ROLES },
-  { label: "Vendor Onboarding", to: AP_ROUTES.VENDOR_ONBOARD, allowedRoles: AP_ALL_ROLES },
-  { label: "Vendors", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
-  { label: "Upload Invoice", to: AP_ROUTES.INVOICE_UPLOAD, allowedRoles: AP_ALL_ROLES },
-  { label: "OCR Review Queue", to: AP_ROUTES.INVOICE_OCR_REVIEW, allowedRoles: AP_ALL_ROLES },
-  { label: "Validation Queue", to: AP_ROUTES.INVOICE_VALIDATION, allowedRoles: AP_ALL_ROLES },
-  { label: "All Invoices", to: AP_ROUTES.INVOICE_LIST, allowedRoles: AP_ALL_ROLES },
-  { label: "Ready for Payment", to: AP_ROUTES.PAYMENT_READY, allowedRoles: AP_ALL_ROLES },
-  { label: "Payment History", to: AP_ROUTES.PAYMENT_HISTORY, allowedRoles: AP_ALL_ROLES },
+  { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
+  { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, allowedRoles: AP_ALL_ROLES },
+  { label: "Payments", to: AP_ROUTES.PAYMENT_READY, allowedRoles: AP_ALL_ROLES },
 ];
