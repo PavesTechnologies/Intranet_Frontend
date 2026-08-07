@@ -52,7 +52,7 @@ export function getResumeMock(candidate) {
       {
         company: candidate.company,
         title: candidate.role,
-        durationYears: Math.max(1, candidate.experience - 2),
+        durationLabel: `${Math.max(1, candidate.experience - 2)} yrs`,
         highlights: [
           "Owned end-to-end delivery for the team's highest-priority workstream.",
           "Partnered with product and design to ship customer-facing features.",
@@ -61,7 +61,7 @@ export function getResumeMock(candidate) {
       {
         company: "Prior employer (parsed)",
         title: `Associate ${candidate.role}`,
-        durationYears: Math.max(1, 2),
+        durationLabel: "2 yrs",
         highlights: ["Contributed to core platform features under senior engineer guidance."],
       },
     ],
@@ -102,7 +102,7 @@ export function getResumeFromParsedData(candidate) {
     experienceExtracted: candidate.workExperience.map((w) => ({
       company: w.company,
       title: w.title,
-      durationYears: "-",
+      durationLabel: w.duration,
       highlights: w.highlights,
     })),
     educationExtracted: candidate.educationExtracted,
