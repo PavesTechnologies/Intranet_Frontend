@@ -23,7 +23,7 @@ export default function ArModuleIcon({ className = "h-5 w-5" }) {
       {/* Calculator (Foreground) */}
       <rect x="11" y="10" width="11" height="12" rx="1.5" />
       <line x1="14" y1="13" x2="19" y2="13" />
-      
+
       {/* Calculator Buttons (2x2 grid) */}
       <path d="M14 16.5h.01M18 16.5h.01" />
       <path d="M14 19.5h.01M18 19.5h.01" />
