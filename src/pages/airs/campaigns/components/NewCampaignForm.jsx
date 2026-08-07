@@ -20,6 +20,7 @@ export default function NewCampaignForm({
     const [hiringManager, setHiringManager] = useState([]);
     const [recruiter, setRecruiter] = useState([]);
     const resumeParsePromptLookup = usePromptTemplateLookup("resume-parse");
+    const aiEvaluatePromptLookup = usePromptTemplateLookup("ai-evaluate");
 
     useEffect(() => {
         const fetchNamesByRoles = async () => {
@@ -58,6 +59,11 @@ export default function NewCampaignForm({
     const resumeParsePromptOptions = [
         { value: "", label: resumeParsePromptLookup.isLoading ? "Loading prompt templates..." : "Select Resume Parsing Prompt" },
         ...resumeParsePromptLookup.options,
+    ];
+
+    const aiEvaluatePromptOptions = [
+        { value: "", label: aiEvaluatePromptLookup.isLoading ? "Loading prompt templates..." : "Select AI Evaluation Prompt" },
+        ...aiEvaluatePromptLookup.options,
     ];
 
     return (<>
@@ -185,16 +191,30 @@ export default function NewCampaignForm({
                     </div>
                 </div>
 
-                <div className="space-y-1">
-                    <label className={LABEL_CLASS}>
-                        Resume Parsing Prompt <span className="text-red-500">*</span>
-                    </label>
-                    <FilterListbox
-                        options={resumeParsePromptOptions}
-                        value={campaignForm.prompt_template_id}
-                        onChange={(value) => handleCampaignFormChange({ target: { name: "prompt_template_id", value } })}
-                        disabled={resumeParsePromptLookup.isLoading}
-                    />
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                        <label className={LABEL_CLASS}>
+                            Resume Parsing Prompt <span className="text-red-500">*</span>
+                        </label>
+                        <FilterListbox
+                            options={resumeParsePromptOptions}
+                            value={campaignForm.prompt_template_id}
+                            onChange={(value) => handleCampaignFormChange({ target: { name: "prompt_template_id", value } })}
+                            disabled={resumeParsePromptLookup.isLoading}
+                        />
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className={LABEL_CLASS}>
+                            AI Evaluation Prompt <span className="text-red-500">*</span>
+                        </label>
+                        <FilterListbox
+                            options={aiEvaluatePromptOptions}
+                            value={campaignForm.ai_evaluate_prompt_id}
+                            onChange={(value) => handleCampaignFormChange({ target: { name: "ai_evaluate_prompt_id", value } })}
+                            disabled={aiEvaluatePromptLookup.isLoading}
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -217,6 +237,12 @@ export default function NewCampaignForm({
                             toast.error(resumeParsePromptLookup.options.length === 0
                                 ? "No active Resume Parsing prompt templates are available. Create one before starting a campaign."
                                 : "Please select a Resume Parsing Prompt.");
+                            return;
+                        }
+                        if (!String(campaignForm.ai_evaluate_prompt_id || "").trim()) {
+                            toast.error(aiEvaluatePromptLookup.options.length === 0
+                                ? "No active AI Evaluation prompt templates are available. Create one before starting a campaign."
+                                : "Please select an AI Evaluation Prompt.");
                             return;
                         }
                         handleInitiateCampaign();

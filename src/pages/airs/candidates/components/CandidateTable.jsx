@@ -90,7 +90,7 @@ export default function CandidateTable({ candidates, onView, onToggleStar, onDel
         >
           <Eye className="h-4 w-4" />
         </Button>
-        {/* {canDeleteCandidates && (
+        {canDeleteCandidates && (
           <Button
             variant="ghost"
             size="icon"
@@ -103,7 +103,7 @@ export default function CandidateTable({ candidates, onView, onToggleStar, onDel
           >
             <Trash2 className="h-4 w-4" />
           </Button>
-        )} */}
+        )}
       </div>
     ),
   }));
