@@ -158,6 +158,10 @@ export const getCampaignCandidates = async (campaignId) => {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
         });
+        // TEMP DEBUG - remove once candidates render correctly
+        console.log("[getCampaignCandidates] response:", response);
+        console.log("[getCampaignCandidates] response.data:", response.data);
+        console.log("[getCampaignCandidates] response.data.items:", response.data?.items);
         return response.data;
     } catch (error) {
         console.error("Error fetching campaign candidates:", error);

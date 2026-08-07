@@ -146,3 +146,5 @@ const getPromptTemplateLookup = async (taskTypeSlug) => {
 export const getJdParsePromptLookup = () => getPromptTemplateLookup("jd-parse");
 
 export const getResumeParsePromptLookup = () => getPromptTemplateLookup("resume-parse");
+
+export const getAiEvaluatePromptLookup = () => getPromptTemplateLookup("ai-evaluate");

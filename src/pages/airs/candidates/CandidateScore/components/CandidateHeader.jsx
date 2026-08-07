@@ -38,8 +38,8 @@ export default function CandidateHeader({ candidate, onBack }) {
         </div>
         <div className="flex gap-4 shrink-0">
           <ScoreRing value={candidate.deterministic} size={40} color="#DC2626" label="DF" />
-          <ScoreRing value={candidate.semantic} size={40} color="#7C3AED" label="SF" />
-          <ScoreRing value={candidate.ats} size={40} color="#2563EB" label="AI" />
+          <ScoreRing value={Math.round(candidate.semantic * 100)} size={40} color="#7C3AED" label="SF" />
+          <ScoreRing value={Math.round(candidate.ats * 100)} size={40} color="#2563EB" label="AI" />
         </div>
       </div>
     </div>
