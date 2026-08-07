@@ -4,7 +4,7 @@ import { mapAiEvaluationBreakdown } from "../utils/mapAiEvaluationBreakdown";
 
 // Module-level cache keyed by campaign_candidate_id — the AI Evaluation tab
 // unmounts/remounts on every tab switch, so this avoids re-fetching the same
-// result each time the recruiter tabs back into it.
+// breakdown each time the recruiter tabs back into it.
 const cache = new Map();
 
 export default function useAiEvaluation(campaignCandidateId) {
