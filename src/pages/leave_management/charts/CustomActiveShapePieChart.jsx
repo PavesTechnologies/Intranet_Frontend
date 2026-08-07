@@ -195,6 +195,7 @@ const CustomActiveShapePieChart = ({ employeeId, refreshKey, year }) => {
                   border: "1px solid #ccc",
                   fontSize: "13px",
                 }}
+                itemStyle={{ color: "#000" }}
               />
               Center label inside pie
               <text
