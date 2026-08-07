@@ -1,23 +1,3 @@
-import PageHeader from "../../components/ui/PageHeader";
-
-// Billing Data Acquisition UI is implemented but temporarily disabled/hidden below
-// (commented out) while Project Billing Setup work lands first. Uncomment the block
-// below and remove this placeholder export to re-enable the full 5-step flow.
-export default function BillingDataAcquisition() {
-  return (
-    <>
-      <PageHeader
-        title="Billing Data Acquisition Workspace"
-        subtitle="Workspace for receivables, billing setup, and billing data acquisition."
-      />
-      <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">Billing Data Acquisition Workspace</h2>
-      </section>
-    </>
-  );
-}
-
-/*
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FolderKanban } from "lucide-react";
@@ -34,6 +14,9 @@ import AcquireDataStep from "./components/acquisition/steps/AcquireDataStep";
 import ReviewChargesStep from "./components/acquisition/steps/ReviewChargesStep";
 import ValidateReconcileStep from "./components/acquisition/steps/ValidateReconcileStep";
 import InvoiceDraftStep from "./components/acquisition/steps/InvoiceDraftStep";
+import InvoiceSoftwareSelection from "./components/acquisition/InvoiceSoftwareSelection";
+import GeneratedSoftwareCharges from "./components/acquisition/GeneratedSoftwareCharges";
+import { InvoiceDraftProvider, useInvoiceDraftContext } from "./context/InvoiceDraftContext";
 import {
   fetchActiveBillingConfigurations,
   fetchBillingContext,
@@ -45,9 +28,10 @@ import {
 const STEPS = [
   { id: 1, label: "Project" },
   { id: 2, label: "Acquire" },
-  { id: 3, label: "Review" },
-  { id: 4, label: "Validate" },
-  { id: 5, label: "Draft" },
+  { id: 3, label: "Software" },
+  { id: 4, label: "Review" },
+  { id: 5, label: "Validate" },
+  { id: 6, label: "Draft" },
 ];
 
 const INITIAL_SELECTION = { configId: "", periodFrom: "", periodTo: "" };
@@ -61,14 +45,17 @@ function isStepValid(step, state) {
     case 3:
       return true;
     case 4:
+      return true;
+    case 5:
       return Boolean(state.validation) && state.validation.checklist.filter((item) => item.critical).every((item) => item.passed);
     default:
       return true;
   }
 }
 
-function BillingDataAcquisitionFull() {
+function BillingDataAcquisitionBody() {
   const navigate = useNavigate();
+  const { setSelectedSoftwareItems, generatedSoftwareChargeLines } = useInvoiceDraftContext();
 
   const [currentStep, setCurrentStep] = useState(1);
   const [activeConfigs, setActiveConfigs] = useState([]);
@@ -113,20 +100,39 @@ function BillingDataAcquisitionFull() {
   }, [selection.configId]);
 
   useEffect(() => {
-    if (currentStep === 4 && !validation && acquisitionResults && billingContext) {
+    if (currentStep === 5 && !validation && acquisitionResults && billingContext) {
       setValidating(true);
-      const result = runValidation(billingContext, acquisitionResults, selection.periodFrom, selection.periodTo);
+      const softwareRecords = generatedSoftwareChargeLines.map((line) => ({
+        id: line.assetId,
+        assetCode: line.assetCode,
+        assetName: line.assetName,
+        description: line.description,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        billingBasis: line.billingBasis,
+        amount: line.calculatedAmount,
+        currency: line.currencyCode,
+      }));
+      const resultsWithSoftware = {
+        ...acquisitionResults,
+        software: {
+          records: softwareRecords,
+          amount: softwareRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
+        },
+      };
+      const result = runValidation(billingContext, resultsWithSoftware, selection.periodFrom, selection.periodTo);
       setValidation(result);
       setValidating(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStep]);
+  }, [currentStep, validation, acquisitionResults, billingContext, generatedSoftwareChargeLines, selection]);
 
   const handleSelectionChange = (next) => {
     setSelection(next);
     setAcquisitionResults(null);
     setValidation(null);
     setDraft(null);
+    setSelectedSoftwareItems([]);
   };
 
   const handleLoadContext = () => {
@@ -144,6 +150,7 @@ function BillingDataAcquisitionFull() {
     setAcquisitionResults(null);
     setValidation(null);
     setDraft(null);
+    setSelectedSoftwareItems([]);
   };
 
   const runAcquisition = () => {
@@ -166,12 +173,31 @@ function BillingDataAcquisitionFull() {
     setAcquisitionResults(null);
     setValidation(null);
     setDraft(null);
+    setSelectedSoftwareItems([]);
   };
 
   const handleRevalidate = () => {
     setValidating(true);
     setTimeout(() => {
-      const result = runValidation(billingContext, acquisitionResults, selection.periodFrom, selection.periodTo);
+      const softwareRecords = generatedSoftwareChargeLines.map((line) => ({
+        id: line.assetId,
+        assetCode: line.assetCode,
+        assetName: line.assetName,
+        description: line.description,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        billingBasis: line.billingBasis,
+        amount: line.calculatedAmount,
+        currency: line.currencyCode,
+      }));
+      const resultsWithSoftware = {
+        ...acquisitionResults,
+        software: {
+          records: softwareRecords,
+          amount: softwareRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
+        },
+      };
+      const result = runValidation(billingContext, resultsWithSoftware, selection.periodFrom, selection.periodTo);
       setValidation(result);
       setValidating(false);
     }, 400);
@@ -187,7 +213,25 @@ function BillingDataAcquisitionFull() {
 
   const handleGenerateDraft = () => {
     setGenerating(true);
-    generateInvoiceDraft(billingContext, acquisitionResults).then((result) => {
+    const softwareRecords = generatedSoftwareChargeLines.map((line) => ({
+      id: line.assetId,
+      assetCode: line.assetCode,
+      assetName: line.assetName,
+      description: line.description,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+      billingBasis: line.billingBasis,
+      amount: line.calculatedAmount,
+      currency: line.currencyCode,
+    }));
+    const resultsWithSoftware = {
+      ...acquisitionResults,
+      software: {
+        records: softwareRecords,
+        amount: softwareRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
+      },
+    };
+    generateInvoiceDraft(billingContext, resultsWithSoftware).then((result) => {
       setDraft(result);
       setGenerating(false);
       showStatusToast("Invoice draft generated successfully.", "success");
@@ -305,18 +349,36 @@ function BillingDataAcquisitionFull() {
       {currentStep === 3 && billingContext && (
         <PageCard>
           <PageCardContent className="p-6">
+            <h3 className="mb-1 text-sm font-semibold text-slate-900">Add Software / Tools / Licenses</h3>
+            <p className="mb-4 text-xs text-slate-500">
+              Select RMS-sourced software, tools, or licenses to bill on this invoice. Selected items will be factored into subsequent Review, Validation, and Draft generation steps.
+            </p>
+            <InvoiceSoftwareSelection
+              projectId={billingContext.configId}
+              periodFrom={selection.periodFrom}
+              periodTo={selection.periodTo}
+              onSelectionChange={setSelectedSoftwareItems}
+            />
+            <GeneratedSoftwareCharges />
+          </PageCardContent>
+        </PageCard>
+      )}
+
+      {currentStep === 4 && billingContext && (
+        <PageCard>
+          <PageCardContent className="p-6">
             <ReviewChargesStep billingContext={billingContext} acquisitionResults={acquisitionResults} />
           </PageCardContent>
         </PageCard>
       )}
 
-      {currentStep === 4 && billingContext && !validation && (
+      {currentStep === 5 && billingContext && !validation && (
         <div className="p-6">
           <Loader />
         </div>
       )}
 
-      {currentStep === 4 && billingContext && validation && (
+      {currentStep === 5 && billingContext && validation && (
         <ValidateReconcileStep
           billingContext={billingContext}
           validation={validation}
@@ -325,7 +387,7 @@ function BillingDataAcquisitionFull() {
         />
       )}
 
-      {currentStep === 5 && billingContext && (
+      {currentStep === 6 && billingContext && (
         <PageCard>
           <PageCardContent className="p-6">
             <InvoiceDraftStep
@@ -358,4 +420,11 @@ function BillingDataAcquisitionFull() {
     </div>
   );
 }
-*/
+
+export default function BillingDataAcquisition() {
+  return (
+    <InvoiceDraftProvider>
+      <BillingDataAcquisitionBody />
+    </InvoiceDraftProvider>
+  );
+}

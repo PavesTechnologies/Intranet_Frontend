@@ -13,9 +13,7 @@ import {
   computeChargeTotals,
 } from "../../../utils/chargeTypes";
 import { BILLING_TYPE_LABELS } from "../../../data/wizardOptions";
-import InvoiceSoftwareSelection from "../InvoiceSoftwareSelection";
-import GeneratedSoftwareCharges from "../GeneratedSoftwareCharges";
-import { InvoiceDraftProvider, useInvoiceDraftContext } from "../../../context/InvoiceDraftContext";
+import { useInvoiceDraftContext } from "../../../context/InvoiceDraftContext";
 
 function SummaryRow({ label, value, emphasize }) {
   return (
@@ -84,7 +82,7 @@ function ChargeGroup({ chargeType, records, currency }) {
 // Software Selection (Phase 4) and Software Charge Generation (Phase 5) are untouched; only
 // this integration layer changed.
 function InvoiceDraftStepBody({ billingContext, selection, acquisitionResults, draft, onOpenDraft }) {
-  const { setSelectedSoftwareItems, generatedSoftwareChargeLines } = useInvoiceDraftContext();
+  const { generatedSoftwareChargeLines } = useInvoiceDraftContext();
 
   // Normalizes SoftwareChargeLine (assetCode/assetName/calculatedAmount/currencyCode) into the
   // same {records, amount} shape every other charge type already uses, so it flows through
@@ -173,7 +171,7 @@ function InvoiceDraftStepBody({ billingContext, selection, acquisitionResults, d
         <PageCardContent className="p-6">
           <h3 className="mb-4 text-sm font-semibold text-slate-900">Draft Details</h3>
           <p className="mb-4 text-xs text-slate-500">
-            Includes acquired billing data alongside any software, tools, or licenses selected below — every line
+            Includes acquired billing data alongside any software, tools, or licenses selected — every line
             here contributes to the Subtotal, Estimated Tax, and Estimated Grand Total above.
           </p>
           <div className="space-y-3">
@@ -188,31 +186,10 @@ function InvoiceDraftStepBody({ billingContext, selection, acquisitionResults, d
           </div>
         </PageCardContent>
       </PageCard>
-
-      <PageCard>
-        <PageCardContent className="p-6">
-          <h3 className="mb-1 text-sm font-semibold text-slate-900">Add Software / Tools / Licenses</h3>
-          <p className="mb-4 text-xs text-slate-500">
-            Select RMS-sourced software, tools, or licenses to bill on this invoice. Selected items appear as
-            Software line items in Draft Details above once generated.
-          </p>
-          <InvoiceSoftwareSelection
-            projectId={billingContext.configId}
-            periodFrom={selection.periodFrom}
-            periodTo={selection.periodTo}
-            onSelectionChange={setSelectedSoftwareItems}
-          />
-          <GeneratedSoftwareCharges />
-        </PageCardContent>
-      </PageCard>
     </div>
   );
 }
 
 export default function InvoiceDraftStep(props) {
-  return (
-    <InvoiceDraftProvider>
-      <InvoiceDraftStepBody {...props} />
-    </InvoiceDraftProvider>
-  );
+  return <InvoiceDraftStepBody {...props} />;
 }

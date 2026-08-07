@@ -8,6 +8,7 @@ import Modal from "../../../../../components/ui/Modal";
 import { Fonts } from "../../../../../components/Fonts/Fonts";
 import { formatCurrency } from "../../../utils/format";
 import { CHARGE_TYPE_LABELS, SOURCE_SYSTEM_LABELS, describeRecord, quantityAndUnitPrice } from "../../../utils/chargeTypes";
+import { useInvoiceDraftContext } from "../../../context/InvoiceDraftContext";
 
 function SummaryCard({ label, value }) {
   return (
@@ -20,25 +21,44 @@ function SummaryCard({ label, value }) {
 
 export default function ReviewChargesStep({ billingContext, acquisitionResults }) {
   const [detailsRow, setDetailsRow] = useState(null);
+  const { generatedSoftwareChargeLines } = useInvoiceDraftContext();
   const currency = billingContext.currency;
 
-  const chargeTypes = ["labor", "contract", "milestone", "recurring", "expense", "tool"];
+  const softwareRecords = generatedSoftwareChargeLines.map((line) => ({
+    id: line.assetId,
+    assetCode: line.assetCode,
+    assetName: line.assetName,
+    description: line.description,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+    billingBasis: line.billingBasis,
+    amount: line.calculatedAmount,
+    currency: line.currencyCode,
+  }));
+
+  const results = {
+    ...acquisitionResults,
+    software: {
+      records: softwareRecords,
+      amount: softwareRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
+    },
+  };
+
+  const chargeTypes = ["labor", "contract", "milestone", "recurring", "expense", "tool", "software"];
   const unified = chargeTypes.flatMap((chargeType) =>
-    (acquisitionResults?.[chargeType]?.records || []).map((record) => ({ chargeType, record }))
+    (results?.[chargeType]?.records || []).map((record) => ({ chargeType, record }))
   );
 
-  const laborTotal = acquisitionResults?.labor?.amount || 0;
-  const contractOrMilestoneTotal = (acquisitionResults?.contract?.amount || 0) + (acquisitionResults?.milestone?.amount || 0);
-  const recurringTotal = acquisitionResults?.recurring?.amount || 0;
-  const expenseTotal = acquisitionResults?.expense?.amount || 0;
-  const toolTotal = acquisitionResults?.tool?.amount || 0;
-  const subtotal = laborTotal + contractOrMilestoneTotal + recurringTotal + expenseTotal + toolTotal;
+  const laborTotal = results?.labor?.amount || 0;
+  const contractOrMilestoneTotal = (results?.contract?.amount || 0) + (results?.milestone?.amount || 0);
+  const recurringTotal = results?.recurring?.amount || 0;
+  const expenseTotal = results?.expense?.amount || 0;
+  const toolTotal = results?.tool?.amount || 0;
+  const softwareTotal = results?.software?.amount || 0;
+  const subtotal = laborTotal + contractOrMilestoneTotal + recurringTotal + expenseTotal + toolTotal + softwareTotal;
 
   const tableRows = unified.map(({ chargeType, record }) => {
     const { quantity, unitPrice } = quantityAndUnitPrice(chargeType, record);
-    // Tool charge records can carry their own currency (Tool Catalog / Assignment convention)
-    // — display it when the backend provides one, falling back to the project's billing
-    // currency otherwise. Other charge types are unaffected.
     const lineCurrency = record.currency || currency;
     return {
       chargeType: CHARGE_TYPE_LABELS[chargeType],
@@ -65,12 +85,13 @@ export default function ReviewChargesStep({ billingContext, acquisitionResults }
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
         <SummaryCard label="Labor Total" value={formatCurrency(laborTotal, currency)} />
         <SummaryCard label="Contract/Milestone Total" value={formatCurrency(contractOrMilestoneTotal, currency)} />
         <SummaryCard label="Recurring Total" value={formatCurrency(recurringTotal, currency)} />
         <SummaryCard label="Expense Total" value={formatCurrency(expenseTotal, currency)} />
         <SummaryCard label="Tool Total" value={formatCurrency(toolTotal, currency)} />
+        <SummaryCard label="Software Total" value={formatCurrency(softwareTotal, currency)} />
         <SummaryCard label="Subtotal" value={formatCurrency(subtotal, currency)} />
       </div>
 
