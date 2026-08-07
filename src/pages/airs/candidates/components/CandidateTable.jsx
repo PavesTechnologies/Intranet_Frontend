@@ -69,8 +69,8 @@ export default function CandidateTable({ candidates, onView, onToggleStar, onDel
       </div>
     ),
     deterministic: <span className="font-semibold text-slate-900">{Number(c.deterministic).toFixed(1)}</span>,
-    ats: <span className="font-semibold text-slate-900">{Number(c.ats).toFixed(1)}</span>,
-    semantic: <span className="font-semibold text-slate-900">{Number(c.semantic).toFixed(1)}</span>,
+    ats: <span className="font-semibold text-slate-900">{(Number(c.ats) * 100).toFixed(1)}</span>,
+    semantic: <span className="font-semibold text-slate-900">{(Number(c.semantic) * 100).toFixed(1)}</span>,
     composite: <ScoreRing value={c.composite} size={32} color="#16A34A" />,
     experience: `${Number(c.experience).toFixed(1)} yrs`,
     location: c.location,
@@ -90,7 +90,7 @@ export default function CandidateTable({ candidates, onView, onToggleStar, onDel
         >
           <Eye className="h-4 w-4" />
         </Button>
-        {/* {canDeleteCandidates && (
+        {canDeleteCandidates && (
           <Button
             variant="ghost"
             size="icon"
@@ -103,7 +103,7 @@ export default function CandidateTable({ candidates, onView, onToggleStar, onDel
           >
             <Trash2 className="h-4 w-4" />
           </Button>
-        )} */}
+        )}
       </div>
     ),
   }));

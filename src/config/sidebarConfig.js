@@ -1,3 +1,6 @@
+import { AP_ALL_ROLES } from "../pages/accounts-payable/constants/apRoles";
+import { AP_ROUTES } from "../pages/accounts-payable/constants/routes";
+
 /**
  * Canonical role identifiers.
  * hasRole() in AuthContext is case-insensitive (uppercases before comparing),
@@ -196,10 +199,8 @@ export const XMS_SUBMENU = [
     to: "/expense-management/masters/expense-categories",
     allowedRoles: XMS_ADMIN,
     children: [
-      { label: "Expense Categories",  to: "/expense-management/masters/expense-categories" },
-      { label: "GL Accounts",         to: "/expense-management/masters/gl-accounts" },
-      { label: "Cost Centers",        to: "/expense-management/masters/cost-centers" },
-      { label: "Cost Center Budgets", to: "/expense-management/masters/cost-center-budgets" },
+      { label: "Categories & Ledger Account", to: "/expense-management/masters/expense-categories" },
+      { label: "Cost Center & Budget Management", to: "/expense-management/masters/cost-center-management" },
       { label: "Projects",            to: "/expense-management/masters/projects" },
       { label: "Clients",             to: "/expense-management/masters/clients" },
       { label: "Currency Management", to: "/expense-management/masters/currency-management" },
@@ -230,4 +231,32 @@ export const XMS_SUBMENU = [
   //   to: "/expense-management/settings",
   //   allowedRoles: XMS_ADMIN,
   // },
+];
+
+/**
+ * Accounts Payable flyout submenu config.
+ * Same shape/filtering contract as EO_SUBMENU/XMS_SUBMENU above — filtered by
+ * filterMenuByRole() before rendering.
+ *
+ * Unlike EO/XMS, every item here shares AP_ALL_ROLES (no item is visible to "everyone") —
+ * the whole module must stay invisible to any role outside AP_ALL_ROLES, so the sidebar
+ * additionally gates the entire flyout <li> on hasRole(AP_ALL_ROLES) (see Sidebar.jsx),
+ * matching the Account Receivable module's pattern rather than EO/XMS's ungated one.
+ *
+ * Deliberately 4 flat items, not 9 — each links to that area's primary list/overview page,
+ * which carries its own "create new" action as a page-level button (e.g. VendorListPage's
+ * "Register Vendor", InvoiceListPage's "Upload Invoice") rather than as a separate sidebar
+ * entry. Sub-views reached from within a page (Vendor Onboarding/Detail/Update, OCR Review
+ * Queue, Validation Queue, Payment History, Mark as Paid) still have their own routes from
+ * Phase 2 — they're just no longer direct sidebar destinations.
+ *
+ * Per-item role differentiation (e.g. Vendor Management restricted to Admin/Vendor_Intake)
+ * is deferred to the business-logic phases — see constants/permissions.js's
+ * AP_PERMISSION_ROLES map for the intended per-capability breakdown.
+ */
+export const AP_SUBMENU = [
+  { label: "Dashboard", to: AP_ROUTES.DASHBOARD, allowedRoles: AP_ALL_ROLES },
+  { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
+  { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, allowedRoles: AP_ALL_ROLES },
+  { label: "Payments", to: AP_ROUTES.PAYMENT_READY, allowedRoles: AP_ALL_ROLES },
 ];

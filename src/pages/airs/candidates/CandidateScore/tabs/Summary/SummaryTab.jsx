@@ -2,6 +2,13 @@ import React from "react";
 import { Sparkles } from "lucide-react";
 import { getSummaryMock } from "./summaryMock";
 
+const NOT_MENTIONED = "Not mentioned";
+
+// textOrDash (candidateDataUtils) already turns missing values into "-"
+// before they reach this component, so we treat "-" the same as empty here.
+const isMissing = (v) => v === null || v === undefined || v === "" || v === "-";
+const orNotMentioned = (v) => (isMissing(v) ? NOT_MENTIONED : v);
+
 const FIELD_ROWS = [
   ["currentDesignation", "Current designation"],
   ["department", "Department"],
@@ -23,13 +30,15 @@ export default function SummaryTab({ candidate }) {
           {FIELD_ROWS.map(([key, label, format]) => (
             <div key={key}>
               <div className="text-slate-400">{label}</div>
-              <div className="font-semibold text-slate-900">{format ? format(summary[key]) : summary[key]}</div>
+              <div className="font-semibold text-slate-900">
+                {isMissing(summary[key]) ? NOT_MENTIONED : format ? format(summary[key]) : summary[key]}
+              </div>
             </div>
           ))}
           <div>
             <div className="text-slate-400">Contact</div>
-            <div className="font-semibold text-slate-900">{summary.contact.email}</div>
-            <div className="font-semibold text-slate-900">{summary.contact.phone}</div>
+            <div className="font-semibold text-slate-900">{orNotMentioned(summary.contact.email)}</div>
+            <div className="font-semibold text-slate-900">{orNotMentioned(summary.contact.phone)}</div>
           </div>
         </div>
       </div>
