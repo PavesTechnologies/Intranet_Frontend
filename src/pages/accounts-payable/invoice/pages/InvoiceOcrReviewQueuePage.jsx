@@ -1,12 +1,12 @@
-import PageHeader from "../../../../components/ui/PageHeader";
+import InvoiceQueueView from "../components/InvoiceQueueView";
+import { QUEUE_TYPES } from "../../constants/queueTypes";
 
 export default function InvoiceOcrReviewQueuePage() {
   return (
-    <div className="p-6">
-      <PageHeader
-        title="OCR Review Queue"
-        subtitle="This page will be implemented in Phase 6."
-      />
-    </div>
+    <InvoiceQueueView
+      title="OCR Review Queue"
+      subtitle="Invoices awaiting OCR field review or correction"
+      defaultQueueType={QUEUE_TYPES.OCR_REVIEW}
+    />
   );
 }
