@@ -153,7 +153,8 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
 
     // scoring fields stay locked on an ACTIVE campaign until confirmed
     const scoringLocked = isActive && !confirmScoring;
-    const currentCount = limits.current_candidate_count ?? 0;
+    // openings are measured against SELECTED candidates, not total intake
+    const selectedCount = limits.selected_count ?? 0;
 
     const handleSave = async () => {
         const name = (form.name || "").trim();
@@ -169,10 +170,10 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
             return toast.error("Please select a Resume Parsing Prompt.");
         }
 
-        // can't drop the cap below the number of candidates already in
+        // can't cut openings below the number already filled
         const cap = form.max_candidates === "" ? null : Number(form.max_candidates);
-        if (cap !== null && cap < currentCount) {
-            return toast.error(`Max candidates (${cap}) cannot be below the current candidate count (${currentCount}).`);
+        if (cap !== null && cap < selectedCount) {
+            return toast.error(`Openings (${cap}) cannot be below the number already selected (${selectedCount}).`);
         }
 
         // Build a PATCH payload containing ONLY the fields that actually changed —
@@ -325,10 +326,12 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
                 )}
 
                 <div className="grid grid-cols-2 gap-4">
-                    <FormInput label="Max Candidates" name="max_candidates" type="number" min="1" value={form.max_candidates} onChange={change} labelClassName={LABEL_CLASS} />
+                    <FormInput label="Openings" name="max_candidates" type="number" min="1" value={form.max_candidates} onChange={change} labelClassName={LABEL_CLASS} />
                     <FormInput label="Deadline" name="deadline" type="datetime-local" value={form.deadline} onChange={change} labelClassName={LABEL_CLASS} />
                 </div>
-                <p className="text-[10px] text-slate-400">Current candidate count: {currentCount}</p>
+                <p className="text-[10px] text-slate-400">
+                    Currently selected: {selectedCount} · the campaign auto-closes once every opening is filled
+                </p>
 
                 {/* Scoring config is only editable when the backend sent it (HR_ADMIN) */}
                 {scoring && (<>

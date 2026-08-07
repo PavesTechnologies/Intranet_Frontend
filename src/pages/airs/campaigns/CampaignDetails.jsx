@@ -284,11 +284,15 @@ const SCORING_LAYERS = [
 function DetailsTab({ info, jd, scoring, limits, hm }) {
   const status = (info.status || "").toUpperCase();
 
+  // max_candidates is the number of openings, filled by SELECTED candidates —
+  // intake is deliberately uncapped, so the gauge must not measure total
+  // candidates against it.
   const max = limits.max_candidates;
-  const current = limits.current_candidate_count ?? 0;
-  const capPct = max ? Math.min(100, Math.round((current / max) * 100)) : null;
-  // full cap is the state that actually blocks new uploads, so it gets the
-  // strongest colour rather than being buried in plain text
+  const selected = limits.selected_count ?? 0;
+  const totalCandidates = limits.current_candidate_count ?? 0;
+  const capPct = max ? Math.min(100, Math.round((selected / max) * 100)) : null;
+  // all positions filled auto-closes the campaign, so it gets the strongest
+  // colour rather than being buried in plain text
   const capTone = capPct == null ? "bg-slate-300"
     : capPct >= 100 ? "bg-rose-500"
       : capPct >= 80 ? "bg-amber-500"
@@ -308,17 +312,20 @@ function DetailsTab({ info, jd, scoring, limits, hm }) {
           </span>
         </GlanceCell>
 
-        <GlanceCell label="Candidates">
+        <GlanceCell label="Positions Filled">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-lg font-black text-slate-900 tabular-nums leading-none">{current}</span>
+            <span className="text-lg font-black text-slate-900 tabular-nums leading-none">{selected}</span>
             <span className="text-[11px] font-bold text-slate-400">
-              {max == null ? "of unlimited" : `of ${max}`}
+              {max == null ? "of unlimited openings" : `of ${max} opening${max === 1 ? "" : "s"}`}
             </span>
           </div>
           {capPct != null && (<div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
               <div className={`h-1.5 rounded-full ${capTone} transition-all duration-500`} style={{ width: `${capPct}%` }} />
             </div>
           )}
+          <p className="text-[10px] text-slate-400 mt-1.5">
+            {totalCandidates} candidate{totalCandidates === 1 ? "" : "s"} in pipeline
+          </p>
         </GlanceCell>
 
         <GlanceCell label="Deadline">
