@@ -21,8 +21,89 @@ function sumAmount(records) {
 }
 
 export function fetchActiveBillingConfigurations() {
-  const results = BILLING_CONFIGURATIONS.filter((config) => config.status === "Active");
-  return delay(results);
+  const configs = [
+    {
+      id: "BC-2026-001",
+      projectCode: "PRJ-1001",
+      projectName: "ERP Modernization",
+      client: "ABC Technologies",
+      billingType: "TIME_MATERIAL",
+      billingFrequency: "MONTHLY",
+      billingPeriod: "14 Aug 2026 - 13 Sep 2026",
+      periodStart: "2026-08-14",
+      periodEnd: "2026-09-13",
+      invoiceGeneration: "AUTOMATIC",
+      billingStatus: "Ready",
+      lastInvoice: "INV-1005",
+      generatedOn: "13 Aug 2026",
+      currency: "INR"
+    },
+    {
+      id: "BC-2026-002",
+      projectCode: "PRJ-1003",
+      projectName: "Digital Banking Platform",
+      client: "Global Finance Ltd",
+      billingType: "FIXED_PRICE",
+      billingFrequency: "HALF_YEARLY",
+      billingPeriod: "01 Jul 2026 - 31 Dec 2026",
+      periodStart: "2026-07-01",
+      periodEnd: "2026-12-31",
+      invoiceGeneration: "MANUAL",
+      billingStatus: "Waiting for Source Data",
+      lastInvoice: "INV-1002",
+      generatedOn: "30 Jun 2026",
+      currency: "USD"
+    },
+    {
+      id: "BC-2026-004",
+      projectCode: "MAN-1001",
+      projectName: "Warehouse Robotics Integration",
+      client: "Atlas Logistics",
+      billingType: "RECURRING",
+      billingFrequency: "MONTHLY",
+      billingPeriod: "01 Aug 2026 - 31 Aug 2026",
+      periodStart: "2026-08-01",
+      periodEnd: "2026-08-31",
+      invoiceGeneration: "AUTOMATIC",
+      billingStatus: "Ready",
+      lastInvoice: "INV-1008",
+      generatedOn: "31 Jul 2026",
+      currency: "INR"
+    },
+    {
+      id: "BC-2026-008",
+      projectCode: "PRJ-1007",
+      projectName: "Patient Portal Revamp",
+      client: "Zen Healthcare",
+      billingType: "RECURRING",
+      billingFrequency: "MONTHLY",
+      billingPeriod: "01 Aug 2026 - 31 Aug 2026",
+      periodStart: "2026-08-01",
+      periodEnd: "2026-08-31",
+      invoiceGeneration: "MANUAL",
+      billingStatus: "Already Billed",
+      lastInvoice: "INV-1010",
+      generatedOn: "01 Aug 2026",
+      currency: "INR"
+    },
+    {
+      id: "BC-2026-011",
+      projectCode: "PRJ-1011",
+      projectName: "Core Insurance Claims Platform",
+      client: "Horizon Insurance Co.",
+      billingType: "MILESTONE",
+      billingFrequency: "QUARTERLY",
+      billingPeriod: "01 Jul 2026 - 30 Sep 2026",
+      periodStart: "2026-07-01",
+      periodEnd: "2026-09-30",
+      invoiceGeneration: "MANUAL",
+      billingStatus: "Ready",
+      lastInvoice: "INV-1012",
+      generatedOn: "30 Jun 2026",
+      currency: "INR"
+    }
+  ];
+  return delay(configs);
 }
 
 export function fetchBillingContext(configId) {

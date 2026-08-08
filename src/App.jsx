@@ -258,16 +258,16 @@ import LeaveBalanceJobProgress from "./pages/leave_management/models/LeaveBalanc
 import EmployeeExitDashboard from "./pages/employee-exit/EmployeeExitDashboard.jsx";
 import ExitDetailsPage from "./pages/employee-exit/ExitDetailsPage.jsx";
 
-import AccountReceivableLayout from "./pages/account_receivable/AccountReceivableLayout.jsx";
-import AccountReceivableDashboard from "./pages/account_receivable/Dashboard.jsx";
-import Overview from "./pages/account_receivable/Overview.jsx";
-import BillingConfigurations from "./pages/account_receivable/BillingConfigurations.jsx";
-import ConfigurationHistory from "./pages/account_receivable/ConfigurationHistory.jsx";
-import BillingDataAcquisition from "./pages/account_receivable/BillingDataAcquisition.jsx";
-import NewConfigurationWizard from "./pages/account_receivable/NewConfigurationWizard.jsx";
-import ToolPricingPage from "./pages/account_receivable/ToolPricingPage.jsx";
-import ProjectToolAssignmentPage from "./pages/account_receivable/ProjectToolAssignmentPage.jsx";
-import ToolChargeAcquisitionPage from "./pages/account_receivable/ToolChargeAcquisitionPage.jsx";
+import AccountReceivableLayout from "./pages/account_receivable/pages/AccountReceivableLayout.jsx";
+import AccountReceivableDashboard from "./pages/account_receivable/pages/Dashboard.jsx";
+import Overview from "./pages/account_receivable/pages/Overview.jsx";
+import BillingConfigurations from "./pages/account_receivable/pages/BillingConfigurations.jsx";
+import ConfigurationHistory from "./pages/account_receivable/pages/ConfigurationHistory.jsx";
+import BillingDataAcquisition from "./pages/account_receivable/pages/BillingDataAcquisition.jsx";
+import NewConfigurationWizard from "./pages/account_receivable/pages/NewConfigurationWizard.jsx";
+import ToolPricingPage from "./pages/account_receivable/pages/ToolPricingPage.jsx";
+import ProjectToolAssignmentPage from "./pages/account_receivable/pages/ProjectToolAssignmentPage.jsx";
+import ToolChargeAcquisitionPage from "./pages/account_receivable/pages/ToolChargeAcquisitionPage.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -594,6 +594,10 @@ const AppRoutes = () => {
             />
             <Route
               path="billing-data-acquisition"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingDataAcquisition /></ProtectedRoute>}
+            />
+            <Route
+              path="billing-data-acquisition/workspace"
               element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingDataAcquisition /></ProtectedRoute>}
             />
             <Route

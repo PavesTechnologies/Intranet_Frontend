@@ -47,7 +47,8 @@ export const RECURRING_BILLING_MODE_OPTIONS = [
 // read-only display in the Existing Enterprise Project flow, where billingMode is
 // synchronized master data rather than something the user picks from the list above).
 export const BILLING_MODE_LABELS = {
-  STANDARD: "Standard T&M",
+  STANDARD: "Standard Rate",
+  ROLE_BASED: "Role-Based Rates",
   FIXED: "Fixed Price",
   MILESTONE: "Milestone-Based",
   MONTHLY_RETAINER: "Monthly Retainer",
@@ -55,10 +56,12 @@ export const BILLING_MODE_LABELS = {
 };
 
 export const BILLING_FREQUENCIES = [
+  { value: "WEEKLY", label: "Weekly" },
+  { value: "BIWEEKLY", label: "Biweekly" },
   { value: "MONTHLY", label: "Monthly" },
   { value: "QUARTERLY", label: "Quarterly" },
-  { value: "HALF_YEARLY", label: "Half-Yearly" },
   { value: "YEARLY", label: "Yearly" },
+  { value: "ON_DEMAND", label: "On Demand" },
 ];
 
 export const BILLING_CYCLE_OPTIONS = [
@@ -139,6 +142,7 @@ export const PAYMENT_TERMS_OPTIONS = [
   { value: "NET_30", label: "Net 30" },
   { value: "NET_45", label: "Net 45" },
   { value: "NET_60", label: "Net 60" },
+  { value: "IMMEDIATE", label: "Immediate" },
 ];
 
 export const APPROVAL_WORKFLOW_OPTIONS = [

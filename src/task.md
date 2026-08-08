@@ -1,0 +1,25 @@
+- [x] Update options in `wizardOptions.js` (add all billing frequencies)
+- [x] Create the new consolidated `ProjectStep.jsx` component
+- [x] Update `NewConfigurationWizard.jsx` steps, validation, and layout
+- [x] Update downstream components (`BillingConfigurationStep.jsx` and `ReviewActivateStep.jsx`) to handle the new state schema
+- [x] Remove obsolete components (`SourceSelectionStep.jsx`, `EnterpriseProjectSelectionStep.jsx`, `ManualProjectCreationStep.jsx`)
+- [x] Verify the application runs successfully and check flows
+- [x] Simplify `TimeAndMaterialForm` in `BillingConfigurationStep.jsx` to MVP scope
+- [x] Add editable tables for Role-based and Resource-based modes
+- [x] Verify the application builds successfully
+- [x] Refactor summary cards in `BillingConfigurationStep.jsx`
+- [x] Implement user choice forcing for Billing Mode (no default selection)
+- [x] Rename dynamic section to "Rate Configuration"
+- [x] Verify build compiles successfully
+- [x] Rename Billing Mode to Rate Model and remove Resource-Based pricing
+- [x] Add strict validation for Standard and Role-Based rates
+- [x] Verify build compiles successfully
+- [x] Simplify fields in `BillingControlsStep.jsx` to Invoice Preferences scope
+- [x] Update validations in `NewConfigurationWizard.jsx` for Step 3
+- [x] Refactor Review & Activate summary for preferences
+- [x] Verify build compiles successfully
+- [x] Refactor `billingDataAcquisitionService.js` for derived periods and metadata
+- [x] Build execution dashboard (Screen 1) in `BillingDataAcquisition.jsx`
+- [x] Build acquisition preview modal/view (Screen 2)
+- [x] Build final invoice draft generation screen
+- [x] Verify build compiles successfully
