@@ -474,7 +474,7 @@ export default function RequestLeaveModal({
         "Failed to submit leave request: " +
           (err.response?.data?.message || err.message),
       );
-      toast.error("Failed to submit leave request: ");
+      toast.error("Failed to submit leave request: " + (err.response?.data?.message || err.message));
     } finally {
       setSubmitting(false);
     }

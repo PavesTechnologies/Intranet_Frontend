@@ -49,6 +49,11 @@ export default function PipelineCandidateScorecardPage({
     name: resumeRow?.candidate_full_name,
     email: resumeRow?.candidate_email,
     createdAt: resumeRow?.created_at,
+    // Resume Upload History rows carry campaign_candidate_id, but the
+    // parsed-json endpoint (this page's only data source) doesn't — thread it
+    // through here so the Deterministic/Semantic/AI Evaluation tabs can call
+    // /campaign-candidates/{campaign_candidate_id}/... with the right id.
+    campaignCandidateId: resumeRow?.campaign_candidate_id,
   };
   const { candidate, loading, error, refetch } = useParsedResumeCandidate(candidateId, fallback);
   const [activeTab, setActiveTab] = useState(TABS[0].id);
