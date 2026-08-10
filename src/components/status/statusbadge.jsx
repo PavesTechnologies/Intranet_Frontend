@@ -96,6 +96,21 @@ const StatusBadge = ({ label, size = "md" }) => {
     textColor = "text-green-700";
   }
 
+  if (normalized === "partially paid") {
+    bgColor = "bg-sky-100";
+    textColor = "text-sky-700";
+  }
+
+  if (normalized === "duplicate") {
+    bgColor = "bg-orange-100";
+    textColor = "text-orange-700";
+  }
+
+  if (normalized === "disputed") {
+    bgColor = "bg-rose-100";
+    textColor = "text-rose-700";
+  }
+
   const sizeStyles = {
     sm: "text-xs px-2 py-0.5",
     md: "text-sm px-3 py-1",
