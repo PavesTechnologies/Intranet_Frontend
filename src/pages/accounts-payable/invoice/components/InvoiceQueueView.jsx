@@ -6,6 +6,7 @@ import Pagination from "../../../../components/Pagination/pagination";
 import InvoiceStatusTabs from "./InvoiceStatusTabs";
 import InvoiceFilterPanel from "./InvoiceFilterPanel";
 import InvoiceTable from "./InvoiceTable";
+import InvoiceKpiCards from "./InvoiceKpiCards";
 import { useInvoices } from "../hooks/useInvoices";
 import { useInvoiceFilters } from "../hooks/useInvoiceFilters";
 import { QUEUE_STATUS_FILTERS } from "../../constants/queueTypes";
@@ -19,11 +20,14 @@ const PAGE_SIZE = 10;
  * and InvoiceValidationQueuePage — one implementation, not three near-duplicate list pages (see
  * PART D: "Do not create another invoice list page"). Each page just supplies a title/subtitle
  * and which queue tab starts active; switching tabs re-filters in place rather than navigating.
+ *
+ * KPI cards are opt-in (showKpis) so only Invoice Management gains them — the OCR Review and
+ * Validation queue pages stay exactly as they were.
  */
-export default function InvoiceQueueView({ title, subtitle, defaultQueueType, showUploadAction = false }) {
+export default function InvoiceQueueView({ title, subtitle, defaultQueueType, showUploadAction = false, showKpis = false }) {
   const navigate = useNavigate();
   const [queueType, setQueueType] = useState(defaultQueueType);
-  const { filters, setSearch, setInvoiceType, setDateRange, setPage, resetFilters, hasActiveFilters } =
+  const { filters, setSearch, setInvoiceType, setStatus, setDateRange, setPage, resetFilters, hasActiveFilters } =
     useInvoiceFilters();
 
   const { invoices, page, totalPages, isLoading, isError, error } = useInvoices({
@@ -51,12 +55,15 @@ export default function InvoiceQueueView({ title, subtitle, defaultQueueType, sh
         }
       />
 
+      {showKpis && <InvoiceKpiCards />}
+
       <InvoiceStatusTabs activeQueueType={queueType} onChange={handleQueueChange} />
 
       <InvoiceFilterPanel
         filters={filters}
         onSearch={setSearch}
         onInvoiceTypeChange={setInvoiceType}
+        onStatusChange={setStatus}
         onDateRangeChange={setDateRange}
         onReset={resetFilters}
         hasActiveFilters={hasActiveFilters}

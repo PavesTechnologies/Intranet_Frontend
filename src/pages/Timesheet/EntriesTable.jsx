@@ -10,6 +10,7 @@ import { add } from "date-fns";
 import api from "../../api/axiosInstance";
 import { toast } from "react-toastify";
 import { ConfirmDialog } from "./TimesheetGroup";
+import { getEntryRowId } from "./entrySelection";
 
 const TS_BASE_URL = window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT;
 
@@ -451,6 +452,8 @@ const EntriesTable = ({
   const compactSelectProps = {
     className: "min-w-0",
     buttonClassName: "px-3 text-sm",
+    // Project/task lists can be long — show 4 rows, then scroll.
+    maxVisibleOptions: 4,
   };
   const compactTimeProps = {
     className: "min-w-0",
@@ -467,33 +470,9 @@ const EntriesTable = ({
                
         <tr className="bg-indigo-900 text-white text-sm">
                    
-          {selectionMode && (
-            <th className="px-3 py-2">
-                           
-              <input
-                type="checkbox"
-                title="Select All"
-                checked={
-                  [...entries, ...pendingEntries].length > 0 &&
-                  selectedEntryIds.length ===
-                    [...entries, ...pendingEntries].length
-                }
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelectedEntryIds(
-                      [...entries, ...pendingEntries].map(
-                        (entry, idx) =>
-                          entry.timesheetEntryId || `new-${idx}`,
-                      ),
-                    );
-                  } else {
-                    setSelectedEntryIds([]);
-                  }
-                }}
-              />
-                         
-            </th>
-          )}
+          {/* Select-all lives on the day header now — this cell only keeps the
+              column aligned with the per-row checkboxes below. */}
+          {selectionMode && <th className="w-8 px-3 py-2" aria-hidden="true" />}
                     <th className={headerCellClass}>Project</th>         
           <th className={headerCellClass}>Task</th>         
           <th className={headerCellClass}>Start</th>         
@@ -515,28 +494,26 @@ const EntriesTable = ({
                
         {[...entries, ...pendingEntries].map((entry, idx) => (
           <tr
-            key={entry.timesheetEntryId || `new-${idx}`}
+            key={getEntryRowId(entry, idx)}
             className={`text-sm ${
               idx % 2 === 0 ? "bg-white" : "bg-gray-50"
             } hover:bg-blue-50 transition`}
           >
-                       
+
             {selectionMode && (
               <td className="px-3 py-2 text-center">
-                               
+
                 <input
                   type="checkbox"
+                  className="h-4 w-4 cursor-pointer accent-[#263383]"
                   checked={selectedEntryIds.includes(
-                    entry.timesheetEntryId || `new-${idx}`,
+                    getEntryRowId(entry, idx),
                   )}
                   onChange={(e) =>
-                    toggleCheckbox(
-                      entry.timesheetEntryId || `new-${idx}`,
-                      e.target.checked,
-                    )
+                    toggleCheckbox(getEntryRowId(entry, idx), e.target.checked)
                   }
                 />
-                             
+
               </td>
             )}
                        

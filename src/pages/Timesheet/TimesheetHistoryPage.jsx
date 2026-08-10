@@ -66,14 +66,21 @@ const TimesheetHistoryPage = () => {
     }
 
     return apiResponse.weeklySummary.map((week) => {
+      // Safeguard for older API builds that label an un-submitted week as
+      // SUBMITTED: a week whose days are all DRAFT is still a Draft.
+      const days = week.timesheets || [];
+      const allDaysDraft =
+        days.length > 0 &&
+        days.every((ts) => ts.status?.toUpperCase() === "DRAFT");
+
       // Map the week data to our expected format
       const weekGroup = {
         weekStart: week.startDate,
         weekEnd: week.endDate,
         weekRange: formatWeekRange(week.startDate, week.endDate),
-        timesheets: week.timesheets || [],
+        timesheets: days,
         totalHours: week.totalHours || 0,
-        status: mapWeeklyStatus(week.weeklyStatus),
+        status: allDaysDraft ? "Draft" : mapWeeklyStatus(week.weeklyStatus),
         actionStatus: [], // Will be populated from individual timesheets
         weekNumber: week.weekId, // Map weekId to weekNumber
         monthName: new Date(week.startDate).toLocaleDateString("en-US", {

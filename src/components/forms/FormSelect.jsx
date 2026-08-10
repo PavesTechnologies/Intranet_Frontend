@@ -3,6 +3,10 @@ import { Listbox } from "@headlessui/react";
 import { Check, ChevronDown } from "lucide-react";
 import classNames from "classnames";
 
+// One option row = py-2 (1rem) + sm:text-sm line-height (1.25rem); the list adds py-1 (0.5rem).
+const OPTION_ROW_REM = 2.25;
+const LIST_PADDING_REM = 0.5;
+
 const FormSelect = ({
   label,
   options,
@@ -11,8 +15,19 @@ const FormSelect = ({
   name,
   className = "",
   buttonClassName = "",
+  // Cap the dropdown to N rows and scroll past them. Omit to keep the default max-h-60.
+  maxVisibleOptions,
 }) => {
   const selectedOption = options.find((opt) => opt.value === value);
+
+  const optionsStyle =
+    maxVisibleOptions > 0
+      ? {
+          maxHeight: `${
+            maxVisibleOptions * OPTION_ROW_REM + LIST_PADDING_REM
+          }rem`,
+        }
+      : undefined;
 
   return (
     <div className={`space-y-1 w-full min-w-0 ${className}`.trim()}>
@@ -22,7 +37,7 @@ const FormSelect = ({
       <Listbox value={value} onChange={(val) => onChange({ target: { name, value: val } })}>
         <div className="relative min-w-0">
           <Listbox.Button
-            className={`w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${buttonClassName}`.trim()}
+            className={`w-full h-10 min-w-0 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-left text-sm flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${buttonClassName}`.trim()}
           >
             <span className="block truncate pr-6">
               {selectedOption?.label || "Select"}
@@ -33,7 +48,11 @@ const FormSelect = ({
           </Listbox.Button>
 
           <Listbox.Options
-            className="absolute z-50 mt-1 max-h-60 overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm w-max min-w-full"
+            style={optionsStyle}
+            className={classNames(
+              "absolute z-50 mt-1 overflow-y-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm w-max min-w-full",
+              !optionsStyle && "max-h-60",
+            )}
           >
             {options.map((option) => (
               <Listbox.Option
