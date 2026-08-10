@@ -1,9 +1,6 @@
 import api from "../../../api/axiosInstance";
 
-const BASE_URL =
-  window.__APP_CONFIG__?.AR_BASE_URL ||
-  window.__APP_CONFIG__?.RMS_BASE_URL ||
-  "";
+const BASE_URL = window.__APP_CONFIG__.AR_BASE_URL;
 
 const BILLING_CONFIGURATIONS_URL = `${BASE_URL}/api/billing-configurations`;
 

@@ -6,8 +6,8 @@ export function KPICard({ label, value, icon, color, active, onClick, suffix, cl
             <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", color || "bg-secondary text-secondary-foreground")}>
                 {icon}
             </div>
-            <div className="min-w-0">
-                <p className="text-xs font-medium text-slate-500 mb-0.5 whitespace-nowrap">
+            <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-slate-500 mb-0.5 leading-tight truncate" title={label}>
                     {label}
                 </p>
                 <p className="text-2xl font-bold text-slate-900 tabular-nums tracking-tight">
