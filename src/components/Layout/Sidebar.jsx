@@ -487,9 +487,8 @@ const Sidebar = ({ isCollapsed }) => {
               onMouseEnter={handleAirsMouseEnter}
               onMouseLeave={handleAirsMouseLeave}
             >
-              <Link
-                to="/airs/jds"
-                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${location.pathname.startsWith("/airs")
+              <div
+                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/airs")
                   ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
                   : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
                   }`}
@@ -506,7 +505,7 @@ const Sidebar = ({ isCollapsed }) => {
                     />
                   </>
                 )}
-              </Link>
+              </div>
 
               {airsHovered && (
                 <ul

@@ -96,7 +96,7 @@ export default function NewCampaignForm({
 
                 <div className="grid grid-cols-2 gap-4">
                     <FormInput
-                        label="Max Candidates"
+                        label="Openings"
                         name="max_candidates"
                         type="number"
                         min="1"
