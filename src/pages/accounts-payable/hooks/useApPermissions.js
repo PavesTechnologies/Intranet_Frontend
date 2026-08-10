@@ -21,6 +21,7 @@ export function useApPermissions() {
     canUploadInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.UPLOAD_INVOICE)),
     canReviewOcr: hasRole(rolesForPermission(AP_PERMISSIONS.REVIEW_OCR)),
     canValidateInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.VALIDATE_INVOICE)),
+    canApproveInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.APPROVE_INVOICE)),
     canViewInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_INVOICE)),
     canMarkPaid: hasRole(rolesForPermission(AP_PERMISSIONS.MARK_PAID)),
     canViewPayment: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_PAYMENT)),

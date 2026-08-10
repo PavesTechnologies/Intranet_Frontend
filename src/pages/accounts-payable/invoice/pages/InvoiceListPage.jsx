@@ -9,6 +9,7 @@ export default function InvoiceListPage() {
       subtitle="Manage and track vendor invoices"
       defaultQueueType={QUEUE_TYPES.ALL_INVOICES}
       showUploadAction
+      showKpis
     />
   );
 }

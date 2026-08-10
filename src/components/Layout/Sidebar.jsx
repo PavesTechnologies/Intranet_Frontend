@@ -666,13 +666,13 @@ const Sidebar = ({ isCollapsed }) => {
                 ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
                 : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
                 }`}
-              title={isCollapsed ? "Account Payable" : ""}
+              title={isCollapsed ? "Accounts Payable" : ""}
             >
               <ApModuleIcon className="h-5 w-5 shrink-0" />
 
               {!isCollapsed && (
                 <>
-                  <span className="flex-1">Account Payable</span>
+                  <span className="flex-1">Accounts Payable</span>
                   <ChevronRight
                     className={`h-4 w-4 transition-all duration-300 ${apHovered ? "translate-x-1" : ""
                       }`}
