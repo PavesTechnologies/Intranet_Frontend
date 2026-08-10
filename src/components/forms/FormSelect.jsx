@@ -22,7 +22,7 @@ const FormSelect = ({
       <Listbox value={value} onChange={(val) => onChange({ target: { name, value: val } })}>
         <div className="relative min-w-0">
           <Listbox.Button
-            className={`w-full min-w-0 px-4 py-2 border border-gray-300 rounded-lg shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${buttonClassName}`.trim()}
+            className={`w-full h-10 min-w-0 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-left text-sm flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${buttonClassName}`.trim()}
           >
             <span className="block truncate pr-6">
               {selectedOption?.label || "Select"}
