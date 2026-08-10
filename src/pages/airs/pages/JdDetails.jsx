@@ -57,6 +57,7 @@ const DEFAULT_CAMPAIGN_FORM = {
   hiring_manager_id: "",
   recruiter_id: "",
   prompt_template_id: "",
+  ai_evaluate_prompt_id: "",
 };
 
 const STATUS_BADGE = {
@@ -797,6 +798,10 @@ export default function JdDetails() {
       toast.error("Please select a Resume Parsing Prompt.");
       return;
     }
+    if (!String(campaignForm.ai_evaluate_prompt_id || "").trim()) {
+      toast.error("Please select an AI Evaluation Prompt.");
+      return;
+    }
     if (campaignForm.max_candidates !== "" && campaignForm.max_candidates !== null && Number(campaignForm.max_candidates) <= 0) {
       toast.error("Max candidates must be greater than 0.");
       return;
@@ -821,6 +826,7 @@ export default function JdDetails() {
       hiring_manager_id: campaignForm.hiring_manager_id.trim(),
       recruiter_id: campaignForm.recruiter_id.trim(),
       prompt_template_id: String(campaignForm.prompt_template_id || "").trim(),
+      ai_evaluate_prompt_id: String(campaignForm.ai_evaluate_prompt_id || "").trim(),
     };
 
     setIsSubmittingCampaign(true);
