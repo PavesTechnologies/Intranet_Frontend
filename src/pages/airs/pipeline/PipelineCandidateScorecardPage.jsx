@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense } from "react";
+import React, { useMemo, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import CandidateHeader from "../candidates/CandidateScore/components/CandidateHeader";
@@ -45,16 +45,27 @@ export default function PipelineCandidateScorecardPage({
   const location = useLocation();
   const candidateId = candidateIdProp ?? params.candidateId;
   const resumeRow = resumeRowProp ?? location.state?.resume;
-  const fallback = {
-    name: resumeRow?.candidate_full_name,
-    email: resumeRow?.candidate_email,
-    createdAt: resumeRow?.created_at,
-    // Resume Upload History rows carry campaign_candidate_id, but the
-    // parsed-json endpoint (this page's only data source) doesn't — thread it
-    // through here so the Deterministic/Semantic/AI Evaluation tabs can call
-    // /campaign-candidates/{campaign_candidate_id}/... with the right id.
-    campaignCandidateId: resumeRow?.campaign_candidate_id,
-  };
+  const campaignCandidateId =
+    resumeRow?.campaign_candidate_id ??
+    resumeRow?.campaignCandidateId ??
+    resumeRow?.campaignCandidate?.id ??
+    resumeRow?.campaign_candidate?.id ??
+    // Pipeline routes are opened with the campaign-candidate id; keep that id
+    // available for score tabs even when router state is lost on refresh.
+    (candidateIdProp ? null : params.candidateId);
+  const fallback = useMemo(
+    () => ({
+      name: resumeRow?.candidate_full_name,
+      email: resumeRow?.candidate_email,
+      createdAt: resumeRow?.created_at,
+      // Resume Upload History rows carry campaign_candidate_id, but the
+      // parsed-json endpoint (this page's only data source) doesn't — thread it
+      // through here so the Deterministic/Semantic/AI Evaluation tabs can call
+      // /campaign-candidates/{campaign_candidate_id}/... with the right id.
+      campaignCandidateId,
+    }),
+    [campaignCandidateId, resumeRow?.candidate_email, resumeRow?.candidate_full_name, resumeRow?.created_at]
+  );
   const { candidate, loading, error, refetch } = useParsedResumeCandidate(candidateId, fallback);
   const [activeTab, setActiveTab] = useState(TABS[0].id);
   const isModal = variant === "modal";

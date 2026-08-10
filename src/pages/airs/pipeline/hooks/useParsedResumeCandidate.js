@@ -31,8 +31,7 @@ export default function useParsedResumeCandidate(candidateId, fallback) {
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candidateId]);
+  }, [candidateId, fallback]);
 
   useEffect(() => {
     fetchCandidate();

@@ -28,7 +28,7 @@ export function mapParsedResumeToCandidate(raw, fallback = {}) {
     // campaign_candidate_id specifically, not this resume's plain
     // candidate_id. The parsed-json response doesn't carry it, so it comes in
     // through `fallback` (from the Resume Upload History row that linked here).
-    id: data.campaign_candidate_id ?? fallback.campaignCandidateId ?? null,
+    id: data.campaign_candidate_id ?? data.campaignCandidateId ?? fallback.campaignCandidateId ?? null,
     candidateId: data.candidate_id ?? null,
     resumeId: data.resume_id ?? null,
 
