@@ -451,6 +451,8 @@ const EntriesTable = ({
   const compactSelectProps = {
     className: "min-w-0",
     buttonClassName: "px-3 text-sm",
+    // Project/task lists can be long — show 4 rows, then scroll.
+    maxVisibleOptions: 4,
   };
   const compactTimeProps = {
     className: "min-w-0",

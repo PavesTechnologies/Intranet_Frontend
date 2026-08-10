@@ -204,6 +204,9 @@ const TimesheetGroup = ({
   const [selectionTimesheetId, setSelectionTimesheetId] = useState(null);
   const menuRef = useRef(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  // Timesheet-level (whole day) delete — separate from the entry-level delete above.
+  const [timesheetToDelete, setTimesheetToDelete] = useState(null);
+  const [deletingTimesheet, setDeletingTimesheet] = useState(false);
   const [isSubmittingWeek, setIsSubmittingWeek] = useState(false); // Create individual refs for each timesheet menu
 
   const menuRefs = useRef({}); // Check if submit button should be disabled
@@ -369,6 +372,77 @@ const TimesheetGroup = ({
 
   const handleCancelDelete = () => {
     setIsConfirmOpen(false);
+  };
+
+  // ---- Timesheet-level delete (removes the whole day, not single entries) ----
+  // The backend has no "delete timesheet" route: deleteEntries drops the timesheet
+  // itself once its last entry is gone, so we send every entry id for that day.
+  const getEntryIds = (timesheet) =>
+    (timesheet?.entries || [])
+      .map((e) => e.timesheetEntryId ?? e.timesheetEntryid ?? e.id)
+      .filter((id) => id != null);
+
+  const isDayLocked = (timesheet) => {
+    const s = timesheet?.status?.toLowerCase();
+    return s === "approved" || s === "partially approved";
+  };
+
+  const handleDeleteTimesheetClick = (timesheet) => {
+    if (getEntryIds(timesheet).length === 0) {
+      showStatusToast("This day has no entries to delete.", "error");
+      return;
+    }
+    setOpenMenuId(null);
+    setMenuOpen(false);
+    setTimesheetToDelete(timesheet);
+  };
+
+  const handleConfirmDeleteTimesheet = async () => {
+    const target = timesheetToDelete;
+    if (!target || deletingTimesheet) return;
+
+    const entryIds = getEntryIds(target);
+    if (entryIds.length === 0) {
+      showStatusToast("This day has no entries to delete.", "error");
+      setTimesheetToDelete(null);
+      return;
+    }
+
+    setDeletingTimesheet(true);
+    try {
+      const response = await api.delete(
+        `${
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        }/api/timesheet/deleteEntries/${target.timesheetId}`,
+        { data: { entryIds } },
+      );
+
+      const data = response.data;
+      const message =
+        (typeof data === "string" ? data : data?.message) ||
+        "Timesheet deleted successfully";
+      showStatusToast(message, "success");
+
+      // Drop any UI state that pointed at the timesheet we just removed,
+      // otherwise selection/add-entry stay bound to a dead id after refresh.
+      if (selectionTimesheetId === target.timesheetId) {
+        setSelectionTimesheetId(null);
+        setSelectedEntryIds([]);
+      }
+      if (timesheetIdAdding === target.timesheetId) setTimesheetIdAdding(null);
+
+      setTimesheetToDelete(null);
+      if (refreshData) await refreshData();
+    } catch (error) {
+      const respData = error.response?.data;
+      const message =
+        (typeof respData === "string" ? respData : respData?.message) ||
+        error.message ||
+        "Failed to delete timesheet";
+      showStatusToast(message, "error");
+    } finally {
+      setDeletingTimesheet(false);
+    }
   };
 
   const handleSelect = (id) => {
@@ -888,39 +962,54 @@ const TimesheetGroup = ({
                 {/* 3 dots menu for daily format */}       {" "}
         {!isWeeklyFormat && (
           <div
-            className="absolute right-0 top-1/2 -translate-y-1/2"
+            className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-2"
             ref={menuRef}
           >
                        {" "}
             {window.location.pathname !== "/managerapproval" && (
-              <button
-                onClick={() => setMenuOpen((open) => !open)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-gray-300 focus:outline-none"
-                type="button"
-                disabled={
-                  currentStatus?.toLowerCase() === "approved" ||
-                  currentStatus?.toLowerCase() === "partially approved"
-                }
-                title={
-                  currentStatus?.toLowerCase() === "approved" ||
-                  currentStatus?.toLowerCase() === "partially approved"
-                    ? "Cannot edit approved timesheet"
-                    : "More options"
-                }
-              >
-                <MoreVertical size={20} />
-              </button>
-            )}
-                       {" "}
-            {menuOpen && (
-              <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl border border-gray-100 py-1.5 z-50 overflow-hidden" style={{ boxShadow: "0 12px 32px rgba(8,21,52,0.16)" }}>
-                               {" "}
+              <>
+                {/* Add Entry lives beside the ⋮ menu, not inside it */}
                 <button
                   onClick={handleAddEntryDaily}
-                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-[#f4f6fc] hover:text-[#263383] transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-[#263383] transition-colors hover:bg-[#f4f6fc] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  type="button"
+                  disabled={
+                    currentStatus?.toLowerCase() === "approved" ||
+                    currentStatus?.toLowerCase() === "partially approved"
+                  }
+                  title={
+                    currentStatus?.toLowerCase() === "approved" ||
+                    currentStatus?.toLowerCase() === "partially approved"
+                      ? "Cannot edit approved timesheet"
+                      : "Add Entry"
+                  }
                 >
                   <Plus size={16} className="flex-shrink-0" /> Add Entry
                 </button>
+                <button
+                  onClick={() => setMenuOpen((open) => !open)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-gray-300 focus:outline-none"
+                  type="button"
+                  disabled={
+                    currentStatus?.toLowerCase() === "approved" ||
+                    currentStatus?.toLowerCase() === "partially approved"
+                  }
+                  title={
+                    currentStatus?.toLowerCase() === "approved" ||
+                    currentStatus?.toLowerCase() === "partially approved"
+                      ? "Cannot edit approved timesheet"
+                      : "More options"
+                  }
+                >
+                  <MoreVertical size={20} />
+                </button>
+              </>
+            )}
+                       {" "}
+            {menuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-xl border border-gray-100 py-1.5 z-50 overflow-hidden" style={{ boxShadow: "0 12px 32px rgba(8,21,52,0.16)" }}>
+                               {" "}
+                {/* Add Entry moved out of this menu — see the button beside ⋮ */}
                                {" "}
                 <button
                   onClick={handleDeleteClick}
@@ -1032,6 +1121,53 @@ const TimesheetGroup = ({
                                          {" "}
                       {/* 3 dots menu for individual timesheet */}             
                            {" "}
+                      {/* Add Entry — available on draft/submitted/rejected days,
+                          disabled once the day is approved */}
+                      {window.location.pathname !== "/managerapproval" && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddEntryWeekly(timesheet.timesheetId);
+                            setOpenMenuId(null);
+                          }}
+                          disabled={isDayLocked(timesheet)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-[#263383] transition-colors hover:bg-[#f4f6fc] focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={
+                            isDayLocked(timesheet)
+                              ? "Cannot edit approved timesheet"
+                              : "Add Entry"
+                          }
+                        >
+                          <Plus size={14} className="flex-shrink-0" /> Add Entry
+                        </button>
+                      )}
+                      {/* Timesheet-level delete — removes the whole day */}
+                      {window.location.pathname !== "/managerapproval" && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTimesheetClick(timesheet);
+                          }}
+                          disabled={
+                            isDayLocked(timesheet) ||
+                            getEntryIds(timesheet).length === 0 ||
+                            deletingTimesheet
+                          }
+                          className="p-1 rounded-full text-red-500 hover:bg-red-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={
+                            isDayLocked(timesheet)
+                              ? "Cannot delete approved timesheet"
+                              : getEntryIds(timesheet).length === 0
+                                ? "No entries to delete"
+                                : "Delete this timesheet"
+                          }
+                          aria-label="Delete this timesheet"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                       {window.location.pathname !== "/managerapproval" && (
                         <div
                           className="relative"
@@ -1074,18 +1210,7 @@ const TimesheetGroup = ({
                           {openMenuId === timesheet.timesheetId && (
                             <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl border border-gray-100 py-1.5 z-50 overflow-hidden" style={{ boxShadow: "0 12px 32px rgba(8,21,52,0.16)" }}>
                                                          {" "}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleAddEntryWeekly(timesheet.timesheetId);
-                                  setOpenMenuId(null);
-                                  setMenuOpen(false);
-                                }}
-                                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-[#f4f6fc] hover:text-[#263383] transition-colors"
-                              >
-                  <Plus size={16} className="flex-shrink-0" /> Add Entry
-                                                   {" "}
-                              </button>
+                              {/* Add Entry moved out of this menu - see the button beside the delete icon */}
                                                          {" "}
                               <button
                                 onClick={(e) => {
@@ -1227,6 +1352,19 @@ const TimesheetGroup = ({
         } selected entr${selectedEntryIds.length > 1 ? "ies" : "y"}?`}
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
+      />
+      <ConfirmDialog
+        open={!!timesheetToDelete}
+        title="Delete Timesheet"
+        message={`This will delete the timesheet for ${
+          timesheetToDelete ? formatDate(timesheetToDelete.workDate).text : ""
+        } along with all ${
+          timesheetToDelete ? getEntryIds(timesheetToDelete).length : 0
+        } of its entries. This action cannot be undone.`}
+        onConfirm={handleConfirmDeleteTimesheet}
+        onCancel={() => {
+          if (!deletingTimesheet) setTimesheetToDelete(null);
+        }}
       />
          {" "}
     </div>
