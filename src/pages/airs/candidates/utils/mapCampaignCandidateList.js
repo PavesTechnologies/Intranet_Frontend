@@ -10,6 +10,8 @@ export function mapCampaignCandidateRow(row = {}) {
     name: textOrDash(row.candidate_name),
     initials: initialsFromName(row.candidate_name),
     role: textOrDash(row.current_designation),
+    rank: typeof row.rank === "number" ? row.rank : null,
+    rankingStatus: row.ranking_status || null,
     // Plain-text score columns display "-" when missing; composite feeds a
     // ScoreRing gauge and experience is templated as "N yrs", so both need a
     // real number to avoid a broken arithmetic/render, hence the 0 fallback.
@@ -21,6 +23,14 @@ export function mapCampaignCandidateRow(row = {}) {
     location: textOrDash(row.location),
     stage: textOrDash(row.pipeline_stage),
     risk: numberOrDash(row.risk_score),
+    aiRecommendation: row.ai_recommendation || null,
+    isFraudFlagged: !!row.is_fraud_flagged,
+    hrOverride: !!row.hr_override,
+    decisionType: row.decision_type || null,
+    decisionSource: row.decision_source || null,
+    decisionReason: row.decision_reason || null,
+    decisionAt: row.decision_at || null,
+    parseStatus: row.parse_status || null,
     starred: false,
   };
 }
