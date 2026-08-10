@@ -207,9 +207,18 @@ export const XMS_SUBMENU = [
     ],
   },
   {
-    label: "Policies",
-    to: "/expense-management/policies",
-    allowedRoles: XMS_ADMIN,
+    label: "Policy & Compliance",
+    to: "/expense-management/policy-engine/dashboard",
+    allowedRoles: XMS_REPORT_VIEWERS,
+    children: [
+      { label: "Dashboard",           to: "/expense-management/policy-engine/dashboard" },
+      { label: "Policy Bundles",      to: "/expense-management/policy-engine/bundles" },
+      { label: "Policy Groups",       to: "/expense-management/policy-engine/groups" },
+      { label: "Assignments",         to: "/expense-management/policy-engine/assignments" },
+      { label: "Rules",               to: "/expense-management/policy-engine/rules" },
+      { label: "Severity Thresholds", to: "/expense-management/policy-engine/severity-thresholds" },
+      { label: "Version History",     to: "/expense-management/policy-engine/versions" },
+    ],
   },
   // {
   //   label: "Reports",

@@ -185,7 +185,14 @@ import XmsProjectsMasterPage from "./pages/expense-management/pages/masters/Proj
 import XmsClientsMasterPage from "./pages/expense-management/pages/masters/ClientsMasterPage.jsx";
 import XmsCurrencyManagementPage from "./pages/expense-management/pages/masters/CurrencyManagementPage.jsx";
 import XmsTaxConfigurationPage from "./pages/expense-management/pages/masters/TaxConfigurationPage.jsx";
-import XmsPoliciesPage from "./pages/expense-management/pages/policies/PoliciesPage.jsx";
+import XmsPolicyDashboardPage from "./pages/expense-management/pages/PolicyDashboard.jsx";
+import XmsPolicyBundlesPage from "./pages/expense-management/pages/PolicyBundles.jsx";
+import XmsPolicyRulesPage from "./pages/expense-management/pages/PolicyRules.jsx";
+import XmsPolicyGroupsPage from "./pages/expense-management/pages/PolicyGroups.jsx";
+import XmsPolicyAssignmentsPage from "./pages/expense-management/pages/PolicyAssignments.jsx";
+import XmsSeverityThresholdPage from "./pages/expense-management/pages/SeverityThreshold.jsx";
+import XmsPolicyVersionsPage from "./pages/expense-management/pages/PolicyVersions.jsx";
+import { POLICY_VIEW_ROLES } from "./pages/expense-management/components/policy/common/policyEnums.js";
 import XmsReportsPage from "./pages/expense-management/pages/reports/ReportsPage.jsx";
 import XmsNotificationsPage from "./pages/expense-management/pages/activity/NotificationsPage.jsx";
 import XmsAuditLogsPage from "./pages/expense-management/pages/activity/AuditLogsPage.jsx";
@@ -1261,7 +1268,13 @@ const AppRoutes = () => {
           <Route path="/expense-management/masters/currency-management" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsCurrencyManagementPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/tax-configuration" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsTaxConfigurationPage /></ProtectedRoute>} />
 
-          <Route path="/expense-management/policies" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsPoliciesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/policy-engine/dashboard" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyDashboardPage /></ProtectedRoute>} />
+          <Route path="/expense-management/policy-engine/bundles" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyBundlesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/policy-engine/rules" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyRulesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/policy-engine/groups" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyGroupsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/policy-engine/assignments" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyAssignmentsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/policy-engine/severity-thresholds" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsSeverityThresholdPage /></ProtectedRoute>} />
+          <Route path="/expense-management/policy-engine/versions" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyVersionsPage /></ProtectedRoute>} />
           <Route path="/expense-management/reports" element={<ProtectedRoute allowedRoles={["Manager", "Finance", "Admin", "Super_Admin"]}><XmsReportsPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/activity/notifications" element={<ProtectedRoute allowedRoles={["General", "Manager", "Finance", "Admin", "Super_Admin"]}><XmsNotificationsPage /></ProtectedRoute>} />
