@@ -185,6 +185,8 @@ export const SOURCE_FILTER_OPTIONS = [
 export const STATUS_FILTER_OPTIONS = [
   { value: "", label: "All Statuses" },
   { value: "Draft", label: "Draft" },
+  { value: "Pending Approval", label: "Pending Approval" },
   { value: "Active", label: "Active" },
+  { value: "Rejected", label: "Rejected" },
   { value: "Inactive", label: "Inactive" },
 ];

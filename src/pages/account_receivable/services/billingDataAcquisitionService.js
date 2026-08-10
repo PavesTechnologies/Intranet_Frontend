@@ -2,7 +2,7 @@
 // promise-based, artificially-latent functions so pages can already be written against an
 // async data-fetching contract — swap the bodies for real axios calls (see
 // src/pages/resource_management/services for the target shape) once the Epic 1 API exists.
-import { BILLING_CONFIGURATIONS } from "../data/billingConfigurations";
+import { getBillingConfigurations } from "./billingConfigurationService";
 import { BILLING_CONTEXTS } from "../data/billingContexts";
 import { MOCK_TRANSACTIONS } from "../data/billingDataAcquisition";
 
@@ -20,9 +20,9 @@ function sumAmount(records) {
   return records.reduce((total, record) => total + (Number(record.amount) || 0), 0);
 }
 
-export function fetchActiveBillingConfigurations() {
-  const results = BILLING_CONFIGURATIONS.filter((config) => config.status === "Active");
-  return delay(results);
+export async function fetchActiveBillingConfigurations() {
+  const configurations = await getBillingConfigurations();
+  return configurations.filter((config) => config.status === "Active");
 }
 
 export function fetchBillingContext(configId) {

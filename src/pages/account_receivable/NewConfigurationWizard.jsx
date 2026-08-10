@@ -18,10 +18,11 @@ import ToolBillingStep from "./components/steps/ToolBillingStep";
 import BillingControlsStep from "./components/steps/BillingControlsStep";
 import ReviewActivateStep from "./components/steps/ReviewActivateStep";
 import {
-  fetchBillingConfigurationById,
-  saveDraftConfiguration,
-  activateConfiguration,
-} from "./services/billingConfigService";
+  approveBillingConfiguration,
+  getApiErrorMessage,
+  getBillingConfigurationById,
+  saveBillingConfiguration,
+} from "./services/billingConfigurationService";
 
 const INITIAL_WIZARD_DATA = {
   setupMode: null,
@@ -150,21 +151,33 @@ export default function NewConfigurationWizard() {
   const [saving, setSaving] = useState(false);
   const [activating, setActivating] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [savedConfigId, setSavedConfigId] = useState(configId || null);
 
   useEffect(() => {
     if (!configId) return;
 
     let isMounted = true;
-    fetchBillingConfigurationById(configId).then((result) => {
-      if (!isMounted || !result) return;
+    const loadConfiguration = async () => {
+      try {
+        const result = await getBillingConfigurationById(configId);
+        if (!isMounted || !result) return;
 
-      const { summary, detail } = result;
-      if (detail) {
-        setWizardData((prev) => ({ ...prev, ...detail }));
+        const { summary, detail } = result;
+        if (detail) {
+          setWizardData((prev) => ({ ...prev, ...detail }));
+        }
+        setSavedConfigId(summary.id || configId);
+        setCurrentStep(summary.status === "Draft" ? Math.min(summary.currentStep || 1, STEPS.length) : STEPS.length);
+      } catch (error) {
+        if (!isMounted) return;
+        showStatusToast(getApiErrorMessage(error, "Failed to load billing configuration."), "error");
+        navigate(CONFIGURATIONS_PATH);
+      } finally {
+        if (isMounted) setLoadingExisting(false);
       }
-      setCurrentStep(summary.status === "Draft" ? Math.min(summary.currentStep || 1, STEPS.length) : STEPS.length);
-      setLoadingExisting(false);
-    });
+    };
+
+    loadConfiguration();
 
     return () => {
       isMounted = false;
@@ -189,22 +202,45 @@ export default function NewConfigurationWizard() {
   const handleToolBillingChange = (toolBilling) => setWizardData((prev) => ({ ...prev, toolBilling }));
   const handleControlsChange = (controls) => setWizardData((prev) => ({ ...prev, controls }));
 
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
     setSaving(true);
-    saveDraftConfiguration(wizardData).then(() => {
-      setSaving(false);
+    try {
+      const result = await saveBillingConfiguration(
+        { ...wizardData, currentStep, status: "DRAFT" },
+        savedConfigId
+      );
+      const nextId = result?.billingConfigurationId || result?.configurationId || result?.id || savedConfigId;
+      setSavedConfigId(nextId);
       showStatusToast("Draft saved successfully.", "success");
-    });
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Failed to save draft."), "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => navigate(CONFIGURATIONS_PATH);
 
-  const handleActivate = () => {
+  const handleActivate = async () => {
     setActivating(true);
-    activateConfiguration(wizardData).then(() => {
-      setActivating(false);
+    try {
+      const result = await saveBillingConfiguration(
+        { ...wizardData, currentStep: STEPS.length, status: "PENDING_APPROVAL" },
+        savedConfigId
+      );
+      const nextId = result?.billingConfigurationId || result?.configurationId || result?.id || savedConfigId;
+      setSavedConfigId(nextId);
+
+      if (nextId) {
+        await approveBillingConfiguration(nextId);
+      }
+
       setShowSuccess(true);
-    });
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Failed to approve billing configuration."), "error");
+    } finally {
+      setActivating(false);
+    }
   };
 
   const handleActivationClose = () => {

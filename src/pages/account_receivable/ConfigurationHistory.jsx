@@ -7,7 +7,8 @@ import Button from "../../components/Button/Button";
 import GenericTable from "../../components/Table/table";
 import Modal from "../../components/ui/Modal";
 import { Fonts } from "../../components/Fonts/Fonts";
-import { fetchConfigurationHistory } from "./services/billingConfigService";
+import { getApiErrorMessage, getBillingConfigurations } from "./services/billingConfigurationService";
+import { showStatusToast } from "../../components/toastfy/toast";
 
 const TABLE_HEADERS = ["Version", "Project", "Change Summary", "Changed By", "Change Date", "Project Source", "Actions"];
 const TABLE_COLUMNS = ["version", "project", "changeSummary", "changedBy", "changeDate", "source", "actions"];
@@ -18,10 +19,31 @@ export default function ConfigurationHistory() {
   const [detailsEntry, setDetailsEntry] = useState(null);
 
   useEffect(() => {
-    fetchConfigurationHistory().then((result) => {
-      setHistory(result);
-      setLoading(false);
-    });
+    const loadHistory = async () => {
+      setLoading(true);
+      try {
+        const configurations = await getBillingConfigurations();
+        setHistory(
+          configurations.map((config, index) => ({
+            version: config.version || `v${config.currentStep || index + 1}`,
+            projectName: config.projectName,
+            configId: config.id,
+            changeSummary: config.changeSummary || `${config.status} configuration`,
+            changedBy: config.updatedBy || "System",
+            changeDate: config.lastUpdated,
+            source: config.source,
+            details: config.details || [],
+          }))
+        );
+      } catch (error) {
+        showStatusToast(getApiErrorMessage(error, "Failed to load configuration history."), "error");
+        setHistory([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadHistory();
   }, []);
 
   const tableRows = history.map((entry) => ({

@@ -13,7 +13,8 @@ import PageHeader from "../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../components/Cards/PageCard";
 import { KPICard } from "../../components/kpi/KPI";
 import Button from "../../components/Button/Button";
-import { fetchOverviewStats, fetchRecentActivity } from "./services/billingConfigService";
+import { getApiErrorMessage, getBillingConfigurationActivity, getBillingConfigurationStats } from "./services/billingConfigurationService";
+import { showStatusToast } from "../../components/toastfy/toast";
 
 export default function Overview() {
   const navigate = useNavigate();
@@ -24,12 +25,27 @@ export default function Overview() {
   useEffect(() => {
     let isMounted = true;
 
-    Promise.all([fetchOverviewStats(), fetchRecentActivity()]).then(([statsResult, activityResult]) => {
-      if (!isMounted) return;
-      setStats(statsResult);
-      setActivity(activityResult);
-      setLoading(false);
-    });
+    const loadOverview = async () => {
+      setLoading(true);
+      try {
+        const [statsResult, activityResult] = await Promise.all([
+          getBillingConfigurationStats(),
+          getBillingConfigurationActivity(),
+        ]);
+        if (!isMounted) return;
+        setStats(statsResult);
+        setActivity(activityResult);
+      } catch (error) {
+        if (!isMounted) return;
+        showStatusToast(getApiErrorMessage(error, "Failed to load billing configuration overview."), "error");
+        setStats(null);
+        setActivity([]);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadOverview();
 
     return () => {
       isMounted = false;
