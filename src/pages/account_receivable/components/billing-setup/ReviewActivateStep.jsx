@@ -81,6 +81,8 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
             { label: "Project", value: projectInfo.projectName },
             { label: "Project Code", value: projectInfo.projectCode },
             { label: "Duration", value: projectInfo.startDate ? `${formatDisplayDate(projectInfo.startDate)} to ${formatDisplayDate(projectInfo.endDate) || "Ongoing"}` : "—" },
+            { label: "Currency", value: projectInfo.currency || projectInfo.projectBudgetCurrency || "—" },
+            { label: "Project Budget", value: projectInfo.projectBudget !== "" && projectInfo.projectBudget !== null && projectInfo.projectBudget !== undefined ? projectInfo.projectBudget : "—" },
           ]}
         />
 
@@ -89,7 +91,7 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
           stepId={2}
           onEdit={onEditStep}
           rows={[
-            { label: "Currency", value: projectInfo.currency },
+            { label: "Currency", value: projectInfo.currency || projectInfo.projectBudgetCurrency || "—" },
             { label: "Billing Type", value: billingTypeLabel },
             { label: "Billing Frequency", value: billingFrequencyLabel },
           ]}

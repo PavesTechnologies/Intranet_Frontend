@@ -18,7 +18,8 @@ import ToolBillingStep from "./components/steps/ToolBillingStep";
 import BillingControlsStep from "./components/steps/BillingControlsStep";
 import ReviewActivateStep from "./components/steps/ReviewActivateStep";
 import {
-  approveBillingConfiguration,
+  activateBillingConfiguration,
+  extractBillingConfigurationId,
   getApiErrorMessage,
   getBillingConfigurationById,
   saveBillingConfiguration,
@@ -151,7 +152,7 @@ export default function NewConfigurationWizard() {
   const [saving, setSaving] = useState(false);
   const [activating, setActivating] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [savedConfigId, setSavedConfigId] = useState(configId || null);
+  const [savedConfigId, setSavedConfigId] = useState(extractBillingConfigurationId(configId));
 
   useEffect(() => {
     if (!configId) return;
@@ -209,8 +210,14 @@ export default function NewConfigurationWizard() {
         { ...wizardData, currentStep, status: "DRAFT" },
         savedConfigId
       );
-      const nextId = result?.billingConfigurationId || result?.configurationId || result?.id || savedConfigId;
-      setSavedConfigId(nextId);
+      const nextId =
+        extractBillingConfigurationId(wizardData.billingConfigurationId) ||
+        extractBillingConfigurationId(result) ||
+        extractBillingConfigurationId(savedConfigId);
+      if (nextId) {
+        setSavedConfigId(nextId);
+        setWizardData((prev) => ({ ...prev, billingConfigurationId: nextId }));
+      }
       showStatusToast("Draft saved successfully.", "success");
     } catch (error) {
       showStatusToast(getApiErrorMessage(error, "Failed to save draft."), "error");
@@ -222,22 +229,56 @@ export default function NewConfigurationWizard() {
   const handleCancel = () => navigate(CONFIGURATIONS_PATH);
 
   const handleActivate = async () => {
+    // Ensure required steps are complete before activating
+    for (let step = 1; step <= 5; step += 1) {
+      if (!isStepValid(step, wizardData)) {
+        showStatusToast("Please complete all required steps before activation.", "error");
+        setCurrentStep(step);
+        return;
+      }
+    }
+
     setActivating(true);
     try {
       const result = await saveBillingConfiguration(
         { ...wizardData, currentStep: STEPS.length, status: "PENDING_APPROVAL" },
         savedConfigId
       );
-      const nextId = result?.billingConfigurationId || result?.configurationId || result?.id || savedConfigId;
-      setSavedConfigId(nextId);
+      const nextId =
+        extractBillingConfigurationId(wizardData.billingConfigurationId) ||
+        extractBillingConfigurationId(result) ||
+        extractBillingConfigurationId(savedConfigId);
+      if (!nextId) {
+        showStatusToast(
+          "Unable to activate billing configuration. Missing billing configuration ID from save response.",
+          "error"
+        );
+        setActivating(false);
+        return;
+      }
 
-      if (nextId) {
-        await approveBillingConfiguration(nextId);
+      setSavedConfigId(nextId);
+      setWizardData((prev) => ({ ...prev, billingConfigurationId: nextId }));
+
+      const activationResult = await activateBillingConfiguration(nextId);
+
+      // Refresh configuration detail to reflect active status
+      try {
+        const refreshed = await getBillingConfigurationById(nextId);
+        if (refreshed && refreshed.detail) {
+          setWizardData((prev) => ({ ...prev, ...refreshed.detail }));
+        } else {
+          // minimal update if full detail not returned
+          setWizardData((prev) => ({ ...prev, billingConfig: { ...prev.billingConfig }, status: refreshed?.summary?.status || "Active", isActive: true }));
+        }
+      } catch (refreshError) {
+        // ignore refresh errors but still proceed
+        console.warn("Failed to refresh configuration after activation", refreshError);
       }
 
       setShowSuccess(true);
     } catch (error) {
-      showStatusToast(getApiErrorMessage(error, "Failed to approve billing configuration."), "error");
+      showStatusToast(getApiErrorMessage(error, "Failed to activate billing configuration."), "error");
     } finally {
       setActivating(false);
     }

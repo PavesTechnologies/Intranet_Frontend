@@ -10,6 +10,7 @@ import {
   Pencil,
   ArrowRightCircle,
   Ban,
+  XCircle,
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
@@ -25,11 +26,17 @@ import StatusBadge from "../../../components/status/statusbadge";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import ActionMenu from "../components/common/ActionMenu";
+import Modal from "../../../components/Modal/modal";
+import FormTextArea from "../../../components/forms/FormTextArea";
 
 import {
-  fetchOverviewStats,
-  fetchRecentActivity,
   fetchBillingConfigurations,
+  deactivateBillingConfiguration,
+  approveBillingConfiguration,
+  rejectBillingConfiguration,
+  getApiErrorMessage,
+  getBillingConfigurationStats,
+  getBillingConfigurationActivity,
 } from "../services/billingConfigService";
 import { SOURCE_FILTER_OPTIONS, STATUS_FILTER_OPTIONS } from "../data/wizardOptions";
 
@@ -71,21 +78,38 @@ export default function Overview() {
   const [currentPage, setCurrentPage] = useState(1);
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [deactivateLoading, setDeactivateLoading] = useState(false);
+  const [approveTarget, setApproveTarget] = useState(null);
+  const [approveLoading, setApproveLoading] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectLoading, setRejectLoading] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  // load configurations helper available to handlers
+  const loadConfigurations = async () => {
+    setLoadingStats(true);
+    setLoadingConfigs(true);
+    try {
+      const configsResult = await fetchBillingConfigurations();
+      setConfigs(configsResult);
+
+      // derive stats and activity from configurations
+      const statsResult = await getBillingConfigurationStats();
+      const activityResult = await getBillingConfigurationActivity();
+      setStats(statsResult);
+      setActivity(activityResult);
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Failed to load billing configuration overview."), "error");
+      setStats(null);
+      setActivity([]);
+    } finally {
+      setLoadingStats(false);
+      setLoadingConfigs(false);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
-
-    Promise.all([fetchOverviewStats(), fetchRecentActivity(), fetchBillingConfigurations()]).then(
-      ([statsResult, activityResult, configsResult]) => {
-        if (!isMounted) return;
-        setStats(statsResult);
-        setActivity(activityResult);
-        setConfigs(configsResult);
-        setLoadingStats(false);
-        setLoadingConfigs(false);
-      }
-    );
-
+    // initial load
+    loadConfigurations();
     return () => {
       isMounted = false;
     };

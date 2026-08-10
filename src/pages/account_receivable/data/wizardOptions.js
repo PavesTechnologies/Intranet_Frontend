@@ -60,6 +60,8 @@ export const BILLING_FREQUENCIES = [
   { value: "BIWEEKLY", label: "Biweekly" },
   { value: "MONTHLY", label: "Monthly" },
   { value: "QUARTERLY", label: "Quarterly" },
+  { value: "HALF_YEARLY", label: "Half-Yearly" },
+  { value: "ANNUALLY", label: "Annually" },
   { value: "YEARLY", label: "Yearly" },
   { value: "ON_DEMAND", label: "On Demand" },
 ];
