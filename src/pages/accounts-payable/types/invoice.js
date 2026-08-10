@@ -87,6 +87,14 @@ import { ISSUE_SEVERITY, ISSUE_SOURCE, ISSUE_STATUS } from "../constants/invoice
  * @property {boolean} required - false when this workflow has no approval gate for the invoice
  * @property {string} approvedBy - empty when not yet approved
  * @property {string} approvedAt - ISO date string, empty when not yet approved
+ * @property {string} rejectionReason - empty unless status is REJECTED
+ */
+
+/**
+ * @typedef {Object} InvoiceHistoryEntry
+ * @property {string} status - one of INVOICE_STATUS at the time of this entry
+ * @property {string} at - ISO date-time string
+ * @property {string} note - human-readable context, e.g. "Submitted by AP Executive"
  */
 
 /**
@@ -123,6 +131,7 @@ import { ISSUE_SEVERITY, ISSUE_SOURCE, ISSUE_STATUS } from "../constants/invoice
  * @property {InvoicePaymentRecord[]} payments
  * @property {OcrExtractedFields} ocrFields
  * @property {ValidationChecklist} validation
+ * @property {InvoiceHistoryEntry[]} history
  * @property {string} uploadedBy
  * @property {string} uploadedAt - ISO date string
  */
@@ -132,8 +141,8 @@ export function createEmptyInvoice() {
   return {
     id: "",
     invoiceNumber: "",
-    invoiceType: INVOICE_TYPES.TAX_INVOICE,
-    status: INVOICE_STATUS.UPLOADED,
+    invoiceType: INVOICE_TYPES.NON_PO,
+    status: INVOICE_STATUS.DRAFT,
     invoiceDate: "",
     dueDate: "",
     vendor: null,
@@ -149,7 +158,7 @@ export function createEmptyInvoice() {
     invoiceLines: [],
     attachments: [],
     issues: [],
-    approval: { required: false, approvedBy: "", approvedAt: "" },
+    approval: { required: true, approvedBy: "", approvedAt: "", rejectionReason: "" },
     payments: [],
     ocrFields: {
       invoiceNumber: "",
@@ -161,6 +170,7 @@ export function createEmptyInvoice() {
       confidenceScore: 0,
     },
     validation: { vendorMatched: false, amountMatched: false, duplicateChecked: false, notes: "" },
+    history: [],
     uploadedBy: "",
     uploadedAt: "",
   };
