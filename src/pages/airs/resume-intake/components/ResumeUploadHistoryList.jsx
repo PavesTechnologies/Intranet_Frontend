@@ -6,7 +6,7 @@ import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { getResumeById, retryResume, replayResumeDlqEntry } from "../../service/resumeIntake";
-import { renderParseStatusBadge, renderSourceBadge, formatResumeDate } from "../utils/resumeIntakeUtils.jsx";
+import { renderParseStatusBadge, renderSourceBadge, renderPipelineStageBadge, formatResumeDate } from "../utils/resumeIntakeUtils.jsx";
 import LoadingSpinner from "../../../../components/LoadingSpinner.jsx";
 
 // Progress indicators mapping to statuses
@@ -83,6 +83,7 @@ export default function ResumeUploadHistoryList({ files, isLoading, onRetried })
     "Format & Date",
     "Parsing Progress",
     "Status",
+    "Pipeline Stage",
     "Actions"
   ];
 
@@ -92,6 +93,7 @@ export default function ResumeUploadHistoryList({ files, isLoading, onRetried })
     "fileDetails",
     "progress",
     "status",
+    "pipelineStage",
     "actions"
   ];
 
@@ -149,6 +151,7 @@ export default function ResumeUploadHistoryList({ files, isLoading, onRetried })
         </div>
       ),
       status: renderParseStatusBadge(f.parse_status),
+      pipelineStage: renderPipelineStageBadge(f),
       actions: (
         <div className="flex items-center gap-1 justify-center">
           {isFinished && (

@@ -1,21 +1,26 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import StatusBadge from "../../components/status/statusbadge";
 import EntriesTable from "./EntriesTable";
 import {
   CheckCircle,
   XCircle,
   Clock,
-  MoreVertical,
   ChevronDown,
   ChevronUp,
   Plus,
   Trash2,
-  MousePointerClick,
 } from "lucide-react";
 import Tooltip from "../../components/status/Tooltip";
 import { showStatusToast } from "../../components/toastfy/toast";
 import api from "../../api/axiosInstance";
 import { submitWeeklyTimesheet } from "./api";
+import SelectedEntriesMenu from "./SelectedEntriesMenu";
+import {
+  dayKeyFor,
+  getEntryRowIds,
+  isDeletableRowId,
+  isPendingRowId,
+} from "./entrySelection";
 import "react-datepicker/dist/react-datepicker.css";
 import DatePicker from "react-datepicker";
 import { addDays, startOfMonth } from "date-fns";
@@ -181,6 +186,11 @@ const TimesheetGroup = ({
 }) => {
   const collapsible = typeof onToggleCollapse === "function";
   const showBody = !collapsible || !isCollapsed;
+  // Editing affordances (select, add entry, delete) belong to the employee's
+  // own timesheet page only. The Manager / Reporting-Manager / Admin approval
+  // views mount this same component from /managerapproval and must stay
+  // read-only — matches EntriesTable's `showActions` guard.
+  const isEmployeeView = window.location.pathname === "/timesheets";
   const isWeeklyFormat = weekGroup && weekGroup.timesheets;
   const weekData = isWeeklyFormat ? weekGroup : null;
   const dailyData = !isWeeklyFormat
@@ -198,16 +208,17 @@ const TimesheetGroup = ({
     isWeeklyFormat ? weekData.weekStart : workDate,
   );
   const [editDateIndex, setEditDateIndex] = useState(null);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [approvingDay, setApprovingDay] = useState(null); // per-day overturn (re-approve) in flight
-  const [openMenuId, setOpenMenuId] = useState(null);
-  const [selectionTimesheetId, setSelectionTimesheetId] = useState(null);
-  const menuRef = useRef(null);
+  // Which day's entries are currently selectable, namespaced so the draft
+  // panel (timesheetId === undefined) can't collide with a real day.
+  const [selection, setSelection] = useState({ key: null, timesheetId: null });
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [isSubmittingWeek, setIsSubmittingWeek] = useState(false); // Create individual refs for each timesheet menu
+  // Timesheet-level (whole day) delete — separate from the entry-level delete above.
+  const [timesheetToDelete, setTimesheetToDelete] = useState(null);
+  const [deletingTimesheet, setDeletingTimesheet] = useState(false);
+  const [isSubmittingWeek, setIsSubmittingWeek] = useState(false);
 
-  const menuRefs = useRef({}); // Check if submit button should be disabled
-
+  // Check if submit button should be disabled
   const isSubmitDisabled = () => {
     if (!isWeeklyFormat || !weekData) return true;
 
@@ -266,32 +277,16 @@ const TimesheetGroup = ({
     }
   };
 
-  useEffect(() => {
-    function handleClickOutside(event) {
-      // Check if click is outside any menu
-      const isOutsideAllMenus = Object.values(menuRefs.current).every(
-        (ref) => ref && !ref.contains(event.target),
-      );
-
-      if (isOutsideAllMenus) {
-        setOpenMenuId(null);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []); // Calculate total hours based on format
-
+  // Calculate total hours based on format
   const totalHours = isWeeklyFormat
     ? weekData.totalHours.toFixed(2)
     : calculateTotalHours(entriesState);
 
   const handleAddEntryDaily = () => {
-    setMenuOpen(false);
     setTimesheetIdAdding(timesheetId);
   };
 
   const handleAddEntryWeekly = (id) => {
-    setMenuOpen(false);
     setTimesheetIdAdding(id);
   };
 
@@ -301,7 +296,6 @@ const TimesheetGroup = ({
       return;
     }
 
-    setMenuOpen(false);
     setIsConfirmOpen(true);
   };
 
@@ -313,12 +307,11 @@ const TimesheetGroup = ({
   const handleConfirmDelete = async () => {
     setIsConfirmOpen(false);
 
-    const isPendingId = (id) =>
-      typeof id === "string" && id.startsWith("pending-");
-
-    const pendingIds = selectedEntryIds.filter(isPendingId);
+    const pendingIds = selectedEntryIds.filter(isPendingRowId);
+    // `new-<idx>` placeholders are render-time fallbacks, not real entry ids —
+    // isDeletableRowId keeps them out of the delete request.
     const realIds = selectedEntryIds.filter(
-      (id) => id != null && !isPendingId(id),
+      (id) => !isPendingRowId(id) && isDeletableRowId(id),
     );
 
     // 1. Local-only removal for pending (draft) entries — no backend call.
@@ -331,7 +324,7 @@ const TimesheetGroup = ({
     // 2. Backend call only when there are persisted ids AND a valid target timesheet.
     //    Selection is scoped to one timesheet at a time, so we only ever delete
     //    from that timesheet's URL — never fan out across the week.
-    const targetTimesheetId = selectionTimesheetId || timesheetId;
+    const targetTimesheetId = selection.timesheetId ?? timesheetId;
 
     try {
       let responseText = "";
@@ -356,7 +349,7 @@ const TimesheetGroup = ({
       }
 
       setSelectedEntryIds([]);
-      setSelectionTimesheetId(null);
+      setSelection({ key: null, timesheetId: null });
     } catch (error) {
       const respData = error.response?.data;
       const message =
@@ -371,10 +364,113 @@ const TimesheetGroup = ({
     setIsConfirmOpen(false);
   };
 
-  const handleSelect = (id) => {
-    setMenuOpen(false);
-    setSelectedEntryIds([]); // clear previous selection (also when switching scope)
-    setSelectionTimesheetId((prev) => (prev === id ? null : id));
+  // ---- Timesheet-level delete (removes the whole day, not single entries) ----
+  // The backend has no "delete timesheet" route: deleteEntries drops the timesheet
+  // itself once its last entry is gone, so we send every entry id for that day.
+  const getEntryIds = (timesheet) =>
+    (timesheet?.entries || [])
+      .map((e) => e.timesheetEntryId ?? e.timesheetEntryid ?? e.id)
+      .filter((id) => id != null);
+
+  // Locked = already reviewed. Both spellings of "partially approved" are in
+  // circulation (the API sends the underscore form in places).
+  const isStatusLocked = (value) => {
+    const s = value?.toLowerCase().replace(/_/g, " ");
+    return s === "approved" || s === "partially approved";
+  };
+
+  const isDayLocked = (timesheet) => isStatusLocked(timesheet?.status);
+
+  // ---- Entry selection (day-scoped) ----
+  // Counts are derived by intersecting with this day's row ids, never by
+  // comparing lengths: after a refresh the ids change, and stale ids must
+  // contribute 0 rather than corrupt the "all selected" state.
+  const getDaySelection = (rowIds) => {
+    const selectedForDay = rowIds.filter((id) => selectedEntryIds.includes(id));
+    return {
+      selectedForDay,
+      allSelected:
+        rowIds.length > 0 && selectedForDay.length === rowIds.length,
+      someSelected:
+        selectedForDay.length > 0 && selectedForDay.length < rowIds.length,
+    };
+  };
+
+  // What a Delete would actually remove — `new-<idx>` placeholders are dropped,
+  // so the confirmation copy can never promise more than the request sends.
+  const deletableSelectedCount =
+    selectedEntryIds.filter(isDeletableRowId).length;
+
+  // Ticking a day replaces the selection wholesale, so ticking day B clears
+  // day A in the same commit. Unticking individual rows leaves `selection.key`
+  // alone, which is what keeps cherry-picking possible.
+  const toggleDaySelectAll = (targetTimesheetId, checked, rowIds) => {
+    if (!checked) {
+      setSelectedEntryIds([]);
+      setSelection({ key: null, timesheetId: null });
+      return;
+    }
+    setSelection({
+      key: dayKeyFor(targetTimesheetId),
+      timesheetId: targetTimesheetId ?? null,
+    });
+    setSelectedEntryIds(rowIds);
+  };
+
+  const handleDeleteTimesheetClick = (timesheet) => {
+    if (getEntryIds(timesheet).length === 0) {
+      showStatusToast("This day has no entries to delete.", "error");
+      return;
+    }
+    setTimesheetToDelete(timesheet);
+  };
+
+  const handleConfirmDeleteTimesheet = async () => {
+    const target = timesheetToDelete;
+    if (!target || deletingTimesheet) return;
+
+    const entryIds = getEntryIds(target);
+    if (entryIds.length === 0) {
+      showStatusToast("This day has no entries to delete.", "error");
+      setTimesheetToDelete(null);
+      return;
+    }
+
+    setDeletingTimesheet(true);
+    try {
+      const response = await api.delete(
+        `${
+          window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
+        }/api/timesheet/deleteEntries/${target.timesheetId}`,
+        { data: { entryIds } },
+      );
+
+      const data = response.data;
+      const message =
+        (typeof data === "string" ? data : data?.message) ||
+        "Timesheet deleted successfully";
+      showStatusToast(message, "success");
+
+      // Drop any UI state that pointed at the timesheet we just removed,
+      // otherwise selection/add-entry stay bound to a dead id after refresh.
+      if (selection.key === dayKeyFor(target.timesheetId)) {
+        setSelection({ key: null, timesheetId: null });
+        setSelectedEntryIds([]);
+      }
+      if (timesheetIdAdding === target.timesheetId) setTimesheetIdAdding(null);
+
+      setTimesheetToDelete(null);
+      if (refreshData) await refreshData();
+    } catch (error) {
+      const respData = error.response?.data;
+      const message =
+        (typeof respData === "string" ? respData : respData?.message) ||
+        error.message ||
+        "Failed to delete timesheet";
+      showStatusToast(message, "error");
+    } finally {
+      setDeletingTimesheet(false);
+    }
   };
 
   const approveStatus = approvers.every(
@@ -594,6 +690,16 @@ const TimesheetGroup = ({
     return new Date(d).toISOString().split("T")[0];
   };
 
+  // Daily ("+ New Timesheet") panel: its rows live in pendingEntries until the
+  // timesheet is created, so they are selectable exactly like persisted ones.
+  const draftRowIds = getEntryRowIds(entriesState, pendingEntries);
+  const draftSelection = getDaySelection(draftRowIds);
+  const canSelectDraft =
+    !isWeeklyFormat &&
+    isEmployeeView &&
+    !isStatusLocked(currentStatus) &&
+    draftRowIds.length > 0;
+
   return (
     <div
       className={`mb-6 bg-white rounded-xl shadow-lg border-2 ${getBorderColor()} hover:border-opacity-80 transition-colors duration-200 text-xs`}
@@ -700,10 +806,47 @@ const TimesheetGroup = ({
         {!isWeeklyFormat && (
           <>
                        {" "}
+            <div className="absolute left-0 top-1/2 flex -translate-y-1/2 items-center gap-3">
+            {canSelectDraft && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 shrink-0 cursor-pointer accent-[#263383]"
+                  aria-label="Select all entries for this timesheet"
+                  checked={draftSelection.allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = draftSelection.someSelected;
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) =>
+                    toggleDaySelectAll(timesheetId, e.target.checked, draftRowIds)
+                  }
+                />
+                {draftSelection.selectedForDay.length > 0 ? (
+                  <SelectedEntriesMenu
+                    count={draftSelection.selectedForDay.length}
+                    onDelete={handleDeleteClick}
+                    disabled={deletingTimesheet}
+                    label="Actions for the selected entries"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleDaySelectAll(timesheetId, true, draftRowIds);
+                    }}
+                    className="whitespace-nowrap text-xs font-medium text-gray-500 transition-colors hover:text-[#263383] focus:outline-none"
+                  >
+                    Select all
+                  </button>
+                )}
+              </div>
+            )}
             {editDateIndex === timesheetId &&
             emptyTimesheet &&
             status?.toLowerCase() !== "approved" ? (
-              <div className="absolute left-0 top-1/2 -translate-y-1/2">
+              <div className="relative">
                                {" "}
                 <DatePicker
                   selected={date ? parseLocalDate(date) : null}
@@ -863,7 +1006,7 @@ const TimesheetGroup = ({
                   status?.toLowerCase() !== "approved" &&
                   setEditDateIndex(timesheetId)
                 }
-                className={`absolute left-0 top-1/2 -translate-y-1/2 text-gray-500 font-semibold ${
+                className={`whitespace-nowrap text-gray-500 font-semibold ${
                   status?.toLowerCase() !== "approved"
                     ? "cursor-pointer hover:text-blue-600"
                     : "cursor-not-allowed"
@@ -872,6 +1015,7 @@ const TimesheetGroup = ({
                 {currentDate}
               </div>
             )}
+            </div>
                        {" "}
             <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2">
                            {" "}
@@ -885,62 +1029,25 @@ const TimesheetGroup = ({
                      {" "}
           </>
         )}
-                {/* 3 dots menu for daily format */}       {" "}
-        {!isWeeklyFormat && (
-          <div
-            className="absolute right-0 top-1/2 -translate-y-1/2"
-            ref={menuRef}
-          >
-                       {" "}
-            {window.location.pathname !== "/managerapproval" && (
+        {/* Daily format actions */}
+        {!isWeeklyFormat &&
+          isEmployeeView && (
+            <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-2">
               <button
-                onClick={() => setMenuOpen((open) => !open)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-gray-300 focus:outline-none"
+                onClick={handleAddEntryDaily}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-[#263383] transition-colors hover:bg-[#f4f6fc] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 type="button"
-                disabled={
-                  currentStatus?.toLowerCase() === "approved" ||
-                  currentStatus?.toLowerCase() === "partially approved"
-                }
+                disabled={isStatusLocked(currentStatus)}
                 title={
-                  currentStatus?.toLowerCase() === "approved" ||
-                  currentStatus?.toLowerCase() === "partially approved"
+                  isStatusLocked(currentStatus)
                     ? "Cannot edit approved timesheet"
-                    : "More options"
+                    : "Add Entry"
                 }
               >
-                <MoreVertical size={20} />
+                <Plus size={16} className="flex-shrink-0" /> Add Entry
               </button>
-            )}
-                       {" "}
-            {menuOpen && (
-              <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl border border-gray-100 py-1.5 z-50 overflow-hidden" style={{ boxShadow: "0 12px 32px rgba(8,21,52,0.16)" }}>
-                               {" "}
-                <button
-                  onClick={handleAddEntryDaily}
-                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-[#f4f6fc] hover:text-[#263383] transition-colors"
-                >
-                  <Plus size={16} className="flex-shrink-0" /> Add Entry
-                </button>
-                               {" "}
-                <button
-                  onClick={handleDeleteClick}
-                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
-                >
-                  <Trash2 size={16} className="flex-shrink-0" /> Delete
-                </button>
-                               {" "}
-                <button
-                  onClick={() => handleSelect(timesheetId)}
-                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm font-medium text-[#263383] hover:bg-[#f4f6fc] transition-colors"
-                >
-                  <MousePointerClick size={16} className="flex-shrink-0" /> Select
-                </button>
-                             {" "}
-              </div>
-            )}
-                     {" "}
-          </div>
-        )}
+            </div>
+          )}
              {" "}
       </div>
            {" "}
@@ -950,29 +1057,86 @@ const TimesheetGroup = ({
                    {" "}
           {weekData.timesheets
             .sort((a, b) => new Date(a.workDate) - new Date(b.workDate))
-            .map((timesheet, index) => (
+            .map((timesheet, index) => {
+              const rowIds = getEntryRowIds(timesheet.entries, pendingEntries);
+              const daySelection = getDaySelection(rowIds);
+              // Holiday / leave days render no EntriesTable at all, so a
+              // checkbox there would toggle a table that doesn't exist.
+              const canSelectDay =
+                isEmployeeView &&
+                !(
+                  timesheet.defaultHolidayTimesheet ||
+                  timesheet.isLeaveTimesheet
+                ) &&
+                !isDayLocked(timesheet) &&
+                rowIds.length > 0;
+
+              return (
               <div
                 key={timesheet.timesheetId}
                 className="bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors duration-200 shadow-sm overflow-visible"
               >
                                 {/* Individual Day Header */}               {" "}
                 <div
-                  className={`${formatDate(timesheet.workDate).isWeekend ? "bg-yellow-100 cursor-not-allowed" : timesheet.defaultHolidayTimesheet || timesheet.isLeaveTimesheet ? "bg-red-200 cursor-not-allowed" : ""} border-b-2 border-gray-300 px-4 py-3 flex justify-between items-center rounded-t-lg overflow-visible`}
+                  className={`${formatDate(timesheet.workDate).isWeekend ? "bg-yellow-100 cursor-not-allowed" : timesheet.defaultHolidayTimesheet || timesheet.isLeaveTimesheet ? "bg-red-200 cursor-not-allowed" : ""} border-b-2 border-gray-300 px-4 py-2.5 flex justify-between items-center rounded-t-lg overflow-visible`}
                 >
                                    {" "}
-                  <div className={`flex items-center gap-3`}>
-                                       {" "}
-                    <div className="text-sm font-semibold text-gray-700">
-                                           {" "}
-                      {formatDate(timesheet.workDate).text}                 
-                       {" "}
-                    </div>
-                                       {" "}
-                    <div className="text-sm text-gray-500">
-                                            {timesheet.hoursWorked} hrs        
-                                 {" "}
-                    </div>
-                                     {" "}
+                  {/* Selector first, then the date + hours it applies to */}
+                  <div className="flex items-center gap-3">
+                    {canSelectDay && (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 shrink-0 cursor-pointer accent-[#263383]"
+                          aria-label={`Select all entries for ${
+                            formatDate(timesheet.workDate).text
+                          }`}
+                          checked={daySelection.allSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = daySelection.someSelected;
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) =>
+                            toggleDaySelectAll(
+                              timesheet.timesheetId,
+                              e.target.checked,
+                              rowIds,
+                            )
+                          }
+                        />
+                        {daySelection.selectedForDay.length > 0 ? (
+                          <SelectedEntriesMenu
+                            count={daySelection.selectedForDay.length}
+                            onDelete={handleDeleteClick}
+                            disabled={deletingTimesheet}
+                            label={`Actions for the entries selected on ${
+                              formatDate(timesheet.workDate).text
+                            }`}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleDaySelectAll(
+                                timesheet.timesheetId,
+                                true,
+                                rowIds,
+                              );
+                            }}
+                            className="whitespace-nowrap text-xs font-medium text-gray-500 transition-colors hover:text-[#263383] focus:outline-none"
+                          >
+                            Select all
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    <span className="inline-flex items-center whitespace-nowrap rounded-md bg-[#f4f6fc] px-2.5 py-1 text-sm font-semibold text-[#263383] ring-1 ring-[#263383]/15">
+                      {formatDate(timesheet.workDate).text}
+                    </span>
+                    <span className="whitespace-nowrap text-sm text-gray-500">
+                      {timesheet.hoursWorked} hrs
+                    </span>
                   </div>
                                    {" "}
                   {!(
@@ -1030,93 +1194,52 @@ const TimesheetGroup = ({
                           </div>
                         )}
                                          {" "}
-                      {/* 3 dots menu for individual timesheet */}             
-                           {" "}
-                      {window.location.pathname !== "/managerapproval" && (
-                        <div
-                          className="relative"
-                          ref={(el) => {
-                            if (el) {
-                              menuRefs.current[timesheet.timesheetId] = el;
-                            }
+                      {/* Add Entry — available on draft/submitted/rejected days,
+                          disabled once the day is approved */}
+                      {isEmployeeView && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddEntryWeekly(timesheet.timesheetId);
+                            setOpenMenuId(null);
                           }}
+                          disabled={isDayLocked(timesheet)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-[#263383] transition-colors hover:bg-[#f4f6fc] focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={
+                            isDayLocked(timesheet)
+                              ? "Cannot edit approved timesheet"
+                              : "Add Entry"
+                          }
                         >
-                                                 {" "}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const newMenuId =
-                                openMenuId === timesheet.timesheetId
-                                  ? null
-                                  : timesheet.timesheetId;
-                              setOpenMenuId(newMenuId);
-                              setMenuOpen(newMenuId !== null);
-                            }}
-                            className={`p-1 rounded-full hover:bg-gray-200 focus:outline-none ${timesheet.status?.toLowerCase() === "approved" || timesheet.status?.toLowerCase() === "partially_approved" ? "opacity-50 cursor-not-allowed" : ""}`}
-                            type="button"
-                            disabled={
-                              timesheet.status?.toLowerCase() === "approved" ||
-                              timesheet.status?.toLowerCase() ===
-                                "partially approved"
-                            }
-                            title={
-                              timesheet.status?.toLowerCase() === "approved" ||
-                              timesheet.status?.toLowerCase() ===
-                                "partially approved"
-                                ? "Cannot edit approved timesheet"
-                                : "More options"
-                            }
-                          >
-                                                      <MoreVertical size={16} />
-                                                   {" "}
-                          </button>
-                                                 {" "}
-                          {openMenuId === timesheet.timesheetId && (
-                            <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl border border-gray-100 py-1.5 z-50 overflow-hidden" style={{ boxShadow: "0 12px 32px rgba(8,21,52,0.16)" }}>
-                                                         {" "}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleAddEntryWeekly(timesheet.timesheetId);
-                                  setOpenMenuId(null);
-                                  setMenuOpen(false);
-                                }}
-                                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-[#f4f6fc] hover:text-[#263383] transition-colors"
-                              >
-                  <Plus size={16} className="flex-shrink-0" /> Add Entry
-                                                   {" "}
-                              </button>
-                                                         {" "}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteClick();
-                                  setOpenMenuId(null);
-                                  setMenuOpen(false);
-                                }}
-                                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
-                              >
-                  <Trash2 size={16} className="flex-shrink-0" /> Delete
-                                               {" "}
-                              </button>
-                                                         {" "}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSelect(timesheet.timesheetId);
-                                  setOpenMenuId(null);
-                                  setMenuOpen(false);
-                                }}
-                                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-left text-sm font-medium text-[#263383] hover:bg-[#f4f6fc] transition-colors"
-                              >
-                  <MousePointerClick size={16} className="flex-shrink-0" /> Select
-                                               {" "}
-                              </button>
-                                                       {" "}
-                            </div>
-                          )}
-                                               {" "}
-                        </div>
+                          <Plus size={14} className="flex-shrink-0" /> Add Entry
+                        </button>
+                      )}
+                      {/* Timesheet-level delete — removes the whole day */}
+                      {isEmployeeView && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTimesheetClick(timesheet);
+                          }}
+                          disabled={
+                            isDayLocked(timesheet) ||
+                            getEntryIds(timesheet).length === 0 ||
+                            deletingTimesheet
+                          }
+                          className="p-1 rounded-full text-red-500 hover:bg-red-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={
+                            isDayLocked(timesheet)
+                              ? "Cannot delete approved timesheet"
+                              : getEntryIds(timesheet).length === 0
+                                ? "No entries to delete"
+                                : "Delete this timesheet"
+                          }
+                          aria-label="Delete this timesheet"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       )}
                                        {" "}
                     </div>
@@ -1157,7 +1280,7 @@ const TimesheetGroup = ({
                       refreshData={refreshData}
                       projectInfo={projectInfo}
                       selectionMode={
-                        selectionTimesheetId === timesheet.timesheetId
+                        selection.key === dayKeyFor(timesheet.timesheetId)
                       }
                     />
                                    {" "}
@@ -1165,9 +1288,10 @@ const TimesheetGroup = ({
                 )}
                                 {" "}
               </div>
-            ))}
+            );
+            })}
                     {/* Submit Week Button */}         {" "}
-          {window.location.pathname !== "/managerapproval" &&
+          {isEmployeeView &&
             isWeeklyFormat &&
             weekData && (
               <div className="mt-4 px-4 py-3 border-t border-gray-200 bg-white rounded-b-lg">
@@ -1213,7 +1337,7 @@ const TimesheetGroup = ({
           }
           refreshData={refreshData}
           projectInfo={projectInfo}
-          selectionMode={selectionTimesheetId === timesheetId}
+          selectionMode={selection.key === dayKeyFor(timesheetId)}
         />
       )}
            {" "}
@@ -1223,10 +1347,23 @@ const TimesheetGroup = ({
         open={isConfirmOpen}
         title="Confirm Delete"
         message={`Are you sure you want to delete ${
-          selectedEntryIds.length
-        } selected entr${selectedEntryIds.length > 1 ? "ies" : "y"}?`}
+          deletableSelectedCount
+        } selected entr${deletableSelectedCount > 1 ? "ies" : "y"}?`}
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
+      />
+      <ConfirmDialog
+        open={!!timesheetToDelete}
+        title="Delete Timesheet"
+        message={`This will delete the timesheet for ${
+          timesheetToDelete ? formatDate(timesheetToDelete.workDate).text : ""
+        } along with all ${
+          timesheetToDelete ? getEntryIds(timesheetToDelete).length : 0
+        } of its entries. This action cannot be undone.`}
+        onConfirm={handleConfirmDeleteTimesheet}
+        onCancel={() => {
+          if (!deletingTimesheet) setTimesheetToDelete(null);
+        }}
       />
          {" "}
     </div>
