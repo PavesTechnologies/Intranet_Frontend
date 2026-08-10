@@ -808,20 +808,40 @@ const TimesheetGroup = ({
                        {" "}
             <div className="absolute left-0 top-1/2 flex -translate-y-1/2 items-center gap-3">
             {canSelectDraft && (
-              <input
-                type="checkbox"
-                className="h-4 w-4 shrink-0 cursor-pointer accent-[#263383]"
-                aria-label="Select all entries for this timesheet"
-                title="Select all entries"
-                checked={draftSelection.allSelected}
-                ref={(el) => {
-                  if (el) el.indeterminate = draftSelection.someSelected;
-                }}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) =>
-                  toggleDaySelectAll(timesheetId, e.target.checked, draftRowIds)
-                }
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 shrink-0 cursor-pointer accent-[#263383]"
+                  aria-label="Select all entries for this timesheet"
+                  checked={draftSelection.allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = draftSelection.someSelected;
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) =>
+                    toggleDaySelectAll(timesheetId, e.target.checked, draftRowIds)
+                  }
+                />
+                {draftSelection.selectedForDay.length > 0 ? (
+                  <SelectedEntriesMenu
+                    count={draftSelection.selectedForDay.length}
+                    onDelete={handleDeleteClick}
+                    disabled={deletingTimesheet}
+                    label="Actions for the selected entries"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleDaySelectAll(timesheetId, true, draftRowIds);
+                    }}
+                    className="whitespace-nowrap text-xs font-medium text-gray-500 transition-colors hover:text-[#263383] focus:outline-none"
+                  >
+                    Select all
+                  </button>
+                )}
+              </div>
             )}
             {editDateIndex === timesheetId &&
             emptyTimesheet &&
@@ -995,12 +1015,6 @@ const TimesheetGroup = ({
                 {currentDate}
               </div>
             )}
-            <SelectedEntriesMenu
-              count={canSelectDraft ? draftSelection.selectedForDay.length : 0}
-              onDelete={handleDeleteClick}
-              disabled={deletingTimesheet}
-              label="Actions for the selected entries"
-            />
             </div>
                        {" "}
             <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2">
@@ -1064,50 +1078,65 @@ const TimesheetGroup = ({
               >
                                 {/* Individual Day Header */}               {" "}
                 <div
-                  className={`${formatDate(timesheet.workDate).isWeekend ? "bg-yellow-100 cursor-not-allowed" : timesheet.defaultHolidayTimesheet || timesheet.isLeaveTimesheet ? "bg-red-200 cursor-not-allowed" : ""} border-b-2 border-gray-300 px-4 py-3 flex flex-col gap-2 rounded-t-lg overflow-visible`}
+                  className={`${formatDate(timesheet.workDate).isWeekend ? "bg-yellow-100 cursor-not-allowed" : timesheet.defaultHolidayTimesheet || timesheet.isLeaveTimesheet ? "bg-red-200 cursor-not-allowed" : ""} border-b-2 border-gray-300 px-4 py-2.5 flex justify-between items-center rounded-t-lg overflow-visible`}
                 >
                                    {" "}
-                  {/* Date sits on its own line above the controls */}
-                  <div>
-                    <span className="inline-flex items-center rounded-md bg-[#f4f6fc] px-2.5 py-1 text-sm font-semibold text-[#263383] ring-1 ring-[#263383]/15">
-                      {formatDate(timesheet.workDate).text}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
+                  {/* Selector first, then the date + hours it applies to */}
                   <div className="flex items-center gap-3">
                     {canSelectDay && (
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 shrink-0 cursor-pointer accent-[#263383]"
-                        aria-label={`Select all entries for ${
-                          formatDate(timesheet.workDate).text
-                        }`}
-                        title="Select all entries"
-                        checked={daySelection.allSelected}
-                        ref={(el) => {
-                          if (el) el.indeterminate = daySelection.someSelected;
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) =>
-                          toggleDaySelectAll(
-                            timesheet.timesheetId,
-                            e.target.checked,
-                            rowIds,
-                          )
-                        }
-                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 shrink-0 cursor-pointer accent-[#263383]"
+                          aria-label={`Select all entries for ${
+                            formatDate(timesheet.workDate).text
+                          }`}
+                          checked={daySelection.allSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = daySelection.someSelected;
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) =>
+                            toggleDaySelectAll(
+                              timesheet.timesheetId,
+                              e.target.checked,
+                              rowIds,
+                            )
+                          }
+                        />
+                        {daySelection.selectedForDay.length > 0 ? (
+                          <SelectedEntriesMenu
+                            count={daySelection.selectedForDay.length}
+                            onDelete={handleDeleteClick}
+                            disabled={deletingTimesheet}
+                            label={`Actions for the entries selected on ${
+                              formatDate(timesheet.workDate).text
+                            }`}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleDaySelectAll(
+                                timesheet.timesheetId,
+                                true,
+                                rowIds,
+                              );
+                            }}
+                            className="whitespace-nowrap text-xs font-medium text-gray-500 transition-colors hover:text-[#263383] focus:outline-none"
+                          >
+                            Select all
+                          </button>
+                        )}
+                      </div>
                     )}
-                    <div className="text-sm text-gray-500">
+                    <span className="inline-flex items-center whitespace-nowrap rounded-md bg-[#f4f6fc] px-2.5 py-1 text-sm font-semibold text-[#263383] ring-1 ring-[#263383]/15">
+                      {formatDate(timesheet.workDate).text}
+                    </span>
+                    <span className="whitespace-nowrap text-sm text-gray-500">
                       {timesheet.hoursWorked} hrs
-                    </div>
-                    <SelectedEntriesMenu
-                      count={canSelectDay ? daySelection.selectedForDay.length : 0}
-                      onDelete={handleDeleteClick}
-                      disabled={deletingTimesheet}
-                      label={`Actions for the entries selected on ${
-                        formatDate(timesheet.workDate).text
-                      }`}
-                    />
+                    </span>
                   </div>
                                    {" "}
                   {!(
@@ -1222,7 +1251,6 @@ const TimesheetGroup = ({
                     <CustomStatusBadge label="Leave Day" size="sm" />
                   )}
                                  {" "}
-                  </div>
                 </div>
                                 {/* Entries Table */}               {" "}
                 {!(
