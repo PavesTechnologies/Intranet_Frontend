@@ -50,21 +50,53 @@ export default function PipelineCandidateScorecardPage({
     resumeRow?.campaignCandidateId ??
     resumeRow?.campaignCandidate?.id ??
     resumeRow?.campaign_candidate?.id ??
+    // CampaignDetails' candidate table passes its already-mapped row
+    // (mapCampaignCandidateRow), whose id IS the campaign_candidate_id.
+    resumeRow?.id ??
     // Pipeline routes are opened with the campaign-candidate id; keep that id
     // available for score tabs even when router state is lost on refresh.
     (candidateIdProp ? null : params.candidateId);
   const fallback = useMemo(
     () => ({
-      name: resumeRow?.candidate_full_name,
-      email: resumeRow?.candidate_email,
-      createdAt: resumeRow?.created_at,
+      // `resumeRow` is either a raw Resume Upload History row (snake_case) or
+      // an already-mapped campaign-candidate row from CampaignDetails'
+      // CandidateTable (mapCampaignCandidateRow, camelCase) — support both.
+      name: resumeRow?.candidate_full_name ?? resumeRow?.name,
+      email: resumeRow?.candidate_email ?? resumeRow?.email,
+      createdAt: resumeRow?.created_at ?? resumeRow?.createdAt,
       // Resume Upload History rows carry campaign_candidate_id, but the
       // parsed-json endpoint (this page's only data source) doesn't — thread it
       // through here so the Deterministic/Semantic/AI Evaluation tabs can call
       // /campaign-candidates/{campaign_candidate_id}/... with the right id.
       campaignCandidateId,
+      // pipeline_stage/decision_* are only present once the resume's candidate
+      // is linked to a campaign — same fields Resume Upload History already
+      // renders via renderPipelineStageBadge.
+      stage: resumeRow?.pipeline_stage ?? resumeRow?.stage,
+      decisionType: resumeRow?.decision_type ?? resumeRow?.decisionType,
+      decisionSource: resumeRow?.decision_source ?? resumeRow?.decisionSource,
+      decisionReason: resumeRow?.decision_reason ?? resumeRow?.decisionReason,
+      decisionAt: resumeRow?.decision_at ?? resumeRow?.decisionAt,
     }),
-    [campaignCandidateId, resumeRow?.candidate_email, resumeRow?.candidate_full_name, resumeRow?.created_at]
+    [
+      campaignCandidateId,
+      resumeRow?.candidate_email,
+      resumeRow?.email,
+      resumeRow?.candidate_full_name,
+      resumeRow?.name,
+      resumeRow?.created_at,
+      resumeRow?.createdAt,
+      resumeRow?.pipeline_stage,
+      resumeRow?.stage,
+      resumeRow?.decision_type,
+      resumeRow?.decisionType,
+      resumeRow?.decision_source,
+      resumeRow?.decisionSource,
+      resumeRow?.decision_reason,
+      resumeRow?.decisionReason,
+      resumeRow?.decision_at,
+      resumeRow?.decisionAt,
+    ]
   );
   const { candidate, loading, error, refetch } = useParsedResumeCandidate(candidateId, fallback);
   const [activeTab, setActiveTab] = useState(TABS[0].id);
