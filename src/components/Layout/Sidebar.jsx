@@ -77,16 +77,25 @@ const accountReceivableSubmenu = [
         to: "/account-receivable/project-billing-setup/overview",
       },
       {
-        label: "Billing Configurations",
-        to: "/account-receivable/project-billing-setup/configurations",
-      },
-      {
-        label: "Configuration History",
-        to: "/account-receivable/project-billing-setup/history",
+        label: "Billing Config Workspace",
+        to: "/account-receivable/project-billing-setup/workspace",
       },
     ],
   },
-  { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition" },
+  {
+    label: "Billing Data Acquisition",
+    to: "/account-receivable/billing-data-acquisition",
+    children: [
+      {
+        label: "Overview",
+        to: "/account-receivable/billing-data-acquisition",
+      },
+      {
+        label: "Acquisition Workspace",
+        to: "/account-receivable/billing-data-acquisition/workspace",
+      },
+    ],
+  },
 ];
 
 const airsSubmenu = [

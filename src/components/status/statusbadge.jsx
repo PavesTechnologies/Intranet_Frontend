@@ -79,6 +79,23 @@ const StatusBadge = ({ label, size = "md" }) => {
     textColor = "text-yellow-700";
   }
 
+  // Accounts Payable invoice statuses not covered by the generic keyword branches above
+  // (see the standing note in constants/invoiceStatus.js).
+  if (normalized === "ocr processing") {
+    bgColor = "bg-blue-100";
+    textColor = "text-blue-700";
+  }
+
+  if (normalized === "ready for payment") {
+    bgColor = "bg-indigo-100";
+    textColor = "text-indigo-700";
+  }
+
+  if (raw === "paid") {
+    bgColor = "bg-green-100";
+    textColor = "text-green-700";
+  }
+
   const sizeStyles = {
     sm: "text-xs px-2 py-0.5",
     md: "text-sm px-3 py-1",
