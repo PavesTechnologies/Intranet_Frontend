@@ -1,45 +1,206 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FolderKanban,
   FileText,
   Cable,
   PenLine,
-  Wrench,
   CheckCircle2,
+  Eye,
+  Pencil,
+  ArrowRightCircle,
+  Ban,
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
+import FilterCard from "../../../components/ui/FilterCard";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import { KPICard } from "../../../components/kpi/KPI";
 import Button from "../../../components/Button/Button";
-import { fetchOverviewStats, fetchRecentActivity } from "../services/billingConfigService";
+import SearchInput from "../../../components/filter/Searchbar";
+import FormSelect from "../../../components/forms/FormSelect";
+import GenericTable from "../../../components/Table/table";
+import Pagination from "../../../components/Pagination/pagination";
+import StatusBadge from "../../../components/status/statusbadge";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
+import { showStatusToast } from "../../../components/toastfy/toast";
+import ActionMenu from "../components/common/ActionMenu";
+
+import {
+  fetchOverviewStats,
+  fetchRecentActivity,
+  fetchBillingConfigurations,
+} from "../services/billingConfigService";
+import { SOURCE_FILTER_OPTIONS, STATUS_FILTER_OPTIONS } from "../data/wizardOptions";
+
+const INITIAL_FILTERS = { search: "", status: "", source: "" };
+const PAGE_SIZE = 6;
+
+const TABLE_HEADERS = ["Project", "Client", "Billing Type", "Source", "Status", "Last Updated", "Actions"];
+const TABLE_COLUMNS = ["project", "client", "billingType", "source", "status", "lastUpdated", "actions"];
+
+const SOURCE_BADGE_CLASSES = {
+  Enterprise: "bg-indigo-100 text-indigo-700",
+  Standalone: "bg-slate-100 text-slate-700",
+};
+
+function SourceBadge({ source }) {
+  return (
+    <span
+      className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+        SOURCE_BADGE_CLASSES[source] || "bg-slate-100 text-slate-700"
+      }`}
+    >
+      {source}
+    </span>
+  );
+}
 
 export default function Overview() {
   const navigate = useNavigate();
+
+  // Overview Stats & Recent Activity State
   const [stats, setStats] = useState(null);
   const [activity, setActivity] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  // Billing Configurations State
+  const [configs, setConfigs] = useState([]);
+  const [loadingConfigs, setLoadingConfigs] = useState(true);
+  const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [deactivateTarget, setDeactivateTarget] = useState(null);
+  const [deactivateLoading, setDeactivateLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
-    Promise.all([fetchOverviewStats(), fetchRecentActivity()]).then(([statsResult, activityResult]) => {
-      if (!isMounted) return;
-      setStats(statsResult);
-      setActivity(activityResult);
-      setLoading(false);
-    });
+    Promise.all([fetchOverviewStats(), fetchRecentActivity(), fetchBillingConfigurations()]).then(
+      ([statsResult, activityResult, configsResult]) => {
+        if (!isMounted) return;
+        setStats(statsResult);
+        setActivity(activityResult);
+        setConfigs(configsResult);
+        setLoadingStats(false);
+        setLoadingConfigs(false);
+      }
+    );
 
     return () => {
       isMounted = false;
     };
   }, []);
 
+  const handleFilterChange = (event) => {
+    const { name, value } = event.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setCurrentPage(1);
+  };
+
+  const handleSearch = (value) => {
+    setFilters((prev) => ({ ...prev, search: value }));
+    setCurrentPage(1);
+  };
+
+  const filteredConfigs = useMemo(() => {
+    const search = filters.search.trim().toLowerCase();
+
+    return configs.filter((config) => {
+      const matchesSearch =
+        !search ||
+        config.projectName.toLowerCase().includes(search) ||
+        config.projectCode.toLowerCase().includes(search) ||
+        config.client.toLowerCase().includes(search);
+      const matchesStatus = !filters.status || config.status === filters.status;
+      const matchesSource = !filters.source || config.source === filters.source;
+
+      return matchesSearch && matchesStatus && matchesSource;
+    });
+  }, [configs, filters]);
+
+  const totalPages = Math.ceil(filteredConfigs.length / PAGE_SIZE) || 1;
+  const paginatedConfigs = filteredConfigs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const handleView = (config) => {
+    navigate(`/account-receivable/project-billing-setup/configurations/${config.id}?mode=view`);
+  };
+
+  const handleEdit = (config) => {
+    navigate(`/account-receivable/project-billing-setup/configurations/${config.id}?mode=edit`);
+  };
+
+  const handleContinueDraft = (config) => {
+    navigate(`/account-receivable/project-billing-setup/configurations/${config.id}`);
+  };
+
+  const handleConfirmDeactivate = () => {
+    setDeactivateLoading(true);
+    setTimeout(() => {
+      setConfigs((prev) =>
+        prev.map((config) =>
+          config.id === deactivateTarget.id ? { ...config, status: "Inactive" } : config
+        )
+      );
+      setDeactivateLoading(false);
+      setDeactivateTarget(null);
+      showStatusToast("Billing configuration deactivated.", "success");
+    }, 400);
+  };
+
+  const tableRows = useMemo(
+    () =>
+      filteredConfigs.slice(0, 5).map((config) => ({
+        project: (
+          <div className="text-left">
+            <div className="font-semibold text-slate-900">{config.projectName}</div>
+            <div className="text-xs text-slate-400">{config.projectCode}</div>
+          </div>
+        ),
+        client: config.client,
+        billingType: config.billingType,
+        source: <SourceBadge source={config.source} />,
+        status: <StatusBadge label={config.status} size="sm" />,
+        lastUpdated: (
+          <div>
+            <div>{config.lastUpdated}</div>
+            <div className="text-xs text-slate-400">{config.updatedBy}</div>
+          </div>
+        ),
+        actions: (
+          <ActionMenu
+            items={[
+              { label: "View", icon: <Eye className="h-4 w-4" />, onClick: () => handleView(config) },
+              {
+                label: "Continue Draft",
+                icon: <ArrowRightCircle className="h-4 w-4" />,
+                hidden: config.status !== "Draft",
+                onClick: () => handleContinueDraft(config),
+              },
+              {
+                label: "Edit",
+                icon: <Pencil className="h-4 w-4 text-gray-600" />,
+                hidden: config.status === "Draft",
+                onClick: () => handleEdit(config),
+              },
+              {
+                label: "Deactivate",
+                icon: <Ban className="h-4 w-4" />,
+                hidden: config.status !== "Active",
+                danger: true,
+                onClick: () => setDeactivateTarget(config),
+              },
+            ]}
+          />
+        ),
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredConfigs]
+  );
+
   const kpiCards = [
     {
       key: "total",
-      label: "Total Billing Configurations",
+      label: "Total Configurations",
       value: stats?.total ?? "—",
       icon: FolderKanban,
       color: "bg-slate-500 text-white",
@@ -72,36 +233,31 @@ export default function Overview() {
       icon: PenLine,
       color: "bg-orange-500 text-white",
     },
-    {
-      key: "toolBillingEnabled",
-      label: "Tool Billing Enabled Projects",
-      value: stats?.toolBillingEnabled ?? "—",
-      icon: Wrench,
-      color: "bg-sky-600 text-white",
-    },
   ];
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-3">
+      {/* 1. Page Header */}
       <PageHeader
         title="Project Billing Setup — Overview"
         subtitle="A snapshot of billing configuration coverage across enterprise and standalone projects."
         actions={
           <Button
             variant="primary"
-            onClick={() => navigate("/account-receivable/project-billing-setup/configurations/new")}
+            onClick={() => navigate("/account-receivable/project-billing-setup/workspace")}
           >
             + Create Billing Setup
           </Button>
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      {/* 2. KPIs Row */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {kpiCards.map((kpi) => (
           <KPICard
             key={kpi.key}
             label={kpi.label}
-            value={loading ? "…" : kpi.value}
+            value={loadingStats ? "…" : kpi.value}
             icon={<kpi.icon className="h-5 w-5" />}
             color={kpi.color}
             className="h-full w-full bg-white shadow-sm"
@@ -109,20 +265,78 @@ export default function Overview() {
         ))}
       </div>
 
-      <PageCard>
-        <PageCardContent className="p-6">
-          <h2 className="mb-4 text-lg font-semibold text-slate-900">Recent Activity</h2>
+      {/* 3. Filters Box */}
+      <FilterCard title="Filters" description="Search and narrow down billing configurations.">
+        <div className="w-full sm:w-64">
+          <SearchInput
+            value={filters.search}
+            onChange={handleFilterChange}
+            onSearch={handleSearch}
+            placeholder="Search by project, code or client..."
+          />
+        </div>
+        <div className="w-full sm:w-64">
+          <FormSelect
+            name="status"
+            value={filters.status}
+            onChange={handleFilterChange}
+            options={STATUS_FILTER_OPTIONS}
+          />
+        </div>
+        <div className="w-full sm:w-64">
+          <FormSelect
+            name="source"
+            value={filters.source}
+            onChange={handleFilterChange}
+            options={SOURCE_FILTER_OPTIONS}
+          />
+        </div>
+      </FilterCard>
 
-          {loading ? (
-            <div className="py-8 text-center text-sm text-slate-500">Loading recent activity…</div>
+      {/* 4. Billing Configurations Table */}
+      <PageCard>
+        <PageCardContent className="p-4 sm:p-5">
+
+          {!loadingConfigs && filteredConfigs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100">
+                <FileText className="h-6 w-6 text-slate-400" />
+              </div>
+              <h3 className="mb-1 text-sm font-semibold text-slate-900">No Billing Configurations Found</h3>
+              <p className="text-xs text-slate-500">
+                Try adjusting your search query, or create a new billing setup.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="w-full overflow-x-auto">
+                <GenericTable
+                  headers={TABLE_HEADERS}
+                  columns={TABLE_COLUMNS}
+                  rows={tableRows}
+                  loading={loadingConfigs}
+                />
+              </div>
+            </>
+          )}
+        </PageCardContent>
+      </PageCard>
+
+      {/* 5. Recent Activity (Bottom) */}
+      <PageCard>
+        <PageCardContent className="p-4 sm:p-5">
+          <h2 className="mb-3 text-base font-semibold text-slate-900">Recent Activity</h2>
+
+          {loadingStats ? (
+            <div className="py-6 text-center text-sm text-slate-500">Loading recent activity…</div>
           ) : activity.length === 0 ? (
-            <div className="py-8 text-center text-sm text-slate-500">No recent activity yet.</div>
+            <div className="py-6 text-center text-sm text-slate-500">No recent activity yet.</div>
           ) : (
             <ul className="divide-y divide-slate-100">
               {activity.map((item, index) => (
                 <li
                   key={`${item.configId}-${index}`}
-                  className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
                 >
                   <div>
                     <span className="font-medium text-slate-900">{item.configId}</span>
@@ -138,6 +352,22 @@ export default function Overview() {
           )}
         </PageCardContent>
       </PageCard>
+
+      {/* Deactivation Modal */}
+      <ConfirmationModal
+        isOpen={Boolean(deactivateTarget)}
+        title="Deactivate Billing Configuration"
+        message={
+          deactivateTarget
+            ? `Are you sure you want to deactivate the billing setup for ${deactivateTarget.projectName}? Invoice generation will stop until it is reactivated.`
+            : ""
+        }
+        confirmText="Deactivate"
+        variant="danger"
+        isLoading={deactivateLoading}
+        onCancel={() => setDeactivateTarget(null)}
+        onConfirm={handleConfirmDeactivate}
+      />
     </div>
   );
 }

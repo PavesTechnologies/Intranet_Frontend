@@ -22,35 +22,19 @@ const projectBillingNav = [
     path: "/account-receivable/project-billing-setup/overview",
   },
   {
-    label: "Billing Configurations",
-    path: "/account-receivable/project-billing-setup/configurations",
-  },
-  {
-    label: "Tool Pricing",
-    path: "/account-receivable/project-billing-setup/tool-pricing",
-  },
-  {
-    label: "Project Tool Assignments",
-    path: "/account-receivable/project-billing-setup/project-tool-assignments",
-  },
-  {
-    label: "Configuration History",
-    path: "/account-receivable/project-billing-setup/history",
+    label: "Billing Config Workspace",
+    path: "/account-receivable/project-billing-setup/workspace",
   },
 ];
 
 const acquisitionNav = [
   {
-    label: "Dashboard",
+    label: "Overview",
     path: "/account-receivable/billing-data-acquisition",
   },
   {
     label: "Acquisition Workspace",
     path: "/account-receivable/billing-data-acquisition/workspace",
-  },
-  {
-    label: "Tool Charge Acquisition",
-    path: "/account-receivable/billing-data-acquisition/tool-charges",
   },
 ];
 

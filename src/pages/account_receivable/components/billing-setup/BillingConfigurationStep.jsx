@@ -532,90 +532,97 @@ export default function BillingConfigurationStep({ value = {}, onChange, setupMo
   const update = (patch) => onChange({ ...value, ...patch });
   const updateSection = (section, patch) => update({ [section]: patch });
 
+  const billingTypeOptions = BILLING_TYPES.filter((type) =>
+    ["TIME_MATERIAL", "MILESTONE", "RECURRING"].includes(type.value)
+  );
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {/* Header */}
-      <div>
-        <h2 className={Fonts.heading4}>Commercial Configuration</h2>
+      <div className="border-b border-slate-100 pb-4">
+        <h2 className={Fonts.heading3}>Commercial Configuration</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Configure the specific commercial terms for this project's billing setup.
+          Configure pricing, currency, and rate calculation for this billing setup.
         </p>
       </div>
 
-      {/* Compact Summary Strip */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Engagement Details:</span>
-          <span className="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">
-            Billing Type: {BILLING_TYPE_LABELS[billingType] || billingType || "—"}
-          </span>
-          <span className="inline-flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-700/10">
-            Frequency: {frequencyLabel(billingFrequency)}
-          </span>
-        </div>
-      </div>
-
-      {/* Pricing configuration card */}
-      <div className="rounded-xl border border-slate-200 p-6 bg-white shadow-sm space-y-6">
-        <div>
-          <h3 className="text-base font-semibold text-slate-900">
-            Pricing configuration
-          </h3>
-        </div>
+      {/* Section 1: Billing scope */}
+      <div className="space-y-5">
 
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-          {projectInfo.projectSource === "STANDALONE" ? (
+          <div className="max-w-xs">
             <FormSelect
-              label="Currency *"
+              label="Billing Currency *"
               name="currency"
               value={currency || ""}
               onChange={(e) => onProjectInfoChange({ ...projectInfo, currency: e.target.value })}
               options={CURRENCY_OPTIONS.filter((opt) => opt.value !== "")}
             />
-          ) : (
-            <FormInput
-              label="Currency"
-              name="currency"
-              value={currency || ""}
-              disabled
-              onChange={() => {}}
-              placeholder="Auto-filled from project"
-            />
-          )}
+          </div>
 
-          {/* Rate Model Selection (Configurable for Standalone/Enterprise T&M / Recurring) */}
-          {!isExisting && (billingType === "TIME_MATERIAL" || billingType === "RECURRING") && (
-            <div className="md:col-span-2 space-y-3">
-              <label className="block text-sm font-medium text-slate-700">
-                Rate Model <span className="text-red-500">*</span>
-              </label>
-              <RadioCardGroup
-                name="billingMode"
-                options={
-                  billingType === "TIME_MATERIAL"
-                    ? [
-                        { value: "STANDARD", label: "Standard Rate", description: "One hourly rate applies to all approved billable hours." },
-                        { value: "ROLE_BASED", label: "Role-Based Rates", description: "Different hourly rates are maintained for each project role." },
-                      ]
-                    : [
-                        { value: "MONTHLY_RETAINER", label: "Monthly Retainer", description: "Bill a fixed recurring amount every billing period." },
-                        { value: "SUBSCRIPTION", label: "Subscription", description: "Bill a recurring subscription fee for ongoing services." },
-                      ]
-                }
-                value={billingMode || ""}
-                onChange={(next) => update({ billingMode: next })}
-                columns={2}
-              />
-            </div>
-          )}
+          <div className="md:col-span-2 space-y-2">
+            <label className="block text-sm font-medium text-slate-700">
+              Billing Type <span className="text-red-500">*</span>
+            </label>
+            <RadioCardGroup
+              name="billingType"
+              options={billingTypeOptions}
+              value={billingType}
+              onChange={(next) => {
+                update({ billingType: next, billingMode: "" });
+              }}
+            />
+          </div>
+
+          <div className="md:col-span-2 space-y-2">
+            <label className="block text-sm font-medium text-slate-700">
+              Billing Frequency <span className="text-red-500">*</span>
+            </label>
+            <RadioCardGroup
+              name="billingFrequency"
+              options={BILLING_FREQUENCIES}
+              value={billingFrequency}
+              onChange={(next) => update({ billingFrequency: next })}
+              columns={3}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Rate Details / Rate Configuration (Dynamic) */}
-      {(isExisting || billingMode || (billingType !== "TIME_MATERIAL" && billingType !== "RECURRING")) ? (
-        <div className="rounded-xl border border-slate-200 p-6 bg-white shadow-sm space-y-6">
+      {/* Section 2: Pricing model (T&M or Recurring) */}
+      {!isExisting && (billingType === "TIME_MATERIAL" || billingType === "RECURRING") && (
+        <div className="space-y-6 pt-6 border-t border-slate-100">
           <div>
-            <h3 className="text-base font-semibold text-slate-900">
+            <h3 className={Fonts.subheading}>
+              Pricing model
+            </h3>
+          </div>
+
+          <RadioCardGroup
+            name="billingMode"
+            options={
+              billingType === "TIME_MATERIAL"
+                ? [
+                    { value: "STANDARD", label: "Standard Rate", description: "One hourly rate applies to all approved billable hours." },
+                    { value: "ROLE_BASED", label: "Role-Based Rates", description: "Different hourly rates are maintained for each project role." },
+                  ]
+                : [
+                    { value: "MONTHLY_RETAINER", label: "Monthly Retainer", description: "Bill a fixed recurring amount every billing period." },
+                    { value: "SUBSCRIPTION", label: "Subscription", description: "Bill a recurring subscription fee for ongoing services." },
+                  ]
+            }
+            value={billingMode || ""}
+            onChange={(next) => update({ billingMode: next })}
+            columns={2}
+          />
+        </div>
+      )}
+
+      {/* Rate Details / Rate Configuration (Dynamic) */}
+      {(isExisting || billingMode || (billingType !== "TIME_MATERIAL" && billingType !== "RECURRING" && billingType !== "")) ? (
+        <div className="space-y-6 pt-6 border-t border-slate-100">
+          <div>
+            <h3 className={Fonts.subheading}>
               Rate details
             </h3>
           </div>
@@ -661,9 +668,11 @@ export default function BillingConfigurationStep({ value = {}, onChange, setupMo
           </div>
         </div>
       ) : (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/55 p-8 text-center text-slate-500">
-          <p className="text-sm font-medium">Please select a Rate Model to configure hourly rates.</p>
-        </div>
+        billingType !== "" && (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/55 p-8 text-center text-slate-500">
+            <p className="text-sm font-medium">Please select a Pricing Model to configure rates.</p>
+          </div>
+        )
       )}
     </div>
   );

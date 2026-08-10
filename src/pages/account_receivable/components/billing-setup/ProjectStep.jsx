@@ -160,13 +160,13 @@ export default function ProjectStep({ value = {}, onChange }) {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-start justify-between border-b border-slate-100 pb-5">
+      <div className="flex items-start justify-between border-b border-slate-100 pb-4">
         <div>
-          <h2 className={Fonts.heading3}>Project Information</h2>
+          <h2 className={Fonts.heading3}>Project Selection</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Identify the client project and define the foundational engagement model.
+            Select an existing enterprise project or configure a standalone project.
           </p>
         </div>
         {projectSource === "STANDALONE" && (
@@ -181,13 +181,8 @@ export default function ProjectStep({ value = {}, onChange }) {
         )}
       </div>
 
-      {/* Project selection card */}
-      <div className="rounded-xl border border-slate-200 p-6 bg-white shadow-sm space-y-6">
-        <div>
-          <h3 className="text-base font-semibold text-slate-900">
-            Project selection
-          </h3>
-        </div>
+      {/* Inputs Section */}
+      <div className="space-y-5">
 
         {projectSource === "ENTERPRISE" ? (
           /* ENTERPRISE FLOW */
@@ -270,32 +265,6 @@ export default function ProjectStep({ value = {}, onChange }) {
                 ))}
               </select>
             </div>
-
-            {/* Read-only Enterprise details */}
-            <FormInput
-              label="Project Code"
-              name="projectCode"
-              value={value.projectCode || ""}
-              disabled
-              onChange={() => {}}
-              placeholder="Select project to auto-fill"
-            />
-
-            <FormDatePicker
-              label="Project Start Date"
-              name="startDate"
-              value={value.startDate || ""}
-              disabled
-              onChange={() => {}}
-            />
-
-            <FormDatePicker
-              label="Project End Date"
-              name="endDate"
-              value={value.endDate || ""}
-              disabled
-              onChange={() => {}}
-            />
           </div>
         ) : (
           /* STANDALONE FLOW */
@@ -354,41 +323,44 @@ export default function ProjectStep({ value = {}, onChange }) {
         )}
       </div>
 
-      {/* Commercial model card */}
-      <div className="rounded-xl border border-slate-200 p-6 bg-white shadow-sm space-y-6">
-        <div>
-          <h3 className="text-base font-semibold text-slate-900">
-            Commercial model
-          </h3>
-        </div>
-
-        <div className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Billing Type <span className="text-red-500">*</span>
-            </label>
-            <RadioCardGroup
-              name="billingType"
-              options={billingTypeOptions}
-              value={value.billingType || ""}
-              onChange={(next) => onChange({ ...value, billingType: next })}
-            />
+      {/* Card 2: Project summary (Only for Enterprise, when selected) */}
+      {projectSource === "ENTERPRISE" && value.projectId && (
+        <div className="rounded-2xl border border-slate-100 p-6 bg-slate-50/60 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
+            <h3 className={Fonts.subheading}>
+              Project summary
+            </h3>
+            <span className="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">
+              Synced from PMS
+            </span>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Billing Frequency <span className="text-red-500">*</span>
-            </label>
-            <RadioCardGroup
-              name="billingFrequency"
-              options={BILLING_FREQUENCIES}
-              value={value.billingFrequency || ""}
-              onChange={(next) => onChange({ ...value, billingFrequency: next })}
-              columns={3}
-            />
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-4">
+            <div>
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Project Code</span>
+              <span className="text-sm font-bold text-slate-800 mt-1 block">{value.projectCode || "—"}</span>
+            </div>
+            <div>
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Project Duration</span>
+              <span className="text-sm font-bold text-slate-800 mt-1 block">
+                {value.startDate ? `${value.startDate} to ${value.endDate || "Ongoing"}` : "—"}
+              </span>
+            </div>
+            <div>
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Project Source</span>
+              <span className="text-sm font-bold text-slate-800 mt-1 block">Enterprise (PMS)</span>
+            </div>
+            {matchedProject && (
+              <div>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Project Manager</span>
+                <span className="text-sm font-bold text-slate-800 mt-1 block">
+                  {matchedProject.projectManagerName || matchedProject.projectManagerId || "—"}
+                </span>
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

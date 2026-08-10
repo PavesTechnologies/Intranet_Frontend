@@ -1,26 +1,63 @@
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import { Fonts } from "../../../../components/Fonts/Fonts";
-import RadioCardGroup from "../common/RadioCardGroup";
 import { PAYMENT_TERMS_OPTIONS } from "../../data/wizardOptions";
+
+function getOrdinalSuffix(i) {
+  const j = i % 10, k = i % 100;
+  if (j === 1 && k !== 11) return "st";
+  if (j === 2 && k !== 12) return "nd";
+  if (j === 3 && k !== 13) return "rd";
+  return "th";
+}
+
+function getDuePreviewText(genDayStr, term) {
+  const day = parseInt(genDayStr, 10);
+  if (Number.isNaN(day) || day < 1 || day > 31) return "";
+  
+  let daysToAdd = 0;
+  if (term === "NET_15") daysToAdd = 15;
+  else if (term === "NET_30") daysToAdd = 30;
+  else if (term === "NET_45") daysToAdd = 45;
+  else if (term === "NET_60") daysToAdd = 60;
+  else if (term === "IMMEDIATE") daysToAdd = 0;
+  else return "";
+
+  const baseDate = new Date(2026, 9, day);
+  const dueDate = new Date(2026, 9, day + daysToAdd);
+
+  const baseFormat = `Invoice generated on ${day}${getOrdinalSuffix(day)}`;
+  
+  const diffMonth = dueDate.getMonth() - baseDate.getMonth() + (12 * (dueDate.getFullYear() - baseDate.getFullYear()));
+  let monthText = "the same month";
+  if (diffMonth === 1) monthText = "next month";
+  else if (diffMonth > 1) monthText = `${diffMonth} months later`;
+
+  const dueDay = dueDate.getDate();
+  const dueFormat = `Payment due: ${dueDay}${getOrdinalSuffix(dueDay)} of ${monthText}`;
+  
+  return `${baseFormat} ➔ ${dueFormat}`;
+}
 
 export default function BillingControlsStep({ value = {}, onChange }) {
   const update = (patch) => onChange({ ...value, ...patch });
 
+  const previewText = getDuePreviewText(value.invoiceGenerationDay, value.paymentTerms);
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {/* Header */}
-      <div>
+      <div className="border-b border-slate-100 pb-4">
         <h2 className={Fonts.heading3}>Invoice Preferences</h2>
         <p className="mt-1 text-sm text-slate-500">
           Configure how invoices are generated and payment terms after the amount is calculated.
         </p>
       </div>
 
-      {/* Invoice generation card */}
-      <div className="rounded-xl border border-slate-200 p-6 bg-white shadow-sm space-y-6">
+      {/* Section 1: Invoice generation */}
+      <div className="space-y-5">
         <div>
-          <h3 className="text-base font-semibold text-slate-900">
+          <h3 className={Fonts.subheading}>
             Invoice generation
           </h3>
           <p className="mt-1 text-xs text-slate-500">
@@ -57,6 +94,11 @@ export default function BillingControlsStep({ value = {}, onChange }) {
               Automatic
             </button>
           </div>
+          <p className="text-xs text-slate-400">
+            {value.autoInvoiceGeneration === true
+              ? "System automatically generates draft invoices at the end of each cycle."
+              : "Invoices must be generated manually by finance administrators."}
+          </p>
         </div>
 
         {/* Dynamic field for Automatic Generation */}
@@ -79,10 +121,10 @@ export default function BillingControlsStep({ value = {}, onChange }) {
         )}
       </div>
 
-      {/* Payment terms card */}
-      <div className="rounded-xl border border-slate-200 p-6 bg-white shadow-sm space-y-6">
+      {/* Section 2: Payment terms */}
+      <div className="space-y-6 pt-6 border-t border-slate-100">
         <div>
-          <h3 className="text-base font-semibold text-slate-900">
+          <h3 className={Fonts.subheading}>
             Payment terms
           </h3>
           <p className="mt-1 text-xs text-slate-500">
@@ -90,16 +132,26 @@ export default function BillingControlsStep({ value = {}, onChange }) {
           </p>
         </div>
 
-        <div className="space-y-4">
-          <label className="block text-sm font-medium text-slate-700">
-            Payment Terms <span className="text-red-500">*</span>
-          </label>
-          <FormSelect
-            name="paymentTerms"
-            value={value.paymentTerms || ""}
-            onChange={(event) => update({ paymentTerms: event.target.value })}
-            options={PAYMENT_TERMS_OPTIONS}
-          />
+        <div className="grid grid-cols-1 gap-5">
+          <div className="space-y-4 max-w-xs">
+            <label className="block text-sm font-medium text-slate-700">
+              Payment Terms <span className="text-red-500">*</span>
+            </label>
+            <FormSelect
+              name="paymentTerms"
+              value={value.paymentTerms || ""}
+              onChange={(event) => update({ paymentTerms: event.target.value })}
+              options={PAYMENT_TERMS_OPTIONS}
+            />
+          </div>
+
+          {/* Payment preview summary block */}
+          {previewText && (
+            <div className="rounded-lg bg-blue-50/50 border border-blue-100 p-4 text-sm text-blue-800">
+              <span className="font-semibold block mb-1">Invoice timeline preview</span>
+              <span className="font-medium">{previewText}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

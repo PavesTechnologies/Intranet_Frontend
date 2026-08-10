@@ -262,20 +262,6 @@ export default function ToolPricingPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <nav className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500">
-        {BREADCRUMB_ITEMS.map((item, index) => (
-          <span key={item.label} className="flex items-center gap-2">
-            {item.to ? (
-              <Link to={item.to} className="hover:text-slate-800">
-                {item.label}
-              </Link>
-            ) : (
-              <span className="text-slate-900">{item.label}</span>
-            )}
-            {index < BREADCRUMB_ITEMS.length - 1 && <ChevronRight className="h-3.5 w-3.5 text-slate-300" />}
-          </span>
-        ))}
-      </nav>
 
       <PageHeader
         title="Tool Pricing"

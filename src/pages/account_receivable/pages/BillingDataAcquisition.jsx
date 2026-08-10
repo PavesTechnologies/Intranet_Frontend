@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   FolderKanban,
-  Search,
   Calendar,
   ArrowRight,
   FileText,
@@ -15,14 +14,24 @@ import {
   Clock,
   Sparkles,
   Info,
-  RefreshCw
+  Edit3,
+  Eye,
+  RefreshCw,
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
+import FilterCard from "../../../components/ui/FilterCard";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+import { KPICard } from "../../../components/kpi/KPI";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
 import FormInput from "../../../components/forms/FormInput";
+import FormSelect from "../../../components/forms/FormSelect";
+import SearchInput from "../../../components/filter/Searchbar";
+import GenericTable from "../../../components/Table/table";
+import StatusBadge from "../../../components/status/statusbadge";
+import ActionMenu from "../components/common/ActionMenu";
+import { Fonts } from "../../../components/Fonts/Fonts";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import {
   fetchActiveBillingConfigurations,
@@ -76,6 +85,17 @@ export default function BillingDataAcquisition() {
   const [generating, setGenerating] = useState(false);
   const [reminderSent, setReminderSent] = useState(null);
   const [showGatingModal, setShowGatingModal] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest(".action-menu-container")) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener("click", handleOutsideClick);
+    return () => document.removeEventListener("click", handleOutsideClick);
+  }, []);
 
   const handleSendReminder = () => {
     const now = new Date();
@@ -172,6 +192,125 @@ export default function BillingDataAcquisition() {
   });
 
   const uniqueClients = [...new Set(activeConfigs.map((c) => c.client))];
+  const hasActiveFilters = Boolean(searchTerm || filterClient || filterStatus || filterType || filterGeneration);
+
+  const handleClearFilters = () => {
+    setSearchTerm("");
+    setFilterClient("");
+    setFilterStatus("");
+    setFilterType("");
+    setFilterGeneration("");
+  };
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    if (name === "search") setSearchTerm(value);
+    if (name === "client") setFilterClient(value);
+    if (name === "status") setFilterStatus(value);
+    if (name === "billingType") setFilterType(value);
+    if (name === "generation") setFilterGeneration(value);
+  };
+
+  const TABLE_HEADERS = ["Project", "Client", "Billing Type", "Frequency", "Billing Period", "Generation", "Status", "Last Invoice", "Actions"];
+  const TABLE_COLUMNS = ["project", "client", "billingType", "frequency", "billingPeriod", "generation", "status", "lastInvoice", "actions"];
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const tableRows = useMemo(() =>
+    filteredConfigs.map((config) => ({
+      project: (
+        <div>
+          <div className="font-semibold text-slate-900 text-xs">{config.projectName}</div>
+          <div className="text-[10px] text-slate-400 font-mono mt-0.5">{config.projectCode}</div>
+        </div>
+      ),
+      client: (
+        <div>
+          <div className="font-semibold text-slate-800 text-xs">{config.client}</div>
+          <div className="text-[10px] text-slate-400">Enterprise Client</div>
+        </div>
+      ),
+      billingType: <span className="text-xs text-slate-700">{BILLING_TYPE_LABELS[config.billingType] || config.billingType}</span>,
+      frequency: <span className="text-xs text-slate-600">{frequencyLabel(config.billingFrequency)}</span>,
+      billingPeriod: <span className="font-mono text-[11px] text-slate-600">{config.billingPeriod}</span>,
+      generation: (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${config.invoiceGeneration === "AUTOMATIC" ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-slate-50 text-slate-700 border-slate-200"}`}>
+          {config.invoiceGeneration}
+        </span>
+      ),
+      status: <StatusBadge label={config.billingStatus} size="sm" />,
+      lastInvoice: <span className="font-mono text-[11px] text-slate-600">{config.lastInvoice || "\u2014"}</span>,
+      actions: (
+        <ActionMenu
+          items={[
+            config.billingStatus === "Already Billed"
+              ? {
+                  label: "View Invoice Draft",
+                  icon: <FileText className="h-4 w-4 text-blue-600" />,
+                  onClick: () => {
+                    setCurrentConfig(config);
+                    setGenerating(true);
+                    generateInvoiceDraft(config, {}).then((result) => {
+                      setDraft(result);
+                      setGenerating(false);
+                      setSubView("DRAFT");
+                      navigate("/account-receivable/billing-data-acquisition/workspace");
+                    });
+                  },
+                }
+              : {
+                  label: "Acquire Billing Data",
+                  icon: <Play className="h-4 w-4 text-blue-600" />,
+                  disabled: config.billingStatus === "Waiting for Source Data",
+                  onClick: () => handleAcquireClick(config),
+                },
+            {
+              label: "Edit Billing Setup",
+              icon: <Edit3 className="h-4 w-4 text-slate-500" />,
+              onClick: () => navigate(`/account-receivable/billing-setup/edit/${config.id}`),
+            },
+            {
+              label: "Project Details",
+              icon: <Eye className="h-4 w-4 text-slate-500" />,
+              onClick: () => showStatusToast(`Viewing details for ${config.projectName}`, "info"),
+            },
+          ]}
+        />
+      ),
+    })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredConfigs]
+  );
+
+  const clientOptions = [
+    { value: "", label: "All Clients" },
+    ...uniqueClients.map((c) => ({ value: c, label: c })),
+  ];
+  const statusOptions = [
+    { value: "", label: "All Statuses" },
+    { value: "Ready", label: "Ready" },
+    { value: "Waiting for Source Data", label: "Waiting" },
+    { value: "Already Billed", label: "Already Billed" },
+    { value: "Acquisition Failed", label: "Failed" },
+  ];
+  const typeOptions = [
+    { value: "", label: "All Billing Types" },
+    { value: "TIME_MATERIAL", label: "Time & Material" },
+    { value: "FIXED_PRICE", label: "Fixed Price" },
+    { value: "MILESTONE", label: "Milestone" },
+    { value: "RECURRING", label: "Recurring" },
+  ];
+  const generationOptions = [
+    { value: "", label: "All Gen Modes" },
+    { value: "MANUAL", label: "Manual" },
+    { value: "AUTOMATIC", label: "Automatic" },
+  ];
+
+  const kpiCards = [
+    { key: "active", label: "Active Setups", value: activeConfigs.length, icon: FolderKanban, color: "blue" },
+    { key: "ready", label: "Ready to Bill", value: activeConfigs.filter((c) => c.billingStatus === "Ready").length, icon: TrendingUp, color: "green" },
+    { key: "auto", label: "Auto Cycles", value: activeConfigs.filter((c) => c.invoiceGeneration === "AUTOMATIC").length, icon: Clock, color: "indigo" },
+    { key: "waiting", label: "Waiting for Data", value: activeConfigs.filter((c) => c.billingStatus === "Waiting for Source Data").length, icon: AlertTriangle, color: "amber" },
+  ];
 
   if (loadingConfigs) {
     return (
@@ -184,7 +323,7 @@ export default function BillingDataAcquisition() {
   // --- RENDER DRAFT VIEW ---
   if (isWorkspacePath && subView === "DRAFT" && draft && currentConfig) {
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="space-y-6">
         <div className="flex items-center justify-between border-b border-slate-200 pb-4">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">Invoice Draft Generated</h2>
@@ -277,7 +416,7 @@ export default function BillingDataAcquisition() {
   if (isWorkspacePath) {
     if (!currentConfig) {
       return (
-        <div className="space-y-6 p-6">
+        <div className="space-y-6">
           <PageHeader
             title="Acquisition Workspace"
             subtitle="Process source data acquisition and calculate pre-tax commercial records."
@@ -301,7 +440,7 @@ export default function BillingDataAcquisition() {
     }
 
     return (
-      <div className="space-y-6 p-6">
+      <div className="space-y-6">
         {/* Workspace Header */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
           <div>
@@ -654,221 +793,70 @@ export default function BillingDataAcquisition() {
 
   // --- RENDER DEFAULT DASHBOARD VIEW ---
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-3">
       <PageHeader
-        title="Billing Data Acquisition Dashboard"
+        title="Overview"
         subtitle="Review billing readiness, trigger data acquisition, and initiate automated calculations based on active commercial agreements."
       />
 
-      {/* KPI Header Cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Billing Setups</span>
-            <h4 className="text-2xl font-bold text-slate-900">{activeConfigs.length}</h4>
-          </div>
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-            <FolderKanban className="h-5 w-5" />
-          </div>
-        </div>
-        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Ready to Bill</span>
-            <h4 className="text-2xl font-bold text-emerald-600">
-              {activeConfigs.filter((c) => c.billingStatus === "Ready").length}
-            </h4>
-          </div>
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-            <TrendingUp className="h-5 w-5" />
-          </div>
-        </div>
-        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Invoice Cycles Auto Run</span>
-            <h4 className="text-2xl font-bold text-indigo-600">
-              {activeConfigs.filter((c) => c.invoiceGeneration === "AUTOMATIC").length}
-            </h4>
-          </div>
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-            <Clock className="h-5 w-5" />
-          </div>
-        </div>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {kpiCards.map((kpi) => (
+          <KPICard
+            key={kpi.key}
+            label={kpi.label}
+            value={kpi.value}
+            icon={<kpi.icon className="h-5 w-5" />}
+            color={kpi.color}
+            className="h-full w-full bg-white shadow-sm"
+          />
+        ))}
       </div>
 
-      {/* Filters Bar */}
-      <PageCard className="border-slate-200">
-        <PageCardContent className="p-4 space-y-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search project..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm bg-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
-              />
-            </div>
+      {/* Filters */}
+      <FilterCard title="Filters" description="Narrow down active billing configurations.">
+        <div className="w-full sm:w-52">
+          <SearchInput
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search project..."
+          />
+        </div>
+        <div className="w-full sm:w-52">
+          <FormSelect name="client" value={filterClient} onChange={handleFilterChange} options={clientOptions} />
+        </div>
+        <div className="w-full sm:w-52">
+          <FormSelect name="billingType" value={filterType} onChange={handleFilterChange} options={typeOptions} />
+        </div>
+        <div className="w-full sm:w-52">
+          <FormSelect name="status" value={filterStatus} onChange={handleFilterChange} options={statusOptions} />
+        </div>
+        <div className="w-full sm:w-52">
+          <FormSelect name="generation" value={filterGeneration} onChange={handleFilterChange} options={generationOptions} />
+        </div>
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={handleClearFilters}
+            className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors whitespace-nowrap"
+          >
+            Clear filters
+          </button>
+        )}
+      </FilterCard>
 
-            <select
-              value={filterClient}
-              onChange={(e) => setFilterClient(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-shadow"
-            >
-              <option value="">All Clients</option>
-              {uniqueClients.map((client) => (
-                <option key={client} value={client}>
-                  {client}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-shadow"
-            >
-              <option value="">All Billing Types</option>
-              <option value="TIME_MATERIAL">Time & Material</option>
-              <option value="FIXED_PRICE">Fixed Price</option>
-              <option value="MILESTONE">Milestone</option>
-              <option value="RECURRING">Recurring</option>
-            </select>
-
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-shadow"
-            >
-              <option value="">All Statuses</option>
-              <option value="Ready">Ready</option>
-              <option value="Waiting for Source Data">Waiting</option>
-              <option value="Already Billed">Already Billed</option>
-              <option value="Acquisition Failed">Failed</option>
-            </select>
-
-            <select
-              value={filterGeneration}
-              onChange={(e) => setFilterGeneration(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-shadow"
-            >
-              <option value="">All Gen Modes</option>
-              <option value="MANUAL">Manual</option>
-              <option value="AUTOMATIC">Automatic</option>
-            </select>
+      {/* Configurations Table */}
+      <PageCard>
+        <PageCardContent className="p-4 sm:p-5">
+          <div className="w-full overflow-x-auto">
+            <GenericTable
+              headers={TABLE_HEADERS}
+              columns={TABLE_COLUMNS}
+              rows={tableRows}
+              loading={loadingConfigs}
+            />
           </div>
         </PageCardContent>
-      </PageCard>
-
-      {/* Main Grid */}
-      <PageCard className="border-slate-200 overflow-hidden">
-        <div className="w-full overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead>
-              <tr className="bg-slate-50 text-slate-700 font-semibold">
-                <th className="px-6 py-4 text-left">Project</th>
-                <th className="px-6 py-4 text-left">Client</th>
-                <th className="px-6 py-4 text-left">Billing Type</th>
-                <th className="px-6 py-4 text-left">Frequency</th>
-                <th className="px-6 py-4 text-left">Billing Period</th>
-                <th className="px-6 py-4 text-left">Generation</th>
-                <th className="px-6 py-4 text-left">Status</th>
-                <th className="px-6 py-4 text-left">Last Invoice</th>
-                <th className="px-6 py-4 text-left">Generated On</th>
-                <th className="px-6 py-4 text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
-              {filteredConfigs.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center text-slate-500">
-                    No active billing configurations matched the filters.
-                  </td>
-                </tr>
-              ) : (
-                filteredConfigs.map((config) => (
-                  <tr key={config.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900">
-                      <div>{config.projectName}</div>
-                      <div className="text-xs text-slate-400">{config.projectCode}</div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-600">{config.client}</td>
-                    <td className="px-6 py-4 text-slate-600">
-                      {BILLING_TYPE_LABELS[config.billingType] || config.billingType}
-                    </td>
-                    <td className="px-6 py-4 text-slate-600">
-                      {frequencyLabel(config.billingFrequency)}
-                    </td>
-                    <td className="px-6 py-4 text-slate-600 font-mono text-xs">
-                      {config.billingPeriod}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${config.invoiceGeneration === "AUTOMATIC"
-                            ? "bg-indigo-50 text-indigo-700"
-                            : "bg-slate-100 text-slate-700"
-                          }`}
-                      >
-                        {config.invoiceGeneration}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${config.billingStatus === "Ready"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : config.billingStatus === "Already Billed"
-                              ? "bg-blue-50 text-blue-700"
-                              : "bg-amber-50 text-amber-700"
-                          }`}
-                      >
-                        {config.billingStatus}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 font-mono text-xs text-slate-600">
-                      {config.lastInvoice || "—"}
-                    </td>
-                    <td className="px-6 py-4 text-slate-600 font-mono text-xs">
-                      {config.generatedOn || "—"}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {config.billingStatus === "Already Billed" ? (
-                        <button
-                          onClick={() => {
-                            setCurrentConfig(config);
-                            setGenerating(true);
-                            generateInvoiceDraft(config, {}).then((result) => {
-                              setDraft(result);
-                              setGenerating(false);
-                              setSubView("DRAFT");
-                              navigate("/account-receivable/billing-data-acquisition/workspace");
-                            });
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
-                        >
-                          <FileText className="h-3 w-3" /> View Invoice
-                        </button>
-                      ) : config.billingStatus === "Waiting for Source Data" ? (
-                        <button
-                          disabled
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-400 bg-slate-100 border border-slate-200 rounded-lg cursor-not-allowed"
-                        >
-                          <Play className="h-3 w-3 fill-current text-slate-300" /> Acquire
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleAcquireClick(config)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                        >
-                          <Play className="h-3 w-3 fill-current" /> Acquire
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
       </PageCard>
 
       {/* Manual Date Period Config Modal */}
@@ -876,7 +864,7 @@ export default function BillingDataAcquisition() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-slate-200 space-y-6">
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Define Manual Billing Period</h3>
+              <h3 className={Fonts.subheading}>Define Manual Billing Period</h3>
               <p className="text-xs text-slate-500 mt-1">
                 This project configuration requires manual billing period approval. Review or adjust dates.
               </p>
@@ -924,7 +912,7 @@ export default function BillingDataAcquisition() {
             <div className="flex gap-3">
               <AlertCircle className="h-6 w-6 text-amber-600 flex-shrink-0" />
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Pending Billable Records Detected</h3>
+                <h3 className={Fonts.subheading}>Pending Billable Records Detected</h3>
                 <p className="text-xs text-slate-500 mt-1">
                   12 billable hours are still awaiting approval.
                 </p>

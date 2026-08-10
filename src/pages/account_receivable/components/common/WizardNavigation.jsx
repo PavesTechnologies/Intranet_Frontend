@@ -14,7 +14,7 @@ export default function WizardNavigation({
   onCancel,
 }) {
   return (
-    <div className="sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_-4px_12px_rgba(15,23,42,0.06)]">
+    <div className="flex flex-wrap items-center justify-between gap-3">
       <Button variant="outline" onClick={onBack} disabled={isFirstStep} aria-label="Go back one step">
         Back
       </Button>

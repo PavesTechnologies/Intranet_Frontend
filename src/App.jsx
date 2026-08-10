@@ -581,6 +581,10 @@ const AppRoutes = () => {
               element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingConfigurations /></ProtectedRoute>}
             />
             <Route
+              path="project-billing-setup/workspace"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><NewConfigurationWizard /></ProtectedRoute>}
+            />
+            <Route
               path="project-billing-setup/configurations/new"
               element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><NewConfigurationWizard /></ProtectedRoute>}
             />

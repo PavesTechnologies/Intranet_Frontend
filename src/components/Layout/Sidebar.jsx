@@ -77,20 +77,8 @@ const accountReceivableSubmenu = [
         to: "/account-receivable/project-billing-setup/overview",
       },
       {
-        label: "Billing Configurations",
-        to: "/account-receivable/project-billing-setup/configurations",
-      },
-      {
-        label: "Configuration History",
-        to: "/account-receivable/project-billing-setup/history",
-      },
-      {
-        label: "Tool Pricing",
-        to: "/account-receivable/project-billing-setup/tool-pricing",
-      },
-      {
-        label: "Project Tool Assignments",
-        to: "/account-receivable/project-billing-setup/project-tool-assignments",
+        label: "Billing Config Workspace",
+        to: "/account-receivable/project-billing-setup/workspace",
       },
     ],
   },
@@ -99,8 +87,12 @@ const accountReceivableSubmenu = [
     to: "/account-receivable/billing-data-acquisition",
     children: [
       {
-        label: "Tool Charges",
-        to: "/account-receivable/billing-data-acquisition/tool-charges",
+        label: "Overview",
+        to: "/account-receivable/billing-data-acquisition",
+      },
+      {
+        label: "Acquisition Workspace",
+        to: "/account-receivable/billing-data-acquisition/workspace",
       },
     ],
   },

@@ -181,7 +181,7 @@ export const CURRENCY_OPTIONS = [
 ];
 
 export const SOURCE_FILTER_OPTIONS = [
-  { value: "", label: "All" },
+  { value: "", label: "All Sources" },
   { value: "Enterprise", label: "Enterprise" },
   { value: "Standalone", label: "Standalone" },
 ];

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ChevronRight, Pencil } from "lucide-react";
+import { ChevronRight, Pencil, FolderKanban, Coins, Receipt, ShieldCheck, Check } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
@@ -76,10 +76,10 @@ const INITIAL_WIZARD_DATA = {
 };
 
 const STEPS = [
-  { id: 1, label: "Project" },
-  { id: 2, label: "Commercial Configuration" },
-  { id: 3, label: "Invoice Preferences" },
-  { id: 4, label: "Review & Activate" },
+  { id: 1, label: "Project Selection", desc: "Select project and basic info", icon: <FolderKanban className="h-5 w-5" /> },
+  { id: 2, label: "Commercial Configuration", desc: "Define pricing and rate details", icon: <Coins className="h-5 w-5" /> },
+  { id: 3, label: "Invoice Preferences", desc: "Configure billing rules and terms", icon: <Receipt className="h-5 w-5" /> },
+  { id: 4, label: "Review & Activate", desc: "Verify setup before activating", icon: <ShieldCheck className="h-5 w-5" /> },
 ];
 
 const CONFIGURATIONS_PATH = "/account-receivable/project-billing-setup/configurations";
@@ -92,15 +92,13 @@ function isStepValid(step, data) {
       if (source === "ENTERPRISE") {
         return Boolean(
           project.clientId &&
-            project.projectId &&
-            project.projectCode &&
-            project.startDate &&
-            project.endDate &&
-            project.billingType &&
-            project.billingFrequency
+          project.projectId &&
+          project.projectCode &&
+          project.startDate &&
+          project.endDate
         );
       } else {
-        const required = ["clientName", "projectName", "projectCode", "startDate", "endDate", "billingType", "billingFrequency"];
+        const required = ["clientName", "projectName", "projectCode", "startDate", "endDate"];
         const hasAllRequired = required.every((field) => Boolean(project[field]));
         const datesValid = !project.startDate || !project.endDate || project.endDate >= project.startDate;
         return hasAllRequired && datesValid;
@@ -110,6 +108,8 @@ function isStepValid(step, data) {
       const config = data.billingConfig || {};
       const project = data.projectInfo || {};
       if (!project.currency) return false;
+      if (!config.billingType) return false;
+      if (!config.billingFrequency) return false;
       if (config.billingType === "TIME_MATERIAL") {
         if (!config.billingMode) return false;
         if (config.billingMode === "STANDARD") {
@@ -194,7 +194,7 @@ export default function NewConfigurationWizard() {
   const handleProjectInfoChange = (projectInfo) => {
     setWizardData((prev) => {
       const setupMode = projectInfo.projectSource === "ENTERPRISE" ? "EXISTING" : "STANDALONE";
-      
+
       // We do not preselect any billingMode. Let the user explicitly choose it on Step 2.
       let billingMode = prev.billingConfig.billingMode;
       if (projectInfo.billingType !== prev.projectInfo.billingType) {
@@ -250,8 +250,8 @@ export default function NewConfigurationWizard() {
     () => [
       { label: "Account Receivable", to: "/account-receivable/dashboard" },
       { label: "Project Billing Setup", to: "/account-receivable/project-billing-setup/overview" },
-      { label: "Billing Configurations", to: CONFIGURATIONS_PATH },
-      { label: configId ? (viewOnly ? "View Configuration" : "Edit Configuration") : "New Configuration", to: null },
+      { label: "Billing Config Workspace", to: null },
+      { label: configId ? (viewOnly ? "View Workspace" : "Edit Workspace") : "New Setup", to: null },
     ],
     [configId, viewOnly]
   );
@@ -297,47 +297,63 @@ export default function NewConfigurationWizard() {
     );
   }
 
-  return (
-    <div className="space-y-6 p-6">
-      <nav className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500">
-        {breadcrumbItems.map((item, index) => (
-          <span key={item.label} className="flex items-center gap-2">
-            {item.to ? (
-              <Link to={item.to} className="hover:text-slate-800">
-                {item.label}
-              </Link>
-            ) : (
-              <span className="text-slate-900">{item.label}</span>
-            )}
-            {index < breadcrumbItems.length - 1 && <ChevronRight className="h-3.5 w-3.5 text-slate-300" />}
-          </span>
-        ))}
-      </nav>
+  const progressValue = Math.round(((currentStep - 1) / (STEPS.length - 1)) * 100);
 
+  return (
+    <div className="space-y-3">
+      {/* Page Header */}
       <PageHeader
-        title={configId ? "Edit Project Billing Configuration" : "New Project Billing Configuration"}
-        subtitle="Configure commercial billing information for a client project."
+        title={configId ? "Edit Billing Configuration Workspace" : "Billing Configuration Workspace"}
+        subtitle="Configure commercial terms, pricing models, and billing rules for customer projects."
       />
 
-      <div className="sticky top-0 z-20 -mx-6 bg-slate-50/95 px-6 pb-2 pt-1 backdrop-blur md:static md:mx-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
-        <PageCard>
-          <PageCardContent className="p-6">
-            <WizardStepper steps={STEPS} currentStep={currentStep} onStepClick={handleStepClick} />
-          </PageCardContent>
-        </PageCard>
+      {/* Segmented Flow Stepper Path */}
+      <div className="flex flex-wrap items-center gap-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/60 shadow-inner">
+        {STEPS.map((step, index) => {
+          const isCompleted = currentStep > step.id;
+          const isActive = currentStep === step.id;
+          const isLast = index === STEPS.length - 1;
+          const isClickable = isCompleted && Boolean(handleStepClick);
+
+          return (
+            <div key={step.id} className="flex-1 min-w-[130px] flex items-center">
+              <button
+                type="button"
+                disabled={!isClickable}
+                onClick={() => isClickable && handleStepClick(step.id)}
+                className={`w-full flex items-center justify-center gap-2 py-1.5 px-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 focus:outline-none ${isActive
+                  ? "bg-white text-slate-900 shadow-sm border border-slate-200/80"
+                  : isCompleted
+                    ? "text-slate-700 hover:text-slate-900 hover:bg-white/60 cursor-pointer"
+                    : "text-slate-400 cursor-default"
+                  }`}
+              >
+                <span className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold border transition-all ${isActive
+                  ? "border-indigo-600 bg-indigo-600 text-white"
+                  : isCompleted
+                    ? "border-emerald-600 bg-emerald-600 text-white"
+                    : "border-slate-300 bg-slate-50 text-slate-400"
+                  }`}>
+                  {isCompleted ? "✓" : step.id}
+                </span>
+                <span className="truncate">{step.label}</span>
+              </button>
+              {!isLast && (
+                <span className="text-slate-300 px-1 font-normal text-xs select-none">➔</span>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {currentStep === 1 && (
-        <PageCard>
-          <PageCardContent className="p-6">
+      {/* Active Form Step Container */}
+      <PageCard className="border-slate-200/80 shadow-sm">
+        <PageCardContent className="p-4 sm:p-5 space-y-4">
+          {currentStep === 1 && (
             <ProjectStep value={wizardData.projectInfo} onChange={handleProjectInfoChange} />
-          </PageCardContent>
-        </PageCard>
-      )}
+          )}
 
-      {currentStep === 2 && (
-        <PageCard>
-          <PageCardContent className="p-6">
+          {currentStep === 2 && (
             <BillingConfigurationStep
               value={wizardData.billingConfig}
               onChange={handleBillingConfigChange}
@@ -345,32 +361,30 @@ export default function NewConfigurationWizard() {
               projectInfo={wizardData.projectInfo}
               onProjectInfoChange={handleProjectInfoChange}
             />
-          </PageCardContent>
-        </PageCard>
-      )}
+          )}
 
-      {currentStep === 3 && (
-        <PageCard>
-          <PageCardContent className="p-6">
+          {currentStep === 3 && (
             <BillingControlsStep value={wizardData.controls} onChange={handleControlsChange} />
-          </PageCardContent>
-        </PageCard>
-      )}
+          )}
 
-      {currentStep === 4 && <ReviewActivateStep wizardData={wizardData} onEditStep={handleStepClick} />}
+          {currentStep === 4 && <ReviewActivateStep wizardData={wizardData} onEditStep={handleStepClick} />}
 
-      <WizardNavigation
-        isFirstStep={currentStep === 1}
-        isLastStep={isLastStep}
-        nextDisabled={nextDisabled}
-        showSaveDraft={currentStep > 1}
-        saving={saving}
-        activating={activating}
-        onBack={handleBack}
-        onNext={isLastStep ? handleActivate : handleNext}
-        onSaveDraft={handleSaveDraft}
-        onCancel={handleCancel}
-      />
+          <div className="border-t border-slate-100 pt-4">
+            <WizardNavigation
+              isFirstStep={currentStep === 1}
+              isLastStep={isLastStep}
+              nextDisabled={nextDisabled}
+              showSaveDraft={currentStep > 1}
+              saving={saving}
+              activating={activating}
+              onBack={handleBack}
+              onNext={isLastStep ? handleActivate : handleNext}
+              onSaveDraft={handleSaveDraft}
+              onCancel={handleCancel}
+            />
+          </div>
+        </PageCardContent>
+      </PageCard>
 
       <ActivationSuccessDialog
         isOpen={showSuccess}
