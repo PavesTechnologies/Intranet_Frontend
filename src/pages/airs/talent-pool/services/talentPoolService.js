@@ -22,12 +22,24 @@ const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 // switch for the bare-repeated-key form (same file's `indexes === null`
 // branch) — this is the one-line fix; campaign_id/designation/page/size are
 // untouched.
-export const searchTalentPoolCandidates = async ({ skills, designation, campaignId, page = 1, size = 20 } = {}) => {
+export const searchTalentPoolCandidates = async ({
+    skills,
+    designation,
+    locations,
+    experienceMin,
+    experienceMax,
+    campaignId,
+    page = 1,
+    size = 20,
+} = {}) => {
     try {
         const response = await api.get(`${BASE_URL}/talent-pool/candidates`, {
             params: {
                 skills: skills && skills.length > 0 ? skills : undefined,
                 designation: designation || undefined,
+                locations: locations && locations.length > 0 ? locations : undefined,
+                experience_min: experienceMin != null && experienceMin !== "" ? experienceMin : undefined,
+                experience_max: experienceMax != null && experienceMax !== "" ? experienceMax : undefined,
                 campaign_id: campaignId || undefined,
                 page,
                 size,

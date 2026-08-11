@@ -26,6 +26,12 @@ export default function TalentPoolPage() {
     removeSkill,
     designation,
     setDesignation,
+    locations,
+    toggleLocation,
+    experienceMin,
+    setExperienceMin,
+    experienceMax,
+    setExperienceMax,
     hasActiveFilters,
     currentPage,
     setCurrentPage,
@@ -99,6 +105,12 @@ export default function TalentPoolPage() {
         removeSkill={removeSkill}
         designation={designation}
         setDesignation={setDesignation}
+        locations={locations}
+        toggleLocation={toggleLocation}
+        experienceMin={experienceMin}
+        setExperienceMin={setExperienceMin}
+        experienceMax={experienceMax}
+        setExperienceMax={setExperienceMax}
       />
 
       {loading ? (
