@@ -95,33 +95,60 @@ export default function InvoiceUploadPage() {
   };
 
   const handleUpload = async () => {
-    if (!selectedFile) {
-      setValidationError("Please select a file to upload.");
-      return;
+  if (!selectedFile) {
+    setValidationError("Please select a file to upload.");
+    return;
+  }
+
+  try {
+    setProcessingStep("uploading");
+
+    const result = await uploadInvoice.mutateAsync(selectedFile);
+
+    const invoiceNumber =
+      result?.extracted_invoice?.invoice_number || "Invoice";
+
+    const status = result?.invoice_status;
+
+    if (status === "OCR_FAILED") {
+      toast.error(
+        `${invoiceNumber} — OCR extraction failed.`
+      );
+    } else if (status === "OCR_REVIEW_PENDING") {
+      toast.info(
+        `${invoiceNumber} requires OCR review.`
+      );
+    } else {
+      toast.success(
+        `${invoiceNumber} processed successfully.`
+      );
     }
 
-    try {
-      // Staged progress is a client-side simulation for UX — the actual mock outcome is decided
-      // inside invoiceService.uploadInvoice, not here.
-      setProcessingStep("uploading");
-      await wait(600);
-      setProcessingStep("ocr");
-      await wait(700);
-      setProcessingStep("validating");
-
-      const { invoice: createdInvoice, outcome } = await uploadInvoice.mutateAsync(selectedFile);
-
-      const message = OUTCOME_MESSAGES[outcome?.type]?.(createdInvoice.invoiceNumber);
-      if (message?.tone === "error") toast.error(message.text);
-      else if (message?.tone === "info") toast.info(message.text);
-      else toast.success(message?.text || `${createdInvoice.invoiceNumber} uploaded.`);
-
-      navigate(createdInvoice?.id ? AP_ROUTES.INVOICE_DETAIL(createdInvoice.id) : AP_ROUTES.INVOICE_LIST);
-    } catch (error) {
-      setProcessingStep(null);
-      toast.error(getApiErrorMessage(error, "Upload failed. Please try again."));
+    if (result?.invoice_id) {
+      navigate(
+        AP_ROUTES.INVOICE_DETAIL(result.invoice_id)
+      );
+    } else if (result?.inbound_document_id) {
+      navigate(
+        AP_ROUTES.INVOICE_OCR_REVIEW(
+          result.inbound_document_id
+        )
+      );
+    } else {
+      navigate(AP_ROUTES.INVOICE_LIST);
     }
-  };
+
+  } catch (error) {
+    toast.error(
+      getApiErrorMessage(
+        error,
+        "Invoice processing failed. Please try again."
+      )
+    );
+  } finally {
+    setProcessingStep(null);
+  }
+};
 
   return (
     <div className="p-6">
