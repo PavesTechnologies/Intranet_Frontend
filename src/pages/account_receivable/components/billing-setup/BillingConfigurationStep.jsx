@@ -26,7 +26,6 @@ import {
 import {
   getActiveBillingTypes,
   getActiveBillingFrequencies,
-  getActiveCurrencies,
   getTmRateCardsByBillingConfiguration,
   createTmRateCard,
   updateTmRateCard,
@@ -542,10 +541,9 @@ export default function BillingConfigurationStep({ value = {}, onChange, setupMo
   const billingFrequency = value.billingFrequency || "";
   const billingTypeId = value.billingTypeId || "";
   const billingFrequencyId = value.billingFrequencyId || "";
-  const currency = projectInfo?.currency || "";
+  const currency = String(projectInfo?.projectBudgetCurrency || projectInfo?.currency || "").trim().toUpperCase();
   const [activeBillingTypeOptions, setActiveBillingTypeOptions] = useState([]);
   const [activeBillingFrequencyOptions, setActiveBillingFrequencyOptions] = useState([]);
-  const [activeCurrencyOptions, setActiveCurrencyOptions] = useState([]);
   const [loadingBillingData, setLoadingBillingData] = useState(true);
   const frequencyLabel = (val) => activeBillingFrequencyOptions.find((option) => option.value === val)?.label || val || "—";
 
@@ -554,27 +552,23 @@ export default function BillingConfigurationStep({ value = {}, onChange, setupMo
 
     const loadBillingOptions = async () => {
       try {
-        const [billingTypes, billingFrequencies, currencies] = await Promise.all([
+        const [billingTypes, billingFrequencies] = await Promise.all([
           getActiveBillingTypes(),
           getActiveBillingFrequencies(),
-          getActiveCurrencies(),
         ]);
 
         if (!isMounted) return;
 
         const normalizedTypes = Array.isArray(billingTypes) ? billingTypes.map(normalizeBillingType).filter((type) => type.value) : [];
         const normalizedFrequencies = Array.isArray(billingFrequencies) ? billingFrequencies.filter((frequency) => frequency.value) : [];
-        const normalizedCurrencies = Array.isArray(currencies) ? currencies.filter((currency) => currency.currencyId) : [];
 
         setActiveBillingTypeOptions(normalizedTypes);
         setActiveBillingFrequencyOptions(normalizedFrequencies);
-        setActiveCurrencyOptions(normalizedCurrencies);
       } catch (error) {
         if (!isMounted) return;
         setActiveBillingTypeOptions([]);
         setActiveBillingFrequencyOptions([]);
-        setActiveCurrencyOptions([]);
-        showStatusToast(getApiErrorMessage(error, "Failed to load billing types, frequencies, and currencies."), "error");
+        showStatusToast(getApiErrorMessage(error, "Failed to load billing types and frequencies."), "error");
       } finally {
         if (isMounted) setLoadingBillingData(false);
       }
@@ -588,30 +582,20 @@ export default function BillingConfigurationStep({ value = {}, onChange, setupMo
   }, []);
 
   useEffect(() => {
-    if (projectInfo.currencyId || activeCurrencyOptions.length === 0) return;
-
-    const projectCurrencyCode = String(projectInfo.currency || projectInfo.projectBudgetCurrency || "")
-      .trim()
-      .toUpperCase();
-    if (!projectCurrencyCode) return;
-
-    const matchedCurrency = activeCurrencyOptions.find((option) => {
-      const optionCode = String(option.currencyCode || option.code || "").trim().toUpperCase();
-      return optionCode === projectCurrencyCode;
-    });
-
-    if (!matchedCurrency?.currencyId) return;
+    const projectCurrencyCode = String(projectInfo.projectBudgetCurrency || projectInfo.currency || "").trim().toUpperCase();
+    if (
+      !projectCurrencyCode ||
+      (projectInfo.currency === projectCurrencyCode && projectInfo.projectBudgetCurrency === projectCurrencyCode)
+    ) {
+      return;
+    }
 
     onProjectInfoChange({
       ...projectInfo,
-      currencyId: matchedCurrency.currencyId,
-      currency: matchedCurrency.currencyCode || projectCurrencyCode,
+      currency: projectCurrencyCode,
+      projectBudgetCurrency: projectInfo.projectBudgetCurrency || projectCurrencyCode,
     });
-  }, [
-    activeCurrencyOptions,
-    onProjectInfoChange,
-    projectInfo,
-  ]);
+  }, [onProjectInfoChange, projectInfo]);
 
   const update = (patch) => onChange({ ...value, ...patch });
   const updateSection = (section, patch) => update({ [section]: patch });
@@ -651,26 +635,7 @@ export default function BillingConfigurationStep({ value = {}, onChange, setupMo
       <div className="space-y-5">
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <div className="max-w-xs">
-            <FormSelect
-              label="Billing Currency *"
-              name="currencyId"
-              value={projectInfo.currencyId || ""}
-              onChange={(e) => {
-                const selectedCurrency = activeCurrencyOptions.find((option) => String(option.currencyId) === String(e.target.value));
-                onProjectInfoChange({
-                  ...projectInfo,
-                  currencyId: e.target.value,
-                  currency: selectedCurrency?.currencyCode || "",
-                });
-              }}
-              options={[
-                { value: "", label: loadingBillingData ? "Loading currencies..." : "Select currency" },
-                ...activeCurrencyOptions.map((currencyOption) => ({
-                  value: currencyOption.currencyId,
-                  label: currencyOption.label,
-                })),
-              ]}
-            />
+            <ReadOnlyField label="Billing Currency *" value={currency} />
           </div>
 
           <FormInput label="Project Budget" name="projectBudget" type="number" min="0" step="0.01" value={projectInfo.projectBudget ?? ""} onChange={(e) => onProjectInfoChange({ ...projectInfo, projectBudget: e.target.value })} placeholder="e.g. 45678" />

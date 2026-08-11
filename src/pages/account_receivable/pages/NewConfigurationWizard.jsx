@@ -113,7 +113,7 @@ function isStepValid(step, data) {
     case 2: {
       const config = data.billingConfig || {};
       const project = data.projectInfo || {};
-      if (!project.currencyId) return false;
+      if (!(project.projectBudgetCurrency || project.currency)) return false;
       if (!config.billingType) return false;
       if (!config.billingTypeId) return false;
       if (!config.billingFrequency) return false;
@@ -170,7 +170,7 @@ function isStepValid(step, data) {
           return false;
         }
       }
-      return Boolean(controls.paymentTerms && controls.paymentTermId);
+      return Boolean(controls.paymentTermId);
     }
     default:
       return true;
