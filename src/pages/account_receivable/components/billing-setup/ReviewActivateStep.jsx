@@ -4,12 +4,6 @@ import {
   BILLING_TYPE_LABELS,
   BILLING_MODE_LABELS,
   BILLING_FREQUENCIES,
-  TAX_PREFERENCE_OPTIONS,
-  PAYMENT_TERMS_OPTIONS,
-  APPROVAL_WORKFLOW_OPTIONS,
-  FINANCE_REVIEWER_OPTIONS,
-  FINANCE_APPROVER_OPTIONS,
-  INVOICE_NUMBER_SERIES_OPTIONS,
 } from "../../data/wizardOptions";
 
 function labelFor(options, value) {
@@ -81,7 +75,7 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
             { label: "Project", value: projectInfo.projectName },
             { label: "Project Code", value: projectInfo.projectCode },
             { label: "Duration", value: projectInfo.startDate ? `${formatDisplayDate(projectInfo.startDate)} to ${formatDisplayDate(projectInfo.endDate) || "Ongoing"}` : "—" },
-            { label: "Currency", value: projectInfo.currency || projectInfo.projectBudgetCurrency || "—" },
+            { label: "Currency", value: projectInfo.projectBudgetCurrency || projectInfo.currency || "—" },
             { label: "Project Budget", value: projectInfo.projectBudget !== "" && projectInfo.projectBudget !== null && projectInfo.projectBudget !== undefined ? projectInfo.projectBudget : "—" },
           ]}
         />
@@ -91,7 +85,7 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
           stepId={2}
           onEdit={onEditStep}
           rows={[
-            { label: "Currency", value: projectInfo.currency || projectInfo.projectBudgetCurrency || "—" },
+            { label: "Currency", value: projectInfo.projectBudgetCurrency || projectInfo.currency || "—" },
             { label: "Billing Type", value: billingTypeLabel },
             { label: "Billing Frequency", value: billingFrequencyLabel },
           ]}
@@ -166,7 +160,7 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
             ...(controls.autoInvoiceGeneration === true
               ? [{ label: "Generation Day", value: controls.invoiceGenerationDay }]
               : []),
-            { label: "Payment Terms", value: labelFor(PAYMENT_TERMS_OPTIONS, controls.paymentTerms) },
+            { label: "Payment Terms", value: controls.paymentTermName || controls.paymentTerms || controls.paymentTermId || "—" },
           ]}
         />
       </div>
