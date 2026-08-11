@@ -29,6 +29,23 @@ const FormSelect = ({
         }
       : undefined;
 
+  const handleOptionsWheel = (event) => {
+    const element = event.currentTarget;
+    const canScrollOptions = element.scrollHeight > element.clientHeight;
+
+    if (!canScrollOptions) {
+      window.scrollBy({ top: event.deltaY, behavior: "auto" });
+      return;
+    }
+
+    const atTop = element.scrollTop <= 0;
+    const atBottom = Math.ceil(element.scrollTop + element.clientHeight) >= element.scrollHeight;
+
+    if ((atTop && event.deltaY < 0) || (atBottom && event.deltaY > 0)) {
+      window.scrollBy({ top: event.deltaY, behavior: "auto" });
+    }
+  };
+
   return (
     <div className={`space-y-1 w-full min-w-0 ${className}`.trim()}>
       {label && (
@@ -49,6 +66,7 @@ const FormSelect = ({
 
           <Listbox.Options
             style={optionsStyle}
+            onWheel={handleOptionsWheel}
             className={classNames(
               "absolute z-50 mt-1 overflow-y-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm w-max min-w-full",
               !optionsStyle && "max-h-60",
