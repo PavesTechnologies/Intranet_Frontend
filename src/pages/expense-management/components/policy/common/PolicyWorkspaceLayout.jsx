@@ -30,7 +30,7 @@ export function PolicyToolbar({ title, subtitle, actions, className = "" }) {
  */
 export function PolicyWorkspaceGrid({ left, right, className = "" }) {
   return (
-    <div className={`grid flex-1 grid-cols-1 gap-3 lg:h-[calc(100vh-190px)] lg:min-h-[640px] lg:grid-cols-[35%_65%] ${className}`}>
+    <div className={`grid flex-1 grid-cols-1 gap-3 lg:h-[calc(100vh-152px)] lg:min-h-[520px] lg:grid-cols-[35%_65%] ${className}`}>
       {left}
       {right}
     </div>

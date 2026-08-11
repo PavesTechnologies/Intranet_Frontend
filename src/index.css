@@ -242,3 +242,356 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 .ts-reveal { animation: tsReveal 0.22s ease-out; }
+
+
+/* ================================================================
+ * Expense Management density scope
+ * ----------------------------------------------------------------
+ * Scoped under `.xms-density` (applied by Layout.jsx only on
+ * /expense-management/* routes). Shrinks Tailwind's default
+ * spacing/font-size utility output to ~80% density — the same
+ * visual density the module had at 80% browser zoom — without
+ * touching any other module, without transform/zoom tricks, and
+ * without redefining Tailwind's global theme scale. Written as
+ * plain (unlayered) CSS so it outranks `@tailwind utilities`
+ * regardless of selector order.
+ * ================================================================ */
+.xms-density {
+  --xms-sp-1_5: clamp(0.27rem, 0.27rem + 0.036vw, 0.33rem);
+  --xms-sp-2: clamp(0.36rem, 0.36rem + 0.048vw, 0.44rem);
+  --xms-sp-2_5: clamp(0.45rem, 0.45rem + 0.06vw, 0.55rem);
+  --xms-sp-3: clamp(0.54rem, 0.54rem + 0.072vw, 0.66rem);
+  --xms-sp-3_5: clamp(0.63rem, 0.63rem + 0.084vw, 0.77rem);
+  --xms-sp-4: clamp(0.72rem, 0.72rem + 0.096vw, 0.88rem);
+  --xms-sp-4_5: clamp(0.81rem, 0.81rem + 0.108vw, 0.99rem);
+  --xms-sp-5: clamp(0.9rem, 0.9rem + 0.12vw, 1.1rem);
+  --xms-sp-6: clamp(1.08rem, 1.08rem + 0.144vw, 1.32rem);
+  --xms-sp-7: clamp(1.26rem, 1.26rem + 0.168vw, 1.54rem);
+  --xms-sp-8: clamp(1.44rem, 1.44rem + 0.192vw, 1.76rem);
+  --xms-sp-9: clamp(1.62rem, 1.62rem + 0.216vw, 1.98rem);
+  --xms-sp-10: clamp(1.8rem, 1.8rem + 0.24vw, 2.2rem);
+  --xms-sp-12: clamp(2.16rem, 2.16rem + 0.288vw, 2.64rem);
+  --xms-sp-14: clamp(2.52rem, 2.52rem + 0.336vw, 3.08rem);
+  --xms-sp-16: clamp(2.88rem, 2.88rem + 0.384vw, 3.52rem);
+  --xms-fs-xs: clamp(0.555rem, 0.555rem + 0.058vw, 0.6525rem);
+  --xms-lh-xs: 0.8rem;
+  --xms-fs-sm: clamp(0.6475rem, 0.6475rem + 0.068vw, 0.7612rem);
+  --xms-lh-sm: 1rem;
+  --xms-fs-base: clamp(0.74rem, 0.74rem + 0.078vw, 0.87rem);
+  --xms-lh-base: 1.2rem;
+  --xms-fs-lg: clamp(0.8325rem, 0.8325rem + 0.088vw, 0.9788rem);
+  --xms-lh-lg: 1.4rem;
+  --xms-fs-xl: clamp(0.925rem, 0.925rem + 0.097vw, 1.0875rem);
+  --xms-lh-xl: 1.4rem;
+  --xms-fs-2xl: clamp(1.11rem, 1.11rem + 0.117vw, 1.305rem);
+  --xms-lh-2xl: 1.6rem;
+  --xms-fs-3xl: clamp(1.3875rem, 1.3875rem + 0.146vw, 1.6313rem);
+  --xms-lh-3xl: 1.8rem;
+  --xms-fs-4xl: clamp(1.665rem, 1.665rem + 0.175vw, 1.9575rem);
+  --xms-lh-4xl: 2rem;
+  --xms-icon-btn: clamp(1.7rem, 1.7rem + 0.3vw, 1.9rem);
+  --xms-sidebar-collapsed: 4rem;
+  --xms-sidebar-expanded: 14rem;
+}
+
+.xms-density .p-1\.5 { padding: var(--xms-sp-1_5); }
+.xms-density .p-2 { padding: var(--xms-sp-2); }
+.xms-density .p-2\.5 { padding: var(--xms-sp-2_5); }
+.xms-density .p-3 { padding: var(--xms-sp-3); }
+.xms-density .p-3\.5 { padding: var(--xms-sp-3_5); }
+.xms-density .p-4 { padding: var(--xms-sp-4); }
+.xms-density .p-4\.5 { padding: var(--xms-sp-4_5); }
+.xms-density .p-5 { padding: var(--xms-sp-5); }
+.xms-density .p-6 { padding: var(--xms-sp-6); }
+.xms-density .p-7 { padding: var(--xms-sp-7); }
+.xms-density .p-8 { padding: var(--xms-sp-8); }
+.xms-density .p-9 { padding: var(--xms-sp-9); }
+.xms-density .p-10 { padding: var(--xms-sp-10); }
+.xms-density .p-12 { padding: var(--xms-sp-12); }
+.xms-density .p-14 { padding: var(--xms-sp-14); }
+.xms-density .p-16 { padding: var(--xms-sp-16); }
+.xms-density .px-1\.5 { padding-left: var(--xms-sp-1_5); padding-right: var(--xms-sp-1_5); }
+.xms-density .px-2 { padding-left: var(--xms-sp-2); padding-right: var(--xms-sp-2); }
+.xms-density .px-2\.5 { padding-left: var(--xms-sp-2_5); padding-right: var(--xms-sp-2_5); }
+.xms-density .px-3 { padding-left: var(--xms-sp-3); padding-right: var(--xms-sp-3); }
+.xms-density .px-3\.5 { padding-left: var(--xms-sp-3_5); padding-right: var(--xms-sp-3_5); }
+.xms-density .px-4 { padding-left: var(--xms-sp-4); padding-right: var(--xms-sp-4); }
+.xms-density .px-4\.5 { padding-left: var(--xms-sp-4_5); padding-right: var(--xms-sp-4_5); }
+.xms-density .px-5 { padding-left: var(--xms-sp-5); padding-right: var(--xms-sp-5); }
+.xms-density .px-6 { padding-left: var(--xms-sp-6); padding-right: var(--xms-sp-6); }
+.xms-density .px-7 { padding-left: var(--xms-sp-7); padding-right: var(--xms-sp-7); }
+.xms-density .px-8 { padding-left: var(--xms-sp-8); padding-right: var(--xms-sp-8); }
+.xms-density .px-9 { padding-left: var(--xms-sp-9); padding-right: var(--xms-sp-9); }
+.xms-density .px-10 { padding-left: var(--xms-sp-10); padding-right: var(--xms-sp-10); }
+.xms-density .px-12 { padding-left: var(--xms-sp-12); padding-right: var(--xms-sp-12); }
+.xms-density .px-14 { padding-left: var(--xms-sp-14); padding-right: var(--xms-sp-14); }
+.xms-density .px-16 { padding-left: var(--xms-sp-16); padding-right: var(--xms-sp-16); }
+.xms-density .py-1\.5 { padding-top: var(--xms-sp-1_5); padding-bottom: var(--xms-sp-1_5); }
+.xms-density .py-2 { padding-top: var(--xms-sp-2); padding-bottom: var(--xms-sp-2); }
+.xms-density .py-2\.5 { padding-top: var(--xms-sp-2_5); padding-bottom: var(--xms-sp-2_5); }
+.xms-density .py-3 { padding-top: var(--xms-sp-3); padding-bottom: var(--xms-sp-3); }
+.xms-density .py-3\.5 { padding-top: var(--xms-sp-3_5); padding-bottom: var(--xms-sp-3_5); }
+.xms-density .py-4 { padding-top: var(--xms-sp-4); padding-bottom: var(--xms-sp-4); }
+.xms-density .py-4\.5 { padding-top: var(--xms-sp-4_5); padding-bottom: var(--xms-sp-4_5); }
+.xms-density .py-5 { padding-top: var(--xms-sp-5); padding-bottom: var(--xms-sp-5); }
+.xms-density .py-6 { padding-top: var(--xms-sp-6); padding-bottom: var(--xms-sp-6); }
+.xms-density .py-7 { padding-top: var(--xms-sp-7); padding-bottom: var(--xms-sp-7); }
+.xms-density .py-8 { padding-top: var(--xms-sp-8); padding-bottom: var(--xms-sp-8); }
+.xms-density .py-9 { padding-top: var(--xms-sp-9); padding-bottom: var(--xms-sp-9); }
+.xms-density .py-10 { padding-top: var(--xms-sp-10); padding-bottom: var(--xms-sp-10); }
+.xms-density .py-12 { padding-top: var(--xms-sp-12); padding-bottom: var(--xms-sp-12); }
+.xms-density .py-14 { padding-top: var(--xms-sp-14); padding-bottom: var(--xms-sp-14); }
+.xms-density .py-16 { padding-top: var(--xms-sp-16); padding-bottom: var(--xms-sp-16); }
+.xms-density .pl-1\.5 { padding-left: var(--xms-sp-1_5); }
+.xms-density .pl-2 { padding-left: var(--xms-sp-2); }
+.xms-density .pl-2\.5 { padding-left: var(--xms-sp-2_5); }
+.xms-density .pl-3 { padding-left: var(--xms-sp-3); }
+.xms-density .pl-3\.5 { padding-left: var(--xms-sp-3_5); }
+.xms-density .pl-4 { padding-left: var(--xms-sp-4); }
+.xms-density .pl-4\.5 { padding-left: var(--xms-sp-4_5); }
+.xms-density .pl-5 { padding-left: var(--xms-sp-5); }
+.xms-density .pl-6 { padding-left: var(--xms-sp-6); }
+.xms-density .pl-7 { padding-left: var(--xms-sp-7); }
+.xms-density .pl-8 { padding-left: var(--xms-sp-8); }
+.xms-density .pl-9 { padding-left: var(--xms-sp-9); }
+.xms-density .pl-10 { padding-left: var(--xms-sp-10); }
+.xms-density .pl-12 { padding-left: var(--xms-sp-12); }
+.xms-density .pr-1\.5 { padding-right: var(--xms-sp-1_5); }
+.xms-density .pr-2 { padding-right: var(--xms-sp-2); }
+.xms-density .pr-2\.5 { padding-right: var(--xms-sp-2_5); }
+.xms-density .pr-3 { padding-right: var(--xms-sp-3); }
+.xms-density .pr-3\.5 { padding-right: var(--xms-sp-3_5); }
+.xms-density .pr-4 { padding-right: var(--xms-sp-4); }
+.xms-density .pr-4\.5 { padding-right: var(--xms-sp-4_5); }
+.xms-density .pr-5 { padding-right: var(--xms-sp-5); }
+.xms-density .pr-6 { padding-right: var(--xms-sp-6); }
+.xms-density .pr-7 { padding-right: var(--xms-sp-7); }
+.xms-density .pr-8 { padding-right: var(--xms-sp-8); }
+.xms-density .pr-9 { padding-right: var(--xms-sp-9); }
+.xms-density .pr-10 { padding-right: var(--xms-sp-10); }
+.xms-density .pr-12 { padding-right: var(--xms-sp-12); }
+.xms-density .pt-1\.5 { padding-top: var(--xms-sp-1_5); }
+.xms-density .pt-2 { padding-top: var(--xms-sp-2); }
+.xms-density .pt-2\.5 { padding-top: var(--xms-sp-2_5); }
+.xms-density .pt-3 { padding-top: var(--xms-sp-3); }
+.xms-density .pt-3\.5 { padding-top: var(--xms-sp-3_5); }
+.xms-density .pt-4 { padding-top: var(--xms-sp-4); }
+.xms-density .pt-4\.5 { padding-top: var(--xms-sp-4_5); }
+.xms-density .pt-5 { padding-top: var(--xms-sp-5); }
+.xms-density .pt-6 { padding-top: var(--xms-sp-6); }
+.xms-density .pt-7 { padding-top: var(--xms-sp-7); }
+.xms-density .pt-8 { padding-top: var(--xms-sp-8); }
+.xms-density .pt-9 { padding-top: var(--xms-sp-9); }
+.xms-density .pt-10 { padding-top: var(--xms-sp-10); }
+.xms-density .pt-12 { padding-top: var(--xms-sp-12); }
+.xms-density .pb-1\.5 { padding-bottom: var(--xms-sp-1_5); }
+.xms-density .pb-2 { padding-bottom: var(--xms-sp-2); }
+.xms-density .pb-2\.5 { padding-bottom: var(--xms-sp-2_5); }
+.xms-density .pb-3 { padding-bottom: var(--xms-sp-3); }
+.xms-density .pb-3\.5 { padding-bottom: var(--xms-sp-3_5); }
+.xms-density .pb-4 { padding-bottom: var(--xms-sp-4); }
+.xms-density .pb-4\.5 { padding-bottom: var(--xms-sp-4_5); }
+.xms-density .pb-5 { padding-bottom: var(--xms-sp-5); }
+.xms-density .pb-6 { padding-bottom: var(--xms-sp-6); }
+.xms-density .pb-7 { padding-bottom: var(--xms-sp-7); }
+.xms-density .pb-8 { padding-bottom: var(--xms-sp-8); }
+.xms-density .pb-9 { padding-bottom: var(--xms-sp-9); }
+.xms-density .pb-10 { padding-bottom: var(--xms-sp-10); }
+.xms-density .pb-12 { padding-bottom: var(--xms-sp-12); }
+.xms-density .m-1\.5 { margin: var(--xms-sp-1_5); }
+.xms-density .m-2 { margin: var(--xms-sp-2); }
+.xms-density .m-2\.5 { margin: var(--xms-sp-2_5); }
+.xms-density .m-3 { margin: var(--xms-sp-3); }
+.xms-density .m-3\.5 { margin: var(--xms-sp-3_5); }
+.xms-density .m-4 { margin: var(--xms-sp-4); }
+.xms-density .m-4\.5 { margin: var(--xms-sp-4_5); }
+.xms-density .m-5 { margin: var(--xms-sp-5); }
+.xms-density .m-6 { margin: var(--xms-sp-6); }
+.xms-density .m-7 { margin: var(--xms-sp-7); }
+.xms-density .m-8 { margin: var(--xms-sp-8); }
+.xms-density .m-9 { margin: var(--xms-sp-9); }
+.xms-density .m-10 { margin: var(--xms-sp-10); }
+.xms-density .m-12 { margin: var(--xms-sp-12); }
+.xms-density .mx-1\.5 { margin-left: var(--xms-sp-1_5); margin-right: var(--xms-sp-1_5); }
+.xms-density .mx-2 { margin-left: var(--xms-sp-2); margin-right: var(--xms-sp-2); }
+.xms-density .mx-2\.5 { margin-left: var(--xms-sp-2_5); margin-right: var(--xms-sp-2_5); }
+.xms-density .mx-3 { margin-left: var(--xms-sp-3); margin-right: var(--xms-sp-3); }
+.xms-density .mx-3\.5 { margin-left: var(--xms-sp-3_5); margin-right: var(--xms-sp-3_5); }
+.xms-density .mx-4 { margin-left: var(--xms-sp-4); margin-right: var(--xms-sp-4); }
+.xms-density .mx-4\.5 { margin-left: var(--xms-sp-4_5); margin-right: var(--xms-sp-4_5); }
+.xms-density .mx-5 { margin-left: var(--xms-sp-5); margin-right: var(--xms-sp-5); }
+.xms-density .mx-6 { margin-left: var(--xms-sp-6); margin-right: var(--xms-sp-6); }
+.xms-density .mx-7 { margin-left: var(--xms-sp-7); margin-right: var(--xms-sp-7); }
+.xms-density .mx-8 { margin-left: var(--xms-sp-8); margin-right: var(--xms-sp-8); }
+.xms-density .mx-9 { margin-left: var(--xms-sp-9); margin-right: var(--xms-sp-9); }
+.xms-density .mx-10 { margin-left: var(--xms-sp-10); margin-right: var(--xms-sp-10); }
+.xms-density .mx-12 { margin-left: var(--xms-sp-12); margin-right: var(--xms-sp-12); }
+.xms-density .my-1\.5 { margin-top: var(--xms-sp-1_5); margin-bottom: var(--xms-sp-1_5); }
+.xms-density .my-2 { margin-top: var(--xms-sp-2); margin-bottom: var(--xms-sp-2); }
+.xms-density .my-2\.5 { margin-top: var(--xms-sp-2_5); margin-bottom: var(--xms-sp-2_5); }
+.xms-density .my-3 { margin-top: var(--xms-sp-3); margin-bottom: var(--xms-sp-3); }
+.xms-density .my-3\.5 { margin-top: var(--xms-sp-3_5); margin-bottom: var(--xms-sp-3_5); }
+.xms-density .my-4 { margin-top: var(--xms-sp-4); margin-bottom: var(--xms-sp-4); }
+.xms-density .my-4\.5 { margin-top: var(--xms-sp-4_5); margin-bottom: var(--xms-sp-4_5); }
+.xms-density .my-5 { margin-top: var(--xms-sp-5); margin-bottom: var(--xms-sp-5); }
+.xms-density .my-6 { margin-top: var(--xms-sp-6); margin-bottom: var(--xms-sp-6); }
+.xms-density .my-7 { margin-top: var(--xms-sp-7); margin-bottom: var(--xms-sp-7); }
+.xms-density .my-8 { margin-top: var(--xms-sp-8); margin-bottom: var(--xms-sp-8); }
+.xms-density .my-9 { margin-top: var(--xms-sp-9); margin-bottom: var(--xms-sp-9); }
+.xms-density .my-10 { margin-top: var(--xms-sp-10); margin-bottom: var(--xms-sp-10); }
+.xms-density .my-12 { margin-top: var(--xms-sp-12); margin-bottom: var(--xms-sp-12); }
+.xms-density .ml-1\.5 { margin-left: var(--xms-sp-1_5); }
+.xms-density .ml-2 { margin-left: var(--xms-sp-2); }
+.xms-density .ml-2\.5 { margin-left: var(--xms-sp-2_5); }
+.xms-density .ml-3 { margin-left: var(--xms-sp-3); }
+.xms-density .ml-3\.5 { margin-left: var(--xms-sp-3_5); }
+.xms-density .ml-4 { margin-left: var(--xms-sp-4); }
+.xms-density .ml-4\.5 { margin-left: var(--xms-sp-4_5); }
+.xms-density .ml-5 { margin-left: var(--xms-sp-5); }
+.xms-density .ml-6 { margin-left: var(--xms-sp-6); }
+.xms-density .ml-7 { margin-left: var(--xms-sp-7); }
+.xms-density .ml-8 { margin-left: var(--xms-sp-8); }
+.xms-density .ml-9 { margin-left: var(--xms-sp-9); }
+.xms-density .ml-10 { margin-left: var(--xms-sp-10); }
+.xms-density .ml-12 { margin-left: var(--xms-sp-12); }
+.xms-density .mr-1\.5 { margin-right: var(--xms-sp-1_5); }
+.xms-density .mr-2 { margin-right: var(--xms-sp-2); }
+.xms-density .mr-2\.5 { margin-right: var(--xms-sp-2_5); }
+.xms-density .mr-3 { margin-right: var(--xms-sp-3); }
+.xms-density .mr-3\.5 { margin-right: var(--xms-sp-3_5); }
+.xms-density .mr-4 { margin-right: var(--xms-sp-4); }
+.xms-density .mr-4\.5 { margin-right: var(--xms-sp-4_5); }
+.xms-density .mr-5 { margin-right: var(--xms-sp-5); }
+.xms-density .mr-6 { margin-right: var(--xms-sp-6); }
+.xms-density .mr-7 { margin-right: var(--xms-sp-7); }
+.xms-density .mr-8 { margin-right: var(--xms-sp-8); }
+.xms-density .mr-9 { margin-right: var(--xms-sp-9); }
+.xms-density .mr-10 { margin-right: var(--xms-sp-10); }
+.xms-density .mr-12 { margin-right: var(--xms-sp-12); }
+.xms-density .mt-1\.5 { margin-top: var(--xms-sp-1_5); }
+.xms-density .mt-2 { margin-top: var(--xms-sp-2); }
+.xms-density .mt-2\.5 { margin-top: var(--xms-sp-2_5); }
+.xms-density .mt-3 { margin-top: var(--xms-sp-3); }
+.xms-density .mt-3\.5 { margin-top: var(--xms-sp-3_5); }
+.xms-density .mt-4 { margin-top: var(--xms-sp-4); }
+.xms-density .mt-4\.5 { margin-top: var(--xms-sp-4_5); }
+.xms-density .mt-5 { margin-top: var(--xms-sp-5); }
+.xms-density .mt-6 { margin-top: var(--xms-sp-6); }
+.xms-density .mt-7 { margin-top: var(--xms-sp-7); }
+.xms-density .mt-8 { margin-top: var(--xms-sp-8); }
+.xms-density .mt-9 { margin-top: var(--xms-sp-9); }
+.xms-density .mt-10 { margin-top: var(--xms-sp-10); }
+.xms-density .mt-12 { margin-top: var(--xms-sp-12); }
+.xms-density .mb-1\.5 { margin-bottom: var(--xms-sp-1_5); }
+.xms-density .mb-2 { margin-bottom: var(--xms-sp-2); }
+.xms-density .mb-2\.5 { margin-bottom: var(--xms-sp-2_5); }
+.xms-density .mb-3 { margin-bottom: var(--xms-sp-3); }
+.xms-density .mb-3\.5 { margin-bottom: var(--xms-sp-3_5); }
+.xms-density .mb-4 { margin-bottom: var(--xms-sp-4); }
+.xms-density .mb-4\.5 { margin-bottom: var(--xms-sp-4_5); }
+.xms-density .mb-5 { margin-bottom: var(--xms-sp-5); }
+.xms-density .mb-6 { margin-bottom: var(--xms-sp-6); }
+.xms-density .mb-7 { margin-bottom: var(--xms-sp-7); }
+.xms-density .mb-8 { margin-bottom: var(--xms-sp-8); }
+.xms-density .mb-9 { margin-bottom: var(--xms-sp-9); }
+.xms-density .mb-10 { margin-bottom: var(--xms-sp-10); }
+.xms-density .mb-12 { margin-bottom: var(--xms-sp-12); }
+.xms-density .gap-1\.5 { gap: var(--xms-sp-1_5); }
+.xms-density .gap-2 { gap: var(--xms-sp-2); }
+.xms-density .gap-2\.5 { gap: var(--xms-sp-2_5); }
+.xms-density .gap-3 { gap: var(--xms-sp-3); }
+.xms-density .gap-3\.5 { gap: var(--xms-sp-3_5); }
+.xms-density .gap-4 { gap: var(--xms-sp-4); }
+.xms-density .gap-4\.5 { gap: var(--xms-sp-4_5); }
+.xms-density .gap-5 { gap: var(--xms-sp-5); }
+.xms-density .gap-6 { gap: var(--xms-sp-6); }
+.xms-density .gap-7 { gap: var(--xms-sp-7); }
+.xms-density .gap-8 { gap: var(--xms-sp-8); }
+.xms-density .gap-9 { gap: var(--xms-sp-9); }
+.xms-density .gap-10 { gap: var(--xms-sp-10); }
+.xms-density .gap-12 { gap: var(--xms-sp-12); }
+.xms-density .gap-x-1\.5 { column-gap: var(--xms-sp-1_5); }
+.xms-density .gap-x-2 { column-gap: var(--xms-sp-2); }
+.xms-density .gap-x-2\.5 { column-gap: var(--xms-sp-2_5); }
+.xms-density .gap-x-3 { column-gap: var(--xms-sp-3); }
+.xms-density .gap-x-3\.5 { column-gap: var(--xms-sp-3_5); }
+.xms-density .gap-x-4 { column-gap: var(--xms-sp-4); }
+.xms-density .gap-x-4\.5 { column-gap: var(--xms-sp-4_5); }
+.xms-density .gap-x-5 { column-gap: var(--xms-sp-5); }
+.xms-density .gap-x-6 { column-gap: var(--xms-sp-6); }
+.xms-density .gap-x-7 { column-gap: var(--xms-sp-7); }
+.xms-density .gap-x-8 { column-gap: var(--xms-sp-8); }
+.xms-density .gap-x-9 { column-gap: var(--xms-sp-9); }
+.xms-density .gap-x-10 { column-gap: var(--xms-sp-10); }
+.xms-density .gap-x-12 { column-gap: var(--xms-sp-12); }
+.xms-density .gap-y-1\.5 { row-gap: var(--xms-sp-1_5); }
+.xms-density .gap-y-2 { row-gap: var(--xms-sp-2); }
+.xms-density .gap-y-2\.5 { row-gap: var(--xms-sp-2_5); }
+.xms-density .gap-y-3 { row-gap: var(--xms-sp-3); }
+.xms-density .gap-y-3\.5 { row-gap: var(--xms-sp-3_5); }
+.xms-density .gap-y-4 { row-gap: var(--xms-sp-4); }
+.xms-density .gap-y-4\.5 { row-gap: var(--xms-sp-4_5); }
+.xms-density .gap-y-5 { row-gap: var(--xms-sp-5); }
+.xms-density .gap-y-6 { row-gap: var(--xms-sp-6); }
+.xms-density .gap-y-7 { row-gap: var(--xms-sp-7); }
+.xms-density .gap-y-8 { row-gap: var(--xms-sp-8); }
+.xms-density .gap-y-9 { row-gap: var(--xms-sp-9); }
+.xms-density .gap-y-10 { row-gap: var(--xms-sp-10); }
+.xms-density .gap-y-12 { row-gap: var(--xms-sp-12); }
+.xms-density .space-y-1\.5 > :not([hidden]) ~ :not([hidden]) { margin-top: var(--xms-sp-1_5); }
+.xms-density .space-y-2 > :not([hidden]) ~ :not([hidden]) { margin-top: var(--xms-sp-2); }
+.xms-density .space-y-2\.5 > :not([hidden]) ~ :not([hidden]) { margin-top: var(--xms-sp-2_5); }
+.xms-density .space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: var(--xms-sp-3); }
+.xms-density .space-y-3\.5 > :not([hidden]) ~ :not([hidden]) { margin-top: var(--xms-sp-3_5); }
+.xms-density .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: var(--xms-sp-4); }
+.xms-density .space-y-4\.5 > :not([hidden]) ~ :not([hidden]) { margin-top: var(--xms-sp-4_5); }
+.xms-density .space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top: var(--xms-sp-5); }
+.xms-density .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: var(--xms-sp-6); }
+.xms-density .space-y-7 > :not([hidden]) ~ :not([hidden]) { margin-top: var(--xms-sp-7); }
+.xms-density .space-y-8 > :not([hidden]) ~ :not([hidden]) { margin-top: var(--xms-sp-8); }
+.xms-density .space-y-9 > :not([hidden]) ~ :not([hidden]) { margin-top: var(--xms-sp-9); }
+.xms-density .space-y-10 > :not([hidden]) ~ :not([hidden]) { margin-top: var(--xms-sp-10); }
+.xms-density .space-y-12 > :not([hidden]) ~ :not([hidden]) { margin-top: var(--xms-sp-12); }
+.xms-density .space-x-1\.5 > :not([hidden]) ~ :not([hidden]) { margin-left: var(--xms-sp-1_5); }
+.xms-density .space-x-2 > :not([hidden]) ~ :not([hidden]) { margin-left: var(--xms-sp-2); }
+.xms-density .space-x-2\.5 > :not([hidden]) ~ :not([hidden]) { margin-left: var(--xms-sp-2_5); }
+.xms-density .space-x-3 > :not([hidden]) ~ :not([hidden]) { margin-left: var(--xms-sp-3); }
+.xms-density .space-x-3\.5 > :not([hidden]) ~ :not([hidden]) { margin-left: var(--xms-sp-3_5); }
+.xms-density .space-x-4 > :not([hidden]) ~ :not([hidden]) { margin-left: var(--xms-sp-4); }
+.xms-density .space-x-4\.5 > :not([hidden]) ~ :not([hidden]) { margin-left: var(--xms-sp-4_5); }
+.xms-density .space-x-5 > :not([hidden]) ~ :not([hidden]) { margin-left: var(--xms-sp-5); }
+.xms-density .space-x-6 > :not([hidden]) ~ :not([hidden]) { margin-left: var(--xms-sp-6); }
+.xms-density .space-x-7 > :not([hidden]) ~ :not([hidden]) { margin-left: var(--xms-sp-7); }
+.xms-density .space-x-8 > :not([hidden]) ~ :not([hidden]) { margin-left: var(--xms-sp-8); }
+.xms-density .space-x-9 > :not([hidden]) ~ :not([hidden]) { margin-left: var(--xms-sp-9); }
+.xms-density .space-x-10 > :not([hidden]) ~ :not([hidden]) { margin-left: var(--xms-sp-10); }
+.xms-density .space-x-12 > :not([hidden]) ~ :not([hidden]) { margin-left: var(--xms-sp-12); }
+
+.xms-density .text-xs { font-size: var(--xms-fs-xs); line-height: var(--xms-lh-xs); }
+.xms-density .text-sm { font-size: var(--xms-fs-sm); line-height: var(--xms-lh-sm); }
+.xms-density .text-base { font-size: var(--xms-fs-base); line-height: var(--xms-lh-base); }
+.xms-density .text-lg { font-size: var(--xms-fs-lg); line-height: var(--xms-lh-lg); }
+.xms-density .text-xl { font-size: var(--xms-fs-xl); line-height: var(--xms-lh-xl); }
+.xms-density .text-2xl { font-size: var(--xms-fs-2xl); line-height: var(--xms-lh-2xl); }
+.xms-density .text-3xl { font-size: var(--xms-fs-3xl); line-height: var(--xms-lh-3xl); }
+.xms-density .text-4xl { font-size: var(--xms-fs-4xl); line-height: var(--xms-lh-4xl); }
+
+/* Fixed-purpose sizing: icon buttons (paired h-N w-N) shrink; bare skeleton/
+   row heights (h-N without a matching w-N, e.g. skeleton placeholders) shrink
+   via the same spacing scale — but a decorative square icon box like
+   `h-10 w-10` is left alone so icons stay legible. */
+.xms-density .h-8.w-8 { height: var(--xms-icon-btn); width: var(--xms-icon-btn); }
+.xms-density .h-10:not(.w-10) { height: var(--xms-sp-10); }
+.xms-density .h-12:not(.w-12) { height: var(--xms-sp-12); }
+.xms-density .h-14:not(.w-14) { height: var(--xms-sp-14); }
+.xms-density .h-16:not(.w-16) { height: var(--xms-sp-16); }
+
+/* Header/Sidebar chrome — scoped so other modules stay untouched */
+.xms-density .w-20 { width: var(--xms-sidebar-collapsed); }
+.xms-density .w-64 { width: var(--xms-sidebar-expanded); }
+.xms-density .text-1\.5xl { font-size: clamp(0.95rem, 0.95rem + 0.2vw, 1.05rem); line-height: 1.35rem; }
+
+/* Micro-label arbitrary sizes (badges, uppercase tags) — already near the
+   legibility floor, so nudged down modestly rather than by the full 20%. */
+.xms-density .text-\[11px\] { font-size: var(--xms-fs-xs); }
+.xms-density .text-\[10px\] { font-size: 9px; }

@@ -273,12 +273,7 @@ import AccountReceivableLayout from "./pages/account_receivable/pages/AccountRec
 import AccountReceivableDashboard from "./pages/account_receivable/pages/Dashboard.jsx";
 import Overview from "./pages/account_receivable/pages/Overview.jsx";
 import BillingConfigurations from "./pages/account_receivable/pages/BillingConfigurations.jsx";
-import ConfigurationHistory from "./pages/account_receivable/pages/ConfigurationHistory.jsx";
-import BillingDataAcquisition from "./pages/account_receivable/pages/BillingDataAcquisition.jsx";
 import NewConfigurationWizard from "./pages/account_receivable/pages/NewConfigurationWizard.jsx";
-import ToolPricingPage from "./pages/account_receivable/pages/ToolPricingPage.jsx";
-import ProjectToolAssignmentPage from "./pages/account_receivable/pages/ProjectToolAssignmentPage.jsx";
-import ToolChargeAcquisitionPage from "./pages/account_receivable/pages/ToolChargeAcquisitionPage.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -603,30 +598,8 @@ const AppRoutes = () => {
               path="project-billing-setup/configurations/:configId"
               element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><NewConfigurationWizard /></ProtectedRoute>}
             />
-            <Route
-              path="project-billing-setup/history"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><ConfigurationHistory /></ProtectedRoute>}
-            />
-            <Route
-              path="billing-data-acquisition"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingDataAcquisition /></ProtectedRoute>}
-            />
-            <Route
-              path="billing-data-acquisition/workspace"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingDataAcquisition /></ProtectedRoute>}
-            />
-            <Route
-              path="billing-data-acquisition/tool-charges"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><ToolChargeAcquisitionPage /></ProtectedRoute>}
-            />
-            <Route
-              path="project-billing-setup/tool-pricing"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><ToolPricingPage /></ProtectedRoute>}
-            />
-            <Route
-              path="project-billing-setup/project-tool-assignments"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><ProjectToolAssignmentPage /></ProtectedRoute>}
-            />
+            {/* Configuration history removed — not supported by backend */}
+            {/* Removed unsupported billing data & tool management pages — not backed by BillingConfigurationController */}
           </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />
           <Route path="/profile" element={<Profile />} />

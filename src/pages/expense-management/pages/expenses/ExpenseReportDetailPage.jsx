@@ -48,6 +48,10 @@ import FormDatePicker from "@/components/forms/FormDatePicker";
 import GstCalculationCard from "@/pages/expense-management/components/expense-reports/GstCalculationCard";
 import CurrencyConversionCard from "@/pages/expense-management/components/expense-reports/CurrencyConversionCard";
 import ReceiptDropzone from "@/pages/expense-management/components/expense-reports/ReceiptDropzone";
+import PolicyStatusBadge, {
+  PolicyResultBanner,
+  derivePolicyStatus,
+} from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
 import ApprovalStatusPill from "@/pages/expense-management/approval-engine/components/ApprovalStatusPill";
 import { useApprovalLiveSync } from "@/pages/expense-management/approval-engine/hooks/useApprovalLiveSync";
 import {
@@ -528,11 +532,11 @@ export default function ExpenseReportDetailPage() {
   ];
 
   const headers = canManage
-    ? ["Category", "Merchant", "Date", "Amount", "GST", "Net Amount", "Base Amount", "Billable", "Actions"]
-    : ["Category", "Merchant", "Date", "Amount", "GST", "Net Amount", "Base Amount", "Billable"];
+    ? ["Category", "Merchant", "Date", "Amount", "Policy", "GST", "Net Amount", "Base Amount", "Billable", "Actions"]
+    : ["Category", "Merchant", "Date", "Amount", "Policy", "GST", "Net Amount", "Base Amount", "Billable"];
   const columns = canManage
-    ? ["category", "merchant", "date", "amount", "gst", "net", "base", "billable", "actions"]
-    : ["category", "merchant", "date", "amount", "gst", "net", "base", "billable"];
+    ? ["category", "merchant", "date", "amount", "policy", "gst", "net", "base", "billable", "actions"]
+    : ["category", "merchant", "date", "amount", "policy", "gst", "net", "base", "billable"];
 
   const tableRows = filteredLineItems.map((li) => {
     const rowObj = {
@@ -549,6 +553,7 @@ export default function ExpenseReportDetailPage() {
           {formatAmount(li.amount)} <span className="text-xs text-gray-400">{li.currencyCode}</span>
         </span>
       ),
+      policy: <PolicyStatusBadge lineStatus={li.lineStatus} policyWarnings={li.policyWarnings} />,
       gst: <span className="font-mono text-amber-600">{formatAmount(li.taxAmount)}</span>,
       net: <span className="font-mono font-semibold text-emerald-700">{formatAmount(li.netAmount)}</span>,
       base: (
@@ -1348,6 +1353,38 @@ function LineItemDrawer({
     return Object.keys(errors).length === 0;
   };
 
+  // Enforcement (not severity) decides the outcome — see PolicyStatusBadge.
+  // BLOCKED keeps the drawer open (with the violation banner visible) rather
+  // than closing behind a misleading success toast; WARNING still follows
+  // the normal save-and-close flow but surfaces the warning via toast.
+  const finalizeLineItemSave = (savedItem, successMessage, { closeOnSuccess = false } = {}) => {
+    const { status, warnings } = derivePolicyStatus(savedItem?.lineStatus, savedItem?.policyWarnings);
+    setSavedLineItem(savedItem);
+
+    if (status === "BLOCKED") {
+      const firstMsg = warnings[0]?.message;
+      showStatusToast(
+        firstMsg ? `Saved, but blocked by policy: ${firstMsg}` : "Saved, but this line item is blocked by policy.",
+        "error"
+      );
+      onSaved?.();
+      return;
+    }
+
+    if (status === "WARNING") {
+      const firstMsg = warnings[0]?.message;
+      showStatusToast(
+        firstMsg ? `${successMessage} Policy warning: ${firstMsg}` : `${successMessage} (Policy warning)`,
+        "warning"
+      );
+    } else {
+      showStatusToast(successMessage, "success");
+    }
+
+    onSaved?.();
+    if (closeOnSuccess) onClose();
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -1386,10 +1423,9 @@ function LineItemDrawer({
           setPendingFiles([]);
         }
 
-        showStatusToast("Line item updated successfully!", "success");
-        setSavedLineItem(res.data?.data || res.data || { ...payload, lineItemId });
+        const updatedItem = res.data?.data || res.data || { ...payload, lineItemId };
         fetchReceipts();
-        onSaved?.();
+        finalizeLineItemSave(updatedItem, "Line item updated successfully!");
       } else if (ocrReceiptId) {
         // OCR Confirm flow
         res = await api.post(`/xms/employee/receipts/${ocrReceiptId}/confirm`, {
@@ -1401,9 +1437,8 @@ function LineItemDrawer({
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           }
         });
-        showStatusToast("Line item created and receipt confirmed successfully!", "success");
-        onSaved?.();
-        onClose();
+        const createdItem = res.data?.data || res.data;
+        finalizeLineItemSave(createdItem, "Line item created and receipt confirmed successfully!", { closeOnSuccess: true });
       } else {
         res = await lineItemService.create(reportId, payload);
         const createdItem = res.data?.data || res.data;
@@ -1422,9 +1457,7 @@ function LineItemDrawer({
           }
         }
 
-        showStatusToast("Line item added successfully!", "success");
-        onSaved?.();
-        onClose();
+        finalizeLineItemSave(createdItem, "Line item added successfully!", { closeOnSuccess: true });
       }
     } catch (err) {
       console.error("Error saving line item:", err);
@@ -1496,7 +1529,10 @@ function LineItemDrawer({
         </div>
       )}
 
-      {savedLineItem && !isEditingExisting && !ocrReceiptId && (
+      <PolicyResultBanner lineStatus={savedLineItem?.lineStatus} policyWarnings={savedLineItem?.policyWarnings} />
+
+      {savedLineItem && !isEditingExisting && !ocrReceiptId &&
+        derivePolicyStatus(savedLineItem?.lineStatus, savedLineItem?.policyWarnings).status !== "BLOCKED" && (
         <div className="mb-4 flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs font-medium text-green-700">
           <CheckCircle2 size={14} />
           Line item saved. You can keep editing, attach receipts, or click Done.

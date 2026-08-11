@@ -26,7 +26,14 @@ function resultForCheck(checkLabel, issues) {
   return matching.severity === ISSUE_SEVERITY.ERROR ? CHECK_RESULT.ERROR : CHECK_RESULT.WARNING;
 }
 
-export default function InvoiceValidationPanel({ invoice }) {
+/**
+ * Validation is a backend processing stage, not a top-level Invoice Management tab — the
+ * checklist below is rendered on every invoice's detail page (readOnly) so results stay visible
+ * via the Status filter / detail page, per the "Validation should not be a primary tab" rule.
+ * The Submit/Reject actions only render when the invoice is actually at this pipeline stage
+ * (Validation Pending / Validation Failed, i.e. `readOnly` is false).
+ */
+export default function InvoiceValidationPanel({ invoice, readOnly = false }) {
   const validateInvoice = useValidateInvoiceMutation();
   const rejectValidation = useRejectValidationMutation();
 
@@ -38,7 +45,7 @@ export default function InvoiceValidationPanel({ invoice }) {
     validateInvoice.mutate(
       { invoiceId: invoice.id },
       {
-        onSuccess: () => toast.success("Invoice validated — moved to Ready for Payment."),
+        onSuccess: () => toast.success("Invoice validated — submitted for approval."),
         onError: (error) => toast.error(getApiErrorMessage(error, "Could not validate this invoice.")),
       }
     );
@@ -57,7 +64,7 @@ export default function InvoiceValidationPanel({ invoice }) {
   return (
     <PageCard>
       <PageCardContent>
-        <h3 className="mb-3 text-sm font-semibold text-gray-700">Validation Checks</h3>
+        <h3 className="mb-3 text-sm font-semibold text-gray-700">Validation</h3>
         <ul className="space-y-2">
           {Object.values(VALIDATION_CHECKS).map((checkLabel) => {
             const result = resultForCheck(checkLabel, invoice.issues);
@@ -74,21 +81,25 @@ export default function InvoiceValidationPanel({ invoice }) {
           })}
         </ul>
 
-        <div className="mt-4 flex flex-wrap justify-end gap-2">
-          <Button variant="outline" onClick={handleReject} loading={rejectValidation.isPending}>
-            Reject
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleValidate}
-            loading={validateInvoice.isPending}
-            disabled={hasOpenErrors}
-          >
-            Approve &amp; Mark Ready for Payment
-          </Button>
-        </div>
-        {hasOpenErrors && (
-          <p className="mt-2 text-right text-xs text-red-600">Resolve all open errors below before approving.</p>
+        {!readOnly && (
+          <>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <Button variant="outline" onClick={handleReject} loading={rejectValidation.isPending}>
+                Reject
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleValidate}
+                loading={validateInvoice.isPending}
+                disabled={hasOpenErrors}
+              >
+                Submit for Approval
+              </Button>
+            </div>
+            {hasOpenErrors && (
+              <p className="mt-2 text-right text-xs text-red-600">Resolve all open errors below before submitting.</p>
+            )}
+          </>
         )}
       </PageCardContent>
     </PageCard>

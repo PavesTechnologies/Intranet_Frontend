@@ -3,6 +3,7 @@ import FormSelect from "../../../../components/forms/FormSelect";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
 import Button from "../../../../components/Button/Button";
 import { INVOICE_TYPE_OPTIONS } from "../../constants/invoiceTypes";
+import { INVOICE_STATUS_OPTIONS } from "../../constants/invoiceStatus";
 
 const DATE_FIELD_OPTIONS = [
   { value: "invoiceDate", label: "Invoice Date" },
@@ -10,15 +11,24 @@ const DATE_FIELD_OPTIONS = [
 ];
 
 const INVOICE_TYPE_FILTER_OPTIONS = [{ value: "", label: "All Types" }, ...INVOICE_TYPE_OPTIONS];
+const INVOICE_STATUS_FILTER_OPTIONS = [{ value: "", label: "All Statuses" }, ...INVOICE_STATUS_OPTIONS];
 
 /**
- * Combined search + type + date-range filter bar. Filters compose (search AND type AND date
- * range are all applied together by invoiceService.getInvoices) rather than being mutually
- * exclusive.
+ * Combined search + type + status + date-range filter bar. Filters compose (search AND type AND
+ * status AND date range are all applied together by invoiceService.getInvoices) rather than
+ * being mutually exclusive — e.g. picking a Status while a tab is active narrows within that tab.
  */
-export default function InvoiceFilterPanel({ filters, onSearch, onInvoiceTypeChange, onDateRangeChange, onReset, hasActiveFilters }) {
+export default function InvoiceFilterPanel({
+  filters,
+  onSearch,
+  onInvoiceTypeChange,
+  onStatusChange,
+  onDateRangeChange,
+  onReset,
+  hasActiveFilters,
+}) {
   return (
-    <div className="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-6">
+    <div className="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-7">
       <div className="lg:col-span-2">
         <SearchInput
           value={filters.search}
@@ -28,11 +38,19 @@ export default function InvoiceFilterPanel({ filters, onSearch, onInvoiceTypeCha
       </div>
 
       <FormSelect
-        label="Type"
+        label="Invoice Type"
         name="invoiceType"
         options={INVOICE_TYPE_FILTER_OPTIONS}
         value={filters.invoiceType}
         onChange={(e) => onInvoiceTypeChange(e.target.value)}
+      />
+
+      <FormSelect
+        label="Status"
+        name="status"
+        options={INVOICE_STATUS_FILTER_OPTIONS}
+        value={filters.status}
+        onChange={(e) => onStatusChange(e.target.value)}
       />
 
       <FormSelect
