@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Pagination from "../../components/Pagination/pagination";
 import { TimesheetGroup } from "./TimesheetGroup";
 import Button from "../../components/Button/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import { fetchCalendarHolidays } from "./api";
 import WeeklyEntryModal from "./WeeklyEntry/WeeklyEntryModal";
 import { showStatusToast } from "../../components/toastfy/toast";
+import { useHolidays } from "./hooks/useHolidays";
+import { useExpandedWeeks } from "./hooks/useExpandedWeeks";
+import { useAllowedDayCheck } from "./hooks/useAllowedDayCheck";
 
 const TimesheetTable = ({
   loading,
@@ -19,39 +21,9 @@ const TimesheetTable = ({
   getWeeklyStatusColor,
 }) => {
   const [weeklyEntryOpen, setWeeklyEntryOpen] = useState(false);
-  const [holidaysMap, setHolidaysMap] = useState({});
-  const [holidayLoading, setHolidayLoading] = useState(false);
-  const [expandedWeeks, setExpandedWeeks] = useState({});
-
-  const toggleWeek = (key) =>
-    setExpandedWeeks((prev) => ({ ...prev, [key]: !prev[key] }));
-
-  // Only the current month accepts entries, so the weekly editor needs at least
-  // one allowed day in it. "Allowed" mirrors the existing rule: weekends are
-  // blocked unless a holiday overrides with submitTimesheet === true, and any
-  // holiday with submitTimesheet === false is blocked.
-  const hasAnyAllowedDay = () => {
-    const toISO = (d) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-        d.getDate(),
-      ).padStart(2, "0")}`;
-    const isAllowed = (d) => {
-      const holiday = holidaysMap[toISO(d)];
-      const dow = d.getDay(); // 0 = Sunday, 6 = Saturday
-      if ((dow === 0 || dow === 6) && (!holiday || holiday.submitTimesheet === false))
-        return false;
-      if (holiday && holiday.submitTimesheet === false) return false;
-      return true;
-    };
-    const today = new Date();
-    const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const d = new Date(today);
-    while (d >= firstOfMonth) {
-      if (isAllowed(d)) return true;
-      d.setDate(d.getDate() - 1);
-    }
-    return false;
-  };
+  const { holidaysMap, loading: holidayLoading } = useHolidays();
+  const { expandedWeeks, toggleWeek } = useExpandedWeeks();
+  const { hasAnyAllowedDay } = useAllowedDayCheck(holidaysMap);
 
   const handleOpenWeeklyEntry = () => {
     if (!hasAnyAllowedDay()) {
@@ -60,32 +32,6 @@ const TimesheetTable = ({
     }
     setWeeklyEntryOpen(true);
   };
-
-  useEffect(() => {
-    setHolidayLoading(true);
-    const loadHolidays = async () => {
-      try {
-        const data = await fetchCalendarHolidays();
-        if (!data) return;
-        const map = {};
-        data.forEach((h) => {
-          const [year, month, day] = h.holidayDate.split("-").map(Number);
-          const localDate = new Date(year, month - 1, day, 0, 0, 0);
-          const key = `${localDate.getFullYear()}-${String(
-            localDate.getMonth() + 1
-          ).padStart(2, "0")}-${String(localDate.getDate()).padStart(2, "0")}`;
-          map[key] = h;
-        });
-        setHolidaysMap(map);
-
-      } catch (err) {
-        console.error("❌ Failed to load holidays:", err);
-      } finally {
-        setHolidayLoading(false);
-      }
-    };
-    loadHolidays();
-  }, []);
 
   return (
     <div
