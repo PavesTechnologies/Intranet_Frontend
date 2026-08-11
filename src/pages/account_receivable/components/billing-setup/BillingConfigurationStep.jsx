@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Check, Plus, Pencil, Trash2 } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
@@ -15,12 +15,8 @@ import RadioCardGroup from "../common/RadioCardGroup";
 import ToggleSwitch from "../common/ToggleSwitch";
 import {
   RECURRING_BILLING_MODE_OPTIONS,
-  RATE_CARD_OPTIONS,
-  OVERTIME_RULE_OPTIONS,
-  ROUNDING_RULE_OPTIONS,
   INVOICE_SCHEDULE_TYPE_OPTIONS,
   RECOGNITION_TRIGGER_OPTIONS,
-  BILLING_CYCLE_OPTIONS,
   MILESTONE_STATUS_OPTIONS,
 } from "../../data/wizardOptions";
 import {
@@ -64,6 +60,36 @@ function getBillingFrequencyOptions(billingType, frequencies = []) {
 
   return frequencies;
 }
+
+const RATE_PERIOD_OPTIONS = [
+  { value: "HOURLY", label: "Hourly" },
+  { value: "DAILY", label: "Daily" },
+  { value: "WEEKLY", label: "Weekly" },
+];
+
+const EMPTY_RATE_CARD = {
+  role: "",
+  roleName: "",
+  rate: "",
+  ratePeriod: "HOURLY",
+  effectiveFrom: "",
+  effectiveTo: "",
+  remarks: "",
+  rateCardId: null,
+  isSaved: false,
+};
+
+const mapRateCard = (card = {}, includeRole = true) => ({
+  ...(includeRole ? { role: card.roleName || card.role || card.name || "" } : {}),
+  roleName: card.roleName || card.role || card.name || "",
+  rate: card.rate ?? card.amount ?? "",
+  ratePeriod: card.ratePeriod || card.period || "HOURLY",
+  effectiveFrom: card.effectiveFrom || card.validFrom || "",
+  effectiveTo: card.effectiveTo || card.validTo || "",
+  remarks: card.remarks || card.notes || card.description || "",
+  rateCardId: card.id || card.rateCardId || card.tmRateCardId || null,
+  isSaved: Boolean(card.id || card.rateCardId || card.tmRateCardId),
+});
 
 function normalizeBillingType(type) {
   const name = String(type?.billingTypeName || "").trim();
@@ -124,24 +150,49 @@ function ReadOnlyField({ label, value }) {
 
 function TimeAndMaterialForm({ value = {}, onChange, billingMode, currency, isExisting, billingConfigurationId }) {
   const update = (patch) => onChange({ ...value, ...patch });
+  const standardRate = {
+    ...EMPTY_RATE_CARD,
+    rate: value.rate || "",
+    ratePeriod: value.ratePeriod || "HOURLY",
+    effectiveFrom: value.effectiveFrom || "",
+    effectiveTo: value.effectiveTo || "",
+    remarks: value.remarks || "",
+    rateCardId: value.rateCardId || null,
+    isSaved: Boolean(value.rateCardId),
+  };
 
-  // rows: local UI representation for role-based rate rows
-  const [rows, setRows] = useState(() => (value.roles || []).map((r) => ({ role: r.role, rate: r.rate, rateCardId: r.rateCardId, isSaved: !!r.rateCardId })));
+  const [rows, setRows] = useState(() => (value.roles || []).map((r) => mapRateCard(r)));
   const [loadingRows, setLoadingRows] = useState(false);
 
   const syncParent = (nextRows) => {
     setRows(nextRows);
-    onChange({ ...value, roles: nextRows.map((r) => ({ role: r.role, rate: r.rate, rateCardId: r.rateCardId })) });
+    onChange({
+      ...value,
+      roles: nextRows.map(({ role, roleName, rate, ratePeriod, effectiveFrom, effectiveTo, remarks, rateCardId }) => ({
+        role,
+        roleName: roleName || role,
+        rate,
+        ratePeriod,
+        effectiveFrom,
+        effectiveTo,
+        remarks,
+        rateCardId,
+      })),
+    });
   };
 
   const handleRoleChange = (index, field, val) => {
     const updated = [...rows];
-    updated[index] = { ...updated[index], [field]: val };
+    updated[index] = {
+      ...updated[index],
+      [field]: val,
+      ...(field === "role" ? { roleName: val } : {}),
+    };
     syncParent(updated);
   };
 
   const addRole = () => {
-    const updated = [...rows, { role: "", rate: "", isSaved: false }];
+    const updated = [...rows, { ...EMPTY_RATE_CARD }];
     syncParent(updated);
   };
 
@@ -172,28 +223,27 @@ function TimeAndMaterialForm({ value = {}, onChange, billingMode, currency, isEx
     let mounted = true;
 
     const load = async () => {
-      if (billingMode !== "ROLE_BASED") return;
+      if (!["STANDARD", "ROLE_BASED"].includes(billingMode)) return;
       if (!billingConfigurationId) return;
 
       setLoadingRows(true);
       try {
         const cards = await getTmRateCardsByBillingConfiguration(billingConfigurationId);
         if (!mounted) return;
-        const mapped = (cards || []).map((card) => ({
-          role: card.role || card.name || "",
-          rate: card.hourlyRate ?? card.rate ?? card.amount ?? "",
-          rateCardId: card.id || card.rateCardId || card.tmRateCardId || null,
-          isSaved: true,
-        }));
+        const mapped = (cards || []).map((card) => mapRateCard(card));
 
-        if (mapped.length > 0) {
-          syncParent(mapped);
-        } else {
-          // keep whatever was present locally
-          syncParent(rows);
+        if (billingMode === "STANDARD") {
+          const commonRate = mapped.find((card) => !card.role) || mapped[0];
+          if (commonRate) {
+            update(mapRateCard(commonRate, false));
+          }
+          return;
         }
+
+        const roleRates = mapped.filter((card) => card.role);
+        syncParent(roleRates.length > 0 ? roleRates : rows);
       } catch (error) {
-        showStatusToast(getApiErrorMessage(error, "Unable to load role-based rate cards."), "error");
+        showStatusToast(getApiErrorMessage(error, "Unable to load rate cards."), "error");
       } finally {
         if (mounted) setLoadingRows(false);
       }
@@ -206,12 +256,38 @@ function TimeAndMaterialForm({ value = {}, onChange, billingMode, currency, isEx
   }, [billingMode, billingConfigurationId]);
 
   const buildTmRateCardPayload = (row, billingConfigurationId) => {
-    // Isolated mapping to backend DTO; update here when actual DTO fields are known
-    return {
+    const payload = {
       billingConfigurationId,
-      role: row.role || "",
-      hourlyRate: row.rate || "",
+      roleName: billingMode === "ROLE_BASED" ? String(row.roleName || row.role || "").trim() : null,
+      rate: row.rate || "",
+      ratePeriod: row.ratePeriod || "HOURLY",
+      effectiveFrom: row.effectiveFrom || "",
+      effectiveTo: row.effectiveTo || "",
+      remarks: row.remarks || "",
     };
+    return payload;
+  };
+
+  const saveStandardRate = async () => {
+    if (!billingConfigurationId) {
+      showStatusToast("Save the billing configuration first to persist the rate card.", "error");
+      return;
+    }
+
+    const payload = buildTmRateCardPayload(standardRate, billingConfigurationId);
+
+    try {
+      update({ ...standardRate, saving: true });
+      const saved = standardRate.rateCardId
+        ? await updateTmRateCard(standardRate.rateCardId, payload)
+        : await createTmRateCard(billingConfigurationId, payload);
+
+      update(mapRateCard(saved, false));
+      showStatusToast("Rate card saved", "success");
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Unable to save rate card."), "error");
+      update({ ...standardRate, saving: false });
+    }
   };
 
   const saveRow = async (index) => {
@@ -221,8 +297,21 @@ function TimeAndMaterialForm({ value = {}, onChange, billingMode, currency, isEx
       showStatusToast("Save the billing configuration first to persist rate cards.", "error");
       return;
     }
+    const roleName = String(row.roleName || row.role || "").trim();
+    if (!roleName) {
+      showStatusToast("Role name is required for role-based rate cards.", "error");
+      return;
+    }
+    const duplicateRole = rows.some((item, itemIndex) => (
+      itemIndex !== index &&
+      String(item.roleName || item.role || "").trim().toLowerCase() === roleName.toLowerCase()
+    ));
+    if (duplicateRole) {
+      showStatusToast("Role names must be unique for role-based rate cards.", "error");
+      return;
+    }
 
-    const payload = buildTmRateCardPayload(row, billingConfigurationId);
+    const payload = buildTmRateCardPayload({ ...row, roleName }, billingConfigurationId);
 
     try {
       const updating = [...rows];
@@ -236,12 +325,7 @@ function TimeAndMaterialForm({ value = {}, onChange, billingMode, currency, isEx
         saved = await createTmRateCard(billingConfigurationId, payload);
       }
 
-      const mapped = {
-        role: saved.role || saved.name || row.role,
-        rate: saved.hourlyRate ?? saved.rate ?? saved.amount ?? row.rate,
-        rateCardId: saved.id || saved.rateCardId || saved.tmRateCardId || row.rateCardId,
-        isSaved: true,
-      };
+      const mapped = { ...mapRateCard(saved), role: saved.roleName || saved.role || saved.name || row.role, roleName };
 
       const newRows = [...rows];
       newRows[index] = mapped;
@@ -259,16 +343,52 @@ function TimeAndMaterialForm({ value = {}, onChange, billingMode, currency, isEx
         <h3 className="mb-4 text-sm font-semibold text-slate-900">Rate Configuration</h3>
 
         {billingMode === "STANDARD" && (
-          <div className="max-w-md">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <FormInput
-              label="Hourly Billing Rate *"
-              name="billingRate"
+              label={`Rate (${currency}) *`}
+              name="rate"
               type="number"
-              value={value.billingRate || ""}
-              onChange={(event) => update({ billingRate: event.target.value })}
+              value={standardRate.rate}
+              onChange={(event) => update({ rate: event.target.value })}
               placeholder={`e.g. 1800 (${currency})`}
               disabled={isExisting}
             />
+            <FormSelect
+              label="Rate Period *"
+              name="ratePeriod"
+              value={standardRate.ratePeriod}
+              onChange={(event) => update({ ratePeriod: event.target.value })}
+              options={RATE_PERIOD_OPTIONS}
+            />
+            <FormDatePicker
+              label="Effective From"
+              name="effectiveFrom"
+              value={standardRate.effectiveFrom}
+              onChange={(event) => update({ effectiveFrom: event.target.value })}
+            />
+            <FormDatePicker
+              label="Effective To"
+              name="effectiveTo"
+              value={standardRate.effectiveTo}
+              onChange={(event) => update({ effectiveTo: event.target.value })}
+            />
+            <div className="md:col-span-2">
+              <FormInput
+                label="Remarks"
+                name="remarks"
+                value={standardRate.remarks}
+                onChange={(event) => update({ remarks: event.target.value })}
+                placeholder="Optional remarks"
+                disabled={isExisting}
+              />
+            </div>
+            {!isExisting && (
+              <div className="md:col-span-2">
+                <Button variant="outline" size="small" onClick={saveStandardRate} disabled={standardRate.saving}>
+                  <Check className="h-4 w-4" /> Save Rate Card
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -283,7 +403,11 @@ function TimeAndMaterialForm({ value = {}, onChange, billingMode, currency, isEx
                 <thead>
                   <tr className="bg-slate-50 text-slate-700 font-semibold">
                     <th className="px-4 py-2.5 text-left">Role</th>
-                    <th className="px-4 py-2.5 text-left">Hourly Rate ({currency})</th>
+                    <th className="px-4 py-2.5 text-left">Rate ({currency})</th>
+                    <th className="px-4 py-2.5 text-left">Period</th>
+                    <th className="px-4 py-2.5 text-left">Effective From</th>
+                    <th className="px-4 py-2.5 text-left">Effective To</th>
+                    <th className="px-4 py-2.5 text-left">Remarks</th>
                     {!isExisting && <th className="px-4 py-2.5 text-center w-20">Actions</th>}
                   </tr>
                 </thead>
@@ -307,6 +431,33 @@ function TimeAndMaterialForm({ value = {}, onChange, billingMode, currency, isEx
                           disabled={isExisting}
                         />
                       </td>
+                      <td className="px-4 py-2 min-w-[150px]">
+                        <FormSelect
+                          value={item.ratePeriod || "HOURLY"}
+                          onChange={(e) => handleRoleChange(index, "ratePeriod", e.target.value)}
+                          options={RATE_PERIOD_OPTIONS}
+                        />
+                      </td>
+                      <td className="px-4 py-2 min-w-[150px]">
+                        <FormDatePicker
+                          value={item.effectiveFrom}
+                          onChange={(e) => handleRoleChange(index, "effectiveFrom", e.target.value)}
+                        />
+                      </td>
+                      <td className="px-4 py-2 min-w-[150px]">
+                        <FormDatePicker
+                          value={item.effectiveTo}
+                          onChange={(e) => handleRoleChange(index, "effectiveTo", e.target.value)}
+                        />
+                      </td>
+                      <td className="px-4 py-2 min-w-[180px]">
+                        <FormInput
+                          value={item.remarks}
+                          onChange={(e) => handleRoleChange(index, "remarks", e.target.value)}
+                          placeholder="Optional remarks"
+                          disabled={isExisting}
+                        />
+                      </td>
                       {!isExisting && (
                         <td className="px-4 py-2 text-center">
                           <div className="flex items-center justify-center gap-2">
@@ -317,7 +468,7 @@ function TimeAndMaterialForm({ value = {}, onChange, billingMode, currency, isEx
                               className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
                               title="Save rate"
                             >
-                              ✓
+                              <Check className="h-4 w-4" />
                             </button>
                             <button
                               type="button"
