@@ -34,6 +34,27 @@ const FormSelect = ({
     }rem`,
   };
 
+  // Wheel over the option list scrolls the list; once it reaches an end — or when
+  // the list is short enough not to scroll — the page scrolls instead.
+  // NOTE: this must be bound to the element that actually scrolls, which is the
+  // inner container below, not Listbox.Options.
+  const handleOptionsWheel = (event) => {
+    const element = event.currentTarget;
+    const canScrollOptions = element.scrollHeight > element.clientHeight;
+
+    if (!canScrollOptions) {
+      window.scrollBy({ top: event.deltaY, behavior: "auto" });
+      return;
+    }
+
+    const atTop = element.scrollTop <= 0;
+    const atBottom = Math.ceil(element.scrollTop + element.clientHeight) >= element.scrollHeight;
+
+    if ((atTop && event.deltaY < 0) || (atBottom && event.deltaY > 0)) {
+      window.scrollBy({ top: event.deltaY, behavior: "auto" });
+    }
+  };
+
   return (
     <div className={`space-y-1 w-full min-w-0 ${className}`.trim()}>
       {label && (
@@ -66,7 +87,11 @@ const FormSelect = ({
                 : "absolute z-50 mt-1 w-max min-w-full",
             )}
           >
-            <div className="overflow-y-auto" style={scrollStyle}>
+            <div
+              className="overflow-y-auto"
+              style={scrollStyle}
+              onWheel={handleOptionsWheel}
+            >
               {options.map((option) => (
                 <Listbox.Option
                   key={option.value}
