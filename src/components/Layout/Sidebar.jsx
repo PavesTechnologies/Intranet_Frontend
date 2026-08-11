@@ -451,7 +451,7 @@ const Sidebar = ({ isCollapsed }) => {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 scrollbar-hide">
-        <style jsx>{`
+        <style>{`
           .scrollbar-hide::-webkit-scrollbar {
             display: none;
           }

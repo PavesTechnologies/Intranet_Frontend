@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import { ShieldCheck, Calculator, SlidersHorizontal } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorState from "@/pages/airs/skill-ontology/components/ErrorState";
+import AccordionSection from "../../components/AccordionSection";
 import useDeterministicScore from "../../../hooks/useDeterministicScore";
 import SummaryCard from "./components/SummaryCard";
 import SkillsTabNav from "./components/SkillsTabNav";
@@ -40,10 +42,10 @@ export default function DeterministicScoreTab({ candidate }) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <SummaryCard summary={breakdown.summary} />
 
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-4">
         <SkillsTabNav
           activeTab={skillsTab}
           onChange={setSkillsTab}
@@ -78,14 +80,22 @@ export default function DeterministicScoreTab({ candidate }) {
         </div>
       </div>
 
-      <ValidationSection
-        experienceValidation={breakdown.experienceValidation}
-        educationValidation={breakdown.educationValidation}
-      />
+      <div className="bg-white border border-slate-200 rounded-xl px-4">
+        <AccordionSection icon={ShieldCheck} title="Validation">
+          <ValidationSection
+            experienceValidation={breakdown.experienceValidation}
+            educationValidation={breakdown.educationValidation}
+          />
+        </AccordionSection>
 
-      <ScoreCalculation scoreCalculation={breakdown.scoreCalculation} configuration={breakdown.configuration} />
+        <AccordionSection icon={Calculator} title="Score Calculation">
+          <ScoreCalculation scoreCalculation={breakdown.scoreCalculation} configuration={breakdown.configuration} />
+        </AccordionSection>
 
-      <ConfigurationCard configuration={breakdown.configuration} />
+        <AccordionSection icon={SlidersHorizontal} title="Configuration" defaultOpen={false}>
+          <ConfigurationCard configuration={breakdown.configuration} />
+        </AccordionSection>
+      </div>
     </div>
   );
 }
