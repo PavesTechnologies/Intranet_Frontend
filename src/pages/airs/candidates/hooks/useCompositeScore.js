@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { getSemanticScoreBreakdown } from "../services/candidateScoreService";
-import { mapSemanticScoreBreakdown } from "../utils/mapSemanticScoreBreakdown";
+import { getCompositeScoreBreakdown } from "../services/candidateScoreService";
+import { mapCompositeScoreBreakdown } from "../utils/mapCompositeScoreBreakdown";
 
-export default function useSemanticScore(campaignCandidateId) {
+export default function useCompositeScore(campaignCandidateId) {
   const [breakdown, setBreakdown] = useState(null);
   const [loading, setLoading] = useState(Boolean(campaignCandidateId));
   const [error, setError] = useState(null);
@@ -12,9 +12,8 @@ export default function useSemanticScore(campaignCandidateId) {
     setLoading(true);
     setError(null);
     try {
-      const response = await getSemanticScoreBreakdown(campaignCandidateId);
-      const mapped = mapSemanticScoreBreakdown(response);
-      setBreakdown(mapped);
+      const response = await getCompositeScoreBreakdown(campaignCandidateId);
+      setBreakdown(mapCompositeScoreBreakdown(response));
     } catch (err) {
       setError(err);
       setBreakdown(null);

@@ -71,7 +71,7 @@ export const INVOICE_FIXTURES = [
     id: "inv-10001",
     invoiceNumber: "INV-10001",
     invoiceType: INVOICE_TYPES.PO,
-    status: INVOICE_STATUS.READY_FOR_PAYMENT,
+    status: INVOICE_STATUS.PAID,
     invoiceDate: "2026-07-20",
     dueDate: "2026-08-19",
     vendor: VENDORS.ABC,

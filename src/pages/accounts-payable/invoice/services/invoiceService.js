@@ -3,6 +3,7 @@ import { INVOICE_STATUS } from "../../constants/invoiceStatus";
 import { ISSUE_STATUS, ISSUE_SOURCE, ISSUE_SEVERITY } from "../../constants/invoiceIssues";
 import { createEmptyInvoice } from "../../types/invoice";
 import { calculateBalance } from "../../utils/formatters";
+import api from "../../../../api/axiosInstance.js";
 
 /**
  * Mock-backed invoice service. Every method matches the call signature a real endpoint would
@@ -16,6 +17,8 @@ import { calculateBalance } from "../../utils/formatters";
 
 const MOCK_RESPONSE_DELAY_MS = 350;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+api.defaults.baseURL = "http://localhost:8000/apm"; // Base URL for the API
 
 // In-memory store, seeded from the fixtures once per app session (not per call) so
 // uploads/edits/resolutions persist across navigation within the same browser session.
@@ -206,38 +209,24 @@ export const invoiceService = {
    * @returns {Promise<{invoice: Object, outcome: {type: string}}>}
    */
   async uploadInvoice(file) {
-    await wait(MOCK_RESPONSE_DELAY_MS);
-    try {
-      const uploadedAt = new Date().toISOString();
-      const outcome = pickUploadOutcome();
-      const base = createEmptyInvoice();
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
 
-      const invoice = {
-        ...base,
-        id: `inv-${10000 + nextInvoiceSeq}`,
-        invoiceNumber: `INV-${10000 + nextInvoiceSeq}`,
-        status: outcome.status,
-        ocrFields: { ...base.ocrFields, confidenceScore: outcome.confidenceScore },
-        issues: outcome.issues,
-        attachments: [
-          { id: `att-${file.name}`, fileName: file.name, fileType: file.type || "unknown", uploadedAt, fileUrl: "" },
-        ],
-        history: [
-          { status: INVOICE_STATUS.DRAFT, at: uploadedAt, note: "Uploaded by AP Executive" },
-          { status: INVOICE_STATUS.OCR_PROCESSING, at: uploadedAt, note: "Sent for OCR extraction" },
-          { status: outcome.status, at: uploadedAt, note: outcome.historyNote },
-        ],
-        uploadedAt,
-        uploadedBy: "ap.executive@company.com",
-      };
-      nextInvoiceSeq += 1;
-      invoiceStore = [invoice, ...invoiceStore];
-      return { invoice: cloneInvoice(invoice), outcome: { type: outcome.type } };
-    } catch (error) {
-      console.error("Error in invoiceService.uploadInvoice:", error);
-      throw error;
-    }
-  },
+    const response = await api.post(
+      "/invoice/process-invoice",
+      formData
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error(
+      "Error in invoiceService.uploadInvoice:",
+      error
+    );
+    throw error;
+  }
+},
 
   /** @param {string} invoiceId @returns {Promise<Array>} */
   async getInvoiceIssues(invoiceId) {
