@@ -41,7 +41,7 @@ export default function SearchInput({
       value={query}
       onChange={handleChange}
       placeholder={placeholder}
-      className={`w-full rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20 ${className}`}
+      className={`w-full h-10 rounded-lg border border-gray-300 px-4 text-sm text-gray-700 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${className}`}
     />
   );
 }

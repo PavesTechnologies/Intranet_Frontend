@@ -5,7 +5,14 @@ import GenericTable from "../../../../components/Table/table";
 import Button from "../../../../components/Button/Button";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import ScoreRing from "./ScoreRing";
-import { renderStageBadge, renderRiskBadge } from "../utils/candidateUtils.jsx";
+import {
+  renderStageBadge,
+  renderRiskBadge,
+  renderAiRecommendationBadge,
+  renderDecisionBadge,
+  renderFlags,
+} from "../utils/candidateUtils.jsx";
+import { DASH } from "../utils/candidateDataUtils";
 import { deleteCandidate } from "../../service/resumeIntake";
 import { extractErrorMessage } from "../../resume-intake/intake/utils/intakeUtils.jsx";
 import { useAuth } from "../../../../contexts/AuthContext";
@@ -41,15 +48,51 @@ export default function CandidateTable({ candidates, onView, onToggleStar, onDel
     );
   }
 
-  const headers = ["Candidate", "Deterministic", "Semantic", "ATS", "Composite", "Exp.", "Location", "Stage", "Risk", "Actions"];
+  const headers = [
+    "Candidate",
+    "Deterministic",
+    "Semantic",
+    "ATS",
+    "Composite",
+    "AI Rec.",
+    "Exp.",
+    "Stage",
+    "Rank",
+    "Actions",
+  ];
 
-  const columns = ["name", "deterministic", "semantic", "ats", "composite", "experience", "location", "stage", "risk", "actions"];
+  const columns = [
+    "name",
+    "deterministic",
+    "semantic",
+    "ats",
+    "composite",
+    "aiRecommendation",
+    "experience",
+    "stage",
+    "rank",
+    "actions",
+  ];
+
+  // Deterministic/semantic/ATS are dash-safe placeholders (candidates not yet
+  // scored by that layer) rather than numbers, so render "—" instead of
+  // running them through toFixed and printing "NaN".
+  const renderScore = (value, scale = 1) =>
+    value === DASH ? (
+      <span className="text-slate-400">—</span>
+    ) : (
+      <span className="font-semibold text-slate-900">{(Number(value) * scale).toFixed(1)}</span>
+    );
+
   const rows = candidates.map((c) => ({
     id: c.id,
     rowClass: "hover:bg-slate-50/50 transition cursor-pointer",
     onRowClick: () => onView(c),
     name: (
       <div className="w-full flex items-center gap-2.5 text-left">
+        <span className="w-6 text-center text-[11px] font-bold text-slate-400 shrink-0" title={c.rankingStatus ? `Ranking: ${c.rankingStatus}` : undefined}>
+          {c.rank != null ? `#${c.rank}` : "—"}
+        </span>
         <div className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 bg-gradient-to-br from-blue-600 to-indigo-600">
           {c.initials}
         </div>
@@ -68,14 +111,15 @@ export default function CandidateTable({ candidates, onView, onToggleStar, onDel
         </button>
       </div>
     ),
-    deterministic: <span className="font-semibold text-slate-900">{Number(c.deterministic).toFixed(1)}</span>,
-    ats: <span className="font-semibold text-slate-900">{(Number(c.ats) * 100).toFixed(1)}</span>,
-    semantic: <span className="font-semibold text-slate-900">{(Number(c.semantic) * 100).toFixed(1)}</span>,
+    deterministic: renderScore(c.deterministic),
+    ats: renderScore(c.ats),
+    semantic: renderScore(c.semantic, 100),
     composite: <ScoreRing value={c.composite} size={32} color="#16A34A" />,
+    aiRecommendation: renderAiRecommendationBadge(c.aiRecommendation),
     experience: `${Number(c.experience).toFixed(1)} yrs`,
     location: c.location,
     stage: renderStageBadge(c.stage),
-    risk: renderRiskBadge(c.risk),
+    rank: renderRiskBadge(c.rank),
     actions: (
       <div className="flex items-center gap-1">
         <Button
@@ -90,7 +134,7 @@ export default function CandidateTable({ candidates, onView, onToggleStar, onDel
         >
           <Eye className="h-4 w-4" />
         </Button>
-        {/* {canDeleteCandidates && (
+        {canDeleteCandidates && (
           <Button
             variant="ghost"
             size="icon"
@@ -103,14 +147,16 @@ export default function CandidateTable({ candidates, onView, onToggleStar, onDel
           >
             <Trash2 className="h-4 w-4" />
           </Button>
-        )} */}
+        )}
       </div>
     ),
   }));
 
   return (
     <>
-      <GenericTable headers={headers} columns={columns} rows={rows} />
+      <div className="overflow-x-auto">
+        <GenericTable headers={headers} columns={columns} rows={rows} />
+      </div>
 
       <ConfirmationModal
         isOpen={!!candidateToDelete}

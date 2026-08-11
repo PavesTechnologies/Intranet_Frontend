@@ -23,7 +23,13 @@ export function mapParsedResumeToCandidate(raw, fallback = {}) {
   const primaryEducation = arr(parsed.education)[0] ?? {};
 
   return {
-    id: data.candidate_id ?? null,
+    // The Deterministic/Semantic/AI Evaluation tabs call
+    // /campaign-candidates/{id}/... via candidate?.id — that needs
+    // campaign_candidate_id specifically, not this resume's plain
+    // candidate_id. The parsed-json response doesn't carry it, so it comes in
+    // through `fallback` (from the Resume Upload History row that linked here).
+    id: data.campaign_candidate_id ?? data.campaignCandidateId ?? fallback.campaignCandidateId ?? null,
+    candidateId: data.candidate_id ?? null,
     resumeId: data.resume_id ?? null,
 
     name: textOrDash(fallback.name),
@@ -41,6 +47,10 @@ export function mapParsedResumeToCandidate(raw, fallback = {}) {
     notice: textOrDash(null),
     salary: textOrDash(null),
     stage: textOrDash(fallback.stage),
+    decisionType: fallback.decisionType ?? null,
+    decisionSource: fallback.decisionSource ?? null,
+    decisionReason: fallback.decisionReason ?? null,
+    decisionAt: fallback.decisionAt ?? null,
 
     // No scoring data exists on this endpoint — the header's score rings
     // just render 0 until a real scoring source is wired in.
@@ -135,6 +145,7 @@ export function mapParsedResumeToCandidate(raw, fallback = {}) {
       startDate: w.start_date ?? null,
       endDate: w.end_date ?? null,
       isCurrent: !!w.is_current,
+      duration: textOrDash(w.duration_text),
       highlights: (w.description ?? "")
         .split("\n")
         .map((line) => line.trim())

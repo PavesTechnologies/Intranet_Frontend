@@ -57,6 +57,7 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
     const [closureReason, setClosureReason] = useState("");
     const [impact, setImpact] = useState(null);   // lazy-loaded transition impact summary
     const resumeParsePromptLookup = usePromptTemplateLookup("resume-parse");
+    const aiEvaluatePromptLookup = usePromptTemplateLookup("ai-evaluate");
 
     useEffect(() => {
         if (!isOpen) return;
@@ -71,6 +72,7 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
             ai_threshold: scoring?.ai_threshold ?? "",
             deterministic_threshold: scoring?.deterministic_threshold ?? "",
             prompt_template_id: info.prompt_template_id || "",
+            ai_evaluate_prompt_id: info.ai_evaluate_prompt_id || "",
         });
         setConfirmScoring(false);
         setSelectedPresetId("");
@@ -153,7 +155,8 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
 
     // scoring fields stay locked on an ACTIVE campaign until confirmed
     const scoringLocked = isActive && !confirmScoring;
-    const currentCount = limits.current_candidate_count ?? 0;
+    // openings are measured against SELECTED candidates, not total intake
+    const selectedCount = limits.selected_count ?? 0;
 
     const handleSave = async () => {
         const name = (form.name || "").trim();
@@ -168,11 +171,14 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
         if (!String(form.prompt_template_id || "").trim()) {
             return toast.error("Please select a Resume Parsing Prompt.");
         }
+        if (!String(form.ai_evaluate_prompt_id || "").trim()) {
+            return toast.error("Please select an AI Evaluation Prompt.");
+        }
 
-        // can't drop the cap below the number of candidates already in
+        // can't cut openings below the number already filled
         const cap = form.max_candidates === "" ? null : Number(form.max_candidates);
-        if (cap !== null && cap < currentCount) {
-            return toast.error(`Max candidates (${cap}) cannot be below the current candidate count (${currentCount}).`);
+        if (cap !== null && cap < selectedCount) {
+            return toast.error(`Openings (${cap}) cannot be below the number already selected (${selectedCount}).`);
         }
 
         // Build a PATCH payload containing ONLY the fields that actually changed —
@@ -180,6 +186,7 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
         const payload = {};
         if (name !== (info.name || "")) payload.name = name;
         if (form.prompt_template_id !== (info.prompt_template_id || "")) payload.prompt_template_id = form.prompt_template_id;
+        if (form.ai_evaluate_prompt_id !== (info.ai_evaluate_prompt_id || "")) payload.ai_evaluate_prompt_id = form.ai_evaluate_prompt_id;
 
         // max_candidates: the backend only clears it via an explicit
         // clear_max_candidates flag — sending max_candidates: null is a no-op
@@ -273,19 +280,36 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
                     </div>
                 </div>
 
-                <div>
-                    <label className={LABEL_CLASS}>
-                        Resume Parsing Prompt <span className="text-red-500">*</span>
-                    </label>
-                    <FilterListbox
-                        options={[
-                            { value: "", label: resumeParsePromptLookup.isLoading ? "Loading prompt templates..." : "Select Resume Parsing Prompt" },
-                            ...resumeParsePromptLookup.options,
-                        ]}
-                        value={form.prompt_template_id}
-                        onChange={(value) => setForm((p) => ({ ...p, prompt_template_id: value }))}
-                        disabled={resumeParsePromptLookup.isLoading}
-                    />
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className={LABEL_CLASS}>
+                            Resume Parsing Prompt <span className="text-red-500">*</span>
+                        </label>
+                        <FilterListbox
+                            options={[
+                                { value: "", label: resumeParsePromptLookup.isLoading ? "Loading prompt templates..." : "Select Resume Parsing Prompt" },
+                                ...resumeParsePromptLookup.options,
+                            ]}
+                            value={form.prompt_template_id}
+                            onChange={(value) => setForm((p) => ({ ...p, prompt_template_id: value }))}
+                            disabled={resumeParsePromptLookup.isLoading}
+                        />
+                    </div>
+
+                    <div>
+                        <label className={LABEL_CLASS}>
+                            AI Evaluation Prompt <span className="text-red-500">*</span>
+                        </label>
+                        <FilterListbox
+                            options={[
+                                { value: "", label: aiEvaluatePromptLookup.isLoading ? "Loading prompt templates..." : "Select AI Evaluation Prompt" },
+                                ...aiEvaluatePromptLookup.options,
+                            ]}
+                            value={form.ai_evaluate_prompt_id}
+                            onChange={(value) => setForm((p) => ({ ...p, ai_evaluate_prompt_id: value }))}
+                            disabled={aiEvaluatePromptLookup.isLoading}
+                        />
+                    </div>
                 </div>
 
                 {statusChanged && targetStatus === "PAUSED" && (<div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-100">
@@ -325,10 +349,12 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
                 )}
 
                 <div className="grid grid-cols-2 gap-4">
-                    <FormInput label="Max Candidates" name="max_candidates" type="number" min="1" value={form.max_candidates} onChange={change} labelClassName={LABEL_CLASS} />
+                    <FormInput label="Openings" name="max_candidates" type="number" min="1" value={form.max_candidates} onChange={change} labelClassName={LABEL_CLASS} />
                     <FormInput label="Deadline" name="deadline" type="datetime-local" value={form.deadline} onChange={change} labelClassName={LABEL_CLASS} />
                 </div>
-                <p className="text-[10px] text-slate-400">Current candidate count: {currentCount}</p>
+                <p className="text-[10px] text-slate-400">
+                    Currently selected: {selectedCount} · the campaign auto-closes once every opening is filled
+                </p>
 
                 {/* Scoring config is only editable when the backend sent it (HR_ADMIN) */}
                 {scoring && (<>

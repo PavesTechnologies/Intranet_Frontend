@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 import SearchableSelect from "../SearchableSelect";
-import { fetchActiveEnterpriseProjects } from "../../services/billingConfigService";
+import { getApiErrorMessage, getBillingConfigurationClients, getBillingConfigurationProjectsByClient } from "../../services/billingConfigurationService";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import { BILLING_TYPE_LABELS, BILLING_MODE_LABELS, BILLING_FREQUENCIES } from "../../data/wizardOptions";
 
 function frequencyLabel(value) {
@@ -11,8 +12,10 @@ function frequencyLabel(value) {
 }
 
 export default function EnterpriseProjectSelectionStep({ value = {}, onChange }) {
+  const [clients, setClients] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [loadingList, setLoadingList] = useState(true);
+  const [loadingClients, setLoadingClients] = useState(true);
+  const [loadingProjects, setLoadingProjects] = useState(false);
   const isMounted = useRef(true);
 
   useEffect(
@@ -23,29 +26,57 @@ export default function EnterpriseProjectSelectionStep({ value = {}, onChange })
   );
 
   useEffect(() => {
-    fetchActiveEnterpriseProjects().then((projectList) => {
-      if (!isMounted.current) return;
-      setProjects(projectList);
-      setLoadingList(false);
-    });
+    const loadClients = async () => {
+      setLoadingClients(true);
+      try {
+        const clientList = await getBillingConfigurationClients();
+        if (!isMounted.current) return;
+        setClients(clientList);
+      } catch (error) {
+        if (!isMounted.current) return;
+        showStatusToast(getApiErrorMessage(error, "Failed to load clients."), "error");
+        setClients([]);
+      } finally {
+        if (isMounted.current) setLoadingClients(false);
+      }
+    };
+
+    loadClients();
   }, []);
+
+  useEffect(() => {
+    if (!value.clientId) {
+      setProjects([]);
+      return;
+    }
+
+    const loadProjects = async () => {
+      setLoadingProjects(true);
+      try {
+        const projectList = await getBillingConfigurationProjectsByClient(value.clientId);
+        if (!isMounted.current) return;
+        setProjects(projectList);
+      } catch (error) {
+        if (!isMounted.current) return;
+        showStatusToast(getApiErrorMessage(error, "Failed to load projects for the selected client."), "error");
+        setProjects([]);
+      } finally {
+        if (isMounted.current) setLoadingProjects(false);
+      }
+    };
+
+    loadProjects();
+  }, [value.clientId]);
 
   // --- Cascading option lists: each tier only offers values consistent with prior selections ---
   const clientOptions = useMemo(
-    () =>
-      Array.from(new Map(projects.map((project) => [project.clientId, project.clientName])), ([val, label]) => ({
-        value: val,
-        label,
-      })),
-    [projects]
+    () => clients.map((client) => ({ value: client.clientId, label: client.clientName })),
+    [clients]
   );
 
   const projectOptions = useMemo(
-    () =>
-      projects
-        .filter((project) => !value.clientId || project.clientId === value.clientId)
-        .map((project) => ({ value: project.id, label: project.projectName })),
-    [projects, value.clientId]
+    () => projects.map((project) => ({ value: project.id, label: project.projectName })),
+    [projects]
   );
 
   const matchedProject = useMemo(
@@ -147,8 +178,8 @@ export default function EnterpriseProjectSelectionStep({ value = {}, onChange })
           value={value.clientId || ""}
           onChange={handleClientChange}
           options={clientOptions}
-          placeholder={loadingList ? "Loading clients..." : "Select client"}
-          disabled={loadingList}
+          placeholder={loadingClients ? "Loading clients..." : "Select client"}
+          disabled={loadingClients}
         />
         <SearchableSelect
           label="Project Name"
@@ -156,8 +187,8 @@ export default function EnterpriseProjectSelectionStep({ value = {}, onChange })
           value={value.projectId || ""}
           onChange={handleProjectChange}
           options={projectOptions}
-          placeholder={value.clientId ? "Select project" : "Select client first"}
-          disabled={loadingList || !value.clientId}
+          placeholder={loadingProjects ? "Loading projects..." : value.clientId ? "Select project" : "Select client first"}
+          disabled={loadingClients || loadingProjects || !value.clientId}
         />
 
         <SearchableSelect

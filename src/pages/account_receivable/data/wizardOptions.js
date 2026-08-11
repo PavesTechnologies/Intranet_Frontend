@@ -47,7 +47,8 @@ export const RECURRING_BILLING_MODE_OPTIONS = [
 // read-only display in the Existing Enterprise Project flow, where billingMode is
 // synchronized master data rather than something the user picks from the list above).
 export const BILLING_MODE_LABELS = {
-  STANDARD: "Standard T&M",
+  STANDARD: "Standard Rate",
+  ROLE_BASED: "Role-Based Rates",
   FIXED: "Fixed Price",
   MILESTONE: "Milestone-Based",
   MONTHLY_RETAINER: "Monthly Retainer",
@@ -55,10 +56,14 @@ export const BILLING_MODE_LABELS = {
 };
 
 export const BILLING_FREQUENCIES = [
+  { value: "WEEKLY", label: "Weekly" },
+  { value: "BIWEEKLY", label: "Biweekly" },
   { value: "MONTHLY", label: "Monthly" },
   { value: "QUARTERLY", label: "Quarterly" },
   { value: "HALF_YEARLY", label: "Half-Yearly" },
+  { value: "ANNUALLY", label: "Annually" },
   { value: "YEARLY", label: "Yearly" },
+  { value: "ON_DEMAND", label: "On Demand" },
 ];
 
 export const BILLING_CYCLE_OPTIONS = [
@@ -133,14 +138,6 @@ export const TAX_PREFERENCE_OPTIONS = [
   { value: "REVERSE_CHARGE", label: "Reverse Charge" },
 ];
 
-export const PAYMENT_TERMS_OPTIONS = [
-  { value: "", label: "Select payment terms" },
-  { value: "NET_15", label: "Net 15" },
-  { value: "NET_30", label: "Net 30" },
-  { value: "NET_45", label: "Net 45" },
-  { value: "NET_60", label: "Net 60" },
-];
-
 export const APPROVAL_WORKFLOW_OPTIONS = [
   { value: "", label: "Select approval workflow" },
   { value: "SINGLE_APPROVER", label: "Single Approver" },
@@ -168,16 +165,8 @@ export const INVOICE_NUMBER_SERIES_OPTIONS = [
   { value: "AR_EXPORT_2026", label: "AR-Export-2026 Series" },
 ];
 
-export const CURRENCY_OPTIONS = [
-  { value: "", label: "Select currency" },
-  { value: "INR", label: "INR" },
-  { value: "USD", label: "USD" },
-  { value: "EUR", label: "EUR" },
-  { value: "GBP", label: "GBP" },
-];
-
 export const SOURCE_FILTER_OPTIONS = [
-  { value: "", label: "All" },
+  { value: "", label: "All Sources" },
   { value: "Enterprise", label: "Enterprise" },
   { value: "Standalone", label: "Standalone" },
 ];
@@ -185,6 +174,8 @@ export const SOURCE_FILTER_OPTIONS = [
 export const STATUS_FILTER_OPTIONS = [
   { value: "", label: "All Statuses" },
   { value: "Draft", label: "Draft" },
+  { value: "Pending Approval", label: "Pending Approval" },
   { value: "Active", label: "Active" },
+  { value: "Rejected", label: "Rejected" },
   { value: "Inactive", label: "Inactive" },
 ];
