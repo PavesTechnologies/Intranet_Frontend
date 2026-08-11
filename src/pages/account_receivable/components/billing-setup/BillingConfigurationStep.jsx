@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Check, Plus, Pencil, Trash2 } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
@@ -10,23 +10,24 @@ import Modal from "../../../../components/ui/Modal";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { Fonts } from "../../../../components/Fonts/Fonts";
+import { showStatusToast } from "../../../../components/toastfy/toast";
 import RadioCardGroup from "../common/RadioCardGroup";
 import ToggleSwitch from "../common/ToggleSwitch";
 import {
-  BILLING_TYPES,
-  BILLING_TYPE_LABELS,
   RECURRING_BILLING_MODE_OPTIONS,
-  BILLING_MODE_LABELS,
-  BILLING_FREQUENCIES,
-  RATE_CARD_OPTIONS,
-  OVERTIME_RULE_OPTIONS,
-  ROUNDING_RULE_OPTIONS,
   INVOICE_SCHEDULE_TYPE_OPTIONS,
   RECOGNITION_TRIGGER_OPTIONS,
-  BILLING_CYCLE_OPTIONS,
   MILESTONE_STATUS_OPTIONS,
-  CURRENCY_OPTIONS,
 } from "../../data/wizardOptions";
+import {
+  getActiveBillingTypes,
+  getActiveBillingFrequencies,
+  getTmRateCardsByBillingConfiguration,
+  createTmRateCard,
+  updateTmRateCard,
+  deleteTmRateCard,
+  getApiErrorMessage,
+} from "../../services/billingConfigurationService";
 
 let milestoneSeq = 0;
 function nextMilestoneId() {
@@ -34,8 +35,95 @@ function nextMilestoneId() {
   return `MS-NEW-${milestoneSeq}`;
 }
 
-function frequencyLabel(value) {
-  return BILLING_FREQUENCIES.find((option) => option.value === value)?.label || value || "—";
+function getPricingModelOptions(billingType) {
+  switch (billingType) {
+    case "TIME_MATERIAL":
+      return [
+        { value: "STANDARD", label: "Standard Rate" },
+        { value: "ROLE_BASED", label: "Role-Based Rates" },
+      ];
+    case "RECURRING":
+      return RECURRING_BILLING_MODE_OPTIONS;
+    default:
+      return [];
+  }
+}
+
+function getBillingFrequencyOptions(billingType, frequencies = []) {
+  if (billingType === "RECURRING") {
+    return frequencies.filter((option) =>
+      ["MONTHLY", "QUARTERLY", "HALF_YEARLY", "ANNUALLY"].includes(
+        option.value,
+      ),
+    );
+  }
+
+  return frequencies;
+}
+
+const RATE_PERIOD_OPTIONS = [
+  { value: "HOURLY", label: "Hourly" },
+  { value: "DAILY", label: "Daily" },
+  { value: "WEEKLY", label: "Weekly" },
+];
+
+const EMPTY_RATE_CARD = {
+  role: "",
+  roleName: "",
+  rate: "",
+  ratePeriod: "HOURLY",
+  effectiveFrom: "",
+  effectiveTo: "",
+  remarks: "",
+  rateCardId: null,
+  isSaved: false,
+};
+
+const mapRateCard = (card = {}, includeRole = true) => ({
+  ...(includeRole ? { role: card.roleName || card.role || card.name || "" } : {}),
+  roleName: card.roleName || card.role || card.name || "",
+  rate: card.rate ?? card.amount ?? "",
+  ratePeriod: card.ratePeriod || card.period || "HOURLY",
+  effectiveFrom: card.effectiveFrom || card.validFrom || "",
+  effectiveTo: card.effectiveTo || card.validTo || "",
+  remarks: card.remarks || card.notes || card.description || "",
+  rateCardId: card.id || card.rateCardId || card.tmRateCardId || null,
+  isSaved: Boolean(card.id || card.rateCardId || card.tmRateCardId),
+});
+
+function normalizeBillingType(type) {
+  const name = String(type?.billingTypeName || "").trim();
+
+  let value = "";
+
+  switch (name.toLowerCase()) {
+    case "fixed price":
+      value = "FIXED_PRICE";
+      break;
+
+    case "timesheet based":
+      value = "TIME_MATERIAL";
+      break;
+
+    case "milestone based":
+      value = "MILESTONE";
+      break;
+
+    case "subscription":
+    case "recurring":
+      value = "RECURRING";
+      break;
+
+    default:
+      value = "";
+  }
+
+  return {
+    ...type,
+    value,
+    label: value === "RECURRING" ? "Recurring" : name,
+    billingTypeId: type.billingTypeId,
+  };
 }
 
 function SectionCard({ title, children }) {
@@ -60,82 +148,271 @@ function ReadOnlyField({ label, value }) {
   return <FormInput label={label} value={value || "—"} disabled onChange={() => {}} />;
 }
 
-function BillingSummaryHeader({ projectInfo }) {
-  return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <SummaryCard
-        label="Billing Type"
-        value={BILLING_TYPE_LABELS[projectInfo.billingType] || projectInfo.billingType}
-      />
-      <SummaryCard
-        label="Billing Mode"
-        value={BILLING_MODE_LABELS[projectInfo.billingMode] || projectInfo.billingMode}
-      />
-      <SummaryCard label="Billing Frequency" value={frequencyLabel(projectInfo.billingFrequency)} />
-      <SummaryCard label="Currency" value={projectInfo.currency} />
-    </div>
-  );
-}
-
-function TimeAndMaterialForm({ value = {}, onChange, billingMode, currency, isExisting }) {
+function TimeAndMaterialForm({ value = {}, onChange, billingMode, currency, isExisting, billingConfigurationId }) {
   const update = (patch) => onChange({ ...value, ...patch });
+  const standardRate = {
+    ...EMPTY_RATE_CARD,
+    rate: value.rate || "",
+    ratePeriod: value.ratePeriod || "HOURLY",
+    effectiveFrom: value.effectiveFrom || "",
+    effectiveTo: value.effectiveTo || "",
+    remarks: value.remarks || "",
+    rateCardId: value.rateCardId || null,
+    isSaved: Boolean(value.rateCardId),
+  };
 
-  // Initialize roles if empty
-  const roles = value.roles || [
-    { role: "Developer", rate: "" },
-    { role: "Tester", rate: "" },
-    { role: "Project Manager", rate: "" },
-  ];
+  const [rows, setRows] = useState(() => (value.roles || []).map((r) => mapRateCard(r)));
+  const [loadingRows, setLoadingRows] = useState(false);
+
+  const syncParent = (nextRows) => {
+    setRows(nextRows);
+    onChange({
+      ...value,
+      roles: nextRows.map(({ role, roleName, rate, ratePeriod, effectiveFrom, effectiveTo, remarks, rateCardId }) => ({
+        role,
+        roleName: roleName || role,
+        rate,
+        ratePeriod,
+        effectiveFrom,
+        effectiveTo,
+        remarks,
+        rateCardId,
+      })),
+    });
+  };
 
   const handleRoleChange = (index, field, val) => {
-    const updatedRoles = [...roles];
-    updatedRoles[index] = { ...updatedRoles[index], [field]: val };
-    update({ roles: updatedRoles });
+    const updated = [...rows];
+    updated[index] = {
+      ...updated[index],
+      [field]: val,
+      ...(field === "role" ? { roleName: val } : {}),
+    };
+    syncParent(updated);
   };
 
   const addRole = () => {
-    update({ roles: [...roles, { role: "", rate: "" }] });
+    const updated = [...rows, { ...EMPTY_RATE_CARD }];
+    syncParent(updated);
   };
 
-  const removeRole = (index) => {
-    update({ roles: roles.filter((_, i) => i !== index) });
+  const removeRole = async (index) => {
+    const target = rows[index];
+    if (!target?.rateCardId) {
+      syncParent(rows.filter((_, i) => i !== index));
+      return;
+    }
+
+    try {
+      const confirmed = window.confirm("Remove this rate card? This cannot be undone.");
+      if (!confirmed) return;
+      const deletingRows = [...rows];
+      deletingRows[index] = { ...deletingRows[index], deleting: true };
+      setRows(deletingRows);
+
+      await deleteTmRateCard(target.rateCardId);
+      showStatusToast("Rate card removed", "success");
+      syncParent(rows.filter((_, i) => i !== index));
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Unable to remove rate card"), "error");
+      setRows((prev) => prev.map((r, i) => (i === index ? { ...r, deleting: false } : r)));
+    }
+  };
+
+  useEffect(() => {
+    let mounted = true;
+
+    const load = async () => {
+      if (!["STANDARD", "ROLE_BASED"].includes(billingMode)) return;
+      if (!billingConfigurationId) return;
+
+      setLoadingRows(true);
+      try {
+        const cards = await getTmRateCardsByBillingConfiguration(billingConfigurationId);
+        if (!mounted) return;
+        const mapped = (cards || []).map((card) => mapRateCard(card));
+
+        if (billingMode === "STANDARD") {
+          const commonRate = mapped.find((card) => !card.role) || mapped[0];
+          if (commonRate) {
+            update(mapRateCard(commonRate, false));
+          }
+          return;
+        }
+
+        const roleRates = mapped.filter((card) => card.role);
+        syncParent(roleRates.length > 0 ? roleRates : rows);
+      } catch (error) {
+        showStatusToast(getApiErrorMessage(error, "Unable to load rate cards."), "error");
+      } finally {
+        if (mounted) setLoadingRows(false);
+      }
+    };
+
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [billingMode, billingConfigurationId]);
+
+  const buildTmRateCardPayload = (row, billingConfigurationId) => {
+    const payload = {
+      billingConfigurationId,
+      roleName: billingMode === "ROLE_BASED" ? String(row.roleName || row.role || "").trim() : null,
+      rate: row.rate || "",
+      ratePeriod: row.ratePeriod || "HOURLY",
+      effectiveFrom: row.effectiveFrom || "",
+      effectiveTo: row.effectiveTo || "",
+      remarks: row.remarks || "",
+    };
+    return payload;
+  };
+
+  const saveStandardRate = async () => {
+    if (!billingConfigurationId) {
+      showStatusToast("Save the billing configuration first to persist the rate card.", "error");
+      return;
+    }
+
+    const payload = buildTmRateCardPayload(standardRate, billingConfigurationId);
+
+    try {
+      update({ ...standardRate, saving: true });
+      const saved = standardRate.rateCardId
+        ? await updateTmRateCard(standardRate.rateCardId, payload)
+        : await createTmRateCard(billingConfigurationId, payload);
+
+      update(mapRateCard(saved, false));
+      showStatusToast("Rate card saved", "success");
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Unable to save rate card."), "error");
+      update({ ...standardRate, saving: false });
+    }
+  };
+
+  const saveRow = async (index) => {
+    const row = rows[index];
+    if (!row) return;
+    if (!billingConfigurationId) {
+      showStatusToast("Save the billing configuration first to persist rate cards.", "error");
+      return;
+    }
+    const roleName = String(row.roleName || row.role || "").trim();
+    if (!roleName) {
+      showStatusToast("Role name is required for role-based rate cards.", "error");
+      return;
+    }
+    const duplicateRole = rows.some((item, itemIndex) => (
+      itemIndex !== index &&
+      String(item.roleName || item.role || "").trim().toLowerCase() === roleName.toLowerCase()
+    ));
+    if (duplicateRole) {
+      showStatusToast("Role names must be unique for role-based rate cards.", "error");
+      return;
+    }
+
+    const payload = buildTmRateCardPayload({ ...row, roleName }, billingConfigurationId);
+
+    try {
+      const updating = [...rows];
+      updating[index] = { ...updating[index], saving: true };
+      setRows(updating);
+
+      let saved;
+      if (row.rateCardId) {
+        saved = await updateTmRateCard(row.rateCardId, payload);
+      } else {
+        saved = await createTmRateCard(billingConfigurationId, payload);
+      }
+
+      const mapped = { ...mapRateCard(saved), role: saved.roleName || saved.role || saved.name || row.role, roleName };
+
+      const newRows = [...rows];
+      newRows[index] = mapped;
+      syncParent(newRows);
+      showStatusToast("Rate card saved", "success");
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Unable to save rate card."), "error");
+      setRows((prev) => prev.map((r, i) => (i === index ? { ...r, saving: false } : r)));
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* Rate Configuration (Dynamic Section) */}
       <div className="rounded-xl border border-slate-200 p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">
-          Rate Configuration
-        </h3>
+        <h3 className="mb-4 text-sm font-semibold text-slate-900">Rate Configuration</h3>
 
         {billingMode === "STANDARD" && (
-          <div className="max-w-md">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <FormInput
-              label="Hourly Billing Rate *"
-              name="billingRate"
+              label={`Rate (${currency}) *`}
+              name="rate"
               type="number"
-              value={value.billingRate || ""}
-              onChange={(event) => update({ billingRate: event.target.value })}
+              value={standardRate.rate}
+              onChange={(event) => update({ rate: event.target.value })}
               placeholder={`e.g. 1800 (${currency})`}
               disabled={isExisting}
             />
+            <FormSelect
+              label="Rate Period *"
+              name="ratePeriod"
+              value={standardRate.ratePeriod}
+              onChange={(event) => update({ ratePeriod: event.target.value })}
+              options={RATE_PERIOD_OPTIONS}
+            />
+            <FormDatePicker
+              label="Effective From"
+              name="effectiveFrom"
+              value={standardRate.effectiveFrom}
+              onChange={(event) => update({ effectiveFrom: event.target.value })}
+            />
+            <FormDatePicker
+              label="Effective To"
+              name="effectiveTo"
+              value={standardRate.effectiveTo}
+              onChange={(event) => update({ effectiveTo: event.target.value })}
+            />
+            <div className="md:col-span-2">
+              <FormInput
+                label="Remarks"
+                name="remarks"
+                value={standardRate.remarks}
+                onChange={(event) => update({ remarks: event.target.value })}
+                placeholder="Optional remarks"
+                disabled={isExisting}
+              />
+            </div>
+            {!isExisting && (
+              <div className="md:col-span-2">
+                <Button variant="outline" size="small" onClick={saveStandardRate} disabled={standardRate.saving}>
+                  <Check className="h-4 w-4" /> Save Rate Card
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
         {billingMode === "ROLE_BASED" && (
           <div className="space-y-4">
+            {loadingRows ? (
+              <p className="text-sm text-slate-500">Loading role-based rates…</p>
+            ) : null}
+
             <div className="w-full overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead>
                   <tr className="bg-slate-50 text-slate-700 font-semibold">
                     <th className="px-4 py-2.5 text-left">Role</th>
-                    <th className="px-4 py-2.5 text-left">Hourly Rate ({currency})</th>
+                    <th className="px-4 py-2.5 text-left">Rate ({currency})</th>
+                    <th className="px-4 py-2.5 text-left">Period</th>
+                    <th className="px-4 py-2.5 text-left">Effective From</th>
+                    <th className="px-4 py-2.5 text-left">Effective To</th>
+                    <th className="px-4 py-2.5 text-left">Remarks</th>
                     {!isExisting && <th className="px-4 py-2.5 text-center w-20">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {roles.map((item, index) => (
+                  {rows.map((item, index) => (
                     <tr key={index}>
                       <td className="px-4 py-2">
                         <FormInput
@@ -154,15 +431,54 @@ function TimeAndMaterialForm({ value = {}, onChange, billingMode, currency, isEx
                           disabled={isExisting}
                         />
                       </td>
+                      <td className="px-4 py-2 min-w-[150px]">
+                        <FormSelect
+                          value={item.ratePeriod || "HOURLY"}
+                          onChange={(e) => handleRoleChange(index, "ratePeriod", e.target.value)}
+                          options={RATE_PERIOD_OPTIONS}
+                        />
+                      </td>
+                      <td className="px-4 py-2 min-w-[150px]">
+                        <FormDatePicker
+                          value={item.effectiveFrom}
+                          onChange={(e) => handleRoleChange(index, "effectiveFrom", e.target.value)}
+                        />
+                      </td>
+                      <td className="px-4 py-2 min-w-[150px]">
+                        <FormDatePicker
+                          value={item.effectiveTo}
+                          onChange={(e) => handleRoleChange(index, "effectiveTo", e.target.value)}
+                        />
+                      </td>
+                      <td className="px-4 py-2 min-w-[180px]">
+                        <FormInput
+                          value={item.remarks}
+                          onChange={(e) => handleRoleChange(index, "remarks", e.target.value)}
+                          placeholder="Optional remarks"
+                          disabled={isExisting}
+                        />
+                      </td>
                       {!isExisting && (
                         <td className="px-4 py-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => removeRole(index)}
-                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => saveRow(index)}
+                              disabled={rows[index]?.saving}
+                              className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Save rate"
+                            >
+                              <Check className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeRole(index)}
+                              className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Remove role"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -170,6 +486,7 @@ function TimeAndMaterialForm({ value = {}, onChange, billingMode, currency, isEx
                 </tbody>
               </table>
             </div>
+
             {!isExisting && (
               <button
                 type="button"
@@ -257,16 +574,10 @@ function MilestoneForm({ milestones = [], settings = {}, onMilestonesChange, onS
     setModalState({
       mode: "edit",
       id: milestone.id,
-      form: {
-        name: milestone.name,
-        amount: milestone.amount,
-        dueDate: milestone.dueDate,
-        status: milestone.status || "PENDING",
-      },
+      form: { name: milestone.name, amount: milestone.amount, dueDate: milestone.dueDate, status: milestone.status || "PENDING" },
     });
 
-  const handleModalFieldChange = (patch) =>
-    setModalState((prev) => ({ ...prev, form: { ...prev.form, ...patch } }));
+  const handleModalFieldChange = (patch) => setModalState((prev) => ({ ...prev, form: { ...prev.form, ...patch } }));
 
   const handleModalSave = () => {
     const { mode, id, form } = modalState;
@@ -289,7 +600,9 @@ function MilestoneForm({ milestones = [], settings = {}, onMilestonesChange, onS
     name: milestone.name,
     amount: milestone.amount,
     dueDate: milestone.dueDate,
-    status: <StatusBadge label={milestone.status === "COMPLETED" ? "Completed" : "Pending"} size="sm" />,
+    status: (
+      <StatusBadge label={milestone.status === "COMPLETED" ? "Completed" : "Pending"} size="sm" />
+    ),
     actions: (
       <div className="flex items-center justify-center gap-2">
         <Button variant="ghost" size="icon" title="Edit milestone" onClick={() => openEditModal(milestone)}>
@@ -315,94 +628,37 @@ function MilestoneForm({ milestones = [], settings = {}, onMilestonesChange, onS
         </div>
 
         {milestones.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-500">
-            No milestones added yet. Add at least one milestone.
-          </p>
+          <p className="py-6 text-center text-sm text-slate-500">No milestones added yet. Add at least one milestone.</p>
         ) : (
           <div className="w-full overflow-x-auto">
-            <GenericTable
-              headers={["Milestone Name", "Amount", "Due Date", "Status", "Actions"]}
-              columns={["name", "amount", "dueDate", "status", "actions"]}
-              rows={tableRows}
-            />
+            <GenericTable headers={["Milestone Name", "Amount", "Due Date", "Status", "Actions"]} columns={["name", "amount", "dueDate", "status", "actions"]} rows={tableRows} />
           </div>
         )}
       </div>
 
       <div className="space-y-4 rounded-xl border border-slate-200 p-5">
-        <ToggleSwitch
-          label="Bill only completed milestones"
-          checked={Boolean(settings.billOnlyCompletedMilestones)}
-          onChange={(checked) => onSettingsChange({ ...settings, billOnlyCompletedMilestones: checked })}
-        />
-        <ToggleSwitch
-          label="Allow partial milestone billing"
-          checked={Boolean(settings.allowPartialMilestoneBilling)}
-          onChange={(checked) => onSettingsChange({ ...settings, allowPartialMilestoneBilling: checked })}
-        />
+        <ToggleSwitch label="Bill only completed milestones" checked={Boolean(settings.billOnlyCompletedMilestones)} onChange={(checked) => onSettingsChange({ ...settings, billOnlyCompletedMilestones: checked })} />
+        <ToggleSwitch label="Allow partial milestone billing" checked={Boolean(settings.allowPartialMilestoneBilling)} onChange={(checked) => onSettingsChange({ ...settings, allowPartialMilestoneBilling: checked })} />
       </div>
 
-      <Modal
-        isOpen={Boolean(modalState)}
-        onClose={() => setModalState(null)}
-        title={modalState?.mode === "add" ? "Add Milestone" : "Edit Milestone"}
-        width="420px"
-      >
+      <Modal isOpen={Boolean(modalState)} onClose={() => setModalState(null)} title={modalState?.mode === "add" ? "Add Milestone" : "Edit Milestone"} width="420px">
         {modalState && (
           <div className="space-y-4">
-            <FormInput
-              label="Milestone Name"
-              requiredMark
-              name="name"
-              value={modalState.form.name}
-              onChange={(event) => handleModalFieldChange({ name: event.target.value })}
-              placeholder="e.g. UAT Completion"
-            />
-            <FormInput
-              label="Amount"
-              requiredMark
-              name="amount"
-              type="number"
-              value={modalState.form.amount}
-              onChange={(event) => handleModalFieldChange({ amount: event.target.value })}
-              placeholder="e.g. 1200000"
-            />
-            <FormDatePicker
-              label="Due Date"
-              name="dueDate"
-              value={modalState.form.dueDate}
-              onChange={(event) => handleModalFieldChange({ dueDate: event.target.value })}
-            />
+            <FormInput label="Milestone Name" requiredMark name="name" value={modalState.form.name} onChange={(event) => handleModalFieldChange({ name: event.target.value })} placeholder="e.g. UAT Completion" />
+            <FormInput label="Amount" requiredMark name="amount" type="number" value={modalState.form.amount} onChange={(event) => handleModalFieldChange({ amount: event.target.value })} placeholder="e.g. 1200000" />
+            <FormDatePicker label="Due Date" name="dueDate" value={modalState.form.dueDate} onChange={(event) => handleModalFieldChange({ dueDate: event.target.value })} />
             {modalState.mode === "edit" && (
-              <FormSelect
-                label="Status"
-                name="status"
-                value={modalState.form.status}
-                onChange={(event) => handleModalFieldChange({ status: event.target.value })}
-                options={MILESTONE_STATUS_OPTIONS}
-              />
+              <FormSelect label="Status" name="status" value={modalState.form.status} onChange={(event) => handleModalFieldChange({ status: event.target.value })} options={MILESTONE_STATUS_OPTIONS} />
             )}
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setModalState(null)}>
-                Cancel
-              </Button>
-              <Button variant="primary" disabled={!isModalFormValid} onClick={handleModalSave}>
-                Save Milestone
-              </Button>
+              <Button variant="outline" onClick={() => setModalState(null)}>Cancel</Button>
+              <Button variant="primary" disabled={!isModalFormValid} onClick={handleModalSave}>Save Milestone</Button>
             </div>
           </div>
         )}
       </Modal>
 
-      <ConfirmationModal
-        isOpen={Boolean(deleteTarget)}
-        title="Remove Milestone"
-        message={deleteTarget ? `Remove milestone "${deleteTarget.name}"? This cannot be undone.` : ""}
-        confirmText="Remove"
-        variant="danger"
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={handleConfirmDelete}
-      />
+      <ConfirmationModal isOpen={Boolean(deleteTarget)} title="Remove Milestone" message={deleteTarget ? `Remove milestone "${deleteTarget.name}"? This cannot be undone.` : ""} confirmText="Remove" variant="danger" onCancel={() => setDeleteTarget(null)} onConfirm={handleConfirmDelete} />
     </div>
   );
 }
@@ -415,108 +671,15 @@ function MonthlyRetainerForm({ value = {}, onChange, billingFrequency }) {
       <h2 className={Fonts.heading4}>Monthly Retainer Configuration</h2>
 
       <SectionCard title="Retainer Terms">
-        <FormInput
-          label="Monthly Retainer Amount"
-          name="amount"
-          type="number"
-          value={value.amount || ""}
-          onChange={(event) => update({ amount: event.target.value })}
-          placeholder="e.g. 450000"
-        />
-        <FormDatePicker
-          label="Billing Start Date"
-          name="billingStartDate"
-          value={value.billingStartDate || ""}
-          onChange={(event) => update({ billingStartDate: event.target.value })}
-        />
-        <ReadOnlyField label="Billing Frequency" value={frequencyLabel(billingFrequency)} />
-        <FormInput
-          label="Billing Day of Month"
-          name="billingDayOfMonth"
-          type="number"
-          min="1"
-          max="31"
-          value={value.billingDayOfMonth || ""}
-          onChange={(event) => update({ billingDayOfMonth: event.target.value })}
-          placeholder="e.g. 1"
-        />
+        <FormInput label="Monthly Retainer Amount" name="amount" type="number" value={value.amount || ""} onChange={(event) => update({ amount: event.target.value })} placeholder="e.g. 450000" />
+        <FormDatePicker label="Billing Start Date" name="billingStartDate" value={value.billingStartDate || ""} onChange={(event) => update({ billingStartDate: event.target.value })} />
+        <ReadOnlyField label="Billing Frequency" value={billingFrequency || "—"} />
+        <FormInput label="Billing Day of Month" name="billingDayOfMonth" type="number" min="1" max="31" value={value.billingDayOfMonth || ""} onChange={(event) => update({ billingDayOfMonth: event.target.value })} placeholder="e.g. 1" />
       </SectionCard>
 
       <div className="space-y-4 rounded-xl border border-slate-200 p-5">
-        <ToggleSwitch
-          label="Auto Invoice Generation"
-          checked={Boolean(value.autoInvoiceGeneration)}
-          onChange={(checked) => update({ autoInvoiceGeneration: checked })}
-        />
-        <ToggleSwitch
-          label="Pro-rate First Month"
-          checked={Boolean(value.prorateFirstMonth)}
-          onChange={(checked) => update({ prorateFirstMonth: checked })}
-        />
-      </div>
-    </div>
-  );
-}
-
-function SubscriptionForm({ value = {}, onChange }) {
-  const update = (patch) => onChange({ ...value, ...patch });
-
-  return (
-    <div className="space-y-4">
-      <h2 className={Fonts.heading4}>Subscription Billing Configuration</h2>
-
-      <SectionCard title="Subscription Terms">
-        <FormInput
-          label="Subscription Plan"
-          name="plan"
-          value={value.plan || ""}
-          onChange={(event) => update({ plan: event.target.value })}
-          placeholder="e.g. Enterprise Tier"
-        />
-        <FormInput
-          label="Subscription Amount"
-          name="amount"
-          type="number"
-          value={value.amount || ""}
-          onChange={(event) => update({ amount: event.target.value })}
-          placeholder="e.g. 25000"
-        />
-        <FormSelect
-          label="Billing Cycle"
-          name="billingCycle"
-          value={value.billingCycle || ""}
-          onChange={(event) => update({ billingCycle: event.target.value })}
-          options={BILLING_CYCLE_OPTIONS}
-        />
-        <FormInput
-          label="Grace Period (days)"
-          name="gracePeriodDays"
-          type="number"
-          value={value.gracePeriodDays || ""}
-          onChange={(event) => update({ gracePeriodDays: event.target.value })}
-          placeholder="e.g. 7"
-        />
-        <FormDatePicker
-          label="Subscription Start Date"
-          name="startDate"
-          value={value.startDate || ""}
-          onChange={(event) => update({ startDate: event.target.value })}
-        />
-        <FormDatePicker
-          label="Subscription End Date"
-          name="endDate"
-          value={value.endDate || ""}
-          onChange={(event) => update({ endDate: event.target.value })}
-          min={value.startDate || undefined}
-        />
-      </SectionCard>
-
-      <div className="rounded-xl border border-slate-200 p-5">
-        <ToggleSwitch
-          label="Auto Renewal"
-          checked={Boolean(value.autoRenewal)}
-          onChange={(checked) => update({ autoRenewal: checked })}
-        />
+        <ToggleSwitch label="Auto Invoice Generation" checked={Boolean(value.autoInvoiceGeneration)} onChange={(checked) => update({ autoInvoiceGeneration: checked })} />
+        <ToggleSwitch label="Pro-rate First Month" checked={Boolean(value.prorateFirstMonth)} onChange={(checked) => update({ prorateFirstMonth: checked })} />
       </div>
     </div>
   );
@@ -527,154 +690,153 @@ export default function BillingConfigurationStep({ value = {}, onChange, setupMo
   const billingType = value.billingType || "";
   const billingMode = value.billingMode || "";
   const billingFrequency = value.billingFrequency || "";
-  const currency = projectInfo?.currency || "";
+  const billingTypeId = value.billingTypeId || "";
+  const billingFrequencyId = value.billingFrequencyId || "";
+  const currency = String(projectInfo?.projectBudgetCurrency || projectInfo?.currency || "").trim().toUpperCase();
+  const [activeBillingTypeOptions, setActiveBillingTypeOptions] = useState([]);
+  const [activeBillingFrequencyOptions, setActiveBillingFrequencyOptions] = useState([]);
+  const [loadingBillingData, setLoadingBillingData] = useState(true);
+  const frequencyLabel = (val) => activeBillingFrequencyOptions.find((option) => option.value === val)?.label || val || "—";
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadBillingOptions = async () => {
+      try {
+        const [billingTypes, billingFrequencies] = await Promise.all([
+          getActiveBillingTypes(),
+          getActiveBillingFrequencies(),
+        ]);
+
+        if (!isMounted) return;
+
+        const normalizedTypes = Array.isArray(billingTypes) ? billingTypes.map(normalizeBillingType).filter((type) => type.value) : [];
+        const normalizedFrequencies = Array.isArray(billingFrequencies) ? billingFrequencies.filter((frequency) => frequency.value) : [];
+
+        setActiveBillingTypeOptions(normalizedTypes);
+        setActiveBillingFrequencyOptions(normalizedFrequencies);
+      } catch (error) {
+        if (!isMounted) return;
+        setActiveBillingTypeOptions([]);
+        setActiveBillingFrequencyOptions([]);
+        showStatusToast(getApiErrorMessage(error, "Failed to load billing types and frequencies."), "error");
+      } finally {
+        if (isMounted) setLoadingBillingData(false);
+      }
+    };
+
+    loadBillingOptions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const projectCurrencyCode = String(projectInfo.projectBudgetCurrency || projectInfo.currency || "").trim().toUpperCase();
+    if (
+      !projectCurrencyCode ||
+      (projectInfo.currency === projectCurrencyCode && projectInfo.projectBudgetCurrency === projectCurrencyCode)
+    ) {
+      return;
+    }
+
+    onProjectInfoChange({
+      ...projectInfo,
+      currency: projectCurrencyCode,
+      projectBudgetCurrency: projectInfo.projectBudgetCurrency || projectCurrencyCode,
+    });
+  }, [onProjectInfoChange, projectInfo]);
 
   const update = (patch) => onChange({ ...value, ...patch });
   const updateSection = (section, patch) => update({ [section]: patch });
+  const pricingModelOptions = getPricingModelOptions(billingType);
+  const frequencyOptions = getBillingFrequencyOptions(billingType, activeBillingFrequencyOptions);
 
-  const billingTypeOptions = BILLING_TYPES.filter((type) =>
-    ["TIME_MATERIAL", "MILESTONE", "RECURRING"].includes(type.value)
-  );
+  const handleBillingTypeChange = (nextId) => {
+    const selectedOption = activeBillingTypeOptions.find((type) => String(type.billingTypeId) === String(nextId));
+    if (!selectedOption) return;
+
+    const normalizedBillingType = selectedOption.value;
+    const nextPricingModels = getPricingModelOptions(normalizedBillingType);
+    const nextBillingMode = nextPricingModels.length > 0 ? nextPricingModels[0].value : "";
+
+    update({
+      billingType: normalizedBillingType,
+      billingTypeId: selectedOption.billingTypeId,
+      billingTypeLabel: selectedOption.label,
+      billingMode: nextBillingMode,
+      billingFrequency: normalizedBillingType === "RECURRING" ? value.billingFrequency || "" : "",
+      billingFrequencyId: normalizedBillingType === "RECURRING" ? value.billingFrequencyId || "" : "",
+      timeAndMaterial: normalizedBillingType === "TIME_MATERIAL" ? value.timeAndMaterial || {} : {},
+      fixedPrice: normalizedBillingType === "FIXED_PRICE" ? value.fixedPrice || {} : {},
+      milestones: normalizedBillingType === "MILESTONE" ? value.milestones || [] : [],
+      milestoneSettings: normalizedBillingType === "MILESTONE" ? value.milestoneSettings || {} : {},
+      monthlyRetainer: normalizedBillingType === "RECURRING" ? value.monthlyRetainer || {} : {},
+    });
+  };
 
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="border-b border-slate-100 pb-4">
         <h2 className={Fonts.heading3}>Commercial Configuration</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Configure pricing, currency, and rate calculation for this billing setup.
-        </p>
+        <p className="mt-1 text-sm text-slate-500">Configure pricing, currency, and rate calculation for this billing setup.</p>
       </div>
 
-      {/* Section 1: Billing scope */}
       <div className="space-y-5">
-
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <div className="max-w-xs">
-            <FormSelect
-              label="Billing Currency *"
-              name="currency"
-              value={currency || ""}
-              onChange={(e) => onProjectInfoChange({ ...projectInfo, currency: e.target.value })}
-              options={CURRENCY_OPTIONS.filter((opt) => opt.value !== "")}
-            />
+            <ReadOnlyField label="Billing Currency *" value={currency} />
+          </div>
+
+          <FormInput label="Project Budget" name="projectBudget" type="number" min="0" step="0.01" value={projectInfo.projectBudget ?? ""} onChange={(e) => onProjectInfoChange({ ...projectInfo, projectBudget: e.target.value })} placeholder="e.g. 45678" />
+
+          <div className="md:col-span-2 space-y-2">
+            <label className="block text-sm font-medium text-slate-700">Billing Type <span className="text-red-500">*</span></label>
+            <div className="space-y-2">
+              {loadingBillingData ? <p className="text-sm text-slate-500">Loading billing types and frequencies...</p> : null}
+              <RadioCardGroup name="billingTypeId" options={activeBillingTypeOptions.map((type) => ({ value: type.billingTypeId, label: type.label }))} value={billingTypeId} onChange={handleBillingTypeChange} columns={3} />
+            </div>
           </div>
 
           <div className="md:col-span-2 space-y-2">
-            <label className="block text-sm font-medium text-slate-700">
-              Billing Type <span className="text-red-500">*</span>
-            </label>
-            <RadioCardGroup
-              name="billingType"
-              options={billingTypeOptions}
-              value={billingType}
-              onChange={(next) => {
-                update({ billingType: next, billingMode: "" });
-              }}
-            />
-          </div>
-
-          <div className="md:col-span-2 space-y-2">
-            <label className="block text-sm font-medium text-slate-700">
-              Billing Frequency <span className="text-red-500">*</span>
-            </label>
-            <RadioCardGroup
-              name="billingFrequency"
-              options={BILLING_FREQUENCIES}
-              value={billingFrequency}
-              onChange={(next) => update({ billingFrequency: next })}
-              columns={3}
-            />
+            <label className="block text-sm font-medium text-slate-700">Billing Frequency <span className="text-red-500">*</span></label>
+            <RadioCardGroup name="billingFrequencyId" options={frequencyOptions.map((f) => ({ value: f.billingFrequencyId, label: f.label }))} value={billingFrequencyId} onChange={(next) => {
+              const selectedFrequency = activeBillingFrequencyOptions.find((option) => String(option.billingFrequencyId) === String(next));
+              update({ billingFrequency: selectedFrequency?.value || "", billingFrequencyId: selectedFrequency?.billingFrequencyId || selectedFrequency?.id || "" });
+            }} columns={3} />
           </div>
         </div>
       </div>
 
-      {/* Section 2: Pricing model (T&M or Recurring) */}
-      {!isExisting && (billingType === "TIME_MATERIAL" || billingType === "RECURRING") && (
+      {!isExisting && pricingModelOptions.length > 0 && (
         <div className="space-y-6 pt-6 border-t border-slate-100">
           <div>
-            <h3 className={Fonts.subheading}>
-              Pricing model
-            </h3>
+            <h3 className={Fonts.subheading}>Pricing model</h3>
           </div>
 
-          <RadioCardGroup
-            name="billingMode"
-            options={
-              billingType === "TIME_MATERIAL"
-                ? [
-                    { value: "STANDARD", label: "Standard Rate", description: "One hourly rate applies to all approved billable hours." },
-                    { value: "ROLE_BASED", label: "Role-Based Rates", description: "Different hourly rates are maintained for each project role." },
-                  ]
-                : [
-                    { value: "MONTHLY_RETAINER", label: "Monthly Retainer", description: "Bill a fixed recurring amount every billing period." },
-                    { value: "SUBSCRIPTION", label: "Subscription", description: "Bill a recurring subscription fee for ongoing services." },
-                  ]
-            }
-            value={billingMode || ""}
-            onChange={(next) => update({ billingMode: next })}
-            columns={2}
-          />
+          <RadioCardGroup name="billingMode" options={pricingModelOptions} value={billingMode || ""} onChange={(next) => update({ billingMode: next })} columns={2} />
         </div>
       )}
 
-      {/* Rate Details / Rate Configuration (Dynamic) */}
-      {(isExisting || billingMode || (billingType !== "TIME_MATERIAL" && billingType !== "RECURRING" && billingType !== "")) ? (
+      {billingType !== "" ? (
         <div className="space-y-6 pt-6 border-t border-slate-100">
           <div>
-            <h3 className={Fonts.subheading}>
-              Rate details
-            </h3>
+            <h3 className={Fonts.subheading}>Rate details</h3>
           </div>
           <div>
             {billingType === "TIME_MATERIAL" && (
-              <TimeAndMaterialForm
-                value={value.timeAndMaterial}
-                onChange={(next) => updateSection("timeAndMaterial", next)}
-                billingMode={billingMode}
-                currency={currency}
-                isExisting={isExisting}
-              />
+              <TimeAndMaterialForm value={value.timeAndMaterial} onChange={(next) => updateSection("timeAndMaterial", next)} billingMode={billingMode} currency={currency} isExisting={isExisting} billingConfigurationId={value.billingConfigurationId || value.id} />
             )}
 
-            {billingType === "FIXED_PRICE" && (
-              <FixedPriceForm
-                value={value.fixedPrice}
-                onChange={(next) => updateSection("fixedPrice", next)}
-                currency={currency}
-              />
-            )}
+            {billingType === "FIXED_PRICE" && (<FixedPriceForm value={value.fixedPrice} onChange={(next) => updateSection("fixedPrice", next)} currency={currency} />)}
 
-            {billingType === "MILESTONE" && (
-              <MilestoneForm
-                milestones={value.milestones}
-                settings={value.milestoneSettings}
-                onMilestonesChange={(next) => update({ milestones: next })}
-                onSettingsChange={(next) => update({ milestoneSettings: next })}
-              />
-            )}
+            {billingType === "MILESTONE" && (<MilestoneForm milestones={value.milestones} settings={value.milestoneSettings} onMilestonesChange={(next) => update({ milestones: next })} onSettingsChange={(next) => update({ milestoneSettings: next })} />)}
 
-            {billingType === "RECURRING" && billingMode === "MONTHLY_RETAINER" && (
-              <MonthlyRetainerForm
-                value={value.monthlyRetainer}
-                onChange={(next) => updateSection("monthlyRetainer", next)}
-                billingFrequency={billingFrequency}
-              />
-            )}
-
-            {billingType === "RECURRING" && billingMode === "SUBSCRIPTION" && (
-              <SubscriptionForm value={value.subscription} onChange={(next) => updateSection("subscription", next)} />
-            )}
+            {billingType === "RECURRING" && (<MonthlyRetainerForm value={value.monthlyRetainer || {}} onChange={(next) => updateSection("monthlyRetainer", next)} billingFrequency={frequencyLabel(billingFrequency)} />)}
           </div>
         </div>
-      ) : (
-        billingType !== "" && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/55 p-8 text-center text-slate-500">
-            <p className="text-sm font-medium">Please select a Pricing Model to configure rates.</p>
-          </div>
-        )
-      )}
+      ) : null}
     </div>
   );
 }
-

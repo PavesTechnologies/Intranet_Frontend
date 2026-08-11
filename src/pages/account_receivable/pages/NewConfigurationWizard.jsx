@@ -15,7 +15,9 @@ import BillingConfigurationStep from "../components/billing-setup/BillingConfigu
 import BillingControlsStep from "../components/billing-setup/BillingControlsStep";
 import ReviewActivateStep from "../components/billing-setup/ReviewActivateStep";
 import {
+  extractBillingConfigurationId,
   fetchBillingConfigurationById,
+  getApiErrorMessage,
   saveDraftConfiguration,
   activateConfiguration,
 } from "../services/billingConfigService";
@@ -31,8 +33,13 @@ const INITIAL_WIZARD_DATA = {
     billingFrequency: "",
     timeAndMaterial: {
       rateCard: "",
-      billingRate: "",
-      rateEffectiveFrom: "",
+      rate: "",
+      ratePeriod: "HOURLY",
+      effectiveFrom: "",
+      effectiveTo: "",
+      remarks: "",
+      rateCardId: null,
+      roles: [],
       overtimeRule: "NONE",
       minimumBillingHours: "",
       maximumBillableHoursPerDay: "",
@@ -70,8 +77,12 @@ const INITIAL_WIZARD_DATA = {
   },
   controls: {
     paymentTerms: "",
+    paymentTermId: "",
+    taxRegionId: "",
+    invoiceGenerationType: "MANUAL",
     autoInvoiceGeneration: null,
     invoiceGenerationDay: "",
+    expenseBillingEligible: false,
   },
 };
 
@@ -107,23 +118,48 @@ function isStepValid(step, data) {
     case 2: {
       const config = data.billingConfig || {};
       const project = data.projectInfo || {};
-      if (!project.currency) return false;
+      if (!(project.projectBudgetCurrency || project.currency)) return false;
       if (!config.billingType) return false;
+      if (!config.billingTypeId) return false;
       if (!config.billingFrequency) return false;
+      if (!config.billingFrequencyId) return false;
+
       if (config.billingType === "TIME_MATERIAL") {
         if (!config.billingMode) return false;
         if (config.billingMode === "STANDARD") {
-          return Boolean(config.timeAndMaterial?.billingRate);
+          return Boolean(config.timeAndMaterial?.rate && config.timeAndMaterial?.ratePeriod);
         }
         if (config.billingMode === "ROLE_BASED") {
           const roles = config.timeAndMaterial?.roles || [];
           if (roles.length === 0) return false;
-          return roles.every((r) => Boolean(r.role && r.rate));
+          return roles.every((r) => Boolean(r.role && r.rate && r.ratePeriod));
         }
       }
+
       if (config.billingType === "RECURRING") {
         if (!config.billingMode) return false;
+        if (config.billingMode === "MONTHLY_RETAINER") {
+          return Boolean(config.monthlyRetainer?.amount && config.monthlyRetainer?.billingStartDate);
+        }
+        if (config.billingMode === "SUBSCRIPTION") {
+          return Boolean(
+            config.subscription?.plan &&
+            config.subscription?.amount &&
+            config.subscription?.billingCycle &&
+            config.subscription?.startDate &&
+            config.subscription?.endDate
+          );
+        }
       }
+
+      if (config.billingType === "FIXED_PRICE") {
+        return Boolean(config.fixedPrice?.totalContractValue);
+      }
+
+      if (config.billingType === "MILESTONE") {
+        return (config.milestones || []).length > 0;
+      }
+
       return true;
     }
     case 3: {
@@ -131,13 +167,15 @@ function isStepValid(step, data) {
       if (controls.autoInvoiceGeneration === undefined || controls.autoInvoiceGeneration === null) {
         return false;
       }
+      if (!controls.invoiceGenerationType) return false;
+      if (!controls.taxRegionId) return false;
       if (controls.autoInvoiceGeneration === true) {
         const day = parseInt(controls.invoiceGenerationDay, 10);
         if (Number.isNaN(day) || day < 1 || day > 31) {
           return false;
         }
       }
-      return Boolean(controls.paymentTerms);
+      return Boolean(controls.paymentTermId);
     }
     default:
       return true;
@@ -157,26 +195,38 @@ export default function NewConfigurationWizard() {
   const [saving, setSaving] = useState(false);
   const [activating, setActivating] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [savedConfigId, setSavedConfigId] = useState(extractBillingConfigurationId(configId));
 
   useEffect(() => {
     if (!configId) return;
 
     let isMounted = true;
-    fetchBillingConfigurationById(configId).then((result) => {
-      if (!isMounted || !result) return;
+    const loadConfiguration = async () => {
+      try {
+        const result = await fetchBillingConfigurationById(configId);
+        if (!isMounted || !result) return;
 
-      const { summary, detail } = result;
-      if (detail) {
-        setWizardData((prev) => ({ ...prev, ...detail }));
+        const { summary, detail } = result;
+        if (detail) {
+          setWizardData((prev) => ({ ...prev, ...detail }));
+        }
+        setSavedConfigId(summary.id || configId);
+        setCurrentStep(summary.status === "Draft" ? Math.min(summary.currentStep || 1, STEPS.length) : STEPS.length);
+      } catch (error) {
+        if (!isMounted) return;
+        showStatusToast(getApiErrorMessage(error, "Failed to load billing configuration."), "error");
+        navigate(CONFIGURATIONS_PATH);
+      } finally {
+        if (isMounted) setLoadingExisting(false);
       }
-      setCurrentStep(summary.status === "Draft" ? Math.min(summary.currentStep || 1, STEPS.length) : STEPS.length);
-      setLoadingExisting(false);
-    });
+    };
+
+    loadConfiguration();
 
     return () => {
       isMounted = false;
     };
-  }, [configId]);
+  }, [configId, navigate]);
 
   const handleBack = () => setCurrentStep((step) => Math.max(step - 1, 1));
 
@@ -218,22 +268,68 @@ export default function NewConfigurationWizard() {
   const handleBillingConfigChange = (billingConfig) => setWizardData((prev) => ({ ...prev, billingConfig }));
   const handleControlsChange = (controls) => setWizardData((prev) => ({ ...prev, controls }));
 
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
     setSaving(true);
-    saveDraftConfiguration(wizardData).then(() => {
-      setSaving(false);
+    try {
+      const result = await saveDraftConfiguration(wizardData, savedConfigId);
+      const nextId =
+        extractBillingConfigurationId(result) ||
+        extractBillingConfigurationId(wizardData.billingConfigurationId) ||
+        savedConfigId;
+      if (nextId) {
+        setSavedConfigId(nextId);
+        setWizardData((prev) => ({
+          ...prev,
+          billingConfigurationId: nextId,
+          billingConfig: {
+            ...prev.billingConfig,
+            billingConfigurationId: nextId,
+            id: nextId,
+          },
+        }));
+      }
       showStatusToast("Draft saved successfully.", "success");
-    });
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Failed to save draft."), "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => navigate(CONFIGURATIONS_PATH);
 
-  const handleActivate = () => {
+  const handleActivate = async () => {
     setActivating(true);
-    activateConfiguration(wizardData).then(() => {
-      setActivating(false);
+    try {
+      const saveResult = await saveDraftConfiguration(wizardData, savedConfigId);
+      const billingConfigurationId =
+        extractBillingConfigurationId(saveResult) ||
+        extractBillingConfigurationId(wizardData.billingConfigurationId) ||
+        savedConfigId;
+
+      if (!billingConfigurationId) {
+        showStatusToast("Unable to activate billing configuration: missing billingConfigurationId.", "error");
+        return;
+      }
+
+      setSavedConfigId(billingConfigurationId);
+      setWizardData((prev) => ({
+        ...prev,
+        billingConfigurationId,
+        billingConfig: {
+          ...prev.billingConfig,
+          billingConfigurationId,
+          id: billingConfigurationId,
+        },
+      }));
+
+      await activateConfiguration(billingConfigurationId);
       setShowSuccess(true);
-    });
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Failed to activate billing configuration."), "error");
+    } finally {
+      setActivating(false);
+    }
   };
 
   const handleActivationClose = () => {

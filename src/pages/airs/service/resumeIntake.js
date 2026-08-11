@@ -60,6 +60,25 @@ export const getAllResumes = async (filters) => {
     }
 };
 
+// Same shape as getAllResumes, plus each item's pipeline_stage/decision_*
+// fields sourced from its linked campaign_candidate. Backs the Upload
+// History tab so it can show where each resume's candidate stands in the
+// pipeline without an extra per-row query.
+export const getResumesPipelineStatus = async (filters) => {
+    try {
+        const response = await api.get(`${BASE_URL}/resumes/pipeline-status`, {
+            params: filters,
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching resumes pipeline status:", error);
+        throw error;
+    }
+};
+
 export const resumeTimeline = async (resumeId, attemptNumber) => {
     try {
         const response = await api.get(`${BASE_URL}/resumes/${resumeId}/timeline`, {
