@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { showStatusToast } from "../components/toastfy/toast";
 import axios from "axios";
 import { useWebSocket } from "../pages/leave_management/websockets/WebSocketProvider";
+import { useApprovalWebSocket } from "../pages/expense-management/approval-engine/websocket/ApprovalWebSocketProvider";
 
 const AuthContext = createContext(undefined);
 
@@ -25,6 +26,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
   const { updateToken } = useWebSocket();
+  const { updateToken: updateApprovalToken } = useApprovalWebSocket() ?? {};
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isfirsttlogin, setIsfirsttlogin] = useState(false);
@@ -55,6 +57,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("token", token);
 
     loadUser(token);
+    updateApprovalToken?.(token);
   };
 
   const logout = (expired = false) => {
@@ -86,6 +89,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("user");
     localStorage.removeItem("lastPath");
     updateToken(null);
+    updateApprovalToken?.(null);
 
     if (localStorage.getItem("isfirsttlogin")) {
       localStorage.removeItem("isfirsttlogin");
