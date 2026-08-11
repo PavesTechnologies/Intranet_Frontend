@@ -6,6 +6,7 @@ import {
   XCircle,
   Clock,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Plus,
   Trash2,
@@ -212,6 +213,11 @@ const TimesheetGroup = ({
   // Which day's entries are currently selectable, namespaced so the draft
   // panel (timesheetId === undefined) can't collide with a real day.
   const [selection, setSelection] = useState({ key: null, timesheetId: null });
+  // Employee view: each day of the week starts collapsed behind a chevron.
+  // Approver views are unaffected — their days are always open.
+  const [openDays, setOpenDays] = useState({});
+  const toggleDayOpen = (id) =>
+    setOpenDays((prev) => ({ ...prev, [id]: !prev[id] }));
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   // Timesheet-level (whole day) delete — separate from the entry-level delete above.
   const [timesheetToDelete, setTimesheetToDelete] = useState(null);
@@ -288,6 +294,7 @@ const TimesheetGroup = ({
 
   const handleAddEntryWeekly = (id) => {
     setTimesheetIdAdding(id);
+    setOpenDays((prev) => ({ ...prev, [id]: true })); // reveal a collapsed day
   };
 
   const handleDeleteClick = () => {
@@ -415,6 +422,8 @@ const TimesheetGroup = ({
       timesheetId: targetTimesheetId ?? null,
     });
     setSelectedEntryIds(rowIds);
+    if (targetTimesheetId != null)
+      setOpenDays((prev) => ({ ...prev, [targetTimesheetId]: true }));
   };
 
   const handleDeleteTimesheetClick = (timesheet) => {
@@ -1070,6 +1079,11 @@ const TimesheetGroup = ({
                 ) &&
                 !isDayLocked(timesheet) &&
                 rowIds.length > 0;
+              // Collapsible only on the employee page, and collapsed by default.
+              const dayCollapsible = isEmployeeView;
+              const dayOpen = dayCollapsible
+                ? !!openDays[timesheet.timesheetId]
+                : true;
 
               return (
               <div
@@ -1083,6 +1097,26 @@ const TimesheetGroup = ({
                                    {" "}
                   {/* Selector first, then the date + hours it applies to */}
                   <div className="flex items-center gap-3">
+                    {dayCollapsible && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleDayOpen(timesheet.timesheetId);
+                        }}
+                        aria-expanded={dayOpen}
+                        aria-label={`${dayOpen ? "Collapse" : "Expand"} ${
+                          formatDate(timesheet.workDate).text
+                        }`}
+                        className="shrink-0 rounded p-0.5 text-gray-500 transition-colors hover:bg-gray-200 hover:text-[#263383]"
+                      >
+                        {dayOpen ? (
+                          <ChevronDown size={16} />
+                        ) : (
+                          <ChevronRight size={16} />
+                        )}
+                      </button>
+                    )}
                     {canSelectDay && (
                       <div className="flex items-center gap-2">
                         <input
@@ -1253,10 +1287,11 @@ const TimesheetGroup = ({
                                  {" "}
                 </div>
                                 {/* Entries Table */}               {" "}
-                {!(
+                {dayOpen &&
+                  !(
                   timesheet.defaultHolidayTimesheet ||
                   timesheet.isLeaveTimesheet
-                ) && (
+                  ) && (
                   <div className="p-2">
                                      {" "}
                     <EntriesTable

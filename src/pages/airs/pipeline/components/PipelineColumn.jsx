@@ -1,6 +1,6 @@
 import React from "react";
 import PipelineCandidateCard from "./PipelineCandidateCard";
-import { PIPELINE_STAGE_COLOR } from "../constants/pipelineConstants";
+import { PIPELINE_STAGE_COLOR, PIPELINE_STAGE_LABEL } from "../constants/pipelineConstants";
 
 export default function PipelineColumn({ stage, cards, onDragStart, onDrop, onCardClick }) {
   return (
@@ -13,7 +13,7 @@ export default function PipelineColumn({ stage, cards, onDragStart, onDrop, onCa
       <div className="flex items-center justify-between px-1.5 mb-2">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full" style={{ background: PIPELINE_STAGE_COLOR[stage] }} />
-          <span className="text-[12.5px] font-bold text-slate-900">{stage}</span>
+          <span className="text-[12.5px] font-bold text-slate-900">{PIPELINE_STAGE_LABEL[stage] || stage}</span>
         </div>
         <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-white text-slate-400">{cards.length}</span>
       </div>
@@ -22,8 +22,9 @@ export default function PipelineColumn({ stage, cards, onDragStart, onDrop, onCa
           <PipelineCandidateCard
             key={card.id}
             card={card}
-            onDragStart={() => onDragStart(card.id)}
+            onDragStart={() => onDragStart(card)}
             onClick={() => onCardClick(card)}
+            onViewDetails={() => onCardClick(card)}
           />
         ))}
         {cards.length === 0 && <div className="text-center text-[11px] py-6 text-slate-400">Drop candidates here</div>}
