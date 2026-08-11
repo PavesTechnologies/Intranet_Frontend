@@ -38,13 +38,12 @@ import {
   getBillingConfigurationStats,
   getBillingConfigurationActivity,
 } from "../services/billingConfigService";
-import { SOURCE_FILTER_OPTIONS, STATUS_FILTER_OPTIONS } from "../data/wizardOptions";
 
 const INITIAL_FILTERS = { search: "", status: "", source: "" };
 const PAGE_SIZE = 6;
 
-const TABLE_HEADERS = ["Project", "Client", "Billing Type", "Source", "Status", "Last Updated", "Actions"];
-const TABLE_COLUMNS = ["project", "client", "billingType", "source", "status", "lastUpdated", "actions"];
+const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Source", "Status", "Actions"];
+const TABLE_COLUMNS = ["client", "project", "billingType", "source", "status", "actions"];
 
 const SOURCE_BADGE_CLASSES = {
   Enterprise: "bg-indigo-100 text-indigo-700",
@@ -126,17 +125,31 @@ export default function Overview() {
     setCurrentPage(1);
   };
 
+  const filterOptions = useMemo(() => {
+    const uniqueOptions = (field, defaultLabel) => [
+      { value: "", label: defaultLabel },
+      ...Array.from(new Set(configs.map((config) => config[field]).filter(Boolean)))
+        .sort((a, b) => String(a).localeCompare(String(b)))
+        .map((value) => ({ value, label: value })),
+    ];
+
+    return {
+      status: uniqueOptions("status", "All Statuses"),
+      source: uniqueOptions("source", "All Sources"),
+    };
+  }, [configs]);
+
   const filteredConfigs = useMemo(() => {
     const search = filters.search.trim().toLowerCase();
 
     return configs.filter((config) => {
       const matchesSearch =
         !search ||
-        config.projectName.toLowerCase().includes(search) ||
-        config.projectCode.toLowerCase().includes(search) ||
-        config.client.toLowerCase().includes(search);
-      const matchesStatus = !filters.status || config.status === filters.status;
-      const matchesSource = !filters.source || config.source === filters.source;
+        String(config.projectName || "").toLowerCase().includes(search) ||
+        String(config.projectCode || "").toLowerCase().includes(search) ||
+        String(config.client || "").toLowerCase().includes(search);
+      const matchesStatus = !filters.status || String(config.status) === String(filters.status);
+      const matchesSource = !filters.source || String(config.source) === String(filters.source);
 
       return matchesSearch && matchesStatus && matchesSource;
     });
@@ -226,23 +239,17 @@ export default function Overview() {
 
   const tableRows = useMemo(
     () =>
-      filteredConfigs.slice(0, 5).map((config) => ({
+      paginatedConfigs.map((config) => ({
+        client: config.client,
         project: (
           <div className="text-left">
             <div className="font-semibold text-slate-900">{config.projectName}</div>
             <div className="text-xs text-slate-400">{config.projectCode}</div>
           </div>
         ),
-        client: config.client,
         billingType: config.billingType,
         source: <SourceBadge source={config.source} />,
         status: <StatusBadge label={config.status} size="sm" />,
-        lastUpdated: (
-          <div>
-            <div>{config.lastUpdated}</div>
-            <div className="text-xs text-slate-400">{config.updatedBy}</div>
-          </div>
-        ),
         actions: (
           <ActionMenu
             items={[
@@ -282,9 +289,9 @@ export default function Overview() {
             ]}
           />
         ),
-      })),
+    })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filteredConfigs]
+    [paginatedConfigs]
   );
 
   const kpiCards = [
@@ -370,7 +377,7 @@ export default function Overview() {
             name="status"
             value={filters.status}
             onChange={handleFilterChange}
-            options={STATUS_FILTER_OPTIONS}
+            options={filterOptions.status}
           />
         </div>
         <div className="w-full sm:w-64">
@@ -378,7 +385,7 @@ export default function Overview() {
             name="source"
             value={filters.source}
             onChange={handleFilterChange}
-            options={SOURCE_FILTER_OPTIONS}
+            options={filterOptions.source}
           />
         </div>
       </FilterCard>
@@ -407,6 +414,12 @@ export default function Overview() {
                   loading={loadingConfigs}
                 />
               </div>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+                onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+              />
             </>
           )}
         </PageCardContent>
@@ -429,8 +442,6 @@ export default function Overview() {
                   className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
                 >
                   <div>
-                    <span className="font-medium text-slate-900">{item.configId}</span>
-                    <span className="mx-2 text-slate-300">•</span>
                     <span className="text-slate-600">{item.action}</span>
                   </div>
                   <div className="text-xs text-slate-400">

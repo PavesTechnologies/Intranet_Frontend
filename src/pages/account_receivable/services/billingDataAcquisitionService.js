@@ -131,7 +131,7 @@ export function getApplicableChargeTypes(billingType, toolBillingEnabled) {
  *
  * Calls POST /api/v1/billing-snapshots which:
  *   1. Fetches approved billable timesheets from TMS (GET /api/timesheets/billing)
- *   2. Merges the hourly rate from the Billing Configuration
+ *   2. Merges the TM rate from the Billing Configuration
  *   3. Validates, saves a BillingSnapshot, and returns the line items
  *
  * Returns the response in the shape the UI's labor.records[] expects:

@@ -33,8 +33,13 @@ const INITIAL_WIZARD_DATA = {
     billingFrequency: "",
     timeAndMaterial: {
       rateCard: "",
-      billingRate: "",
-      rateEffectiveFrom: "",
+      rate: "",
+      ratePeriod: "HOURLY",
+      effectiveFrom: "",
+      effectiveTo: "",
+      remarks: "",
+      rateCardId: null,
+      roles: [],
       overtimeRule: "NONE",
       minimumBillingHours: "",
       maximumBillableHoursPerDay: "",
@@ -113,7 +118,7 @@ function isStepValid(step, data) {
     case 2: {
       const config = data.billingConfig || {};
       const project = data.projectInfo || {};
-      if (!project.currencyId) return false;
+      if (!(project.projectBudgetCurrency || project.currency)) return false;
       if (!config.billingType) return false;
       if (!config.billingTypeId) return false;
       if (!config.billingFrequency) return false;
@@ -122,12 +127,12 @@ function isStepValid(step, data) {
       if (config.billingType === "TIME_MATERIAL") {
         if (!config.billingMode) return false;
         if (config.billingMode === "STANDARD") {
-          return Boolean(config.timeAndMaterial?.billingRate);
+          return Boolean(config.timeAndMaterial?.rate && config.timeAndMaterial?.ratePeriod);
         }
         if (config.billingMode === "ROLE_BASED") {
           const roles = config.timeAndMaterial?.roles || [];
           if (roles.length === 0) return false;
-          return roles.every((r) => Boolean(r.role && r.rate));
+          return roles.every((r) => Boolean(r.role && r.rate && r.ratePeriod));
         }
       }
 
@@ -170,7 +175,7 @@ function isStepValid(step, data) {
           return false;
         }
       }
-      return Boolean(controls.paymentTerms && controls.paymentTermId);
+      return Boolean(controls.paymentTermId);
     }
     default:
       return true;
@@ -196,21 +201,32 @@ export default function NewConfigurationWizard() {
     if (!configId) return;
 
     let isMounted = true;
-    fetchBillingConfigurationById(configId).then((result) => {
-      if (!isMounted || !result) return;
+    const loadConfiguration = async () => {
+      try {
+        const result = await fetchBillingConfigurationById(configId);
+        if (!isMounted || !result) return;
 
-      const { summary, detail } = result;
-      if (detail) {
-        setWizardData((prev) => ({ ...prev, ...detail }));
+        const { summary, detail } = result;
+        if (detail) {
+          setWizardData((prev) => ({ ...prev, ...detail }));
+        }
+        setSavedConfigId(summary.id || configId);
+        setCurrentStep(summary.status === "Draft" ? Math.min(summary.currentStep || 1, STEPS.length) : STEPS.length);
+      } catch (error) {
+        if (!isMounted) return;
+        showStatusToast(getApiErrorMessage(error, "Failed to load billing configuration."), "error");
+        navigate(CONFIGURATIONS_PATH);
+      } finally {
+        if (isMounted) setLoadingExisting(false);
       }
-      setCurrentStep(summary.status === "Draft" ? Math.min(summary.currentStep || 1, STEPS.length) : STEPS.length);
-      setLoadingExisting(false);
-    });
+    };
+
+    loadConfiguration();
 
     return () => {
       isMounted = false;
     };
-  }, [configId]);
+  }, [configId, navigate]);
 
   const handleBack = () => setCurrentStep((step) => Math.max(step - 1, 1));
 
@@ -255,14 +271,22 @@ export default function NewConfigurationWizard() {
   const handleSaveDraft = async () => {
     setSaving(true);
     try {
-      const result = await saveDraftConfiguration(wizardData);
+      const result = await saveDraftConfiguration(wizardData, savedConfigId);
       const nextId =
         extractBillingConfigurationId(result) ||
         extractBillingConfigurationId(wizardData.billingConfigurationId) ||
         savedConfigId;
       if (nextId) {
         setSavedConfigId(nextId);
-        setWizardData((prev) => ({ ...prev, billingConfigurationId: nextId }));
+        setWizardData((prev) => ({
+          ...prev,
+          billingConfigurationId: nextId,
+          billingConfig: {
+            ...prev.billingConfig,
+            billingConfigurationId: nextId,
+            id: nextId,
+          },
+        }));
       }
       showStatusToast("Draft saved successfully.", "success");
     } catch (error) {
@@ -277,7 +301,7 @@ export default function NewConfigurationWizard() {
   const handleActivate = async () => {
     setActivating(true);
     try {
-      const saveResult = await saveDraftConfiguration(wizardData);
+      const saveResult = await saveDraftConfiguration(wizardData, savedConfigId);
       const billingConfigurationId =
         extractBillingConfigurationId(saveResult) ||
         extractBillingConfigurationId(wizardData.billingConfigurationId) ||
@@ -289,7 +313,15 @@ export default function NewConfigurationWizard() {
       }
 
       setSavedConfigId(billingConfigurationId);
-      setWizardData((prev) => ({ ...prev, billingConfigurationId }));
+      setWizardData((prev) => ({
+        ...prev,
+        billingConfigurationId,
+        billingConfig: {
+          ...prev.billingConfig,
+          billingConfigurationId,
+          id: billingConfigurationId,
+        },
+      }));
 
       await activateConfiguration(billingConfigurationId);
       setShowSuccess(true);
