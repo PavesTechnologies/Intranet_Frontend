@@ -102,13 +102,13 @@ const airsSubmenu = [
 // HR_ADMIN gets a trimmed-down AIRS menu — only these items, plus
 // Prompt Templates below (HR_ADMIN-only, not part of the general airsSubmenu).
 const hrAdminAirsSubmenu = [
-  ...airsSubmenu.filter((item) => ["JD Management", "Skill Ontology", "Campaigns"].includes(item.label)),
+  ...airsSubmenu.filter((item) => ["JD Management", "Skill Ontology", "Campaigns", "Pipeline", "Talent Pool"].includes(item.label)),
   { label: "Prompt Templates", to: "/airs/prompt-templates" },
 ];
 
 // RECRUITER gets a trimmed-down AIRS menu — only these items.
 const recruiterAirsSubmenu = airsSubmenu.filter((item) =>
-  ["Campaigns", "Resume Intake", "Pipeline"].includes(item.label),
+  ["Campaigns", "Resume Intake", "Pipeline", "Talent Pool"].includes(item.label),
 );
 
 

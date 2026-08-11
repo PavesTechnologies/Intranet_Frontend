@@ -1,51 +1,64 @@
-import React from "react";
-import { Search, Sparkles } from "lucide-react";
-import { toast } from "react-toastify";
-import Button from "../../../../components/Button/Button";
-import { TALENT_POOL_TAGS } from "../constants/talentPoolConstants";
+import React, { useState } from "react";
+import { Search, Briefcase, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
-export default function TalentPoolFilters({ search, setSearch, tags, toggleTag }) {
+// GET /talent-pool/candidates' real filters: `skills` (repeatable, OR'd
+// together) and `designation` (case-insensitive substring) — both applied
+// server-side, not a client-side refine over the current page.
+export default function TalentPoolFilters({ skills, addSkill, removeSkill, designation, setDesignation }) {
+  const [skillInput, setSkillInput] = useState("");
+
+  const submitSkill = () => {
+    if (!skillInput.trim()) return;
+    addSkill(skillInput);
+    setSkillInput("");
+  };
+
   return (
-    <div className="space-y-3 mb-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-slate-200 min-w-[240px] flex-1">
-          <Search size={15} className="text-slate-400" />
+    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200">
+          <Search size={15} className="text-slate-400 shrink-0" />
           <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder='Semantic search — e.g. "backend engineer with fintech exposure"'
+            value={skillInput}
+            onChange={(e) => setSkillInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                submitSkill();
+              }
+            }}
+            placeholder="Add a skill — e.g. Java, then Enter"
             className="outline-none text-[13px] w-full bg-transparent text-slate-900"
           />
         </div>
-        <Button
-          variant="outline"
-          size="small"
-          onClick={() => toast.info("AI recommendations are not available in this environment yet.")}
-          className="!border-blue-200 !text-blue-700 !bg-blue-50 shrink-0"
-        >
-          <Sparkles className="h-4 w-4 mr-1.5" /> AI recommend
-        </Button>
+
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200">
+          <Briefcase size={15} className="text-slate-400 shrink-0" />
+          <input
+            value={designation}
+            onChange={(e) => setDesignation(e.target.value)}
+            placeholder="Filter by designation — e.g. Backend Engineer"
+            className="outline-none text-[13px] w-full bg-transparent text-slate-900"
+          />
+        </div>
       </div>
 
-      <div className="flex gap-1.5 flex-wrap">
-        {TALENT_POOL_TAGS.map((t) => {
-          const active = tags.includes(t);
-          return (
-            <button
-              key={t}
-              onClick={() => toggleTag(t)}
-              className="px-2.5 py-1 rounded-full text-[11.5px] font-semibold border transition-colors"
-              style={{
-                borderColor: active ? "#2563EB" : "#E6E9F0",
-                background: active ? "#EAF0FD" : "#fff",
-                color: active ? "#2563EB" : "#5B6472",
-              }}
+      {skills.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          {skills.map((s) => (
+            <Badge
+              key={s}
+              className="bg-indigo-50 text-indigo-700 border-indigo-100 font-semibold px-2.5 py-1 text-[11px] gap-1"
             >
-              {t}
-            </button>
-          );
-        })}
-      </div>
+              {s}
+              <button type="button" onClick={() => removeSkill(s)} className="hover:text-indigo-900">
+                <X size={11} />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
