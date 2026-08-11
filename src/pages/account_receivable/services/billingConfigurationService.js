@@ -1,5 +1,4 @@
 import api from "../../../api/axiosInstance";
-import { lookupService } from "../../expense-management/api/expenseReportsApi";
 
 const BASE_URL = window.__APP_CONFIG__.AR_BASE_URL;
 
@@ -7,7 +6,7 @@ const BILLING_CONFIGURATIONS_URL = `${BASE_URL}/api/billing-configurations`;
 const ACTIVE_BILLING_TYPES_URL = `${BASE_URL}/api/billing-types/active`;
 const ACTIVE_BILLING_FREQUENCIES_URL = `${BASE_URL}/api/billing-frequency/active`;
 const ACTIVE_PAYMENT_TERMS_URL = `${BASE_URL}/api/payment-terms/active`;
-const ACTIVE_TAX_REGIONS_URL = `${BASE_URL}/api/tax-regions/active`;
+const ACTIVE_TAX_REGIONS_URL = `${BASE_URL}/api/tax-region/active`;
 const BILLING_SUBSCRIPTIONS_URL = `${BASE_URL}/api/billing-subscription`;
 const TM_RATE_CARDS_URL = `${BASE_URL}/api/billing-tm-rate-card`;
 
@@ -76,6 +75,21 @@ const normalizeStatus = (status) => {
   return normalized || "Draft";
 };
 
+// Only Draft configurations, and Active (Approved + isActive) configurations should ever
+// reach the UI. Rejected, deactivated (Approved + isActive === false), and any other
+// inactive records are filtered out of the raw API response before normalization.
+const shouldDisplayBillingConfiguration = (config = {}) => {
+  const status = String(
+    config.status || config.approvalStatus || config.configurationStatus || ""
+  )
+    .trim()
+    .toUpperCase();
+
+  if (status === "DRAFT") return true;
+  if (status === "APPROVED") return config.isActive === true;
+  return false;
+};
+
 const getConfigId = (config) =>
   config?.billingConfigurationId ||
   config?.configurationId ||
@@ -123,7 +137,7 @@ const getBillingConfig = (config) =>
 
 const getToolBilling = (config) => config?.toolBilling || config?.toolBillingConfig || {};
 
-const getControls = (config) => config?.controls || config?.financialControls || {};
+const getControls = (config = {}) => config.controls || config.financialControls || config;
 
 const parseProjectDuration = (value) => {
   if (!value || typeof value !== "string") return { startDate: "", endDate: "" };
@@ -267,38 +281,58 @@ export const normalizePaymentTerm = (term = {}) => {
     ...term,
     id,
     paymentTermId: id,
+    paymentTermName: name,
     value,
     label: name,
   };
 };
 
-export const normalizeCurrency = (currency = {}) => {
-  const id = currency.currencyId || currency.currency_id || currency.id || currency.value || "";
-  const code = currency.currencyCode || currency.currency_code || currency.code || currency.value || "";
-  const name = currency.currencyName || currency.currency_name || currency.name || currency.label || code;
-
-  return {
-    ...currency,
-    id,
-    currencyId: id,
-    currencyCode: code,
-    value: id,
-    label: code && name && code !== name ? `${code} - ${name}` : name || code,
-  };
-};
-
 export const normalizeTaxRegion = (region = {}) => {
   const id = region.taxRegionId || region.tax_region_id || region.id || region.value || "";
-  const code = region.taxRegionCode || region.tax_region_code || region.code || "";
-  const name = region.taxRegionName || region.tax_region_name || region.name || region.label || code;
+  const name = String(region.taxRegionName || region.tax_region_name || region.name || region.label || "").trim();
 
   return {
     ...region,
     id,
     taxRegionId: id,
-    taxRegionCode: code,
+    taxRegionName: name,
     value: id,
-    label: code && name && code !== name ? `${code} - ${name}` : name || code,
+    label: name,
+  };
+};
+
+const normalizeControls = (controls = {}) => {
+  const paymentTerm = controls.paymentTerm && typeof controls.paymentTerm === "object" ? controls.paymentTerm : null;
+  const taxRegion = controls.taxRegion && typeof controls.taxRegion === "object" ? controls.taxRegion : null;
+  const normalizedPaymentTerm = paymentTerm ? normalizePaymentTerm(paymentTerm) : {};
+  const normalizedTaxRegion = taxRegion ? normalizeTaxRegion(taxRegion) : {};
+  const paymentTermName =
+    controls.paymentTermName ||
+    controls.payment_term_name ||
+    controls.paymentTerms ||
+    normalizedPaymentTerm.paymentTermName ||
+    "";
+  const taxRegionName =
+    controls.taxRegionName ||
+    controls.tax_region_name ||
+    normalizedTaxRegion.taxRegionName ||
+    "";
+
+  return {
+    ...controls,
+    paymentTermId:
+      controls.paymentTermId ||
+      controls.payment_term_id ||
+      normalizedPaymentTerm.paymentTermId ||
+      "",
+    paymentTermName,
+    paymentTerms: controls.paymentTerms || normalizeBillingFrequencyValue(paymentTermName),
+    taxRegionId:
+      controls.taxRegionId ||
+      controls.tax_region_id ||
+      normalizedTaxRegion.taxRegionId ||
+      "",
+    taxRegionName,
   };
 };
 
@@ -328,7 +362,6 @@ export const normalizeProject = (project = {}) => {
     projectName: project.projectName || project.name || project.label || "",
     projectCode: project.projectCode || project.code || project.projectKey || "",
     contractNumber: project.contractNumber || project.contractReference || "",
-    currencyId: project.currencyId || currencyObject?.currencyId || currencyObject?.id || project.currency_id || "",
     currency: currencyCode || projectBudgetCurrency || "",
     billingType: project.billingType || "",
     billingMode: project.billingMode || "",
@@ -350,7 +383,9 @@ export const getApiErrorMessage = (error, fallback = "Something went wrong. Plea
 
 export const getBillingConfigurations = async () => {
   const response = await api.get(BILLING_CONFIGURATIONS_URL);
-  return asArray(unwrapData(response)).map(normalizeBillingConfiguration);
+  return asArray(unwrapData(response))
+    .filter(shouldDisplayBillingConfiguration)
+    .map(normalizeBillingConfiguration);
 };
 
 export const getBillingConfigurationById = async (billingConfigurationId) => {
@@ -366,7 +401,7 @@ export const getBillingConfigurationById = async (billingConfigurationId) => {
       projectInfo: getProjectInfo(config),
       billingConfig: getBillingConfig(config),
       toolBilling: getToolBilling(config),
-      controls: getControls(config),
+      controls: normalizeControls(getControls(config)),
     },
   };
 };
@@ -432,12 +467,7 @@ export const getActiveBillingFrequencies = async () => {
 
 export const getActivePaymentTerms = async () => {
   const response = await api.get(ACTIVE_PAYMENT_TERMS_URL);
-  return asArray(unwrapData(response)).map(normalizePaymentTerm).filter((t) => t.value);
-};
-
-export const getActiveCurrencies = async () => {
-  const currencies = await lookupService.getActiveCurrencies();
-  return asArray(currencies).map(normalizeCurrency).filter((currency) => currency.currencyId);
+  return asArray(unwrapData(response)).map(normalizePaymentTerm).filter((term) => term.paymentTermId);
 };
 
 export const getActiveTaxRegions = async () => {
@@ -535,7 +565,7 @@ const REQUIRED_BILLING_CONFIGURATION_FIELDS = [
   "billingTypeId",
   "billingFrequencyId",
   "paymentTermId",
-  "currencyId",
+  "currency",
   "taxRegionId",
   "invoiceGenerationType",
   "pricingModel",
@@ -545,18 +575,98 @@ const REQUIRED_BILLING_CONFIGURATION_FIELDS = [
 
 const isBlank = (value) => value === null || value === undefined || value === "";
 
+const MONTH_INDEX_BY_SHORT_NAME = {
+  jan: 0,
+  feb: 1,
+  mar: 2,
+  apr: 3,
+  may: 4,
+  jun: 5,
+  jul: 6,
+  aug: 7,
+  sep: 8,
+  oct: 9,
+  nov: 10,
+  dec: 11,
+};
+
+const toLocalDateString = (value) => {
+  if (!value) return "";
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return "";
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  const rawValue = String(value).trim();
+  if (!rawValue) return "";
+
+  const isoMatch = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+  const displayMatch = rawValue.match(/^(\d{1,2})[-\s/]([A-Za-z]{3,})[-\s/](\d{4})$/);
+  if (displayMatch) {
+    const [, dayPart, monthPart, yearPart] = displayMatch;
+    const monthIndex = MONTH_INDEX_BY_SHORT_NAME[monthPart.slice(0, 3).toLowerCase()];
+    if (monthIndex !== undefined) {
+      return `${yearPart}-${String(monthIndex + 1).padStart(2, "0")}-${String(Number(dayPart)).padStart(2, "0")}`;
+    }
+  }
+
+  const parsed = new Date(rawValue);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeCurrencyCode = (...values) => {
+  for (const value of values) {
+    if (!value) continue;
+
+    const code =
+      typeof value === "object"
+        ? value.projectBudgetCurrency || value.currencyCode || value.currency_code || value.code || value.value
+        : value;
+    const normalized = String(code || "").trim().toUpperCase();
+    if (normalized) return normalized;
+  }
+
+  return "";
+};
+
 export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
   const projectInfo = wizardPayload.projectInfo || {};
   const billingConfig = wizardPayload.billingConfig || {};
   const controls = wizardPayload.controls || {};
+  const currency = normalizeCurrencyCode(
+    projectInfo.projectBudgetCurrency,
+    projectInfo.currency,
+    billingConfig.currency,
+    wizardPayload.currency,
+  );
+  const effectiveFrom = toLocalDateString(
+    billingConfig.effectiveFrom ||
+      wizardPayload.effectiveFrom ||
+      projectInfo.startDate,
+  );
+  const effectiveTo = toLocalDateString(
+    billingConfig.effectiveTo ||
+      wizardPayload.effectiveTo ||
+      projectInfo.endDate,
+  );
 
-  return {
+  const requestPayload = {
     clientId: projectInfo.clientId || wizardPayload.clientId || "",
     projectId: projectInfo.projectId || wizardPayload.projectId || "",
     billingTypeId: billingConfig.billingTypeId || wizardPayload.billingTypeId || "",
     billingFrequencyId: billingConfig.billingFrequencyId || wizardPayload.billingFrequencyId || "",
     paymentTermId: controls.paymentTermId || wizardPayload.paymentTermId || "",
-    currencyId: projectInfo.currencyId || billingConfig.currencyId || wizardPayload.currencyId || "",
+    currency,
     taxRegionId: controls.taxRegionId || wizardPayload.taxRegionId || "",
     invoiceGenerationType:
       controls.invoiceGenerationType ||
@@ -565,12 +675,14 @@ export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
     pricingModel: billingConfig.billingMode || billingConfig.pricingModel || wizardPayload.pricingModel || "",
     expenseBillingEligible:
       controls.expenseBillingEligible ?? wizardPayload.expenseBillingEligible ?? false,
-    effectiveFrom:
-      billingConfig.effectiveFrom ||
-      wizardPayload.effectiveFrom ||
-      projectInfo.startDate ||
-      "",
+    effectiveFrom,
   };
+
+  if (effectiveTo) {
+    requestPayload.effectiveTo = effectiveTo;
+  }
+
+  return requestPayload;
 };
 
 const assertBillingConfigurationPayload = (payload) => {
