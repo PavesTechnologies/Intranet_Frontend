@@ -4,6 +4,7 @@ import { TimesheetGroup } from "./TimesheetGroup";
 import Button from "../../components/Button/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { fetchCalendarHolidays } from "./api";
+import WeeklyEntryModal from "./WeeklyEntry/WeeklyEntryModal";
 import { showStatusToast } from "../../components/toastfy/toast";
 
 const TimesheetTable = ({
@@ -17,21 +18,19 @@ const TimesheetTable = ({
   projectInfo,
   getWeeklyStatusColor,
 }) => {
-  const [addingNewTimesheet, setAddingNewTimesheet] = useState(false);
+  const [weeklyEntryOpen, setWeeklyEntryOpen] = useState(false);
   const [holidaysMap, setHolidaysMap] = useState({});
   const [holidayLoading, setHolidayLoading] = useState(false);
   const [expandedWeeks, setExpandedWeeks] = useState({});
-  const [newTimesheetDate, setNewTimesheetDate] = useState(null);
 
   const toggleWeek = (key) =>
     setExpandedWeeks((prev) => ({ ...prev, [key]: !prev[key] }));
 
-  // Default date for a new timesheet: today if it's an allowed working day,
-  // otherwise step back to the most recent allowed day within the current month.
-  // "Allowed" mirrors the date-picker rule: weekends are blocked unless a holiday
-  // overrides with submitTimesheet === true; any holiday with submitTimesheet === false
-  // is blocked. Returns a "YYYY-MM-DD" string, or null when no day qualifies.
-  const getDefaultWorkDate = () => {
+  // Only the current month accepts entries, so the weekly editor needs at least
+  // one allowed day in it. "Allowed" mirrors the existing rule: weekends are
+  // blocked unless a holiday overrides with submitTimesheet === true, and any
+  // holiday with submitTimesheet === false is blocked.
+  const hasAnyAllowedDay = () => {
     const toISO = (d) =>
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
         d.getDate(),
@@ -47,24 +46,19 @@ const TimesheetTable = ({
     const today = new Date();
     const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const d = new Date(today);
-    while (d >= firstOfMonth && !isAllowed(d)) d.setDate(d.getDate() - 1);
-    return d >= firstOfMonth ? toISO(d) : null;
+    while (d >= firstOfMonth) {
+      if (isAllowed(d)) return true;
+      d.setDate(d.getDate() - 1);
+    }
+    return false;
   };
 
-  // Toggle the new-timesheet panel. When opening, pick a submittable default date;
-  // if none is available in the current month, show a toast and keep it closed.
-  const handleToggleNewTimesheet = () => {
-    if (addingNewTimesheet) {
-      setAddingNewTimesheet(false);
-      return;
-    }
-    const def = getDefaultWorkDate();
-    if (!def) {
+  const handleOpenWeeklyEntry = () => {
+    if (!hasAnyAllowedDay()) {
       showStatusToast("No dates available for timesheet entry", "error");
       return;
     }
-    setNewTimesheetDate(def);
-    setAddingNewTimesheet(true);
+    setWeeklyEntryOpen(true);
   };
 
   useEffect(() => {
@@ -105,33 +99,23 @@ const TimesheetTable = ({
     >
       <Button
         size="small"
-        variant={addingNewTimesheet ? "secondary" : "primary"}
+        variant="primary"
         className={`mb-4 ${holidayLoading ? "opacity-15 cursor-not-allowed" : ""}`}
-        onClick={handleToggleNewTimesheet}
+        onClick={handleOpenWeeklyEntry}
         disabled={holidayLoading}
       >
-        {addingNewTimesheet ? "Cancel Timesheet" : "+ New Timesheet"}
+        + New Timesheet
       </Button>
 
-      {addingNewTimesheet && (
-        <div style={{ marginBottom: "20px" }}>
-          <TimesheetGroup
-            emptyTimesheet={true}
-            workDate={newTimesheetDate}
-            entries={[]}
-            status="Pending"
-            mapWorkType={mapWorkType}
-            refreshData={() => {
-              refreshData?.();
-              setAddingNewTimesheet(false);
-            }}
-            addingNewTimesheet={addingNewTimesheet}
-            setAddingNewTimesheet={setAddingNewTimesheet}
-            projectInfo={projectInfo}
-            holidaysMap={holidaysMap} // ✅ Pass holidays map here
-          />
-        </div>
-      )}
+      <WeeklyEntryModal
+        isOpen={weeklyEntryOpen}
+        onClose={() => setWeeklyEntryOpen(false)}
+        projectInfo={projectInfo}
+        holidaysMap={holidaysMap}
+        onSaved={async () => {
+          await refreshData?.();
+        }}
+      />
 
       {loading ? (
         <LoadingSpinner text="Loading timesheet entries..." />
