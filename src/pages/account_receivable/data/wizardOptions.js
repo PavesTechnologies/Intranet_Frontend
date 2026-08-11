@@ -60,6 +60,8 @@ export const BILLING_FREQUENCIES = [
   { value: "BIWEEKLY", label: "Biweekly" },
   { value: "MONTHLY", label: "Monthly" },
   { value: "QUARTERLY", label: "Quarterly" },
+  { value: "HALF_YEARLY", label: "Half-Yearly" },
+  { value: "ANNUALLY", label: "Annually" },
   { value: "YEARLY", label: "Yearly" },
   { value: "ON_DEMAND", label: "On Demand" },
 ];
@@ -189,6 +191,8 @@ export const SOURCE_FILTER_OPTIONS = [
 export const STATUS_FILTER_OPTIONS = [
   { value: "", label: "All Statuses" },
   { value: "Draft", label: "Draft" },
+  { value: "Pending Approval", label: "Pending Approval" },
   { value: "Active", label: "Active" },
+  { value: "Rejected", label: "Rejected" },
   { value: "Inactive", label: "Inactive" },
 ];

@@ -10,6 +10,7 @@ import {
   Pencil,
   ArrowRightCircle,
   Ban,
+  XCircle,
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
@@ -25,11 +26,17 @@ import StatusBadge from "../../../components/status/statusbadge";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import ActionMenu from "../components/common/ActionMenu";
+import Modal from "../../../components/Modal/modal";
+import FormTextArea from "../../../components/forms/FormTextArea";
 
 import {
-  fetchOverviewStats,
-  fetchRecentActivity,
   fetchBillingConfigurations,
+  deactivateBillingConfiguration,
+  approveBillingConfiguration,
+  rejectBillingConfiguration,
+  getApiErrorMessage,
+  getBillingConfigurationStats,
+  getBillingConfigurationActivity,
 } from "../services/billingConfigService";
 import { SOURCE_FILTER_OPTIONS, STATUS_FILTER_OPTIONS } from "../data/wizardOptions";
 
@@ -71,21 +78,38 @@ export default function Overview() {
   const [currentPage, setCurrentPage] = useState(1);
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [deactivateLoading, setDeactivateLoading] = useState(false);
+  const [approveTarget, setApproveTarget] = useState(null);
+  const [approveLoading, setApproveLoading] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectLoading, setRejectLoading] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  // load configurations helper available to handlers
+  const loadConfigurations = async () => {
+    setLoadingStats(true);
+    setLoadingConfigs(true);
+    try {
+      const configsResult = await fetchBillingConfigurations();
+      setConfigs(configsResult);
+
+      // derive stats and activity from configurations
+      const statsResult = await getBillingConfigurationStats();
+      const activityResult = await getBillingConfigurationActivity();
+      setStats(statsResult);
+      setActivity(activityResult);
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Failed to load billing configuration overview."), "error");
+      setStats(null);
+      setActivity([]);
+    } finally {
+      setLoadingStats(false);
+      setLoadingConfigs(false);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
-
-    Promise.all([fetchOverviewStats(), fetchRecentActivity(), fetchBillingConfigurations()]).then(
-      ([statsResult, activityResult, configsResult]) => {
-        if (!isMounted) return;
-        setStats(statsResult);
-        setActivity(activityResult);
-        setConfigs(configsResult);
-        setLoadingStats(false);
-        setLoadingConfigs(false);
-      }
-    );
-
+    // initial load
+    loadConfigurations();
     return () => {
       isMounted = false;
     };
@@ -133,18 +157,71 @@ export default function Overview() {
     navigate(`/account-receivable/project-billing-setup/configurations/${config.id}`);
   };
 
-  const handleConfirmDeactivate = () => {
+  const handleConfirmDeactivate = async () => {
     setDeactivateLoading(true);
-    setTimeout(() => {
-      setConfigs((prev) =>
-        prev.map((config) =>
-          config.id === deactivateTarget.id ? { ...config, status: "Inactive" } : config
-        )
-      );
-      setDeactivateLoading(false);
-      setDeactivateTarget(null);
+    try {
+      await deactivateBillingConfiguration(deactivateTarget.id);
+      await loadConfigurations();
       showStatusToast("Billing configuration deactivated.", "success");
-    }, 400);
+      setDeactivateTarget(null);
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Failed to deactivate billing configuration."), "error");
+    } finally {
+      setDeactivateLoading(false);
+    }
+  };
+
+  const handleConfirmApprove = async () => {
+    setApproveLoading(true);
+    try {
+      await approveBillingConfiguration(approveTarget.id);
+      await loadConfigurations();
+      showStatusToast("Billing configuration approved.", "success");
+      setApproveTarget(null);
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Failed to approve billing configuration."), "error");
+    } finally {
+      setApproveLoading(false);
+    }
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectionReason.trim()) {
+      showStatusToast("Please enter a rejection reason.", "warning");
+      return;
+    }
+
+    setRejectLoading(true);
+    try {
+      await rejectBillingConfiguration(rejectTarget.id, rejectionReason.trim());
+      await loadConfigurations();
+      showStatusToast("Billing configuration rejected.", "success");
+      setRejectTarget(null);
+      setRejectionReason("");
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Failed to reject billing configuration."), "error");
+    } finally {
+      setRejectLoading(false);
+    }
+  };
+
+  const openRejectModal = (config) => {
+    setRejectTarget(config);
+    setRejectionReason("");
+  };
+
+  const closeRejectModal = () => {
+    if (rejectLoading) return;
+    setRejectTarget(null);
+    setRejectionReason("");
+  };
+
+  const canApproveOrReject = (status) => !["Active", "Inactive", "Rejected"].includes(status);
+
+  const closeDeactivateModal = () => {
+    if (!deactivateLoading) {
+      setDeactivateTarget(null);
+    }
   };
 
   const tableRows = useMemo(
@@ -181,6 +258,19 @@ export default function Overview() {
                 icon: <Pencil className="h-4 w-4 text-gray-600" />,
                 hidden: config.status === "Draft",
                 onClick: () => handleEdit(config),
+              },
+              {
+                label: "Approve",
+                icon: <CheckCircle2 className="h-4 w-4" />,
+                hidden: !canApproveOrReject(config.status),
+                onClick: () => setApproveTarget(config),
+              },
+              {
+                label: "Reject",
+                icon: <XCircle className="h-4 w-4" />,
+                hidden: !canApproveOrReject(config.status),
+                danger: true,
+                onClick: () => openRejectModal(config),
               },
               {
                 label: "Deactivate",
@@ -365,9 +455,56 @@ export default function Overview() {
         confirmText="Deactivate"
         variant="danger"
         isLoading={deactivateLoading}
-        onCancel={() => setDeactivateTarget(null)}
+        onCancel={closeDeactivateModal}
         onConfirm={handleConfirmDeactivate}
       />
+
+      <ConfirmationModal
+        isOpen={Boolean(approveTarget)}
+        title="Approve Billing Configuration"
+        message={
+          approveTarget
+            ? `Approve the billing setup for ${approveTarget.projectName}?`
+            : ""
+        }
+        confirmText="Approve"
+        variant="success"
+        isLoading={approveLoading}
+        onCancel={() => !approveLoading && setApproveTarget(null)}
+        onConfirm={handleConfirmApprove}
+      />
+
+      <Modal
+        isOpen={Boolean(rejectTarget)}
+        onClose={closeRejectModal}
+        title="Reject Billing Configuration"
+        width="480px"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            {rejectTarget
+              ? `Enter the reason for rejecting ${rejectTarget.projectName}.`
+              : ""}
+          </p>
+          <FormTextArea
+            label="Rejection Reason"
+            name="rejectionReason"
+            value={rejectionReason}
+            onChange={(event) => setRejectionReason(event.target.value)}
+            placeholder="Add rejection reason"
+            rows={4}
+            disabled={rejectLoading}
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="small" onClick={closeRejectModal} disabled={rejectLoading}>
+              Cancel
+            </Button>
+            <Button variant="danger" size="small" onClick={handleConfirmReject} loading={rejectLoading} loadingText="Rejecting...">
+              Reject
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

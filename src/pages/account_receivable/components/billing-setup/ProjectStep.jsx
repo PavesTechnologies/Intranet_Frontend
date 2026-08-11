@@ -4,16 +4,18 @@ import { Check, ChevronDown, RefreshCw, AlertCircle } from "lucide-react";
 import classNames from "classnames";
 
 import FormInput from "../../../../components/forms/FormInput";
-import FormSelect from "../../../../components/forms/FormSelect";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
 import { Fonts } from "../../../../components/Fonts/Fonts";
-import { fetchActiveEnterpriseProjects } from "../../services/billingConfigService";
-import { BILLING_TYPES, BILLING_FREQUENCIES, CURRENCY_OPTIONS } from "../../data/wizardOptions";
-import RadioCardGroup from "../common/RadioCardGroup";
+import {
+  getBillingConfigurationClients,
+  getBillingConfigurationProjectsByClient,
+} from "../../services/billingConfigService";
 
 export default function ProjectStep({ value = {}, onChange }) {
   const [projects, setProjects] = useState([]);
-  const [loadingList, setLoadingList] = useState(true);
+  const [clientOptions, setClientOptions] = useState([]);
+  const [loadingClients, setLoadingClients] = useState(true);
+  const [loadingProjects, setLoadingProjects] = useState(false);
   const [clientQuery, setClientQuery] = useState("");
   const isMounted = useRef(true);
 
@@ -25,36 +27,43 @@ export default function ProjectStep({ value = {}, onChange }) {
   }, []);
 
   useEffect(() => {
-    fetchActiveEnterpriseProjects().then((projectList) => {
-      if (!isMounted.current) return;
-      setProjects(projectList);
-      setLoadingList(false);
-    });
+    // Load clients list from backend; project list is loaded when a client is selected
+    getBillingConfigurationClients()
+      .then((clients) => {
+        if (!isMounted.current) return;
+        setProjects([]);
+        setClientOptions(
+          Array.isArray(clients)
+            ? Array.from(new Map(clients.map((c) => [c.clientId || c.id, c.clientName || c.name])), ([val, label]) => ({ value: val, label }))
+            : []
+        );
+      })
+      .catch(() => {
+        if (!isMounted.current) return;
+        setProjects([]);
+        setClientOptions([]);
+      })
+      .finally(() => {
+        if (!isMounted.current) return;
+        setLoadingClients(false);
+      });
   }, []);
 
   // Internal projectSource defaults to ENTERPRISE if not set
   const projectSource = value.projectSource || "ENTERPRISE";
 
-  // List unique client options from enterprise projects
-  const clientOptions = useMemo(() => {
-    return Array.from(
-      new Map(projects.map((project) => [project.clientId, project.clientName])),
-      ([val, label]) => ({ value: val, label })
-    );
-  }, [projects]);
+  // clientOptions are loaded from backend via `getBillingConfigurationClients`
 
   // Projects filtered by selected client
   const projectOptions = useMemo(() => {
     if (!value.clientId) return [];
-    return projects
-      .filter((project) => project.clientId === value.clientId)
-      .map((project) => ({ value: project.id, label: project.projectName }));
+    return projects.map((project) => ({ value: String(project.projectId || project.id || ""), label: project.projectName }));
   }, [projects, value.clientId]);
 
   // Selected enterprise project details
   const matchedProject = useMemo(() => {
     if (!value.projectId) return null;
-    return projects.find((project) => project.id === value.projectId) || null;
+    return projects.find((project) => String(project.id) === String(value.projectId)) || null;
   }, [projects, value.projectId]);
 
   // Filter client list based on search query
@@ -67,9 +76,34 @@ export default function ProjectStep({ value = {}, onChange }) {
 
   const showClientNotFound = clientQuery !== "" && filteredClientOptions.length === 0;
 
+  const getProjectDurationLabel = (projectData) => {
+    if (projectData?.projectDuration) return projectData.projectDuration;
+    if (projectData?.startDate || projectData?.endDate) {
+      return `${projectData.startDate || "—"} to ${projectData.endDate || "Ongoing"}`;
+    }
+    return "—";
+  };
+
   // Handlers
   const handleClientSelect = (clientId) => {
     const clientName = clientOptions.find((opt) => opt.value === clientId)?.label || "";
+    setLoadingProjects(true);
+    setProjects([]);
+
+    getBillingConfigurationProjectsByClient(clientId)
+      .then((projectList) => {
+        if (!isMounted.current) return;
+        setProjects(Array.isArray(projectList) ? projectList : []);
+      })
+      .catch(() => {
+        if (!isMounted.current) return;
+        setProjects([]);
+      })
+      .finally(() => {
+        if (!isMounted.current) return;
+        setLoadingProjects(false);
+      });
+
     onChange({
       ...value,
       projectSource: "ENTERPRISE",
@@ -78,7 +112,10 @@ export default function ProjectStep({ value = {}, onChange }) {
       projectId: "",
       projectName: "",
       projectCode: "",
+      projectDuration: "",
       currency: "",
+      projectBudget: "",
+      projectBudgetCurrency: "",
       startDate: "",
       endDate: "",
     });
@@ -86,7 +123,7 @@ export default function ProjectStep({ value = {}, onChange }) {
 
   const handleProjectSelect = (event) => {
     const projectId = event.target.value;
-    const project = projects.find((p) => p.id === projectId);
+    const project = projects.find((p) => String(p.id) === String(projectId));
     if (project) {
       onChange({
         ...value,
@@ -96,7 +133,11 @@ export default function ProjectStep({ value = {}, onChange }) {
         projectId,
         projectName: project.projectName,
         projectCode: project.projectCode,
-        currency: project.currency,
+        projectDuration: project.projectDuration,
+        currencyId: project.currencyId || "",
+        currency: project.currency || project.projectBudgetCurrency || "",
+        projectBudget: project.projectBudget ?? "",
+        projectBudgetCurrency: project.projectBudgetCurrency || project.currency || "",
         startDate: project.startDate,
         endDate: project.endDate,
       });
@@ -106,7 +147,10 @@ export default function ProjectStep({ value = {}, onChange }) {
         projectId: "",
         projectName: "",
         projectCode: "",
+        projectDuration: "",
         currency: "",
+        projectBudget: "",
+        projectBudgetCurrency: "",
         startDate: "",
         endDate: "",
       });
@@ -122,7 +166,10 @@ export default function ProjectStep({ value = {}, onChange }) {
       projectId: "",
       projectName: "",
       projectCode: "",
-      currency: "INR", // default currency
+      currencyId: "",
+      currency: "",
+      projectBudget: "",
+      projectBudgetCurrency: "",
       startDate: "",
       endDate: "",
     });
@@ -138,7 +185,10 @@ export default function ProjectStep({ value = {}, onChange }) {
       projectId: "",
       projectName: "",
       projectCode: "",
+      currencyId: "",
       currency: "",
+      projectBudget: "",
+      projectBudgetCurrency: "",
       startDate: "",
       endDate: "",
     });
@@ -153,11 +203,6 @@ export default function ProjectStep({ value = {}, onChange }) {
   const handleDateChange = (name) => (event) => {
     onChange({ ...value, [name]: event.target.value });
   };
-
-  // Filter out BILLING_TYPES that don't match the simplified UI (Time & Material, Milestone, Recurring)
-  const billingTypeOptions = BILLING_TYPES.filter((type) =>
-    ["TIME_MATERIAL", "MILESTONE", "RECURRING"].includes(type.value)
-  );
 
   return (
     <div className="space-y-5">
@@ -186,9 +231,10 @@ export default function ProjectStep({ value = {}, onChange }) {
 
         {projectSource === "ENTERPRISE" ? (
           /* ENTERPRISE FLOW */
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            {/* Client Searchable Dropdown */}
-            <div className="space-y-1 w-full min-w-0">
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              {/* Client Searchable Dropdown */}
+              <div className="space-y-1 w-full min-w-0">
               <label className="block text-sm font-medium text-slate-700">
                 Client Name <span className="text-red-500">*</span>
               </label>
@@ -198,8 +244,8 @@ export default function ProjectStep({ value = {}, onChange }) {
                     className="w-full min-w-0 px-4 py-2 border border-slate-300 rounded-lg shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition disabled:cursor-not-allowed disabled:bg-slate-50 text-sm"
                     displayValue={() => value.clientName || ""}
                     onChange={(event) => setClientQuery(event.target.value)}
-                    placeholder={loadingList ? "Loading clients..." : "Search client..."}
-                    disabled={loadingList}
+                    placeholder={loadingClients ? "Loading clients..." : "Search client..."}
+                    disabled={loadingClients}
                   />
                   <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
                     <ChevronDown className="w-4 h-4 text-slate-500" />
@@ -252,11 +298,19 @@ export default function ProjectStep({ value = {}, onChange }) {
                 name="projectId"
                 value={value.projectId || ""}
                 onChange={handleProjectSelect}
-                disabled={loadingList || !value.clientId}
+                disabled={loadingClients || !value.clientId}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition disabled:cursor-not-allowed disabled:bg-slate-50 text-sm"
               >
                 <option value="">
-                  {!value.clientId ? "Select client first" : "Select project"}
+                  {loadingClients
+                    ? "Loading clients..."
+                    : !value.clientId
+                    ? "Select client first"
+                    : loadingProjects
+                    ? "Loading projects..."
+                    : projectOptions.length === 0
+                    ? "No projects found"
+                    : "Select project"}
                 </option>
                 {projectOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -264,7 +318,9 @@ export default function ProjectStep({ value = {}, onChange }) {
                   </option>
                 ))}
               </select>
+              </div>
             </div>
+
           </div>
         ) : (
           /* STANDALONE FLOW */
@@ -343,7 +399,7 @@ export default function ProjectStep({ value = {}, onChange }) {
             <div>
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Project Duration</span>
               <span className="text-sm font-bold text-slate-800 mt-1 block">
-                {value.startDate ? `${value.startDate} to ${value.endDate || "Ongoing"}` : "—"}
+                {getProjectDurationLabel(value)}
               </span>
             </div>
             <div>

@@ -163,6 +163,7 @@ export default function UploadStep({ onSubmit, bare = false }) {
       if (conflictData?.candidate_exists && conflictData?.candidate_id) {
         setDuplicateCandidate({
           candidateId: conflictData.candidate_id,
+          campaignCandidateId: conflictData.campaign_candidate_id ?? conflictData.campaignCandidateId,
           message: responseBody?.message || "Candidate already exists in this campaign.",
         });
       } else if (conflictData?.duplicate_resume_id && Array.isArray(conflictData?.available_resolutions)) {
@@ -415,6 +416,7 @@ export default function UploadStep({ onSubmit, bare = false }) {
           resumeRow={{
             candidate_full_name: form.candidateName.trim(),
             candidate_email: form.candidateEmail.trim(),
+            campaign_candidate_id: duplicateCandidate.campaignCandidateId,
           }}
           onBack={() => setIsScorecardOpen(false)}
           variant="modal"

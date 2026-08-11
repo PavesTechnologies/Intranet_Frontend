@@ -16,7 +16,7 @@ export default function RadioCardGroup({
   return (
     <div role="radiogroup" aria-label={name} className={`grid grid-cols-1 gap-3 ${columnClass}`}>
       {options.map((option) => {
-        const isSelected = value === option.value;
+        const isSelected = String(value) === String(option.value);
 
         return (
           <button

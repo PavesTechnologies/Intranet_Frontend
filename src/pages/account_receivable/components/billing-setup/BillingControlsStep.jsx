@@ -1,7 +1,9 @@
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import { Fonts } from "../../../../components/Fonts/Fonts";
-import { PAYMENT_TERMS_OPTIONS } from "../../data/wizardOptions";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import { getActivePaymentTerms, getActiveTaxRegions, getApiErrorMessage } from "../../services/billingConfigurationService";
+import { useEffect, useState } from "react";
 
 function getOrdinalSuffix(i) {
   const j = i % 10, k = i % 100;
@@ -42,6 +44,39 @@ function getDuePreviewText(genDayStr, term) {
 export default function BillingControlsStep({ value = {}, onChange }) {
   const update = (patch) => onChange({ ...value, ...patch });
 
+  const [paymentTermOptions, setPaymentTermOptions] = useState([]);
+  const [taxRegionOptions, setTaxRegionOptions] = useState([]);
+  const [loadingPaymentTerms, setLoadingPaymentTerms] = useState(true);
+  const [loadingTaxRegions, setLoadingTaxRegions] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      setLoadingPaymentTerms(true);
+      setLoadingTaxRegions(true);
+      try {
+        const [terms, taxRegions] = await Promise.all([getActivePaymentTerms(), getActiveTaxRegions()]);
+        if (!mounted) return;
+        setPaymentTermOptions(terms.map((t) => ({ value: t.paymentTermId || t.id, label: t.label, paymentTerms: t.value })));
+        setTaxRegionOptions(taxRegions.map((region) => ({ value: region.taxRegionId || region.id, label: region.label })));
+      } catch (error) {
+        showStatusToast(getApiErrorMessage(error, "Unable to load payment terms and tax regions."), "error");
+        setPaymentTermOptions([]);
+        setTaxRegionOptions([]);
+      } finally {
+        if (mounted) {
+          setLoadingPaymentTerms(false);
+          setLoadingTaxRegions(false);
+        }
+      }
+    };
+
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const previewText = getDuePreviewText(value.invoiceGenerationDay, value.paymentTerms);
 
   return (
@@ -73,7 +108,7 @@ export default function BillingControlsStep({ value = {}, onChange }) {
           <div className="inline-flex rounded-lg bg-slate-100 p-1">
             <button
               type="button"
-              onClick={() => update({ autoInvoiceGeneration: false, invoiceGenerationDay: "" })}
+              onClick={() => update({ autoInvoiceGeneration: false, invoiceGenerationType: "MANUAL", invoiceGenerationDay: "" })}
               className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
                 value.autoInvoiceGeneration === false
                   ? "bg-white text-slate-900 shadow-sm"
@@ -84,7 +119,7 @@ export default function BillingControlsStep({ value = {}, onChange }) {
             </button>
             <button
               type="button"
-              onClick={() => update({ autoInvoiceGeneration: true })}
+              onClick={() => update({ autoInvoiceGeneration: true, invoiceGenerationType: "AUTOMATIC" })}
               className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
                 value.autoInvoiceGeneration === true
                   ? "bg-white text-slate-900 shadow-sm"
@@ -133,16 +168,53 @@ export default function BillingControlsStep({ value = {}, onChange }) {
         </div>
 
         <div className="grid grid-cols-1 gap-5">
-          <div className="space-y-4 max-w-xs">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <div className="space-y-4">
             <label className="block text-sm font-medium text-slate-700">
               Payment Terms <span className="text-red-500">*</span>
             </label>
-            <FormSelect
-              name="paymentTerms"
-              value={value.paymentTerms || ""}
-              onChange={(event) => update({ paymentTerms: event.target.value })}
-              options={PAYMENT_TERMS_OPTIONS}
-            />
+            {loadingPaymentTerms ? (
+              <p className="text-sm text-slate-500">Loading payment terms…</p>
+            ) : (
+              <FormSelect
+                name="paymentTerms"
+                value={value.paymentTermId || ""}
+                onChange={(event) => {
+                  const selected = paymentTermOptions.find((opt) => String(opt.value) === String(event.target.value));
+                  update({ paymentTermId: event.target.value, paymentTerms: selected?.paymentTerms || "" });
+                }}
+                options={[{ value: "", label: "Select payment terms" }, ...paymentTermOptions]}
+              />
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-slate-700">
+              Tax Region <span className="text-red-500">*</span>
+            </label>
+            {loadingTaxRegions ? (
+              <p className="text-sm text-slate-500">Loading tax regions...</p>
+            ) : (
+              <FormSelect
+                name="taxRegionId"
+                value={value.taxRegionId || ""}
+                onChange={(event) => update({ taxRegionId: event.target.value })}
+                options={[{ value: "", label: "Select tax region" }, ...taxRegionOptions]}
+              />
+            )}
+          </div>
+          </div>
+
+          <div className="max-w-md rounded-lg border border-slate-200 p-4">
+            <label className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={Boolean(value.expenseBillingEligible)}
+                onChange={(event) => update({ expenseBillingEligible: event.target.checked })}
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              Expense billing eligible
+            </label>
           </div>
 
           {/* Payment preview summary block */}
