@@ -104,6 +104,8 @@ export default function ExpenseReportDetailPage() {
   const cancelReport = useCancelReport();
   const [pendingLifecycleAction, setPendingLifecycleAction] = useState(null); // "recall" | "cancel" | null
   const isLifecycleBusy = submitReport.isPending || recallReport.isPending || cancelReport.isPending;
+  const [report, setReport] = useState(null);
+  const [lineItems, setLineItems] = useState([]);
 
   const needsCorrectionLines = (lineItemReviews || []).filter((r) => r.status === "NEEDS_CORRECTION");
   // Mirrors the backend's ReportStatus.isEditable() set exactly (EMS/enums/ReportStatus.java) -
@@ -111,9 +113,7 @@ export default function ExpenseReportDetailPage() {
   // point of the correction loop), not just DRAFT.
   const isReportEditable = ["DRAFT", "POLICY_REJECTED", "QUERY_RAISED", "AWAITING_CORRECTION"].includes(report?.reportStatus);
 
-  const [report, setReport] = useState(null);
-  const [lineItems, setLineItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
   const [costCenters, setCostCenters] = useState([]);
