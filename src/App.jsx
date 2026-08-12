@@ -136,6 +136,7 @@ import CandidateScorePage from "./pages/airs/candidates/CandidateScore/Candidate
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
 import PipelineCandidateScorecardPage from "./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
+import TalentPoolCandidateProfilePage from "./pages/airs/talent-pool/profile/TalentPoolCandidateProfilePage.jsx";
 import AnalyticsPage from "./pages/airs/analytics/AnalyticsPage.jsx";
 import SettingsPage from "./pages/airs/settings/SettingsPage.jsx";
 import SkillOntologyPage from "./pages/airs/skill-ontology/SkillOntologyPage.jsx";
@@ -188,9 +189,13 @@ import XmsOcrProcessingPage from "./pages/expense-management/pages/receipts/OcrP
 import XmsRequestAdvancePage from "./pages/expense-management/pages/cash-advance/RequestAdvancePage.jsx";
 import XmsMyAdvancesPage from "./pages/expense-management/pages/cash-advance/MyAdvancesPage.jsx";
 import XmsSettlementPage from "./pages/expense-management/pages/cash-advance/SettlementPage.jsx";
-import XmsPendingApprovalsPage from "./pages/expense-management/pages/approvals/PendingApprovalsPage.jsx";
-import XmsApprovedApprovalsPage from "./pages/expense-management/pages/approvals/ApprovedApprovalsPage.jsx";
-import XmsRejectedApprovalsPage from "./pages/expense-management/pages/approvals/RejectedApprovalsPage.jsx";
+import XmsPendingApprovalsPage from "./pages/expense-management/approval-engine/pages/PendingApprovalsPage.jsx";
+import XmsApprovalHistoryPage from "./pages/expense-management/approval-engine/pages/ApprovalHistoryPage.jsx";
+import XmsApprovalFlowsPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowsPage.jsx";
+import XmsApprovalFlowBuilderPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowBuilderPage.jsx";
+import XmsCatchAllFlowPage from "./pages/expense-management/approval-engine/pages/CatchAllFlowPage.jsx";
+import XmsDepartmentApproversPage from "./pages/expense-management/approval-engine/pages/DepartmentApproversPage.jsx";
+import XmsDelegationsPage from "./pages/expense-management/approval-engine/pages/DelegationsPage.jsx";
 import XmsVerificationPage from "./pages/expense-management/pages/finance/VerificationPage.jsx";
 import XmsReimbursementsPage from "./pages/expense-management/pages/finance/ReimbursementsPage.jsx";
 import XmsPaymentStatusPage from "./pages/expense-management/pages/finance/PaymentStatusPage.jsx";
@@ -1269,7 +1274,7 @@ const AppRoutes = () => {
           <Route
             path="/airs/pipeline"
             element={
-              <ProtectedRoute roles={["General"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <PipelineBoardPage />
               </ProtectedRoute>
             }
@@ -1277,7 +1282,7 @@ const AppRoutes = () => {
           <Route
             path="/airs/pipeline/candidates/:candidateId"
             element={
-              <ProtectedRoute roles={["General"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <PipelineCandidateScorecardPage />
               </ProtectedRoute>
             }
@@ -1287,6 +1292,14 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute roles={["General"]}>
                 <TalentPoolPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/talent-pool/:candidateId"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <TalentPoolCandidateProfilePage />
               </ProtectedRoute>
             }
           />
@@ -1385,9 +1398,20 @@ const AppRoutes = () => {
           <Route path="/expense-management/cash-advance/my" element={<ProtectedRoute allowedRoles={["General"]}><XmsMyAdvancesPage /></ProtectedRoute>} />
           <Route path="/expense-management/cash-advance/settlement" element={<ProtectedRoute allowedRoles={["General"]}><XmsSettlementPage /></ProtectedRoute>} />
 
-          <Route path="/expense-management/approvals/pending" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsPendingApprovalsPage /></ProtectedRoute>} />
-          <Route path="/expense-management/approvals/approved" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsApprovedApprovalsPage /></ProtectedRoute>} />
-          <Route path="/expense-management/approvals/rejected" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsRejectedApprovalsPage /></ProtectedRoute>} />
+          {/* No role gate (§1.5): any employee can be a resolved approver (NAMED_USER/DEPARTMENT_OWNER/
+              COST_CENTER_OWNER), not just "Manager" - the backend itself has no role restriction on
+              these endpoints either, "My Approvals" is presence-based, not role-based. */}
+          <Route path="/expense-management/approvals/pending" element={<ProtectedRoute><XmsPendingApprovalsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/approvals/approved" element={<ProtectedRoute><XmsApprovalHistoryPage outcome="APPROVED" title="Approved" breadcrumbLabel="Approved" /></ProtectedRoute>} />
+          <Route path="/expense-management/approvals/rejected" element={<ProtectedRoute><XmsApprovalHistoryPage outcome="REJECTED" title="Rejected" breadcrumbLabel="Rejected" /></ProtectedRoute>} />
+
+          {/* Approval Rules (Admin config) - ADMIN-only, matching the Masters section's own role gate. */}
+          <Route path="/expense-management/approval-rules/flows" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsApprovalFlowsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/approval-rules/flows/new" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsApprovalFlowBuilderPage /></ProtectedRoute>} />
+          <Route path="/expense-management/approval-rules/flows/:flowId/edit" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsApprovalFlowBuilderPage /></ProtectedRoute>} />
+          <Route path="/expense-management/approval-rules/catch-all" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsCatchAllFlowPage /></ProtectedRoute>} />
+          <Route path="/expense-management/approval-rules/department-approvers" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsDepartmentApproversPage /></ProtectedRoute>} />
+          <Route path="/expense-management/approval-rules/delegations" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsDelegationsPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/finance/verification" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsVerificationPage /></ProtectedRoute>} />
           <Route path="/expense-management/finance/reimbursements" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsReimbursementsPage /></ProtectedRoute>} />

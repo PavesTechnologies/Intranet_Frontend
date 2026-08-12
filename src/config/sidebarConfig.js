@@ -167,7 +167,10 @@ export const XMS_SUBMENU = [
   {
     label: "Approvals",
     to: "/expense-management/approvals/pending",
-    allowedRoles: XMS_MANAGER,
+    // Not XMS_MANAGER-only (§1.5): any employee can be a resolved approver (NAMED_USER/
+    // DEPARTMENT_OWNER/COST_CENTER_OWNER), so a General-role approver still needs a way in.
+    // "My Approvals" is presence-based - visible to everyone, empty for anyone with nothing pending.
+    allowedRoles: XMS_EVERYONE,
     children: [
       { label: "Pending",  to: "/expense-management/approvals/pending" },
       { label: "Approved", to: "/expense-management/approvals/approved" },
@@ -205,6 +208,17 @@ export const XMS_SUBMENU = [
       { label: "Clients",             to: "/expense-management/masters/clients" },
       { label: "Currency Management", to: "/expense-management/masters/currency-management" },
       { label: "Tax Configuration",   to: "/expense-management/masters/tax-configuration" },
+    ],
+  },
+  {
+    label: "Approval Rules",
+    to: "/expense-management/approval-rules/flows",
+    allowedRoles: XMS_ADMIN,
+    children: [
+      { label: "Flows",                to: "/expense-management/approval-rules/flows" },
+      { label: "Catch-All Flow",       to: "/expense-management/approval-rules/catch-all" },
+      { label: "Department Approvers", to: "/expense-management/approval-rules/department-approvers" },
+      { label: "Delegations",          to: "/expense-management/approval-rules/delegations" },
     ],
   },
   {
