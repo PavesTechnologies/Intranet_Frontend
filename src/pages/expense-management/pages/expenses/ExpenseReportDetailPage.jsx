@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { createPortal } from "react-dom";
 import {
   Plus,
   Pencil,
@@ -20,6 +21,11 @@ import {
   Loader2,
   Sparkles,
   Keyboard,
+  X,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  RotateCw,
 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import { PageCard, PageCardContent } from "@/components/Cards/PageCard";
@@ -110,6 +116,64 @@ export default function ExpenseReportDetailPage() {
   const [scannedResult, setScannedResult] = useState(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
+  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [isOcrReviewOpen, setIsOcrReviewOpen] = useState(false);
+  const [ocrReviewData, setOcrReviewData] = useState({
+    categoryId: "",
+    expenseDate: "",
+    merchantName: "",
+    description: "",
+    amount: "",
+    currencyId: "",
+    taxAmount: "0",
+    costCenterId: "",
+    clientBillable: false,
+    projectId: "",
+    ocrReceiptId: null,
+    confidenceScore: null,
+  });
+  const [ocrReviewErrors, setOcrReviewErrors] = useState({});
+  const [ocrSubmitting, setOcrSubmitting] = useState(false);
+
+  const [lineItemToView, setLineItemToView] = useState(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewReceipts, setViewReceipts] = useState([]);
+  const [loadingViewReceipts, setLoadingViewReceipts] = useState(false);
+
+  const [viewReceiptPreviewUrl, setViewReceiptPreviewUrl] = useState("");
+  const [viewReceiptFile, setViewReceiptFile] = useState(null);
+  const [viewZoom, setViewZoom] = useState(1);
+  const [viewRotation, setViewRotation] = useState(0);
+
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+
+  useEffect(() => {
+    if (!isOcrReviewOpen) {
+      setZoom(1);
+      setRotation(0);
+    }
+  }, [isOcrReviewOpen]);
+
+  useEffect(() => {
+    if (!isViewModalOpen) {
+      setViewZoom(1);
+      setViewRotation(0);
+      setViewReceiptPreviewUrl("");
+      setViewReceiptFile(null);
+    }
+  }, [isViewModalOpen]);
+
+  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.2, 3));
+  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.2, 0.5));
+  const handleRotateLeft = () => setRotation((prev) => prev - 90);
+  const handleRotateRight = () => setRotation((prev) => prev + 90);
+  const handleResetView = () => {
+    setZoom(1);
+    setRotation(0);
+  };
+
   const [isEditReportOpen, setIsEditReportOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({ title: "", businessPurpose: "", costCenterId: "", currencyId: "" });
   const [editFormErrors, setEditFormErrors] = useState({});
@@ -126,6 +190,18 @@ export default function ExpenseReportDetailPage() {
       setLoadError(true);
     }
   }, [reportId]);
+
+  useEffect(() => {
+    if (!scannedFile) {
+      setReceiptPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(scannedFile);
+    setReceiptPreviewUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [scannedFile]);
 
   const fetchLineItems = useCallback(async () => {
     try {
@@ -150,14 +226,25 @@ export default function ExpenseReportDetailPage() {
   const fetchLookups = useCallback(async () => {
     try {
       setLookupsLoading(true);
-      const [costCenterList, currencyList, categoryList] = await Promise.all([
+      const [costCenterList, currencyList, categoryList, projectListResponse] = await Promise.all([
         lookupService.getActiveCostCenters(),
         lookupService.getActiveCurrencies(),
         lookupService.getActiveCategories(),
+        api.get("/xms/admin/projects", {
+          baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }).catch((err) => {
+          console.error("Failed to load projects:", err);
+          return { data: { data: [] } };
+        }),
       ]);
       setCostCenters(costCenterList);
       setCurrencies(currencyList);
       setCategories(categoryList);
+      const pList = projectListResponse?.data?.data || projectListResponse?.data || [];
+      setProjects(Array.isArray(pList) ? pList : []);
     } catch (err) {
       console.error("Failed to load lookups:", err);
     } finally {
@@ -241,7 +328,8 @@ export default function ExpenseReportDetailPage() {
 
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      formData.append("file", file, safeName);
 
       // Upload file to the report's receipt store
       const uploadRes = await api.post(`/xms/employee/expense-reports/${reportId}/receipts`, formData, {
@@ -307,29 +395,55 @@ export default function ExpenseReportDetailPage() {
               taxNum = 0;
             }
 
-            const scanResultObj = {
-              merchantName: merchantVal,
-              amount: (isLowConfidence || amountNum <= 0) ? "" : amountNum.toFixed(2),
-              taxAmount: isLowConfidence ? "0.00" : taxNum.toFixed(2),
+            // Pre-match category name if present in active categories list
+            let categoryIdVal = "";
+            if (responsePayload.categoryName) {
+              const matchedCat = categories.find(
+                (c) => c.categoryName?.toLowerCase() === responsePayload.categoryName.toLowerCase() ||
+                       c.categoryCode?.toLowerCase() === responsePayload.categoryName.toLowerCase()
+              );
+              if (matchedCat) {
+                categoryIdVal = matchedCat.categoryId;
+              }
+            }
+
+            // Pre-match currency code if present in active currencies list
+            let currencyIdVal = "";
+            if (responsePayload.currencyCode) {
+              const matchedCur = currencies.find(
+                (c) => c.currencyCode?.toUpperCase() === responsePayload.currencyCode.toUpperCase()
+              );
+              if (matchedCur) {
+                currencyIdVal = matchedCur.currencyId;
+              }
+            }
+            if (!currencyIdVal && report?.currencyId) {
+              currencyIdVal = report.currencyId;
+            }
+
+            const reviewData = {
+              categoryId: categoryIdVal,
               expenseDate: isLowConfidence ? "" : (responsePayload.receiptDate || new Date().toISOString().split("T")[0]),
-              description: "", // Leave empty
-              categoryId: "", // Leave empty
-              currencyId: "", // Leave empty
-              costCenterId: "", // Leave empty
+              merchantName: merchantVal,
+              description: "",
+              amount: (isLowConfidence || amountNum <= 0) ? "" : amountNum.toFixed(2),
+              currencyId: currencyIdVal,
+              taxAmount: isLowConfidence ? "0.00" : taxNum.toFixed(2),
+              costCenterId: report?.costCenterId || "",
               clientBillable: false,
+              projectId: "",
               ocrReceiptId: receiptId,
               confidenceScore: confidence,
-              scannedFile: file,
             };
 
-            // Skip success review screen, open existing form directly
+            // Close selection dialog and open the full-screen OCR review modal
             setIsSelectionDialogOpen(false);
-            setSelectedLineItem(scanResultObj);
-            setIsLineItemDrawerOpen(true);
+            setOcrReviewData(reviewData);
+            setOcrReviewErrors({});
+            setIsOcrReviewOpen(true);
 
             setTimeout(() => {
               setSelectionStep("options");
-              setScannedFile(null);
               setScanningProgress(0);
               setScannedResult(null);
             }, 300);
@@ -376,6 +490,85 @@ export default function ExpenseReportDetailPage() {
   const openEditLineItem = (li) => {
     setSelectedLineItem(li);
     setIsLineItemDrawerOpen(true);
+  };
+
+  const openViewLineItem = async (li) => {
+    setLineItemToView(li);
+    setIsViewModalOpen(true);
+    setViewReceipts([]);
+    setViewReceiptPreviewUrl("");
+    setViewReceiptFile(null);
+    setViewZoom(1);
+    setViewRotation(0);
+
+    if (li.lineItemId) {
+      try {
+        setLoadingViewReceipts(true);
+        const res = await receiptService.getAll(li.lineItemId);
+        const list = Array.isArray(res.data) ? res.data : res.data?.receipts || res.data?.content || res.data?.data || [];
+        setViewReceipts(list);
+
+        if (list.length > 0) {
+          const firstReceipt = list[0];
+          setViewReceiptFile(firstReceipt);
+          const urlRes = await receiptService.getViewUrl(firstReceipt.receiptId);
+          const url = extractUrl(urlRes.data?.data || urlRes.data);
+          if (url) {
+            setViewReceiptPreviewUrl(url);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch receipts for view:", err);
+      } finally {
+        setLoadingViewReceipts(false);
+      }
+    }
+  };
+
+  const handleSelectActiveViewReceipt = async (receipt) => {
+    try {
+      setViewReceiptFile(receipt);
+      setViewReceiptPreviewUrl("");
+      const urlRes = await receiptService.getViewUrl(receipt.receiptId);
+      const url = extractUrl(urlRes.data?.data || urlRes.data);
+      if (url) {
+        setViewReceiptPreviewUrl(url);
+      }
+    } catch (err) {
+      console.error("Failed to change active receipt view:", err);
+    }
+  };
+
+  const handleViewReceiptForReadonly = async (receipt) => {
+    try {
+      if (receipt.receiptId) {
+        const res = await receiptService.getViewUrl(receipt.receiptId);
+        const url = extractUrl(res.data?.data || res.data);
+        if (url) window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      showStatusToast("Failed to open receipt preview.", "error");
+    }
+  };
+
+  const handleDownloadReceiptForReadonly = async (receipt) => {
+    try {
+      if (receipt.receiptId) {
+        const res = await receiptService.getDownloadUrl(receipt.receiptId);
+        const url = extractUrl(res.data?.data || res.data);
+        if (url) {
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = receipt.fileName || "receipt";
+          link.rel = "noopener noreferrer";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        }
+      }
+    } catch (err) {
+      showStatusToast("Failed to download receipt.", "error");
+    }
   };
 
   const handleLineItemSaved = () => {
@@ -522,6 +715,16 @@ export default function ExpenseReportDetailPage() {
             type="button"
             variant="link"
             size="icon"
+            title="View Line Item"
+            className="h-8 w-8 p-0 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-800 transition rounded-md"
+            onClick={() => openViewLineItem(li)}
+          >
+            <Eye size={16} />
+          </Button>
+          <Button
+            type="button"
+            variant="link"
+            size="icon"
             title="Edit Line Item"
             className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800 transition rounded-md"
             onClick={() => openEditLineItem(li)}
@@ -544,6 +747,86 @@ export default function ExpenseReportDetailPage() {
 
     return rowObj;
   });
+
+  const handleOcrInputChange = (e) => {
+    const { name, value } = e.target;
+    setOcrReviewData((prev) => ({ ...prev, [name]: value }));
+    if (ocrReviewErrors[name]) setOcrReviewErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const handleOcrSelectChange = (name, value) => {
+    setOcrReviewData((prev) => ({ ...prev, [name]: value }));
+    if (ocrReviewErrors[name]) setOcrReviewErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const validateOcrForm = () => {
+    const errors = {};
+    const amountNum = Number(ocrReviewData.amount);
+    const gstNum = Number(ocrReviewData.taxAmount);
+
+    if (!ocrReviewData.amount || amountNum <= 0) {
+      errors.amount = "Amount is required and must be greater than 0.";
+    }
+    if (ocrReviewData.taxAmount === "" || gstNum < 0) {
+      errors.taxAmount = "GST must be zero or a positive number.";
+    } else if (amountNum > 0 && gstNum > amountNum) {
+      errors.taxAmount = "GST cannot exceed the expense amount.";
+    }
+    if (!ocrReviewData.merchantName.trim()) errors.merchantName = "Merchant is required.";
+    if (!ocrReviewData.currencyId) errors.currencyId = "Currency is required.";
+    if (!ocrReviewData.categoryId) errors.categoryId = "Category is required.";
+    if (!ocrReviewData.costCenterId) errors.costCenterId = "Cost center is required.";
+    if (!ocrReviewData.expenseDate) errors.expenseDate = "Expense date is required.";
+    if (ocrReviewData.clientBillable && !ocrReviewData.projectId) {
+      errors.projectId = "Project is required when billable.";
+    }
+
+    setOcrReviewErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleOcrSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateOcrForm()) return;
+
+    const payload = {
+      categoryId: ocrReviewData.categoryId,
+      expenseDate: ocrReviewData.expenseDate,
+      merchantName: ocrReviewData.merchantName.trim(),
+      description: ocrReviewData.description ? ocrReviewData.description.trim() : "",
+      amount: Number(ocrReviewData.amount),
+      currencyId: ocrReviewData.currencyId,
+      taxAmount: Number(ocrReviewData.taxAmount),
+      costCenterId: ocrReviewData.costCenterId,
+      projectId: ocrReviewData.clientBillable ? (ocrReviewData.projectId || null) : null,
+      clientBillable: !!ocrReviewData.clientBillable,
+    };
+
+    try {
+      setOcrSubmitting(true);
+      await api.post(`/xms/employee/receipts/${ocrReviewData.ocrReceiptId}/confirm`, {
+        ...payload,
+        lineItemId: null
+      }, {
+        baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        }
+      });
+
+      showStatusToast("Line item created and receipt confirmed successfully!", "success");
+      fetchLineItems();
+      fetchReport();
+      setIsOcrReviewOpen(false);
+      setScannedFile(null);
+    } catch (err) {
+      console.error("Error confirming OCR receipt:", err);
+      const errMsg = err.response?.data?.message || err.response?.data?.detail || "Failed to confirm line item.";
+      showStatusToast(errMsg, "error");
+    } finally {
+      setOcrSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -965,6 +1248,579 @@ export default function ExpenseReportDetailPage() {
         isLoading={deletingReport}
         variant="danger"
       />
+
+      {isViewModalOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-[#f8fafc] flex flex-col h-screen w-screen overflow-hidden animate-in fade-in duration-200">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200 shadow-sm shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-700 shadow-sm">
+                <Eye size={20} />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-900">View Line Item</h2>
+                <p className="text-xs text-gray-500 font-medium">Detailed read-only information for this expense line item.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsViewModalOpen(false)}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Body - 50% / 50% split */}
+          <div className="flex-1 flex min-h-0">
+            {/* Left Column (50%): Receipt Preview */}
+            <div className="w-1/2 bg-[#0b0f19] flex items-center justify-center border-r border-gray-100 min-w-0 h-full overflow-hidden relative group">
+              {loadingViewReceipts ? (
+                <div className="flex flex-col items-center gap-2 text-sm text-gray-400">
+                  <Loader2 size={24} className="animate-spin text-indigo-500" />
+                  <span>Loading receipt preview...</span>
+                </div>
+              ) : viewReceiptPreviewUrl ? (
+                viewReceiptFile?.fileName?.toLowerCase().endsWith(".pdf") ? (
+                  <iframe
+                    src={viewReceiptPreviewUrl}
+                    className="w-full h-full border-0"
+                    title="Receipt PDF Preview"
+                  />
+                ) : (
+                  <>
+                    <img
+                      src={viewReceiptPreviewUrl}
+                      style={{
+                        transform: `scale(${viewZoom}) rotate(${viewRotation}deg)`,
+                        transition: "transform 0.2s ease-in-out",
+                      }}
+                      className="w-full h-full object-contain"
+                      alt="Receipt Image Preview"
+                    />
+                    <div className="absolute bottom-4 right-4 flex items-center gap-1.5 bg-slate-900/85 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-slate-700/50 shadow-lg text-white z-10 select-none">
+                      <button
+                        type="button"
+                        onClick={() => setViewZoom((prev) => Math.max(prev - 0.2, 0.5))}
+                        className="p-1 hover:bg-slate-800 rounded-full transition text-slate-300 hover:text-white"
+                        title="Zoom Out (-)"
+                      >
+                        <ZoomOut size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewZoom((prev) => Math.min(prev + 0.2, 3))}
+                        className="p-1 hover:bg-slate-800 rounded-full transition text-slate-300 hover:text-white"
+                        title="Zoom In (+)"
+                      >
+                        <ZoomIn size={15} />
+                      </button>
+                      <div className="w-[1px] h-3 bg-slate-700/50 mx-0.5" />
+                      <button
+                        type="button"
+                        onClick={() => setViewRotation((prev) => prev - 90)}
+                        className="p-1 hover:bg-slate-800 rounded-full transition text-slate-300 hover:text-white"
+                        title="Rotate Left (↺)"
+                      >
+                        <RotateCcw size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewRotation((prev) => prev + 90)}
+                        className="p-1 hover:bg-slate-800 rounded-full transition text-slate-300 hover:text-white"
+                        title="Rotate Right (↻)"
+                      >
+                        <RotateCw size={15} />
+                      </button>
+                      <div className="w-[1px] h-3 bg-slate-700/50 mx-0.5" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setViewZoom(1);
+                          setViewRotation(0);
+                        }}
+                        className="px-2 py-0.5 text-[10px] font-bold hover:bg-slate-800 rounded-md transition text-slate-300 hover:text-white"
+                        title="Reset"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </>
+                )
+              ) : (
+                <div className="text-sm text-gray-400">No receipt preview available</div>
+              )}
+            </div>
+
+            {/* Right Column (50%): Form/Details */}
+            <div className="w-1/2 bg-white flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                {lineItemToView && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <DetailField icon={<Layers size={15} />} label="Category" value={lineItemToView.categoryName || "—"} />
+                      <DetailField icon={<Calendar size={15} />} label="Expense Date" value={formatDate(lineItemToView.expenseDate)} />
+                      <DetailField icon={<Briefcase size={15} />} label="Merchant" value={lineItemToView.merchantName || "—"} />
+                      <DetailField icon={<Briefcase size={15} />} label="Cost Center" value={lineItemToView.costCenterName || "—"} />
+
+                      <div className="col-span-2 grid grid-cols-3 gap-3 bg-gray-50/50 p-3.5 rounded-xl border border-gray-100">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block">Amount</span>
+                          <span className="text-sm font-semibold font-mono text-gray-800">
+                            {formatAmount(lineItemToView.amount)} {lineItemToView.currencyCode}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block">GST (Tax)</span>
+                          <span className="text-sm font-semibold font-mono text-amber-600">
+                            {formatAmount(lineItemToView.taxAmount)} {lineItemToView.currencyCode}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block">Net Amount</span>
+                          <span className="text-sm font-semibold font-mono text-emerald-700">
+                            {formatAmount(lineItemToView.netAmount)} {lineItemToView.currencyCode}
+                          </span>
+                        </div>
+                      </div>
+
+                      <DetailField icon={<Landmark size={15} />} label="Base Amount" value={`${formatAmount(lineItemToView.baseAmount)} ${lineItemToView.baseCurrencyCode}`} />
+                      <DetailField icon={<Briefcase size={15} />} label="Client Billable?" value={lineItemToView.clientBillable ? "Yes" : "No"} />
+                      {lineItemToView.clientBillable && (
+                        <div className="col-span-2">
+                          <DetailField icon={<Briefcase size={15} />} label="Project" value={lineItemToView.projectName || "—"} />
+                        </div>
+                      )}
+                      <div className="col-span-2">
+                        <DetailField icon={<FileText size={15} />} label="Description" value={lineItemToView.description || "—"} />
+                      </div>
+                    </div>
+
+                    {/* Attached Receipts list */}
+                    <div className="border-t border-gray-100 pt-4 space-y-2">
+                      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Attached Receipts</h3>
+                      {loadingViewReceipts ? (
+                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                          <Loader2 size={14} className="animate-spin text-indigo-500" />
+                          <span>Loading receipts list...</span>
+                        </div>
+                      ) : viewReceipts.length === 0 ? (
+                        <p className="text-xs text-gray-400 italic">No receipts attached to this line item.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {viewReceipts.map((r) => {
+                            const isActive = viewReceiptFile?.receiptId === r.receiptId;
+                            return (
+                              <div
+                                key={r.receiptId}
+                                className={`flex items-center justify-between p-2.5 rounded-lg border transition ${
+                                  isActive
+                                    ? "border-indigo-500 bg-indigo-50/20"
+                                    : "border-gray-200/80 bg-white hover:border-indigo-300"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <FileText size={16} className="text-indigo-500 shrink-0" />
+                                  <span className="text-xs font-medium text-gray-700 truncate" title={r.fileName}>
+                                    {r.fileName}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectActiveViewReceipt(r)}
+                                    className={`p-1 rounded transition ${
+                                      isActive
+                                        ? "bg-indigo-100 text-indigo-700"
+                                        : "hover:bg-gray-100 text-gray-500 hover:text-indigo-600"
+                                    }`}
+                                    title="View receipt in panel"
+                                  >
+                                    <Eye size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadReceiptForReadonly(r)}
+                                    className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-indigo-600 transition"
+                                    title="Download Receipt"
+                                  >
+                                    <Download size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Footer Actions */}
+              <div className="shrink-0 border-t border-gray-100 bg-gray-50 px-6 py-3 flex items-center justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsViewModalOpen(false)}
+                  className="w-full sm:w-auto"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {isOcrReviewOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-[#f8fafc] flex flex-col h-screen w-screen overflow-hidden animate-in fade-in duration-200">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200 shadow-sm shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-700 shadow-sm">
+                <Sparkles size={20} className="animate-pulse" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Review AI Scanned Receipt</h2>
+                <p className="text-xs text-gray-500 font-medium">Verify or edit the extracted details below before saving.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsOcrReviewOpen(false)}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Body - 50% / 50% split */}
+          <div className="flex-1 flex min-h-0">
+            {/* Left Column (50%): Receipt Preview */}
+            <div className="w-1/2 bg-[#0b0f19] flex items-center justify-center border-r border-gray-100 min-w-0 h-full overflow-hidden relative group">
+              {receiptPreviewUrl ? (
+                scannedFile?.type === "application/pdf" ? (
+                  <iframe
+                    src={receiptPreviewUrl}
+                    className="w-full h-full border-0"
+                    title="Receipt PDF Preview"
+                  />
+                ) : (
+                  <>
+                    <img
+                      src={receiptPreviewUrl}
+                      style={{
+                        transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                        transition: "transform 0.2s ease-in-out",
+                      }}
+                      className="w-full h-full object-contain"
+                      alt="Receipt Image Preview"
+                    />
+                    <div className="absolute bottom-4 right-4 flex items-center gap-1.5 bg-slate-900/85 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-slate-700/50 shadow-lg text-white z-10 select-none">
+                      <button
+                        type="button"
+                        onClick={handleZoomOut}
+                        className="p-1 hover:bg-slate-800 rounded-full transition text-slate-300 hover:text-white"
+                        title="Zoom Out (-)"
+                      >
+                        <ZoomOut size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleZoomIn}
+                        className="p-1 hover:bg-slate-800 rounded-full transition text-slate-300 hover:text-white"
+                        title="Zoom In (+)"
+                      >
+                        <ZoomIn size={15} />
+                      </button>
+                      <div className="w-[1px] h-3 bg-slate-700/50 mx-0.5" />
+                      <button
+                        type="button"
+                        onClick={handleRotateLeft}
+                        className="p-1 hover:bg-slate-800 rounded-full transition text-slate-300 hover:text-white"
+                        title="Rotate Left (↺)"
+                      >
+                        <RotateCcw size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRotateRight}
+                        className="p-1 hover:bg-slate-800 rounded-full transition text-slate-300 hover:text-white"
+                        title="Rotate Right (↻)"
+                      >
+                        <RotateCw size={15} />
+                      </button>
+                      <div className="w-[1px] h-3 bg-slate-700/50 mx-0.5" />
+                      <button
+                        type="button"
+                        onClick={handleResetView}
+                        className="px-2 py-0.5 text-[10px] font-bold hover:bg-slate-800 rounded-md transition text-slate-300 hover:text-white"
+                        title="Reset"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </>
+                )
+              ) : (
+                <div className="text-sm text-gray-400">No receipt preview available</div>
+              )}
+            </div>
+
+            {/* Right Column (50%): Form */}
+            <div className="w-1/2 bg-white flex flex-col min-h-0">
+              <form onSubmit={handleOcrSubmit} className="flex-1 flex flex-col min-h-0">
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Category */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-gray-600">
+                        Category <span className="text-red-500">*</span>
+                      </label>
+                      <Select
+                        options={categoryOptions}
+                        value={categoryOptions.find((o) => o.value === ocrReviewData.categoryId) || null}
+                        onChange={(opt) => handleOcrSelectChange("categoryId", opt ? opt.value : "")}
+                        placeholder="Select expense category..."
+                        isSearchable
+                        styles={compactSelectStyles}
+                        isDisabled={ocrSubmitting}
+                      />
+                      {ocrReviewErrors.categoryId && (
+                        <span className="text-[11px] text-red-600 block mt-0.5">{ocrReviewErrors.categoryId}</span>
+                      )}
+                    </div>
+
+                    {/* Merchant */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-gray-600">
+                        Merchant <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="merchantName"
+                        placeholder="e.g. REDBUS"
+                        value={ocrReviewData.merchantName}
+                        onChange={handleOcrInputChange}
+                        disabled={ocrSubmitting}
+                        className={`w-full px-2.5 py-1.5 rounded-md border text-xs transition focus:outline-none focus:ring-2 ${
+                          ocrReviewErrors.merchantName
+                            ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                            : "border-gray-300 focus:border-indigo-500 focus:ring-indigo-500/20"
+                        }`}
+                      />
+                      {ocrReviewErrors.merchantName && (
+                        <span className="text-[11px] text-red-600 block mt-0.5">{ocrReviewErrors.merchantName}</span>
+                      )}
+                    </div>
+
+                    {/* Expense Date */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-gray-600">
+                        Expense Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        name="expenseDate"
+                        value={ocrReviewData.expenseDate}
+                        onChange={handleOcrInputChange}
+                        disabled={ocrSubmitting}
+                        className={`w-full px-2.5 py-1.5 rounded-md border text-xs transition focus:outline-none focus:ring-2 ${
+                          ocrReviewErrors.expenseDate
+                            ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                            : "border-gray-300 focus:border-indigo-500 focus:ring-indigo-500/20"
+                        }`}
+                      />
+                      {ocrReviewErrors.expenseDate && (
+                        <span className="text-[11px] text-red-600 block mt-0.5">{ocrReviewErrors.expenseDate}</span>
+                      )}
+                    </div>
+
+                    {/* Cost Center */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-gray-600">
+                        Cost Center <span className="text-red-500">*</span>
+                      </label>
+                      <Select
+                        options={costCenterOptions}
+                        value={costCenterOptions.find((o) => o.value === ocrReviewData.costCenterId) || null}
+                        onChange={(opt) => handleOcrSelectChange("costCenterId", opt ? opt.value : "")}
+                        placeholder="Select cost center..."
+                        isSearchable
+                        styles={compactSelectStyles}
+                        isDisabled={ocrSubmitting}
+                      />
+                      {ocrReviewErrors.costCenterId && (
+                        <span className="text-[11px] text-red-600 block mt-0.5">{ocrReviewErrors.costCenterId}</span>
+                      )}
+                    </div>
+
+                    {/* Amount, Currency, and GST in a 3-column sub-grid */}
+                    <div className="col-span-2 grid grid-cols-3 gap-3">
+                      {/* Amount */}
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-600">
+                          Amount <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          name="amount"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={ocrReviewData.amount}
+                          onChange={handleOcrInputChange}
+                          disabled={ocrSubmitting}
+                          className={`w-full px-2.5 py-1.5 rounded-md border text-xs transition focus:outline-none focus:ring-2 ${
+                            ocrReviewErrors.amount
+                              ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                              : "border-gray-300 focus:border-indigo-500 focus:ring-indigo-500/20"
+                          }`}
+                        />
+                        {ocrReviewErrors.amount && (
+                          <span className="text-[11px] text-red-600 block mt-0.5">{ocrReviewErrors.amount}</span>
+                        )}
+                      </div>
+
+                      {/* Currency */}
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-600">
+                          Currency <span className="text-red-500">*</span>
+                        </label>
+                        <Select
+                          options={currencyOptions}
+                          value={currencyOptions.find((o) => o.value === ocrReviewData.currencyId) || null}
+                          onChange={(opt) => handleOcrSelectChange("currencyId", opt ? opt.value : "")}
+                          placeholder="Select currency..."
+                          isSearchable
+                          styles={compactSelectStyles}
+                          isDisabled={ocrSubmitting}
+                        />
+                        {ocrReviewErrors.currencyId && (
+                          <span className="text-[11px] text-red-600 block mt-0.5">{ocrReviewErrors.currencyId}</span>
+                        )}
+                      </div>
+
+                      {/* GST */}
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-600">
+                          GST <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          name="taxAmount"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={ocrReviewData.taxAmount}
+                          onChange={handleOcrInputChange}
+                          disabled={ocrSubmitting}
+                          className={`w-full px-2.5 py-1.5 rounded-md border text-xs transition focus:outline-none focus:ring-2 ${
+                            ocrReviewErrors.taxAmount
+                              ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                              : "border-gray-300 focus:border-indigo-500 focus:ring-indigo-500/20"
+                        }`}
+                        />
+                        {ocrReviewErrors.taxAmount && (
+                          <span className="text-[11px] text-red-600 block mt-0.5">{ocrReviewErrors.taxAmount}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Client Billable & Project */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-gray-600">Client Billable?</label>
+                      <select
+                        name="clientBillable"
+                        value={ocrReviewData.clientBillable.toString()}
+                        onChange={(e) => handleOcrSelectChange("clientBillable", e.target.value === "true")}
+                        disabled={ocrSubmitting}
+                        className="w-full px-2.5 py-1.5 h-[32px] rounded-md border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white animate-none"
+                      >
+                        <option value="false">No</option>
+                        <option value="true">Yes</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-gray-600">
+                        Project {ocrReviewData.clientBillable && <span className="text-red-500">*</span>}
+                      </label>
+                      <Select
+                        options={projects
+                          .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
+                          .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))}
+                        value={projects
+                          .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
+                          .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))
+                          .find((o) => o.value === ocrReviewData.projectId) || null}
+                        onChange={(opt) => handleOcrSelectChange("projectId", opt ? opt.value : "")}
+                        placeholder="Select project..."
+                        isSearchable
+                        styles={compactSelectStyles}
+                        isDisabled={ocrSubmitting || !ocrReviewData.clientBillable}
+                      />
+                      {ocrReviewErrors.projectId && (
+                        <span className="text-[11px] text-red-600 block mt-0.5">{ocrReviewErrors.projectId}</span>
+                      )}
+                    </div>
+
+                    {/* Description */}
+                    <div className="col-span-2 space-y-1">
+                      <label className="block text-xs font-semibold text-gray-600">Description</label>
+                      <input
+                        type="text"
+                        name="description"
+                        placeholder="Optional notes about this expense..."
+                        value={ocrReviewData.description}
+                        onChange={handleOcrInputChange}
+                        disabled={ocrSubmitting}
+                        className="w-full px-2.5 py-1.5 rounded-md border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Real-time Cards */}
+                  <div className="grid grid-cols-2 gap-3 mt-1">
+                    <GstCalculationCard amount={ocrReviewData.amount} gst={ocrReviewData.taxAmount} />
+                    <CurrencyConversionCard
+                      amount={ocrReviewData.amount}
+                      currencyCode={currencyOptions.find((o) => o.value === ocrReviewData.currencyId)?.code}
+                      pending={true}
+                    />
+                  </div>
+                </div>
+
+                {/* Footer Action Bar */}
+                <div className="shrink-0 border-t border-gray-100 bg-gray-50 px-6 py-3 flex items-center justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsOcrReviewOpen(false)}
+                    disabled={ocrSubmitting}
+                    className="w-full sm:w-auto"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    loading={ocrSubmitting}
+                    loadingText="Saving..."
+                    disabled={ocrSubmitting}
+                    className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 border-none"
+                  >
+                    Save & Confirm
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
@@ -979,6 +1835,50 @@ const customSelectStyles = {
     minHeight: "42px",
     backgroundColor: "#ffffff",
     "&:hover": { borderColor: state.isFocused ? "#3b82f6" : "#d1d5db" },
+  }),
+  menu: (base) => ({ ...base, zIndex: 9999 }),
+};
+
+const compactSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    borderRadius: "0.375rem",
+    borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
+    boxShadow: state.isFocused ? "0 0 0 2px rgba(59, 130, 246, 0.5)" : "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+    padding: "0px 4px",
+    minHeight: "32px",
+    height: "32px",
+    backgroundColor: "#ffffff",
+    "&:hover": { borderColor: state.isFocused ? "#3b82f6" : "#d1d5db" },
+  }),
+  valueContainer: (base) => ({
+    ...base,
+    padding: "0px 6px",
+    height: "30px",
+  }),
+  input: (base) => ({
+    ...base,
+    margin: "0px",
+  }),
+  indicatorsContainer: (base) => ({
+    ...base,
+    height: "30px",
+  }),
+  dropdownIndicator: (base) => ({
+    ...base,
+    padding: "4px",
+  }),
+  clearIndicator: (base) => ({
+    ...base,
+    padding: "4px",
+  }),
+  singleValue: (base) => ({
+    ...base,
+    fontSize: "0.75rem",
+  }),
+  placeholder: (base) => ({
+    ...base,
+    fontSize: "0.75rem",
   }),
   menu: (base) => ({ ...base, zIndex: 9999 }),
 };
@@ -1013,6 +1913,11 @@ function LineItemDrawer({
   const [savedLineItem, setSavedLineItem] = useState(null);
   const [ocrReceiptId, setOcrReceiptId] = useState(null);
   const [projects, setProjects] = useState([]);
+
+  const [editActiveReceiptUrl, setEditActiveReceiptUrl] = useState("");
+  const [editActiveReceiptFile, setEditActiveReceiptFile] = useState(null);
+  const [editZoom, setEditZoom] = useState(1);
+  const [editRotation, setEditRotation] = useState(0);
 
   const [receipts, setReceipts] = useState([]);
   const [loadingReceipts, setLoadingReceipts] = useState(false);
@@ -1107,6 +2012,79 @@ function LineItemDrawer({
     }
     setFormErrors({});
   }, [isOpen, lineItem, defaultCostCenterId]);
+
+  // Set the first receipt as active when receipts load or pending files change
+  useEffect(() => {
+    const loadFirstReceiptUrl = async () => {
+      // If we have uploaded receipts and haven't selected one yet, select the first
+      if (receipts.length > 0) {
+        if (!editActiveReceiptFile || !receipts.some(r => r.receiptId === editActiveReceiptFile.receiptId)) {
+          const first = receipts[0];
+          setEditActiveReceiptFile(first);
+          try {
+            const res = await receiptService.getViewUrl(first.receiptId);
+            const url = extractUrl(res.data?.data || res.data);
+            if (url) setEditActiveReceiptUrl(url);
+          } catch (err) {
+            console.error("Failed to load edit active receipt url:", err);
+          }
+        }
+      } 
+      // If no uploaded receipts, check pending files
+      else if (pendingFiles.length > 0) {
+        if (!editActiveReceiptFile || !pendingFiles.some(pf => pf.id === editActiveReceiptFile.id)) {
+          const first = pendingFiles[0];
+          setEditActiveReceiptFile(first);
+          if (first.file) {
+            const url = URL.createObjectURL(first.file);
+            setEditActiveReceiptUrl(url);
+          }
+        }
+      }
+      // If nothing is present, clear active
+      else {
+        setEditActiveReceiptFile(null);
+        setEditActiveReceiptUrl("");
+      }
+    };
+    loadFirstReceiptUrl();
+  }, [receipts, pendingFiles]);
+
+  // Clean up object URLs to prevent leaks
+  useEffect(() => {
+    return () => {
+      if (editActiveReceiptUrl && editActiveReceiptUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(editActiveReceiptUrl);
+      }
+    };
+  }, [editActiveReceiptUrl]);
+
+  // Reset viewer when modal closes/opens
+  useEffect(() => {
+    if (!isOpen) {
+      setEditActiveReceiptUrl("");
+      setEditActiveReceiptFile(null);
+      setEditZoom(1);
+      setEditRotation(0);
+    }
+  }, [isOpen]);
+
+  const handleSelectEditReceipt = async (receipt) => {
+    try {
+      setEditActiveReceiptFile(receipt);
+      setEditActiveReceiptUrl("");
+      if (receipt.receiptId) {
+        const res = await receiptService.getViewUrl(receipt.receiptId);
+        const url = extractUrl(res.data?.data || res.data);
+        if (url) setEditActiveReceiptUrl(url);
+      } else if (receipt.file) {
+        const url = URL.createObjectURL(receipt.file);
+        setEditActiveReceiptUrl(url);
+      }
+    } catch (err) {
+      console.error("Failed to select edit receipt:", err);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -1263,7 +2241,8 @@ function LineItemDrawer({
         if (lineItemId && pendingFiles.length > 0) {
           for (const pf of pendingFiles) {
             const formDataUpload = new FormData();
-            formDataUpload.append("file", pf.file);
+            const safeName = pf.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+            formDataUpload.append("file", pf.file, safeName);
             try {
               await receiptService.upload(lineItemId, formDataUpload);
             } catch (uploadErr) {
@@ -1300,7 +2279,8 @@ function LineItemDrawer({
         if (lineItemId && pendingFiles.length > 0) {
           for (const pf of pendingFiles) {
             const formDataUpload = new FormData();
-            formDataUpload.append("file", pf.file);
+            const safeName = pf.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+            formDataUpload.append("file", pf.file, safeName);
             try {
               await receiptService.upload(lineItemId, formDataUpload);
             } catch (uploadErr) {
@@ -1343,66 +2323,12 @@ function LineItemDrawer({
   const selectedCostCenter = costCenterOptions.find((o) => o.value === formData.costCenterId) || null;
   const selectedCategory = mergedCategoryOptions.find((o) => o.value === formData.categoryId) || null;
 
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={savedLineItem ? "Edit Line Item" : "Add Line Item"}
-      subtitle={
-        savedLineItem
-          ? "Modify this expense line item, or attach supporting receipts below."
-          : "Capture a single expense with real-time currency and GST calculation."
-      }
-      size="2xl"
-      fullScreenMobile
-      closeOnBackdrop={false}
-      footer={
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={onClose} disabled={submitting} className="w-full sm:w-auto">
-            {savedLineItem ? "Done" : "Cancel"}
-          </Button>
-          <Button
-            type="submit"
-            form="line-item-form"
-            variant="primary"
-            loading={submitting}
-            loadingText="Saving..."
-            disabled={submitting}
-            className="w-full sm:w-auto"
-          >
-            {savedLineItem ? "Save Changes" : "Save Line Item"}
-          </Button>
-        </div>
-      }
-    >
-      {ocrReceiptId && (
-        <div className="mb-4 flex items-center justify-between rounded-lg bg-indigo-50 border border-indigo-200 px-3.5 py-2.5 text-xs font-medium text-indigo-700 shadow-sm">
-          <div className="flex items-center gap-2">
-            <Sparkles size={14} className="text-indigo-500 animate-pulse shrink-0" />
-            <span>AI Scanned: We've pre-filled fields using OCR with {lineItem?.confidenceScore ? `${Math.round(lineItem.confidenceScore <= 1 ? lineItem.confidenceScore * 100 : lineItem.confidenceScore)}%` : "100%"} confidence.</span>
-          </div>
-        </div>
-      )}
-
-      {savedLineItem && !isEditingExisting && !ocrReceiptId && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs font-medium text-green-700">
-          <CheckCircle2 size={14} />
-          Line item saved. You can keep editing, attach receipts, or click Done.
-        </div>
-      )}
-
-      {categoryOptions.length === 0 && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-medium text-amber-700">
-          <AlertTriangle size={14} />
-          Expense categories couldn't be loaded for your account — contact your administrator if this
-          persists.
-        </div>
-      )}
-
-      <form id="line-item-form" onSubmit={handleSubmit} className="space-y-4 py-1">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">
+  const renderFormFields = () => {
+    return (
+      <div className="space-y-3 py-1">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-0.5">
+            <label className="block text-xs font-semibold text-gray-600">
               Category <span className="text-red-500">*</span>
             </label>
             <Select
@@ -1411,22 +2337,26 @@ function LineItemDrawer({
               onChange={(opt) => handleSelectChange("categoryId", opt ? opt.value : "")}
               placeholder="Select expense category..."
               isSearchable
-              styles={customSelectStyles}
+              styles={compactSelectStyles}
               isDisabled={submitting}
             />
-            {formErrors.categoryId && <span className="text-xs text-red-600 block mt-1">{formErrors.categoryId}</span>}
+            {formErrors.categoryId && <span className="text-[11px] text-red-600 block mt-0.5">{formErrors.categoryId}</span>}
           </div>
 
-          <FormDatePicker
+          <FormInput
             label="Expense Date *"
             name="expenseDate"
+            type="date"
             value={formData.expenseDate}
             onChange={handleInputChange}
+            className="space-y-0.5"
+            labelClassName="block text-xs font-semibold text-gray-600"
+            inputClassName="w-full text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm h-8"
             required
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormInput
             label="Merchant"
             name="merchantName"
@@ -1436,10 +2366,13 @@ function LineItemDrawer({
             requiredMark
             disabled={submitting}
             error={formErrors.merchantName}
+            className="space-y-0.5"
+            labelClassName="block text-xs font-semibold text-gray-600"
+            inputClassName="w-full text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm h-8"
           />
 
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">
+          <div className="space-y-0.5">
+            <label className="block text-xs font-semibold text-gray-600">
               Cost Center <span className="text-red-500">*</span>
             </label>
             <Select
@@ -1448,23 +2381,30 @@ function LineItemDrawer({
               onChange={(opt) => handleSelectChange("costCenterId", opt ? opt.value : "")}
               placeholder="Select cost center..."
               isSearchable
-              styles={customSelectStyles}
+              styles={compactSelectStyles}
               isDisabled={submitting}
             />
-            {formErrors.costCenterId && <span className="text-xs text-red-600 block mt-1">{formErrors.costCenterId}</span>}
+            {formErrors.costCenterId && <span className="text-[11px] text-red-600 block mt-0.5">{formErrors.costCenterId}</span>}
           </div>
         </div>
 
-        <FormTextArea
-          label="Description"
-          name="description"
-          placeholder="Optional notes about this expense..."
-          value={formData.description}
-          onChange={handleInputChange}
-          disabled={submitting}
-        />
+        <div className="space-y-0.5">
+          <label htmlFor="description" className="block text-xs font-semibold text-gray-600">
+            Description
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            value={formData.description}
+            onChange={handleInputChange}
+            placeholder="Optional notes about this expense..."
+            rows={2}
+            disabled={submitting}
+            className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs shadow-sm outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed resize-none"
+          />
+        </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <FormInput
             label="Amount"
             name="amount"
@@ -1477,10 +2417,13 @@ function LineItemDrawer({
             requiredMark
             disabled={submitting}
             error={formErrors.amount}
+            className="space-y-0.5"
+            labelClassName="block text-xs font-semibold text-gray-600"
+            inputClassName="w-full text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm h-8"
           />
 
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">
+          <div className="space-y-0.5">
+            <label className="block text-xs font-semibold text-gray-600">
               Currency <span className="text-red-500">*</span>
             </label>
             <Select
@@ -1489,10 +2432,10 @@ function LineItemDrawer({
               onChange={(opt) => handleSelectChange("currencyId", opt ? opt.value : "")}
               placeholder="Select currency..."
               isSearchable
-              styles={customSelectStyles}
+              styles={compactSelectStyles}
               isDisabled={submitting}
             />
-            {formErrors.currencyId && <span className="text-xs text-red-600 block mt-1">{formErrors.currencyId}</span>}
+            {formErrors.currencyId && <span className="text-[11px] text-red-600 block mt-0.5">{formErrors.currencyId}</span>}
           </div>
 
           <FormInput
@@ -1507,23 +2450,31 @@ function LineItemDrawer({
             requiredMark
             disabled={submitting}
             error={formErrors.taxAmount}
+            className="space-y-0.5"
+            labelClassName="block text-xs font-semibold text-gray-600"
+            inputClassName="w-full text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm h-8"
           />
         </div>
 
-        <FormSelect
-          label="Client Billable?"
-          name="clientBillable"
-          value={formData.clientBillable}
-          onChange={(e) => handleSelectChange("clientBillable", e.target.value === true || e.target.value === "true")}
-          options={[
-            { label: "Yes", value: true },
-            { label: "No", value: false },
-          ]}
-        />
+        <div className="space-y-0.5">
+          <label className="block text-xs font-semibold text-gray-600">
+            Client Billable?
+          </label>
+          <select
+            name="clientBillable"
+            value={formData.clientBillable.toString()}
+            onChange={(e) => handleSelectChange("clientBillable", e.target.value === "true")}
+            className="w-full text-xs px-2.5 py-1.5 border border-gray-300 bg-white rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm h-8"
+            disabled={submitting}
+          >
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </div>
 
         {formData.clientBillable && (
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">
+          <div className="space-y-0.5">
+            <label className="block text-xs font-semibold text-gray-600">
               Project <span className="text-red-500">*</span>
             </label>
             <Select
@@ -1532,14 +2483,14 @@ function LineItemDrawer({
               onChange={(opt) => handleSelectChange("projectId", opt ? opt.value : "")}
               placeholder="Select project..."
               isSearchable
-              styles={customSelectStyles}
+              styles={compactSelectStyles}
               isDisabled={submitting}
             />
-            {formErrors.projectId && <span className="text-xs text-red-600 block mt-1">{formErrors.projectId}</span>}
+            {formErrors.projectId && <span className="text-[11px] text-red-600 block mt-0.5">{formErrors.projectId}</span>}
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <GstCalculationCard amount={formData.amount} gst={formData.taxAmount} />
           <CurrencyConversionCard
             amount={formData.amount}
@@ -1551,71 +2502,80 @@ function LineItemDrawer({
           />
         </div>
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">Receipts</label>
+        <div className="space-y-1.5">
+          <label className="block text-xs font-semibold text-gray-600">Receipts</label>
           {isEditingExisting ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {loadingReceipts ? (
-                <div className="flex items-center justify-center py-6 text-gray-400">
-                  <Loader2 className="animate-spin" size={18} />
+                <div className="flex items-center justify-center py-4 text-gray-400">
+                  <Loader2 className="animate-spin" size={16} />
                 </div>
               ) : receipts.length === 0 ? (
-                <p className="text-center text-xs text-gray-400 py-2">No receipts uploaded yet.</p>
+                <p className="text-center text-[11px] text-gray-400 py-1">No receipts uploaded yet.</p>
               ) : (
-                <div className="space-y-2">
-                  {receipts.map((r) => (
-                    <div
-                      key={r.receiptId}
-                      className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-2.5 hover:border-gray-300 hover:shadow-sm transition"
-                    >
-                      <div className="shrink-0 p-2 rounded-lg bg-blue-50 text-blue-600">
-                        {isImageFile(r.fileName) ? <ImageIcon size={16} /> : <FileText size={16} />}
+                <div className="space-y-1.5">
+                  {receipts.map((r) => {
+                    const isActive = editActiveReceiptFile?.receiptId === r.receiptId;
+                    return (
+                      <div
+                        key={r.receiptId}
+                        className={`flex items-center gap-2 rounded-lg border p-2 transition ${
+                          isActive
+                            ? "border-indigo-500 bg-indigo-50/20"
+                            : "border-gray-200 bg-white hover:border-gray-300"
+                        }`}
+                      >
+                        <div className="shrink-0 p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                          {isImageFile(r.fileName) ? <ImageIcon size={14} /> : <FileText size={14} />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-gray-800 truncate">{r.fileName || "Receipt"}</p>
+                          <p className="text-[10px] text-gray-400">
+                            {formatFileSize(r.fileSize)} &bull; {formatDate(r.uploadedAt)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="icon"
+                            title="View Receipt"
+                            className={`h-6 w-6 p-0 rounded-md transition ${
+                              isActive ? "bg-indigo-100 text-indigo-700" : "text-gray-600 hover:bg-gray-100"
+                            }`}
+                            onClick={() => handleSelectEditReceipt(r)}
+                          >
+                            <Eye size={12} />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="icon"
+                            title="Download Receipt"
+                            className="h-6 w-6 p-0 text-blue-600 hover:bg-blue-50 rounded-md"
+                            onClick={() => handleDownloadReceipt(r)}
+                          >
+                            <Download size={12} />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="icon"
+                            title="Delete Receipt"
+                            className="h-6 w-6 p-0 text-red-600 hover:bg-red-50 rounded-md"
+                            onClick={() => setReceiptToDelete(r)}
+                          >
+                            <Trash2 size={12} />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-gray-800 truncate">{r.fileName || "Receipt"}</p>
-                        <p className="text-[10px] text-gray-400">
-                          {formatFileSize(r.fileSize)} &bull; {formatDate(r.uploadedAt)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-0.5 shrink-0">
-                        <Button
-                          type="button"
-                          variant="link"
-                          size="icon"
-                          title="View Receipt"
-                          className="h-7 w-7 p-0 text-gray-600 hover:bg-gray-100 rounded-md"
-                          onClick={() => handleViewReceipt(r)}
-                        >
-                          <Eye size={14} />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="link"
-                          size="icon"
-                          title="Download Receipt"
-                          className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 rounded-md"
-                          onClick={() => handleDownloadReceipt(r)}
-                        >
-                          <Download size={14} />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="link"
-                          size="icon"
-                          title="Delete Receipt"
-                          className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 rounded-md"
-                          onClick={() => setReceiptToDelete(r)}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
               {/* Add More Receipts Section */}
-              <div className="mt-4 space-y-3">
+              <div className="mt-2 space-y-1.5">
                 <p className="text-xs font-semibold text-gray-700">Add More Receipts</p>
                 <div
                   onDragOver={(e) => {
@@ -1629,14 +2589,14 @@ function LineItemDrawer({
                     handleFileChange(e.dataTransfer.files);
                   }}
                   onClick={() => inputRef.current?.click()}
-                  className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed p-5 text-center cursor-pointer transition ${isDragging ? "border-[#0A0082] bg-indigo-50" : "border-gray-300 bg-gray-50 hover:bg-gray-100"
+                  className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-3 text-center cursor-pointer transition ${isDragging ? "border-[#0A0082] bg-indigo-50" : "border-gray-300 bg-gray-50 hover:bg-gray-100"
                     }`}
                 >
-                  <UploadCloud className={isDragging ? "text-[#0A0082]" : "text-gray-400"} size={22} />
-                  <p className="text-xs font-medium text-gray-600">
+                  <UploadCloud className={isDragging ? "text-[#0A0082]" : "text-gray-400"} size={18} />
+                  <p className="text-[11px] font-medium text-gray-600">
                     Drag &amp; drop a receipt, or <span className="text-[#0A0082] font-semibold">browse</span>
                   </p>
-                  <p className="text-[10px] text-gray-400">PDF, PNG, JPG up to 10MB</p>
+                  <p className="text-[9px] text-gray-400">PDF, PNG, JPG up to 10MB</p>
                   <input
                     ref={inputRef}
                     type="file"
@@ -1651,51 +2611,66 @@ function LineItemDrawer({
                 </div>
 
                 {pendingFiles.length > 0 && (
-                  <div className="space-y-2">
-                    {pendingFiles.map((pf) => (
-                      <div
-                        key={pf.id}
-                        className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-2.5 hover:border-gray-300 hover:shadow-sm transition"
-                      >
-                        <div className="shrink-0 p-2 rounded-lg bg-blue-50 text-blue-600">
-                          {isImageFile(pf.name) ? <ImageIcon size={16} /> : <FileText size={16} />}
+                  <div className="space-y-1.5">
+                    {pendingFiles.map((pf) => {
+                      const isActive = editActiveReceiptFile?.id === pf.id;
+                      return (
+                        <div
+                          key={pf.id}
+                          className={`flex items-center gap-2 rounded-lg border p-2 transition ${
+                            isActive
+                              ? "border-indigo-500 bg-indigo-50/20"
+                              : "border-gray-200 bg-white hover:border-gray-300"
+                          }`}
+                        >
+                          <div className="shrink-0 p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                            {isImageFile(pf.name) ? <ImageIcon size={14} /> : <FileText size={14} />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-gray-800 truncate">{pf.name}</p>
+                            <p className="text-[10px] text-gray-400">
+                              {formatFileSize(pf.size)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="icon"
+                              title="View Receipt"
+                              className={`h-6 w-6 p-0 rounded-md transition ${
+                                isActive ? "bg-indigo-100 text-indigo-700" : "text-gray-600 hover:bg-gray-100"
+                              }`}
+                              onClick={() => handleSelectEditReceipt(pf)}
+                            >
+                              <Eye size={12} />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="icon"
+                              title="Remove File"
+                              className="h-6 w-6 p-0 text-red-600 hover:bg-red-50 rounded-md"
+                              onClick={() => {
+                                setPendingFiles((prev) => prev.filter((item) => item.id !== pf.id));
+                                if (editActiveReceiptFile?.id === pf.id) {
+                                  setEditActiveReceiptFile(null);
+                                  setEditActiveReceiptUrl("");
+                                }
+                              }}
+                            >
+                              <Trash2 size={12} />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold text-gray-800 truncate">{pf.name}</p>
-                          <p className="text-[10px] text-gray-400">
-                            {formatFileSize(pf.size)}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-0.5 shrink-0">
-                          <Button
-                            type="button"
-                            variant="link"
-                            size="icon"
-                            title="View Receipt"
-                            className="h-7 w-7 p-0 text-gray-600 hover:bg-gray-100 rounded-md"
-                            onClick={() => handleViewReceipt(pf)}
-                          >
-                            <Eye size={14} />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="link"
-                            size="icon"
-                            title="Remove File"
-                            className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 rounded-md"
-                            onClick={() => setPendingFiles((prev) => prev.filter((item) => item.id !== pf.id))}
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -1708,14 +2683,14 @@ function LineItemDrawer({
                   handleFileChange(e.dataTransfer.files);
                 }}
                 onClick={() => inputRef.current?.click()}
-                className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed p-5 text-center cursor-pointer transition ${isDragging ? "border-[#0A0082] bg-indigo-50" : "border-gray-300 bg-gray-50 hover:bg-gray-100"
+                className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-4 text-center cursor-pointer transition ${isDragging ? "border-[#0A0082] bg-indigo-50" : "border-gray-300 bg-gray-50 hover:bg-gray-100"
                   }`}
               >
-                <UploadCloud className={isDragging ? "text-[#0A0082]" : "text-gray-400"} size={22} />
-                <p className="text-xs font-medium text-gray-600">
+                <UploadCloud className={isDragging ? "text-[#0A0082]" : "text-gray-400"} size={20} />
+                <p className="text-[11px] font-medium text-gray-600">
                   Drag &amp; drop a receipt, or <span className="text-[#0A0082] font-semibold">browse</span>
                 </p>
-                <p className="text-[10px] text-gray-400">PDF, PNG, JPG up to 10MB</p>
+                <p className="text-[9px] text-gray-400">PDF, PNG, JPG up to 10MB</p>
                 <input
                   ref={inputRef}
                   type="file"
@@ -1730,14 +2705,14 @@ function LineItemDrawer({
               </div>
 
               {pendingFiles.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {pendingFiles.map((pf) => (
                     <div
                       key={pf.id}
-                      className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-2.5 hover:border-gray-300 hover:shadow-sm transition"
+                      className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 hover:border-gray-300 transition"
                     >
-                      <div className="shrink-0 p-2 rounded-lg bg-blue-50 text-blue-600">
-                        {isImageFile(pf.name) ? <ImageIcon size={16} /> : <FileText size={16} />}
+                      <div className="shrink-0 p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                        {isImageFile(pf.name) ? <ImageIcon size={14} /> : <FileText size={14} />}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold text-gray-800 truncate">{pf.name}</p>
@@ -1751,20 +2726,20 @@ function LineItemDrawer({
                           variant="link"
                           size="icon"
                           title="View Receipt"
-                          className="h-7 w-7 p-0 text-gray-600 hover:bg-gray-100 rounded-md"
+                          className="h-6 w-6 p-0 text-gray-600 hover:bg-gray-100 rounded-md"
                           onClick={() => handleViewReceipt(pf)}
                         >
-                          <Eye size={14} />
+                          <Eye size={12} />
                         </Button>
                         <Button
                           type="button"
                           variant="link"
                           size="icon"
                           title="Remove File"
-                          className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 rounded-md"
+                          className="h-6 w-6 p-0 text-red-600 hover:bg-red-50 rounded-md"
                           onClick={() => setPendingFiles((prev) => prev.filter((item) => item.id !== pf.id))}
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={12} />
                         </Button>
                       </div>
                     </div>
@@ -1774,8 +2749,171 @@ function LineItemDrawer({
             </div>
           )}
         </div>
-      </form>
+      </div>
+    );
+  };
 
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] bg-[#f8fafc] flex flex-col h-screen w-screen overflow-hidden animate-in fade-in duration-200">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200 shadow-sm shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-700 shadow-sm">
+            {savedLineItem ? <Pencil size={20} /> : <Plus size={20} />}
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-gray-900">
+              {savedLineItem ? "Edit Line Item" : "Add Line Item"}
+            </h2>
+            <p className="text-xs text-gray-500 font-medium">
+              {savedLineItem
+                ? "Modify this expense line item, or attach supporting receipts below."
+                : "Capture a single expense with real-time currency and GST calculation."}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition"
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      {/* Body - 50% / 50% split */}
+      <div className="flex-1 flex min-h-0">
+        {/* Left Column (50%): Receipt Preview */}
+        <div className="w-1/2 bg-[#0b0f19] flex items-center justify-center border-r border-gray-100 min-w-0 h-full overflow-hidden relative group">
+          {loadingReceipts ? (
+            <div className="flex flex-col items-center gap-2 text-sm text-gray-400">
+              <Loader2 size={24} className="animate-spin text-indigo-500" />
+              <span>Loading receipt...</span>
+            </div>
+          ) : editActiveReceiptUrl ? (
+            editActiveReceiptFile?.fileName?.toLowerCase().endsWith(".pdf") || 
+            editActiveReceiptFile?.name?.toLowerCase().endsWith(".pdf") ? (
+              <iframe
+                src={editActiveReceiptUrl}
+                className="w-full h-full border-0"
+                title="Receipt PDF Preview"
+              />
+            ) : (
+              <>
+                <img
+                  src={editActiveReceiptUrl}
+                  style={{
+                    transform: `scale(${editZoom}) rotate(${editRotation}deg)`,
+                    transition: "transform 0.2s ease-in-out",
+                  }}
+                  className="w-full h-full object-contain"
+                  alt="Receipt Image Preview"
+                />
+                <div className="absolute bottom-4 right-4 flex items-center gap-1.5 bg-slate-900/85 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-slate-700/50 shadow-lg text-white z-10 select-none">
+                  <button
+                    type="button"
+                    onClick={() => setEditZoom((prev) => Math.max(prev - 0.2, 0.5))}
+                    className="p-1 hover:bg-slate-800 rounded-full transition text-slate-300 hover:text-white"
+                    title="Zoom Out (-)"
+                  >
+                    <ZoomOut size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditZoom((prev) => Math.min(prev + 0.2, 3))}
+                    className="p-1 hover:bg-slate-800 rounded-full transition text-slate-300 hover:text-white"
+                    title="Zoom In (+)"
+                  >
+                    <ZoomIn size={15} />
+                  </button>
+                  <div className="w-[1px] h-3 bg-slate-700/50 mx-0.5" />
+                  <button
+                    type="button"
+                    onClick={() => setEditRotation((prev) => prev - 90)}
+                    className="p-1 hover:bg-slate-800 rounded-full transition text-slate-300 hover:text-white"
+                    title="Rotate Left (↺)"
+                  >
+                    <RotateCcw size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditRotation((prev) => prev + 90)}
+                    className="p-1 hover:bg-slate-800 rounded-full transition text-slate-300 hover:text-white"
+                    title="Rotate Right (↻)"
+                  >
+                    <RotateCw size={15} />
+                  </button>
+                  <div className="w-[1px] h-3 bg-slate-700/50 mx-0.5" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditZoom(1);
+                      setEditRotation(0);
+                    }}
+                    className="px-2 py-0.5 text-[10px] font-bold hover:bg-slate-800 rounded-md transition text-slate-300 hover:text-white"
+                    title="Reset"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </>
+            )
+          ) : (
+            <div className="flex flex-col items-center gap-2 text-slate-400 select-none">
+              <UploadCloud size={32} className="text-slate-500 animate-pulse" />
+              <span className="text-xs font-semibold text-slate-400">No receipt preview available</span>
+              <span className="text-[10px] text-slate-500 max-w-[220px] text-center leading-relaxed">Please upload a receipt on the right side to preview it here.</span>
+            </div>
+          )}
+        </div>
+
+        {/* Right Column (50%): Form Fields */}
+        <div className="w-1/2 flex flex-col min-h-0 bg-white">
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            {ocrReceiptId && (
+              <div className="mb-4 flex items-center justify-between rounded-lg bg-indigo-50 border border-indigo-200 px-3.5 py-2.5 text-xs font-medium text-indigo-700 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={14} className="text-indigo-500 animate-pulse shrink-0" />
+                  <span>AI Scanned: We've pre-filled fields using OCR with {lineItem?.confidenceScore ? `${Math.round(lineItem.confidenceScore <= 1 ? lineItem.confidenceScore * 100 : lineItem.confidenceScore)}%` : "100%"} confidence.</span>
+                </div>
+              </div>
+            )}
+
+            {categoryOptions.length === 0 && (
+              <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-medium text-amber-700">
+                <AlertTriangle size={14} />
+                Expense categories couldn't be loaded for your account.
+              </div>
+            )}
+
+            <form id="line-item-form" onSubmit={handleSubmit} className="space-y-4">
+              {renderFormFields()}
+            </form>
+          </div>
+
+          {/* Footer Action Bar */}
+          <div className="shrink-0 border-t border-gray-100 bg-gray-50 px-6 py-3 flex items-center justify-end gap-3">
+            <Button type="button" variant="outline" onClick={onClose} disabled={submitting} className="w-full sm:w-auto">
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="line-item-form"
+              variant="primary"
+              loading={submitting}
+              loadingText="Saving..."
+              disabled={submitting}
+              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 border-none"
+            >
+              {savedLineItem ? "Save Changes" : "Save Line Item"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Confirmation Modal */}
       <ConfirmationModal
         isOpen={!!receiptToDelete}
         title="Delete Receipt"
@@ -1787,7 +2925,8 @@ function LineItemDrawer({
         isLoading={deletingReceipt}
         variant="danger"
       />
-    </Modal>
+    </div>,
+    document.body
   );
 }
 
