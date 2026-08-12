@@ -1,11 +1,14 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { UploadCloud, FileText, X, CheckCircle2, Loader2 } from "lucide-react";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import { useUploadInvoiceMutation } from "../hooks/useInvoiceMutations";
+import { invoiceService } from "../services/invoiceService";
+import { INVOICE_DETAIL_KEY } from "../hooks/useInvoiceDetail";
 import { AP_ROUTES } from "../../constants/routes";
 import { getApiErrorMessage } from "../../utils/apiError";
 
@@ -14,19 +17,9 @@ const ACCEPTED_EXTENSIONS = [".pdf", ".png", ".jpg", ".jpeg"];
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
 const PROCESSING_STEPS = [
-  { key: "uploading", label: "Uploading document" },
-  { key: "ocr", label: "OCR processing" },
-  { key: "validating", label: "Validating extracted data" },
+  { key: "uploading", label: "Uploading & processing document" },
+  { key: "confirming", label: "Confirming invoice record" },
 ];
-
-const OUTCOME_MESSAGES = {
-  ocr_review: (invoiceNumber) => ({ tone: "info", text: `Invoice ${invoiceNumber} requires OCR review.` }),
-  ocr_failed: (invoiceNumber) => ({ tone: "error", text: `Invoice ${invoiceNumber} — OCR extraction failed.` }),
-  validation_failed: (invoiceNumber) => ({ tone: "error", text: `Invoice ${invoiceNumber} — validation failed and needs correction.` }),
-  pending_approval: (invoiceNumber) => ({ tone: "success", text: `Invoice ${invoiceNumber} submitted for approval.` }),
-};
-
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function getExtension(fileName) {
   const index = fileName.lastIndexOf(".");
@@ -53,6 +46,7 @@ function formatFileSize(bytes) {
 /** Route: /accounts-payable/invoices/upload */
 export default function InvoiceUploadPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const inputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [validationError, setValidationError] = useState("");
@@ -95,60 +89,54 @@ export default function InvoiceUploadPage() {
   };
 
   const handleUpload = async () => {
-  if (!selectedFile) {
-    setValidationError("Please select a file to upload.");
-    return;
-  }
-
-  try {
-    setProcessingStep("uploading");
-
-    const result = await uploadInvoice.mutateAsync(selectedFile);
-
-    const invoiceNumber =
-      result?.extracted_invoice?.invoice_number || "Invoice";
-
-    const status = result?.invoice_status;
-
-    if (status === "OCR_FAILED") {
-      toast.error(
-        `${invoiceNumber} — OCR extraction failed.`
-      );
-    } else if (status === "OCR_REVIEW_PENDING") {
-      toast.info(
-        `${invoiceNumber} requires OCR review.`
-      );
-    } else {
-      toast.success(
-        `${invoiceNumber} processed successfully.`
-      );
+    if (!selectedFile) {
+      setValidationError("Please select a file to upload.");
+      return;
     }
 
-    if (result?.invoice_id) {
-      navigate(
-        AP_ROUTES.INVOICE_DETAIL(result.invoice_id)
-      );
-    } else if (result?.inbound_document_id) {
-      navigate(
-        AP_ROUTES.INVOICE_OCR_REVIEW(
-          result.inbound_document_id
-        )
-      );
-    } else {
-      navigate(AP_ROUTES.INVOICE_LIST);
-    }
+    try {
+      setProcessingStep("uploading");
 
-  } catch (error) {
-    toast.error(
-      getApiErrorMessage(
-        error,
-        "Invoice processing failed. Please try again."
-      )
-    );
-  } finally {
-    setProcessingStep(null);
-  }
-};
+      const result = await uploadInvoice.mutateAsync(selectedFile);
+
+      const invoiceNumber = result?.extracted_invoice?.invoice_number || "Invoice";
+      const status = result?.invoice_status;
+
+      if (status === "OCR_FAILED") {
+        toast.error(`${invoiceNumber} — OCR extraction failed.`);
+      } else if (status === "OCR_REVIEW_PENDING") {
+        toast.info(`${invoiceNumber} requires OCR review.`);
+      } else {
+        toast.success(`${invoiceNumber} processed successfully.`);
+      }
+
+      if (result?.invoice_id) {
+        // Confirm the invoice record is actually retrievable (and warm the detail page's
+        // cache) before navigating, instead of trusting the upload response alone.
+        setProcessingStep("confirming");
+        try {
+          await queryClient.fetchQuery({
+            queryKey: INVOICE_DETAIL_KEY(result.invoice_id),
+            queryFn: () => invoiceService.getInvoice(result.invoice_id),
+          });
+          navigate(AP_ROUTES.INVOICE_DETAIL(result.invoice_id));
+        } catch {
+          toast.info("Invoice uploaded — it will appear in Invoice Management once processing finishes.");
+          navigate(AP_ROUTES.INVOICE_LIST);
+        }
+      } else if (result?.inbound_document_id) {
+        // No invoice record yet (still OCR-only) — send the user to the OCR Review queue
+        // rather than a detail route that doesn't accept an inbound document id.
+        navigate(AP_ROUTES.INVOICE_OCR_REVIEW);
+      } else {
+        navigate(AP_ROUTES.INVOICE_LIST);
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Invoice processing failed. Please try again."));
+    } finally {
+      setProcessingStep(null);
+    }
+  };
 
   return (
     <div className="p-6">
