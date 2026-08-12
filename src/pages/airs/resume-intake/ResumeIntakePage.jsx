@@ -109,7 +109,7 @@ export default function ResumeIntakePage() {
         </div>
         <div className="flex items-center gap-3">
           <Button variant="primary" size="medium" onClick={() => setIsIntakeModalOpen(true)}>
-            <ClipboardCheck className="h-4 w-4 mr-1.5" /> Upload Resumes
+             Upload Resumes
           </Button>
         </div>
       </div>
@@ -130,7 +130,7 @@ export default function ResumeIntakePage() {
         <button
           type="button"
           onClick={() => setActiveListTab("history")}
-          className={`py-2 px-4 border-b-2 font-bold text-xs uppercase tracking-wider transition-colors mr-2 ${activeListTab === "history"
+          className={`py-2 px-4 border-b-2 font-bold text-xs tracking-wider transition-colors mr-2 ${activeListTab === "history"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-slate-400 hover:text-slate-700"
             }`}
@@ -140,7 +140,7 @@ export default function ResumeIntakePage() {
         <button
           type="button"
           onClick={() => setActiveListTab("processing")}
-          className={`py-2 px-4 border-b-2 font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 mr-2 ${activeListTab === "processing"
+          className={`py-2 px-4 border-b-2 font-bold text-xs tracking-wider transition-colors flex items-center gap-1.5 mr-2 ${activeListTab === "processing"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-slate-400 hover:text-slate-700"
             }`}
@@ -155,12 +155,12 @@ export default function ResumeIntakePage() {
         <button
           type="button"
           onClick={() => setActiveListTab("bulk-batches")}
-          className={`py-2 px-4 border-b-2 font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 ${activeListTab === "bulk-batches"
+          className={`py-2 px-4 border-b-2 font-bold text-xs tracking-wider transition-colors flex items-center gap-1.5 ${activeListTab === "bulk-batches"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-slate-400 hover:text-slate-700"
             }`}
         >
-          <FileArchive size={14} /> Bulk Batches
+           Bulk Batches
           {bulkJobs.length > 0 && (
             <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">
               {bulkJobs.length}
