@@ -76,7 +76,7 @@ function LevelCard({ id, level, onChange, onRemove, canRemove }) {
       <div className="flex items-center justify-between mb-3">
         <button type="button" {...attributes} {...listeners} className="text-gray-400 cursor-grab active:cursor-grabbing flex items-center gap-1.5">
           <GripVertical className="h-4 w-4" />
-          <span className="text-sm font-semibold text-gray-700">Level</span>
+          <span className="text-sm font-semibold text-gray-700">Approval Level</span>
         </button>
         {canRemove && (
           <button type="button" onClick={onRemove} className="text-gray-400 hover:text-rose-600">

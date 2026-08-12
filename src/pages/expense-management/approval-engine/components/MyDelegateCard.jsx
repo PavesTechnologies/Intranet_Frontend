@@ -4,6 +4,8 @@ import Button from "@/components/Button/Button";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApprovalDelegations, useSaveApprovalDelegation, useDeleteApprovalDelegation } from "../hooks/useApprovalDelegations";
+import EmployeeLabel from "./EmployeeLabel";
+import { formatDate } from "../constants/approvalLabels";
 
 /**
  * Self-service delegation, deliberately placed where an approver naturally lands (the queue page),
@@ -74,7 +76,8 @@ export default function MyDelegateCard() {
           <p className="text-sm font-semibold text-gray-900">My Delegate</p>
           {myDelegation ? (
             <p className="text-xs text-gray-500">
-              {myDelegation.delegateId} covers your approvals from {myDelegation.startDate} to {myDelegation.endDate}
+              <EmployeeLabel employeeId={myDelegation.delegateId} className="font-medium text-gray-700" /> covers your approvals from{" "}
+              {formatDate(myDelegation.startDate)} to {formatDate(myDelegation.endDate)}
             </p>
           ) : (
             <p className="text-xs text-gray-500">No delegate set - your approvals stay with you while you're away.</p>
