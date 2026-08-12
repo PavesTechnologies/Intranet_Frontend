@@ -48,34 +48,78 @@ export default function BillingControlsStep({ value = {}, onChange }) {
   const [taxRegionOptions, setTaxRegionOptions] = useState([]);
   const [loadingPaymentTerms, setLoadingPaymentTerms] = useState(true);
   const [loadingTaxRegions, setLoadingTaxRegions] = useState(true);
+  const [paymentTermsError, setPaymentTermsError] = useState("");
+  const [taxRegionsError, setTaxRegionsError] = useState("");
 
   useEffect(() => {
     let mounted = true;
-    const load = async () => {
+
+    const loadPaymentTerms = async () => {
       setLoadingPaymentTerms(true);
-      setLoadingTaxRegions(true);
+      setPaymentTermsError("");
       try {
-        const [terms, taxRegions] = await Promise.all([getActivePaymentTerms(), getActiveTaxRegions()]);
+        const terms = await getActivePaymentTerms();
         if (!mounted) return;
-        setPaymentTermOptions(terms.map((t) => ({ value: t.paymentTermId || t.id, label: t.label, paymentTerms: t.value })));
-        setTaxRegionOptions(taxRegions.map((region) => ({ value: region.taxRegionId || region.id, label: region.label })));
+        setPaymentTermOptions(
+          terms.map((term) => ({
+            value: term.paymentTermId,
+            label: term.paymentTermName,
+            paymentTerms: term.value,
+          })),
+        );
       } catch (error) {
-        showStatusToast(getApiErrorMessage(error, "Unable to load payment terms and tax regions."), "error");
+        if (!mounted) return;
+        setPaymentTermsError(getApiErrorMessage(error, "Unable to load payment terms."));
         setPaymentTermOptions([]);
-        setTaxRegionOptions([]);
+        showStatusToast(getApiErrorMessage(error, "Unable to load payment terms."), "error");
       } finally {
-        if (mounted) {
-          setLoadingPaymentTerms(false);
-          setLoadingTaxRegions(false);
-        }
+        if (mounted) setLoadingPaymentTerms(false);
       }
     };
 
-    load();
+    const loadTaxRegions = async () => {
+      setLoadingTaxRegions(true);
+      setTaxRegionsError("");
+      try {
+        const taxRegions = await getActiveTaxRegions();
+        if (!mounted) return;
+        setTaxRegionOptions(
+          taxRegions.map((region) => ({
+            value: region.taxRegionId,
+            label: region.taxRegionName,
+          })),
+        );
+      } catch (error) {
+        if (!mounted) return;
+        setTaxRegionsError(getApiErrorMessage(error, "Unable to load tax regions."));
+        setTaxRegionOptions([]);
+        showStatusToast(getApiErrorMessage(error, "Unable to load tax regions."), "error");
+      } finally {
+        if (mounted) setLoadingTaxRegions(false);
+      }
+    };
+
+    loadPaymentTerms();
+    loadTaxRegions();
+
     return () => {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    const selected = paymentTermOptions.find((option) => String(option.value) === String(value.paymentTermId));
+    if (!selected) return;
+    if (value.paymentTermName === selected.label && value.paymentTerms === selected.paymentTerms) return;
+    update({ paymentTermName: selected.label, paymentTerms: selected.paymentTerms });
+  }, [paymentTermOptions, value.paymentTermId, value.paymentTermName, value.paymentTerms]);
+
+  useEffect(() => {
+    const selected = taxRegionOptions.find((option) => String(option.value) === String(value.taxRegionId));
+    if (!selected) return;
+    if (value.taxRegionName === selected.label) return;
+    update({ taxRegionName: selected.label });
+  }, [taxRegionOptions, value.taxRegionId, value.taxRegionName]);
 
   const previewText = getDuePreviewText(value.invoiceGenerationDay, value.paymentTerms);
 
@@ -177,15 +221,20 @@ export default function BillingControlsStep({ value = {}, onChange }) {
               <p className="text-sm text-slate-500">Loading payment terms…</p>
             ) : (
               <FormSelect
-                name="paymentTerms"
+                name="paymentTermId"
                 value={value.paymentTermId || ""}
                 onChange={(event) => {
                   const selected = paymentTermOptions.find((opt) => String(opt.value) === String(event.target.value));
-                  update({ paymentTermId: event.target.value, paymentTerms: selected?.paymentTerms || "" });
+                  update({
+                    paymentTermId: event.target.value,
+                    paymentTermName: selected?.label || "",
+                    paymentTerms: selected?.paymentTerms || "",
+                  });
                 }}
-                options={[{ value: "", label: "Select payment terms" }, ...paymentTermOptions]}
+                options={[{ value: "", label: paymentTermsError ? "Payment terms unavailable" : "Select payment terms" }, ...paymentTermOptions]}
               />
             )}
+            {paymentTermsError && <p className="text-xs text-red-600">{paymentTermsError}</p>}
           </div>
 
           <div className="space-y-4">
@@ -198,10 +247,14 @@ export default function BillingControlsStep({ value = {}, onChange }) {
               <FormSelect
                 name="taxRegionId"
                 value={value.taxRegionId || ""}
-                onChange={(event) => update({ taxRegionId: event.target.value })}
-                options={[{ value: "", label: "Select tax region" }, ...taxRegionOptions]}
+                onChange={(event) => {
+                  const selected = taxRegionOptions.find((opt) => String(opt.value) === String(event.target.value));
+                  update({ taxRegionId: event.target.value, taxRegionName: selected?.label || "" });
+                }}
+                options={[{ value: "", label: taxRegionsError ? "Tax regions unavailable" : "Select tax region" }, ...taxRegionOptions]}
               />
             )}
+            {taxRegionsError && <p className="text-xs text-red-600">{taxRegionsError}</p>}
           </div>
           </div>
 

@@ -1,5 +1,4 @@
 import api from "../../../api/axiosInstance";
-import { lookupService } from "../../expense-management/api/expenseReportsApi";
 
 const BASE_URL = window.__APP_CONFIG__.AR_BASE_URL;
 
@@ -7,7 +6,7 @@ const BILLING_CONFIGURATIONS_URL = `${BASE_URL}/api/billing-configurations`;
 const ACTIVE_BILLING_TYPES_URL = `${BASE_URL}/api/billing-types/active`;
 const ACTIVE_BILLING_FREQUENCIES_URL = `${BASE_URL}/api/billing-frequency/active`;
 const ACTIVE_PAYMENT_TERMS_URL = `${BASE_URL}/api/payment-terms/active`;
-const ACTIVE_TAX_REGIONS_URL = `${BASE_URL}/api/tax-regions/active`;
+const ACTIVE_TAX_REGIONS_URL = `${BASE_URL}/api/tax-region/active`;
 const BILLING_SUBSCRIPTIONS_URL = `${BASE_URL}/api/billing-subscription`;
 const TM_RATE_CARDS_URL = `${BASE_URL}/api/billing-tm-rate-card`;
 
@@ -76,6 +75,21 @@ const normalizeStatus = (status) => {
   return normalized || "Draft";
 };
 
+// Only Draft configurations, and Active (Approved + isActive) configurations should ever
+// reach the UI. Rejected, deactivated (Approved + isActive === false), and any other
+// inactive records are filtered out of the raw API response before normalization.
+const shouldDisplayBillingConfiguration = (config = {}) => {
+  const status = String(
+    config.status || config.approvalStatus || config.configurationStatus || ""
+  )
+    .trim()
+    .toUpperCase();
+
+  if (status === "DRAFT") return true;
+  if (status === "APPROVED") return config.isActive === true;
+  return false;
+};
+
 const getConfigId = (config) =>
   config?.billingConfigurationId ||
   config?.configurationId ||
@@ -123,7 +137,67 @@ const getBillingConfig = (config) =>
 
 const getToolBilling = (config) => config?.toolBilling || config?.toolBillingConfig || {};
 
-const getControls = (config) => config?.controls || config?.financialControls || {};
+const getControls = (config = {}) => config.controls || config.financialControls || config;
+
+const firstPresent = (...values) =>
+  values.find((value) => value !== null && value !== undefined && value !== "");
+
+const getObjectValue = (value, keys = []) => {
+  if (!value || typeof value !== "object") return "";
+  return firstPresent(...keys.map((key) => value[key])) || "";
+};
+
+const normalizePricingModelValue = (value) => {
+  const rawValue =
+    value && typeof value === "object"
+      ? firstPresent(value.pricingModel, value.billingMode, value.code, value.value, value.name, value.label)
+      : value;
+  const normalized = normalizeBillingFrequencyValue(rawValue);
+
+  if (["STANDARD", "STANDARD_RATE", "STANDARD_RATE_CARD"].includes(normalized)) return "STANDARD";
+  if (["ROLE_BASED", "ROLE_BASED_RATES", "ROLE_BASED_RATE_CARD"].includes(normalized)) return "ROLE_BASED";
+
+  return normalized;
+};
+
+const normalizeTmRateCard = (card = {}) => ({
+  ...card,
+  roleName:
+    firstPresent(
+      card.roleName,
+      card.role,
+      card.resourceRole,
+      card.designation,
+      card.name,
+      card.label,
+    ) || "",
+  role:
+    firstPresent(
+      card.role,
+      card.roleName,
+      card.resourceRole,
+      card.designation,
+      card.name,
+      card.label,
+    ) || "",
+  rate: firstPresent(card.rate, card.amount) || "",
+  ratePeriod: normalizeBillingFrequencyValue(firstPresent(card.ratePeriod, card.period)) || "HOURLY",
+  effectiveFrom: toLocalDateString(firstPresent(card.effectiveFrom, card.validFrom)) || "",
+  effectiveTo: toLocalDateString(firstPresent(card.effectiveTo, card.validTo)) || "",
+  remarks: firstPresent(card.remarks, card.notes, card.description) || "",
+  rateCardId: firstPresent(card.rateCardId, card.tmRateCardId, card.id) || null,
+});
+
+const getTmRateCardId = (card = {}) => firstPresent(card.rateCardId, card.tmRateCardId, card.id) || null;
+
+const normalizeBoolean = (value, fallback = false) => {
+  if (value === null || value === undefined || value === "") return fallback;
+  if (typeof value === "boolean") return value;
+  const normalized = String(value).trim().toUpperCase();
+  if (["TRUE", "YES", "Y", "1", "AUTOMATIC", "AUTO"].includes(normalized)) return true;
+  if (["FALSE", "NO", "N", "0", "MANUAL"].includes(normalized)) return false;
+  return fallback;
+};
 
 const parseProjectDuration = (value) => {
   if (!value || typeof value !== "string") return { startDate: "", endDate: "" };
@@ -153,6 +227,34 @@ export const normalizeBillingConfiguration = (config = {}) => {
   const controls = getControls(config);
   const setupMode = config.setupMode || projectInfo.setupMode || (config.source === "Standalone" ? "STANDALONE" : "EXISTING");
   const status = normalizeStatus(config.status || config.approvalStatus || config.configurationStatus);
+  const billingTypeObject =
+    config.billingType && typeof config.billingType === "object"
+      ? config.billingType
+      : billingConfig.billingType && typeof billingConfig.billingType === "object"
+      ? billingConfig.billingType
+      : null;
+  const billingTypeName = firstPresent(
+    config.billingTypeLabel,
+    config.billingTypeName,
+    billingConfig.billingTypeLabel,
+    billingConfig.billingTypeName,
+    getObjectValue(billingTypeObject, ["billingTypeName", "name", "label", "displayName"]),
+    typeof config.billingType === "string" ? config.billingType : "",
+    typeof billingConfig.billingType === "string" ? billingConfig.billingType : "",
+  );
+  const billingFrequencyObject =
+    config.billingFrequency && typeof config.billingFrequency === "object"
+      ? config.billingFrequency
+      : billingConfig.billingFrequency && typeof billingConfig.billingFrequency === "object"
+      ? billingConfig.billingFrequency
+      : null;
+  const billingFrequencyName = firstPresent(
+    config.billingFrequencyName,
+    billingConfig.billingFrequencyName,
+    getObjectValue(billingFrequencyObject, ["billingFrequencyName", "name", "label", "displayName"]),
+    typeof config.billingFrequency === "string" ? config.billingFrequency : "",
+    typeof billingConfig.billingFrequency === "string" ? billingConfig.billingFrequency : "",
+  );
 
   return {
     ...config,
@@ -167,8 +269,10 @@ export const normalizeBillingConfiguration = (config = {}) => {
       projectInfo.client?.clientName ||
       projectInfo.client?.name ||
       "",
-    billingType: config.billingTypeLabel || labelize(config.billingType || billingConfig.billingType),
-    billingFrequency: config.billingFrequency || billingConfig.billingFrequency || "",
+    billingType: billingTypeName || "",
+    billingTypeName: billingTypeName || "",
+    billingFrequency: billingFrequencyName || "",
+    billingFrequencyName: billingFrequencyName || "",
     source: config.source || (setupMode === "STANDALONE" ? "Standalone" : "Enterprise"),
     setupMode,
     status,
@@ -267,38 +371,287 @@ export const normalizePaymentTerm = (term = {}) => {
     ...term,
     id,
     paymentTermId: id,
+    paymentTermName: name,
     value,
     label: name,
   };
 };
 
-export const normalizeCurrency = (currency = {}) => {
-  const id = currency.currencyId || currency.currency_id || currency.id || currency.value || "";
-  const code = currency.currencyCode || currency.currency_code || currency.code || currency.value || "";
-  const name = currency.currencyName || currency.currency_name || currency.name || currency.label || code;
-
-  return {
-    ...currency,
-    id,
-    currencyId: id,
-    currencyCode: code,
-    value: id,
-    label: code && name && code !== name ? `${code} - ${name}` : name || code,
-  };
-};
-
 export const normalizeTaxRegion = (region = {}) => {
   const id = region.taxRegionId || region.tax_region_id || region.id || region.value || "";
-  const code = region.taxRegionCode || region.tax_region_code || region.code || "";
-  const name = region.taxRegionName || region.tax_region_name || region.name || region.label || code;
+  const name = String(region.taxRegionName || region.tax_region_name || region.name || region.label || "").trim();
 
   return {
     ...region,
     id,
     taxRegionId: id,
-    taxRegionCode: code,
+    taxRegionName: name,
     value: id,
-    label: code && name && code !== name ? `${code} - ${name}` : name || code,
+    label: name,
+  };
+};
+
+const normalizeControls = (controls = {}) => {
+  const paymentTerm = controls.paymentTerm && typeof controls.paymentTerm === "object" ? controls.paymentTerm : null;
+  const taxRegion = controls.taxRegion && typeof controls.taxRegion === "object" ? controls.taxRegion : null;
+  const normalizedPaymentTerm = paymentTerm ? normalizePaymentTerm(paymentTerm) : {};
+  const normalizedTaxRegion = taxRegion ? normalizeTaxRegion(taxRegion) : {};
+  const paymentTermName =
+    controls.paymentTermName ||
+    controls.payment_term_name ||
+    controls.paymentTerms ||
+    normalizedPaymentTerm.paymentTermName ||
+    "";
+  const taxRegionName =
+    controls.taxRegionName ||
+    controls.tax_region_name ||
+    normalizedTaxRegion.taxRegionName ||
+    "";
+
+  return {
+    ...controls,
+    paymentTermId:
+      controls.paymentTermId ||
+      controls.payment_term_id ||
+      normalizedPaymentTerm.paymentTermId ||
+      "",
+    paymentTermName,
+    paymentTerms: controls.paymentTerms || normalizeBillingFrequencyValue(paymentTermName),
+    taxRegionId:
+      controls.taxRegionId ||
+      controls.tax_region_id ||
+      normalizedTaxRegion.taxRegionId ||
+      "",
+    taxRegionName,
+  };
+};
+
+const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfiguration(config)) => {
+  const rawProjectInfo = getProjectInfo(config);
+  const rawBillingConfig = getBillingConfig(config);
+  const rawControls = getControls(config);
+  const billingTypeObject =
+    config.billingType && typeof config.billingType === "object"
+      ? config.billingType
+      : rawBillingConfig.billingType && typeof rawBillingConfig.billingType === "object"
+      ? rawBillingConfig.billingType
+      : null;
+  const billingFrequencyObject =
+    config.billingFrequency && typeof config.billingFrequency === "object"
+      ? config.billingFrequency
+      : rawBillingConfig.billingFrequency && typeof rawBillingConfig.billingFrequency === "object"
+      ? rawBillingConfig.billingFrequency
+      : null;
+  const paymentTermObject =
+    rawControls.paymentTerm && typeof rawControls.paymentTerm === "object"
+      ? rawControls.paymentTerm
+      : config.paymentTerm && typeof config.paymentTerm === "object"
+      ? config.paymentTerm
+      : null;
+  const taxRegionObject =
+    rawControls.taxRegion && typeof rawControls.taxRegion === "object"
+      ? rawControls.taxRegion
+      : config.taxRegion && typeof config.taxRegion === "object"
+      ? config.taxRegion
+      : null;
+
+  const billingTypeId = firstPresent(
+    rawBillingConfig.billingTypeId,
+    config.billingTypeId,
+    getObjectValue(billingTypeObject, ["billingTypeId", "id", "typeId"]),
+  );
+  const billingTypeValue = normalizeBillingTypeValue(
+    firstPresent(
+      rawBillingConfig.billingTypeCode,
+      config.billingTypeCode,
+      rawBillingConfig.billingTypeValue,
+      getObjectValue(billingTypeObject, [
+        "billingTypeCode",
+        "code",
+        "value",
+        "typeCode",
+        "type",
+        "billingTypeValue",
+        "billingTypeName",
+        "name",
+        "label",
+      ]),
+      typeof rawBillingConfig.billingType === "string" ? rawBillingConfig.billingType : "",
+      typeof config.billingType === "string" ? config.billingType : "",
+    ),
+  );
+  const billingTypeLabel =
+    firstPresent(
+      config.billingTypeLabel,
+      config.billingTypeName,
+      rawBillingConfig.billingTypeLabel,
+      rawBillingConfig.billingTypeName,
+      getObjectValue(billingTypeObject, ["billingTypeName", "name", "label", "displayName"]),
+      normalized.billingType,
+    ) || "";
+  const billingTypeName = billingTypeLabel;
+
+  const billingFrequencyId = firstPresent(
+    rawBillingConfig.billingFrequencyId,
+    config.billingFrequencyId,
+    getObjectValue(billingFrequencyObject, ["billingFrequencyId", "id"]),
+  );
+  const billingFrequencyValue = normalizeBillingFrequencyValue(
+    firstPresent(
+      rawBillingConfig.billingFrequencyCode,
+      config.billingFrequencyCode,
+      rawBillingConfig.billingFrequencyValue,
+      getObjectValue(billingFrequencyObject, ["billingFrequencyName", "name", "label", "code", "value"]),
+      typeof rawBillingConfig.billingFrequency === "string" ? rawBillingConfig.billingFrequency : "",
+      typeof config.billingFrequency === "string" ? config.billingFrequency : "",
+    ),
+  );
+  const billingFrequencyName =
+    firstPresent(
+      config.billingFrequencyName,
+      rawBillingConfig.billingFrequencyName,
+      getObjectValue(billingFrequencyObject, ["billingFrequencyName", "name", "label", "displayName"]),
+      typeof rawBillingConfig.billingFrequency === "string" ? rawBillingConfig.billingFrequency : "",
+      typeof config.billingFrequency === "string" ? config.billingFrequency : "",
+    ) || "";
+  const pricingModel = normalizePricingModelValue(
+    firstPresent(
+      rawBillingConfig.billingMode,
+      rawBillingConfig.pricingModel,
+      rawBillingConfig.selectedPricingModel,
+      rawBillingConfig.rateModel,
+      config.pricingModel,
+      config.billingMode,
+      config.selectedPricingModel,
+      config.rateModel,
+    ),
+  );
+  const currency = normalizeCurrencyCode(
+    rawProjectInfo.projectBudgetCurrency,
+    rawProjectInfo.currency,
+    config.currency,
+    rawBillingConfig.currency,
+  );
+  const effectiveFrom = toLocalDateString(
+    firstPresent(rawBillingConfig.effectiveFrom, config.effectiveFrom, rawProjectInfo.startDate),
+  );
+  const effectiveTo = toLocalDateString(
+    firstPresent(rawBillingConfig.effectiveTo, config.effectiveTo, rawProjectInfo.endDate),
+  );
+  const normalizedPaymentTerm = paymentTermObject ? normalizePaymentTerm(paymentTermObject) : {};
+  const normalizedTaxRegion = taxRegionObject ? normalizeTaxRegion(taxRegionObject) : {};
+  const invoiceGenerationType = normalizeBillingFrequencyValue(
+    firstPresent(rawControls.invoiceGenerationType, config.invoiceGenerationType),
+  ) || (normalizeBoolean(firstPresent(rawControls.autoInvoiceGeneration, config.autoInvoiceGeneration), false) ? "AUTOMATIC" : "MANUAL");
+  const autoInvoiceGeneration = normalizeBoolean(
+    firstPresent(rawControls.autoInvoiceGeneration, config.autoInvoiceGeneration, invoiceGenerationType),
+    invoiceGenerationType === "AUTOMATIC",
+  );
+
+  return {
+    ...config,
+    billingConfigurationId: normalized.billingConfigurationId,
+    setupMode: normalized.setupMode,
+    projectInfo: {
+      ...rawProjectInfo,
+      projectSource: normalized.setupMode === "STANDALONE" ? "STANDALONE" : "ENTERPRISE",
+      clientId: firstPresent(rawProjectInfo.clientId, config.clientId, rawProjectInfo.client?.clientId, rawProjectInfo.client?.id) || "",
+      clientName: firstPresent(
+        rawProjectInfo.clientName,
+        config.clientName,
+        config.client,
+        rawProjectInfo.client?.clientName,
+        rawProjectInfo.client?.name,
+        normalized.client,
+      ) || "",
+      projectId: firstPresent(rawProjectInfo.projectId, config.projectId, rawProjectInfo.id) || "",
+      projectName: firstPresent(rawProjectInfo.projectName, config.projectName, rawProjectInfo.name, normalized.projectName) || "",
+      projectCode: firstPresent(rawProjectInfo.projectCode, config.projectCode, rawProjectInfo.code, normalized.projectCode) || "",
+      projectBudget: firstPresent(rawProjectInfo.projectBudget, config.projectBudget, rawProjectInfo.budget, rawProjectInfo.budgetAmount) || "",
+      projectBudgetCurrency: currency,
+      currency,
+      startDate: toLocalDateString(firstPresent(rawProjectInfo.startDate, rawProjectInfo.projectStartDate, config.effectiveFrom, config.startDate)) || effectiveFrom,
+      endDate: toLocalDateString(firstPresent(rawProjectInfo.endDate, rawProjectInfo.projectEndDate, config.effectiveTo, config.endDate)) || effectiveTo,
+    },
+    billingConfig: {
+      ...rawBillingConfig,
+      billingConfigurationId: normalized.billingConfigurationId,
+      id: normalized.billingConfigurationId,
+      billingType: billingTypeValue,
+      billingTypeId: billingTypeId || "",
+      billingTypeLabel,
+      billingTypeName,
+      billingFrequency: billingFrequencyValue,
+      billingFrequencyId: billingFrequencyId || "",
+      billingFrequencyLabel: billingFrequencyName,
+      billingFrequencyName,
+      billingMode: pricingModel,
+      pricingModel,
+      currency,
+      effectiveFrom,
+      effectiveTo,
+      timeAndMaterial: {
+        ...(rawBillingConfig.timeAndMaterial || {}),
+        rate:
+          firstPresent(
+            rawBillingConfig.timeAndMaterial?.rate,
+            rawBillingConfig.rate,
+            config.rate,
+          ) || "",
+        ratePeriod:
+          normalizeBillingFrequencyValue(
+            firstPresent(
+              rawBillingConfig.timeAndMaterial?.ratePeriod,
+              rawBillingConfig.ratePeriod,
+              config.ratePeriod,
+            ),
+          ) || "HOURLY",
+        remarks:
+          firstPresent(
+            rawBillingConfig.timeAndMaterial?.remarks,
+            rawBillingConfig.remarks,
+            config.remarks,
+          ) || "",
+        roles: (rawBillingConfig.timeAndMaterial?.roles || rawBillingConfig.roles || rawBillingConfig.rateCards || []).map(normalizeTmRateCard),
+      },
+      fixedPrice: {
+        ...(rawBillingConfig.fixedPrice || {}),
+        totalContractValue:
+          firstPresent(
+            rawBillingConfig.fixedPrice?.totalContractValue,
+            rawBillingConfig.totalContractValue,
+            config.totalContractValue,
+            config.contractValue,
+          ) || "",
+        advanceReceived:
+          firstPresent(rawBillingConfig.fixedPrice?.advanceReceived, rawBillingConfig.advanceReceived, config.advanceReceived) || "",
+        retentionPercent:
+          firstPresent(rawBillingConfig.fixedPrice?.retentionPercent, rawBillingConfig.retentionPercent, config.retentionPercent) || "",
+      },
+      milestones: rawBillingConfig.milestones || config.milestones || [],
+      milestoneSettings: rawBillingConfig.milestoneSettings || config.milestoneSettings || {},
+      monthlyRetainer: rawBillingConfig.monthlyRetainer || {},
+      subscription: rawBillingConfig.subscription || {},
+    },
+    controls: normalizeControls({
+      ...rawControls,
+      paymentTermId:
+        firstPresent(rawControls.paymentTermId, config.paymentTermId, normalizedPaymentTerm.paymentTermId) || "",
+      paymentTermName:
+        firstPresent(rawControls.paymentTermName, config.paymentTermName, normalizedPaymentTerm.paymentTermName) || "",
+      taxRegionId:
+        firstPresent(rawControls.taxRegionId, config.taxRegionId, normalizedTaxRegion.taxRegionId) || "",
+      taxRegionName:
+        firstPresent(rawControls.taxRegionName, config.taxRegionName, normalizedTaxRegion.taxRegionName) || "",
+      invoiceGenerationType,
+      autoInvoiceGeneration,
+      invoiceGenerationDay:
+        firstPresent(rawControls.invoiceGenerationDay, config.invoiceGenerationDay, config.generationDay) || "",
+      expenseBillingEligible: normalizeBoolean(
+        firstPresent(rawControls.expenseBillingEligible, config.expenseBillingEligible),
+        false,
+      ),
+    }),
   };
 };
 
@@ -328,7 +681,6 @@ export const normalizeProject = (project = {}) => {
     projectName: project.projectName || project.name || project.label || "",
     projectCode: project.projectCode || project.code || project.projectKey || "",
     contractNumber: project.contractNumber || project.contractReference || "",
-    currencyId: project.currencyId || currencyObject?.currencyId || currencyObject?.id || project.currency_id || "",
     currency: currencyCode || projectBudgetCurrency || "",
     billingType: project.billingType || "",
     billingMode: project.billingMode || "",
@@ -350,24 +702,47 @@ export const getApiErrorMessage = (error, fallback = "Something went wrong. Plea
 
 export const getBillingConfigurations = async () => {
   const response = await api.get(BILLING_CONFIGURATIONS_URL);
-  return asArray(unwrapData(response)).map(normalizeBillingConfiguration);
+  return asArray(unwrapData(response))
+    .filter(shouldDisplayBillingConfiguration)
+    .map(normalizeBillingConfiguration);
 };
 
 export const getBillingConfigurationById = async (billingConfigurationId) => {
   const response = await api.get(`${BILLING_CONFIGURATIONS_URL}/${billingConfigurationId}`);
   const config = unwrapData(response);
   const normalized = normalizeBillingConfiguration(config);
+  const detail = normalizeWizardDetail(config, normalized);
+  const configId = detail.billingConfigurationId || normalized.billingConfigurationId || billingConfigurationId;
+
+  if (["STANDARD", "ROLE_BASED"].includes(detail.billingConfig?.pricingModel) && configId) {
+    const rateCards = await getTmRateCardsByBillingConfiguration(configId);
+    const normalizedRateCards = rateCards.map(normalizeTmRateCard);
+
+    if (detail.billingConfig.pricingModel === "STANDARD") {
+      const standardRate = normalizedRateCards.find((card) => !card.roleName) || normalizedRateCards[0];
+      if (standardRate) {
+        detail.billingConfig.timeAndMaterial = {
+          ...(detail.billingConfig.timeAndMaterial || {}),
+          rate: standardRate.rate,
+          ratePeriod: standardRate.ratePeriod,
+          effectiveFrom: standardRate.effectiveFrom,
+          effectiveTo: standardRate.effectiveTo,
+          remarks: standardRate.remarks,
+          rateCardId: standardRate.rateCardId,
+          roles: [],
+        };
+      }
+    } else {
+      detail.billingConfig.timeAndMaterial = {
+        ...(detail.billingConfig.timeAndMaterial || {}),
+        roles: normalizedRateCards.filter((card) => card.roleName),
+      };
+    }
+  }
 
   return {
     summary: normalized,
-    detail: {
-      ...config,
-      setupMode: config?.setupMode || normalized.setupMode,
-      projectInfo: getProjectInfo(config),
-      billingConfig: getBillingConfig(config),
-      toolBilling: getToolBilling(config),
-      controls: getControls(config),
-    },
+    detail,
   };
 };
 
@@ -432,12 +807,7 @@ export const getActiveBillingFrequencies = async () => {
 
 export const getActivePaymentTerms = async () => {
   const response = await api.get(ACTIVE_PAYMENT_TERMS_URL);
-  return asArray(unwrapData(response)).map(normalizePaymentTerm).filter((t) => t.value);
-};
-
-export const getActiveCurrencies = async () => {
-  const currencies = await lookupService.getActiveCurrencies();
-  return asArray(currencies).map(normalizeCurrency).filter((currency) => currency.currencyId);
+  return asArray(unwrapData(response)).map(normalizePaymentTerm).filter((term) => term.paymentTermId);
 };
 
 export const getActiveTaxRegions = async () => {
@@ -535,7 +905,7 @@ const REQUIRED_BILLING_CONFIGURATION_FIELDS = [
   "billingTypeId",
   "billingFrequencyId",
   "paymentTermId",
-  "currencyId",
+  "currency",
   "taxRegionId",
   "invoiceGenerationType",
   "pricingModel",
@@ -545,18 +915,98 @@ const REQUIRED_BILLING_CONFIGURATION_FIELDS = [
 
 const isBlank = (value) => value === null || value === undefined || value === "";
 
+const MONTH_INDEX_BY_SHORT_NAME = {
+  jan: 0,
+  feb: 1,
+  mar: 2,
+  apr: 3,
+  may: 4,
+  jun: 5,
+  jul: 6,
+  aug: 7,
+  sep: 8,
+  oct: 9,
+  nov: 10,
+  dec: 11,
+};
+
+const toLocalDateString = (value) => {
+  if (!value) return "";
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return "";
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  const rawValue = String(value).trim();
+  if (!rawValue) return "";
+
+  const isoMatch = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+  const displayMatch = rawValue.match(/^(\d{1,2})[-\s/]([A-Za-z]{3,})[-\s/](\d{4})$/);
+  if (displayMatch) {
+    const [, dayPart, monthPart, yearPart] = displayMatch;
+    const monthIndex = MONTH_INDEX_BY_SHORT_NAME[monthPart.slice(0, 3).toLowerCase()];
+    if (monthIndex !== undefined) {
+      return `${yearPart}-${String(monthIndex + 1).padStart(2, "0")}-${String(Number(dayPart)).padStart(2, "0")}`;
+    }
+  }
+
+  const parsed = new Date(rawValue);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeCurrencyCode = (...values) => {
+  for (const value of values) {
+    if (!value) continue;
+
+    const code =
+      typeof value === "object"
+        ? value.projectBudgetCurrency || value.currencyCode || value.currency_code || value.code || value.value
+        : value;
+    const normalized = String(code || "").trim().toUpperCase();
+    if (normalized) return normalized;
+  }
+
+  return "";
+};
+
 export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
   const projectInfo = wizardPayload.projectInfo || {};
   const billingConfig = wizardPayload.billingConfig || {};
   const controls = wizardPayload.controls || {};
+  const currency = normalizeCurrencyCode(
+    projectInfo.projectBudgetCurrency,
+    projectInfo.currency,
+    billingConfig.currency,
+    wizardPayload.currency,
+  );
+  const effectiveFrom = toLocalDateString(
+    billingConfig.effectiveFrom ||
+      wizardPayload.effectiveFrom ||
+      projectInfo.startDate,
+  );
+  const effectiveTo = toLocalDateString(
+    billingConfig.effectiveTo ||
+      wizardPayload.effectiveTo ||
+      projectInfo.endDate,
+  );
 
-  return {
+  const requestPayload = {
     clientId: projectInfo.clientId || wizardPayload.clientId || "",
     projectId: projectInfo.projectId || wizardPayload.projectId || "",
     billingTypeId: billingConfig.billingTypeId || wizardPayload.billingTypeId || "",
     billingFrequencyId: billingConfig.billingFrequencyId || wizardPayload.billingFrequencyId || "",
     paymentTermId: controls.paymentTermId || wizardPayload.paymentTermId || "",
-    currencyId: projectInfo.currencyId || billingConfig.currencyId || wizardPayload.currencyId || "",
+    currency,
     taxRegionId: controls.taxRegionId || wizardPayload.taxRegionId || "",
     invoiceGenerationType:
       controls.invoiceGenerationType ||
@@ -565,12 +1015,14 @@ export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
     pricingModel: billingConfig.billingMode || billingConfig.pricingModel || wizardPayload.pricingModel || "",
     expenseBillingEligible:
       controls.expenseBillingEligible ?? wizardPayload.expenseBillingEligible ?? false,
-    effectiveFrom:
-      billingConfig.effectiveFrom ||
-      wizardPayload.effectiveFrom ||
-      projectInfo.startDate ||
-      "",
+    effectiveFrom,
   };
+
+  if (effectiveTo) {
+    requestPayload.effectiveTo = effectiveTo;
+  }
+
+  return requestPayload;
 };
 
 const assertBillingConfigurationPayload = (payload) => {
@@ -581,9 +1033,85 @@ const assertBillingConfigurationPayload = (payload) => {
   }
 };
 
+const buildTmRateCardRequestPayload = (card = {}, pricingModel, billingConfigurationId) => ({
+  billingConfigurationId,
+  roleName: pricingModel === "ROLE_BASED" ? String(card.roleName || card.role || "").trim() : null,
+  rate: card.rate ?? "",
+  ratePeriod: normalizeBillingFrequencyValue(card.ratePeriod) || "HOURLY",
+  effectiveFrom: toLocalDateString(card.effectiveFrom) || "",
+  effectiveTo: toLocalDateString(card.effectiveTo) || "",
+  remarks: card.remarks || "",
+});
+
+const buildTmRateCardRequests = (payload = {}, billingConfigurationId) => {
+  const billingConfig = payload.billingConfig || {};
+  const pricingModel = normalizePricingModelValue(billingConfig.billingMode || billingConfig.pricingModel);
+  const timeAndMaterial = billingConfig.timeAndMaterial || {};
+
+  if (billingConfig.billingType !== "TIME_MATERIAL" || !["STANDARD", "ROLE_BASED"].includes(pricingModel)) {
+    return [];
+  }
+
+  if (pricingModel === "STANDARD") {
+    return [
+      {
+        rateCardId: timeAndMaterial.rateCardId || null,
+        payload: buildTmRateCardRequestPayload(timeAndMaterial, pricingModel, billingConfigurationId),
+      },
+    ];
+  }
+
+  const seenRoleNames = new Set();
+  return (timeAndMaterial.roles || []).map((card) => {
+    const roleName = String(card.roleName || card.role || "").trim();
+    if (!roleName) throw new Error("Role name is required for role-based TM rate cards.");
+
+    const uniqueKey = roleName.toLowerCase();
+    if (seenRoleNames.has(uniqueKey)) {
+      throw new Error(`Duplicate role name in TM rate cards: ${roleName}`);
+    }
+    seenRoleNames.add(uniqueKey);
+
+    return {
+      rateCardId: card.rateCardId || card.tmRateCardId || card.id || null,
+      roleName,
+      payload: buildTmRateCardRequestPayload({ ...card, roleName }, pricingModel, billingConfigurationId),
+    };
+  });
+};
+
+const saveTmRateCards = async (payload, billingConfigurationId) => {
+  const requests = buildTmRateCardRequests(payload, billingConfigurationId);
+  if (requests.length === 0) return;
+
+  const billingConfig = payload.billingConfig || {};
+  const pricingModel = normalizePricingModelValue(billingConfig.billingMode || billingConfig.pricingModel);
+  const existingCards = (await getTmRateCardsByBillingConfiguration(billingConfigurationId)).map(normalizeTmRateCard);
+  const touchedIds = new Set();
+
+  for (const request of requests) {
+    const matchingExisting =
+      existingCards.find((card) => request.rateCardId && String(card.rateCardId) === String(request.rateCardId)) ||
+      (pricingModel === "STANDARD"
+        ? existingCards[0]
+        : existingCards.find((card) => card.roleName.toLowerCase() === request.roleName.toLowerCase()));
+
+    const saved = matchingExisting?.rateCardId
+      ? await updateTmRateCard(matchingExisting.rateCardId, request.payload)
+      : await createTmRateCard(billingConfigurationId, request.payload);
+    const savedId = getTmRateCardId(saved) || matchingExisting?.rateCardId;
+    if (savedId) touchedIds.add(String(savedId));
+  }
+
+  await Promise.all(
+    existingCards
+      .filter((card) => card.rateCardId && !touchedIds.has(String(card.rateCardId)))
+      .map((card) => deleteTmRateCard(card.rateCardId)),
+  );
+};
+
 export const saveBillingConfiguration = async (payload, billingConfigurationId) => {
   const requestPayload = buildBillingConfigurationRequestPayload(payload);
-  console.log("Billing configuration save payload", requestPayload);
   assertBillingConfigurationPayload(requestPayload);
 
   const configResponse = billingConfigurationId
@@ -594,6 +1122,10 @@ export const saveBillingConfiguration = async (payload, billingConfigurationId) 
     extractBillingConfigurationId(billingConfigurationId) ||
     extractBillingConfigurationId(configResponse);
   const billingType = payload?.billingConfig?.billingType || configResponse?.billingType || "";
+
+  if (configId && billingType === "TIME_MATERIAL") {
+    await saveTmRateCards(payload, configId);
+  }
 
   if (configId && billingType === "RECURRING") {
     try {
