@@ -9,7 +9,7 @@ import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
 import Modal from "@/components/Modal/modal";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
-import ApprovalStatusPill from "@/pages/expense-management/approval-engine/components/ApprovalStatusPill";
+import StatusBadge from "@/components/status/statusbadge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
