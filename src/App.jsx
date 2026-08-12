@@ -124,6 +124,7 @@ import JdLibrary from "./pages/airs/pages/JdLibrary.jsx";
 import JdCreate from "./pages/airs/pages/JdCreate.jsx";
 import JdDetails from "./pages/airs/pages/JdDetails.jsx";
 import Campaigns from "./pages/airs/campaigns/Campaigns.jsx";
+import AirsDashboardPage from "./pages/airs/dashboard/AirsDashboardPage.jsx";
 import CampaignDetails from "./pages/airs/campaigns/CampaignDetails.jsx";
 
 import AirsPlaceholder from "./pages/airs/pages/AirsPlaceholder.jsx";
@@ -1215,6 +1216,14 @@ const AppRoutes = () => {
               React, so those routes have NO route-level role enforcement.
               Campaign routes below use the working prop, mirroring the
               backend's require_roles(...) on the corresponding endpoints. */}
+          <Route
+            path="/airs/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
+                <AirsDashboardPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/airs/campaigns"
             element={
