@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { AlertTriangle } from "lucide-react";
@@ -8,7 +8,9 @@ import { showStatusToast } from "@/components/toastfy/toast";
 import { useApprovalFlow, useSaveApprovalFlow } from "../hooks/useApprovalFlows";
 import CriteriaBuilder from "../components/CriteriaBuilder";
 import LevelsBuilder from "../components/LevelsBuilder";
+import FlowPreview from "../components/FlowPreview";
 import { parseCriteriaPattern, serializeCriteriaGroups } from "../utils/criteriaPattern";
+import { describeCriteriaGroups } from "../constants/approvalLabels";
 
 const emptyGroup = () => ({ id: crypto.randomUUID(), criteria: [{ id: crypto.randomUUID(), field: "AMOUNT", operator: "GREATER_THAN", value: "" }] });
 const emptyLevel = () => ({ id: crypto.randomUUID(), levelName: "", quorum: "SEQUENTIAL", approvers: [{ id: crypto.randomUUID(), sourceType: "REPORTING_MANAGER", sourceReference: "" }] });
@@ -131,12 +133,18 @@ export default function ApprovalFlowBuilderPage() {
     );
   };
 
+  const whenLabel = useMemo(() => {
+    if (rawMode) return rawPattern || "Always";
+    const { criteria, criteriaPattern } = serializeCriteriaGroups(groups);
+    return describeCriteriaGroups(criteriaPattern, criteria) || criteriaPattern || "Always";
+  }, [rawMode, rawPattern, groups]);
+
   if (isEditing && isLoading) {
     return <div className="p-6 text-sm text-gray-500">Loading flow…</div>;
   }
 
   return (
-    <div className="p-6 max-w-4xl">
+    <div className="p-4 sm:p-6 max-w-6xl">
       <Breadcrumb
         items={[
           { label: "Expense Management", to: "/expense-management/dashboard" },
@@ -148,7 +156,10 @@ export default function ApprovalFlowBuilderPage() {
 
       <h1 className="text-xl font-semibold text-gray-900 mt-3 mb-4">{isEditing ? "Edit Approval Flow" : "New Approval Flow"}</h1>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 lg:col-span-2">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900 mb-2">Flow Details</h2>
         <div className="bg-white rounded-xl border border-gray-200 p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="sm:col-span-2">
             <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
@@ -175,9 +186,10 @@ export default function ApprovalFlowBuilderPage() {
             </select>
           </div>
         </div>
+        </div>
 
         <div>
-          <h2 className="text-sm font-semibold text-gray-900 mb-2">Match Criteria</h2>
+          <h2 className="text-sm font-semibold text-gray-900 mb-2">When / Criteria</h2>
           {rawMode && (
             <div className="mb-3 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
@@ -227,6 +239,12 @@ export default function ApprovalFlowBuilderPage() {
           </Button>
         </div>
       </form>
+
+      <div className="lg:sticky lg:top-4">
+        <h2 className="text-sm font-semibold text-gray-900 mb-2">Flow Preview</h2>
+        <FlowPreview whenLabel={whenLabel} levels={levels} />
+      </div>
+      </div>
     </div>
   );
 }
