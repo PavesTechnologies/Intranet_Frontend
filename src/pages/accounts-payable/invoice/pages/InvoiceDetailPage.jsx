@@ -96,6 +96,7 @@ export default function InvoiceDetailPage() {
             <Field label="Invoice Type" value={invoice.invoiceType} />
             <Field label="Invoice Date" value={formatDate(invoice.invoiceDate)} />
             <Field label="Due Date" value={formatDate(invoice.dueDate)} />
+            <Field label="Inbound Document ID" value={invoice.inboundDocumentId} />
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Status</p>
               <div className="mt-1">
@@ -123,7 +124,7 @@ export default function InvoiceDetailPage() {
           <PageCard>
             <PageCardContent>
               <h3 className="mb-3 text-sm font-semibold text-gray-700">Attachments</h3>
-              <InvoiceAttachmentList attachments={invoice.attachments} />
+              <InvoiceAttachmentList attachments={invoice.attachments} inboundDocumentId={invoice.inboundDocumentId} />
             </PageCardContent>
           </PageCard>
 

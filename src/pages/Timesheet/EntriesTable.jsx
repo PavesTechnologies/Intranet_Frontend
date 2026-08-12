@@ -452,9 +452,13 @@ const EntriesTable = ({
   const compactSelectProps = {
     className: "min-w-0",
     buttonClassName: "px-3 text-sm",
-    // Project/task lists can be long — show 4 rows, then scroll.
     maxVisibleOptions: 4,
+    // The grid scrolls horizontally, which would clip an absolutely positioned
+    // dropdown; anchor it so the panel escapes the overflow container.
+    anchorOptions: true,
   };
+  // Project and task lists grow with the catalogue — show 3 rows, then scroll.
+  const listSelectProps = { ...compactSelectProps, maxVisibleOptions: 3 };
   const compactTimeProps = {
     className: "min-w-0",
     inputClassName: "min-w-0 text-sm",
@@ -527,7 +531,7 @@ const EntriesTable = ({
                     value={editData.projectId}
                     options={projectOptions}
                     onChange={handleChange}
-                    {...compactSelectProps}
+                    {...listSelectProps}
                   />
                                  
                 </td>
@@ -539,7 +543,7 @@ const EntriesTable = ({
                     value={editData.taskId}
                     options={getTaskOptions(editData.projectId)}
                     onChange={handleChange}
-                    {...compactSelectProps}
+                    {...listSelectProps}
                   />
                                  
                 </td>
@@ -705,7 +709,7 @@ const EntriesTable = ({
                 value={addData.projectId || ""}
                 options={projectOptions}
                 onChange={handleAddChange}
-                {...compactSelectProps}
+                {...listSelectProps}
               />
                          
             </td>
@@ -717,7 +721,7 @@ const EntriesTable = ({
                 value={addData.taskId || ""}
                 options={getTaskOptions(addData.projectId)}
                 onChange={handleAddChange}
-                {...compactSelectProps}
+                {...listSelectProps}
               />
                          
             </td>

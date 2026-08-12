@@ -31,7 +31,6 @@ export default function ProjectStep({ value = {}, onChange }) {
     getBillingConfigurationClients()
       .then((clients) => {
         if (!isMounted.current) return;
-        setProjects([]);
         setClientOptions(
           Array.isArray(clients)
             ? Array.from(new Map(clients.map((c) => [c.clientId || c.id, c.clientName || c.name])), ([val, label]) => ({ value: val, label }))
@@ -48,6 +47,25 @@ export default function ProjectStep({ value = {}, onChange }) {
         setLoadingClients(false);
       });
   }, []);
+
+  useEffect(() => {
+    if (!value.clientId) return;
+
+    setLoadingProjects(true);
+    getBillingConfigurationProjectsByClient(value.clientId)
+      .then((projectList) => {
+        if (!isMounted.current) return;
+        setProjects(Array.isArray(projectList) ? projectList : []);
+      })
+      .catch(() => {
+        if (!isMounted.current) return;
+        setProjects([]);
+      })
+      .finally(() => {
+        if (!isMounted.current) return;
+        setLoadingProjects(false);
+      });
+  }, [value.clientId]);
 
   // Internal projectSource defaults to ENTERPRISE if not set
   const projectSource = value.projectSource || "ENTERPRISE";
@@ -134,8 +152,7 @@ export default function ProjectStep({ value = {}, onChange }) {
         projectName: project.projectName,
         projectCode: project.projectCode,
         projectDuration: project.projectDuration,
-        currencyId: project.currencyId || "",
-        currency: project.currency || project.projectBudgetCurrency || "",
+        currency: project.projectBudgetCurrency || project.currency || "",
         projectBudget: project.projectBudget ?? "",
         projectBudgetCurrency: project.projectBudgetCurrency || project.currency || "",
         startDate: project.startDate,
@@ -166,7 +183,6 @@ export default function ProjectStep({ value = {}, onChange }) {
       projectId: "",
       projectName: "",
       projectCode: "",
-      currencyId: "",
       currency: "",
       projectBudget: "",
       projectBudgetCurrency: "",
@@ -185,7 +201,6 @@ export default function ProjectStep({ value = {}, onChange }) {
       projectId: "",
       projectName: "",
       projectCode: "",
-      currencyId: "",
       currency: "",
       projectBudget: "",
       projectBudgetCurrency: "",

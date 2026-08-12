@@ -136,6 +136,7 @@ import CandidateScorePage from "./pages/airs/candidates/CandidateScore/Candidate
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
 import PipelineCandidateScorecardPage from "./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
+import TalentPoolCandidateProfilePage from "./pages/airs/talent-pool/profile/TalentPoolCandidateProfilePage.jsx";
 import AnalyticsPage from "./pages/airs/analytics/AnalyticsPage.jsx";
 import SettingsPage from "./pages/airs/settings/SettingsPage.jsx";
 import SkillOntologyPage from "./pages/airs/skill-ontology/SkillOntologyPage.jsx";
@@ -1273,7 +1274,7 @@ const AppRoutes = () => {
           <Route
             path="/airs/pipeline"
             element={
-              <ProtectedRoute roles={["General"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <PipelineBoardPage />
               </ProtectedRoute>
             }
@@ -1281,7 +1282,7 @@ const AppRoutes = () => {
           <Route
             path="/airs/pipeline/candidates/:candidateId"
             element={
-              <ProtectedRoute roles={["General"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <PipelineCandidateScorecardPage />
               </ProtectedRoute>
             }
@@ -1291,6 +1292,14 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute roles={["General"]}>
                 <TalentPoolPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/talent-pool/:candidateId"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <TalentPoolCandidateProfilePage />
               </ProtectedRoute>
             }
           />
