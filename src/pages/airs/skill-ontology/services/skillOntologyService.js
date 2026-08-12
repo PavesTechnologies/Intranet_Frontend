@@ -97,7 +97,7 @@ export const getUnknownSkills = async (params = {}) => {
 
   return dedupedRequest(key, async () => {
     try {
-      console.log("[skillOntologyService] GET", url, query);
+      // console.log("[skillOntologyService] GET", url, query);
       const response = await api.get(url, { params: query, headers: authHeaders() });
       const payload = response.data?.data || {};
       const items = payload.items || (Array.isArray(payload) ? payload : []);
@@ -148,7 +148,7 @@ const mapSuggestion = (raw, isAlias) => ({
 // modal collects; the backend only strictly requires the id in the path.
 export const deleteUnknownSkill = async (unknownSkillId, payload = {}) => {
   try {
-    console.log("[skillOntologyService] DELETE", `${BASE_URL}/skills/unknown/${unknownSkillId}`, payload);
+    // console.log("[skillOntologyService] DELETE", `${BASE_URL}/skills/unknown/${unknownSkillId}`, payload);
     const response = await api.delete(`${BASE_URL}/skills/unknown/${unknownSkillId}`, {
       headers: authHeaders(),
       data: payload,
@@ -169,7 +169,7 @@ export const bulkApproveUnknownSkills = async (unknownSkillIds) => {
   try {
     const url = `${BASE_URL}/skills/unknown/bulk-approve`;
     const body = { unknown_skill_ids: unknownSkillIds };
-    console.log("[skillOntologyService] POST", url, body);
+    // console.log("[skillOntologyService] POST", url, body);
     const response = await api.post(url, body, { headers: authHeaders() });
     return ok({ message: response.data?.message, ...(response.data?.data || {}) });
   } catch (error) {
@@ -184,7 +184,7 @@ export const bulkDeleteUnknownSkills = async (unknownSkillIds) => {
   try {
     const url = `${BASE_URL}/skills/unknown/bulk-delete`;
     const body = { unknown_skill_ids: unknownSkillIds };
-    console.log("[skillOntologyService] POST", url, body);
+    // console.log("[skillOntologyService] POST", url, body);
     const response = await api.post(url, body, { headers: authHeaders() });
     return ok({ message: response.data?.message, ...(response.data?.data || {}) });
   } catch (error) {
@@ -206,7 +206,7 @@ export const resolveUnknownSkill = async (unknownSkillId, payload) => {
       canonical_name: payload.canonical_name,
       type: payload.type,
     };
-    console.log("[skillOntologyService] POST", url, body);
+    // console.log("[skillOntologyService] POST", url, body);
     const response = await api.post(url, body, { headers: authHeaders() });
     return ok({ message: response.data?.message, ...(response.data?.data || {}) });
   } catch (error) {
@@ -229,7 +229,7 @@ export const createCanonicalSkillFromUnknown = async (unknownSkillId, payload) =
       parent_skill_id: payload.parent_skill_id || null,
       confidence: payload.confidence?.toLowerCase(),
     };
-    console.log("[skillOntologyService] POST", url, body);
+    // console.log("[skillOntologyService] POST", url, body);
     const response = await api.post(url, body, { headers: authHeaders() });
     return ok({ message: response.data?.message, ...(response.data?.data || {}) });
   } catch (error) {
@@ -248,7 +248,7 @@ export const getUnknownSkillSuggestions = async (unknownSkillId, suggestionType,
 
   return dedupedRequest(key, async () => {
     try {
-      console.log("[skillOntologyService] GET", url, query);
+      // console.log("[skillOntologyService] GET", url, query);
       const response = await api.get(url, { params: query, headers: authHeaders() });
       const items = response.data?.data || [];
       const isAlias = isAliasSuggestionType(suggestionType);
@@ -281,7 +281,7 @@ export const getSkills = async (params = {}) => {
 
   return dedupedRequest(key, async () => {
     try {
-      console.log("[skillOntologyService] GET", url, query);
+      // console.log("[skillOntologyService] GET", url, query);
       const response = await api.get(url, { params: query, headers: authHeaders() });
       const payload = response.data?.data || {};
       return ok({
@@ -383,7 +383,7 @@ export const getCategories = async () => {
 
   return dedupedRequest("categories", async () => {
     try {
-      console.log("[skillOntologyService] GET", url);
+      // console.log("[skillOntologyService] GET", url);
       const response = await api.get(url, { headers: authHeaders() });
       const items = response.data?.data || [];
       return ok([...items].sort((a, b) => a.category.localeCompare(b.category)));

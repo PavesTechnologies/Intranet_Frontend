@@ -238,6 +238,13 @@ export default function BulkJobDetailModal({ job, isOpen, onClose }) {
           candidate_full_name: candidate.full_name,
           candidate_email: candidate.email,
           created_at: f.created_at,
+          campaign_candidate_id:
+            candidate.campaign_candidate_id ??
+            candidate.campaignCandidateId ??
+            detailRes?.data?.campaign_candidate_id ??
+            detailRes?.data?.campaignCandidateId ??
+            f.campaign_candidate_id ??
+            f.campaignCandidateId,
         },
       });
     } catch (err) {

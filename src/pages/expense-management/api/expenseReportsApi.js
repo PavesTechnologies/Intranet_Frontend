@@ -68,6 +68,14 @@ export const lineItemService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
+  // The line-item response already embeds `lineStatus` / `policyWarnings` on
+  // create, update, and list — prefer those. This is only for flows that
+  // need a fresh/reloaded violation list independent of a line-item fetch.
+  getPolicyWarnings: (reportId, lineItemId) =>
+    api.get(`/xms/employee/expense-reports/${reportId}/line-items/${lineItemId}/policy-warnings`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
 };
 
 export const receiptService = {

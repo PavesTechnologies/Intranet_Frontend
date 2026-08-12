@@ -20,29 +20,29 @@ export const useLeaveWebSocket = (channel, eventTypes, onEvent, cooldown = 2000)
         const types = eventKey.split(","); // recreate from stable string
 
         const handler = (data) => {
-            console.log(`📨 [${channel}] received:`, data?.type, "| watching:", types);
+            // console.log(`📨 [${channel}] received:`, data?.type, "| watching:", types);
 
             if (!types.includes(data?.type)) {
-                console.log(`⏭️ Ignored — "${data?.type}" not in [${eventKey}]`);
+                // console.log(`⏭️ Ignored — "${data?.type}" not in [${eventKey}]`);
                 return;
             }
             if (cooldownRef.current) {
-                console.log(`⏳ Cooldown active — skipping`);
+                // console.log(`⏳ Cooldown active — skipping`);
                 return;
             }
 
             cooldownRef.current = true;
-            console.log(`🔄 Calling onEvent for: ${data.type}`);
+            // console.log(`🔄 Calling onEvent for: ${data.type}`);
             onEvent(data);
 
             setTimeout(() => { cooldownRef.current = false; }, cooldown);
         };
 
-        console.log(`✅ Subscribing to "${channel}" for [${eventKey}]`);
+        // console.log(`✅ Subscribing to "${channel}" for [${eventKey}]`);
         const unsub = subscribe(channel, handler);
 
         return () => {
-            console.log(`🔌 Unsubscribing from "${channel}"`);
+            // console.log(`🔌 Unsubscribing from "${channel}"`);
             unsub?.();
         };
 

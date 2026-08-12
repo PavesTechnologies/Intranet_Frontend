@@ -342,7 +342,7 @@ export default function EditLeaveModal({
     ];
   }, [leaveBalances]);
 
-  console.log(normalizedBalances);
+  // console.log(normalizedBalances);
 
   const leaveTypeOptions = useLeaveDropdownOptions(normalizedBalances);
   const selectedLeaveType = leaveTypeOptions.find(

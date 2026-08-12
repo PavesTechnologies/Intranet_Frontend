@@ -810,7 +810,7 @@ export default function EmployeeProfileView() {
 
   const confirmDeleteSkill = async () => {
     const { resourceSkillId } = deleteConfirm;
-    console.log("🗑️ [confirmDeleteSkill] resourceSkillId:", resourceSkillId);
+    // console.log("🗑️ [confirmDeleteSkill] resourceSkillId:", resourceSkillId);
     setDeleteConfirm(prev => ({ ...prev, isDeleting: true }));
     try {
       await skillService.deleteSkill(resourceSkillId);

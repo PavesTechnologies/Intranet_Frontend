@@ -22,7 +22,7 @@ const CreateComplianceModal = ({ open, onClose }) => {
 
   const handleSave = () => {
     // 🔹 MOCK SAVE (for now)
-    console.log("Compliance Requirement Saved:", formData);
+    // console.log("Compliance Requirement Saved:", formData);
 
     // Later:
     // - validate duplicates

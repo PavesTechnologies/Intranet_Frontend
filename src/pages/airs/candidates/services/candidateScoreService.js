@@ -48,3 +48,35 @@ export const getSemanticScoreBreakdown = async (campaignCandidateId) => {
     throw error;
   }
 };
+
+// Candidate Scorecard — AI Evaluation tab —
+// GET /airs/campaign-candidates/{campaign_candidate_id}/ai-evaluation
+export const getAiEvaluationBreakdown = async (campaignCandidateId) => {
+  try {
+    const response = await api.get(`${BASE_URL}/campaign-candidates/${campaignCandidateId}/ai-evaluation`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching AI evaluation breakdown:", error);
+    throw error;
+  }
+};
+
+// Candidate Scorecard — Final Status tab —
+// GET /airs/campaign-candidates/{campaign_candidate_id}/composite
+export const getCompositeScoreBreakdown = async (campaignCandidateId) => {
+  try {
+    const response = await api.get(`${BASE_URL}/campaign-candidates/${campaignCandidateId}/composite`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching composite score breakdown:", error);
+    throw error;
+  }
+};

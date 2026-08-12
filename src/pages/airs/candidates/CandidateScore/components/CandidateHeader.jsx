@@ -2,8 +2,12 @@ import React from "react";
 import { ArrowLeft, MapPin, Briefcase, Mail } from "lucide-react";
 import ScoreRing from "../../components/ScoreRing";
 import { renderStageBadge } from "../../utils/candidateUtils.jsx";
+import { DECISION_SOURCE_LABEL } from "../../constants/candidateConstants";
+import { formatDateTime } from "../../utils/candidateDataUtils";
 
 export default function CandidateHeader({ candidate, onBack }) {
+  const isRejected = String(candidate.stage).toUpperCase() === "REJECTED";
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 mb-4">
       <div className="flex items-center gap-4">
@@ -17,9 +21,18 @@ export default function CandidateHeader({ candidate, onBack }) {
           {candidate.initials}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-[15px] font-bold text-slate-900">{candidate.name}</span>
-            {/* {renderStageBadge(candidate.stage)} */}
+            {renderStageBadge(candidate.stage)}
+            {(isRejected) && (
+              <span className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
+                {candidate.decisionSource && (
+                  <span>Source: {DECISION_SOURCE_LABEL[candidate.decisionSource] || candidate.decisionSource}</span>
+                )}
+                {candidate.decisionReason && <span>Reason: {candidate.decisionReason}</span>}
+                {candidate.decisionAt && <span>At: {formatDateTime(candidate.decisionAt)}</span>}
+              </span>
+            )}
           </div>
           <div className="text-[12px] flex items-center gap-3 flex-wrap text-slate-400">
             <span className="flex items-center gap-1">
@@ -36,11 +49,12 @@ export default function CandidateHeader({ candidate, onBack }) {
             </span>
           </div>
         </div>
-        <div className="flex gap-4 shrink-0">
+        {/* <div className="flex gap-4 shrink-0">
           <ScoreRing value={candidate.deterministic} size={40} color="#DC2626" label="DF" />
           <ScoreRing value={candidate.semantic} size={40} color="#7C3AED" label="SF" />
           <ScoreRing value={candidate.ats} size={40} color="#2563EB" label="AI" />
-        </div>
+          <ScoreRing value={candidate.composite} size={40} color="#16A34A" label="FS" />
+        </div> */}
       </div>
     </div>
   );

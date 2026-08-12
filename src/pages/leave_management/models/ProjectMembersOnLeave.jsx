@@ -126,8 +126,8 @@ const ProjectMembersOnLeave = ({ employeeId, leaveId }) => {
 
             const leaveCache = {};
 
-            console.log("employees in projects", employees);
-            console.log("employeeId", employeeId);
+            // console.log("employees in projects", employees);
+            // console.log("employeeId", employeeId);
             const membersWithLeaves = await Promise.all(
               employees
                 .filter((emp) => emp.id != employeeId) // exclude current employee
