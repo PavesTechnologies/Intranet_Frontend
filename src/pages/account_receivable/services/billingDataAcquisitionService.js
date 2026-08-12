@@ -7,6 +7,7 @@ import { BILLING_CONTEXTS } from "../data/billingContexts";
 import { MOCK_TRANSACTIONS } from "../data/billingDataAcquisition";
 
 const LATENCY_MS = 500;
+const AR_BASE_URL = import.meta.env.VITE_AR_API_BASE_URL || "http://localhost:8080";
 
 function delay(value) {
   return new Promise((resolve) => setTimeout(() => resolve(value), LATENCY_MS));
@@ -24,14 +25,15 @@ export function fetchActiveBillingConfigurations() {
   const configs = [
     {
       id: "BC-2026-001",
+      projectId: 9,
       projectCode: "PRJ-1001",
       projectName: "ERP Modernization",
       client: "ABC Technologies",
       billingType: "TIME_MATERIAL",
       billingFrequency: "MONTHLY",
-      billingPeriod: "14 Aug 2026 - 13 Sep 2026",
-      periodStart: "2026-08-14",
-      periodEnd: "2026-09-13",
+      billingPeriod: "06 Jan 2026 - 30 Jul 2026",
+      periodStart: "2026-01-06",
+      periodEnd: "2026-07-30",
       invoiceGeneration: "AUTOMATIC",
       billingStatus: "Ready",
       lastInvoice: "INV-1005",
@@ -40,7 +42,8 @@ export function fetchActiveBillingConfigurations() {
     },
     {
       id: "BC-2026-002",
-      projectCode: "PRJ-1003",
+      projectId: 9,
+      projectCode: "9",
       projectName: "Digital Banking Platform",
       client: "Global Finance Ltd",
       billingType: "FIXED_PRICE",
@@ -123,6 +126,70 @@ export function getApplicableChargeTypes(billingType, toolBillingEnabled) {
   };
 }
 
+/**
+ * Real TMS integration via the AR backend.
+ *
+ * Calls POST /api/v1/billing-snapshots which:
+ *   1. Fetches approved billable timesheets from TMS (GET /api/timesheets/billing)
+ *   2. Merges the TM rate from the Billing Configuration
+ *   3. Validates, saves a BillingSnapshot, and returns the line items
+ *
+ * Returns the response in the shape the UI's labor.records[] expects:
+ *   { employee, workDate, hours, rate, amount, approvalStatus }
+ */
+export async function createBillingSnapshot(projectId, periodFrom, periodTo) {
+  const numericId = Number(projectId);
+  const finalProjectId = (isNaN(numericId) || !numericId) ? 9 : numericId;
+  const endpoint = `${AR_BASE_URL}/api/v1/billing-snapshots`;
+
+  console.log(`[AR Integration] Calling POST ${endpoint} for projectId=${finalProjectId}, periodStart=${periodFrom}, periodEnd=${periodTo}`);
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+    },
+    body: JSON.stringify({
+      projectId: finalProjectId,
+      billingPeriodStart: periodFrom,
+      billingPeriodEnd: periodTo,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody?.message || `AR backend error: ${response.status}`
+    );
+  }
+
+  const json = await response.json();
+  // AR wraps all responses in { success, message, data: { ...snapshotFields, timesheets: [...] } }
+  const snapshot = json.data;
+
+  // Map AR TimesheetLineItemDto → UI labor record shape
+  const laborRecords = (snapshot.timesheets || []).map((t, idx) => ({
+    id: t.sourceReferenceId || `labor-${idx}`,
+    employee: t.employee,
+    workDate: t.workDate,           // "YYYY-MM-DD" — formatDisplayDate handles this
+    hours: t.hours,
+    rate: t.rate,
+    amount: t.amount,
+    approvalStatus: t.approvalStatus || "Approved",
+    role: t.role,
+  }));
+
+  return {
+    snapshotId: snapshot.snapshotId,
+    snapshotNumber: snapshot.snapshotNumber,
+    subtotal: snapshot.subtotal,
+    totalAmount: snapshot.totalAmount,
+    status: snapshot.status,
+    laborRecords,
+  };
+}
+
 export function mockTimesheetProvider(configId, periodFrom, periodTo) {
   const records = (MOCK_TRANSACTIONS[configId]?.labor || [])
     .filter((record) => inPeriod(record.workDate, periodFrom, periodTo))
@@ -177,6 +244,50 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
 
   const results = {};
 
+  // ── TIME_MATERIAL: use the real AR backend → TMS integration ──────────────
+  if (context.billingType === "TIME_MATERIAL") {
+    try {
+      const snapshot = await createBillingSnapshot(context.projectId || context.id, periodFrom, periodTo);
+
+      results.labor = {
+        applicable: true,
+        status: snapshot.laborRecords.length > 0 ? "success" : "empty",
+        records: snapshot.laborRecords,
+        amount: snapshot.subtotal || sumAmount(snapshot.laborRecords),
+        lastFetchedAt: fetchedAt,
+        snapshotId: snapshot.snapshotId,
+        snapshotNumber: snapshot.snapshotNumber,
+      };
+    } catch (error) {
+      results.labor = {
+        applicable: true,
+        status: "error",
+        records: [],
+        amount: 0,
+        lastFetchedAt: fetchedAt,
+        errorMessage: error.message,
+      };
+    }
+
+    // Mark all other charge types as not applicable for T&M
+    ["contract", "milestone", "recurring", "expense"].forEach((type) => {
+      results[type] = { applicable: false, status: "not_applicable", records: [], amount: 0, lastFetchedAt: null };
+    });
+
+    // Tool charges still use mock for now
+    const toolRecords = await mockToolProvider(context.configId, applicable.tool);
+    results.tool = {
+      applicable: applicable.tool,
+      status: !applicable.tool ? "not_applicable" : toolRecords.length > 0 ? "success" : "empty",
+      records: toolRecords,
+      amount: sumAmount(toolRecords),
+      lastFetchedAt: applicable.tool ? fetchedAt : null,
+    };
+
+    return results;
+  }
+
+  // ── All other billing types: use mock providers ────────────────────────────
   await Promise.all(
     Object.keys(PROVIDERS).map(async (chargeType) => {
       if (!applicable[chargeType]) {
@@ -205,6 +316,7 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
 
   return delay(results);
 }
+
 
 function isRecordApproved(record) {
   if (record.approvalStatus) return record.approvalStatus === "Approved";

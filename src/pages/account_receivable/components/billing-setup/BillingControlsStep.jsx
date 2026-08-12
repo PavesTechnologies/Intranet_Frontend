@@ -1,7 +1,9 @@
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import { Fonts } from "../../../../components/Fonts/Fonts";
-import { PAYMENT_TERMS_OPTIONS } from "../../data/wizardOptions";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import { getActivePaymentTerms, getActiveTaxRegions, getApiErrorMessage } from "../../services/billingConfigurationService";
+import { useEffect, useState } from "react";
 
 function getOrdinalSuffix(i) {
   const j = i % 10, k = i % 100;
@@ -42,6 +44,83 @@ function getDuePreviewText(genDayStr, term) {
 export default function BillingControlsStep({ value = {}, onChange }) {
   const update = (patch) => onChange({ ...value, ...patch });
 
+  const [paymentTermOptions, setPaymentTermOptions] = useState([]);
+  const [taxRegionOptions, setTaxRegionOptions] = useState([]);
+  const [loadingPaymentTerms, setLoadingPaymentTerms] = useState(true);
+  const [loadingTaxRegions, setLoadingTaxRegions] = useState(true);
+  const [paymentTermsError, setPaymentTermsError] = useState("");
+  const [taxRegionsError, setTaxRegionsError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadPaymentTerms = async () => {
+      setLoadingPaymentTerms(true);
+      setPaymentTermsError("");
+      try {
+        const terms = await getActivePaymentTerms();
+        if (!mounted) return;
+        setPaymentTermOptions(
+          terms.map((term) => ({
+            value: term.paymentTermId,
+            label: term.paymentTermName,
+            paymentTerms: term.value,
+          })),
+        );
+      } catch (error) {
+        if (!mounted) return;
+        setPaymentTermsError(getApiErrorMessage(error, "Unable to load payment terms."));
+        setPaymentTermOptions([]);
+        showStatusToast(getApiErrorMessage(error, "Unable to load payment terms."), "error");
+      } finally {
+        if (mounted) setLoadingPaymentTerms(false);
+      }
+    };
+
+    const loadTaxRegions = async () => {
+      setLoadingTaxRegions(true);
+      setTaxRegionsError("");
+      try {
+        const taxRegions = await getActiveTaxRegions();
+        if (!mounted) return;
+        setTaxRegionOptions(
+          taxRegions.map((region) => ({
+            value: region.taxRegionId,
+            label: region.taxRegionName,
+          })),
+        );
+      } catch (error) {
+        if (!mounted) return;
+        setTaxRegionsError(getApiErrorMessage(error, "Unable to load tax regions."));
+        setTaxRegionOptions([]);
+        showStatusToast(getApiErrorMessage(error, "Unable to load tax regions."), "error");
+      } finally {
+        if (mounted) setLoadingTaxRegions(false);
+      }
+    };
+
+    loadPaymentTerms();
+    loadTaxRegions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const selected = paymentTermOptions.find((option) => String(option.value) === String(value.paymentTermId));
+    if (!selected) return;
+    if (value.paymentTermName === selected.label && value.paymentTerms === selected.paymentTerms) return;
+    update({ paymentTermName: selected.label, paymentTerms: selected.paymentTerms });
+  }, [paymentTermOptions, value.paymentTermId, value.paymentTermName, value.paymentTerms]);
+
+  useEffect(() => {
+    const selected = taxRegionOptions.find((option) => String(option.value) === String(value.taxRegionId));
+    if (!selected) return;
+    if (value.taxRegionName === selected.label) return;
+    update({ taxRegionName: selected.label });
+  }, [taxRegionOptions, value.taxRegionId, value.taxRegionName]);
+
   const previewText = getDuePreviewText(value.invoiceGenerationDay, value.paymentTerms);
 
   return (
@@ -73,7 +152,7 @@ export default function BillingControlsStep({ value = {}, onChange }) {
           <div className="inline-flex rounded-lg bg-slate-100 p-1">
             <button
               type="button"
-              onClick={() => update({ autoInvoiceGeneration: false, invoiceGenerationDay: "" })}
+              onClick={() => update({ autoInvoiceGeneration: false, invoiceGenerationType: "MANUAL", invoiceGenerationDay: "" })}
               className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
                 value.autoInvoiceGeneration === false
                   ? "bg-white text-slate-900 shadow-sm"
@@ -84,7 +163,7 @@ export default function BillingControlsStep({ value = {}, onChange }) {
             </button>
             <button
               type="button"
-              onClick={() => update({ autoInvoiceGeneration: true })}
+              onClick={() => update({ autoInvoiceGeneration: true, invoiceGenerationType: "AUTOMATIC" })}
               className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
                 value.autoInvoiceGeneration === true
                   ? "bg-white text-slate-900 shadow-sm"
@@ -133,16 +212,62 @@ export default function BillingControlsStep({ value = {}, onChange }) {
         </div>
 
         <div className="grid grid-cols-1 gap-5">
-          <div className="space-y-4 max-w-xs">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <div className="space-y-4">
             <label className="block text-sm font-medium text-slate-700">
               Payment Terms <span className="text-red-500">*</span>
             </label>
-            <FormSelect
-              name="paymentTerms"
-              value={value.paymentTerms || ""}
-              onChange={(event) => update({ paymentTerms: event.target.value })}
-              options={PAYMENT_TERMS_OPTIONS}
-            />
+            {loadingPaymentTerms ? (
+              <p className="text-sm text-slate-500">Loading payment terms…</p>
+            ) : (
+              <FormSelect
+                name="paymentTermId"
+                value={value.paymentTermId || ""}
+                onChange={(event) => {
+                  const selected = paymentTermOptions.find((opt) => String(opt.value) === String(event.target.value));
+                  update({
+                    paymentTermId: event.target.value,
+                    paymentTermName: selected?.label || "",
+                    paymentTerms: selected?.paymentTerms || "",
+                  });
+                }}
+                options={[{ value: "", label: paymentTermsError ? "Payment terms unavailable" : "Select payment terms" }, ...paymentTermOptions]}
+              />
+            )}
+            {paymentTermsError && <p className="text-xs text-red-600">{paymentTermsError}</p>}
+          </div>
+
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-slate-700">
+              Tax Region <span className="text-red-500">*</span>
+            </label>
+            {loadingTaxRegions ? (
+              <p className="text-sm text-slate-500">Loading tax regions...</p>
+            ) : (
+              <FormSelect
+                name="taxRegionId"
+                value={value.taxRegionId || ""}
+                onChange={(event) => {
+                  const selected = taxRegionOptions.find((opt) => String(opt.value) === String(event.target.value));
+                  update({ taxRegionId: event.target.value, taxRegionName: selected?.label || "" });
+                }}
+                options={[{ value: "", label: taxRegionsError ? "Tax regions unavailable" : "Select tax region" }, ...taxRegionOptions]}
+              />
+            )}
+            {taxRegionsError && <p className="text-xs text-red-600">{taxRegionsError}</p>}
+          </div>
+          </div>
+
+          <div className="max-w-md rounded-lg border border-slate-200 p-4">
+            <label className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={Boolean(value.expenseBillingEligible)}
+                onChange={(event) => update({ expenseBillingEligible: event.target.checked })}
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              Expense billing eligible
+            </label>
           </div>
 
           {/* Payment preview summary block */}

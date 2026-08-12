@@ -605,8 +605,6 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   ];
 
   const { pageItems, totalPages, currentPage: safePage } = paginate(list, currentPage, CANDIDATE_PAGE_SIZE);
-  // TEMP DEBUG - remove once candidates render correctly
-  console.log("[CandidatesTab] rendered candidates (pageItems):", pageItems);
 
   const toggleStar = (candidateId) => {
     setStarredIds((prev) => {
@@ -708,7 +706,7 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
 
       <CandidateTable
         candidates={pageItems}
-        onView={(c) => navigate(`/airs/candidates/${c.id}`)}
+        onView={(c) => navigate(`/airs/pipeline/candidates/${c.id}`, { state: { resume: c } })}
         onToggleStar={toggleStar}
         selectable={canAct}
         selectedIds={selectedIds}

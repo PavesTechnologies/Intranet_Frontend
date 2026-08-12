@@ -1,20 +1,5 @@
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import { Fonts } from "../../../../components/Fonts/Fonts";
-import {
-  BILLING_TYPE_LABELS,
-  BILLING_MODE_LABELS,
-  BILLING_FREQUENCIES,
-  TAX_PREFERENCE_OPTIONS,
-  PAYMENT_TERMS_OPTIONS,
-  APPROVAL_WORKFLOW_OPTIONS,
-  FINANCE_REVIEWER_OPTIONS,
-  FINANCE_APPROVER_OPTIONS,
-  INVOICE_NUMBER_SERIES_OPTIONS,
-} from "../../data/wizardOptions";
-
-function labelFor(options, value) {
-  return options.find((option) => option.value === value)?.label || value || "—";
-}
 
 function formatBoolean(flag) {
   return flag ? "Enabled" : "Disabled";
@@ -44,10 +29,10 @@ function ReviewSection({ title, rows, stepId, onEdit }) {
           )}
         </div>
         <div className="divide-y divide-slate-100">
-          {rows.map((row) => (
-            <div key={row.label} className="flex justify-between items-center py-2 text-sm">
+          {rows.map((row, index) => (
+            <div key={`${row.label}-${index}`} className="flex justify-between items-center py-2 text-sm">
               <span className="text-slate-500 font-medium">{row.label}</span>
-              <span className="font-semibold text-slate-800">{row.value || "—"}</span>
+              <span className="font-semibold text-slate-800">{row.value || "â€”"}</span>
             </div>
           ))}
         </div>
@@ -57,10 +42,38 @@ function ReviewSection({ title, rows, stepId, onEdit }) {
 }
 
 export default function ReviewActivateStep({ wizardData, onEditStep }) {
-  const { setupMode, projectInfo = {}, billingConfig = {}, controls = {} } = wizardData;
+  const { projectInfo = {}, billingConfig = {}, controls = {} } = wizardData;
 
-  const billingTypeLabel = BILLING_TYPE_LABELS[billingConfig.billingType] || "—";
-  const billingFrequencyLabel = labelFor(BILLING_FREQUENCIES, billingConfig.billingFrequency);
+  const billingTypeLabel =
+    billingConfig.billingTypeName ||
+    billingConfig.billingTypeLabel ||
+    billingConfig.billingType ||
+    "â€”";
+  const billingFrequencyLabel =
+    billingConfig.billingFrequencyName ||
+    billingConfig.billingFrequencyLabel ||
+    billingConfig.billingFrequency ||
+    "â€”";
+  const pricingModel = billingConfig.pricingModel || billingConfig.billingMode || "";
+  const roleRateRows = (billingConfig.timeAndMaterial?.roles || [])
+    .filter((roleRate) => roleRate.role || roleRate.rate)
+    .map((roleRate) => ({
+      label: roleRate.role || "Role Rate",
+      value: [
+        roleRate.rate,
+        roleRate.ratePeriod,
+        roleRate.effectiveFrom ? `from ${formatDisplayDate(roleRate.effectiveFrom)}` : "",
+        roleRate.effectiveTo ? `to ${formatDisplayDate(roleRate.effectiveTo)}` : "",
+        roleRate.remarks,
+      ].filter(Boolean).join(" | "),
+    }));
+  const standardRateValue = [
+    billingConfig.timeAndMaterial?.rate,
+    billingConfig.timeAndMaterial?.ratePeriod,
+    billingConfig.timeAndMaterial?.effectiveFrom ? `from ${formatDisplayDate(billingConfig.timeAndMaterial.effectiveFrom)}` : "",
+    billingConfig.timeAndMaterial?.effectiveTo ? `to ${formatDisplayDate(billingConfig.timeAndMaterial.effectiveTo)}` : "",
+    billingConfig.timeAndMaterial?.remarks,
+  ].filter(Boolean).join(" | ");
 
   return (
     <div className="space-y-5">
@@ -80,7 +93,9 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
             { label: "Client", value: projectInfo.clientName },
             { label: "Project", value: projectInfo.projectName },
             { label: "Project Code", value: projectInfo.projectCode },
-            { label: "Duration", value: projectInfo.startDate ? `${formatDisplayDate(projectInfo.startDate)} to ${formatDisplayDate(projectInfo.endDate) || "Ongoing"}` : "—" },
+            { label: "Duration", value: projectInfo.startDate ? `${formatDisplayDate(projectInfo.startDate)} to ${formatDisplayDate(projectInfo.endDate) || "Ongoing"}` : "â€”" },
+            { label: "Currency", value: projectInfo.projectBudgetCurrency || projectInfo.currency || "â€”" },
+            { label: "Project Budget", value: projectInfo.projectBudget !== "" && projectInfo.projectBudget !== null && projectInfo.projectBudget !== undefined ? projectInfo.projectBudget : "â€”" },
           ]}
         />
 
@@ -89,9 +104,11 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
           stepId={2}
           onEdit={onEditStep}
           rows={[
-            { label: "Currency", value: projectInfo.currency },
+            { label: "Currency", value: projectInfo.projectBudgetCurrency || projectInfo.currency || "â€”" },
             { label: "Billing Type", value: billingTypeLabel },
             { label: "Billing Frequency", value: billingFrequencyLabel },
+            { label: "Effective From", value: formatDisplayDate(billingConfig.effectiveFrom) },
+            { label: "Effective To", value: formatDisplayDate(billingConfig.effectiveTo) || "Ongoing" },
           ]}
         />
 
@@ -104,24 +121,21 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
               ? [
                   {
                     label: billingConfig.billingType === "TIME_MATERIAL" ? "Rate Model" : "Billing Mode",
-                    value: BILLING_MODE_LABELS[billingConfig.billingMode] || "—",
+                    value: pricingModel || "â€”",
                   },
                 ]
               : []),
             ...(billingConfig.billingType === "TIME_MATERIAL"
               ? [
-                  ...(billingConfig.billingMode === "STANDARD" || !billingConfig.billingMode
+                  ...(pricingModel === "STANDARD" || !pricingModel
                     ? [
-                        { label: "Billing Rate", value: billingConfig.timeAndMaterial?.billingRate },
+                        { label: "Standard Rate", value: standardRateValue },
                       ]
                     : []),
-                  ...(billingConfig.billingMode === "ROLE_BASED"
-                    ? [
-                        {
-                          label: "Roles Configured",
-                          value: `${(billingConfig.timeAndMaterial?.roles || []).filter((r) => r.role && r.rate).length} roles`,
-                        },
-                      ]
+                  ...(pricingModel === "ROLE_BASED"
+                    ? roleRateRows.length > 0
+                      ? roleRateRows
+                      : [{ label: "Roles Configured", value: "â€”" }]
                     : []),
                 ]
               : []),
@@ -159,12 +173,14 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
                   ? "Automatic"
                   : controls.autoInvoiceGeneration === false
                   ? "Manual"
-                  : "—",
+                  : "â€”",
             },
             ...(controls.autoInvoiceGeneration === true
               ? [{ label: "Generation Day", value: controls.invoiceGenerationDay }]
               : []),
-            { label: "Payment Terms", value: labelFor(PAYMENT_TERMS_OPTIONS, controls.paymentTerms) },
+            { label: "Payment Terms", value: controls.paymentTermName || controls.paymentTerms || controls.paymentTermId || "â€”" },
+            { label: "Tax Region", value: controls.taxRegionName || controls.taxRegionId || "â€”" },
+            { label: "Expense Billing", value: controls.expenseBillingEligible ? "Eligible" : "Not Eligible" },
           ]}
         />
       </div>

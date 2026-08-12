@@ -5,10 +5,27 @@ import GenericTable from "../../../../components/Table/table";
 import Button from "../../../../components/Button/Button";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import ScoreRing from "./ScoreRing";
-import { renderStageBadge, renderRiskBadge } from "../utils/candidateUtils.jsx";
+import {
+  renderStageBadge,
+  renderRiskBadge,
+  renderAiRecommendationBadge,
+  renderDecisionBadge,
+  renderFlags,
+} from "../utils/candidateUtils.jsx";
+import { DASH } from "../utils/candidateDataUtils";
 import { deleteCandidate } from "../../service/resumeIntake";
 import { extractErrorMessage } from "../../resume-intake/intake/utils/intakeUtils.jsx";
 import { useAuth } from "../../../../contexts/AuthContext";
+
+// The mapper hands scores over as numbers OR the DASH string when the backend
+// had no value, so this must not assume a number: Number("-") is NaN and
+// NaN.toFixed(1) renders "NaN". multiplier converts 0–1 scales (semantic) to
+// the 0–100 the column displays.
+const renderScore = (value, multiplier = 1) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return <span className="text-slate-300">{DASH}</span>;
+  return <span className="font-semibold text-slate-900">{(n * multiplier).toFixed(1)}</span>;
+};
 
 /**
  * Shared candidate table (M10). The selection, note-badge and extra-action
@@ -63,8 +80,8 @@ export default function CandidateTable({
     );
   }
 
-  const headers = ["Candidate", "Deterministic", "Semantic", "ATS", "Composite", "Exp.", "Location", "Stage", "Risk", "Actions"];
-  const columns = ["name", "deterministic", "semantic", "ats", "composite", "experience", "location", "stage", "risk", "actions"];
+  const headers = ["Candidate", "Deterministic", "Semantic", "ATS", "Composite", "AI Rec.", "Exp.", "Location", "Stage", "Risk", "Actions"];
+  const columns = ["name", "deterministic", "semantic", "ats", "composite", "aiRecommendation", "experience", "location", "stage", "risk", "actions"];
 
   if (selectable) {
     headers.unshift(
@@ -96,6 +113,9 @@ export default function CandidateTable({
     ) : null,
     name: (
       <div className="w-full flex items-center gap-2.5 text-left">
+        <span className="w-6 text-center text-[11px] font-bold text-slate-400 shrink-0" title={c.rankingStatus ? `Ranking: ${c.rankingStatus}` : undefined}>
+          {c.rank != null ? `#${c.rank}` : "—"}
+        </span>
         <div className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 bg-gradient-to-br from-blue-600 to-indigo-600">
           {c.initials}
         </div>
@@ -126,13 +146,16 @@ export default function CandidateTable({
         </button>
       </div>
     ),
-    deterministic: <span className="font-semibold text-slate-900">{Number(c.deterministic).toFixed(1)}</span>,
-    ats: <span className="font-semibold text-slate-900">{(Number(c.ats) * 100).toFixed(1)}</span>,
-    semantic: <span className="font-semibold text-slate-900">{(Number(c.semantic) * 100).toFixed(1)}</span>,
+    deterministic: renderScore(c.deterministic),
+    ats: renderScore(c.ats),
+    semantic: renderScore(c.semantic, 100),
     composite: <ScoreRing value={c.composite} size={32} color="#16A34A" />,
+    aiRecommendation: renderAiRecommendationBadge(c.aiRecommendation),
     experience: `${Number(c.experience).toFixed(1)} yrs`,
     location: c.location,
     stage: renderStageBadge(c.stage),
+    // keyed `risk` to match the Risk column; c.rank is the ranking position and
+    // is already shown beside the candidate's name
     risk: renderRiskBadge(c.risk),
     actions: (
       <div className="flex items-center gap-1">
@@ -169,7 +192,9 @@ export default function CandidateTable({
 
   return (
     <>
-      <GenericTable headers={headers} columns={columns} rows={rows} />
+      <div className="overflow-x-auto">
+        <GenericTable headers={headers} columns={columns} rows={rows} />
+      </div>
 
       <ConfirmationModal
         isOpen={!!candidateToDelete}

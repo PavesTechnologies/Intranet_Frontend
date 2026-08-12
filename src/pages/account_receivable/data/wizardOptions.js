@@ -60,6 +60,8 @@ export const BILLING_FREQUENCIES = [
   { value: "BIWEEKLY", label: "Biweekly" },
   { value: "MONTHLY", label: "Monthly" },
   { value: "QUARTERLY", label: "Quarterly" },
+  { value: "HALF_YEARLY", label: "Half-Yearly" },
+  { value: "ANNUALLY", label: "Annually" },
   { value: "YEARLY", label: "Yearly" },
   { value: "ON_DEMAND", label: "On Demand" },
 ];
@@ -136,15 +138,6 @@ export const TAX_PREFERENCE_OPTIONS = [
   { value: "REVERSE_CHARGE", label: "Reverse Charge" },
 ];
 
-export const PAYMENT_TERMS_OPTIONS = [
-  { value: "", label: "Select payment terms" },
-  { value: "NET_15", label: "Net 15" },
-  { value: "NET_30", label: "Net 30" },
-  { value: "NET_45", label: "Net 45" },
-  { value: "NET_60", label: "Net 60" },
-  { value: "IMMEDIATE", label: "Immediate" },
-];
-
 export const APPROVAL_WORKFLOW_OPTIONS = [
   { value: "", label: "Select approval workflow" },
   { value: "SINGLE_APPROVER", label: "Single Approver" },
@@ -172,14 +165,6 @@ export const INVOICE_NUMBER_SERIES_OPTIONS = [
   { value: "AR_EXPORT_2026", label: "AR-Export-2026 Series" },
 ];
 
-export const CURRENCY_OPTIONS = [
-  { value: "", label: "Select currency" },
-  { value: "INR", label: "INR" },
-  { value: "USD", label: "USD" },
-  { value: "EUR", label: "EUR" },
-  { value: "GBP", label: "GBP" },
-];
-
 export const SOURCE_FILTER_OPTIONS = [
   { value: "", label: "All Sources" },
   { value: "Enterprise", label: "Enterprise" },
@@ -189,6 +174,8 @@ export const SOURCE_FILTER_OPTIONS = [
 export const STATUS_FILTER_OPTIONS = [
   { value: "", label: "All Statuses" },
   { value: "Draft", label: "Draft" },
+  { value: "Pending Approval", label: "Pending Approval" },
   { value: "Active", label: "Active" },
+  { value: "Rejected", label: "Rejected" },
   { value: "Inactive", label: "Inactive" },
 ];

@@ -28,7 +28,6 @@ import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
 import Modal from "@/components/Modal/modal";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
-import StatusBadge from "@/components/status/statusbadge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
@@ -49,6 +48,19 @@ import FormDatePicker from "@/components/forms/FormDatePicker";
 import GstCalculationCard from "@/pages/expense-management/components/expense-reports/GstCalculationCard";
 import CurrencyConversionCard from "@/pages/expense-management/components/expense-reports/CurrencyConversionCard";
 import ReceiptDropzone from "@/pages/expense-management/components/expense-reports/ReceiptDropzone";
+import PolicyStatusBadge, {
+  PolicyResultBanner,
+  derivePolicyStatus,
+} from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
+import ApprovalStatusPill from "@/pages/expense-management/approval-engine/components/ApprovalStatusPill";
+import { useApprovalLiveSync } from "@/pages/expense-management/approval-engine/hooks/useApprovalLiveSync";
+import {
+  useApprovalStatus,
+  useLineItemReviews,
+  useSubmitReport,
+  useRecallReport,
+  useCancelReport,
+} from "@/pages/expense-management/approval-engine/hooks/useApprovalWorkflow";
 
 const formatDate = (value) => {
   if (!value) return "—";
@@ -84,9 +96,24 @@ export default function ExpenseReportDetailPage() {
   const { hasRole } = useAuth();
   const canManage = hasRole(["General", "Manager"]);
 
+  useApprovalLiveSync();
+  const { data: approvalStatus } = useApprovalStatus(reportId);
+  const { data: lineItemReviews } = useLineItemReviews(reportId);
+  const submitReport = useSubmitReport();
+  const recallReport = useRecallReport();
+  const cancelReport = useCancelReport();
+  const [pendingLifecycleAction, setPendingLifecycleAction] = useState(null); // "recall" | "cancel" | null
+  const isLifecycleBusy = submitReport.isPending || recallReport.isPending || cancelReport.isPending;
   const [report, setReport] = useState(null);
   const [lineItems, setLineItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  const needsCorrectionLines = (lineItemReviews || []).filter((r) => r.status === "NEEDS_CORRECTION");
+  // Mirrors the backend's ReportStatus.isEditable() set exactly (EMS/enums/ReportStatus.java) -
+  // report-level Edit/Delete must stay available during AWAITING_CORRECTION (that's the whole
+  // point of the correction loop), not just DRAFT.
+  const isReportEditable = ["DRAFT", "POLICY_REJECTED", "QUERY_RAISED", "AWAITING_CORRECTION"].includes(report?.reportStatus);
+
+    const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
   const [costCenters, setCostCenters] = useState([]);
@@ -472,6 +499,31 @@ export default function ExpenseReportDetailPage() {
     }
   };
 
+  const handleSubmitOrResubmit = () => {
+    submitReport.mutate(reportId, {
+      onSuccess: () => {
+        showStatusToast(report.reportStatus === "AWAITING_CORRECTION" ? "Report resubmitted" : "Report submitted for approval", "success");
+        fetchReport();
+      },
+      onError: (err) => showStatusToast(err.response?.data?.message || "Failed to submit report", "error"),
+    });
+  };
+
+  const handleLifecycleConfirm = () => {
+    const mutation = pendingLifecycleAction === "recall" ? recallReport : cancelReport;
+    mutation.mutate(reportId, {
+      onSuccess: () => {
+        showStatusToast(pendingLifecycleAction === "recall" ? "Report recalled to Draft" : "Report cancelled", "success");
+        setPendingLifecycleAction(null);
+        fetchReport();
+      },
+      onError: (err) => {
+        showStatusToast(err.response?.data?.message || "Action failed", "error");
+        setPendingLifecycleAction(null);
+      },
+    });
+  };
+
   const breadcrumbs = [
     { label: "Expense Management", to: "/expense-management/dashboard" },
     { label: "Expenses", to: "/expense-management/expenses/my" },
@@ -480,11 +532,11 @@ export default function ExpenseReportDetailPage() {
   ];
 
   const headers = canManage
-    ? ["Category", "Merchant", "Date", "Amount", "GST", "Net Amount", "Base Amount", "Billable", "Actions"]
-    : ["Category", "Merchant", "Date", "Amount", "GST", "Net Amount", "Base Amount", "Billable"];
+    ? ["Category", "Merchant", "Date", "Amount", "Policy", "GST", "Net Amount", "Base Amount", "Billable", "Actions"]
+    : ["Category", "Merchant", "Date", "Amount", "Policy", "GST", "Net Amount", "Base Amount", "Billable"];
   const columns = canManage
-    ? ["category", "merchant", "date", "amount", "gst", "net", "base", "billable", "actions"]
-    : ["category", "merchant", "date", "amount", "gst", "net", "base", "billable"];
+    ? ["category", "merchant", "date", "amount", "policy", "gst", "net", "base", "billable", "actions"]
+    : ["category", "merchant", "date", "amount", "policy", "gst", "net", "base", "billable"];
 
   const tableRows = filteredLineItems.map((li) => {
     const rowObj = {
@@ -501,6 +553,7 @@ export default function ExpenseReportDetailPage() {
           {formatAmount(li.amount)} <span className="text-xs text-gray-400">{li.currencyCode}</span>
         </span>
       ),
+      policy: <PolicyStatusBadge lineStatus={li.lineStatus} policyWarnings={li.policyWarnings} />,
       gst: <span className="font-mono text-amber-600">{formatAmount(li.taxAmount)}</span>,
       net: <span className="font-mono font-semibold text-emerald-700">{formatAmount(li.netAmount)}</span>,
       base: (
@@ -586,24 +639,72 @@ export default function ExpenseReportDetailPage() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-xl font-bold text-[#0a174e]">{report.title}</h1>
-                  <StatusBadge label={report.reportStatus || "DRAFT"} size="sm" />
+                  <ApprovalStatusPill
+                    status={report.reportStatus || "DRAFT"}
+                    label={
+                      report.reportStatus === "PENDING_APPROVAL" && approvalStatus?.currentLevelDisplayName
+                        ? `Pending ${approvalStatus.currentLevelDisplayName}`
+                        : undefined
+                    }
+                  />
                 </div>
                 <p className="text-xs text-gray-400 font-mono mt-1">{report.reportNumber}</p>
               </div>
 
               {canManage && (
-                <div className="flex gap-2 shrink-0">
-                  <Button variant="outline" size="small" onClick={openEditReport}>
-                    <Pencil size={14} />
-                    Edit
-                  </Button>
-                  <Button variant="danger" size="small" onClick={() => setIsDeleteReportOpen(true)}>
-                    <Trash2 size={14} />
-                    Delete
-                  </Button>
+                <div className="flex gap-2 shrink-0 flex-wrap">
+                  {report.reportStatus === "DRAFT" && (
+                    <Button variant="primary" size="small" loading={submitReport.isPending} loadingText="Submitting..." onClick={handleSubmitOrResubmit}>
+                      Submit for Approval
+                    </Button>
+                  )}
+                  {report.reportStatus === "AWAITING_CORRECTION" && (
+                    <Button variant="primary" size="small" loading={submitReport.isPending} loadingText="Resubmitting..." onClick={handleSubmitOrResubmit}>
+                      Resubmit
+                    </Button>
+                  )}
+                  {approvalStatus?.canRecall && (
+                    <Button variant="outline" size="small" disabled={isLifecycleBusy} onClick={() => setPendingLifecycleAction("recall")}>
+                      Recall to Draft
+                    </Button>
+                  )}
+                  {report.reportStatus !== "DRAFT" && approvalStatus?.canCancel && (
+                    <Button variant="outline" size="small" disabled={isLifecycleBusy} onClick={() => setPendingLifecycleAction("cancel")}>
+                      Cancel
+                    </Button>
+                  )}
+                  {isReportEditable && (
+                    <Button variant="outline" size="small" onClick={openEditReport}>
+                      <Pencil size={14} />
+                      Edit
+                    </Button>
+                  )}
+                  {report.reportStatus === "DRAFT" && (
+                    <Button variant="danger" size="small" onClick={() => setIsDeleteReportOpen(true)}>
+                      <Trash2 size={14} />
+                      Delete
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
+
+            {report.reportStatus === "AWAITING_CORRECTION" && needsCorrectionLines.length > 0 && (
+              <div className="mt-4 rounded-lg bg-orange-50 border border-orange-200 px-4 py-3">
+                <p className="text-sm font-semibold text-orange-800">
+                  {needsCorrectionLines.length} line item{needsCorrectionLines.length > 1 ? "s" : ""} need correction
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {needsCorrectionLines.map((r) => (
+                    <li key={r.lineItemId} className="text-sm text-orange-700">
+                      <span className="font-medium">{lineItems.find((li) => li.lineItemId === r.lineItemId)?.merchantName || "Line item"}:</span>{" "}
+                      {r.comment}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-orange-600">Fix the flagged line(s) below, then click Resubmit above.</p>
+              </div>
+            )}
 
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <DetailField icon={<FileText size={16} />} label="Business Purpose" value={report.businessPurpose || "—"} />
@@ -965,6 +1066,22 @@ export default function ExpenseReportDetailPage() {
         isLoading={deletingReport}
         variant="danger"
       />
+
+      <ConfirmationModal
+        isOpen={!!pendingLifecycleAction}
+        title={pendingLifecycleAction === "recall" ? "Recall to Draft" : "Cancel Report"}
+        message={
+          pendingLifecycleAction === "recall"
+            ? "This returns the report to Draft and clears its approval progress so far. You can resubmit later."
+            : "This cancels the report outright - a terminal action, distinct from Recall. It cannot be resubmitted."
+        }
+        confirmText={pendingLifecycleAction === "recall" ? "Recall to Draft" : "Cancel Report"}
+        cancelText="Back"
+        onConfirm={handleLifecycleConfirm}
+        onCancel={() => setPendingLifecycleAction(null)}
+        isLoading={isLifecycleBusy}
+        variant={pendingLifecycleAction === "recall" ? "primary" : "danger"}
+      />
     </div>
   );
 }
@@ -1236,6 +1353,38 @@ function LineItemDrawer({
     return Object.keys(errors).length === 0;
   };
 
+  // Enforcement (not severity) decides the outcome — see PolicyStatusBadge.
+  // BLOCKED keeps the drawer open (with the violation banner visible) rather
+  // than closing behind a misleading success toast; WARNING still follows
+  // the normal save-and-close flow but surfaces the warning via toast.
+  const finalizeLineItemSave = (savedItem, successMessage, { closeOnSuccess = false } = {}) => {
+    const { status, warnings } = derivePolicyStatus(savedItem?.lineStatus, savedItem?.policyWarnings);
+    setSavedLineItem(savedItem);
+
+    if (status === "BLOCKED") {
+      const firstMsg = warnings[0]?.message;
+      showStatusToast(
+        firstMsg ? `Saved, but blocked by policy: ${firstMsg}` : "Saved, but this line item is blocked by policy.",
+        "error"
+      );
+      onSaved?.();
+      return;
+    }
+
+    if (status === "WARNING") {
+      const firstMsg = warnings[0]?.message;
+      showStatusToast(
+        firstMsg ? `${successMessage} Policy warning: ${firstMsg}` : `${successMessage} (Policy warning)`,
+        "warning"
+      );
+    } else {
+      showStatusToast(successMessage, "success");
+    }
+
+    onSaved?.();
+    if (closeOnSuccess) onClose();
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -1274,10 +1423,9 @@ function LineItemDrawer({
           setPendingFiles([]);
         }
 
-        showStatusToast("Line item updated successfully!", "success");
-        setSavedLineItem(res.data?.data || res.data || { ...payload, lineItemId });
+        const updatedItem = res.data?.data || res.data || { ...payload, lineItemId };
         fetchReceipts();
-        onSaved?.();
+        finalizeLineItemSave(updatedItem, "Line item updated successfully!");
       } else if (ocrReceiptId) {
         // OCR Confirm flow
         res = await api.post(`/xms/employee/receipts/${ocrReceiptId}/confirm`, {
@@ -1289,9 +1437,8 @@ function LineItemDrawer({
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           }
         });
-        showStatusToast("Line item created and receipt confirmed successfully!", "success");
-        onSaved?.();
-        onClose();
+        const createdItem = res.data?.data || res.data;
+        finalizeLineItemSave(createdItem, "Line item created and receipt confirmed successfully!", { closeOnSuccess: true });
       } else {
         res = await lineItemService.create(reportId, payload);
         const createdItem = res.data?.data || res.data;
@@ -1310,9 +1457,7 @@ function LineItemDrawer({
           }
         }
 
-        showStatusToast("Line item added successfully!", "success");
-        onSaved?.();
-        onClose();
+        finalizeLineItemSave(createdItem, "Line item added successfully!", { closeOnSuccess: true });
       }
     } catch (err) {
       console.error("Error saving line item:", err);
@@ -1384,7 +1529,10 @@ function LineItemDrawer({
         </div>
       )}
 
-      {savedLineItem && !isEditingExisting && !ocrReceiptId && (
+      <PolicyResultBanner lineStatus={savedLineItem?.lineStatus} policyWarnings={savedLineItem?.policyWarnings} />
+
+      {savedLineItem && !isEditingExisting && !ocrReceiptId &&
+        derivePolicyStatus(savedLineItem?.lineStatus, savedLineItem?.policyWarnings).status !== "BLOCKED" && (
         <div className="mb-4 flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs font-medium text-green-700">
           <CheckCircle2 size={14} />
           Line item saved. You can keep editing, attach receipts, or click Done.

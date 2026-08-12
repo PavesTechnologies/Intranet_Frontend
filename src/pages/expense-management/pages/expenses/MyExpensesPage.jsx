@@ -9,7 +9,7 @@ import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
 import Modal from "@/components/Modal/modal";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
-import StatusBadge from "@/components/status/statusbadge";
+import ApprovalStatusPill from "@/pages/expense-management/approval-engine/components/ApprovalStatusPill";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
@@ -278,7 +278,7 @@ export default function MyExpensesPage() {
     costCenter: r.costCenterName || "—",
     currency: <span className="font-semibold text-gray-600">{r.currencyCode || "—"}</span>,
     totalAmount: <span className="font-mono font-semibold text-gray-900">{formatAmount(r.totalAmount)}</span>,
-    status: <StatusBadge label={r.reportStatus || "DRAFT"} size="sm" />,
+    status: <ApprovalStatusPill status={r.reportStatus || "DRAFT"} />,
     created: formatDate(r.createdAt),
     actions: (
       <div className="flex items-center gap-1 justify-center">

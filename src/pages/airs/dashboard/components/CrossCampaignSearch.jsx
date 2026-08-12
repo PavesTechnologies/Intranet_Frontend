@@ -5,7 +5,7 @@ import { Globe, Plus, Search, X } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { getSkills } from "../../skill-ontology/services/skillOntologyService";
-import { addCandidateToCampaign } from "../../talent-pool/services/talentPoolService";
+import { addTalentPoolCandidateToCampaign } from "../../talent-pool/services/talentPoolService";
 import { crossCampaignSearch, getDashboardCampaigns } from "../services/dashboardService";
 
 // T03 — the add action reuses M13's talent-pool endpoint, which already owns
@@ -26,7 +26,7 @@ function AddToCampaign({ candidateId, campaigns, alreadyIn }) {
     if (!target) return;
     setBusy(true);
     try {
-      await addCandidateToCampaign(candidateId, target);
+      await addTalentPoolCandidateToCampaign(candidateId, target);
       setAdded(true);
       toast.success("Candidate added — scoring has been queued.");
     } catch (err) {

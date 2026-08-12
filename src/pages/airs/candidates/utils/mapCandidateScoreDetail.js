@@ -68,6 +68,10 @@ export function mapCandidateScoreDetail(raw) {
     notice: textOrDash(data.notice_period),
     salary: textOrDash(data.expected_salary),
     stage: textOrDash(data.pipeline_stage),
+    decisionType: data.decision_type ?? null,
+    decisionSource: data.decision_source ?? null,
+    decisionReason: data.decision_reason ?? null,
+    decisionAt: data.decision_at ?? null,
     // M11-E04-S02 — the override panel needs the raw values, not "-", to decide
     // between offering "apply override" and "clear override".
     pipelineStage: data.pipeline_stage ?? null,
