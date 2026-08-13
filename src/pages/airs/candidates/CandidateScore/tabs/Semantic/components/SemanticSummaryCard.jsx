@@ -16,7 +16,7 @@ function StatTile({ icon: Icon, label, value }) {
   );
 }
 
-// Semantic Score tab — Summary card, built directly from
+// Relevance Score tab — Summary card, built directly from
 // semantic_score_breakdown.summary + .overall_similarity. Mirrors the
 // Deterministic tab's SummaryCard: hero ScoreRing + status/threshold on the
 // left, key stats on the right, pass/fail accent stripe across the top.
@@ -35,7 +35,7 @@ export default function SemanticSummaryCard({ summary, semanticPassed, overallSi
             <ScoreRing value={similarityPct} size={68} color={semanticPassed ? "#059669" : "#E11D48"} />
             <div>
               <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">
-                Semantic Score
+                Relevance Score
               </div>
               <Badge className={`${tone} font-bold px-3 py-1 text-[11px]`}>{label}</Badge>
               <div className="text-[11.5px] text-slate-500 mt-2">
