@@ -13,7 +13,7 @@ const FIELDS = [
   { key: "hierarchy_child_multiplier", label: "Hierarchy Child Multiplier", format: asPct },
   { key: "hierarchy_grandchild_multiplier", label: "Hierarchy Grandchild Multiplier", format: asPct },
   { key: "hierarchy_sibling_multiplier", label: "Hierarchy Sibling Multiplier", format: asPct },
-  { key: "semantic_multiplier", label: "Semantic Multiplier", format: asPct },
+  { key: "semantic_multiplier", label: "Relevance Multiplier", format: asPct },
 ];
 
 // Configuration — deterministic_score_breakdown.configuration.

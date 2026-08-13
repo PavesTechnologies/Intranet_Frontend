@@ -29,7 +29,7 @@ const renderScore = (value, multiplier = 1) => {
 
 /**
  * Shared candidate table (M10). The selection, note-badge and extra-action
- * props below are M11-E04 additions and are all opt-in — every existing caller
+ * Props below are additions and are all opt-in — every existing caller
  * that omits them renders exactly as before.
  */
 export default function CandidateTable({
@@ -37,14 +37,14 @@ export default function CandidateTable({
   onView,
   onToggleStar,
   onDeleted,
-  // M11-E04-S03-T02 bulk selection
+  // Bulk selection
   selectable = false,
   selectedIds,
   onToggleSelect,
   onToggleSelectAll,
-  // M11-E04-S01-T03 note count badges, keyed by campaign_candidate_id
+  // Note count badges, keyed by campaign_candidate_id
   noteCounts,
-  // M11-E04-S03-T01/T03 per-row actions, rendered after the built-in ones
+  // Per-row actions, rendered after the built-in ones
   renderExtraActions,
 }) {
   const { hasRole } = useAuth();
@@ -80,7 +80,7 @@ export default function CandidateTable({
     );
   }
 
-  const headers = ["Candidate", "Deterministic", "Semantic", "ATS", "Composite", "AI Rec.", "Exp.", "Location", "Stage", "Risk", "Actions"];
+  const headers = ["Candidate", "Requirements", "Relevance", "ATS", "Overall", "AI Rec.", "Exp.", "Location", "Stage", "Risk", "Actions"];
   const columns = ["name", "deterministic", "semantic", "ats", "composite", "aiRecommendation", "experience", "location", "stage", "risk", "actions"];
 
   if (selectable) {
@@ -122,7 +122,7 @@ export default function CandidateTable({
         <div className="min-w-0">
           <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5">
             <span className="truncate">{c.name}</span>
-            {/* M11-E04-S01-T03 — only shown when there is something to see */}
+            {/* Only shown when there is something to see */}
             {noteCounts?.[c.id] > 0 && (
               <span
                 title={`${noteCounts[c.id]} recruiter note(s)`}

@@ -7,9 +7,9 @@ const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
 });
 
-// ── M11-E04-S03 stage moves ──────────────────────────────────────────
+// ── stage moves ──────────────────────────────────────────
 
-// T01 — one candidate. Reason is mandatory server-side (min 10 chars).
+// One candidate. Reason is mandatory server-side (min 10 chars).
 export const moveCandidateStage = async (campaignId, campaignCandidateId, targetStage, reason) => {
   const response = await api.post(
     `${ROOT}/campaigns/${campaignId}/candidates/${campaignCandidateId}/stage-move`,
@@ -19,7 +19,7 @@ export const moveCandidateStage = async (campaignId, campaignCandidateId, target
   return response.data?.data || null;
 };
 
-// T03 — reject one candidate straight from the list.
+// Reject one candidate straight from the list.
 export const rejectCandidate = async (campaignId, campaignCandidateId, reason) => {
   const response = await api.post(
     `${ROOT}/campaigns/${campaignId}/candidates/${campaignCandidateId}/reject`,
@@ -29,7 +29,7 @@ export const rejectCandidate = async (campaignId, campaignCandidateId, reason) =
   return response.data?.data || null;
 };
 
-// T02 — batch. All selected candidates must currently share one stage; the
+// Batch. All selected candidates must currently share one stage; the
 // server rejects mixed selections rather than partially applying them.
 export const bulkMoveStage = async (campaignId, campaignCandidateIds, targetStage, reason) => {
   const response = await api.post(
@@ -40,7 +40,7 @@ export const bulkMoveStage = async (campaignId, campaignCandidateIds, targetStag
   return response.data?.data || null;
 };
 
-// ── M11-E04-S02-T03 clear override ───────────────────────────────────
+// ── clear override ───────────────────────────────────
 
 export const clearOverride = async (campaignCandidateId, reason) => {
   const response = await api.post(
@@ -51,7 +51,7 @@ export const clearOverride = async (campaignCandidateId, reason) => {
   return response.data?.data || null;
 };
 
-// ── M11-E04-S01 recruiter notes ──────────────────────────────────────
+// ── recruiter notes ──────────────────────────────────────
 
 export const getCandidateNotes = async (campaignCandidateId) => {
   const response = await api.get(
@@ -84,7 +84,7 @@ export const deleteCandidateNote = async (noteId) => {
   return response.data;
 };
 
-// T03 — one request for a whole page of rows rather than one per badge.
+// One request for a whole page of rows rather than one per badge.
 // Returns {} on failure: a missing badge must never break the list.
 export const getNoteCounts = async (campaignCandidateIds) => {
   if (!campaignCandidateIds || campaignCandidateIds.length === 0) return {};
@@ -100,7 +100,7 @@ export const getNoteCounts = async (campaignCandidateIds) => {
   }
 };
 
-// ── M11-E04-S04-T01 override / rejection history ─────────────────────
+// ── override / rejection history ─────────────────────
 
 // Each entry carries hr_override, so the same list shows both the rejection
 // and whether it was overridden — no second endpoint needed for the history.
@@ -112,7 +112,7 @@ export const getRejectionHistory = async (campaignCandidateId) => {
   return response.data?.data || [];
 };
 
-// ── M11-E04-S02-T01/T02 apply HR override (M07 endpoint) ─────────────
+// ── apply HR override (M07 endpoint) ─────────────
 
 // Lives under /campaign-candidates, not /candidate-actions — this endpoint
 // predates M11 and is owned by M07; M11 only calls it.

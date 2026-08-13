@@ -4,13 +4,11 @@ import { AlertTriangle } from "lucide-react";
 import { getOverrideReport } from "../../campaigns/services/campaignservice";
 
 /**
- * M11-E04-S04-T03 — surfaces campaigns whose HR override rate has crossed
+ * Surfaces campaigns whose HR override rate has crossed
  * OVERRIDE_RATE_ALERT_THRESHOLD.
- *
  * The rate and the alert flag are both computed server-side in the override
  * report; this only renders the campaigns already flagged, so the dashboard
  * and the report can never disagree about what counts as "high".
- *
  * Renders nothing when there is nothing wrong — a permanently-present panel
  * saying "0 alerts" trains people to ignore the space.
  */
