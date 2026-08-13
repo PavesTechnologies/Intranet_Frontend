@@ -182,6 +182,95 @@ function isStepValid(step, data) {
   }
 }
 
+// Mirrors isStepValid but reports which required fields are still missing,
+// so the Next button can explain itself via toast instead of just sitting disabled.
+function getMissingFields(step, data) {
+  const missing = [];
+  switch (step) {
+    case 1: {
+      const project = data.projectInfo || {};
+      const source = project.projectSource || "ENTERPRISE";
+      if (source === "ENTERPRISE") {
+        if (!project.clientId) missing.push("Client Name");
+        if (!project.projectId) missing.push("Project Name");
+        if (!project.projectCode) missing.push("Project Code");
+        if (!project.startDate) missing.push("Project Start Date");
+        if (!project.endDate) missing.push("Project End Date");
+      } else {
+        if (!project.clientName) missing.push("Client Name");
+        if (!project.projectName) missing.push("Project Name");
+        if (!project.projectCode) missing.push("Project Code");
+        if (!project.startDate) missing.push("Project Start Date");
+        if (!project.endDate) missing.push("Project End Date");
+        if (project.startDate && project.endDate && project.endDate < project.startDate) {
+          missing.push("Project End Date must be on or after the Start Date");
+        }
+      }
+      break;
+    }
+    case 2: {
+      const config = data.billingConfig || {};
+      const project = data.projectInfo || {};
+      if (!(project.projectBudgetCurrency || project.currency)) missing.push("Billing Currency (select a project with a currency)");
+      if (!config.billingType) missing.push("Billing Type");
+      if (!config.billingFrequency) missing.push("Billing Frequency");
+
+      if (config.billingType === "TIME_MATERIAL") {
+        if (!config.billingMode) missing.push("Pricing Model");
+        else if (config.billingMode === "STANDARD") {
+          if (!config.timeAndMaterial?.rate) missing.push("Rate");
+          if (!config.timeAndMaterial?.ratePeriod) missing.push("Rate Period");
+        } else if (config.billingMode === "ROLE_BASED") {
+          const roles = config.timeAndMaterial?.roles || [];
+          if (roles.length === 0) missing.push("At least one role-based rate");
+          else if (!roles.every((r) => Boolean(r.role && r.rate && r.ratePeriod))) {
+            missing.push("Role, Rate, and Rate Period for every role row");
+          }
+        }
+      } else if (config.billingType === "RECURRING") {
+        if (!config.billingMode) missing.push("Pricing Model");
+        else if (config.billingMode === "MONTHLY_RETAINER") {
+          if (!config.monthlyRetainer?.amount) missing.push("Retainer Amount");
+          if (!config.monthlyRetainer?.billingStartDate) missing.push("Billing Start Date");
+        } else if (config.billingMode === "SUBSCRIPTION") {
+          if (!config.subscription?.plan) missing.push("Subscription Plan");
+          if (!config.subscription?.amount) missing.push("Subscription Amount");
+          if (!config.subscription?.billingCycle) missing.push("Billing Cycle");
+          if (!config.subscription?.startDate) missing.push("Subscription Start Date");
+          if (!config.subscription?.endDate) missing.push("Subscription End Date");
+        }
+      } else if (config.billingType === "FIXED_PRICE") {
+        if (!config.fixedPrice?.totalContractValue) missing.push("Total Contract Value");
+      } else if (config.billingType === "MILESTONE") {
+        if ((config.milestones || []).length === 0) missing.push("At least one Milestone");
+      }
+      break;
+    }
+    case 3: {
+      const controls = data.controls || {};
+      if (controls.autoInvoiceGeneration === undefined || controls.autoInvoiceGeneration === null) {
+        missing.push("Invoice Generation Mode");
+      }
+      if (!controls.taxRegionId) missing.push("Tax Region");
+      if (controls.autoInvoiceGeneration === true) {
+        const day = parseInt(controls.invoiceGenerationDay, 10);
+        if (Number.isNaN(day) || day < 1 || day > 31) missing.push("Generation Day (1-31)");
+      }
+      if (!controls.paymentTermId) missing.push("Payment Terms");
+      break;
+    }
+    default:
+      break;
+  }
+  return missing;
+}
+
+function getStepValidationMessage(step, data) {
+  const missing = getMissingFields(step, data);
+  if (missing.length === 0) return null;
+  return `Please complete the following before continuing: ${missing.join(", ")}.`;
+}
+
 export default function NewConfigurationWizard() {
   const navigate = useNavigate();
   const { configId } = useParams();
@@ -231,14 +320,25 @@ export default function NewConfigurationWizard() {
   const handleBack = () => setCurrentStep((step) => Math.max(step - 1, 1));
 
   const handleNext = () => {
-    if (!isStepValid(currentStep, wizardData)) return;
+    const validationMessage = getStepValidationMessage(currentStep, wizardData);
+    if (validationMessage) {
+      showStatusToast(validationMessage, "warning");
+      return;
+    }
     setCurrentStep((step) => Math.min(step + 1, STEPS.length));
   };
 
   const handleStepClick = (stepId) => {
-    if (stepId < currentStep || isStepValid(currentStep, wizardData)) {
+    if (stepId < currentStep) {
       setCurrentStep(stepId);
+      return;
     }
+    const validationMessage = getStepValidationMessage(currentStep, wizardData);
+    if (validationMessage) {
+      showStatusToast(validationMessage, "warning");
+      return;
+    }
+    setCurrentStep(stepId);
   };
 
   const handleProjectInfoChange = (projectInfo) => {
@@ -338,9 +438,10 @@ export default function NewConfigurationWizard() {
   };
 
   const isLastStep = currentStep === STEPS.length;
-  const nextDisabled = isLastStep
-    ? activating
-    : !isStepValid(currentStep, wizardData);
+  // Native `disabled` only reflects an in-flight request — a step with missing
+  // fields stays clickable so onNext can explain what's missing via toast.
+  const nextDisabled = isLastStep && activating;
+  const nextIncomplete = !isLastStep && !isStepValid(currentStep, wizardData);
 
   const breadcrumbItems = useMemo(
     () => [
@@ -470,6 +571,7 @@ export default function NewConfigurationWizard() {
               isFirstStep={currentStep === 1}
               isLastStep={isLastStep}
               nextDisabled={nextDisabled}
+              nextIncomplete={nextIncomplete}
               showSaveDraft={currentStep > 1}
               saving={saving}
               activating={activating}
