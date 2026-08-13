@@ -59,10 +59,10 @@ export default function CandidateHeader({ profile, onBack, onAdded }) {
             </div>
             <div className="text-[12.5px] text-slate-500 font-medium mb-1">{candidate.designation || "—"}</div>
             <div className="text-[12px] flex items-center gap-3 flex-wrap text-slate-400">
-              <span className="flex items-center gap-1">
+              {/* <span className="flex items-center gap-1">
                 <Fingerprint size={11} />
                 {candidate.candidate_id}
-              </span>
+              </span> */}
               {candidate.location && (
                 <span className="flex items-center gap-1">
                   <MapPin size={11} />
