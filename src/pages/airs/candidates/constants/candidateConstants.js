@@ -75,8 +75,8 @@ export const DECISION_SOURCE_LABEL = {
 };
 
 export const CANDIDATE_SORT_OPTIONS = [
-  { label: "Composite (high to low)", value: "composite:desc" },
-  { label: "Composite (low to high)", value: "composite:asc" },
+  { label: "Overall score (high to low)", value: "composite:desc" },
+  { label: "Overall score (low to high)", value: "composite:asc" },
   { label: "ATS score", value: "ats:desc" },
   { label: "Semantic score", value: "semantic:desc" },
   { label: "Experience", value: "experience:desc" },

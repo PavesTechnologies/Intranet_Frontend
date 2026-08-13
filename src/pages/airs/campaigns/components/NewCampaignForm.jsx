@@ -116,7 +116,7 @@ export default function NewCampaignForm({
 
                 <div className="grid grid-cols-2 gap-4">
                     <FormInput
-                        label="Deterministic Weight"
+                        label="Requirements Weight"
                         name="weight_deterministic"
                         type="number"
                         value={campaignForm.weight_deterministic}
@@ -124,7 +124,7 @@ export default function NewCampaignForm({
                         labelClassName={LABEL_CLASS}
                     />
                     <FormInput
-                        label="Deterministic Threshold"
+                        label="Requirements Threshold"
                         name="deterministic_threshold"
                         type="number"
                         value={campaignForm.deterministic_threshold}
@@ -132,7 +132,7 @@ export default function NewCampaignForm({
                         labelClassName={LABEL_CLASS}
                     />
                     <FormInput
-                        label="Semantic Weight"
+                        label="Relevance Weight"
                         name="weight_semantic"
                         type="number"
                         value={campaignForm.weight_semantic}
@@ -140,7 +140,7 @@ export default function NewCampaignForm({
                         labelClassName={LABEL_CLASS}
                     />
                     <FormInput
-                        label="Semantic Threshold"
+                        label="Relevance Threshold"
                         name="semantic_threshold"
                         type="number"
                         step="0.01"
