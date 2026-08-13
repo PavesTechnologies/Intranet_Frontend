@@ -1,13 +1,16 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { Archive, UserPlus } from "lucide-react";
+import { Archive, Sparkles, UserPlus } from "lucide-react";
 import Pagination from "@/components/Pagination/pagination";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorState from "@/pages/airs/skill-ontology/components/ErrorState";
 import Button from "@/components/Button/Button";
 import useTalentPool from "./hooks/useTalentPool";
+import useTalentPoolFilterOptions from "./hooks/useTalentPoolFilterOptions";
+import { TALENT_POOL_SEARCH_MODES } from "./constants/talentPoolConstants";
 import TalentPoolFilters from "./components/TalentPoolFilters";
+import TalentPoolActiveFilterChips from "./components/TalentPoolActiveFilterChips";
 import TalentPoolCard from "./components/TalentPoolCard";
 import CampaignPickerModal from "./components/CampaignPickerModal";
 import BulkAddResultsModal from "./components/BulkAddResultsModal";
@@ -21,22 +24,25 @@ export default function TalentPoolPage() {
     loading,
     error,
     refetch,
-    skills,
-    addSkill,
-    removeSkill,
-    designation,
-    setDesignation,
-    locations,
-    toggleLocation,
-    experienceMin,
-    setExperienceMin,
-    experienceMax,
-    setExperienceMax,
+    searchInput,
+    setSearchInput,
+    searchMode,
+    setSearchMode,
+    filters,
+    applyFilters,
+    clearAllFilters,
+    removeFilterValue,
     hasActiveFilters,
     currentPage,
     setCurrentPage,
     totalPages,
   } = useTalentPool();
+
+  const {
+    options: filterOptions,
+    loading: filterOptionsLoading,
+    error: filterOptionsError,
+  } = useTalentPoolFilterOptions();
 
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkPickerOpen, setBulkPickerOpen] = useState(false);
@@ -86,35 +92,47 @@ export default function TalentPoolPage() {
   };
 
   return (
-    <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
-      <div className="mb-6 flex items-start justify-between flex-wrap gap-3">
+    <div className="relative min-h-screen p-8 bg-slate-50/40 text-slate-800 font-sans">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">Talent Pool</h1>
-          <p className="text-xs text-slate-500 mt-1">Eligible candidates across every campaign, searchable by skill.</p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Talent Pool</h1>
+          <p className="text-xs text-slate-500 mt-1 max-w-xl">
+            Eligible candidates across every campaign, searchable by skill.
+          </p>
         </div>
         {selectedIds.length > 0 && (
-          <Button variant="primary" size="small" onClick={() => setBulkPickerOpen(true)}>
-            <UserPlus className="h-4 w-4" /> Add Selected to Campaign ({selectedIds.length})
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="primary" size="medium" onClick={() => setBulkPickerOpen(true)}>
+              <UserPlus className="h-4 w-4" /> Add Selected to Campaign ({selectedIds.length})
+            </Button>
+          </div>
         )}
       </div>
 
-      <TalentPoolFilters
-        skills={skills}
-        addSkill={addSkill}
-        removeSkill={removeSkill}
-        designation={designation}
-        setDesignation={setDesignation}
-        locations={locations}
-        toggleLocation={toggleLocation}
-        experienceMin={experienceMin}
-        setExperienceMin={setExperienceMin}
-        experienceMax={experienceMax}
-        setExperienceMax={setExperienceMax}
+      <TalentPoolActiveFilterChips
+        filters={filters}
+        campaignOptions={filterOptions.campaigns}
+        onRemove={removeFilterValue}
       />
 
+      <div className="mb-4 flex justify-end">
+        <TalentPoolFilters
+          searchInput={searchInput}
+          setSearchInput={setSearchInput}
+          searchMode={searchMode}
+          setSearchMode={setSearchMode}
+          filters={filters}
+          applyFilters={applyFilters}
+          clearAllFilters={clearAllFilters}
+          filterOptions={filterOptions}
+          filterOptionsLoading={filterOptionsLoading}
+          filterOptionsError={filterOptionsError}
+        />
+      </div>
+
       {loading ? (
-        <div className="py-16 flex justify-center">
+        <div className="flex justify-center py-16">
           <LoadingSpinner text="Loading talent pool..." />
         </div>
       ) : error ? (
@@ -124,12 +142,21 @@ export default function TalentPoolPage() {
           onRetry={refetch}
         />
       ) : results.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400">
-          <Archive className="h-10 w-10 mx-auto stroke-1 mb-2" />
-          {hasActiveFilters ? (
-            <>No candidates match the selected filters.</>
+        <div className="text-center py-16 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+          {searchMode === TALENT_POOL_SEARCH_MODES.SEMANTIC && !searchInput.trim() ? (
+            <>
+              <Sparkles className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-xs font-bold text-slate-700">
+                Describe the candidate, resume, or job description you're looking for.
+              </p>
+            </>
           ) : (
-            <>No eligible candidates in the Talent Pool yet.</>
+            <>
+              <Archive className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-xs font-bold text-slate-700">
+                {hasActiveFilters ? "No candidates match the selected filters." : "No eligible candidates in the Talent Pool yet."}
+              </p>
+            </>
           )}
         </div>
       ) : (
@@ -138,17 +165,17 @@ export default function TalentPoolPage() {
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
-                className="accent-indigo-600 h-4 w-4"
+                className="accent-indigo-600 h-3.5 w-3.5"
                 checked={allOnPageSelected}
                 onChange={toggleSelectAll}
                 aria-label={allOnPageSelected ? "Deselect all candidates on this page" : "Select all candidates on this page"}
               />
-              <span className="text-[12px] font-semibold text-slate-600">
+              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
                 {allOnPageSelected ? "Deselect All" : "Select All"} ({results.length})
               </span>
             </label>
             {selectedIds.length > 0 && (
-              <span className="text-[12px] text-slate-400">· {selectedIds.length} selected</span>
+              <span className="text-[11px] text-slate-400">· {selectedIds.length} selected</span>
             )}
           </div>
 

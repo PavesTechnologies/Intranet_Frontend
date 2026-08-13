@@ -2,8 +2,9 @@ import React from "react";
 import { Badge } from "@/components/ui/badge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorState from "@/pages/airs/skill-ontology/components/ErrorState";
-import { Award, Clock, GitBranch, Sigma } from "lucide-react";
+import { Award, Clock, GitBranch, Sigma, Calculator } from "lucide-react";
 import ScoreRing from "../../../components/ScoreRing";
+import AccordionSection from "../../components/AccordionSection";
 import useCompositeScore from "../../../hooks/useCompositeScore";
 import { numberOr } from "../../../utils/candidateDataUtils";
 
@@ -116,21 +117,22 @@ export default function FinalStatusTab({ candidate }) {
         <MetaTile icon={GitBranch} label="Ranking Status" value={formatStatus(breakdown.rankingStatus)} />
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-4">
-        <span className="text-[12.5px] font-bold text-slate-900 block mb-3">Composite Breakdown</span>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {breakdown.components.map((component) => (
-            <ComponentScoreCard
-              key={component.key}
-              label={component.label}
-              score={component.score}
-              weight={component.weight}
-            />
-          ))}
-        </div>
-        <div className="mt-3 rounded-lg bg-slate-50 border border-dashed border-slate-200 p-2.5 text-center">
-          <span className="text-[11.5px] font-mono text-slate-600">{breakdown.formulaText}</span>
-        </div>
+      <div className="bg-white border border-slate-200 rounded-xl px-4">
+        <AccordionSection icon={Calculator} title="Composite Breakdown" collapsible={false}>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {breakdown.components.map((component) => (
+              <ComponentScoreCard
+                key={component.key}
+                label={component.label}
+                score={component.score}
+                weight={component.weight}
+              />
+            ))}
+          </div>
+          <div className="mt-3 rounded-lg bg-slate-50 border border-dashed border-slate-200 p-2.5 text-center">
+            <span className="text-[11.5px] font-mono text-slate-600">{breakdown.formulaText}</span>
+          </div>
+        </AccordionSection>
       </div>
     </div>
   );
