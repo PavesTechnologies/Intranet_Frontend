@@ -2,8 +2,9 @@ import React from "react";
 import { Badge } from "@/components/ui/badge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorState from "@/pages/airs/skill-ontology/components/ErrorState";
-import { Award, Clock, GitBranch, Sigma } from "lucide-react";
+import { Award, Clock, GitBranch, Sigma, Calculator } from "lucide-react";
 import ScoreRing from "../../../components/ScoreRing";
+import AccordionSection from "../../components/AccordionSection";
 import useCompositeScore from "../../../hooks/useCompositeScore";
 import { numberOr } from "../../../utils/candidateDataUtils";
 
