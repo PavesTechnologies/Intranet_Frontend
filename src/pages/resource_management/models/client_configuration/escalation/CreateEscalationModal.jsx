@@ -139,5 +139,3 @@ const CreateEscalationModal = ({ open, onClose }) => {
 };
 
 export default CreateEscalationModal;
-
-export default CreateEscalationModal;

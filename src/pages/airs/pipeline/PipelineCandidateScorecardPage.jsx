@@ -20,7 +20,7 @@ const TABS = [
   { id: "resume", label: "Resume", Component: ResumeTab },
   { id: "deterministic", label: "Deterministic Score", Component: DeterministicScoreTab },
   { id: "semantic", label: "Semantic Score", Component: SemanticScoreTab },
-  { id: "ai", label: "AI Evaluation Score", Component: AiEvaluationTab },
+  { id: "ai", label: "AI Review Score", Component: AiEvaluationTab },
   { id: "finalStatus", label: "Final Status", Component: FinalStatusTab },
 ];
 

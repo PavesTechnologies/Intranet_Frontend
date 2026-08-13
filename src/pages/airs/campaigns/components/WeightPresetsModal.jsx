@@ -138,8 +138,8 @@ export default function WeightPresetsModal({ isOpen, onClose }) {
           <FormInput label="Description" name="description" value={form.description} onChange={change} maxLength={255} />
 
           <div className="grid grid-cols-3 gap-4">
-            <FormInput label="Deterministic Wt" name="weight_deterministic" type="number" value={form.weight_deterministic} onChange={change} />
-            <FormInput label="Semantic Wt" name="weight_semantic" type="number" value={form.weight_semantic} onChange={change} />
+            <FormInput label="Requirements Wt" name="weight_deterministic" type="number" value={form.weight_deterministic} onChange={change} />
+            <FormInput label="Relevance Wt" name="weight_semantic" type="number" value={form.weight_semantic} onChange={change} />
             <FormInput label="AI Wt" name="weight_ai" type="number" value={form.weight_ai} onChange={change} />
           </div>
           <div className="grid grid-cols-3 gap-4">

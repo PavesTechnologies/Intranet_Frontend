@@ -156,6 +156,56 @@ export const bulkUpload = async (formData) => {
     }
 };
 
+// Talent Pool — Resume Versions tab —
+// GET /resumes/candidate/{candidate_id}/versions
+export const getResumeVersions = async (candidateId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/resumes/candidate/${candidateId}/versions`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching resume versions:", error);
+        throw error;
+    }
+};
+
+// Talent Pool — Resume download — returns a temporary signed URL; the
+// frontend must open/download using this URL rather than building a
+// storage URL itself. GET /resumes/{resume_id}/download-url
+export const getResumeDownloadUrl = async (resumeId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/resumes/${resumeId}/download-url`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching resume download URL:", error);
+        throw error;
+    }
+};
+
+// Talent Pool — Resume Version Comparison —
+// GET /resumes/compare?resume_id_1={id}&resume_id_2={id}
+export const compareResumeVersions = async (resumeId1, resumeId2) => {
+    try {
+        const response = await api.get(`${BASE_URL}/resumes/compare`, {
+            params: { resume_id_1: resumeId1, resume_id_2: resumeId2 },
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error comparing resume versions:", error);
+        throw error;
+    }
+};
+
 export const candidateJson = async (candidateId) => {
     try {
         const response = await api.get(`${BASE_URL}/resumes/candidate/${candidateId}/parsed-json`, {

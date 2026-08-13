@@ -16,7 +16,7 @@ function StatTile({ icon: Icon, label, value }) {
   );
 }
 
-// Deterministic Score tab — Summary card, built directly from
+// Requirements Score tab — Summary card, built directly from
 // deterministic_score_breakdown.summary. A hero ScoreRing + status/threshold
 // on the left, key coverage stats on the right, with a pass/fail accent
 // stripe across the top of the card.
@@ -41,7 +41,7 @@ export default function SummaryCard({ summary }) {
             <ScoreRing value={Math.round(overallScore)} size={68} color={passed ? "#059669" : "#E11D48"} />
             <div>
               <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">
-                Deterministic Score
+                Requirements Score
               </div>
               {renderDeterministicStatusBadge(summary.status)}
               <div className="text-[11.5px] text-slate-500 mt-2">
@@ -75,10 +75,13 @@ export default function SummaryCard({ summary }) {
           <div className="mt-4 rounded-xl bg-rose-50 border border-rose-200 p-3 flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
             <div className="text-[11.5px] text-rose-700">
-              {!isEmpty(summary.failure_reason) && <div>{summary.failure_reason}</div>}
-              {failureReasons.map((reason, i) => (
-                <div key={i}>{reason}</div>
-              ))}
+              {/* failure_reasons (array) is the more detailed breakdown — when
+                  present it already covers what failure_reason (singular)
+                  would say, so only fall back to the singular string when the
+                  array is empty to avoid showing the same message twice. */}
+              {failureReasons.length > 0
+                ? failureReasons.map((reason, i) => <div key={i}>{reason}</div>)
+                : <div>{summary.failure_reason}</div>}
             </div>
           </div>
         )}

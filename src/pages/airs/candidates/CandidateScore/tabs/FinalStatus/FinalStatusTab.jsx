@@ -2,8 +2,9 @@ import React from "react";
 import { Badge } from "@/components/ui/badge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorState from "@/pages/airs/skill-ontology/components/ErrorState";
-import { Award, Clock, GitBranch, Sigma } from "lucide-react";
+import { Award, Clock, GitBranch, Sigma, Calculator } from "lucide-react";
 import ScoreRing from "../../../components/ScoreRing";
+import AccordionSection from "../../components/AccordionSection";
 import useCompositeScore from "../../../hooks/useCompositeScore";
 import { numberOr } from "../../../utils/candidateDataUtils";
 
@@ -79,14 +80,14 @@ export default function FinalStatusTab({ candidate }) {
     return (
       <ErrorState
         title="Couldn't load final status"
-        message="We couldn't load this candidate's composite score. Please try again."
+        message="We couldn't load this candidate's overall score. Please try again."
         onRetry={refetch}
       />
     );
   }
 
   if (!breakdown) {
-    return <ErrorState title="No data available" message="No composite score found for this candidate." />;
+    return <ErrorState title="No data available" message="No overall score found for this candidate." />;
   }
 
   const tone = STATUS_TONE[breakdown.rankingStatus] || "bg-slate-100 text-slate-600 border-slate-200";
@@ -101,7 +102,7 @@ export default function FinalStatusTab({ candidate }) {
               <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-slate-900 mb-1.5">
                 <Award size={15} className="text-amber-500" /> Final Status
               </div>
-              <div className="text-[11.5px] text-slate-500">Composite score generated from weighted evaluation stages.</div>
+              <div className="text-[11.5px] text-slate-500">Overall score generated from weighted evaluation stages.</div>
             </div>
           </div>
           <Badge className={`${tone} font-bold px-3 py-1 text-[11.5px] self-start sm:self-center`}>
@@ -117,7 +118,7 @@ export default function FinalStatusTab({ candidate }) {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl p-4">
-        <span className="text-[12.5px] font-bold text-slate-900 block mb-3">Composite Breakdown</span>
+        <span className="text-[12.5px] font-bold text-slate-900 block mb-3">Overall Score Breakdown</span>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {breakdown.components.map((component) => (
             <ComponentScoreCard

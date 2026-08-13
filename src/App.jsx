@@ -22,6 +22,10 @@ import Layout from "./components/Layout/Layout";
 import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
 
+// Finance Management (Application Switcher landing page)
+import FinanceDashboard from "./pages/finance/FinanceDashboard";
+import { FINANCE_ALL_ROLES } from "./config/sidebarConfig";
+
 // Accounts Payable
 import { AP_ROUTES } from "./pages/accounts-payable/constants/routes";
 import { AP_ALL_ROLES } from "./pages/accounts-payable/constants/apRoles";
@@ -124,6 +128,7 @@ import JdLibrary from "./pages/airs/pages/JdLibrary.jsx";
 import JdCreate from "./pages/airs/pages/JdCreate.jsx";
 import JdDetails from "./pages/airs/pages/JdDetails.jsx";
 import Campaigns from "./pages/airs/campaigns/Campaigns.jsx";
+import AirsDashboardPage from "./pages/airs/dashboard/AirsDashboardPage.jsx";
 import CampaignDetails from "./pages/airs/campaigns/CampaignDetails.jsx";
 
 import AirsPlaceholder from "./pages/airs/pages/AirsPlaceholder.jsx";
@@ -136,6 +141,7 @@ import CandidateScorePage from "./pages/airs/candidates/CandidateScore/Candidate
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
 import PipelineCandidateScorecardPage from "./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
+import TalentPoolCandidateProfilePage from "./pages/airs/talent-pool/profile/TalentPoolCandidateProfilePage.jsx";
 import AnalyticsPage from "./pages/airs/analytics/AnalyticsPage.jsx";
 import SettingsPage from "./pages/airs/settings/SettingsPage.jsx";
 import SkillOntologyPage from "./pages/airs/skill-ontology/SkillOntologyPage.jsx";
@@ -420,6 +426,16 @@ const AppRoutes = () => {
         >
           {/* Main */}
           <Route path="/dashboard" element={<Dashboard />} />
+
+          {/* Finance Management landing page — reached via the Application Switcher */}
+          <Route
+            path="/finance/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={FINANCE_ALL_ROLES}>
+                <FinanceDashboard />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Accounts Payable — page skeletons only, business logic lands in later phases */}
           <Route
@@ -1209,11 +1225,17 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
-          {/* NOTE: ProtectedRoute's prop is `allowedRoles` — the `roles={...}`
-              prop used by the other /airs/* routes is silently ignored by
-              React, so those routes have NO route-level role enforcement.
-              Campaign routes below use the working prop, mirroring the
-              backend's require_roles(...) on the corresponding endpoints. */}
+          {/* HIRING_MANAGER is deliberately excluded: every /airs/dashboard/*
+              endpoint is restricted to HR_ADMIN and/or RECRUITER, so a hiring
+              manager would load the page and get a 403 in every section. */}
+          <Route
+            path="/airs/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER"]}>
+                <AirsDashboardPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/airs/campaigns"
             element={
@@ -1273,7 +1295,7 @@ const AppRoutes = () => {
           <Route
             path="/airs/pipeline"
             element={
-              <ProtectedRoute roles={["General"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <PipelineBoardPage />
               </ProtectedRoute>
             }
@@ -1281,7 +1303,7 @@ const AppRoutes = () => {
           <Route
             path="/airs/pipeline/candidates/:candidateId"
             element={
-              <ProtectedRoute roles={["General"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <PipelineCandidateScorecardPage />
               </ProtectedRoute>
             }
@@ -1291,6 +1313,14 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute roles={["General"]}>
                 <TalentPoolPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/talent-pool/:candidateId"
+            element={
+              <ProtectedRoute roles={["General"]}>
+                <TalentPoolCandidateProfilePage />
               </ProtectedRoute>
             }
           />

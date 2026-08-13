@@ -1,7 +1,6 @@
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Briefcase, GraduationCap } from "lucide-react";
-import SectionCard from "./SectionCard";
 import { textOrDash, isEmpty } from "../../../../utils/candidateDataUtils";
 
 const NEUTRAL_TONE = "bg-slate-100 text-slate-600 border-slate-200";
@@ -28,6 +27,20 @@ function ValidationRow({ label, value }) {
   );
 }
 
+function ValidationColumn({ icon: Icon, title, badge, children }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-600">
+          <Icon size={13} className="text-slate-400" /> {title}
+        </span>
+        {badge}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 // Experience Validation & Education Validation —
 // deterministic_score_breakdown.experience_validation / .education_validation.
 export default function ValidationSection({ experienceValidation, educationValidation }) {
@@ -36,15 +49,15 @@ export default function ValidationSection({ experienceValidation, educationValid
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <SectionCard icon={Briefcase} title="Experience Validation" action={<ResultBadge status={exp.status} passed={exp.passed} />}>
+      <ValidationColumn icon={Briefcase} title="Experience Validation" badge={<ResultBadge status={exp.status} passed={exp.passed} />}>
         <div className="grid grid-cols-2 gap-2">
           <ValidationRow label="Required Years" value={isEmpty(exp.required_years) ? "-" : `${exp.required_years} yrs`} />
           <ValidationRow label="Candidate Years" value={isEmpty(exp.candidate_years) ? "-" : `${exp.candidate_years} yrs`} />
           <ValidationRow label="Tolerance" value={isEmpty(exp.tolerance) ? "-" : `± ${exp.tolerance} yr`} />
         </div>
-      </SectionCard>
+      </ValidationColumn>
 
-      <SectionCard icon={GraduationCap} title="Education Validation" action={<ResultBadge status={edu.status} passed={edu.passed} />}>
+      <ValidationColumn icon={GraduationCap} title="Education Validation" badge={<ResultBadge status={edu.status} passed={edu.passed} />}>
         <div className="grid grid-cols-1 gap-2">
           <ValidationRow label="Required Degree" value={textOrDash(edu.required_degree)} />
           <ValidationRow label="Candidate Degree" value={textOrDash(edu.candidate_degree)} />
@@ -53,7 +66,7 @@ export default function ValidationSection({ experienceValidation, educationValid
             value={edu.equivalent_experience_applied ? "Yes" : "No"}
           />
         </div>
-      </SectionCard>
+      </ValidationColumn>
     </div>
   );
 }

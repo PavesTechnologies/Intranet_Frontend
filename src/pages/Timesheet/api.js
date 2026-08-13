@@ -120,6 +120,78 @@ export async function addEntryToTimesheet(timesheetId, workdate, payload) {
   }
 }
 
+/**
+ * Save a whole week, one day at a time.
+ *
+ * The backend has no week-level upsert, so this fans out per day:
+ *   • brand-new day  → POST /create
+ *   • existing day   → POST /addEntries for the added rows
+ *   • edited rows    → PUT  /updateEntries/{id}
+ *
+ * Unlike addEntryToTimesheet it stays quiet and hands every per-day outcome back
+ * to the caller, so the UI can report the whole week in one message.
+ *
+ * @param {Array<{workDate, timesheetId?, status?, newEntries?, updatedEntries?}>} days
+ * @returns {Promise<Array<{workDate, ok, message}>>}
+ */
+export async function saveWeekDraftEntries(days = []) {
+  const results = [];
+
+  for (const day of days) {
+    const added = day.newEntries || [];
+    const edited = day.updatedEntries || [];
+    try {
+      if (added.length) {
+        if (day.timesheetId == null) {
+          const res = await api.post(
+            `${apiEndpoint}/api/timesheet/create?workDate=${day.workDate}`,
+            added,
+          );
+          results.push({ workDate: day.workDate, ok: true, message: pickMessage(res.data) });
+        } else {
+          const res = await api.post(`${apiEndpoint}/api/timesheet/addEntries`, {
+            timeSheetId: day.timesheetId,
+            entries: added,
+          });
+          results.push({ workDate: day.workDate, ok: true, message: pickMessage(res.data) });
+        }
+      }
+
+      if (edited.length && day.timesheetId != null) {
+        const res = await api.put(
+          `${apiEndpoint}/api/timesheet/updateEntries/${day.timesheetId}`,
+          { workDate: day.workDate, status: day.status, entries: edited },
+        );
+        results.push({ workDate: day.workDate, ok: true, message: pickMessage(res.data) });
+      }
+    } catch (err) {
+      const data = err.response?.data;
+      results.push({
+        workDate: day.workDate,
+        ok: false,
+        message:
+          (typeof data === "string" ? data : data?.message) ||
+          err.message ||
+          "Could not be saved",
+      });
+    }
+  }
+
+  return results;
+}
+
+/** Delete saved entries from one day. Quiet — the caller reports the outcome. */
+export async function deleteDayEntries(timesheetId, entryIds = []) {
+  const res = await api.delete(
+    `${apiEndpoint}/api/timesheet/deleteEntries/${timesheetId}`,
+    { data: { entryIds } },
+  );
+  return pickMessage(res.data);
+}
+
+const pickMessage = (data) =>
+  (typeof data === "string" ? data : data?.message) || "Saved";
+
 export async function bulkReviewTimesheet(timesheetIds, status, comment) {
   try {
     // example body
