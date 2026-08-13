@@ -5,6 +5,9 @@ import useCandidateDetail from "../hooks/useCandidateDetail";
 import CandidateHeader from "./components/CandidateHeader";
 import CandidateTabs from "./components/CandidateTabs";
 import ErrorState from "../../skill-ontology/components/ErrorState";
+import CandidateOverridePanel from "../../campaigns/components/CandidateOverridePanel";
+import CandidateNotesPanel from "../../campaigns/components/CandidateNotesPanel";
+import { useAuth } from "../../../../contexts/AuthContext";
 
 const SummaryTab = lazy(() => import("./tabs/Summary/SummaryTab"));
 const ResumeTab = lazy(() => import("./tabs/Resume/ResumeTab"));
@@ -25,8 +28,9 @@ const TABS = [
 export default function CandidateScorePage() {
   const { candidateId } = useParams();
   const navigate = useNavigate();
-  const { candidate, loading, error } = useCandidateDetail(candidateId);
+  const { candidate, loading, error, refetch } = useCandidateDetail(candidateId);
   const [activeTab, setActiveTab] = useState(TABS[0].id);
+  const { user } = useAuth();
 
   if (loading) {
     return (
@@ -65,6 +69,17 @@ export default function CandidateScorePage() {
           <Suspense fallback={null}>
             <ActiveTabComponent candidate={candidate} />
           </Suspense>
+        </div>
+      </div>
+
+      {/* M11-E04 — actions on the candidate, alongside the read-only scorecard */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+        <CandidateOverridePanel candidate={candidate} onChanged={refetch} />
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <CandidateNotesPanel
+            campaignCandidateId={candidate.id}
+            currentUserId={user?.user_id || user?.id}
+          />
         </div>
       </div>
     </div>

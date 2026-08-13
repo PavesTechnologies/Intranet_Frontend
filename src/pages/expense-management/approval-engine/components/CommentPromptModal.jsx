@@ -11,6 +11,7 @@ export default function CommentPromptModal({
   isOpen,
   title,
   description,
+  contextLabel,
   confirmLabel = "Confirm",
   confirmVariant = "primary",
   onConfirm,
@@ -28,6 +29,11 @@ export default function CommentPromptModal({
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5">
         <h3 className={Fonts.heading4}>{title}</h3>
         {description && <p className="mt-2 text-sm text-gray-600 leading-relaxed">{description}</p>}
+        {contextLabel && (
+          <p className="mt-3 rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700">
+            {contextLabel}
+          </p>
+        )}
         <textarea
           className="mt-4 w-full rounded-lg border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0A0082]/30"
           rows={4}
