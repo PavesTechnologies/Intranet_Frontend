@@ -157,6 +157,7 @@ const EntriesTable = ({
 
   const workTypeOptions = [
     { label: "Office", value: "Office" },
+    {label: "Remote", value: "Remote" },
     { label: "Home", value: "Home" },
     { label: "Client Location", value: "Client Location" },
     { label: "Hybrid", value: "Hybrid" },
