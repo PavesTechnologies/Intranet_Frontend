@@ -16,13 +16,13 @@ export function mapCompositeScoreBreakdown(raw) {
     components: [
       {
         key: "deterministic",
-        label: "Deterministic",
+        label: "Requirements",
         score: numberOr(data.deterministic_score, 0),
         weight: deterministicWeight,
       },
       {
         key: "semantic",
-        label: "Semantic",
+        label: "Relevance",
         score: numberOr(data.semantic_score, 0),
         weight: semanticWeight,
       },

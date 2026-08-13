@@ -1,7 +1,7 @@
 import { MOCK_CANDIDATES } from "../mock/candidateMockData";
 
 // Bumped to v2: earlier cached candidates predate the scoreBreakdown.items
-// shape (M07-E01/S05), so a v1 cache would show "No hierarchy match data
+// shape, so a v1 cache would show "No hierarchy match data
 // available" forever. Bumping the key abandons stale caches and falls back
 // to fresh MOCK_CANDIDATES, which always has the current shape.
 export const CANDIDATE_STORAGE_KEY = "airs_candidates_pool_v2";

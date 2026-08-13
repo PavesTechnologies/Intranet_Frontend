@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { AlertOctagon, ShieldAlert, UserCheck } from "lucide-react";
 import { getNavBadges } from "../services/dashboardService";
 
-// M11-E01-S03-T03: live cross-campaign counts, refreshed every 60s without a
+// Live cross-campaign counts, refreshed every 60s without a
 // page reload. A zero count hides its badge rather than rendering "0".
 const REFRESH_MS = 60000;
 

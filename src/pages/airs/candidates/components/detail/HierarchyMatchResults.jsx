@@ -46,7 +46,7 @@ const SKILL_TABLE_COLUMNS = [
   "skillContribution",
 ];
 
-// Shared between the Mandatory and Preferred sections (S05-T01/T02) — same
+// Shared between the Mandatory and Preferred sections — same
 // column set, same row shape, so neither reimplements the other.
 function SkillTable({ items }) {
   const rows = items.map((r, i) => ({
@@ -98,13 +98,13 @@ function SkillTable({ items }) {
 // M03-E05 → S06 / M07-E01 → S05: Candidate Scorecard — Hierarchy Match
 // Results. Every value rendered here (match type, jd weight, normalisation
 // discount, hierarchy multiplier, skill contribution, mandatory coverage,
-// preferred skill bonus, deterministic score/status) is read directly from
+// preferred skill bonus, requirements score/status) is read directly from
 // the candidate's score_breakdown — nothing is calculated in this component.
 //
 // scoreBreakdown shape: { items, noVerifiedSkills, score, status,
-// mandatoryCoveragePct, preferredSkillBonus }. manualSkills (M07-E01/S04) and
+// mandatoryCoveragePct, preferredSkillBonus }. manualSkills and
 // additionalSkills (M07-E01/S05-T03) are shown for visibility but never
-// folded into the deterministic score/status above.
+// folded into the requirements score/status above.
 export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [], additionalSkills = [], isLoading = false }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [additionalOpen, setAdditionalOpen] = useState(false);
@@ -218,8 +218,8 @@ export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [
         </div>
       )}
 
-      {/* S05-T01 — Mandatory Skills. Mandatory Coverage % is a summary stat
-          above the table, distinct from the Deterministic Score/Passed-Failed
+      {/* Mandatory Skills. Mandatory Coverage % is a summary stat
+          above the table, distinct from the Requirements Score/Passed-Failed
           badge which stays at the bottom of the whole section. */}
       <div>
         <div className="flex items-center justify-between mb-2">
@@ -235,7 +235,7 @@ export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [
         )}
       </div>
 
-      {/* S05-T02 — Preferred (Bonus) Skills, visually distinct from Mandatory,
+      {/* Preferred (Bonus) Skills, visually distinct from Mandatory,
           hidden entirely when the JD has no preferred skills. */}
       {preferredItems.length > 0 && (
         <div className="rounded-xl bg-indigo-50/60 border border-indigo-100 p-3">
@@ -247,7 +247,7 @@ export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [
           </div>
           <SkillTable items={preferredItems} />
           <p className="text-[11px] text-indigo-600 mt-2">
-            Preferred skill bonus contributes to composite score via the deterministic weight component.
+            Preferred skill bonus contributes to overall score via the deterministic weight component.
           </p>
         </div>
       )}
@@ -268,7 +268,7 @@ export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [
         </div>
       )}
 
-      {/* S05-T03 — Additional Candidate Skills (collapsible) */}
+      {/* Additional Candidate Skills (collapsible) */}
       <div className="rounded-xl border border-slate-200">
         <button
           type="button"
@@ -327,11 +327,11 @@ export default function HierarchyMatchResults({ scoreBreakdown, manualSkills = [
         )}
       </div>
 
-      {/* S05-T01 summary — Deterministic Score + Passed/Failed at the bottom
+      {/* T01 summary — Requirements Score + Passed/Failed at the bottom
           of the section (Mandatory Coverage % is shown above the table). */}
       <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200 p-4">
         <div>
-          <div className="text-[11px] text-slate-400">Deterministic Score</div>
+          <div className="text-[11px] text-slate-400">Requirements Score</div>
           <div className="text-[15px] font-extrabold text-slate-900">{scoreBreakdown.score.toFixed(2)} / 100</div>
         </div>
         {renderDeterministicStatusBadge(scoreBreakdown.status)}

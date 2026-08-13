@@ -14,7 +14,7 @@ import ValidationSection from "./components/ValidationSection";
 import ScoreCalculation from "./components/ScoreCalculation";
 import ConfigurationCard from "./components/ConfigurationCard";
 
-// Deterministic Score tab — GET /airs/campaign-candidates/{campaign_candidate_id}/deterministic.
+// Requirements Score tab — GET /airs/campaign-candidates/{campaign_candidate_id}/deterministic.
 export default function DeterministicScoreTab({ candidate }) {
   const { breakdown, loading, error, refetch } = useDeterministicScore(candidate?.id);
   const [skillsTab, setSkillsTab] = useState("mandatory");
@@ -22,7 +22,7 @@ export default function DeterministicScoreTab({ candidate }) {
   if (loading) {
     return (
       <div className="py-12 flex items-center justify-center">
-        <LoadingSpinner text="Loading deterministic score..." />
+        <LoadingSpinner text="Loading requirements score..." />
       </div>
     );
   }
@@ -30,15 +30,15 @@ export default function DeterministicScoreTab({ candidate }) {
   if (error) {
     return (
       <ErrorState
-        title="Couldn't load deterministic score"
-        message="We couldn't load this candidate's deterministic score breakdown. Please try again."
+        title="Couldn't load requirements score"
+        message="We couldn't load this candidate's requirements score breakdown. Please try again."
         onRetry={refetch}
       />
     );
   }
 
   if (!breakdown) {
-    return <ErrorState title="No data available" message="No deterministic score breakdown found for this candidate." />;
+    return <ErrorState title="No data available" message="No requirements score breakdown found for this candidate." />;
   }
 
   return (

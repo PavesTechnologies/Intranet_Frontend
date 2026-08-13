@@ -402,11 +402,11 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
                         )}
 
                         <div className="grid grid-cols-2 gap-4">
-                            <FormInput label="Deterministic Wt" name="weight_deterministic" type="number" value={form.weight_deterministic} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
-                            <FormInput label="Deterministic Threshold" name="deterministic_threshold" type="number" value={form.deterministic_threshold} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
-                            <FormInput label="Semantic Wt" name="weight_semantic" type="number" value={form.weight_semantic} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
-                            <FormInput label="Semantic Threshold" name="semantic_threshold" type="number" step="0.01" value={form.semantic_threshold} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
-                            <FormInput label="AI Wt" name="weight_ai" type="number" value={form.weight_ai} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
+                            <FormInput label="Requirements Wt" name="weight_deterministic" type="number" value={form.weight_deterministic} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
+                            <FormInput label="Requirements Threshold" name="deterministic_threshold" type="number" value={form.deterministic_threshold} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
+                            <FormInput label="Relevance Wt" name="weight_semantic" type="number" value={form.weight_semantic} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
+                            <FormInput label="Relevance Threshold" name="semantic_threshold" type="number" step="0.01" value={form.semantic_threshold} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
+                            <FormInput label="AI Review Wt" name="weight_ai" type="number" value={form.weight_ai} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
                             <FormInput label="AI Threshold" name="ai_threshold" type="number" value={form.ai_threshold} onChange={change} disabled={scoringLocked} labelClassName={LABEL_CLASS} />
                         </div>
                     </>
