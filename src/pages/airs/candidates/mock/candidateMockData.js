@@ -37,7 +37,7 @@ export const CANDIDATE_STAGES = ["Screening", "Shortlisted", "Interview", "Selec
 const MATCH_WEIGHTS = { EXACT: 1, CHILD: 0.7, GRANDCHILD: 0.5, SIBLING: 0.4, SEMANTIC: 0.2, MISSING: 0 };
 
 // Field names below mirror the deterministic scoring engine's own
-// score_breakdown contract (M07-E01/S05): jd_weight, candidate_scoring_weight,
+// score_breakdown contract: jd_weight, candidate_scoring_weight,
 // hierarchy_multiplier, match_type, matched_candidate_skill, skill_contribution.
 function makeScoreBreakdownItems(skills, missingSet) {
   // First ~60% of a role's skill list are treated as mandatory, the rest preferred.

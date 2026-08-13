@@ -2,7 +2,7 @@ import React from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 
-// M11-E01-S05-T02: skeletons render at the real card dimensions so the layout
+// Skeletons render at the real card dimensions so the layout
 // doesn't jump when data arrives.
 export function SkeletonTiles({ count = 4 }) {
   return (
@@ -17,7 +17,7 @@ export function SkeletonTiles({ count = 4 }) {
   );
 }
 
-// M11-E01-S05-T03: a failed section shows what failed and offers retry —
+// A failed section shows what failed and offers retry —
 // it never leaves a permanent skeleton or blank space.
 export function SectionError({ message, onRetry }) {
   return (
@@ -31,7 +31,7 @@ export function SectionError({ message, onRetry }) {
   );
 }
 
-// M11-E01-S05-T01: welcoming, action-oriented — never an error style.
+// Welcoming, action-oriented — never an error style.
 export function EmptyState({ icon: Icon, title, message, action }) {
   return (
     <div className="bg-white border border-dashed border-slate-300 rounded-xl p-10 text-center">

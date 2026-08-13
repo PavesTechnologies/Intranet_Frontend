@@ -8,11 +8,10 @@ import {
 } from "../../dashboard/services/dashboardService";
 
 /**
- * M11-E03 filter bar for a campaign's candidate list:
- *   S01-T01/T02 — skill autocomplete + multi-skill AND search
- *   S03-T01/T02 — save / apply / delete named views
- *   S03-T03     — copy a shareable URL of the current filters
- *
+ * Filter bar for a campaign's candidate list:
+ * Skill autocomplete + multi-skill AND search
+ * Save / apply / delete named views
+ * Copy a shareable URL of the current filters
  * Filter state lives in the URL (see CampaignDetails), so a shared link and a
  * saved view describe the same thing and E02's scorecard can read the active
  * filters without coupling to this component.
@@ -142,7 +141,7 @@ export default function CandidateFilterBar({
     }
   };
 
-  // S03-T03 — canonical IDs, never display names, so the link survives a
+  // Canonical IDs, never display names, so the link survives a
   // skill being renamed in the ontology.
   const handleShare = async () => {
     const params = new URLSearchParams();
@@ -258,7 +257,7 @@ export default function CandidateFilterBar({
         </div>
       )}
 
-      {/* M11-E03-S02-T02/T03 — resume-derived filters */}
+      {/* Resume-derived filters */}
       {showMore && (
         <div className="border-t border-slate-100 pt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>

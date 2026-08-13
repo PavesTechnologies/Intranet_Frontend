@@ -11,9 +11,8 @@ import {
 } from "../services/candidateActionsService";
 
 /**
- * M11-E04-S02 — apply an HR override on a rejected candidate (T01/T02) and
- * clear it again (T03).
- *
+ * Apply an HR override on a rejected candidate and
+ * Clear it again.
  * Which action is offered is derived from the candidate's own state rather
  * than from a toggle, because the two are never both valid: a REJECTED
  * candidate can be overridden, and an override that has not yet produced a new
@@ -23,7 +22,7 @@ export default function CandidateOverridePanel({ candidate, onChanged }) {
   const { hasRole } = useAuth();
   const isHrAdmin = hasRole(["HR_ADMIN"]);
   const [open, setOpen] = useState(null);
-  // S04-T01 — the rejection history doubles as the override history: every
+  // The rejection history doubles as the override history: every
   // entry records whether it was overridden.
   const [history, setHistory] = useState([]);
 
@@ -46,12 +45,13 @@ export default function CandidateOverridePanel({ candidate, onChanged }) {
   const stage = (candidate.pipelineStage || candidate.stage || "").toUpperCase();
   const canOverride = stage === "REJECTED" && !candidate.hrOverride;
   // The server only permits clearing while the candidate is still in SCREENING
-  // — past that the override has produced a real outcome. Mirrored here so we
+  // Past that the override has produced a real outcome. Mirrored here so we
   // don't offer a button that is guaranteed to 409.
   const canClear = candidate.hrOverride && stage === "SCREENING";
 
   // Nothing to act on AND nothing to show — stay out of the way entirely.
   if (!canOverride && !canClear && history.length === 0) return null;
+
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -92,7 +92,7 @@ export default function CandidateOverridePanel({ candidate, onChanged }) {
         </>
       )}
 
-      {/* S04-T01 — override history, newest first */}
+      {/* Override history, newest first */}
       {history.length > 0 && (
         <div className="mt-3 pt-3 border-t border-slate-100">
           <p className="text-[10px] uppercase font-bold text-slate-400 mb-1.5">

@@ -77,7 +77,7 @@ export default function TalentPoolCard({ item, onViewProfile, isSelected, onTogg
           <div className="text-[11.5px] truncate text-slate-400">{candidate.designation || "—"}</div>
         </div>
         <div className="rounded-lg bg-slate-50 border border-slate-200 p-1.5 text-center shrink-0">
-          <div className="text-[8.5px] text-slate-400 leading-none">Composite</div>
+          <div className="text-[8.5px] text-slate-400 leading-none">Overall</div>
           <div className="text-[13px] font-extrabold text-slate-900 leading-tight">{bestCompositeScore ?? "—"}</div>
         </div>
       </div>

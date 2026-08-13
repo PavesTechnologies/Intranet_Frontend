@@ -80,14 +80,14 @@ export default function FinalStatusTab({ candidate }) {
     return (
       <ErrorState
         title="Couldn't load final status"
-        message="We couldn't load this candidate's composite score. Please try again."
+        message="We couldn't load this candidate's overall score. Please try again."
         onRetry={refetch}
       />
     );
   }
 
   if (!breakdown) {
-    return <ErrorState title="No data available" message="No composite score found for this candidate." />;
+    return <ErrorState title="No data available" message="No overall score found for this candidate." />;
   }
 
   const tone = STATUS_TONE[breakdown.rankingStatus] || "bg-slate-100 text-slate-600 border-slate-200";
@@ -102,7 +102,7 @@ export default function FinalStatusTab({ candidate }) {
               <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-slate-900 mb-1.5">
                 <Award size={15} className="text-amber-500" /> Final Status
               </div>
-              <div className="text-[11.5px] text-slate-500">Composite score generated from weighted evaluation stages.</div>
+              <div className="text-[11.5px] text-slate-500">Overall score generated from weighted evaluation stages.</div>
             </div>
           </div>
           <Badge className={`${tone} font-bold px-3 py-1 text-[11.5px] self-start sm:self-center`}>
@@ -117,22 +117,21 @@ export default function FinalStatusTab({ candidate }) {
         <MetaTile icon={GitBranch} label="Ranking Status" value={formatStatus(breakdown.rankingStatus)} />
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl px-4">
-        <AccordionSection icon={Calculator} title="Composite Breakdown" collapsible={false}>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {breakdown.components.map((component) => (
-              <ComponentScoreCard
-                key={component.key}
-                label={component.label}
-                score={component.score}
-                weight={component.weight}
-              />
-            ))}
-          </div>
-          <div className="mt-3 rounded-lg bg-slate-50 border border-dashed border-slate-200 p-2.5 text-center">
-            <span className="text-[11.5px] font-mono text-slate-600">{breakdown.formulaText}</span>
-          </div>
-        </AccordionSection>
+      <div className="bg-white border border-slate-200 rounded-xl p-4">
+        <span className="text-[12.5px] font-bold text-slate-900 block mb-3">Overall Score Breakdown</span>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {breakdown.components.map((component) => (
+            <ComponentScoreCard
+              key={component.key}
+              label={component.label}
+              score={component.score}
+              weight={component.weight}
+            />
+          ))}
+        </div>
+        <div className="mt-3 rounded-lg bg-slate-50 border border-dashed border-slate-200 p-2.5 text-center">
+          <span className="text-[11.5px] font-mono text-slate-600">{breakdown.formulaText}</span>
+        </div>
       </div>
     </div>
   );

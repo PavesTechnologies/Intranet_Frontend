@@ -10,9 +10,8 @@ const STAGES = [
 const label = (s) => (s || "").replace(/_/g, " ");
 
 /**
- * M11-E04-S03 — one modal instance for every stage action on the candidate
+ * One modal instance for every stage action on the candidate
  * list, driven by the `action` object the list sets.
- *
  * Deliberately not one modal per row: with a page of candidates that would
  * mount dozens of dialogs, and the reason text would be tied to whichever
  * row happened to render it.
@@ -24,7 +23,7 @@ export default function CandidateActionModals({ action, campaignId, selectedIds,
 
   const fail = (err, fallback) => toast.error(err?.response?.data?.message || fallback);
 
-  // ── single move (T01) ──────────────────────────────────────────────
+  // ── single move ──────────────────────────────────────────────
   if (action.kind === "move") {
     const c = action.candidate;
     const current = (c.stage || "").toUpperCase();
@@ -67,7 +66,7 @@ export default function CandidateActionModals({ action, campaignId, selectedIds,
     );
   }
 
-  // ── manual reject (T03) ────────────────────────────────────────────
+  // ── manual reject ────────────────────────────────────────────
   if (action.kind === "reject") {
     const c = action.candidate;
     return (
@@ -92,7 +91,7 @@ export default function CandidateActionModals({ action, campaignId, selectedIds,
     );
   }
 
-  // ── bulk move (T02) ────────────────────────────────────────────────
+  // ── bulk move ────────────────────────────────────────────────
   if (action.kind === "bulk") {
     const count = selectedIds.size;
     return (

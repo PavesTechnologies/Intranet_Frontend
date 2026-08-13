@@ -100,6 +100,7 @@ const accountReceivableSubmenu = [
 ];
 
 const airsSubmenu = [
+  { label: "Dashboard", to: "/airs/dashboard" },
   { label: "JD Management", to: "/airs/jds" },
   { label: "Campaigns", to: "/airs/campaigns" },
   { label: "Resume Intake", to: "/airs/resume-intake" },
@@ -114,13 +115,13 @@ const airsSubmenu = [
 // HR_ADMIN gets a trimmed-down AIRS menu — only these items, plus
 // Prompt Templates below (HR_ADMIN-only, not part of the general airsSubmenu).
 const hrAdminAirsSubmenu = [
-  ...airsSubmenu.filter((item) => ["JD Management", "Skill Ontology", "Campaigns", "Pipeline", "Talent Pool"].includes(item.label)),
+  ...airsSubmenu.filter((item) => ["Dashboard", "JD Management", "Skill Ontology", "Campaigns", "Pipeline", "Talent Pool"].includes(item.label)),
   { label: "Prompt Templates", to: "/airs/prompt-templates" },
 ];
 
 // RECRUITER gets a trimmed-down AIRS menu — only these items.
 const recruiterAirsSubmenu = airsSubmenu.filter((item) =>
-  ["Campaigns", "Resume Intake", "Pipeline", "Talent Pool"].includes(item.label),
+  ["Dashboard", "Campaigns", "Resume Intake", "Pipeline", "Talent Pool"].includes(item.label),
 );
 
 
@@ -190,11 +191,14 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   const airsRBACAccess = hasRole(["HIRING_MANAGER", "HR", "HR_ADMIN", "RECRUITER"]);
   const isHrAdmin = hasRole(["HR_ADMIN"]);
   const isRecruiter = hasRole(["RECRUITER"]);
+  // Everyone else (HIRING_MANAGER, HR) falls through to the full menu, which
+  // must not offer Dashboard — /airs/dashboard is HR_ADMIN/RECRUITER only, so
+  // the link would lead straight to the unauthorized page.
   const filteredAirsSubmenu = isHrAdmin
     ? hrAdminAirsSubmenu
     : isRecruiter
       ? recruiterAirsSubmenu
-      : airsSubmenu;
+      : airsSubmenu.filter((item) => item.label !== "Dashboard");
 
   // State for User Management Hover
   const [userHovered, setUserHovered] = useState(false);
