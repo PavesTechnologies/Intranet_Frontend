@@ -1,14 +1,15 @@
 import React from "react";
-import { GripVertical, Star } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import { Badge } from "../../../../components/ui/badge";
 
 const matchTone = (composite) => {
+  if (composite == null) return "bg-slate-100 text-slate-500 border-slate-200";
   if (composite >= 70) return "bg-emerald-50 text-emerald-700 border-emerald-100";
   if (composite >= 50) return "bg-amber-50 text-amber-700 border-amber-100";
   return "bg-rose-50 text-rose-700 border-rose-100";
 };
 
-export default function PipelineCandidateCard({ card, onDragStart, onClick }) {
+export default function PipelineCandidateCard({ card, onDragStart, onClick, onViewDetails }) {
   return (
     <div
       draggable
@@ -24,11 +25,22 @@ export default function PipelineCandidateCard({ card, onDragStart, onClick }) {
           <div className="text-[12.5px] font-semibold truncate text-slate-900">{card.name}</div>
           <div className="text-[10.5px] truncate text-slate-400">{card.role}</div>
         </div>
-        <GripVertical size={13} className="text-slate-400" />
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewDetails?.();
+          }}
+          title="View full candidate details"
+          className="text-slate-400 hover:text-indigo-600 transition-colors shrink-0"
+        >
+          <GripVertical size={13} />
+        </button>
       </div>
       <div className="flex items-center justify-between">
-        <Badge className={`${matchTone(card.composite)} font-semibold px-2 py-0.5 text-[11px]`}>{card.composite}% match</Badge>
-        {card.starred && <Star size={13} className="fill-amber-500 text-amber-500" />}
+        <Badge className={`${matchTone(card.composite)} font-semibold px-2 py-0.5 text-[11px]`}>
+          {card.composite != null ? `${card.composite}% match` : "Not scored"}
+        </Badge>
       </div>
     </div>
   );

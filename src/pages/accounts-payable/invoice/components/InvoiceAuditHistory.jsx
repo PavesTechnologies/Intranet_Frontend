@@ -2,9 +2,10 @@ import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard
 import { formatDate } from "../../utils/formatters";
 
 /**
- * Simple status-history timeline for the invoice detail page — mock data for now (see
- * invoiceMockData.js / invoiceService.updateInvoice's automatic history append). Oldest first,
- * matching how the lifecycle actually happened.
+ * Simple status-history timeline for the invoice detail page. The backend's InvoiceDetailsResponse
+ * doesn't return history yet, so invoiceMapper.js defaults this to an empty array — renders the
+ * "No history recorded yet" state until a real history endpoint exists. Oldest first, matching
+ * how the lifecycle actually happened.
  */
 export default function InvoiceAuditHistory({ history = [] }) {
   return (
