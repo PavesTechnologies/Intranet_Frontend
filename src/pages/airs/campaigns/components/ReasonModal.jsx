@@ -1,18 +1,14 @@
 import React, { useEffect, useState } from "react";
-import Modal from "../../../../components/Modal/modal";
+import Modal from "../../../../components/ui/Modal";
 import Button from "../../../../components/Button/Button";
 
 // The backend enforces min 10 chars on every reason field. Mirroring
 // it here turns a 422 into inline guidance, but the server stays the authority.
 const MIN_REASON = 10;
 
-/**
- * Shared reason capture for every action that requires a
- * Justification: stage move, bulk move, manual reject
- *, apply override and clear override.
- * One component rather than five near-identical dialogs, so the character
- * minimum and the disabled-until-valid behaviour can't drift between actions.
- */
+// Shared reason capture for stage move, bulk move, reject and apply/clear
+// override, so the character minimum and the disabled-until-valid behaviour
+// can't drift between them.
 export default function ReasonModal({
   isOpen,
   onClose,
@@ -50,7 +46,7 @@ export default function ReasonModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title} size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={title} width="520px">
       <div className="space-y-3">
         {description && <p className="text-xs text-slate-600">{description}</p>}
         {extraContent}

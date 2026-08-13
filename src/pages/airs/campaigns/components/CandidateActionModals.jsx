@@ -9,13 +9,9 @@ const STAGES = [
 
 const label = (s) => (s || "").replace(/_/g, " ");
 
-/**
- * One modal instance for every stage action on the candidate
- * list, driven by the `action` object the list sets.
- * Deliberately not one modal per row: with a page of candidates that would
- * mount dozens of dialogs, and the reason text would be tied to whichever
- * row happened to render it.
- */
+// One modal instance for every stage action, driven by the `action` the list
+// sets. Not one per row: a page of candidates would mount dozens of dialogs and
+// tie the reason text to whichever row rendered it.
 export default function CandidateActionModals({ action, campaignId, selectedIds, onClose, onDone }) {
   const [targetStage, setTargetStage] = useState("");
 

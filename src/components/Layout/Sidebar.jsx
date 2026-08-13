@@ -503,7 +503,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
             </li>
           )}
 
-          {/* AI Screening (AIRS) Menu
+          {/* AI Screening (AIRS) Menu */}
           {airsRBACAccess && (
             <li
               ref={airsRef}
@@ -557,7 +557,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                 </ul>
               )}
             </li>
-          )} */}
+          )}
 
           {/* Employee Onboarding (Non-General, Non-DM) */}
           {isIntranet && (

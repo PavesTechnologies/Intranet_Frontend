@@ -5,6 +5,7 @@ import CandidateHeader from "../candidates/CandidateScore/components/CandidateHe
 import CandidateTabs from "../candidates/CandidateScore/components/CandidateTabs";
 import ErrorState from "../skill-ontology/components/ErrorState";
 import useParsedResumeCandidate from "./hooks/useParsedResumeCandidate";
+import { SCORE_LABELS } from "../constants/scoreLabels";
 // import { MOCK_CANDIDATES } from "../candidates/mock/candidateMockData";
 // import { mapMockCandidateForScorecard } from "./utils/mapMockCandidateForScorecard";
 
@@ -18,9 +19,9 @@ const FinalStatusTab = lazy(() => import("../candidates/CandidateScore/tabs/Fina
 const TABS = [
   { id: "summary", label: "Summary", Component: SummaryTab },
   { id: "resume", label: "Resume", Component: ResumeTab },
-  { id: "deterministic", label: "Deterministic Score", Component: DeterministicScoreTab },
-  { id: "semantic", label: "Semantic Score", Component: SemanticScoreTab },
-  { id: "ai", label: "AI Review Score", Component: AiEvaluationTab },
+  { id: "deterministic", label: SCORE_LABELS.deterministic, Component: DeterministicScoreTab },
+  { id: "semantic", label: SCORE_LABELS.semantic, Component: SemanticScoreTab },
+  { id: "ai", label: SCORE_LABELS.ai, Component: AiEvaluationTab },
   { id: "finalStatus", label: "Final Status", Component: FinalStatusTab },
 ];
 
