@@ -532,4 +532,19 @@ export const getRejectionAnalytics = async (campaignId) => {
     }
 };
 
+// M11-E04-S04 — HR override report. campaign_alerts carries the per-campaign
+// override_rate and the server-computed override_alert flag that the dashboard
+// warning (T03) renders. HR_ADMIN only.
+export const getOverrideReport = async ({ campaignId, dateFrom, dateTo } = {}) => {
+    const params = {};
+    if (campaignId) params.campaign_id = campaignId;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    const response = await api.get(`${BASE_URL}/campaign-candidates/override-report`, {
+        params,
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+    });
+    return response.data?.data || null;
+};
+
 

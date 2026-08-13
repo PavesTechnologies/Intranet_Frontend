@@ -72,6 +72,11 @@ export function mapCandidateScoreDetail(raw) {
     decisionSource: data.decision_source ?? null,
     decisionReason: data.decision_reason ?? null,
     decisionAt: data.decision_at ?? null,
+    // M11-E04-S02 — the override panel needs the raw values, not "-", to decide
+    // between offering "apply override" and "clear override".
+    pipelineStage: data.pipeline_stage ?? null,
+    hrOverride: data.hr_override ?? false,
+    overrideReason: data.override_reason || null,
     deterministic: numberOr(data.deterministic_score, 0),
     semantic: numberOr(data.semantic_score, 0),
     ats: numberOr(data.ai_ats_score, 0),
