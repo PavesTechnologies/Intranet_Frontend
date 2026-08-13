@@ -478,6 +478,9 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
       ]),
       typeof rawBillingConfig.billingType === "string" ? rawBillingConfig.billingType : "",
       typeof config.billingType === "string" ? config.billingType : "",
+      config.billingTypeName,
+      rawBillingConfig.billingTypeName,
+      normalized.billingType,
     ),
   );
   const billingTypeLabel =
