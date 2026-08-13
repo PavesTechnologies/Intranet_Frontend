@@ -13,15 +13,9 @@ const LABEL = {
   HALF_OPEN: "recovering",
 };
 
-/**
- * Circuit-breaker state for the monitored services.
- *
- * Healthy is collapsed to a single line rather than one pill per service: the
- * common case is everything CLOSED, and three green pills saying so is a whole
- * row of screen spent confirming nothing is wrong. Degraded services get named
- * individually, with the retry time that actually tells someone when to look
- * again.
- */
+// Healthy collapses to one line — the common case is everything CLOSED, and a
+// row of green pills spends screen space confirming nothing is wrong. Degraded
+// services are named individually with their retry time.
 export default function PlatformHealthStrip({ breakers }) {
   if (!breakers?.length) {
     return (

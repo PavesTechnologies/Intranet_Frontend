@@ -140,11 +140,11 @@ export default function WeightPresetsModal({ isOpen, onClose }) {
           <div className="grid grid-cols-3 gap-4">
             <FormInput label="Requirements Wt" name="weight_deterministic" type="number" value={form.weight_deterministic} onChange={change} />
             <FormInput label="Relevance Wt" name="weight_semantic" type="number" value={form.weight_semantic} onChange={change} />
-            <FormInput label="AI Wt" name="weight_ai" type="number" value={form.weight_ai} onChange={change} />
+            <FormInput label="AI Review Wt" name="weight_ai" type="number" value={form.weight_ai} onChange={change} />
           </div>
           <div className="grid grid-cols-3 gap-4">
-            <FormInput label="Deterministic Threshold" name="deterministic_threshold" type="number" value={form.deterministic_threshold} onChange={change} />
-            <FormInput label="Semantic Threshold" name="semantic_threshold" type="number" step="0.01" min="0" max="1" value={form.semantic_threshold} onChange={change} />
+            <FormInput label="Requirements Threshold" name="deterministic_threshold" type="number" value={form.deterministic_threshold} onChange={change} />
+            <FormInput label="Relevance Threshold" name="semantic_threshold" type="number" step="0.01" min="0" max="1" value={form.semantic_threshold} onChange={change} />
             <FormInput label="AI Threshold" name="ai_threshold" type="number" value={form.ai_threshold} onChange={change} />
           </div>
 
