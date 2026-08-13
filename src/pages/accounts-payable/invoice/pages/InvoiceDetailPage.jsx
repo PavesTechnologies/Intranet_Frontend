@@ -12,17 +12,21 @@ import InvoiceAttachmentList from "../components/InvoiceAttachmentList";
 import InvoiceIssueList from "../components/InvoiceIssueList";
 import InvoiceOcrReviewPanel from "../components/InvoiceOcrReviewPanel";
 import InvoiceValidationPanel from "../components/InvoiceValidationPanel";
+import InvoiceApprovalPanel from "../components/InvoiceApprovalPanel";
+import InvoiceAuditHistory from "../components/InvoiceAuditHistory";
 import { useInvoiceDetail } from "../hooks/useInvoiceDetail";
-import { OCR_REVIEW_QUEUE_STATUSES, VALIDATION_QUEUE_STATUSES } from "../../constants/invoiceStatus";
+import { OCR_REVIEW_QUEUE_STATUSES, VALIDATION_QUEUE_STATUSES, INVOICE_STATUS } from "../../constants/invoiceStatus";
 import { AP_ROUTES } from "../../constants/routes";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
 
 /**
  * Single detail route for the whole invoice lifecycle (per the original AP architecture
- * decision) — the page renders an OCR Review or Validation workspace panel depending on the
- * invoice's current status, instead of three separate near-duplicate detail pages each
- * re-implementing Header/Vendor/Amount Summary/Lines/Issues.
+ * decision) — the page renders an OCR Review / Validation / Approval workspace panel depending
+ * on the invoice's current status, instead of separate near-duplicate detail pages each
+ * re-implementing Header/Vendor/Amount Summary/Lines/Issues. The OCR and Validation panels are
+ * always rendered (read-only outside their active stage) so extraction/validation results stay
+ * visible per the detail-page spec; only the Approval panel's actions are stage-gated.
  */
 export default function InvoiceDetailPage() {
   const { invoiceId } = useParams();
@@ -61,6 +65,8 @@ export default function InvoiceDetailPage() {
 
   const isOcrReview = OCR_REVIEW_QUEUE_STATUSES.includes(invoice.status);
   const isValidation = VALIDATION_QUEUE_STATUSES.includes(invoice.status);
+  const isApproval = invoice.status === INVOICE_STATUS.PENDING_APPROVAL;
+  const isRejected = invoice.status === INVOICE_STATUS.REJECTED;
   const symbol = invoice.currency?.symbol || "₹";
 
   return (
@@ -90,6 +96,7 @@ export default function InvoiceDetailPage() {
             <Field label="Invoice Type" value={invoice.invoiceType} />
             <Field label="Invoice Date" value={formatDate(invoice.invoiceDate)} />
             <Field label="Due Date" value={formatDate(invoice.dueDate)} />
+            <Field label="Inbound Document ID" value={invoice.inboundDocumentId} />
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Status</p>
               <div className="mt-1">
@@ -103,8 +110,9 @@ export default function InvoiceDetailPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Main column */}
         <div className="space-y-4 lg:col-span-2">
-          {isOcrReview && <InvoiceOcrReviewPanel invoice={invoice} />}
-          {isValidation && <InvoiceValidationPanel invoice={invoice} />}
+          <InvoiceOcrReviewPanel invoice={invoice} readOnly={!isOcrReview} />
+          {isApproval && <InvoiceApprovalPanel invoice={invoice} />}
+          <InvoiceValidationPanel invoice={invoice} readOnly={!isValidation} />
 
           <PageCard>
             <PageCardContent>
@@ -116,7 +124,7 @@ export default function InvoiceDetailPage() {
           <PageCard>
             <PageCardContent>
               <h3 className="mb-3 text-sm font-semibold text-gray-700">Attachments</h3>
-              <InvoiceAttachmentList attachments={invoice.attachments} />
+              <InvoiceAttachmentList attachments={invoice.attachments} inboundDocumentId={invoice.inboundDocumentId} />
             </PageCardContent>
           </PageCard>
 
@@ -126,6 +134,8 @@ export default function InvoiceDetailPage() {
               <InvoiceIssueList invoiceId={invoice.id} issues={invoice.issues} />
             </PageCardContent>
           </PageCard>
+
+          <InvoiceAuditHistory history={invoice.history} />
         </div>
 
         {/* Side column */}
@@ -165,8 +175,15 @@ export default function InvoiceDetailPage() {
               <h3 className="mb-3 text-sm font-semibold text-gray-700">Approval Information</h3>
               {invoice.approval?.required ? (
                 <dl className="space-y-1 text-sm">
-                  <Field label="Approved By" value={invoice.approval.approvedBy || "Pending"} stacked />
+                  <Field label="Status" value={invoice.status} stacked />
+                  <Field label={isRejected ? "Rejected By" : "Approved By"} value={invoice.approval.approvedBy || "Pending"} stacked />
                   <Field label="Approved On" value={formatDate(invoice.approval.approvedAt)} stacked />
+                  {isRejected && (
+                    <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-2">
+                      <p className="text-xs font-medium uppercase tracking-wide text-red-600">Rejection Reason</p>
+                      <p className="mt-0.5 text-sm text-red-700">{invoice.approval.rejectionReason || "—"}</p>
+                    </div>
+                  )}
                 </dl>
               ) : (
                 <p className="text-sm italic text-gray-500">

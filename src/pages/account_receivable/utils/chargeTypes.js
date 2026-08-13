@@ -1,4 +1,10 @@
 import { formatDisplayDate } from "./format";
+import { BILLING_BASIS_OPTIONS } from "../data/toolCatalogOptions";
+
+const BILLING_BASIS_LABELS = BILLING_BASIS_OPTIONS.reduce((acc, option) => {
+  acc[option.value] = option.label;
+  return acc;
+}, {});
 
 export const CHARGE_TYPE_LABELS = {
   labor: "Labor",
@@ -7,6 +13,7 @@ export const CHARGE_TYPE_LABELS = {
   recurring: "Recurring",
   expense: "Expense",
   tool: "Tool",
+  software: "Software",
 };
 
 export const SOURCE_SYSTEM_LABELS = {
@@ -16,9 +23,13 @@ export const SOURCE_SYSTEM_LABELS = {
   recurring: "Recurring Billing Engine",
   expense: "Expense Management",
   tool: "Tool Catalog",
+  software: "RMS / Tool Pricing",
 };
 
-export const CHARGE_TYPE_ORDER = ["labor", "contract", "milestone", "recurring", "expense", "tool"];
+// "software" (Epic 4 Phase 6 — Invoice Integration) carries generated software charge lines
+// into the same charge-type taxonomy as every other invoice line, so they flow through
+// ChargeGroup/computeChargeTotals unchanged rather than needing a parallel summary.
+export const CHARGE_TYPE_ORDER = ["labor", "contract", "milestone", "recurring", "expense", "tool", "software"];
 
 export function describeRecord(chargeType, record) {
   switch (chargeType) {
@@ -32,8 +43,19 @@ export function describeRecord(chargeType, record) {
       return record.plan && record.plan !== "Retainer" ? record.plan : `Retainer — ${record.billingPeriod}`;
     case "expense":
       return record.description;
-    case "tool":
-      return record.toolName;
+    case "tool": {
+      // Billing Basis comes straight from the backend response (Epic 4 Tool Catalog enum on
+      // real records; the legacy mock "chargeType" field as a fallback) — never computed here.
+      const basisLabel = record.billingBasis
+        ? BILLING_BASIS_LABELS[record.billingBasis] || record.billingBasis
+        : record.chargeType;
+      return basisLabel ? `${record.toolName} (${basisLabel})` : record.toolName;
+    }
+    case "software": {
+      const basisLabel = record.billingBasis ? BILLING_BASIS_LABELS[record.billingBasis] || record.billingBasis : null;
+      const name = record.assetName ? `${record.assetName} (${record.assetCode})` : record.assetCode;
+      return basisLabel ? `${name} — ${basisLabel}` : name;
+    }
     default:
       return record.id;
   }
@@ -41,7 +63,7 @@ export function describeRecord(chargeType, record) {
 
 export function quantityAndUnitPrice(chargeType, record) {
   if (chargeType === "labor") return { quantity: record.hours, unitPrice: record.rate };
-  if (chargeType === "tool") return { quantity: record.quantity, unitPrice: record.unitPrice };
+  if (chargeType === "tool" || chargeType === "software") return { quantity: record.quantity, unitPrice: record.unitPrice };
   return { quantity: 1, unitPrice: record.amount };
 }
 

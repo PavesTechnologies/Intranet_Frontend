@@ -77,16 +77,25 @@ const accountReceivableSubmenu = [
         to: "/account-receivable/project-billing-setup/overview",
       },
       {
-        label: "Billing Configurations",
-        to: "/account-receivable/project-billing-setup/configurations",
-      },
-      {
-        label: "Configuration History",
-        to: "/account-receivable/project-billing-setup/history",
+        label: "Billing Config Workspace",
+        to: "/account-receivable/project-billing-setup/workspace",
       },
     ],
   },
-  { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition" },
+  {
+    label: "Billing Data Acquisition",
+    to: "/account-receivable/billing-data-acquisition",
+    children: [
+      {
+        label: "Overview",
+        to: "/account-receivable/billing-data-acquisition",
+      },
+      {
+        label: "Acquisition Workspace",
+        to: "/account-receivable/billing-data-acquisition/workspace",
+      },
+    ],
+  },
 ];
 
 const airsSubmenu = [
@@ -104,13 +113,13 @@ const airsSubmenu = [
 // HR_ADMIN gets a trimmed-down AIRS menu — only these items, plus
 // Prompt Templates below (HR_ADMIN-only, not part of the general airsSubmenu).
 const hrAdminAirsSubmenu = [
-  ...airsSubmenu.filter((item) => ["JD Management", "Skill Ontology", "Campaigns"].includes(item.label)),
+  ...airsSubmenu.filter((item) => ["JD Management", "Skill Ontology", "Campaigns", "Pipeline", "Talent Pool"].includes(item.label)),
   { label: "Prompt Templates", to: "/airs/prompt-templates" },
 ];
 
 // RECRUITER gets a trimmed-down AIRS menu — only these items.
 const recruiterAirsSubmenu = airsSubmenu.filter((item) =>
-  ["Campaigns", "Resume Intake", "Pipeline"].includes(item.label),
+  ["Campaigns", "Resume Intake", "Pipeline", "Talent Pool"].includes(item.label),
 );
 
 
@@ -442,7 +451,7 @@ const Sidebar = ({ isCollapsed }) => {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 scrollbar-hide">
-        <style jsx>{`
+        <style>{`
           .scrollbar-hide::-webkit-scrollbar {
             display: none;
           }
@@ -470,7 +479,7 @@ const Sidebar = ({ isCollapsed }) => {
             </li>
           }
 
-          {/* AI Screening (AIRS) Menu */}
+          {/* AI Screening (AIRS) Menu
           {airsRBACAccess && (
             <li
               ref={airsRef}
@@ -478,9 +487,8 @@ const Sidebar = ({ isCollapsed }) => {
               onMouseEnter={handleAirsMouseEnter}
               onMouseLeave={handleAirsMouseLeave}
             >
-              <Link
-                to="/airs/jds"
-                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium transition-all duration-200 ${location.pathname.startsWith("/airs")
+              <div
+                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/airs")
                   ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
                   : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
                   }`}
@@ -497,7 +505,7 @@ const Sidebar = ({ isCollapsed }) => {
                     />
                   </>
                 )}
-              </Link>
+              </div>
 
               {airsHovered && (
                 <ul
@@ -525,7 +533,7 @@ const Sidebar = ({ isCollapsed }) => {
                 </ul>
               )}
             </li>
-          )}
+          )} */}
 
           {/* Employee Onboarding (Non-General, Non-DM) */}
           {
@@ -600,136 +608,7 @@ const Sidebar = ({ isCollapsed }) => {
             </li>
           }
 
-          {/* Expense Management (XMS) */}
-          {
-            <li
-              ref={xmsRef}
-              className="relative"
-              onMouseEnter={handleXmsMouseEnter}
-              onMouseLeave={handleXmsMouseLeave}
-            >
-              <div
-                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/expense-management")
-                  ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
-                  : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
-                  }`}
-                title={isCollapsed ? "Expense Management" : ""}
-              >
-                <Receipt className="h-5 w-5 shrink-0" />
-
-                {!isCollapsed && (
-                  <>
-                    <span className="flex-1">Expense Management</span>
-                    <ChevronRight
-                      className={`h-4 w-4 transition-all duration-300 ${xmsHovered ? "translate-x-1" : ""
-                        }`}
-                    />
-                  </>
-                )}
-              </div>
-
-              {xmsHovered && (
-                <ul
-                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
-                    }`}
-                  style={{ top: `${submenuTop}px` }}
-                  onMouseEnter={() => {
-                    parentHoverRef.current = true;
-                    cancelClose();
-                  }}
-                  onMouseLeave={() => {
-                    parentHoverRef.current = false;
-                    setChildMenuOwner(null);
-                    scheduleClose();
-                  }}
-                >
-                  {filteredXmsSubmenu.map((item) => (
-                    <li
-                      key={item.label}
-                      onMouseEnter={(e) => handleParentHover(item, e)}
-                      onMouseDown={(e) => handleParentLeave()}
-                      className="relative group"
-                    >
-                      <NavLink
-                        to={item.to}
-                        className={({ isActive }) =>
-                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
-                            ? "bg-blue-100 text-[#0a174e] font-semibold"
-                            : "hover:bg-[#263383] hover:text-white"
-                          }`
-                        }
-                      >
-                        <span>{item.label}</span>
-                        {item.children && (
-                          <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
-                        )}
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </li>
-          }
-
-          {/* Accounts Payable (Admin, Vendor Intake, AP Executive, Finance Executive only) */}
-          {isApUser && (
-          <li
-            ref={apRef}
-            className="relative"
-            onMouseEnter={handleApMouseEnter}
-            onMouseLeave={handleApMouseLeave}
-          >
-            <div
-              className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/accounts-payable")
-                ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
-                : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
-                }`}
-              title={isCollapsed ? "Account Payable" : ""}
-            >
-              <ApModuleIcon className="h-5 w-5 shrink-0" />
-
-              {!isCollapsed && (
-                <>
-                  <span className="flex-1">Account Payable</span>
-                  <ChevronRight
-                    className={`h-4 w-4 transition-all duration-300 ${apHovered ? "translate-x-1" : ""
-                      }`}
-                  />
-                </>
-              )}
-            </div>
-
-            {apHovered && (
-              <ul
-                className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
-                  }`}
-                style={{ top: `${submenuTop}px` }}
-                onMouseEnter={handleApMouseEnter}
-                onMouseLeave={handleApMouseLeave}
-              >
-                {filteredApSubmenu.map((item) => (
-                  <li key={item.label} className="group relative">
-                    <NavLink
-                      to={item.to}
-                      className={({ isActive }) =>
-                        `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
-                          ? "bg-blue-100 text-[#0a174e] font-semibold"
-                          : "hover:bg-[#263383] hover:text-white"
-                        }`
-                      }
-                    >
-                      <span>{item.label}</span>
-                      {item.children && (
-                        <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
-                      )}
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-          )}
-
+          
           {/* User Management (Admin Only) */}
           {isAdmin && (
             <li
@@ -889,111 +768,7 @@ const Sidebar = ({ isCollapsed }) => {
               </li>
             );
           })}
-
-          {isSuperAdmin && (
-            <li
-              ref={arRef}
-              className="relative"
-              onMouseEnter={handleArMouseEnter}
-              onMouseLeave={handleArMouseLeave}
-            >
-              <div
-                className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-medium cursor-pointer transition-all duration-200 ${location.pathname.startsWith("/account-receivable")
-                  ? "bg-[#263383] text-white border-l-4 border-[#ff3d72]"
-                  : "text-gray-300 hover:bg-[#0f1536] hover:text-white"
-                  }`}
-                title={isCollapsed ? "Account Receivable" : ""}
-              >
-                <ArModuleIcon className="h-5 w-5 shrink-0" />
-
-                {!isCollapsed && (
-                  <>
-                    <span className="flex-1">Account Receivable</span>
-                    <ChevronRight
-                      className={`h-4 w-4 transition-all duration-300 ${arHovered ? "translate-x-1" : ""
-                        }`}
-                    />
-                  </>
-                )}
-              </div>
-
-              {arHovered && (
-                <ul
-                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
-                    }`}
-                  style={{ top: `${submenuTop}px` }}
-                  onMouseEnter={() => {
-                    parentHoverRef.current = true;
-                    cancelClose();
-                  }}
-                  onMouseLeave={() => {
-                    parentHoverRef.current = false;
-                    scheduleClose();
-                  }}
-                >
-                  {accountReceivableSubmenu.map((item) => (
-                    <li
-                      key={item.label}
-                      className="group relative"
-                      onMouseEnter={(e) => handleParentHover(item, e, "ar")}
-                      onMouseDown={() => handleParentLeave()}
-                    >
-                      <NavLink
-                        to={item.to}
-                        className={({ isActive }) =>
-                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
-                            ? "bg-blue-100 text-[#0a174e] font-semibold"
-                            : "hover:bg-[#263383] hover:text-white"
-                          }`
-                        }
-                      >
-                        <span>{item.label}</span>
-                        {item.children && (
-                          <ChevronRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-1" />
-                        )}
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {childMenu && childMenuOwner === "ar" && (
-                <ul
-                  className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[305px]" : "left-[480px]"
-                    }`}
-                  style={{ top: `${childTop - 4}px` }}
-                  onMouseEnter={() => {
-                    childHoverRef.current = true;
-                    cancelClose();
-                  }}
-                  onMouseLeave={() => {
-                    childHoverRef.current = false;
-                    scheduleClose();
-                  }}
-                  onClick={() => {
-                    childHoverRef.current = false;
-                    setChildMenuOwner(null);
-                    scheduleClose();
-                  }}
-                >
-                  {childMenu.map((child) => (
-                    <li key={child.label} className="group relative">
-                      <NavLink
-                        to={child.to}
-                        className={({ isActive }) =>
-                          `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
-                            ? "bg-blue-100 text-[#0a174e] font-semibold"
-                            : "hover:bg-[#263383] hover:text-white"
-                          }`
-                        }
-                      >
-                        <span>{child.label}</span>
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </li>
-          )}
+         
         </ul>
 
         {childMenu && (

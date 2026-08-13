@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
-import { getAllResumes, activeCampaigns } from "../../service/resumeIntake";
+import { getResumesPipelineStatus, activeCampaigns } from "../../service/resumeIntake";
 import { extractErrorMessage } from "../intake/utils/intakeUtils.jsx";
 import { RESUME_LIST_PAGE_SIZE } from "../constants/resumeIntakeConstants";
 
 const DEFAULT_SORT_VALUE = "created_at:desc";
 
-export default function useResumeIntake() {
+export default function useResumeIntake({ enabled = true } = {}) {
   // Kept in the URL (not plain useState) so navigating away to a candidate
   // scorecard and back restores the exact filters/page you had, instead of
   // resetting to defaults on remount — same pattern as the tab in
@@ -71,13 +71,15 @@ export default function useResumeIntake() {
   const [sortBy, sortDir] = sortValue.split(":");
 
   useEffect(() => {
+    if (!enabled) return undefined;
+
     let cancelled = false;
 
     const fetchResumes = async () => {
       setIsLoading(true);
       setListError("");
       try {
-        const res = await getAllResumes({
+        const res = await getResumesPipelineStatus({
           campaign_id: campaignFilter || undefined,
           parse_status: statusFilter || undefined,
           source: sourceFilter || undefined,
@@ -105,7 +107,7 @@ export default function useResumeIntake() {
     return () => {
       cancelled = true;
     };
-  }, [campaignFilter, statusFilter, sourceFilter, sortBy, sortDir, currentPage, refreshToken]);
+  }, [campaignFilter, statusFilter, sourceFilter, sortBy, sortDir, currentPage, refreshToken, enabled]);
 
   const campaignOptions = useMemo(
     () => [{ label: "All Campaigns", value: "" }, ...campaigns.map((c) => ({ label: c.name, value: c.id }))],

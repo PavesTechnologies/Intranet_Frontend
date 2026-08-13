@@ -1,31 +1,21 @@
-import { INVOICE_FIXTURES } from "../../mocks/invoiceMockData";
 import { INVOICE_STATUS } from "../../constants/invoiceStatus";
-import { QUEUE_STATUS_FILTERS } from "../../constants/queueTypes";
-import { INVOICE_ACTIONS, INVOICE_ACTION_RESULT_STATUS } from "../../constants/invoiceActions";
-import { ISSUE_STATUS } from "../../constants/invoiceIssues";
-import { createEmptyInvoice } from "../../types/invoice";
+import { calculateBalance } from "../../utils/formatters";
+import api from "../../../../api/axiosInstance.js";
+import { mapInvoiceRecord } from "./invoiceMapper";
 
 /**
- * Mock-backed invoice service. Every method matches the call signature a real endpoint would
- * have (params in, plain data out — no axios response envelope), so swapping to the real FastAPI
- * backend later means rewriting method bodies to call the shared axiosInstance, not touching any
- * caller (hooks/components never know which backend a method is talking to).
+ * Real backend-backed invoice service (Invoice Details API). Uses the shared axiosInstance —
+ * no second Axios instance, no duplicated auth logic; the request interceptor there already
+ * injects the bearer token for every call made through `api`.
  *
- * NO REAL BACKEND EXISTS YET for any of these endpoints — see the implementation report for the
- * exact list of assumed routes.
+ * AP endpoints live on a separate service from the main USER_MANAGEMENT_URL, so each call is
+ * made with an absolute URL built from window.__APP_CONFIG__.AP_BASE_URL (see public/config.js /
+ * docker-entrypoint.sh) — same pattern already used by
+ * src/pages/accounts-payable/vendor/services/vendorTaxService.js. Passing an absolute URL to a
+ * configured axios instance overrides its baseURL for that call only; the instance's own
+ * baseURL (USER_MANAGEMENT_URL) is never mutated, so other modules using `api` are unaffected.
  */
-
-const MOCK_RESPONSE_DELAY_MS = 350;
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// In-memory store, seeded from the fixtures once per app session (not per call) so
-// uploads/edits/resolutions persist across navigation within the same browser session.
-let invoiceStore = JSON.parse(JSON.stringify(INVOICE_FIXTURES));
-let nextInvoiceSeq = invoiceStore.length + 1;
-
-function cloneInvoice(invoice) {
-  return invoice ? JSON.parse(JSON.stringify(invoice)) : invoice;
-}
+const AP_BASE_URL = window.__APP_CONFIG__.AP_BASE_URL;
 
 function matchesSearch(invoice, search) {
   if (!search) return true;
@@ -48,12 +38,32 @@ function matchesDateRange(invoice, dateField, dateFrom, dateTo) {
   return true;
 }
 
+/** Not exposed on the service object — every read method funnels through this single fetch. */
+async function fetchAllInvoices() {
+  const response = await api.get(`${AP_BASE_URL}/invoice-details/invoice`);
+  const records = Array.isArray(response.data) ? response.data : [];
+  return records.map(mapInvoiceRecord);
+}
+
+/** Normalizes an axios error's HTTP status onto `error.status` so callers (e.g.
+ *  InvoiceDetailPage's `error?.status === 404` check) don't need to know it came from axios. */
+function withNormalizedStatus(error) {
+  error.status = error.status ?? error.response?.status;
+  return error;
+}
+
+function notImplementedError(action) {
+  const error = new Error(`${action} isn't connected to a backend endpoint yet.`);
+  error.status = 501;
+  return error;
+}
+
 export const invoiceService = {
   /**
    * @param {Object} [params]
-   * @param {string} [params.search] - matches invoice number, vendor name, or PO number
-   * @param {string} [params.status] - one of INVOICE_STATUS, or a QUEUE_TYPES key handled by the caller
-   * @param {string[]} [params.statuses] - explicit status allowlist (used by queue views)
+   * @param {string} [params.search] - matches invoice number or vendor name
+   * @param {string} [params.status] - one exact INVOICE_STATUS to filter to (from the Status filter)
+   * @param {string[]} [params.statuses] - status allowlist for the active queue/tab
    * @param {string} [params.invoiceType] - one of INVOICE_TYPES
    * @param {string} [params.dateField] - "invoiceDate" | "dueDate", defaults to "invoiceDate"
    * @param {string} [params.dateFrom] - ISO date string
@@ -61,9 +71,12 @@ export const invoiceService = {
    * @param {number} [params.page=1]
    * @param {number} [params.pageSize=10]
    * @returns {Promise<{items: Array, total: number, page: number, pageSize: number, totalPages: number}>}
+   *
+   * The backend list endpoint takes no filter/pagination query params (returns the full array),
+   * so search/status/type/date-range filtering and pagination are applied client-side here —
+   * same behavior as before, just sourced from a real fetch instead of the mock store.
    */
   async getInvoices(params = {}) {
-    await wait(MOCK_RESPONSE_DELAY_MS);
     try {
       const {
         search = "",
@@ -77,10 +90,11 @@ export const invoiceService = {
         pageSize = 10,
       } = params;
 
-      const allowedStatuses = statuses ?? (status ? [status] : QUEUE_STATUS_FILTERS.all_invoices);
+      const all = await fetchAllInvoices();
 
-      const filtered = invoiceStore.filter((invoice) => {
-        if (allowedStatuses && !allowedStatuses.includes(invoice.status)) return false;
+      const filtered = all.filter((invoice) => {
+        if (statuses && !statuses.includes(invoice.status)) return false;
+        if (status && invoice.status !== status) return false;
         if (invoiceType && invoice.invoiceType !== invoiceType) return false;
         if (!matchesSearch(invoice, search)) return false;
         if (!matchesDateRange(invoice, dateField, dateFrom, dateTo)) return false;
@@ -91,129 +105,143 @@ export const invoiceService = {
       const totalPages = Math.max(1, Math.ceil(total / pageSize));
       const safePage = Math.min(Math.max(1, page), totalPages);
       const start = (safePage - 1) * pageSize;
-      const items = filtered.slice(start, start + pageSize).map(cloneInvoice);
+      const items = filtered.slice(start, start + pageSize);
 
       return { items, total, page: safePage, pageSize, totalPages };
     } catch (error) {
       console.error("Error in invoiceService.getInvoices:", error);
-      throw error;
+      throw withNormalizedStatus(error);
     }
   },
 
-  /** @param {string} invoiceId @returns {Promise<Object>} */
+  /**
+   * @param {string|number} invoiceId - route params arrive as strings; coerced to a number for
+   *   the backend, which expects an int.
+   * @returns {Promise<Object>}
+   */
   async getInvoice(invoiceId) {
-    await wait(MOCK_RESPONSE_DELAY_MS);
     try {
-      const invoice = invoiceStore.find((inv) => inv.id === invoiceId);
-      if (!invoice) {
-        const error = new Error("Invoice not found");
-        error.status = 404;
-        throw error;
-      }
-      return cloneInvoice(invoice);
+      const response = await api.get(`${AP_BASE_URL}/invoice-details/invoice/${Number(invoiceId)}`);
+      return mapInvoiceRecord(response.data);
     } catch (error) {
       console.error("Error in invoiceService.getInvoice:", error);
-      throw error;
+      throw withNormalizedStatus(error);
     }
   },
 
   /**
-   * Uploads a new invoice document. Real backend would accept multipart/form-data and kick off
-   * an async OCR job; this mock creates the record as UPLOADED then immediately (after the
-   * simulated delay) flips it to OCR_PROCESSING, mirroring INVOICE_ACTION_RESULT_STATUS.
+   * Fetches a viewable reference (e.g. a presigned S3 URL) for the invoice's source document.
+   * Only call this when the user explicitly asks to view the document — never on page load.
+   * @param {string|number} inboundDocumentId
+   * @returns {Promise<unknown>} raw response body — shape not yet documented by the backend, so
+   *   callers must defensively read a URL out of it rather than assume a fixed contract.
+   */
+  async viewInvoice(inboundDocumentId) {
+  try {
+    const response = await api.get(
+      `${AP_BASE_URL}/invoice-details/invoice/view/${encodeURIComponent(
+        inboundDocumentId
+      )}`,
+      {
+        responseType: "blob",
+      }
+    );
+
+    return {
+      blob: response.data,
+      contentType:
+        response.headers["content-type"] || "application/pdf",
+    };
+  } catch (error) {
+    console.error("Error in invoiceService.viewInvoice:", error);
+    throw withNormalizedStatus(error);
+  }
+},
+
+  /**
+   * Uploads a new invoice document for OCR/validation processing.
    * @param {File} file
-   * @returns {Promise<Object>} the created invoice
+   * @returns {Promise<Object>} raw process-invoice response (invoice_id / inbound_document_id /
+   *   invoice_status / extracted_invoice) — consumed directly by InvoiceUploadPage, not mapped
+   *   through mapInvoiceRecord since it isn't an InvoiceDetailsResponse.
    */
   async uploadInvoice(file) {
-    await wait(MOCK_RESPONSE_DELAY_MS);
     try {
-      const invoice = {
-        ...createEmptyInvoice(),
-        id: `inv-${10000 + nextInvoiceSeq}`,
-        invoiceNumber: `INV-${10000 + nextInvoiceSeq}`,
-        status: INVOICE_ACTION_RESULT_STATUS[INVOICE_ACTIONS.UPLOAD] ?? INVOICE_STATUS.OCR_PROCESSING,
-        attachments: [
-          { id: `att-${file.name}`, fileName: file.name, fileType: file.type || "unknown", uploadedAt: new Date().toISOString(), fileUrl: "" },
-        ],
-        uploadedAt: new Date().toISOString(),
-      };
-      nextInvoiceSeq += 1;
-      invoiceStore = [invoice, ...invoiceStore];
-      return cloneInvoice(invoice);
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await api.post(`${AP_BASE_URL}/invoice/process-invoice`, formData);
+      return response.data;
     } catch (error) {
       console.error("Error in invoiceService.uploadInvoice:", error);
-      throw error;
-    }
-  },
-
-  /** @param {string} invoiceId @returns {Promise<Array>} */
-  async getInvoiceIssues(invoiceId) {
-    await wait(MOCK_RESPONSE_DELAY_MS);
-    try {
-      const invoice = invoiceStore.find((inv) => inv.id === invoiceId);
-      if (!invoice) {
-        const error = new Error("Invoice not found");
-        error.status = 404;
-        throw error;
-      }
-      return cloneInvoice(invoice.issues);
-    } catch (error) {
-      console.error("Error in invoiceService.getInvoiceIssues:", error);
-      throw error;
+      throw withNormalizedStatus(error);
     }
   },
 
   /**
-   * @param {string} issueId
-   * @param {Object} [payload]
-   * @param {string} [payload.resolvedBy]
-   * @returns {Promise<Object>} the updated issue
+   * No backend endpoint exists yet for partial invoice updates (OCR corrections, validation
+   * submit/reject, approve/reject). Throws a clear, honest error instead of silently mutating a
+   * mock store — callers' existing onError toasts will surface this message.
    */
-  async resolveInvoiceIssue(issueId, payload = {}) {
-    await wait(MOCK_RESPONSE_DELAY_MS);
-    try {
-      for (const invoice of invoiceStore) {
-        const issueIndex = invoice.issues.findIndex((iss) => iss.id === issueId);
-        if (issueIndex === -1) continue;
-        invoice.issues[issueIndex] = {
-          ...invoice.issues[issueIndex],
-          status: ISSUE_STATUS.RESOLVED,
-          resolvedBy: payload.resolvedBy || "current_user",
-          resolvedAt: new Date().toISOString(),
-        };
-        return cloneInvoice(invoice.issues[issueIndex]);
-      }
-      const error = new Error("Issue not found");
-      error.status = 404;
-      throw error;
-    } catch (error) {
-      console.error("Error in invoiceService.resolveInvoiceIssue:", error);
-      throw error;
-    }
+  async updateInvoice(_invoiceId, _payload = {}) {
+    throw notImplementedError("Updating an invoice");
+  },
+
+  /** No backend endpoint exists yet for resolving an invoice issue. */
+  async resolveInvoiceIssue(_issueId, _payload = {}) {
+    throw notImplementedError("Resolving an invoice issue");
   },
 
   /**
-   * Generic partial update — used for saving OCR corrections, submitting for validation, and
-   * recording a validation outcome. Callers pass the fields that changed plus any status
-   * transition; see useInvoiceMutations.js for the named wrappers around this.
-   * @param {string} invoiceId
-   * @param {Object} payload - partial Invoice fields to merge
-   * @returns {Promise<Object>} the updated invoice
+   * Aggregate KPIs for the Invoice Management header cards, computed over the full fetched list
+   * (not the current page/filter). "Paid This Month" will read 0 until the backend exposes
+   * payment records — that's an honest reflection of missing data, not a bug.
+   * @returns {Promise<{totalInvoicesThisMonth: number, pendingApprovalCount: number,
+   *   readyForPaymentCount: number, readyForPaymentBalance: number, paidThisMonthCount: number,
+   *   paidThisMonthAmount: number}>}
    */
-  async updateInvoice(invoiceId, payload = {}) {
-    await wait(MOCK_RESPONSE_DELAY_MS);
+  async getInvoiceSummary() {
     try {
-      const index = invoiceStore.findIndex((inv) => inv.id === invoiceId);
-      if (index === -1) {
-        const error = new Error("Invoice not found");
-        error.status = 404;
-        throw error;
-      }
-      invoiceStore[index] = { ...invoiceStore[index], ...payload };
-      return cloneInvoice(invoiceStore[index]);
+      const all = await fetchAllInvoices();
+      const now = new Date();
+      const isThisMonth = (isoDate) => {
+        if (!isoDate) return false;
+        const d = new Date(isoDate);
+        return !Number.isNaN(d.getTime()) && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      };
+
+      // uploadedAt isn't returned by the backend yet — invoiceDate is the closest honest proxy
+      // for "this month's invoices" available today.
+      const totalInvoicesThisMonth = all.filter((invoice) => isThisMonth(invoice.invoiceDate)).length;
+      const pendingApprovalCount = all.filter((invoice) => invoice.status === INVOICE_STATUS.PENDING_APPROVAL).length;
+
+      const readyForPayment = all.filter((invoice) => invoice.status === INVOICE_STATUS.READY_FOR_PAYMENT);
+      const readyForPaymentBalance = readyForPayment.reduce(
+        (sum, invoice) => sum + calculateBalance(invoice.netAmount, invoice.amountPaid),
+        0
+      );
+
+      const paidThisMonthInvoiceIds = new Set();
+      let paidThisMonthAmount = 0;
+      all.forEach((invoice) => {
+        (invoice.payments || []).forEach((payment) => {
+          if (isThisMonth(payment.paidAt)) {
+            paidThisMonthInvoiceIds.add(invoice.id);
+            paidThisMonthAmount += payment.amount;
+          }
+        });
+      });
+
+      return {
+        totalInvoicesThisMonth,
+        pendingApprovalCount,
+        readyForPaymentCount: readyForPayment.length,
+        readyForPaymentBalance,
+        paidThisMonthCount: paidThisMonthInvoiceIds.size,
+        paidThisMonthAmount,
+      };
     } catch (error) {
-      console.error("Error in invoiceService.updateInvoice:", error);
-      throw error;
+      console.error("Error in invoiceService.getInvoiceSummary:", error);
+      throw withNormalizedStatus(error);
     }
   },
 };

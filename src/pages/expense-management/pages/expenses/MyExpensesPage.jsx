@@ -273,13 +273,13 @@ export default function MyExpensesPage() {
 
   const tableRows = displayedReports.map((r, index) => ({
     serial_no: ((currentPage - 1) * ITEMS_PER_PAGE + index + 1).toString(),
-    reportNumber: <span className="font-mono text-xs font-semibold text-gray-700">{r.reportNumber || "—"}</span>,
-    title: <span className="font-medium text-gray-900">{r.title || "Untitled Report"}</span>,
-    costCenter: r.costCenterName || "—",
-    currency: <span className="font-semibold text-gray-600">{r.currencyCode || "—"}</span>,
-    totalAmount: <span className="font-mono font-semibold text-gray-900">{formatAmount(r.totalAmount)}</span>,
+    reportNumber: <span className="font-mono text-[11px] font-semibold text-gray-700">{r.reportNumber || "—"}</span>,
+    title: <span className="font-medium text-xs text-gray-900">{r.title || "Untitled Report"}</span>,
+    costCenter: <span className="text-xs">{r.costCenterName || "—"}</span>,
+    currency: <span className="font-semibold text-xs text-gray-600">{r.currencyCode || "—"}</span>,
+    totalAmount: <span className="font-mono font-semibold text-xs text-gray-900">{formatAmount(r.totalAmount)}</span>,
     status: <StatusBadge label={r.reportStatus || "DRAFT"} size="sm" />,
-    created: formatDate(r.createdAt),
+    created: <span className="text-xs">{formatDate(r.createdAt)}</span>,
     actions: (
       <div className="flex items-center gap-1 justify-center">
         <Button
@@ -287,10 +287,13 @@ export default function MyExpensesPage() {
           variant="link"
           size="icon"
           title="View Report"
-          className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition rounded-md"
-          onClick={() => navigate(`/expense-management/expenses/reports/${r.reportId}`)}
+          className="h-7 w-7 p-0 text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition rounded-md"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/expense-management/expenses/reports/${r.reportId}`);
+          }}
         >
-          <Eye size={16} />
+          <Eye size={14} />
         </Button>
         {canManage && (
           <>
@@ -299,20 +302,26 @@ export default function MyExpensesPage() {
               variant="link"
               size="icon"
               title="Edit Report"
-              className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800 transition rounded-md"
-              onClick={() => handleEditClick(r)}
+              className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800 transition rounded-md"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEditClick(r);
+              }}
             >
-              <Pencil size={16} />
+              <Pencil size={14} />
             </Button>
             <Button
               type="button"
               variant="link"
               size="icon"
               title="Delete Report"
-              className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-800 transition rounded-md"
-              onClick={() => handleDeleteClick(r)}
+              className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 hover:text-red-800 transition rounded-md"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteClick(r);
+              }}
             >
-              <Trash2 size={16} />
+              <Trash2 size={14} />
             </Button>
           </>
         )}
@@ -329,65 +338,70 @@ export default function MyExpensesPage() {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <Breadcrumb items={breadcrumbs} />
 
-      <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm sm:p-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <h1 className="text-xl font-bold text-[#0a174e]">My Expense Reports</h1>
-          <p className="text-sm text-gray-500 mt-1">Track and manage the expense reports you've created.</p>
+          <h1 className="text-lg font-bold text-[#0a174e]">My Expense Reports</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Track and manage the expense reports you've created.</p>
         </div>
 
         {canManage && (
           <Button
             onClick={() => navigate("/expense-management/expenses/create")}
             variant="primary"
-            size="medium"
-            className="w-full whitespace-nowrap sm:w-auto shadow-sm"
+            size="small"
+            className="w-full whitespace-nowrap sm:w-auto shadow-sm !py-1.5 !text-xs"
           >
-            <Plus size={16} />
+            <Plus size={14} />
             Create Expense Report
           </Button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
-            <FileStack size={24} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
+          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
+            <FileStack size={18} />
           </div>
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Reports</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{totalReportsCount}</p>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Total Reports</p>
+            <p className="text-xl font-bold text-gray-900 mt-0.5">{totalReportsCount}</p>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-amber-50 text-amber-600 rounded-lg">
-            <FilePlus2 size={24} />
+        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
+          <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
+            <FilePlus2 size={18} />
           </div>
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Draft Reports</p>
-            <p className="text-2xl font-bold text-amber-600 mt-1">{draftCount}</p>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Draft Reports</p>
+            <p className="text-xl font-bold text-amber-600 mt-0.5">{draftCount}</p>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-green-50 text-green-600 rounded-lg">
-            <Landmark size={24} />
+        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
+          <div className="p-2.5 bg-green-50 text-green-600 rounded-lg">
+            <Landmark size={18} />
           </div>
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Reimbursable</p>
-            <p className="text-2xl font-bold text-green-600 mt-1">{formatAmount(totalReimbursable)}</p>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Total Reimbursable</p>
+            <p className="text-xl font-bold text-green-600 mt-0.5">{formatAmount(totalReimbursable)}</p>
           </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+      <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
           <div className="lg:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-            <SearchInput value={searchTerm} onSearch={handleSearch} placeholder="Search by title or report number..." />
+            <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
+            <SearchInput
+              value={searchTerm}
+              onSearch={handleSearch}
+              placeholder="Search by title or report number..."
+              className="!py-1.5 !px-3 !text-xs"
+            />
           </div>
           <FormSelect
             label="Status"
@@ -395,11 +409,13 @@ export default function MyExpensesPage() {
             value={statusFilter}
             onChange={handleStatusFilterChange}
             options={statusFilterOptions}
+            className="[&>label]:text-xs [&>label]:mb-1"
+            buttonClassName="!py-1.5 !px-3 !text-xs"
           />
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
         {loading ? (
           <div className="py-16">
             <LoadingSpinner text="Loading Expense Reports..." />
@@ -429,7 +445,7 @@ export default function MyExpensesPage() {
           </PageCard>
         ) : (
           <>
-            <div className="w-full overflow-x-auto rounded-lg">
+            <div className="w-full overflow-x-auto rounded-lg [&_td]:!py-1.5 [&_td]:!px-2.5 [&_td]:!text-xs [&_th]:!py-1.5 [&_th]:!px-2.5 [&_th]:!text-xs [&_table]:!text-xs [&_.rounded-full]:!text-[10px] [&_.rounded-full]:!px-1.5 [&_.rounded-full]:!py-0">
               <GenericTable
                 headers={headers}
                 rows={tableRows.map((row, i) => ({ ...row, onRowClick: () => navigate(`/expense-management/expenses/reports/${displayedReports[i].reportId}`) }))}

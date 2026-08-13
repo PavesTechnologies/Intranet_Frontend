@@ -1,5 +1,8 @@
-// Matches the tag set from the reference template — these overlap with the
-// skills already present in the Candidates module's mock role templates.
-export const TALENT_POOL_TAGS = ["React", "Python", "Kubernetes", "SQL", "Figma", "AWS", "Sales", "MLOps"];
+// M13 Normal Talent Pool Search — the spec fixes the candidate list at 6
+// per page; never request more than this.
+export const TALENT_POOL_PAGE_SIZE = 6;
 
-export const TALENT_POOL_RESULT_LIMIT = 12;
+export const TALENT_POOL_SEARCH_MODES = {
+  NORMAL: "NORMAL",
+  SEMANTIC: "SEMANTIC",
+};

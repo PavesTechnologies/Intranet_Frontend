@@ -56,7 +56,7 @@ export default function ResumeIntakePage() {
     setCurrentPage,
     totalPages,
     refreshResumes,
-  } = useResumeIntake();
+  } = useResumeIntake({ enabled: activeListTab === "history" });
 
   const {
     files: inProcessingFiles,
