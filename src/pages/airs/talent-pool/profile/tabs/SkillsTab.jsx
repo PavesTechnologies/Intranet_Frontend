@@ -10,7 +10,9 @@ import { Badge } from "@/components/ui/badge";
 // and that list-click state isn't available.
 export default function SkillsTab({ profile, listSkills }) {
   const hasFullList = Array.isArray(listSkills) && listSkills.length > 0;
-  const skills = hasFullList ? listSkills : profile.performance_summary.top_5_skills || [];
+  const skills = [...(hasFullList ? listSkills : profile.performance_summary.top_5_skills || [])].sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" }),
+  );
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4">

@@ -71,6 +71,13 @@ const STATUS_BADGE = {
 const statusLabel = (s) =>
   s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "—";
 
+// extracted_json's certification/skill entries are sometimes plain strings and
+// sometimes objects (e.g. { name, importance }) depending on the parser
+// version — pull out a renderable label either way instead of passing the
+// raw value (possibly an object) straight into JSX.
+const entryLabel = (entry) =>
+  typeof entry === "string" ? entry : entry?.name || entry?.skill_name || entry?.skill || "";
+
 // Reduce a pipeline-summary payload into the three headline counts the card shows.
 const deriveCampaignStats = (summary) => {
   const stageCount = (key) =>
@@ -1125,7 +1132,7 @@ export default function JdDetails() {
                         <div className="flex flex-wrap gap-1.5">
                           {currentJd.extracted_json.certifications.map((cert, index) => (
                             <span key={index} className="text-[10px] bg-slate-100 border border-slate-200 px-2 py-0.5 rounded font-bold text-slate-700">
-                              {cert}
+                              {entryLabel(cert)}
                             </span>
                           ))}
                         </div>
@@ -1141,7 +1148,7 @@ export default function JdDetails() {
                           <div className="flex flex-wrap gap-1.5">
                             {currentJd.extracted_json.required_skills.map((skill, index) => (
                               <span key={index} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded font-bold">
-                                {skill}
+                                {entryLabel(skill)}
                               </span>
                             ))}
                           </div>
@@ -1155,7 +1162,7 @@ export default function JdDetails() {
                           <div className="flex flex-wrap gap-1.5">
                             {currentJd.extracted_json.preferred_skills.map((skill, index) => (
                               <span key={index} className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded font-bold">
-                                {skill}
+                                {entryLabel(skill)}
                               </span>
                             ))}
                           </div>
