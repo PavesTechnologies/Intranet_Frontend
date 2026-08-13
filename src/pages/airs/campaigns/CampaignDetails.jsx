@@ -7,7 +7,7 @@ import {
   ExternalLink, ListChecks,
   RotateCcw, Inbox, AlertOctagon, Hourglass, PieChart,
   Send, Flag, SkipForward, Lightbulb, FileUp,
-  ArrowRightLeft, Ban
+  ArrowRightLeft, Ban, Download
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
@@ -21,8 +21,11 @@ import { CANDIDATE_PAGE_SIZE } from "../candidates/constants/candidateConstants"
 import EditCampaignModal from "./components/EditCampaignModal";
 import ReopenCampaignModal from "./components/ReopenCampaignModal";
 import CandidateActionModals from "./components/CandidateActionModals";
+import CampaignExportPanel from "./components/CampaignExportPanel";
+import { exportBatchScorecards } from "./services/exportService";
 import { getNoteCounts } from "./services/candidateActionsService";
 import { useAuth } from "../../../contexts/AuthContext";
+import { REJECTION_LAYER_LABELS } from "../constants/scoreLabels";
 import useCampaignPermissions from "./hooks/useCampaignPermissions";
 import {
   getCampaignDetails, getPipelineSummary, getCampaignTimeline,
@@ -61,7 +64,7 @@ export default function CampaignDetails() {
 
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
-  // ?tab=&stage= let the dashboard quick links (M11-E01-S03-T01) land directly
+  // ?tab=&stage= let the dashboard quick links land directly
   // on a stage-filtered candidate list, and make that view bookmarkable.
   const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") || "details");
   const [editOpen, setEditOpen] = useState(false);
@@ -130,6 +133,9 @@ export default function CampaignDetails() {
     { id: "stalled", label: "Stalled", icon: Hourglass, show: canManageCampaigns },
     { id: "rejections", label: "Rejections", icon: PieChart, show: canSeePipeline },
     { id: "timeline", label: "Timeline", icon: Activity, show: canSeeTimeline },
+    // Its own tab rather than scattered buttons, so every export for
+    // this campaign is discoverable in one place.
+    { id: "exports", label: "Exports", icon: Download, show: true },
   ].filter((t) => t.show);
 
   const statusStyle = {
@@ -139,7 +145,7 @@ export default function CampaignDetails() {
   }[status] || "bg-slate-50 text-slate-600 border-slate-200";
 
   return (<div className="bg-[#F8FAFC] text-slate-900 font-sans min-h-screen p-6">
-      {/* M11-E01-S03-T02 — trail back to the dashboard. Campaign name is
+      {/* Trail back to the dashboard. Campaign name is
           truncated to 40 chars per spec; the current page is not a link. */}
       <div className="mb-4">
         <Breadcrumb
@@ -244,6 +250,8 @@ export default function CampaignDetails() {
       )}
       {activeTab === "timeline" && <TimelineTab campaignId={id} />}
 
+      {activeTab === "exports" && <CampaignExportPanel campaignId={id} />}
+
       {canEdit && (<EditCampaignModal
           isOpen={editOpen}
           onClose={() => setEditOpen(false)}
@@ -307,8 +315,8 @@ const STATUS_PILL = {
 // Same palette the rejection-analytics chart uses, so a layer reads as the
 // same colour everywhere in the module.
 const SCORING_LAYERS = [
-  { key: "weight_deterministic", label: "Deterministic", color: "#6366F1" },
-  { key: "weight_semantic", label: "Semantic", color: "#0EA5E9" },
+  { key: "weight_deterministic", label: "Requirements", color: "#6366F1" },
+  { key: "weight_semantic", label: "Relevance", color: "#0EA5E9" },
   { key: "weight_ai", label: "AI", color: "#8B5CF6" },
 ];
 
@@ -468,15 +476,15 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const [loading, setLoading] = useState(true);
   const [starredIds, setStarredIds] = useState(() => new Set());
   const [currentPage, setCurrentPage] = useState(1);
-  // M11-E03-S01 — selected skills, AND-combined server-side. null means "no
+  // Selected skills, AND-combined server-side. null means "no
   // skill filter"; an empty array would mean "matched nothing".
   const [skills, setSkills] = useState([]);
   const [skillMatchIds, setSkillMatchIds] = useState(null);
-  // S02-T02/T03 — experience / education / upload-source live in the resume,
+  // Experience / education / upload-source live in the resume,
   // so they resolve server-side to a set of ids, same as the skill filter.
   const [resumeFilters, setResumeFilters] = useState({});
   const [resumeMatchIds, setResumeMatchIds] = useState(null);
-  // S02-T01 — score range and AI recommendation are already supported by the
+  // Score range and AI recommendation are already supported by the
   // list endpoint; these narrow the rows we fetched, AND-combined with the rest.
   const [scoreFilters, setScoreFilters] = useState({ min: "", max: "", recommendation: "" });
   // E04 — selection for bulk moves, note badges, and the one shared action modal
@@ -486,6 +494,7 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const [reloadKey, setReloadKey] = useState(0);
   const { hasRole } = useAuth();
   const canAct = hasRole(["HR_ADMIN", "RECRUITER"]);
+  const isHRAdminUser = hasRole(["HR_ADMIN"]);
 
   useEffect(() => {
     let cancelled = false;
@@ -549,7 +558,7 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
     return () => { cancelled = true; };
   }, [campaignId, reloadKey]);
 
-  // S01-T03 — one request for the whole list, refreshed whenever the roster
+  // One request for the whole list, refreshed whenever the roster
   // changes. Failure is silent by design: a missing badge must not break rows.
   useEffect(() => {
     let cancelled = false;
@@ -572,14 +581,14 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
     ...c,
     starred: starredIds.has(c.id),
   }));
-  // All active filters are AND-combined (M11-E03-S02-T01): stage from the
+  // All active filters are AND-combined: stage from the
   // funnel/dropdown, skills from the server-side AND search.
   const byId = new Map((candidates || []).map((r) => [r.campaign_candidate_id ?? r.id, r]));
   const list = allCandidates.filter((c) => {
     if (stageFilter && (c.stage || "").toUpperCase() !== stageFilter) return false;
     if (skillMatchIds && !skillMatchIds.has(c.id)) return false;
     if (resumeMatchIds && !resumeMatchIds.has(c.id)) return false;
-    // S02-T01 — composite range, read from the RAW row: the table mapper
+    // Composite range, read from the RAW row: the table mapper
     // coerces a missing composite_score to 0, which would wrongly match a
     // "max 40" filter. An unscored candidate is excluded whenever a bound is
     // set, rather than being treated as a zero.
@@ -631,7 +640,7 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
         )}
       </div>
 
-      {/* M11-E03 — skill search, saved views and share link */}
+      {/* Skill search, saved views and share link */}
       <CandidateFilterBar
         campaignId={campaignId}
         skills={skills}
@@ -645,10 +654,10 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
         }}
       />
 
-      {/* M11-E03-S02-T01 — score range + AI recommendation, AND-combined with
+      {/* Score range + AI recommendation, AND-combined with
           the stage, skill and resume filters above. */}
       <div className="flex flex-wrap items-center gap-2 bg-white border border-slate-200 rounded-xl p-3">
-        <span className="text-[10px] uppercase font-bold text-slate-400">Composite score</span>
+        <span className="text-[10px] uppercase font-bold text-slate-400">Overall score</span>
         <input type="number" min="0" max="100" placeholder="Min" value={scoreFilters.min}
           onChange={(e) => setScoreFilters({ ...scoreFilters, min: e.target.value })}
           className="w-20 px-2 py-1.5 border border-slate-200 rounded-lg text-xs" />
@@ -674,7 +683,7 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
         )}
       </div>
 
-      {/* S03-T02 — the bulk bar only exists while something is selected */}
+      {/* The bulk bar only exists while something is selected */}
       {canAct && selectedIds.size > 0 && (
         <div className="flex flex-wrap items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
           <span className="text-xs font-bold text-indigo-900">
@@ -696,6 +705,29 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
               {["SCREENING", "SHORTLISTED", "HM_REVIEW", "INTERVIEW", "SELECTED", "HOLD", "REJECTED"]
                 .map((s) => <option key={s} value={s}>{stageLabel(s)}</option>)}
             </select>
+            {/* Batch scorecards, HR_ADMIN only and only
+                meaningful for 2+ candidates (the API enforces both). */}
+            {isHRAdminUser && selectedIds.size >= 2 && (
+              <select
+                className="px-2 py-1.5 border border-indigo-200 rounded-lg text-xs bg-white"
+                value=""
+                onChange={async (e) => {
+                  const fmt = e.target.value;
+                  if (!fmt) return;
+                  e.target.value = "";
+                  try {
+                    await exportBatchScorecards(campaignId, [...selectedIds], fmt);
+                    toast.success("Scorecards downloaded.");
+                  } catch (err) {
+                    toast.error(err?.response?.data?.message || "Batch export failed.");
+                  }
+                }}
+              >
+                <option value="">Export scorecards…</option>
+                <option value="PDF">Single PDF</option>
+                <option value="ZIP">ZIP of PDFs</option>
+              </select>
+            )}
             <button type="button" onClick={() => setSelectedIds(new Set())}
               className="text-[11px] text-indigo-700 font-semibold hover:underline">
               Clear
@@ -766,7 +798,7 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
 function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick, canViewTiming }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  // M11-E01-S04-T02 — HR_ADMIN-only overlay, fetched lazily on first toggle so
+  // HR_ADMIN-only overlay, fetched lazily on first toggle so
   // the funnel itself never waits on it.
   const [showTiming, setShowTiming] = useState(false);
   const [timing, setTiming] = useState(null);
@@ -1424,7 +1456,7 @@ function RejectionsTab({ campaignId, jdId, onAdjustThreshold }) {
           {analytics.recommendations.map((rec) => (<div key={rec.condition} className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-100">
               <Lightbulb className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
               <div className="flex-1 text-[11.5px] text-amber-800">
-                <span className="font-bold">{rec.layer} rejection rate {rec.rate_pct}%</span>
+                <span className="font-bold">{REJECTION_LAYER_LABELS[rec.layer] || rec.layer} rejection rate {rec.rate_pct}%</span>
                 {" "}(threshold {rec.threshold_pct}%) — {rec.recommendation}
                 {/* direct action link per recommendation */}
                 <div className="mt-1.5">
@@ -1466,7 +1498,7 @@ function RejectionsTab({ campaignId, jdId, onAdjustThreshold }) {
           const count = analytics.layer_breakdown[layer] || 0;
           return (<div key={layer}>
               <div className="flex justify-between items-center text-xs mb-1">
-                <span className="font-bold text-slate-700">{layer}</span>
+                <span className="font-bold text-slate-700">{REJECTION_LAYER_LABELS[layer] || layer}</span>
                 <span className="font-black text-slate-900 tabular-nums">{count}</span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">

@@ -1,14 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
-import { Globe, Plus, Search, X } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { getSkills } from "../../skill-ontology/services/skillOntologyService";
 import { addTalentPoolCandidateToCampaign } from "../../talent-pool/services/talentPoolService";
 import { crossCampaignSearch, getDashboardCampaigns } from "../services/dashboardService";
 
-// T03 — the add action reuses M13's talent-pool endpoint, which already owns
+// The add action reuses M13's talent-pool endpoint, which already owns
 // resume selection, stage history, audit and re-queuing scoring. Only ACTIVE
 // campaigns are offered because that endpoint refuses anything else.
 function AddToCampaign({ candidateId, campaigns, alreadyIn }) {
@@ -55,7 +55,7 @@ function AddToCampaign({ candidateId, campaigns, alreadyIn }) {
   );
 }
 
-// M11-E03-S04. The skill picker uses the global ontology list rather than the
+// The skill picker uses the global ontology list rather than the
 // campaign-scoped autocomplete — by definition this search isn't tied to one
 // campaign, so scoping suggestions to one would hide valid choices.
 export default function CrossCampaignSearch({ canAdd = false }) {
@@ -129,13 +129,11 @@ export default function CrossCampaignSearch({ canAdd = false }) {
     }
   };
 
+  // No card or title of its own: the surrounding CollapsibleSection supplies
+  // both, and repeating them nests one bordered box inside another.
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-      <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-3">
-        <Globe className="h-4 w-4 text-slate-400" /> Cross-Campaign Candidate Search
-      </h2>
-
-      <div className="flex flex-wrap items-center gap-2 mb-3">
+    <div>
+      <div className="flex flex-wrap items-center gap-2 mb-3 pt-3">
         <div ref={boxRef} className="relative flex-1 min-w-[220px] max-w-[340px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input

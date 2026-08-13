@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { GitCompare, X } from "lucide-react";
+import { X } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { getPipelineSummary } from "../../campaigns/services/campaignservice";
 
-// M11-E01-S04-T03. Deliberately built on the existing per-campaign
+// Deliberately built on the existing per-campaign
 // pipeline-summary endpoint rather than a new compare API: the funnels are
 // already exposed, and 2-4 parallel reads cost less than maintaining a second
 // aggregation path that could drift from the single-campaign funnel.
@@ -81,16 +81,12 @@ export default function CompareCampaigns({ campaigns = [] }) {
   const best = rates.length ? rates.reduce((a, b) => (b.rate > a.rate ? b : a)) : null;
   const mostHm = rates.length ? rates.reduce((a, b) => (b.hmReview > a.hmReview ? b : a)) : null;
 
+  // Card and title come from the surrounding CollapsibleSection.
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-        <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-          <GitCompare className="h-4 w-4 text-slate-400" /> Compare Campaigns
-        </h2>
-        <p className="text-[11px] text-slate-400">
-          Select {MIN}–{MAX} campaigns{selected.length > 0 && ` · ${selected.length} selected`}
-        </p>
-      </div>
+    <div className="pt-3">
+      <p className="text-[11px] text-slate-400 mb-3">
+        Select {MIN}–{MAX} campaigns{selected.length > 0 && ` · ${selected.length} selected`}
+      </p>
 
       <div className="flex flex-wrap gap-1.5 mb-4">
         {campaigns.map((c) => {

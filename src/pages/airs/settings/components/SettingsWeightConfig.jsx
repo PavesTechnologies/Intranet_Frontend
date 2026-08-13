@@ -50,7 +50,7 @@ export default function SettingsWeightConfig() {
 
   const handleSave = async () => {
     if (Math.abs(total - 100) > 0.01) {
-      return toast.error("Deterministic + Semantic + AI weights must sum to 100.");
+      return toast.error("Requirements + Relevance + AI Review weights must sum to 100.");
     }
     setSaving(true);
     try {

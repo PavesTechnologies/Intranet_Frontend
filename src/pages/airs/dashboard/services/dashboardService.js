@@ -50,7 +50,7 @@ export const getStageTiming = async (campaignId) => {
   return response.data?.data || [];
 };
 
-// ── M11-E03-S01 skill search ─────────────────────────────────────────
+// ── skill search ─────────────────────────────────────────
 
 export const getSkillSuggestions = async (campaignId, q, limit = 10) => {
   const response = await api.get(
@@ -72,7 +72,7 @@ export const filterCandidatesBySkills = async (campaignId, skillIds, q = "") => 
   return response.data?.data || { campaign_candidate_ids: [], match_tiers: {}, result_count: 0 };
 };
 
-// ── M11-E03-S02 resume-derived filters ───────────────────────────────
+// ── resume-derived filters ───────────────────────────────
 
 // Returns null when no filter in this family is active, so the caller knows
 // not to intersect (distinct from an empty array meaning "matched nothing").
@@ -110,7 +110,7 @@ export const getCampaignUploaders = async (campaignId) => {
   return response.data?.data || [];
 };
 
-// ── M11-E03-S04 cross-campaign search ────────────────────────────────
+// ── cross-campaign search ────────────────────────────────
 
 // Scope is NOT sent from here — the server derives it from the caller's role,
 // so a recruiter can't widen their reach by tampering with the request.
@@ -135,7 +135,7 @@ export const crossCampaignSearch = async ({
   return response.data?.data || { results: [], result_count: 0 };
 };
 
-// ── M11-E03-S03 saved views ──────────────────────────────────────────
+// ── saved views ──────────────────────────────────────────
 
 export const getSavedViews = async (campaignId) => {
   const response = await api.get(

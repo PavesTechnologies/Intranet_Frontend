@@ -22,8 +22,7 @@ const fmt = (iso) => {
 };
 
 /**
- * M11-E04-S01-T01/T02 — recruiter notes on one candidate.
- *
+ * Recruiter notes on one candidate.
  * Editing and deleting are only offered on your own notes; the server enforces
  * the same rule, so a hidden button is a convenience, not the control.
  */

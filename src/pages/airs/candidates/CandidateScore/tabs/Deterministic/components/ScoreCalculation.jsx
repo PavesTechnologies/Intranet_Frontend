@@ -38,7 +38,7 @@ export default function ScoreCalculation({ scoreCalculation, configuration }) {
         <ScoreBar label="Education Score" value={sc.education_score} weightPct={pct(config.education_weight)} color="#0D9488" />
 
         <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-100 p-3 mt-1">
-          <span className="text-[12px] font-semibold text-slate-600">Final Deterministic Score</span>
+          <span className="text-[12px] font-semibold text-slate-600">Final Requirements Score</span>
           <span className="text-[16px] font-extrabold text-slate-900">
             {isEmpty(sc.final_score) ? "-" : `${Number(sc.final_score).toFixed(2)} / 100`}
           </span>

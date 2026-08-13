@@ -16,7 +16,7 @@ function StatTile({ icon: Icon, label, value }) {
   );
 }
 
-// Deterministic Score tab — Summary card, built directly from
+// Requirements Score tab — Summary card, built directly from
 // deterministic_score_breakdown.summary. A hero ScoreRing + status/threshold
 // on the left, key coverage stats on the right, with a pass/fail accent
 // stripe across the top of the card.
@@ -41,7 +41,7 @@ export default function SummaryCard({ summary }) {
             <ScoreRing value={Math.round(overallScore)} size={68} color={passed ? "#059669" : "#E11D48"} />
             <div>
               <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">
-                Deterministic Score
+                Requirements Score
               </div>
               {renderDeterministicStatusBadge(summary.status)}
               <div className="text-[11.5px] text-slate-500 mt-2">

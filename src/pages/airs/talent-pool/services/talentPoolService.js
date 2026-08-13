@@ -12,7 +12,6 @@ const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 // ?skills=Java&skills=AWS&skills=Python — matching FastAPI's
 // `skills: list[str] = Query(...)`, which only recognizes the exact key
 // `skills` (not `skills[]`) once per value.
-//
 // Axios's DEFAULT array serialization does not produce that: with no
 // paramsSerializer, an array param is sent as `skills[]=Java&skills[]=AWS`
 // (see node_modules/axios/lib/helpers/toFormData.js — options.indexes

@@ -12,7 +12,7 @@ export default function CandidateStats({ stats }) {
         color="bg-blue-50 text-blue-700"
       />
       <KPICard
-        label="Avg. composite score"
+        label="Avg. overall score"
         value={stats.avgComposite}
         suffix="%"
         icon={<TrendingUp className="h-5 w-5 text-purple-600" />}

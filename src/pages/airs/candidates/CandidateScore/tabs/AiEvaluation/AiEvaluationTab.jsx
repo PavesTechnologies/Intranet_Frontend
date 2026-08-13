@@ -5,14 +5,14 @@ import useAiEvaluation from "../../../hooks/useAiEvaluation";
 import AiSummaryCard from "./components/AiSummaryCard";
 import AiInsightsCard from "./components/AiInsightsCard";
 
-// AI Evaluation Score tab — GET /airs/campaign-candidates/{campaign_candidate_id}/ai-evaluation.
+// AI Review Score tab — GET /airs/campaign-candidates/{campaign_candidate_id}/ai-evaluation.
 export default function AiEvaluationTab({ candidate }) {
   const { breakdown, loading, error, refetch } = useAiEvaluation(candidate?.id);
 
   if (loading) {
     return (
       <div className="py-12 flex items-center justify-center">
-        <LoadingSpinner text="Loading AI evaluation..." />
+        <LoadingSpinner text="Loading AI review..." />
       </div>
     );
   }
@@ -20,15 +20,15 @@ export default function AiEvaluationTab({ candidate }) {
   if (error) {
     return (
       <ErrorState
-        title="Couldn't load AI evaluation"
-        message="We couldn't load this candidate's AI evaluation result. Please try again."
+        title="Couldn't load AI review"
+        message="We couldn't load this candidate's AI review result. Please try again."
         onRetry={refetch}
       />
     );
   }
 
   if (!breakdown) {
-    return <ErrorState title="No data available" message="No AI evaluation result found for this candidate." />;
+    return <ErrorState title="No data available" message="No AI review result found for this candidate." />;
   }
 
   return (

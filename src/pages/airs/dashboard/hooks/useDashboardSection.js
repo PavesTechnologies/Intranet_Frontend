@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-// M11-E01-S05-T02/T03: each dashboard section owns its own fetch so a failure
+// Each dashboard section owns its own fetch so a failure
 // in one never blanks the page, and each can be retried independently. This
 // hook is that unit — one instance per section.
 export default function useDashboardSection(fetcher, deps = []) {
