@@ -11,6 +11,7 @@ const ResumeTab = lazy(() => import("./tabs/Resume/ResumeTab"));
 const DeterministicScoreTab = lazy(() => import("./tabs/Deterministic/DeterministicScoreTab"));
 const SemanticScoreTab = lazy(() => import("./tabs/Semantic/SemanticScoreTab"));
 const AiEvaluationTab = lazy(() => import("./tabs/AiEvaluation/AiEvaluationTab"));
+const InterviewTab = lazy(() => import("./tabs/Interview/InterviewTab"));
 const FinalStatusTab = lazy(() => import("./tabs/FinalStatus/FinalStatusTab"));
 
 const TABS = [
@@ -19,6 +20,7 @@ const TABS = [
   { id: "deterministic", label: "Deterministic Score", Component: DeterministicScoreTab },
   { id: "semantic", label: "Semantic Score", Component: SemanticScoreTab },
   { id: "ai", label: "AI Evaluation Score", Component: AiEvaluationTab },
+  { id: "interview", label: "Interview", Component: InterviewTab },
   { id: "finalStatus", label: "Final Status", Component: FinalStatusTab },
 ];
 
