@@ -3,6 +3,7 @@ import { Check, X } from "lucide-react";
 import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
+import Button from "../../../components/Button/Button";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -132,20 +133,26 @@ const CompOffBalanceRequests = ({ managerId }) => {
                                     <td className="p-3 capitalize">{req.status}</td>
                                     <td className="p-3">
                                         <div className="flex justify-center gap-2">
-                                            <button
+                                            <Button
+                                                variant="primary"
+                                                size="icon"
                                                 onClick={() => handleApprove(req.idleaveCompoff)}
                                                 className="text-green-600 hover:text-green-800"
                                                 disabled={loading}
+                                                aria-label="Approve comp-off request"
                                             >
                                                 <Check className="w-4 h-4" />
-                                            </button>
-                                            <button
+                                            </Button>
+                                            <Button
+                                                variant="danger"
+                                                size="icon"
                                                 onClick={() => handleReject(req.idleaveCompoff)}
                                                 className="text-red-600 hover:text-red-800"
                                                 disabled={loading}
+                                                aria-label="Reject comp-off request"
                                             >
                                                 <X className="w-4 h-4" />
-                                            </button>
+                                            </Button>
                                         </div>
                                     </td>
                                 </tr>

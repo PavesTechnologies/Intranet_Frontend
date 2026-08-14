@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { PieChart, Pie, Sector, Cell, ResponsiveContainer } from "recharts";
+import Button from "../../../components/Button/Button";
 
 const LEAVE_THEMES = {
   EARNED_LEAVE:       { from: "#34d399", to: "#059669", bg: "bg-emerald-50",  text: "text-emerald-700",  ring: "ring-emerald-200" },
@@ -136,12 +137,13 @@ export default function LeaveUsageChart({
           <p className="text-[11px] text-gray-400 mt-0.5">{year} Balance</p>
         </div>
         {onViewDetails && (
-          <button
+          <Button
             onClick={onViewDetails}
-            className="text-[11px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors whitespace-nowrap ml-2"
+            variant="link"
+            className="text-[11px] font-medium text-indigo-500 hover:text-indigo-700 ml-2 whitespace-nowrap"
           >
             Details →
-          </button>
+          </Button>
         )}
       </div>
 

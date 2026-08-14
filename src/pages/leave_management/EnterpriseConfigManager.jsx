@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Save, Trash2, X, CheckCircle, AlertCircle, Edit3, Search, Filter, Download, Upload, RefreshCw, ChevronDown } from 'lucide-react';
 import FilterListbox from '../../components/filter/FilterListbox';
+import Button from "../../components/Button/Button";
 
 const EnterpriseConfigManager = () => {
   const [activeTab, setActiveTab] = useState('leave');
@@ -230,14 +231,14 @@ const EnterpriseConfigManager = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button className="px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-lg flex items-center gap-2 transition-all text-sm font-medium">
+              <Button variant="outline" className="px-4 py-2 text-slate-700 hover:bg-slate-100 flex items-center gap-2 text-sm font-medium">
                 <Upload className="w-4 h-4" />
                 Import
-              </button>
-              <button className="px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-lg flex items-center gap-2 transition-all text-sm font-medium">
+              </Button>
+              <Button variant="outline" className="px-4 py-2 text-slate-700 hover:bg-slate-100 flex items-center gap-2 text-sm font-medium">
                 <Download className="w-4 h-4" />
                 Export
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -300,13 +301,14 @@ const EnterpriseConfigManager = () => {
                   </span>
                 </div>
               </div>
-              <button
+              <Button
                 onClick={handleAddNew}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-all shadow-md hover:shadow-lg font-medium"
+                variant="primary"
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 flex items-center gap-2 shadow-md hover:shadow-lg font-medium"
               >
                 <Plus className="w-5 h-5" />
                 Add New Rule
-              </button>
+              </Button>
             </div>
 
             {/* Search Bar */}
@@ -321,9 +323,9 @@ const EnterpriseConfigManager = () => {
                   className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
-              <button className="px-4 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium transition-all">
+              <Button variant="outline" className="px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium">
                 <RefreshCw className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
 
             {/* Table */}
@@ -373,19 +375,24 @@ const EnterpriseConfigManager = () => {
                           })}
                           <td className="px-4 py-4 text-sm">
                             <div className="flex gap-2">
-                              <button
+                              <Button
                                 onClick={() => handleEdit(rule)}
-                                className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md transition-all flex items-center gap-1.5 text-xs font-medium"
+                                variant="outline"
+                                size="sm"
+                                className="bg-blue-100 hover:bg-blue-200 text-blue-700 flex items-center gap-1.5 text-xs font-medium"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
                                 Edit
-                              </button>
-                              <button
+                              </Button>
+                              <Button
                                 onClick={() => handleDelete(id)}
-                                className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-md transition-all flex items-center gap-1.5 text-xs font-medium"
+                                variant="danger"
+                                size="sm"
+                                className="bg-red-100 hover:bg-red-200 text-red-700 flex items-center gap-1.5 text-xs font-medium"
+                                aria-label="Delete"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              </Button>
                             </div>
                           </td>
                         </tr>
@@ -425,9 +432,9 @@ const EnterpriseConfigManager = () => {
                   <p className="text-blue-100 text-sm">{config.title}</p>
                 </div>
               </div>
-              <button onClick={() => { setShowAddModal(false); setEditingRow(null); setFormData({}); }} className="text-white hover:bg-blue-800 rounded-lg p-2 transition-colors">
+              <Button onClick={() => { setShowAddModal(false); setEditingRow(null); setFormData({}); }} variant="ghost" size="icon" aria-label="Close" className="text-white hover:text-white/70">
                 <X className="w-6 h-6" />
-              </button>
+              </Button>
             </div>
 
             <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(90vh-180px)]">
@@ -443,19 +450,21 @@ const EnterpriseConfigManager = () => {
             </div>
 
             <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex justify-end gap-3">
-              <button
+              <Button
                 onClick={() => { setShowAddModal(false); setEditingRow(null); setFormData({}); }}
-                className="px-6 py-2.5 border border-slate-300 rounded-lg text-slate-700 font-semibold hover:bg-slate-100 transition-colors"
+                variant="outline"
+                className="px-6 py-2.5 text-slate-700 font-semibold hover:bg-slate-100"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={editingRow ? handleUpdate : handleSaveNew}
-                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+                variant="primary"
+                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
               >
                 <Save className="w-4 h-4" />
                 {editingRow ? 'Update Rule' : 'Save Rule'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { PencilIcon } from "lucide-react";
 import EditLeaveModal from "./EditLeaveModal";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationModal from "./ConfirmationModal";
+import Button from "../../../components/Button/Button";
 const token = localStorage.getItem("token");
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -151,16 +152,21 @@ const PendingLeaveRequestsTable = ({
                 <td className="p-3 text-center">{leave.reason || "-"}</td>
                 <td className="p-3 text-center">
                   <div className="flex items-center space-x-4 justify-center">
-                    <PencilIcon
-                      className="cursor-pointer text-blue-700 w-4 h-4"
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Edit leave request"
                       onClick={() => handleEdit(leave)}
-                    />
-                    <button
+                    >
+                      <PencilIcon className="text-blue-700 w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="link"
                       className="text-red-500 hover:underline"
                       onClick={() => handleCancel(leave.leaveId)}
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </td>
               </tr>

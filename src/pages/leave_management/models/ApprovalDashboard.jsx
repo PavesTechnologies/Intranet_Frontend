@@ -7,6 +7,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import clearingDesk from "../../../components/icons/clearing-desk_emmv.svg";
 import ConfirmationModal from "./ConfirmationModal";
 import api from "../../../api/axiosInstance";
+import Button from "../../../components/Button/Button";
 
 const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
@@ -242,18 +243,19 @@ const ApprovalDashboard = () => {
                         </div>
                       </div>
                       <div className="flex justify-end space-x-3 pt-2">
-                        <button
+                        <Button
                           onClick={() => confirmRejectModel(request)}
-                          className="px-4 py-2 bg-red-600 text-white font-semibold rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                          variant="danger"
                         >
                           Reject
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={() => confirmApproveModel(request)}
-                          className="px-4 py-2 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                          variant="primary"
+                          className="bg-green-600 hover:bg-green-700 focus:ring-green-500"
                         >
                           Approve
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>

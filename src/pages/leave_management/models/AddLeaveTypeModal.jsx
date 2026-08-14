@@ -329,9 +329,9 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
           </div>
           <Button
             onClick={onClose}
-            variant=""
+            variant="ghost"
             type="button"
-            size="small"
+            size="icon"
             disabled={submitting}
           >
             <X className="w-6 h-6" />

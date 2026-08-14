@@ -1,6 +1,7 @@
 import React, { useState, Fragment } from "react";
 import { Listbox, Transition } from "@headlessui/react";
 import { ChevronDown } from "lucide-react";
+import Button from "../../../components/Button/Button";
 
 export default function CancellationModal({
   title,
@@ -109,27 +110,25 @@ export default function CancellationModal({
 
         {/* Buttons */}
         <div className="flex justify-end space-x-2 mt-5">
-          <button
+          <Button
+            variant="outline"
             onClick={onCancel}
             disabled={isLoading}
-            className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400
-            disabled:opacity-50"
           >
             Cancel
-          </button>
+          </Button>
 
-          <button
+          <Button
+            variant="danger"
             onClick={handleConfirm}
             disabled={
               isLoading ||
               !selectedReason ||
               (isOther && customReason.trim().length === 0)
             }
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700
-            disabled:opacity-50"
           >
             {isLoading ? `${confirmText}ing...` : confirmText}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import beachDay from "../../../components/icons/beach-day_cnsv.svg";
+import Button from "../../../components/Button/Button";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -217,12 +218,13 @@ export default function LeaveDetailsPage() {
               <h1 className="text-2xl font-bold text-gray-800">
                 {displayName || "Leave"} History - {new Date().getFullYear()}
               </h1>
-              <button
+              <Button
                 onClick={() => navigate(-1)}
-                className="text-indigo-600 font-semibold hover:text-indigo-800 transition-colors"
+                variant="link"
+                className="text-indigo-600 font-semibold hover:text-indigo-800"
               >
                 &larr; Back
-              </button>
+              </Button>
             </div>
 
             {/* Render leave requests grouped by month */}

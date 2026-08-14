@@ -12,6 +12,7 @@ import { toast } from "react-toastify";
 import DateRangePicker from "./DateRangePicker";
 import { format } from "date-fns";
 import EditBlockLeaveModal from "./EditBlockLeaveModal";
+import Button from "../../../components/Button/Button";
 
 // Tailwind tokens
 const skeleton = "animate-pulse bg-gray-400 rounded hover:cursor-wait";
@@ -158,13 +159,14 @@ const MultiSelect = ({
               )}
               {selectAll && (
                 <div className="mt-2">
-                  <button
+                  <Button
                     type="button"
                     onClick={handleToggleAll}
+                    variant="link"
                     className="text-xs text-indigo-600 hover:underline dark:text-indigo-400"
                   >
                     {allSelected ? "Clear visible" : "Select all visible"}
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -867,13 +869,16 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
             </p>
           </div>
           <div>
-            <button
+            <Button
               type="button"
               onClick={() => navigate(-1)}
+              variant="ghost"
+              size="icon"
+              aria-label="Go back"
               className="text-blue-600 hover:text-blue-800"
             >
               <ArrowLeftCircleIcon className="mr-2 h-10 w-9" />
-            </button>
+            </Button>
           </div>
         </div>
       </header>
@@ -1019,17 +1024,21 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
                         {/* Actions */}
                         <td className="px-3 py-3 w-40 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <button
+                            <Button
                               type="button"
                               onClick={() => handleOpenEditModal(b)}
+                              variant="outline"
+                              size="sm"
                               className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-700 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             >
                               <PencilSquareIcon className="h-4 w-4 mr-1" /> Edit
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               type="button"
                               onClick={() => unblock(b.id)}
                               disabled={unblockingId === b.id}
+                              variant="danger"
+                              size="sm"
                               className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-red-500 ${
                                 unblockingId === b.id
                                   ? "bg-red-400 cursor-not-allowed"
@@ -1039,7 +1048,7 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
                               {unblockingId === b.id
                                 ? "Unblocking..."
                                 : "Unblock"}
-                            </button>
+                            </Button>
                           </div>
                         </td>
                       </tr>

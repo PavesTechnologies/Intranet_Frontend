@@ -32,6 +32,19 @@ const VARIANT_CLASSES = {
     "bg-transparent shadow-none text-brand-primary hover:underline px-0 py-0",
 };
 
+// size="icon" is a bare icon trigger, not a filled/outlined control — it must
+// never render a background, border, or shadow. Variant is expressed purely
+// as an icon (currentColor) hover-color shift instead of a hover background.
+const ICON_VARIANT_CLASSES = {
+  primary: "bg-transparent text-brand-primary hover:bg-transparent hover:text-brand-primary-hover",
+  secondary: "bg-transparent text-brand-secondary hover:bg-transparent hover:text-brand-secondary-hover",
+  success: "bg-transparent text-emerald-600 hover:bg-transparent hover:text-emerald-500",
+  danger: "bg-transparent text-danger hover:bg-transparent hover:text-danger/80",
+  outline: "bg-transparent border-none text-gray-700 hover:bg-transparent hover:text-gray-900",
+  ghost: "bg-transparent border-none text-gray-700 hover:bg-transparent hover:text-gray-900",
+  link: "bg-transparent border-none text-brand-primary hover:bg-transparent hover:text-brand-primary-hover",
+};
+
 const Spinner = ({ size }) => {
   const spinnerSize = {
     large: "h-4 w-4",
@@ -77,6 +90,10 @@ const Button = ({
 }) => {
   const isDisabled = disabled || loading;
   const resolvedSize = SIZE_ALIASES[size] || size;
+  const isIcon = resolvedSize === "icon";
+  const variantClass = isIcon
+    ? ICON_VARIANT_CLASSES[variant] || ICON_VARIANT_CLASSES.ghost
+    : VARIANT_CLASSES[variant] || VARIANT_CLASSES.primary;
 
   return (
     <button
@@ -84,11 +101,12 @@ const Button = ({
       disabled={isDisabled}
       aria-busy={loading}
       className={classNames(
-        "inline-flex items-center justify-center gap-2 rounded-lg transition duration-200 shadow-sm",
+        "inline-flex items-center justify-center gap-2 rounded-lg transition duration-200",
+        isIcon ? "hover:scale-105" : "shadow-sm",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2",
         Fonts.button,
         SIZE_CLASSES[resolvedSize] || SIZE_CLASSES.medium,
-        VARIANT_CLASSES[variant] || VARIANT_CLASSES.primary,
+        variantClass,
         isDisabled && "opacity-50 cursor-not-allowed pointer-events-none",
         className
       )}

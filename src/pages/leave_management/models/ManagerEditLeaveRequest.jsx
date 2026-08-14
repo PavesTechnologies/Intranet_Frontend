@@ -1055,13 +1055,14 @@ export default function ManagerEditLeaveRequest({
             <p className="text-gray-400 text-xs mt-1">
               Please try again later.
             </p>
-            <button
+            <Button
               type="button"
               onClick={onClose}
+              variant="outline"
               className="mt-5 px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition"
             >
               Close
-            </button>
+            </Button>
           </div>
         )}
 
@@ -1075,13 +1076,16 @@ export default function ManagerEditLeaveRequest({
               Edit Leave Request
             </h2>
           </div>
-          <button
+          <Button
             onClick={handleClose}
+            variant="ghost"
+            size="icon"
+            aria-label="Close"
             className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition rounded-lg p-1.5"
             type="button"
           >
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">

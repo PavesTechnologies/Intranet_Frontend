@@ -5,6 +5,7 @@ import { Check, Plus, ChevronDown, Pencil, Trash2, X } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { toast } from "react-toastify";
 import ConfirmationModal from "./ConfirmationModal";
+import Button from "../../../components/Button/Button";
 import { set } from "date-fns";
 import { is } from "date-fns/locale";
 
@@ -164,12 +165,13 @@ export default function ApprovalRulesPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Approval Rules</h1>
 
-        <button
+        <Button
+          variant="primary"
           onClick={() => openModal()}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl shadow hover:bg-indigo-700 transition"
+          className="flex items-center gap-2 rounded-xl shadow"
         >
           <Plus className="w-5 h-5" /> Add Rule
-        </button>
+        </Button>
       </div>
 
       {/* TABLE */}
@@ -201,19 +203,25 @@ export default function ApprovalRulesPage() {
                 <td className="p-3">{rule.approverType}</td>
 
                 <td className="p-3 flex justify-center gap-3">
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => openModal(rule)}
                     className="text-indigo-600 hover:text-indigo-800"
+                    aria-label="Edit rule"
                   >
                     <Pencil className="w-5 h-5" />
-                  </button>
+                  </Button>
 
-                  <button
+                  <Button
+                    variant="danger"
+                    size="icon"
                     onClick={() => confirmDelete(rule.id)}
                     className="text-red-600 hover:text-red-800"
+                    aria-label="Delete rule"
                   >
                     <Trash2 className="w-5 h-5" />
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -229,12 +237,15 @@ export default function ApprovalRulesPage() {
               <h2 className="text-lg font-semibold text-gray-800">
                 {editingRule ? "Edit Rule" : "Add New Rule"}
               </h2>
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={closeModal}
                 className="text-gray-500 hover:text-gray-700"
+                aria-label="Close"
               >
                 <X size={20} width={20} />
-              </button>
+              </Button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -299,21 +310,22 @@ export default function ApprovalRulesPage() {
 
               {/* Buttons */}
               <div className="flex justify-end gap-4 pt-2">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={closeModal}
-                  className="px-4 py-2 border rounded-lg hover:bg-gray-100"
                 >
                   Cancel
-                </button>
+                </Button>
 
-                <button
+                <Button
                   type="submit"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow"
+                  variant="primary"
+                  className="shadow"
                   disabled={loading}
                 >
                   Save
-                </button>
+                </Button>
               </div>
             </form>
           </div>

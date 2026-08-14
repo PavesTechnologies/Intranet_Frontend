@@ -1,4 +1,5 @@
 import React from "react";
+import Button from "../../../components/Button/Button";
 
 const EffectiveDeactivationDate = ({
   isOpen,
@@ -26,20 +27,20 @@ const EffectiveDeactivationDate = ({
         />
 
         <div className="flex justify-end space-x-2">
-          <button
+          <Button
+            variant="outline"
             onClick={onCancel}
             disabled={isLoading}
-            className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
             onClick={() => onConfirm(effectiveDate)}
             disabled={isLoading || !effectiveDate}  // disabled until a date is chosen
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? `${confirmText}ing...` : confirmText}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from "../../../api/axiosInstance";
 import { X, CheckCircle, XCircle, Loader } from 'lucide-react';
+import Button from "../../../components/Button/Button";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -72,12 +73,15 @@ const LeaveBalanceJobProgress = ({ jobId, onClose }) => {
                     </span>
                 </div>
                 {/* manual close — always visible */}
-                <button
+                <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={onClose}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    aria-label="Close"
+                    className="text-gray-400 hover:text-gray-600"
                 >
                     <X className="w-4 h-4" />
-                </button>
+                </Button>
             </div>
 
             {/* Body */}

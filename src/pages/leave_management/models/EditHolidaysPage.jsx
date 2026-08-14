@@ -11,6 +11,7 @@ import { ArrowLeft } from "lucide-react";
 import { Listbox, Transition } from "@headlessui/react";
 import { Fragment } from "react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
+import Button from "../../../components/Button/Button";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -289,20 +290,26 @@ const EditHolidaysPage = () => {
                       />
                     </td>
                     <td className="px-4 py-2 flex justify-center gap-2">
-                      <button
+                      <Button
+                        variant="primary"
+                        size="icon"
                         onClick={() => handleSaveHoliday(holiday.holidayId)}
-                        className="p-2 text-green-500 hover:text-green-800"
+                        className="text-green-500 hover:text-green-800"
                         title="Save"
+                        aria-label="Save"
                       >
                         <Save size={20} />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
                         onClick={handleCancelEdit}
-                        className="p-2 text-red-500 hover:text-red-700"
+                        className="text-red-500 hover:text-red-700"
                         title="Cancel"
+                        aria-label="Cancel"
                       >
                         <XCircle size={20} />
-                      </button>
+                      </Button>
                     </td>
                   </>
                 ) : (
@@ -322,9 +329,11 @@ const EditHolidaysPage = () => {
                       {holiday.country ? holiday.country : "-"}
                     </td>
                     <td className="px-4 py-2 flex justify-center gap-2">
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleEditClick(holiday)}
-                        className={`p-2 text-blue-600  ${
+                        className={`text-blue-600  ${
                           holiday.isActive
                             ? "hover:text-blue-800"
                             : "text-opacity-15 cursor-not-allowed"
@@ -334,15 +343,18 @@ const EditHolidaysPage = () => {
                             ? "Edit"
                             : "This holiday cannot be edited."
                         }
+                        aria-label="Edit"
                         disabled={!holiday.isActive}
                       >
                         <Edit size={20} />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="icon"
                         onClick={() =>
                           handleDeleteConfirmation(holiday.holidayId)
                         }
-                        className={`p-2 text-red-600  ${
+                        className={`text-red-600  ${
                           holiday.isActive
                             ? "hover:text-red-800"
                             : "text-opacity-15 cursor-not-allowed"
@@ -352,10 +364,11 @@ const EditHolidaysPage = () => {
                             ? "Delete"
                             : "This holiday cannot be deleted."
                         }
+                        aria-label="Delete"
                         disabled={!holiday.isActive}
                       >
                         <Trash2 size={20} />
-                      </button>
+                      </Button>
                     </td>
                   </>
                 )}

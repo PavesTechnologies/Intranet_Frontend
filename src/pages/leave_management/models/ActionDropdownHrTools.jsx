@@ -1,7 +1,8 @@
 import React from "react";
 import { MoreVertical, Pencil, Trash } from "lucide-react";
 import { useState, useEffect, useRef} from "react";
- 
+import Button from "../../../components/Button/Button";
+
 const ActionDropdown = ({ onEdit, onDelete }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -41,9 +42,9 @@ const ActionDropdown = ({ onEdit, onDelete }) => {
  
   return (
     <div className="relative inline-block text-left" ref={dropdownRef}>
-      <button onClick={() => setIsOpen(!isOpen)}>
+      <Button onClick={() => setIsOpen(!isOpen)} variant="ghost" size="icon" aria-label="Open actions menu">
         <MoreVertical className="w-5 h-5 cursor-pointer" />
-      </button>
+      </Button>
  
       {isOpen && (
         <div className="absolute right-0 z-10 mt-2 w-36 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5">

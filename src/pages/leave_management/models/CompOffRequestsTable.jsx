@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import ConfirmationModal from "./ConfirmationModal";
 import Pagination from "../../../components/Pagination/pagination";
+import Button from "../../../components/Button/Button";
 
 const CompOffRequestsTable = ({ requests, onCancel, loading }) => {
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
@@ -88,12 +89,14 @@ const CompOffRequestsTable = ({ requests, onCancel, loading }) => {
                 <td className="p-3">{req.duration}</td>
                 <td className="p-3">{req.status}</td>
                 <td className="p-3">
-                  <button
+                  <Button
+                    variant="link"
                     onClick={() => handleCancelClick(req.idleaveCompoff)}
-                    className="text-red-600 hover:underline text-sm font-medium"
+                    className="text-red-600 hover:underline"
+                    aria-label="Cancel comp-off request"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}

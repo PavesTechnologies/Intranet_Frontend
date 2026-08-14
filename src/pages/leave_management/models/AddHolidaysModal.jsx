@@ -261,12 +261,15 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
               {holidays.length > 0 ? `${holidays.length} holiday(s) queued` : "Fill in details and add to the list"}
             </p>
           </div>
-          <button
+          <Button
             onClick={onClose}
-            className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all"
+            variant="ghost"
+            size="icon"
+            aria-label="Close"
+            className="text-white/70 hover:text-white transition-all"
           >
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         {/* Scrollable body */}
@@ -397,14 +400,16 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
             </div>
             <p className="text-xs text-gray-400 mb-3">Download the template, fill it in, then upload.</p>
             <div className="flex flex-wrap gap-3">
-              <button
+              <Button
                 onClick={handleDownloadTemplate}
                 disabled={downloading}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-indigo-600 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors disabled:opacity-50"
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 text-indigo-600 border-indigo-200 bg-indigo-50 hover:bg-indigo-100"
               >
                 <Download className="w-3.5 h-3.5" />
                 {downloading ? "Downloading..." : "Download Template"}
-              </button>
+              </Button>
 
               <input
                 ref={fileInputRef}
@@ -413,14 +418,16 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
                 className="hidden"
                 onChange={handleFileUpload}
               />
-              <button
+              <Button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-emerald-600 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors disabled:opacity-50"
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 text-emerald-600 border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
               >
                 <Upload className="w-3.5 h-3.5" />
                 {uploading ? "Processing..." : "Upload Excel"}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -450,12 +457,15 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${TYPE_BADGE[h.type] ?? "bg-gray-100 text-gray-600"}`}>
                       {h.type}
                     </span>
-                    <button
+                    <Button
                       onClick={() => handleRemoveHoliday(h.id)}
+                      variant="danger"
+                      size="icon"
+                      aria-label="Remove holiday"
                       className="flex-shrink-0 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ul>

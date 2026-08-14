@@ -3,6 +3,7 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
 import DateRangePicker from "./DateRangePicker";
+import Button from "../../../components/Button/Button";
 
 export default function EditBlockLeaveModal({
   isOpen,
@@ -230,9 +231,9 @@ export default function EditBlockLeaveModal({
                 Edit Leave Block –{" "}
                 <span className="text-indigo-600">{block.projectName}</span>
               </h2>
-              <button onClick={onClose}>
+              <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
                 <XMarkIcon className="h-6 w-6 text-gray-500 hover:text-gray-700" />
-              </button>
+              </Button>
             </div>
 
             {/* Body */}
@@ -417,20 +418,20 @@ export default function EditBlockLeaveModal({
 
             {/* Footer */}
             <div className="flex justify-end gap-2 border-t bg-gray-50 px-6 py-4">
-              <button
+              <Button
+                variant="outline"
                 onClick={onClose}
                 disabled={submitting}
-                className="px-4 py-2 rounded-md border text-gray-700 bg-white hover:bg-gray-100"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
                 onClick={handleSaveClick}
                 disabled={submitting}
-                className="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400"
               >
                 {submitting ? "Saving..." : "Save Changes"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

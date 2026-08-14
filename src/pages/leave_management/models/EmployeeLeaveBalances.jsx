@@ -425,16 +425,19 @@ const EmployeeLeaveBalances = () => {
           )}
 
           {searchQuery && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => {
                 setSearchQuery("");
                 setDebouncedQuery("");
                 setSuggestions([]);
               }}
               className="absolute right-2 top-2 text-gray-500 hover:text-black"
+              aria-label="Clear search"
             >
               ✕
-            </button>
+            </Button>
           )}
         </div>
 
@@ -484,13 +487,16 @@ const EmployeeLeaveBalances = () => {
                 employeeId: emp.employeeId,
                 employeeName: emp.employeeName,
                 actions: (
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => handleEdit(emp)}
                     className="text-blue-600 hover:text-blue-800"
                     title="Edit"
+                    aria-label="Edit"
                   >
                     <Pencil size={16}></Pencil>
-                  </button>
+                  </Button>
                 ),
               };
               leaveTypes.forEach(({ leaveTypeName, leaveTypeId }) => {
@@ -608,20 +614,21 @@ const EmployeeLeaveBalances = () => {
             </div>
 
             <div className="mt-8 flex justify-end gap-4">
-              <button
+              <Button
+                variant="outline"
                 onClick={() => setIsEditModalOpen(false)}
                 disabled={isSubmitting}
-                className="bg-gray-500 text-white px-5 py-2 rounded hover:bg-gray-600 disabled:opacity-50"
+                className="bg-gray-500 text-white hover:bg-gray-600"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
               >
                 {isSubmitting ? "Submitting..." : "Submit"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

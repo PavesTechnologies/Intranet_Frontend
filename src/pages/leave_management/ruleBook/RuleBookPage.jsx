@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import api from "../../../api/axiosInstance";
 import FilterListbox from "../../../components/filter/FilterListbox";
+import Button from "../../../components/Button/Button";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const SECOND_URL = "/api/workflow/admin";
@@ -199,12 +200,13 @@ const RuleBookPage = () => {
             Rule Book Configuration
           </h1>
           {editing && (
-            <button
+            <Button
               onClick={handleResetForm}
+              variant="link"
               className="text-sm text-gray-500 hover:text-indigo-600"
             >
               ✖ Cancel Edit
-            </button>
+            </Button>
           )}
         </div>
 
@@ -226,12 +228,14 @@ const RuleBookPage = () => {
             </div>
 
             {!showAddActionType ? (
-              <button
+              <Button
                 onClick={() => setShowAddActionType(true)}
+                variant="primary"
+                size="sm"
                 className="bg-indigo-500 text-white px-3 py-2 rounded-md hover:bg-indigo-600"
               >
                 + Add New
-              </button>
+              </Button>
             ) : (
               <div className="flex gap-2">
                 <input
@@ -241,18 +245,21 @@ const RuleBookPage = () => {
                   placeholder="Enter new action type"
                   className="border border-gray-300 rounded-md px-3 py-2 w-48"
                 />
-                <button
+                <Button
                   onClick={handleAddActionType}
-                  className="bg-green-500 text-white px-3 py-2 rounded-md hover:bg-green-600"
+                  variant="primary"
+                  size="sm"
+                  className="bg-green-500 hover:bg-green-600"
                 >
                   Save
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => setShowAddActionType(false)}
+                  variant="link"
                   className="text-gray-500 hover:text-red-500 font-medium"
                 >
                   ✖
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -278,12 +285,14 @@ const RuleBookPage = () => {
         <div>
           <div className="flex justify-between items-center mb-2">
             <h2 className="text-lg font-medium text-gray-700">Conditions</h2>
-            <button
+            <Button
               onClick={handleAddCondition}
+              variant="primary"
+              size="sm"
               className="bg-indigo-500 text-white px-3 py-1 rounded-md hover:bg-indigo-600"
             >
               + Add Condition
-            </button>
+            </Button>
           </div>
 
           {newRule.conditions.length === 0 ? (
@@ -341,12 +350,14 @@ const RuleBookPage = () => {
             <h2 className="text-lg font-medium text-gray-700">
               Approval Steps
             </h2>
-            <button
+            <Button
               onClick={handleAddStep}
-              className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600"
+              variant="primary"
+              size="sm"
+              className="bg-green-500 hover:bg-green-600"
             >
               + Add Step
-            </button>
+            </Button>
           </div>
 
           {newRule.approvalSteps.length === 0 ? (
@@ -415,12 +426,13 @@ const RuleBookPage = () => {
 
         {/* Save / Update */}
         <div className="text-right">
-          <button
+          <Button
             onClick={handleSaveRule}
+            variant="primary"
             className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 transition-all"
           >
             {editing ? "Update Rule" : "Save Rule"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -476,18 +488,22 @@ const RuleBookPage = () => {
                     </td>
                     <td className="p-3 border text-center">
                       <div className="flex justify-center gap-3">
-                        <button
+                        <Button
                           onClick={() => handleEditRule(rule)}
-                          className="px-3 py-1 text-indigo-600 border border-indigo-500 rounded hover:bg-indigo-50 transition"
+                          variant="outline"
+                          size="sm"
+                          className="text-indigo-600 border-indigo-500 hover:bg-indigo-50"
                         >
                           Edit
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={() => handleDeleteRule(rule.id)}
-                          className="px-3 py-1 text-red-600 border border-red-500 rounded hover:bg-red-50 transition"
+                          variant="danger"
+                          size="sm"
+                          className="text-red-600 border-red-500 hover:bg-red-50"
                         >
                           Delete
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>

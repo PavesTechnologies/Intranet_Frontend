@@ -3,6 +3,7 @@ import { Check, X } from "lucide-react";
 import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import Button from "../../../components/Button/Button";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
@@ -148,26 +149,32 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
                   </td>
                   <td className="p-3">{req.reason}</td>
                   <td className="p-3 flex justify-center gap-2">
-                    <button
+                    <Button
                       onClick={() =>
                         handleApprove(req.revokeId, req.employeeId, req.year)
                       }
+                      variant="primary"
+                      size="icon"
+                      aria-label="Approve"
                       className="p-1 pr-2 text-green-600 hover:text-green-800 transition-colors"
                       title="Approve"
                       disabled={loading}
                     >
                       <Check className="w-4 h-4" />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() =>
                         handleReject(req.revokeId, req.employeeId, req.year)
                       }
+                      variant="danger"
+                      size="icon"
+                      aria-label="Reject"
                       className="p-1 pl-4 text-red-600 hover:text-red-800 transition-colors"
                       title="Reject"
                       disabled={loading}
                     >
                       <X className="w-4 h-4" />
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}

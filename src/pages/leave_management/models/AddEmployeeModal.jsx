@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { X, User } from "lucide-react";
 import api from "../../../api/axiosInstance";
 import FilterListbox from "../../../components/filter/FilterListbox";
+import Button from "../../../components/Button/Button";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -108,13 +109,16 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
               Add New Employee
             </h2>
           </div>
-          <button
+          <Button
             onClick={onClose}
+            variant="ghost"
+            size="icon"
+            aria-label="Close"
             className="text-gray-400 hover:text-gray-600"
             type="button"
           >
             <X className="w-6 h-6" />
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5">
@@ -249,21 +253,23 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200">
-            <button
+            <Button
               type="button"
               onClick={onClose}
-              className="btn bg-white text-gray-800 border border-gray-300 hover:bg-gray-100"
+              variant="outline"
+              className="bg-white text-gray-800 border border-gray-300 hover:bg-gray-100"
               disabled={loading}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="btn bg-indigo-600 text-white hover:bg-indigo-700"
+              variant="primary"
+              className="bg-indigo-600 text-white hover:bg-indigo-700"
               disabled={loading}
             >
               {loading ? "Adding..." : "Add Employee"}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

@@ -271,12 +271,13 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
       <div className="flex flex-col">
         <span className="text-gray-700 whitespace-pre-wrap">{displayText}</span>
         {isLong && (
-          <button
+          <Button
+            variant="link"
             onClick={() => setExpanded(!expanded)}
-            className="text-blue-600 text-xs hover:underline self-start"
+            className="text-xs self-start"
           >
             {expanded ? "View Less" : "View More"}
-          </button>
+          </Button>
         )}
       </div>
     );
@@ -599,7 +600,9 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                     </span>
 
                     {/* ✅ Accept All */}
-                    <button
+                    <Button
+                      variant="primary"
+                      size="sm"
                       onClick={handleAcceptAll} //{canApprove ? handleAcceptAll : undefined}
                       disabled={selectedRequests.length === 0} //{!canApprove || selectedRequests.length === 0}
                       // title={
@@ -614,14 +617,15 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                       //     ? "bg-green-600 hover:bg-green-700 text-white cursor-pointer"
                       //     : "bg-gray-300 text-gray-500 cursor-not-allowed"
                       // }`}
-                      className={`px-3 py-1 rounded-md transition
-                      ${"bg-green-600 hover:bg-green-700 text-white cursor-pointer"}`}
+                      className="bg-green-600 hover:bg-green-700 text-white"
                     >
                       Approve
-                    </button>
+                    </Button>
 
                     {/* ❌ Reject All */}
-                    <button
+                    <Button
+                      variant="danger"
+                      size="sm"
                       onClick={handleRejectAll} //{canReject ? handleRejectAll : undefined}
                       disabled={selectedRequests.length === 0} //{!canReject || selectedRequests.length === 0}
                       // title={
@@ -636,23 +640,23 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                       //     ? "bg-red-600 hover:bg-red-700 text-white cursor-pointer"
                       //     : "bg-gray-300 text-gray-500 cursor-not-allowed"
                       // }`}
-                      className={`px-3 py-1 rounded-md transition
-                      ${"bg-red-600 hover:bg-red-700 text-white cursor-pointer"}`}
+                      className="bg-red-600 hover:bg-red-700 text-white"
                     >
                       Reject
-                    </button>
+                    </Button>
 
                     {/* 🧹 Clear Selection */}
-                    <button
+                    <Button
+                      variant="link"
                       onClick={() => {
                         setSelectedRequests([]);
                         setSelectedResourceId([]);
                       }}
-                      className="ml-auto px-2 py-1 text-indigo-600 hover:text-indigo-900 font-semibold transition"
+                      className="ml-auto"
                       title="Clear Selection"
                     >
                       ✕
-                    </button>
+                    </Button>
                   </div>
                 </th>
               </tr>
@@ -798,7 +802,8 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                       />
                     </td>
                     <td className="cursor-pointer text-blue-600 hover:underline sticky left-[4.5%] z-10 bg-white">
-                      <button
+                      <Button
+                        variant="link"
                         onClick={() =>
                           setLeaveBalaceModel({
                             employeeId: request.employeeId,
@@ -811,7 +816,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                         {/* <div className="text-gray-500 text-ellipsis whitespace-nowrap overflow-hidden max-w-[100px]">
                           {request.jobTitle}
                         </div> */}
-                      </button>
+                      </Button>
                     </td>
                     {/* ... other <td> cells for your data ... */}
                     <td className="px-6 py-4">
@@ -927,7 +932,9 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                         {request.status.toLowerCase() === "pending" && (
                           <>
                             {/* ✅ Approve Button */}
-                            <button
+                            <Button
+                              variant="primary"
+                              size="icon"
                               // title={
                               //   canApprove
                               //     ? "Approve"
@@ -939,7 +946,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                               //     ? "text-green-600 hover:text-green-800"
                               //     : "text-gray-400 cursor-not-allowed"
                               // } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              className={`p-1 transition-colors ${"text-green-600 hover:text-green-800"}`}
+                              className="text-green-600 hover:text-green-800"
                               onClick={() =>
                                 //canApprove &&
                                 setConfirmation({
@@ -953,10 +960,12 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                               disabled={loading} //{loading || !canApprove}
                             >
                               <Check className="w-4 h-4" />
-                            </button>
+                            </Button>
 
                             {/* ❌ Reject Button */}
-                            <button
+                            <Button
+                              variant="danger"
+                              size="icon"
                               // title={
                               //   canReject
                               //     ? "Reject"
@@ -968,7 +977,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                               //     ? "text-red-600 hover:text-red-800"
                               //     : "text-gray-400 cursor-not-allowed"
                               // } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              className="p-1 transition-colors text-red-600 hover:text-red-800"
+                              className="text-red-600 hover:text-red-800"
                               onClick={() =>
                                 //canReject &&
                                 setConfirmation({
@@ -982,10 +991,12 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                               disabled={loading} //{loading || !canReject}
                             >
                               <X className="w-4 h-4" />
-                            </button>
+                            </Button>
 
                             {/* ✏️ Edit Button */}
-                            <button
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               // title={
                               //   canEdit
                               //     ? "Edit"
@@ -1003,16 +1014,18 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                               //     ? "text-blue-600 hover:text-blue-800"
                               //     : "text-gray-400 cursor-not-allowed"
                               // } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              className="p-1 transition-colors text-blue-600 hover:text-blue-800"
+                              className="text-blue-600 hover:text-blue-800"
                             >
                               <Pencil className="w-4 h-4" />
-                            </button>
+                            </Button>
                           </>
                         )}
                         {request.status.toLowerCase() === "approved" && (
-                          <button
+                          <Button
+                            variant="danger"
+                            size="icon"
                             title="Cancel Approved Leave"
-                            className="p-1 text-yellow-600 hover:text-yellow-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="text-yellow-600 hover:text-yellow-800"
                             onClick={() =>
                               setConfirmation({
                                 action: "cancel",
@@ -1023,7 +1036,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                             disabled={loading}
                           >
                             <XCircle className="w-6 h-6" />
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </td>

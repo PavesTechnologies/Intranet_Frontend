@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import ConfirmationModal from "./ConfirmationModal";
 import { toast } from "react-toastify";
+import Button from "../../../components/Button/Button";
 
 const CONFIGS = {
   accrual: {
@@ -98,12 +99,15 @@ const LeaveUploadWizard = ({ onClose }) => {
               : "Choose the type of leave balance to update"}
           </p>
         </div>
-        <button
+        <Button
           onClick={onClose}
+          variant="ghost"
+          size="icon"
+          aria-label="Close"
           className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-400"
         >
           <X className="h-5 w-5" />
-        </button>
+        </Button>
       </div>
 
       <div className="p-8">
@@ -175,13 +179,14 @@ const LeaveUploadWizard = ({ onClose }) => {
                   Download Template
                 </h3>
               </div>
-              <button
+              <Button
                 onClick={handleDownloadTemplate}
-                className="flex items-center justify-center w-full gap-2 py-3 px-4 border-2 border-blue-100 text-blue-600 rounded-xl hover:bg-blue-50 hover:border-blue-200 transition-all font-medium text-sm"
+                variant="outline"
+                className="w-full gap-2 py-3 px-4 border-2 border-blue-100 text-blue-600 rounded-xl hover:bg-blue-50 hover:border-blue-200 transition-all font-medium text-sm"
               >
                 <Download className="h-4 w-4" />
                 Download {config.fileName}
-              </button>
+              </Button>
             </div>
 
             {/* Step 3: Upload */}
@@ -228,12 +233,15 @@ const LeaveUploadWizard = ({ onClose }) => {
                       Ready for sync
                     </p>
                   </div>
-                  <button
+                  <Button
                     onClick={handleRemoveFile}
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Remove file"
                     className="p-1.5 hover:bg-green-100 rounded-md text-green-700"
                   >
                     <X className="h-4 w-4" />
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -243,15 +251,17 @@ const LeaveUploadWizard = ({ onClose }) => {
 
       {/* Footer */}
       <div className="px-8 py-6 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
-        <button
+        <Button
           onClick={onClose}
+          variant="outline"
           className="px-6 py-2.5 text-sm font-semibold text-gray-500 hover:text-gray-700"
         >
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setShowConfirm(true)}
           disabled={!file || isUploading}
+          variant="primary"
           className={`flex items-center gap-2 px-8 py-2.5 text-sm font-bold rounded-xl transition-all shadow-md ${
             !file || isUploading
               ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
@@ -259,7 +269,7 @@ const LeaveUploadWizard = ({ onClose }) => {
           }`}
         >
           {isUploading ? "Processing..." : "Sync Data"}
-        </button>
+        </Button>
       </div>
 
       {showConfirm && (

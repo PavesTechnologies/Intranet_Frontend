@@ -504,13 +504,14 @@ export default function EditLeaveModal({
             <p className="text-gray-400 text-xs mt-1">
               Please try again later.
             </p>
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={onClose}
-              className="mt-5 px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition"
+              className="mt-5"
             >
               Close
-            </button>
+            </Button>
           </div>
         )}
 
@@ -524,14 +525,16 @@ export default function EditLeaveModal({
               Edit Leave Request
             </h2>
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors rounded-lg p-1.5"
+            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100"
             type="button"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handleUpdate} className="px-5 py-4 space-y-4">

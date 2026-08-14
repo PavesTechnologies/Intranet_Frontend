@@ -9,6 +9,7 @@ import CancellationModal from "./CancellationModal";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 import { get } from "react-hook-form";
 import FilterListbox from "../../../components/filter/FilterListbox";
+import Button from "../../../components/Button/Button";
 
 const MONTHS = [
   { value: "", label: "All Months" },
@@ -364,9 +365,15 @@ const LeaveHistory = ({ employeeId, year }) => {
                   </td>
                   <td className="p-3">
                     {leave.status === "APPROVED" && (
-                      <button onClick={() => handleModalOpen(leave.leaveId)}>
-                        <XCircle className="text-orange-500 hover:text-orange-700" />
-                      </button>
+                      <Button
+                        variant="danger"
+                        size="icon"
+                        onClick={() => handleModalOpen(leave.leaveId)}
+                        aria-label="Cancel approved leave"
+                        className="bg-transparent shadow-none text-orange-500 hover:text-orange-700 hover:bg-orange-50"
+                      >
+                        <XCircle className="w-5 h-5" />
+                      </Button>
                     )}
                   </td>
                 </tr>

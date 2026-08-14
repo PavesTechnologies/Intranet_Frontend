@@ -12,6 +12,7 @@ import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import DateRangePicker from "./DateRangePicker";
 import { format } from "date-fns";
+import Button from "../../../components/Button/Button";
 
 const skeleton = "animate-pulse bg-gray-400 rounded hover:cursor-wait";
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
@@ -152,13 +153,14 @@ const MultiSelect = ({
               )}
               {selectAll && (
                 <div className="mt-2">
-                  <button
+                  <Button
                     type="button"
+                    variant="link"
                     onClick={handleToggleAll}
                     className="text-xs text-indigo-600 hover:underline dark:text-indigo-400"
                   >
                     {allSelected ? "Clear visible" : "Select all visible"}
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -480,13 +482,16 @@ export default function BlockLeaveDates({ employeeId }) {
               </p>
             </div>
             <div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => navigate(-1)}
                 className="text-blue-600 hover:text-blue-800"
+                aria-label="Go back"
               >
                 <ArrowLeftCircleIcon className="mr-2 h-10 w-9" />
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -631,8 +636,9 @@ export default function BlockLeaveDates({ employeeId }) {
               </div>
 
               <div className="flex justify-end gap-3 border-t border-gray-200 dark:border-gray-800  px-6 py-4 rounded-b-xl">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => {
                     setBlockAllMembers(false);
                     setSelectedMembers([]);
@@ -641,21 +647,17 @@ export default function BlockLeaveDates({ employeeId }) {
                     setEndDate("");
                     setReason("");
                   }}
-                  className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-700 bg-white  px-4 py-2 text-sm font-medium text-gray-700 dark:text-blue-500 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="dark:text-blue-500"
                 >
                   Clear
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
+                  variant="primary"
                   disabled={!canSubmit || submitting}
-                  className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                    !canSubmit || submitting
-                      ? "bg-indigo-400 cursor-not-allowed"
-                      : "bg-indigo-600 hover:bg-indigo-700"
-                  }`}
                 >
                   {submitting ? "Saving..." : "Block leave"}
-                </button>
+                </Button>
               </div>
             </form>
           </section>

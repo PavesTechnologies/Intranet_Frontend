@@ -17,7 +17,15 @@
       "Bash(grep -Hm1 ^description: /c/Users/Rangaswamy.Dama/Downloads/Intranet_Frontend/.claude/skills/*/SKILL.md)",
       "Bash(ls /c/Users/Rangaswamy.Dama/Downloads/Intranet_Frontend/.claude/skills)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5173/ --max-time 3)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:5173/src/pages/airs/candidates/CandidateScore/tabs/Resume/ResumeTab.jsx\" --max-time 5)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:5173/src/pages/airs/candidates/CandidateScore/tabs/Resume/ResumeTab.jsx\" --max-time 5)",
+      "Bash(cd \"c:\\\\Users\\\\Sathwik.Perka\\\\Desktop\\\\fe\\\\Intranet_Frontend\" && grep -n \"tailwind\\\\|lucide\\\\|headlessui\\\\|radix\\\\|class-variance\\\\|clsx\\\\|classnames\\\\|react-select\\\\|heroicons\\\\|react-icons\\\\|framer-motion\\\\|@dnd-kit\\\\|antd\" package.json *)",
+      "Bash(npm run *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git rm *)",
+      "Bash(rm -f docs/ui/phase-1-implementation-log.md)",
+      "Bash(git check-ignore *)",
+      "Bash(git fetch *)"
     ]
   }
 }

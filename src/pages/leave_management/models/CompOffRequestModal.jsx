@@ -144,14 +144,16 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
               Submit compensatory leave request
             </p>
           </div>
-          <button
+          <Button
             onClick={onClose}
             type="button"
+            variant="ghost"
+            size="icon"
             aria-label="Close"
-            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full"
           >
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
 
         {/* Body */}
@@ -284,14 +286,14 @@ const CompOffRequestModal = ({ onSuccess, onSubmit, onClose, loading }) => {
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
-          <button
+          <Button
             onClick={onClose}
             disabled={loading}
             type="button"
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            variant="outline"
           >
             Cancel
-          </button>
+          </Button>
           <Button
             onClick={handleSubmit}
             variant="primary"

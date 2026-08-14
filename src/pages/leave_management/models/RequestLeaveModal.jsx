@@ -496,7 +496,8 @@ export default function RequestLeaveModal({
             <h2 className="text-xl font-bold text-gray-900">Request Leave</h2>
             <Button
               onClick={onClose}
-              variant=" hover:bg-accent hover:text-accent-foreground hover:bg-gray-200 "
+              variant="ghost"
+              className="hover:bg-accent hover:text-accent-foreground hover:bg-gray-200"
               type="button"
               aria-label="Close"
               size="icon"

@@ -487,20 +487,26 @@ const LeaveTable = ({ title, data, onEdit, onDelete }) => {
 
                   <td className={`px-4 py-3 sticky right-0 ${stickyBgClass} group-hover:bg-[#eff6ff] z-10 border-l border-gray-100 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]`}>
                     <div className="flex justify-center gap-3">
-                      <button
+                      <Button
                         onClick={() => onEdit(row)}
-                        className="text-indigo-700 hover:text-indigo-900 transition-colors"
+                        variant="ghost"
+                        size="icon"
+                        className="text-indigo-700 hover:text-indigo-900"
                         title="Edit"
+                        aria-label="Edit"
                       >
                         <Pencil size={16} />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => onDelete(row.leaveTypeId)}
-                        className="text-red-700 hover:text-red-800 transition-colors"
+                        variant="danger"
+                        size="icon"
+                        className="text-red-700 hover:text-red-800"
                         title="Delete"
+                        aria-label="Delete"
                       >
                         <Trash2 size={16} />
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>
