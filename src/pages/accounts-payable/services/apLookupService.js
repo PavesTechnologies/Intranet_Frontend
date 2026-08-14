@@ -36,6 +36,14 @@ export const apLookupService = {
     return res.data;
   },
 
+  getPaymentStatuses: async () => {
+    const res = await api.get(`${BASE}/system/status`, {
+      params: { module_name: "PAYMENT" },
+      headers: authHeaders(),
+    });
+    return res.data;
+  },
+
   getGstinDetails: async (gstin) => {
     const res = await api.get(`${BASE}/system/gstin/${encodeURIComponent(gstin)}`, {
       headers: authHeaders(),

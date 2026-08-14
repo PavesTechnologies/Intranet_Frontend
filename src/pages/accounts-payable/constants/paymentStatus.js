@@ -1,13 +1,14 @@
-import { INVOICE_STATUS } from "./invoiceStatus";
-
 /**
- * A "payment status" is a view over the tail end of the invoice pipeline, re-exported here
- * (not redefined) so the Payments feature has its own import path without duplicating —
- * and risking drift from — the underlying status strings owned by invoiceStatus.js.
+ * Payment record statuses — exact `status_code` values from the backend's status_master
+ * (module_name = PAYMENT), set via PATCH /apm/payment/{id}/status. A Payment and the invoice(s)
+ * it's allocated against are separate backend entities with independent status lifecycles, so
+ * these are defined on their own rather than re-exported from invoiceStatus.js.
  */
 export const PAYMENT_STATUS = {
-  READY_FOR_PAYMENT: INVOICE_STATUS.READY_FOR_PAYMENT,
-  PAID: INVOICE_STATUS.PAID,
+  SCHEDULED: "Scheduled",
+  SENT: "Sent",
+  CLEARED: "Cleared",
+  FAILED: "Failed",
 };
 
 export const PAYMENT_STATUS_OPTIONS = Object.values(PAYMENT_STATUS).map((value) => ({
@@ -15,7 +16,7 @@ export const PAYMENT_STATUS_OPTIONS = Object.values(PAYMENT_STATUS).map((value) 
   label: value,
 }));
 
-/** Recorded on the invoice when Finance marks it as paid. */
+/** Recorded on the payment when created. */
 export const PAYMENT_METHODS = {
   BANK_TRANSFER: "Bank Transfer",
   CHEQUE: "Cheque",
