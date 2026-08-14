@@ -75,21 +75,26 @@ export default function CampaignDetails() {
     () => (searchParams.get("stage") || "").toUpperCase(),
   );
 
-  // — load full campaign profile
-  const loadDetail = useCallback(async () => {
+  // Refreshing must not go through `loading`: that flag drives a full-page
+  // spinner which unmounts the whole tree, including any open modal, so a
+  // background refresh would look like the dialog closing itself.
+  const loadDetail = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
       const res = await getCampaignDetails(id);
       setDetail(unwrap(res));
     } catch {
       toast.error("Failed to load campaign details.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [id]);
 
   useEffect(() => { loadDetail(); }, [loadDetail]);
 
-  if (loading) {
+  // Only the first load blanks the page; afterwards `detail` is already
+  // rendered and a refresh swaps it in place.
+  if (loading && !detail) {
     return (<div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner text="Loading campaign..." />
       </div>
@@ -257,7 +262,7 @@ export default function CampaignDetails() {
           onClose={() => setEditOpen(false)}
           campaignId={id}
           detail={detail}
-          onSaved={() => { setEditOpen(false); setLoading(true); loadDetail(); }}
+          onSaved={() => { setEditOpen(false); loadDetail({ silent: true }); }}
         />
       )}
 
@@ -266,7 +271,7 @@ export default function CampaignDetails() {
             isOpen={lifecycleModal === "reopen"}
             onClose={() => setLifecycleModal(null)}
             campaignId={id}
-            onReopened={() => { setLifecycleModal(null); setLoading(true); loadDetail(); }}
+            onReopened={() => { setLifecycleModal(null); loadDetail({ silent: true }); }}
           />
         </>
       )}

@@ -10,14 +10,9 @@ import {
   getRejectionHistory,
 } from "../services/candidateActionsService";
 
-/**
- * Apply an HR override on a rejected candidate and
- * Clear it again.
- * Which action is offered is derived from the candidate's own state rather
- * than from a toggle, because the two are never both valid: a REJECTED
- * candidate can be overridden, and an override that has not yet produced a new
- * outcome can be cleared. Anything else shows nothing at all.
- */
+// Which action is offered comes from the candidate's state, not a toggle: the
+// two are never both valid. A REJECTED candidate can be overridden; an override
+// that has not yet produced a new outcome can be cleared.
 export default function CandidateOverridePanel({ candidate, onChanged }) {
   const { hasRole } = useAuth();
   const isHrAdmin = hasRole(["HR_ADMIN"]);

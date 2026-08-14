@@ -47,14 +47,6 @@ const parseIfJson = async (response) => {
 
 // ── candidate list ───────────────────────────────────────────────────
 
-export const previewCandidateExport = async (campaignId) => {
-  const response = await api.get(
-    `${ROOT}/campaigns/${campaignId}/candidates/preview`,
-    { headers: authHeaders() },
-  );
-  return response.data?.data || null;
-};
-
 /**
  * Returns {queued: true,...} when the export exceeded EXPORT_ASYNC_THRESHOLD
  * and was handed to Celery, or {queued: false} once the file has downloaded.
@@ -105,45 +97,6 @@ export const exportShortlistPackage = async (campaignId) => {
   saveBlob(response, "shortlist_package.pdf");
 };
 
-// ── scheduled exports ────────────────────────────────────────────────
-
-export const getExportSchedule = async (campaignId) => {
-  const response = await api.get(
-    `${ROOT}/campaigns/${campaignId}/schedule`, { headers: authHeaders() },
-  );
-  return response.data?.data || null;
-};
-
-export const saveExportSchedule = async (campaignId, config) => {
-  const response = await api.put(
-    `${ROOT}/campaigns/${campaignId}/schedule`, config, { headers: authHeaders() },
-  );
-  return response.data?.data || null;
-};
-
-export const setExportSchedulePaused = async (campaignId, paused) => {
-  const response = await api.post(
-    `${ROOT}/campaigns/${campaignId}/schedule/pause`, { paused },
-    { headers: authHeaders() },
-  );
-  return response.data?.data || null;
-};
-
-export const deleteExportSchedule = async (campaignId) => {
-  const response = await api.delete(
-    `${ROOT}/campaigns/${campaignId}/schedule`, { headers: authHeaders() },
-  );
-  return response.data;
-};
-
-export const getExportHistory = async (campaignId, limit = 20) => {
-  const response = await api.get(
-    `${ROOT}/campaigns/${campaignId}/schedule/history`,
-    { params: { limit }, headers: authHeaders() },
-  );
-  return response.data?.data || [];
-};
-
 // ── audit & compliance ───────────────────────────────────────────────
 
 export const exportAuditTrail = async (campaignId) => {
@@ -160,12 +113,4 @@ export const exportComplianceSummary = async (campaignId) => {
     { headers: authHeaders(), responseType: "arraybuffer" },
   );
   saveBlob(response, "compliance_summary.pdf");
-};
-
-export const exportDsar = async (email) => {
-  const response = await api.post(
-    `${ROOT}/dsar`, { email },
-    { headers: authHeaders(), responseType: "arraybuffer" },
-  );
-  saveBlob(response, "dsar.xlsx");
 };
