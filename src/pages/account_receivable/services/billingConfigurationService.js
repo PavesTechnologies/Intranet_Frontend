@@ -1038,12 +1038,12 @@ const assertBillingConfigurationPayload = (payload) => {
 // full-draft side effects (e.g. saveTmRateCards, which bulk-syncs and deletes any TM
 // rate cards absent from the current wizard state). Used when a rate-card save needs
 // a billingConfigurationId to exist but must not touch other rate card rows.
-// export const ensureBillingConfigurationDraft = async (payload) => {
-//   const requestPayload = buildBillingConfigurationRequestPayload(payload);
-//   assertBillingConfigurationPayload(requestPayload);
-//   const configResponse = await createBillingConfiguration(requestPayload);
-//   return extractBillingConfigurationId(configResponse);
-// };
+export const ensureBillingConfigurationDraft = async (payload) => {
+  const requestPayload = buildBillingConfigurationRequestPayload(payload);
+  assertBillingConfigurationPayload(requestPayload);
+  const configResponse = await createBillingConfiguration(requestPayload);
+  return extractBillingConfigurationId(configResponse);
+};
 
 const buildTmRateCardRequestPayload = (card = {}, pricingModel, billingConfigurationId) => ({
   billingConfigurationId,

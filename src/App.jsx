@@ -366,12 +366,12 @@ const ProjectManager = () => {
 const RoleOffEntry = () => {
   const { user } = useAuth();
 
-  if (user?.roles?.includes("Delivery_Manager")) {
-    return <Navigate to="/resource-management/roleoff/dm" replace />;
-  }
-
   if (user?.roles?.includes("Resource_Manager")) {
     return <Navigate to="/resource-management/roleoff/rm" replace />;
+  }
+
+  if (user?.roles?.includes("Delivery_Manager")) {
+    return <Navigate to="/resource-management/roleoff/dm" replace />;
   }
 
   return <Navigate to="/resource-management/roleoff/pm" replace />;
