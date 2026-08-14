@@ -58,7 +58,10 @@ export function mapInvoiceRecord(raw = {}) {
     history: [],
     approval: null,
     payments: [],
-    currency: { code: "INR", symbol: "₹" },
+    // InvoiceDetailsResponse has no currency field at all — not even the vendor's currency_id.
+    // Leave unset rather than assuming INR; every consumer already falls back to the rupee sign
+    // via `invoice.currency?.symbol || "₹"` when this is null.
+    currency: null,
     uploadedAt: null,
   };
 }
