@@ -32,7 +32,7 @@ function ReviewSection({ title, rows, stepId, onEdit }) {
           {rows.map((row, index) => (
             <div key={`${row.label}-${index}`} className="flex justify-between items-center py-2 text-sm">
               <span className="text-slate-500 font-medium">{row.label}</span>
-              <span className="font-semibold text-slate-800">{row.value || "â€”"}</span>
+              <span className="font-semibold text-slate-800">{row.value || "—"}</span>
             </div>
           ))}
         </div>
@@ -48,12 +48,12 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
     billingConfig.billingTypeName ||
     billingConfig.billingTypeLabel ||
     billingConfig.billingType ||
-    "â€”";
+    "—";
   const billingFrequencyLabel =
     billingConfig.billingFrequencyName ||
     billingConfig.billingFrequencyLabel ||
     billingConfig.billingFrequency ||
-    "â€”";
+    "—";
   const pricingModel = billingConfig.pricingModel || billingConfig.billingMode || "";
   const roleRateRows = (billingConfig.timeAndMaterial?.roles || [])
     .filter((roleRate) => roleRate.role || roleRate.rate)
@@ -64,7 +64,6 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
         roleRate.ratePeriod,
         roleRate.effectiveFrom ? `from ${formatDisplayDate(roleRate.effectiveFrom)}` : "",
         roleRate.effectiveTo ? `to ${formatDisplayDate(roleRate.effectiveTo)}` : "",
-        roleRate.remarks,
       ].filter(Boolean).join(" | "),
     }));
   const standardRateValue = [
@@ -72,7 +71,6 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
     billingConfig.timeAndMaterial?.ratePeriod,
     billingConfig.timeAndMaterial?.effectiveFrom ? `from ${formatDisplayDate(billingConfig.timeAndMaterial.effectiveFrom)}` : "",
     billingConfig.timeAndMaterial?.effectiveTo ? `to ${formatDisplayDate(billingConfig.timeAndMaterial.effectiveTo)}` : "",
-    billingConfig.timeAndMaterial?.remarks,
   ].filter(Boolean).join(" | ");
 
   return (
@@ -93,9 +91,9 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
             { label: "Client", value: projectInfo.clientName },
             { label: "Project", value: projectInfo.projectName },
             { label: "Project Code", value: projectInfo.projectCode },
-            { label: "Duration", value: projectInfo.startDate ? `${formatDisplayDate(projectInfo.startDate)} to ${formatDisplayDate(projectInfo.endDate) || "Ongoing"}` : "â€”" },
-            { label: "Currency", value: projectInfo.projectBudgetCurrency || projectInfo.currency || "â€”" },
-            { label: "Project Budget", value: projectInfo.projectBudget !== "" && projectInfo.projectBudget !== null && projectInfo.projectBudget !== undefined ? projectInfo.projectBudget : "â€”" },
+            { label: "Duration", value: projectInfo.startDate ? `${formatDisplayDate(projectInfo.startDate)} to ${formatDisplayDate(projectInfo.endDate) || "Ongoing"}` : "—" },
+            { label: "Currency", value: projectInfo.projectBudgetCurrency || projectInfo.currency || "—" },
+            { label: "Project Budget", value: projectInfo.projectBudget !== "" && projectInfo.projectBudget !== null && projectInfo.projectBudget !== undefined ? projectInfo.projectBudget : "—" },
           ]}
         />
 
@@ -104,7 +102,6 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
           stepId={2}
           onEdit={onEditStep}
           rows={[
-            { label: "Currency", value: projectInfo.projectBudgetCurrency || projectInfo.currency || "â€”" },
             { label: "Billing Type", value: billingTypeLabel },
             { label: "Billing Frequency", value: billingFrequencyLabel },
             { label: "Effective From", value: formatDisplayDate(billingConfig.effectiveFrom) },
@@ -121,7 +118,7 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
               ? [
                   {
                     label: billingConfig.billingType === "TIME_MATERIAL" ? "Rate Model" : "Billing Mode",
-                    value: pricingModel || "â€”",
+                    value: pricingModel || "—",
                   },
                 ]
               : []),
@@ -135,7 +132,7 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
                   ...(pricingModel === "ROLE_BASED"
                     ? roleRateRows.length > 0
                       ? roleRateRows
-                      : [{ label: "Roles Configured", value: "â€”" }]
+                      : [{ label: "Roles Configured", value: "—" }]
                     : []),
                 ]
               : []),
@@ -173,13 +170,13 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
                   ? "Automatic"
                   : controls.autoInvoiceGeneration === false
                   ? "Manual"
-                  : "â€”",
+                  : "—",
             },
             ...(controls.autoInvoiceGeneration === true
               ? [{ label: "Generation Day", value: controls.invoiceGenerationDay }]
               : []),
-            { label: "Payment Terms", value: controls.paymentTermName || controls.paymentTerms || controls.paymentTermId || "â€”" },
-            { label: "Tax Region", value: controls.taxRegionName || controls.taxRegionId || "â€”" },
+            { label: "Payment Terms", value: controls.paymentTermName || controls.paymentTerms || controls.paymentTermId || "—" },
+            { label: "Tax Region", value: controls.taxRegionName || controls.taxRegionId || "—" },
             { label: "Expense Billing", value: controls.expenseBillingEligible ? "Eligible" : "Not Eligible" },
           ]}
         />

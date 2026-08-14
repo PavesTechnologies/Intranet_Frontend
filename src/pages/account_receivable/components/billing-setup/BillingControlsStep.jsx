@@ -3,7 +3,21 @@ import FormSelect from "../../../../components/forms/FormSelect";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import { getActivePaymentTerms, getActiveTaxRegions, getApiErrorMessage } from "../../services/billingConfigurationService";
+import RadioCardGroup from "../common/RadioCardGroup";
 import { useEffect, useState } from "react";
+
+const INVOICE_GENERATION_OPTIONS = [
+  {
+    value: "MANUAL",
+    label: "Manual",
+    description: "Invoices must be generated manually by finance administrators.",
+  },
+  {
+    value: "AUTOMATIC",
+    label: "Automatic",
+    description: "System automatically generates draft invoices at the end of each billing cycle.",
+  },
+];
 
 function getOrdinalSuffix(i) {
   const j = i % 10, k = i % 100;
@@ -144,40 +158,30 @@ export default function BillingControlsStep({ value = {}, onChange }) {
           </p>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           <label className="block text-sm font-medium text-slate-700">
             Invoice Generation Mode <span className="text-red-500">*</span>
           </label>
-          
-          <div className="inline-flex rounded-lg bg-slate-100 p-1">
-            <button
-              type="button"
-              onClick={() => update({ autoInvoiceGeneration: false, invoiceGenerationType: "MANUAL", invoiceGenerationDay: "" })}
-              className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
-                value.autoInvoiceGeneration === false
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Manual
-            </button>
-            <button
-              type="button"
-              onClick={() => update({ autoInvoiceGeneration: true, invoiceGenerationType: "AUTOMATIC" })}
-              className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
-                value.autoInvoiceGeneration === true
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Automatic
-            </button>
-          </div>
-          <p className="text-xs text-slate-400">
-            {value.autoInvoiceGeneration === true
-              ? "System automatically generates draft invoices at the end of each cycle."
-              : "Invoices must be generated manually by finance administrators."}
-          </p>
+
+          <RadioCardGroup
+            name="invoiceGenerationMode"
+            options={INVOICE_GENERATION_OPTIONS}
+            value={
+              value.autoInvoiceGeneration === true
+                ? "AUTOMATIC"
+                : value.autoInvoiceGeneration === false
+                ? "MANUAL"
+                : ""
+            }
+            onChange={(next) => {
+              if (next === "MANUAL") {
+                update({ autoInvoiceGeneration: false, invoiceGenerationType: "MANUAL", invoiceGenerationDay: "" });
+              } else {
+                update({ autoInvoiceGeneration: true, invoiceGenerationType: "AUTOMATIC" });
+              }
+            }}
+            columns={2}
+          />
         </div>
 
         {/* Dynamic field for Automatic Generation */}
@@ -258,15 +262,20 @@ export default function BillingControlsStep({ value = {}, onChange }) {
           </div>
           </div>
 
-          <div className="max-w-md rounded-lg border border-slate-200 p-4">
-            <label className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+          <div className="max-w-md rounded-lg border border-slate-200 p-3.5">
+            <label className="flex items-start gap-2.5 text-sm font-medium text-slate-700 cursor-pointer">
               <input
                 type="checkbox"
                 checked={Boolean(value.expenseBillingEligible)}
                 onChange={(event) => update({ expenseBillingEligible: event.target.checked })}
-                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
               />
-              Expense billing eligible
+              <span>
+                Expense billing eligible
+                <span className="mt-0.5 block text-xs font-normal text-slate-400">
+                  Project expenses can be included on generated invoices.
+                </span>
+              </span>
             </label>
           </div>
 

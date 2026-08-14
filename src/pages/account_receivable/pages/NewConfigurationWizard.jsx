@@ -20,6 +20,7 @@ import {
   getApiErrorMessage,
   saveDraftConfiguration,
   activateConfiguration,
+  ensureBillingConfigurationDraft,
 } from "../services/billingConfigService";
 
 const INITIAL_WIZARD_DATA = {
@@ -37,7 +38,6 @@ const INITIAL_WIZARD_DATA = {
       ratePeriod: "HOURLY",
       effectiveFrom: "",
       effectiveTo: "",
-      remarks: "",
       rateCardId: null,
       roles: [],
       overtimeRule: "NONE",
@@ -285,6 +285,11 @@ export default function NewConfigurationWizard() {
   const [activating, setActivating] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [savedConfigId, setSavedConfigId] = useState(extractBillingConfigurationId(configId));
+  const [configStatus, setConfigStatus] = useState(null);
+
+  // Editing an already-created (non-Draft) configuration should only ever
+  // update that record, never re-run the create/activate flow.
+  const isEditingExisting = Boolean(configId) && Boolean(configStatus) && configStatus !== "Draft";
 
   useEffect(() => {
     if (!configId) return;
@@ -300,6 +305,7 @@ export default function NewConfigurationWizard() {
           setWizardData((prev) => ({ ...prev, ...detail }));
         }
         setSavedConfigId(summary.id || configId);
+        setConfigStatus(summary.status || null);
         setCurrentStep(summary.status === "Draft" ? Math.min(summary.currentStep || 1, STEPS.length) : STEPS.length);
       } catch (error) {
         if (!isMounted) return;
@@ -368,26 +374,48 @@ export default function NewConfigurationWizard() {
   const handleBillingConfigChange = (billingConfig) => setWizardData((prev) => ({ ...prev, billingConfig }));
   const handleControlsChange = (controls) => setWizardData((prev) => ({ ...prev, controls }));
 
+  // Merges a newly-assigned billingConfigurationId into wizard state and returns it.
+  const applyBillingConfigurationId = (nextId) => {
+    if (!nextId) return nextId;
+    setSavedConfigId(nextId);
+    setWizardData((prev) => ({
+      ...prev,
+      billingConfigurationId: nextId,
+      billingConfig: {
+        ...prev.billingConfig,
+        billingConfigurationId: nextId,
+        id: nextId,
+      },
+    }));
+    return nextId;
+  };
+
+  const persistDraft = async () => {
+    const result = await saveDraftConfiguration(wizardData, savedConfigId);
+    const nextId =
+      extractBillingConfigurationId(result) ||
+      extractBillingConfigurationId(wizardData.billingConfigurationId) ||
+      savedConfigId;
+    return applyBillingConfigurationId(nextId);
+  };
+
+  // Returns the existing billingConfigurationId immediately, or creates just the
+  // parent billing configuration record (not a full draft save) and returns the
+  // id it's assigned. Used by the TM rate card save buttons so they never have to
+  // block on a separate "Save Draft" click when the parent config doesn't exist yet.
+  // Deliberately avoids saveDraftConfiguration here: that also bulk-syncs every TM
+  // rate card row (and deletes any absent from wizard state), which would race with
+  // the single-row create/update the rate card button is about to perform itself.
+  const ensureBillingConfigurationId = async () => {
+    if (savedConfigId) return savedConfigId;
+    const nextId = await ensureBillingConfigurationDraft(wizardData);
+    return applyBillingConfigurationId(nextId);
+  };
+
   const handleSaveDraft = async () => {
     setSaving(true);
     try {
-      const result = await saveDraftConfiguration(wizardData, savedConfigId);
-      const nextId =
-        extractBillingConfigurationId(result) ||
-        extractBillingConfigurationId(wizardData.billingConfigurationId) ||
-        savedConfigId;
-      if (nextId) {
-        setSavedConfigId(nextId);
-        setWizardData((prev) => ({
-          ...prev,
-          billingConfigurationId: nextId,
-          billingConfig: {
-            ...prev.billingConfig,
-            billingConfigurationId: nextId,
-            id: nextId,
-          },
-        }));
-      }
+      await persistDraft();
       showStatusToast("Draft saved successfully.", "success");
     } catch (error) {
       showStatusToast(getApiErrorMessage(error, "Failed to save draft."), "error");
@@ -398,9 +426,11 @@ export default function NewConfigurationWizard() {
 
   const handleCancel = () => navigate(CONFIGURATIONS_PATH);
 
-  const handleActivate = async () => {
+  const handleFinalSubmit = async () => {
     setActivating(true);
     try {
+      // savedConfigId is already set whenever we're editing an existing record,
+      // so saveDraftConfiguration always performs an update (PUT), never a create.
       const saveResult = await saveDraftConfiguration(wizardData, savedConfigId);
       const billingConfigurationId =
         extractBillingConfigurationId(saveResult) ||
@@ -408,7 +438,10 @@ export default function NewConfigurationWizard() {
         savedConfigId;
 
       if (!billingConfigurationId) {
-        showStatusToast("Unable to activate billing configuration: missing billingConfigurationId.", "error");
+        showStatusToast(
+          `Unable to ${isEditingExisting ? "update" : "activate"} billing configuration: missing billingConfigurationId.`,
+          "error"
+        );
         return;
       }
 
@@ -423,10 +456,20 @@ export default function NewConfigurationWizard() {
         },
       }));
 
+      if (isEditingExisting) {
+        // The record already exists and is already active — just persist the edits.
+        showStatusToast("Billing configuration updated successfully.", "success");
+        navigate(CONFIGURATIONS_PATH);
+        return;
+      }
+
       await activateConfiguration(billingConfigurationId);
       setShowSuccess(true);
     } catch (error) {
-      showStatusToast(getApiErrorMessage(error, "Failed to activate billing configuration."), "error");
+      showStatusToast(
+        getApiErrorMessage(error, `Failed to ${isEditingExisting ? "update" : "activate"} billing configuration.`),
+        "error"
+      );
     } finally {
       setActivating(false);
     }
@@ -557,6 +600,7 @@ export default function NewConfigurationWizard() {
               setupMode={wizardData.setupMode}
               projectInfo={wizardData.projectInfo}
               onProjectInfoChange={handleProjectInfoChange}
+              ensureBillingConfigurationId={ensureBillingConfigurationId}
             />
           )}
 
@@ -572,11 +616,13 @@ export default function NewConfigurationWizard() {
               isLastStep={isLastStep}
               nextDisabled={nextDisabled}
               nextIncomplete={nextIncomplete}
+              finalLabel={isEditingExisting ? "Update Billing Setup" : "Create Billing Setup"}
+              finalLoadingText={isEditingExisting ? "Updating..." : "Creating..."}
               showSaveDraft={currentStep > 1}
               saving={saving}
               activating={activating}
               onBack={handleBack}
-              onNext={isLastStep ? handleActivate : handleNext}
+              onNext={isLastStep ? handleFinalSubmit : handleNext}
               onSaveDraft={handleSaveDraft}
               onCancel={handleCancel}
             />

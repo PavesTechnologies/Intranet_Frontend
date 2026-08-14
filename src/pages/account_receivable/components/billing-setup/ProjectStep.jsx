@@ -9,6 +9,7 @@ import { Fonts } from "../../../../components/Fonts/Fonts";
 import {
   getBillingConfigurationClients,
   getBillingConfigurationProjectsByClient,
+  fetchBillingConfigurations,
 } from "../../services/billingConfigService";
 
 export default function ProjectStep({ value = {}, onChange }) {
@@ -17,6 +18,7 @@ export default function ProjectStep({ value = {}, onChange }) {
   const [loadingClients, setLoadingClients] = useState(true);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [clientQuery, setClientQuery] = useState("");
+  const [activeProjectCodes, setActiveProjectCodes] = useState(new Set());
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -67,16 +69,55 @@ export default function ProjectStep({ value = {}, onChange }) {
       });
   }, [value.clientId]);
 
+  // Projects that already have an Active billing configuration for this client
+  // are hidden from the picker so a client can't accidentally get two active setups.
+  useEffect(() => {
+    if (!value.clientId || !value.clientName) {
+      setActiveProjectCodes(new Set());
+      return;
+    }
+
+    let cancelled = false;
+    fetchBillingConfigurations()
+      .then((configs) => {
+        if (cancelled) return;
+        const codes = new Set(
+          (Array.isArray(configs) ? configs : [])
+            .filter((config) => config.status === "Active" && config.client === value.clientName)
+            .map((config) => config.projectCode)
+            .filter(Boolean)
+        );
+        setActiveProjectCodes(codes);
+      })
+      .catch(() => {
+        if (!cancelled) setActiveProjectCodes(new Set());
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [value.clientId, value.clientName]);
+
   // Internal projectSource defaults to ENTERPRISE if not set
   const projectSource = value.projectSource || "ENTERPRISE";
 
   // clientOptions are loaded from backend via `getBillingConfigurationClients`
 
-  // Projects filtered by selected client
+  // Projects filtered by selected client, excluding ones already Active for this
+  // client — except the project currently selected, so editing an existing setup
+  // doesn't hide its own project from the dropdown.
+  const availableProjects = useMemo(() => {
+    return projects.filter((project) => {
+      const projectId = String(project.projectId || project.id || "");
+      if (value.projectId && projectId === String(value.projectId)) return true;
+      return !activeProjectCodes.has(project.projectCode);
+    });
+  }, [projects, activeProjectCodes, value.projectId]);
+
   const projectOptions = useMemo(() => {
     if (!value.clientId) return [];
-    return projects.map((project) => ({ value: String(project.projectId || project.id || ""), label: project.projectName }));
-  }, [projects, value.clientId]);
+    return availableProjects.map((project) => ({ value: String(project.projectId || project.id || ""), label: project.projectName }));
+  }, [availableProjects, value.clientId]);
 
   // Selected enterprise project details
   const matchedProject = useMemo(() => {

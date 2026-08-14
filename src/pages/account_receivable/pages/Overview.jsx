@@ -364,7 +364,8 @@ export default function Overview() {
 
       {/* 3. Filters Box */}
       <FilterCard title="Filters" description="Search and narrow down billing configurations.">
-        <div className="w-full sm:flex-[2] sm:min-w-[260px]">
+        <div className="w-full space-y-1 sm:flex-[3] sm:min-w-[320px]">
+          <label className="block text-sm font-medium text-gray-700">Search</label>
           <SearchInput
             value={filters.search}
             onChange={handleFilterChange}
@@ -372,16 +373,18 @@ export default function Overview() {
             placeholder="Search by project, code or client..."
           />
         </div>
-        <div className="w-full sm:flex-1 sm:min-w-[200px]">
+        <div className="w-full sm:flex-1 sm:min-w-[180px]">
           <FormSelect
+            label="Status"
             name="status"
             value={filters.status}
             onChange={handleFilterChange}
             options={filterOptions.status}
           />
         </div>
-        <div className="w-full sm:flex-1 sm:min-w-[200px]">
+        <div className="w-full sm:flex-1 sm:min-w-[180px]">
           <FormSelect
+            label="Source"
             name="source"
             value={filters.source}
             onChange={handleFilterChange}

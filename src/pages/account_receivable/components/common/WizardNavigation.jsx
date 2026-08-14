@@ -6,6 +6,8 @@ export default function WizardNavigation({
   nextDisabled,
   nextIncomplete = false,
   nextLabel = "Next",
+  finalLabel = "Save Billing Setup",
+  finalLoadingText = "Saving...",
   showSaveDraft = true,
   saving,
   activating,
@@ -35,10 +37,10 @@ export default function WizardNavigation({
           disabled={nextDisabled}
           className={nextIncomplete ? "opacity-50" : ""}
           loading={activating}
-          loadingText="Activating..."
-          aria-label={isLastStep ? "Activate billing setup" : "Continue to next step"}
+          loadingText={isLastStep ? finalLoadingText : "Loading..."}
+          aria-label={isLastStep ? finalLabel : "Continue to next step"}
         >
-          {isLastStep ? "Activate Billing Setup" : nextLabel}
+          {isLastStep ? finalLabel : nextLabel}
         </Button>
       </div>
     </div>
