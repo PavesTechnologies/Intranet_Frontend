@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
   ArrowLeft, Users, Activity, AlertTriangle, Lock, Target,
   UserCog, FileText, ArrowRight, Filter, ChevronDown, Clock,
   ExternalLink, ListChecks,
   RotateCcw, Inbox, AlertOctagon, Hourglass, PieChart,
-  Send, Flag, SkipForward, Lightbulb, FileUp
+  Send, Flag, SkipForward, Lightbulb, FileUp,
+  ArrowRightLeft, Ban, Download
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
+import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
@@ -18,6 +20,12 @@ import { paginate } from "../candidates/utils/candidateUtils.jsx";
 import { CANDIDATE_PAGE_SIZE } from "../candidates/constants/candidateConstants";
 import EditCampaignModal from "./components/EditCampaignModal";
 import ReopenCampaignModal from "./components/ReopenCampaignModal";
+import CandidateActionModals from "./components/CandidateActionModals";
+import CampaignExportPanel from "./components/CampaignExportPanel";
+import { exportBatchScorecards } from "./services/exportService";
+import { getNoteCounts } from "./services/candidateActionsService";
+import { useAuth } from "../../../contexts/AuthContext";
+import { REJECTION_LAYER_LABELS } from "../constants/scoreLabels";
 import useCampaignPermissions from "./hooks/useCampaignPermissions";
 import {
   getCampaignDetails, getPipelineSummary, getCampaignTimeline,
@@ -29,6 +37,10 @@ import {
   getBulkUploadsForCampaign,
   formatApiError,
 } from "./services/campaignservice";
+import {
+  getStageTiming, filterCandidatesBySkills, filterCandidates,
+} from "../dashboard/services/dashboardService";
+import CandidateFilterBar from "./components/CandidateFilterBar";
 
 // Colour per pipeline stage (used for the funnel bars)
 const STAGE_COLORS = {
@@ -47,32 +59,42 @@ const fmtDate = (d) => (d ? new Date(d).toLocaleString() : "—");
 export default function CampaignDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { canManageCampaigns, canViewPipeline, canViewTimeline } = useCampaignPermissions();
 
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("details");
+  // ?tab=&stage= let the dashboard quick links land directly
+  // on a stage-filtered candidate list, and make that view bookmarkable.
+  const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") || "details");
   const [editOpen, setEditOpen] = useState(false);
   // lifecycle actions — only one of these is ever open at a time
   const [lifecycleModal, setLifecycleModal] = useState(null); // null | "pause" | "resume" | "close" | "reopen"
   // set when a funnel stage bar is clicked — pre-filters the Candidates tab
-  const [candidateStageFilter, setCandidateStageFilter] = useState("");
+  const [candidateStageFilter, setCandidateStageFilter] = useState(
+    () => (searchParams.get("stage") || "").toUpperCase(),
+  );
 
-  // — load full campaign profile
-  const loadDetail = useCallback(async () => {
+  // Refreshing must not go through `loading`: that flag drives a full-page
+  // spinner which unmounts the whole tree, including any open modal, so a
+  // background refresh would look like the dialog closing itself.
+  const loadDetail = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
       const res = await getCampaignDetails(id);
       setDetail(unwrap(res));
     } catch {
       toast.error("Failed to load campaign details.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [id]);
 
   useEffect(() => { loadDetail(); }, [loadDetail]);
 
-  if (loading) {
+  // Only the first load blanks the page; afterwards `detail` is already
+  // rendered and a refresh swaps it in place.
+  if (loading && !detail) {
     return (<div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner text="Loading campaign..." />
       </div>
@@ -116,6 +138,9 @@ export default function CampaignDetails() {
     { id: "stalled", label: "Stalled", icon: Hourglass, show: canManageCampaigns },
     { id: "rejections", label: "Rejections", icon: PieChart, show: canSeePipeline },
     { id: "timeline", label: "Timeline", icon: Activity, show: canSeeTimeline },
+    // Its own tab rather than scattered buttons, so every export for
+    // this campaign is discoverable in one place.
+    { id: "exports", label: "Exports", icon: Download, show: true },
   ].filter((t) => t.show);
 
   const statusStyle = {
@@ -125,6 +150,22 @@ export default function CampaignDetails() {
   }[status] || "bg-slate-50 text-slate-600 border-slate-200";
 
   return (<div className="bg-[#F8FAFC] text-slate-900 font-sans min-h-screen p-6">
+      {/* Trail back to the dashboard. Campaign name is
+          truncated to 40 chars per spec; the current page is not a link. */}
+      <div className="mb-4">
+        <Breadcrumb
+          items={[
+            { label: "Dashboard", to: "/airs/dashboard" },
+            { label: "Campaigns", to: "/airs/campaigns" },
+            {
+              label: (info.name || "").length > 40
+                ? `${info.name.slice(0, 40)}…`
+                : (info.name || "Campaign"),
+            },
+          ]}
+        />
+      </div>
+
       {/* Header */}
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm mb-6 flex flex-col md:flex-row justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -194,6 +235,7 @@ export default function CampaignDetails() {
       {activeTab === "pipeline" && (<PipelineTab
           campaignId={id}
           isActive={isActive}
+          canViewTiming={canViewTimeline}
           onViewCandidates={() => navigate(`/airs/candidates?campaign=${id}`)}
           onStageClick={(stage) => {
             setCandidateStageFilter(stage);
@@ -213,12 +255,14 @@ export default function CampaignDetails() {
       )}
       {activeTab === "timeline" && <TimelineTab campaignId={id} />}
 
+      {activeTab === "exports" && <CampaignExportPanel campaignId={id} />}
+
       {canEdit && (<EditCampaignModal
           isOpen={editOpen}
           onClose={() => setEditOpen(false)}
           campaignId={id}
           detail={detail}
-          onSaved={() => { setEditOpen(false); setLoading(true); loadDetail(); }}
+          onSaved={() => { setEditOpen(false); loadDetail({ silent: true }); }}
         />
       )}
 
@@ -227,7 +271,7 @@ export default function CampaignDetails() {
             isOpen={lifecycleModal === "reopen"}
             onClose={() => setLifecycleModal(null)}
             campaignId={id}
-            onReopened={() => { setLifecycleModal(null); setLoading(true); loadDetail(); }}
+            onReopened={() => { setLifecycleModal(null); loadDetail({ silent: true }); }}
           />
         </>
       )}
@@ -276,8 +320,8 @@ const STATUS_PILL = {
 // Same palette the rejection-analytics chart uses, so a layer reads as the
 // same colour everywhere in the module.
 const SCORING_LAYERS = [
-  { key: "weight_deterministic", label: "Deterministic", color: "#6366F1" },
-  { key: "weight_semantic", label: "Semantic", color: "#0EA5E9" },
+  { key: "weight_deterministic", label: "Requirements", color: "#6366F1" },
+  { key: "weight_semantic", label: "Relevance", color: "#0EA5E9" },
   { key: "weight_ai", label: "AI", color: "#8B5CF6" },
 ];
 
@@ -437,10 +481,68 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const [loading, setLoading] = useState(true);
   const [starredIds, setStarredIds] = useState(() => new Set());
   const [currentPage, setCurrentPage] = useState(1);
+  // Selected skills, AND-combined server-side. null means "no
+  // skill filter"; an empty array would mean "matched nothing".
+  const [skills, setSkills] = useState([]);
+  const [skillMatchIds, setSkillMatchIds] = useState(null);
+  // Experience / education / upload-source live in the resume,
+  // so they resolve server-side to a set of ids, same as the skill filter.
+  const [resumeFilters, setResumeFilters] = useState({});
+  const [resumeMatchIds, setResumeMatchIds] = useState(null);
+  // Score range and AI recommendation are already supported by the
+  // list endpoint; these narrow the rows we fetched, AND-combined with the rest.
+  const [scoreFilters, setScoreFilters] = useState({ min: "", max: "", recommendation: "" });
+  // E04 — selection for bulk moves, note badges, and the one shared action modal
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [noteCounts, setNoteCounts] = useState({});
+  const [action, setAction] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const { hasRole } = useAuth();
+  const canAct = hasRole(["HR_ADMIN", "RECRUITER"]);
+  const isHRAdminUser = hasRole(["HR_ADMIN"]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const ids = await filterCandidates(campaignId, resumeFilters);
+        if (!cancelled) setResumeMatchIds(ids === null ? null : new Set(ids));
+      } catch {
+        if (!cancelled) {
+          toast.error("Candidate filter failed.");
+          setResumeMatchIds(new Set());
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [campaignId, resumeFilters]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [campaignId, stageFilter]);
+  }, [campaignId, stageFilter, skills]);
+
+  // The AND logic lives in SQL (GROUP BY ... HAVING COUNT DISTINCT), so this
+  // asks the server which candidates qualify and intersects locally.
+  useEffect(() => {
+    let cancelled = false;
+    if (skills.length === 0) { setSkillMatchIds(null); return; }
+    (async () => {
+      try {
+        const res = await filterCandidatesBySkills(
+          campaignId,
+          skills.map((s) => s.canonical_skill_id),
+          skills.map((s) => s.canonical_name).join(", "),
+        );
+        if (!cancelled) setSkillMatchIds(new Set(res.campaign_candidate_ids || []));
+      } catch {
+        if (!cancelled) {
+          toast.error("Skill filter failed.");
+          setSkillMatchIds(new Set());
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [campaignId, skills]);
 
   useEffect(() => {
     let cancelled = false;
@@ -459,7 +561,20 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [campaignId]);
+  }, [campaignId, reloadKey]);
+
+  // One request for the whole list, refreshed whenever the roster
+  // changes. Failure is silent by design: a missing badge must not break rows.
+  useEffect(() => {
+    let cancelled = false;
+    const ids = (candidates || []).map((c) => c.campaign_candidate_id ?? c.id).filter(Boolean);
+    if (ids.length === 0) { setNoteCounts({}); return; }
+    (async () => {
+      const counts = await getNoteCounts(ids);
+      if (!cancelled) setNoteCounts(counts);
+    })();
+    return () => { cancelled = true; };
+  }, [candidates]);
 
   if (loading) {
     return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading candidates..." /></div>;
@@ -471,10 +586,30 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
     ...c,
     starred: starredIds.has(c.id),
   }));
-  // stage filter — set by clicking a funnel bar, changeable here too
-  const list = stageFilter
-    ? allCandidates.filter((c) => (c.stage || "").toUpperCase() === stageFilter)
-    : allCandidates;
+  // All active filters are AND-combined: stage from the
+  // funnel/dropdown, skills from the server-side AND search.
+  const byId = new Map((candidates || []).map((r) => [r.campaign_candidate_id ?? r.id, r]));
+  const list = allCandidates.filter((c) => {
+    if (stageFilter && (c.stage || "").toUpperCase() !== stageFilter) return false;
+    if (skillMatchIds && !skillMatchIds.has(c.id)) return false;
+    if (resumeMatchIds && !resumeMatchIds.has(c.id)) return false;
+    // Composite range, read from the RAW row: the table mapper
+    // coerces a missing composite_score to 0, which would wrongly match a
+    // "max 40" filter. An unscored candidate is excluded whenever a bound is
+    // set, rather than being treated as a zero.
+    if (scoreFilters.min !== "" || scoreFilters.max !== "") {
+      const raw = byId.get(c.id)?.composite_score;
+      if (raw === null || raw === undefined) return false;
+      const score = Number(raw);
+      if (scoreFilters.min !== "" && score < Number(scoreFilters.min)) return false;
+      if (scoreFilters.max !== "" && score > Number(scoreFilters.max)) return false;
+    }
+    if (scoreFilters.recommendation) {
+      const rec = (byId.get(c.id)?.ai_recommendation || "").toUpperCase();
+      if (rec !== scoreFilters.recommendation) return false;
+    }
+    return true;
+  });
 
   const stageOptions = [
     { value: "", label: "All Stages" },
@@ -510,10 +645,147 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
         )}
       </div>
 
+      {/* Skill search, saved views and share link */}
+      <CandidateFilterBar
+        campaignId={campaignId}
+        skills={skills}
+        stageFilter={stageFilter}
+        resultCount={list.length}
+        resumeFilters={resumeFilters}
+        onResumeFiltersChange={setResumeFilters}
+        onSkillsChange={(next, nextStage) => {
+          setSkills(next);
+          if (nextStage !== undefined && onStageFilterChange) onStageFilterChange(nextStage);
+        }}
+      />
+
+      {/* Score range + AI recommendation, AND-combined with
+          the stage, skill and resume filters above. */}
+      <div className="flex flex-wrap items-center gap-2 bg-white border border-slate-200 rounded-xl p-3">
+        <span className="text-[10px] uppercase font-bold text-slate-400">Overall score</span>
+        <input type="number" min="0" max="100" placeholder="Min" value={scoreFilters.min}
+          onChange={(e) => setScoreFilters({ ...scoreFilters, min: e.target.value })}
+          className="w-20 px-2 py-1.5 border border-slate-200 rounded-lg text-xs" />
+        <span className="text-slate-300">–</span>
+        <input type="number" min="0" max="100" placeholder="Max" value={scoreFilters.max}
+          onChange={(e) => setScoreFilters({ ...scoreFilters, max: e.target.value })}
+          className="w-20 px-2 py-1.5 border border-slate-200 rounded-lg text-xs" />
+        <span className="text-[10px] uppercase font-bold text-slate-400 ml-2">AI says</span>
+        <select value={scoreFilters.recommendation}
+          onChange={(e) => setScoreFilters({ ...scoreFilters, recommendation: e.target.value })}
+          className="px-2 py-1.5 border border-slate-200 rounded-lg text-xs">
+          <option value="">Any</option>
+          <option value="SHORTLIST">Shortlist</option>
+          <option value="HOLD">Hold</option>
+          <option value="REJECT">Reject</option>
+        </select>
+        {(scoreFilters.min || scoreFilters.max || scoreFilters.recommendation) && (
+          <button type="button"
+            onClick={() => setScoreFilters({ min: "", max: "", recommendation: "" })}
+            className="text-[11px] text-indigo-600 font-semibold hover:underline ml-auto">
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* The bulk bar only exists while something is selected */}
+      {canAct && selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
+          <span className="text-xs font-bold text-indigo-900">
+            {selectedIds.size} selected
+          </span>
+          <span className="text-[11px] text-indigo-700">
+            All selected candidates must be in the same stage.
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <select
+              className="px-2 py-1.5 border border-indigo-200 rounded-lg text-xs bg-white"
+              value=""
+              onChange={(e) => {
+                if (!e.target.value) return;
+                setAction({ kind: "bulk", targetStage: e.target.value });
+              }}
+            >
+              <option value="">Move all to…</option>
+              {["SCREENING", "SHORTLISTED", "HM_REVIEW", "INTERVIEW", "SELECTED", "HOLD", "REJECTED"]
+                .map((s) => <option key={s} value={s}>{stageLabel(s)}</option>)}
+            </select>
+            {/* Batch scorecards, HR_ADMIN only and only
+                meaningful for 2+ candidates (the API enforces both). */}
+            {isHRAdminUser && selectedIds.size >= 2 && (
+              <select
+                className="px-2 py-1.5 border border-indigo-200 rounded-lg text-xs bg-white"
+                value=""
+                onChange={async (e) => {
+                  const fmt = e.target.value;
+                  if (!fmt) return;
+                  e.target.value = "";
+                  try {
+                    await exportBatchScorecards(campaignId, [...selectedIds], fmt);
+                    toast.success("Scorecards downloaded.");
+                  } catch (err) {
+                    toast.error(err?.response?.data?.message || "Batch export failed.");
+                  }
+                }}
+              >
+                <option value="">Export scorecards…</option>
+                <option value="PDF">Single PDF</option>
+                <option value="ZIP">ZIP of PDFs</option>
+              </select>
+            )}
+            <button type="button" onClick={() => setSelectedIds(new Set())}
+              className="text-[11px] text-indigo-700 font-semibold hover:underline">
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       <CandidateTable
         candidates={pageItems}
         onView={(c) => navigate(`/airs/pipeline/candidates/${c.id}`, { state: { resume: c } })}
         onToggleStar={toggleStar}
+        selectable={canAct}
+        selectedIds={selectedIds}
+        noteCounts={noteCounts}
+        onToggleSelect={(ccId) => setSelectedIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(ccId)) next.delete(ccId); else next.add(ccId);
+          return next;
+        })}
+        onToggleSelectAll={(rows, select) => setSelectedIds((prev) => {
+          const next = new Set(prev);
+          rows.forEach((r) => (select ? next.add(r.id) : next.delete(r.id)));
+          return next;
+        })}
+        renderExtraActions={canAct ? (c) => (
+          <>
+            <button type="button" title="Move to another stage"
+              onClick={(e) => { e.stopPropagation(); setAction({ kind: "move", candidate: c }); }}
+              className="h-8 w-8 inline-flex items-center justify-center text-slate-400 hover:text-indigo-600">
+              <ArrowRightLeft className="h-4 w-4" />
+            </button>
+            {(c.stage || "").toUpperCase() !== "REJECTED" && (
+              <button type="button" title="Reject with a reason"
+                onClick={(e) => { e.stopPropagation(); setAction({ kind: "reject", candidate: c }); }}
+                className="h-8 w-8 inline-flex items-center justify-center text-slate-400 hover:text-red-600">
+                <Ban className="h-4 w-4" />
+              </button>
+            )}
+          </>
+        ) : undefined}
+      />
+
+      <CandidateActionModals
+        action={action}
+        campaignId={campaignId}
+        selectedIds={selectedIds}
+        onClose={() => setAction(null)}
+        onDone={() => {
+          setAction(null);
+          setSelectedIds(new Set());
+          setReloadKey((k) => k + 1);
+        }}
       />
 
       {list.length > 0 && (<Pagination
@@ -528,9 +800,26 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
 }
 
 /* ---------------- Pipeline Tab ---------------- */
-function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick }) {
+function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick, canViewTiming }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  // HR_ADMIN-only overlay, fetched lazily on first toggle so
+  // the funnel itself never waits on it.
+  const [showTiming, setShowTiming] = useState(false);
+  const [timing, setTiming] = useState(null);
+
+  const toggleTiming = async () => {
+    const next = !showTiming;
+    setShowTiming(next);
+    if (next && timing === null) {
+      try {
+        setTiming(await getStageTiming(campaignId));
+      } catch {
+        setTiming([]);
+        toast.error("Failed to load stage timing.");
+      }
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -569,9 +858,16 @@ function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick }) {
             {isActive && <span className="text-emerald-600 font-semibold"> · live</span>}
           </p>
         </div>
-        <Button size="small" variant="primary" onClick={onViewCandidates}>
-          View All Candidates <ArrowRight className="h-3.5 w-3.5" />
-        </Button>
+        <div className="flex items-center gap-2">
+          {canViewTiming && (
+            <Button size="small" variant={showTiming ? "secondary" : "outline"} onClick={toggleTiming}>
+              <Clock className="h-3.5 w-3.5" /> {showTiming ? "Hide" : "Show"} Timing
+            </Button>
+          )}
+          <Button size="small" variant="primary" onClick={onViewCandidates}>
+            View All Candidates <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
@@ -586,6 +882,17 @@ function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick }) {
             <div className="flex justify-between items-center text-xs mb-1">
               <span className="font-bold text-slate-700 group-hover:text-indigo-700">{stageLabel(s.stage)}</span>
               <div className="flex items-center gap-3">
+                {showTiming && (() => {
+                  const t = (timing || []).find((x) => x.stage === s.stage);
+                  if (!t) return null;
+                  return (
+                    <span className={`text-[10px] font-semibold ${t.breaches_sla ? "text-rose-600" : "text-slate-500"}`}>
+                      avg {t.avg_days}d · max {t.max_days}d
+                      {t.sla_days != null && ` · SLA ${t.sla_days}d`}
+                      {t.breaches_sla && " ⚠"}
+                    </span>
+                  );
+                })()}
                 {s.drop_off_pct != null && (<span className="text-[10px] font-semibold text-rose-500">
                     ▼ {Math.round(s.drop_off_pct)}% drop-off
                   </span>
@@ -1154,7 +1461,7 @@ function RejectionsTab({ campaignId, jdId, onAdjustThreshold }) {
           {analytics.recommendations.map((rec) => (<div key={rec.condition} className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-100">
               <Lightbulb className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
               <div className="flex-1 text-[11.5px] text-amber-800">
-                <span className="font-bold">{rec.layer} rejection rate {rec.rate_pct}%</span>
+                <span className="font-bold">{REJECTION_LAYER_LABELS[rec.layer] || rec.layer} rejection rate {rec.rate_pct}%</span>
                 {" "}(threshold {rec.threshold_pct}%) — {rec.recommendation}
                 {/* direct action link per recommendation */}
                 <div className="mt-1.5">
@@ -1196,7 +1503,7 @@ function RejectionsTab({ campaignId, jdId, onAdjustThreshold }) {
           const count = analytics.layer_breakdown[layer] || 0;
           return (<div key={layer}>
               <div className="flex justify-between items-center text-xs mb-1">
-                <span className="font-bold text-slate-700">{layer}</span>
+                <span className="font-bold text-slate-700">{REJECTION_LAYER_LABELS[layer] || layer}</span>
                 <span className="font-black text-slate-900 tabular-nums">{count}</span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">

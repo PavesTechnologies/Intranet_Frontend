@@ -34,8 +34,19 @@ const XMS_EMPLOYEE   = [ROLES.GENERAL];
 const XMS_MANAGER    = [ROLES.MANAGER];
 const XMS_FINANCE    = [ROLES.FINANCE];
 const XMS_ADMIN      = ADMIN_ROLES;
-const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, ...ADMIN_ROLES];
+export const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, ...ADMIN_ROLES];
 const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, ...ADMIN_ROLES];
+
+/**
+ * Union of every role that can see at least one Finance Management module
+ * (Expense Management, Accounts Payable, Accounts Receivable). Composed from
+ * each module's own existing role set — not a new authorization mechanism —
+ * so it stays correct as long as XMS_EVERYONE / AP_ALL_ROLES / the AR
+ * SUPER_ADMIN gate (see Sidebar.jsx / App.jsx) stay in sync.
+ */
+export const FINANCE_ALL_ROLES = [
+  ...new Set([...XMS_EVERYONE, ...AP_ALL_ROLES, ROLES.SUPER_ADMIN]),
+];
 
 /**
  * Employee Onboarding flyout submenu config.

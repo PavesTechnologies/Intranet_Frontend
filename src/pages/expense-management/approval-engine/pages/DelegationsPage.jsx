@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Inbox, Pencil, Plus, Trash2 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import Modal from "@/components/Modal/modal";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import FormInput from "@/components/forms/FormInput";
@@ -11,6 +12,8 @@ import {
   useSaveApprovalDelegation,
   useDeleteApprovalDelegation,
 } from "../hooks/useApprovalDelegations";
+import EmployeeLabel from "../components/EmployeeLabel";
+import { formatDate } from "../constants/approvalLabels";
 
 const emptyForm = { delegationId: null, delegatorId: "", delegateId: "", startDate: "", endDate: "", status: "ACTIVE" };
 
@@ -74,7 +77,7 @@ export default function DelegationsPage() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <Breadcrumb
         items={[
           { label: "Expense Management", to: "/expense-management/dashboard" },
@@ -83,29 +86,44 @@ export default function DelegationsPage() {
         ]}
       />
 
-      <div className="flex items-center justify-between mt-3 mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-3 mb-1">
         <h1 className="text-xl font-semibold text-gray-900">Delegations</h1>
         <Button size="small" variant="primary" onClick={openCreate}>
           <Plus className="h-3.5 w-3.5" /> Add
         </Button>
       </div>
+      <p className="text-sm text-gray-500 mb-4">
+        While active, an approver's assignments route to their delegate instead - for any delegator, admin-wide.
+      </p>
 
-      {isLoading && <p className="text-sm text-gray-500">Loading…</p>}
-      {isError && (
-        <p className="text-sm text-rose-600">
-          Failed to load. <button className="underline" onClick={() => refetch()}>Retry</button>
-        </p>
+      {isLoading && (
+        <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-12">
+          <LoadingSpinner text="Loading…" />
+        </div>
       )}
-      {!isLoading && !isError && (delegations || []).length === 0 && <p className="text-sm text-gray-500">No delegations configured yet.</p>}
+      {isError && (
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 py-8 text-center">
+          <AlertTriangle className="h-5 w-5 text-rose-500" />
+          <p className="text-sm text-rose-700">Failed to load.</p>
+          <Button size="small" variant="outline" onClick={() => refetch()}>Retry</Button>
+        </div>
+      )}
+      {!isLoading && !isError && (delegations || []).length === 0 && (
+        <div className="flex flex-col items-center gap-1 rounded-xl border border-gray-200 bg-white py-12 text-center">
+          <Inbox className="h-6 w-6 text-gray-300" />
+          <p className="text-sm text-gray-500">No delegations configured yet.</p>
+        </div>
+      )}
 
       {(delegations || []).length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
               <tr>
-                <th className="px-4 py-3">Delegator</th>
+                <th className="px-4 py-3">Approver</th>
                 <th className="px-4 py-3">Delegate</th>
-                <th className="px-4 py-3">Window</th>
+                <th className="px-4 py-3">Start Date</th>
+                <th className="px-4 py-3">End Date</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -113,10 +131,19 @@ export default function DelegationsPage() {
             <tbody className="divide-y divide-gray-100">
               {delegations.map((row) => (
                 <tr key={row.delegationId} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-900">{row.delegatorId}</td>
-                  <td className="px-4 py-3 text-gray-900">{row.delegateId}</td>
-                  <td className="px-4 py-3 text-gray-600">{row.startDate} → {row.endDate}</td>
-                  <td className="px-4 py-3 text-gray-600">{row.status}</td>
+                  <td className="px-4 py-3 text-gray-900">
+                    <EmployeeLabel employeeId={row.delegatorId} />
+                  </td>
+                  <td className="px-4 py-3 text-gray-900">
+                    <EmployeeLabel employeeId={row.delegateId} />
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(row.startDate)}</td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(row.endDate)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${row.status === "ACTIVE" ? "bg-emerald-100 text-emerald-800" : "bg-gray-100 text-gray-500"}`}>
+                      {row.status === "ACTIVE" ? "Active" : "Cancelled"}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-2">
                       <Button size="small" variant="outline" onClick={() => openEdit(row)}>
