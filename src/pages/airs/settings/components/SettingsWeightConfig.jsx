@@ -6,9 +6,9 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { getPlatformScoringDefaults, updatePlatformDefaultWeights } from "../../campaigns/services/campaignservice";
 
 const FIELDS = [
-  { key: "weight_deterministic", label: "Deterministic weight", suffix: "%" },
-  { key: "weight_semantic", label: "Semantic weight", suffix: "%" },
-  { key: "weight_ai", label: "AI weight", suffix: "%" },
+  { key: "weight_deterministic", label: "Requirements weight", suffix: "%" },
+  { key: "weight_semantic", label: "Relevance weight", suffix: "%" },
+  { key: "weight_ai", label: "AI Review weight", suffix: "%" },
 ];
 
 const THRESHOLD_FIELDS = [
@@ -50,7 +50,7 @@ export default function SettingsWeightConfig() {
 
   const handleSave = async () => {
     if (Math.abs(total - 100) > 0.01) {
-      return toast.error("Deterministic + Semantic + AI weights must sum to 100.");
+      return toast.error("Requirements + Relevance + AI Review weights must sum to 100.");
     }
     setSaving(true);
     try {

@@ -28,7 +28,7 @@ function healthBadges(c) {
   return badges.slice(0, 2);
 }
 
-// M11-E01-S03-T01: the count itself is the quick link — clicking it opens the
+// The count itself is the quick link — clicking it opens the
 // campaign's candidate list already filtered to that stage, and the URL is
 // shareable. Zero renders as plain text so there's nothing to click.
 function StageLink({ campaignId, stage, count }) {

@@ -51,7 +51,7 @@ export default function NoVerifiedSkillsBanner({ candidate, onAddManualSkill }) 
               <li>Incomplete parse</li>
             </ul>
 
-            <p className="text-[12.5px] font-semibold text-rose-800 mt-2">The deterministic score is 0 as a result.</p>
+            <p className="text-[12.5px] font-semibold text-rose-800 mt-2">The requirements score is 0 as a result.</p>
 
             <div className="flex flex-wrap gap-2 mt-4">
               <Button

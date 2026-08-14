@@ -8,14 +8,14 @@ import SemanticSummaryCard from "./components/SemanticSummaryCard";
 import SkillChipGroup from "./components/SkillChipGroup";
 import { textOrDash } from "../../../utils/candidateDataUtils";
 
-// Semantic Score tab — GET /airs/campaign-candidates/{campaign_candidate_id}/semantic.
+// Relevance Score tab — GET /airs/campaign-candidates/{campaign_candidate_id}/semantic.
 export default function SemanticScoreTab({ candidate }) {
   const { breakdown, loading, error, refetch } = useSemanticScore(candidate?.id);
 
   if (loading) {
     return (
       <div className="py-12 flex items-center justify-center">
-        <LoadingSpinner text="Loading semantic score..." />
+        <LoadingSpinner text="Loading relevance score..." />
       </div>
     );
   }
@@ -23,15 +23,15 @@ export default function SemanticScoreTab({ candidate }) {
   if (error) {
     return (
       <ErrorState
-        title="Couldn't load semantic score"
-        message="We couldn't load this candidate's semantic score breakdown. Please try again."
+        title="Couldn't load relevance score"
+        message="We couldn't load this candidate's relevance score breakdown. Please try again."
         onRetry={refetch}
       />
     );
   }
 
   if (!breakdown) {
-    return <ErrorState title="No data available" message="No semantic score breakdown found for this candidate." />;
+    return <ErrorState title="No data available" message="No relevance score breakdown found for this candidate." />;
   }
 
   return (
