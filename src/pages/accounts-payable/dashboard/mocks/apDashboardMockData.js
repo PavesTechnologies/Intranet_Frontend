@@ -1,77 +1,44 @@
-/* -------------------------------------------------------------------------- */
-/* Dashboard KPI Data                                                        */
-/* -------------------------------------------------------------------------- */
-
 export const dashboardKpis = [
   {
     title: "Total Invoices",
     value: "1,248",
     subtitle: "Invoices received",
     tone: "default",
-    trend: "+8.4%",
-    trendDirection: "up",
   },
   {
     title: "Pending Invoices",
     value: "186",
     subtitle: "Require processing",
     tone: "amber",
-    trend: "-5.2%",
-    trendDirection: "down",
   },
   {
     title: "Exceptions",
     value: "32",
     subtitle: "Require attention",
     tone: "rose",
-    trend: "+3.1%",
-    trendDirection: "up",
   },
   {
     title: "Pending Approvals",
     value: "27",
     subtitle: "Awaiting approval",
     tone: "indigo",
-    trend: "-2.8%",
-    trendDirection: "down",
   },
   {
     title: "Outstanding Payable",
     value: "₹2.84 Cr",
     subtitle: "Total unpaid balance",
     tone: "default",
-    trend: "+4.6%",
-    trendDirection: "up",
   },
   {
     title: "Overdue Payable",
     value: "₹18.4 L",
     subtitle: "Past due date",
     tone: "rose",
-    trend: "+1.8%",
-    trendDirection: "up",
-  },
-  {
-    title: "Due in Next 7 Days",
-    value: "₹32.8 L",
-    subtitle: "41 invoices",
-    tone: "amber",
-    trend: "41 invoices",
-    trendDirection: "neutral",
-  },
-  {
-    title: "Paid This Month",
-    value: "₹1.24 Cr",
-    subtitle: "156 invoices",
-    tone: "emerald",
-    trend: "+12.4%",
-    trendDirection: "up",
   },
 ];
 
-
 /* -------------------------------------------------------------------------- */
-/* Attention Queue                                                            */
+/* Requires Attention                                                         */
 /* -------------------------------------------------------------------------- */
 
 export const attentionQueue = [
@@ -113,26 +80,22 @@ export const attentionQueue = [
   },
 ];
 
-
 /* -------------------------------------------------------------------------- */
-/* Invoice Processing Pipeline                                                */
+/* Invoice Processing                                                         */
 /* -------------------------------------------------------------------------- */
 
 export const invoiceProcessingStages = [
   {
     label: "Received",
     count: 124,
-    tone: "default",
   },
   {
     label: "Processing",
     count: 38,
-    tone: "indigo",
   },
   {
     label: "Validation",
     count: 26,
-    tone: "amber",
   },
   {
     label: "Exception",
@@ -166,7 +129,6 @@ export const invoiceProcessingStages = [
   },
 ];
 
-
 /* -------------------------------------------------------------------------- */
 /* AP Aging                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -176,12 +138,10 @@ export const apAging = {
     {
       label: "Outstanding",
       value: "₹73.4 L",
-      tone: "default",
     },
     {
       label: "Not Due",
       value: "₹50.2 L",
-      tone: "emerald",
     },
     {
       label: "Overdue",
@@ -195,13 +155,11 @@ export const apAging = {
       label: "0-30 Days",
       value: "₹42.5 L",
       amount: 42.5,
-      tone: "default",
     },
     {
       label: "31-60 Days",
       value: "₹18.2 L",
       amount: 18.2,
-      tone: "default",
     },
     {
       label: "61-90 Days",
@@ -217,7 +175,6 @@ export const apAging = {
     },
   ],
 };
-
 
 /* -------------------------------------------------------------------------- */
 /* Payment Overview                                                           */
@@ -240,7 +197,6 @@ export const paymentOverview = [
     label: "Processing",
     value: "₹7.4 L",
     amount: 7.4,
-    tone: "default",
   },
   {
     label: "Paid",
@@ -256,67 +212,8 @@ export const paymentOverview = [
   },
 ];
 
-
 /* -------------------------------------------------------------------------- */
-/* Exception Analysis                                                         */
-/* -------------------------------------------------------------------------- */
-
-export const exceptionAnalysis = [
-  {
-    label: "PO Mismatch",
-    count: 12,
-  },
-  {
-    label: "Duplicate Invoice",
-    count: 8,
-  },
-  {
-    label: "Amount Mismatch",
-    count: 6,
-  },
-  {
-    label: "GST / Tax Mismatch",
-    count: 4,
-  },
-  {
-    label: "Missing Information",
-    count: 3,
-  },
-  {
-    label: "OCR Low Confidence",
-    count: 2,
-  },
-];
-
-
-/* -------------------------------------------------------------------------- */
-/* Top Vendors                                                                */
-/* -------------------------------------------------------------------------- */
-
-export const topVendors = [
-  {
-    vendor: "TechVision Distributors Pvt Ltd",
-    invoices: 42,
-    outstanding: "₹18.4 L",
-    overdue: "₹2.1 L",
-  },
-  {
-    vendor: "Amazon Web Services India",
-    invoices: 31,
-    outstanding: "₹12.6 L",
-    overdue: "₹0",
-  },
-  {
-    vendor: "ABC Technologies Pvt Ltd",
-    invoices: 25,
-    outstanding: "₹9.4 L",
-    overdue: "₹1.2 L",
-  },
-];
-
-
-/* -------------------------------------------------------------------------- */
-/* Invoice Intake Quality                                                     */
+/* Invoice Intake Health                                                      */
 /* -------------------------------------------------------------------------- */
 
 export const invoiceIntakeQuality = {
@@ -327,9 +224,20 @@ export const invoiceIntakeQuality = {
   failed: 12,
 };
 
+/*
+ * Admin should see a simple health indicator instead of
+ * a detailed OCR analytics dashboard.
+ */
+
+export const invoiceIntakeHealth = {
+  processed: 1245,
+  successRate: 97.8,
+  needsReview: 2.8,
+  failedRate: 1.0,
+};
 
 /* -------------------------------------------------------------------------- */
-/* Dashboard Date Filters                                                     */
+/* Date Range                                                                 */
 /* -------------------------------------------------------------------------- */
 
 export const dateRangeOptions = [
