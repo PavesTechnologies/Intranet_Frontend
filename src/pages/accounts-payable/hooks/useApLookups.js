@@ -13,6 +13,7 @@ export const COUNTRIES_KEY = ["accountsPayable", "lookups", "countries"];
 export const CURRENCIES_KEY = ["accountsPayable", "lookups", "currencies"];
 export const PAYMENT_TERMS_KEY = ["accountsPayable", "lookups", "paymentTerms"];
 export const VENDOR_STATUSES_KEY = ["accountsPayable", "lookups", "vendorStatuses"];
+export const PO_STATUSES_KEY = ["accountsPayable", "lookups", "poStatuses"];
 
 export const useCountries = () =>
   useQuery({
@@ -39,6 +40,14 @@ export const useVendorStatuses = () =>
   useQuery({
     queryKey: VENDOR_STATUSES_KEY,
     queryFn: apLookupService.getVendorStatuses,
+    ...MASTER_DATA_OPTIONS,
+  });
+
+/** Purchase Order lifecycle statuses (module_name "PO" — OPEN/CLOSED/CANCELLED). */
+export const usePoStatuses = () =>
+  useQuery({
+    queryKey: PO_STATUSES_KEY,
+    queryFn: apLookupService.getPoStatuses,
     ...MASTER_DATA_OPTIONS,
   });
 
