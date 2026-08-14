@@ -47,6 +47,17 @@ export default {
           partial: "hsl(var(--status-partial) / <alpha-value>)",
           allocated: "hsl(var(--status-allocated) / <alpha-value>)",
         },
+        brand: {
+          primary: "var(--brand-primary)",
+          "primary-hover": "var(--brand-primary-hover)",
+          secondary: "var(--brand-secondary)",
+          "secondary-hover": "var(--brand-secondary-hover)",
+        },
+        success: { DEFAULT: "var(--success)", bg: "var(--success-bg)" },
+        warning: { DEFAULT: "var(--warning)", bg: "var(--warning-bg)" },
+        danger: { DEFAULT: "var(--danger)", bg: "var(--danger-bg)" },
+        info: { DEFAULT: "var(--info)", bg: "var(--info-bg)" },
+        neutral: { DEFAULT: "var(--neutral)", bg: "var(--neutral-bg)" },
       },
       borderRadius: {
         lg: "var(--radius)",

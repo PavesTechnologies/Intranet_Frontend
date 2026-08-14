@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { X } from "lucide-react";
 
 import Button from "../Button/Button";
@@ -61,6 +61,7 @@ const Modal = ({
   zIndex = "z-[9999]",
 
   closeOnBackdrop = true,
+  closeOnEscape = true,
   scrollable = true,
 
   showCloseButton = true,
@@ -85,6 +86,17 @@ const Modal = ({
 
   animation = "zoom",
 }) => {
+  useEffect(() => {
+    if (!isOpen || !closeOnEscape || !onClose) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, closeOnEscape, onClose]);
+
   if (!isOpen) return null;
 
   const mergedClassName = [className, panelClassName].filter(Boolean).join(" ");
