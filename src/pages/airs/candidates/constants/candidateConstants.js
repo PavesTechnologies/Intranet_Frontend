@@ -78,7 +78,7 @@ export const CANDIDATE_SORT_OPTIONS = [
   { label: "Overall score (high to low)", value: "composite:desc" },
   { label: "Overall score (low to high)", value: "composite:asc" },
   { label: "ATS score", value: "ats:desc" },
-  { label: "Semantic score", value: "semantic:desc" },
+  { label: "Relevance score", value: "semantic:desc" },
   { label: "Experience", value: "experience:desc" },
   { label: "Risk (high to low)", value: "risk:desc" },
 ];
