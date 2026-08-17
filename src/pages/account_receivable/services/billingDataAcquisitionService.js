@@ -1,13 +1,13 @@
-// Mock service layer for Billing Data Acquisition. Wraps the static data modules with
-// promise-based, artificially-latent functions so pages can already be written against an
-// async data-fetching contract — swap the bodies for real axios calls (see
-// src/pages/resource_management/services for the target shape) once the Epic 1 API exists.
-import { BILLING_CONFIGURATIONS } from "../data/billingConfigurations";
+import api from "../../../api/axiosInstance";
 import { BILLING_CONTEXTS } from "../data/billingContexts";
 import { MOCK_TRANSACTIONS } from "../data/billingDataAcquisition";
 
 const LATENCY_MS = 500;
-const AR_BASE_URL = import.meta.env.VITE_AR_API_BASE_URL || "http://localhost:8080";
+const AR_BASE_URL = window.__APP_CONFIG__?.AR_BASE_URL || import.meta.env.VITE_AR_API_BASE_URL || "http://localhost:8080";
+
+function getToken() {
+  return localStorage.getItem("token") || "";
+}
 
 function delay(value) {
   return new Promise((resolve) => setTimeout(() => resolve(value), LATENCY_MS));
@@ -21,92 +21,125 @@ function sumAmount(records) {
   return records.reduce((total, record) => total + (Number(record.amount) || 0), 0);
 }
 
-export function fetchActiveBillingConfigurations() {
-  const configs = [
-    {
-      id: "BC-2026-001",
-      projectId: 9,
-      projectCode: "PRJ-1001",
-      projectName: "ERP Modernization",
-      client: "ABC Technologies",
-      billingType: "TIME_MATERIAL",
-      billingFrequency: "MONTHLY",
-      billingPeriod: "06 Jan 2026 - 30 Jul 2026",
-      periodStart: "2026-01-06",
-      periodEnd: "2026-07-30",
-      invoiceGeneration: "AUTOMATIC",
-      billingStatus: "Ready",
-      lastInvoice: "INV-1005",
-      generatedOn: "13 Aug 2026",
-      currency: "INR"
-    },
-    {
-      id: "BC-2026-002",
-      projectId: 9,
-      projectCode: "9",
-      projectName: "Digital Banking Platform",
-      client: "Global Finance Ltd",
-      billingType: "FIXED_PRICE",
-      billingFrequency: "HALF_YEARLY",
-      billingPeriod: "01 Jul 2026 - 31 Dec 2026",
-      periodStart: "2026-07-01",
-      periodEnd: "2026-12-31",
-      invoiceGeneration: "MANUAL",
-      billingStatus: "Waiting for Source Data",
-      lastInvoice: "INV-1002",
-      generatedOn: "30 Jun 2026",
-      currency: "USD"
-    },
-    {
-      id: "BC-2026-004",
-      projectCode: "MAN-1001",
-      projectName: "Warehouse Robotics Integration",
-      client: "Atlas Logistics",
-      billingType: "RECURRING",
-      billingFrequency: "MONTHLY",
-      billingPeriod: "01 Aug 2026 - 31 Aug 2026",
-      periodStart: "2026-08-01",
-      periodEnd: "2026-08-31",
-      invoiceGeneration: "AUTOMATIC",
-      billingStatus: "Ready",
-      lastInvoice: "INV-1008",
-      generatedOn: "31 Jul 2026",
-      currency: "INR"
-    },
-    {
-      id: "BC-2026-008",
-      projectCode: "PRJ-1007",
-      projectName: "Patient Portal Revamp",
-      client: "Zen Healthcare",
-      billingType: "RECURRING",
-      billingFrequency: "MONTHLY",
-      billingPeriod: "01 Aug 2026 - 31 Aug 2026",
-      periodStart: "2026-08-01",
-      periodEnd: "2026-08-31",
-      invoiceGeneration: "MANUAL",
-      billingStatus: "Already Billed",
-      lastInvoice: "INV-1010",
-      generatedOn: "01 Aug 2026",
-      currency: "INR"
-    },
-    {
-      id: "BC-2026-011",
-      projectCode: "PRJ-1011",
-      projectName: "Core Insurance Claims Platform",
-      client: "Horizon Insurance Co.",
-      billingType: "MILESTONE",
-      billingFrequency: "QUARTERLY",
-      billingPeriod: "01 Jul 2026 - 30 Sep 2026",
-      periodStart: "2026-07-01",
-      periodEnd: "2026-09-30",
-      invoiceGeneration: "MANUAL",
-      billingStatus: "Ready",
-      lastInvoice: "INV-1012",
-      generatedOn: "30 Jun 2026",
-      currency: "INR"
-    }
-  ];
-  return delay(configs);
+// ─── Active Billing Configurations (Phase 1: real API) ────────────────────────
+
+/**
+ * Normalise a billing type name string (from billing_type_master) → internal UI key.
+ */
+function normalizeBillingTypeName(name) {
+  if (!name) return "";
+  const upper = String(name).trim().toUpperCase().replace(/\s+/g, "_");
+  if (["TIME_AND_MATERIAL", "TIME_MATERIAL", "TIMESHEET_BASED"].includes(upper)) return "TIME_MATERIAL";
+  if (["FIXED_PRICE", "FIXED"].includes(upper)) return "FIXED_PRICE";
+  if (["MILESTONE", "MILESTONE_BASED"].includes(upper)) return "MILESTONE";
+  if (["RECURRING", "SUBSCRIPTION", "SUBSCRIPTION_BASED", "RECURRING_BILLING"].includes(upper)) return "RECURRING";
+  return upper;
+}
+
+/**
+ * Format an ISO date range (YYYY-MM-DD) into "DD Mon YYYY - DD Mon YYYY".
+ */
+function formatBillingPeriod(startIso, endIso) {
+  if (!startIso && !endIso) return "\u2014";
+  const fmt = (iso) => {
+    if (!iso) return "\u2014";
+    const d = new Date(iso + "T00:00:00");
+    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  };
+  if (!endIso) return fmt(startIso);
+  if (!startIso) return fmt(endIso);
+  return `${fmt(startIso)} - ${fmt(endIso)}`;
+}
+
+/**
+ * Fetches ACTIVE billing configurations from the AR backend and maps
+ * them to the shape the Billing Data Acquisition overview table expects.
+ *
+ * Endpoint: GET /api/billing-data-acquisition/active-configurations
+ *
+ * Server DTO → UI shape:
+ *   projectName, projectCode  → projectName, projectCode
+ *   clientName                → client
+ *   billingType               → billingType  (normalised)
+ *   frequency                 → billingFrequency
+ *   billingPeriodStart/End    → billingPeriod (display), periodStart, periodEnd
+ *   generationMode            → invoiceGeneration
+ *   status                    → billingStatus  (Phase 1: always "READY")
+ *   lastInvoice               → lastInvoice     (Phase 1: always null)
+ */
+export async function fetchActiveBillingConfigurations() {
+  const endpoint = `${AR_BASE_URL}/api/billing-data-acquisition/active-configurations`;
+
+  try {
+    const response = await api.get(endpoint);
+    const json = response.data;
+    // ApiResponse wrapper: { success, message, data: [...] }
+    const configs = Array.isArray(json) ? json : (json?.data ?? []);
+
+    return configs.map((cfg) => ({
+      // Identity
+      id: `BC-${cfg.projectId}`,
+      billingConfigurationId: cfg.billingConfigurationId,
+      projectId: cfg.projectId,
+      projectCode: cfg.projectCode ?? `PRJ-${cfg.projectId}`,
+      projectName: cfg.projectName ?? "\u2014",
+
+      // Client
+      client: cfg.clientName ?? "\u2014",
+
+      // Billing type — the API returns the human-readable master name directly
+      // (e.g. "Timesheet Based", "Fixed Price"). Pass it through as-is.
+      billingType: cfg.billingType ?? "\u2014",
+
+      // Frequency — the API returns the human-readable name (e.g. "Monthly").
+      // frequencyLabel() handles capitalisation so pass through directly.
+      billingFrequency: cfg.frequency ?? "",
+
+      // Billing period — ISO strings (YYYY-MM-DD) → formatted display + raw dates
+      billingPeriod: formatBillingPeriod(cfg.billingPeriodStart, cfg.billingPeriodEnd),
+      periodStart: cfg.billingPeriodStart ?? "",
+      periodEnd: cfg.billingPeriodEnd ?? "",
+
+      // Generation mode from invoice_generation_type: AUTOMATIC | MANUAL
+      invoiceGeneration: cfg.generationMode ?? "MANUAL",
+
+      // Refined acquisition status model: NOT_ACQUIRED | READY | PARTIALLY_READY | ALREADY_BILLED
+      billingStatus: cfg.status ?? "NOT_ACQUIRED",
+      lastInvoice: cfg.lastInvoice ?? null,
+
+      // Currency from API
+      currency: cfg.currency ?? "INR",
+      currencyId: cfg.currencyId ?? cfg.currency_id ?? cfg.currencyMasterId ?? 1,
+      currency_id: cfg.currency_id ?? cfg.currencyId ?? 1,
+      currencyCode: cfg.currencyCode ?? cfg.currency ?? "INR",
+    }));
+  } catch (error) {
+    console.error("[BillingDataAcquisition] fetchActiveBillingConfigurations failed:", error);
+    // Return empty array so the page shows "no data" rather than crashing
+    return [];
+  }
+}
+
+/**
+ * Calls POST /api/billing-data-acquisition/acquire to register/update
+ * a BillingAcquisition execution record for Phase 2 lifecycle tracking.
+ */
+export async function acquireBillingRecord(billingConfigurationId, periodStart, periodEnd, snapshotId = null, status = "READY", currencyId = 1) {
+  if (!billingConfigurationId) return null;
+  const endpoint = `${AR_BASE_URL}/api/billing-data-acquisition/acquire`;
+  try {
+    const response = await api.post(endpoint, {
+      billingConfigurationId,
+      billingPeriodStart: periodStart,
+      billingPeriodEnd: periodEnd,
+      snapshotId,
+      status,
+      currencyId: currencyId,
+    });
+    return response.data;
+  } catch (err) {
+    console.error("[BillingDataAcquisition] acquire POST error:", err);
+  }
 }
 
 export function fetchBillingContext(configId) {
@@ -126,6 +159,68 @@ export function getApplicableChargeTypes(billingType, toolBillingEnabled) {
   };
 }
 
+function resolveCurrencyId(currency) {
+  if (typeof currency === "number" && !isNaN(currency)) return currency;
+  if (!currency) return 1;
+  const str = String(currency).trim().toUpperCase();
+  if (str === "1" || str === "INR" || str === "RS" || str === "RUPEES") return 1;
+  if (str === "2" || str === "USD" || str === "DOLLAR") return 2;
+  if (str === "3" || str === "EUR" || str === "EURO") return 3;
+  if (str === "4" || str === "GBP" || str === "POUND") return 4;
+  const num = Number(str);
+  return !isNaN(num) && num > 0 ? num : 1;
+}
+
+/**
+ * Calls GET /api/v1/billing-snapshots/by-period to retrieve an existing snapshot by project and period.
+ */
+export async function getBillingSnapshotByPeriod(projectId, billingPeriodStart, billingPeriodEnd) {
+  if (!projectId || !billingPeriodStart || !billingPeriodEnd) return null;
+  const numericId = Number(projectId);
+  const finalProjectId = (isNaN(numericId) || !numericId) ? 9 : numericId;
+  const endpoint = `${AR_BASE_URL}/api/v1/billing-snapshots/by-period`;
+
+  try {
+    const response = await api.get(endpoint, {
+      params: {
+        projectId: finalProjectId,
+        billingPeriodStart,
+        billingPeriodEnd,
+      },
+    });
+
+    const json = response.data;
+    if (!json || json.success === false || !json.data) {
+      return null;
+    }
+
+    const snapshot = json.data;
+    const laborRecords = (snapshot.timesheets || []).map((t, idx) => ({
+      id: t.sourceReferenceId || `labor-${idx}`,
+      employee: t.employee,
+      workDate: t.workDate,
+      hours: t.hours,
+      rate: t.rate,
+      amount: t.amount,
+      approvalStatus: t.approvalStatus || "Approved",
+      role: t.role,
+    }));
+
+    return {
+      snapshotId: snapshot.snapshotId,
+      snapshotNumber: snapshot.snapshotNumber,
+      subtotal: snapshot.subtotal,
+      totalAmount: snapshot.totalAmount,
+      status: snapshot.status || "READY",
+      laborRecords,
+      isExisting: true,
+      message: json.message || "Existing snapshot loaded",
+    };
+  } catch (err) {
+    return null;
+  }
+}
+
 /**
  * Real TMS integration via the AR backend.
  *
@@ -134,60 +229,58 @@ export function getApplicableChargeTypes(billingType, toolBillingEnabled) {
  *   2. Merges the TM rate from the Billing Configuration
  *   3. Validates, saves a BillingSnapshot, and returns the line items
  *
- * Returns the response in the shape the UI's labor.records[] expects:
- *   { employee, workDate, hours, rate, amount, approvalStatus }
+ * Request payload contains only the 4 mandatory fields required by the contract:
+ *   projectId, billingConfigurationId, billingPeriodStart, billingPeriodEnd
  */
-export async function createBillingSnapshot(projectId, periodFrom, periodTo) {
+export async function createBillingSnapshot(projectId, periodFrom, periodTo, billingConfigurationId = null) {
   const numericId = Number(projectId);
   const finalProjectId = (isNaN(numericId) || !numericId) ? 9 : numericId;
   const endpoint = `${AR_BASE_URL}/api/v1/billing-snapshots`;
 
-  console.log(`[AR Integration] Calling POST ${endpoint} for projectId=${finalProjectId}, periodStart=${periodFrom}, periodEnd=${periodTo}`);
+  console.log(`[AR Integration] Calling POST ${endpoint} for projectId=${finalProjectId}, billingConfigurationId=${billingConfigurationId}, periodStart=${periodFrom}, periodEnd=${periodTo}`);
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-    },
-    body: JSON.stringify({
-      projectId: finalProjectId,
-      billingPeriodStart: periodFrom,
-      billingPeriodEnd: periodTo,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}));
-    throw new Error(
-      errorBody?.message || `AR backend error: ${response.status}`
-    );
-  }
-
-  const json = await response.json();
-  // AR wraps all responses in { success, message, data: { ...snapshotFields, timesheets: [...] } }
-  const snapshot = json.data;
-
-  // Map AR TimesheetLineItemDto → UI labor record shape
-  const laborRecords = (snapshot.timesheets || []).map((t, idx) => ({
-    id: t.sourceReferenceId || `labor-${idx}`,
-    employee: t.employee,
-    workDate: t.workDate,           // "YYYY-MM-DD" — formatDisplayDate handles this
-    hours: t.hours,
-    rate: t.rate,
-    amount: t.amount,
-    approvalStatus: t.approvalStatus || "Approved",
-    role: t.role,
-  }));
-
-  return {
-    snapshotId: snapshot.snapshotId,
-    snapshotNumber: snapshot.snapshotNumber,
-    subtotal: snapshot.subtotal,
-    totalAmount: snapshot.totalAmount,
-    status: snapshot.status,
-    laborRecords,
+  const payload = {
+    projectId: finalProjectId,
+    billingConfigurationId: billingConfigurationId,
+    billingPeriodStart: periodFrom,
+    billingPeriodEnd: periodTo,
   };
+
+  try {
+    const response = await api.post(endpoint, payload);
+    const json = response.data;
+    const snapshot = json?.data || json;
+
+    // Map AR TimesheetLineItemDto → UI labor record shape
+    const laborRecords = (snapshot?.timesheets || []).map((t, idx) => ({
+      id: t.sourceReferenceId || `labor-${idx}`,
+      employee: t.employee,
+      workDate: t.workDate,           // "YYYY-MM-DD"
+      hours: t.hours,
+      rate: t.rate,
+      amount: t.amount,
+      approvalStatus: t.approvalStatus || "Approved",
+      role: t.role,
+    }));
+
+    return {
+      snapshotId: snapshot?.snapshotId || null,
+      snapshotNumber: snapshot?.snapshotNumber || null,
+      subtotal: snapshot?.subtotal || 0,
+      totalAmount: snapshot?.totalAmount || 0,
+      status: snapshot?.status || "READY",
+      laborRecords,
+      isExisting: Boolean(json?.message?.includes("already exists")),
+      message: json?.message || "",
+    };
+  } catch (error) {
+    const errorBody = error?.response?.data || {};
+    if (errorBody?.message?.includes("already exists")) {
+      const existing = await getBillingSnapshotByPeriod(finalProjectId, periodFrom, periodTo);
+      if (existing) return existing;
+    }
+    throw new Error(errorBody?.message || error?.message || "Snapshot creation failed");
+  }
 }
 
 export function mockTimesheetProvider(configId, periodFrom, periodTo) {
@@ -241,80 +334,121 @@ const PROVIDERS = {
 export async function acquireBillingData(context, periodFrom, periodTo) {
   const applicable = getApplicableChargeTypes(context.billingType, context.toolBillingEnabled);
   const fetchedAt = new Date().toISOString();
-
   const results = {};
 
-  // ── TIME_MATERIAL: use the real AR backend → TMS integration ──────────────
-  if (context.billingType === "TIME_MATERIAL") {
-    try {
-      const snapshot = await createBillingSnapshot(context.projectId || context.id, periodFrom, periodTo);
+  let createdSnapshotId = null;
+  let acquisitionStatus = "READY";
 
-      results.labor = {
-        applicable: true,
-        status: snapshot.laborRecords.length > 0 ? "success" : "empty",
-        records: snapshot.laborRecords,
-        amount: snapshot.subtotal || sumAmount(snapshot.laborRecords),
-        lastFetchedAt: fetchedAt,
-        snapshotId: snapshot.snapshotId,
-        snapshotNumber: snapshot.snapshotNumber,
-      };
+  const billingTypeUpper = String(context.billingType || "").trim().toUpperCase().replace(/\s+/g, "_");
+  const isTM = ["TIME_MATERIAL", "TIMESHEET_BASED", "TIME_AND_MATERIAL"].includes(billingTypeUpper);
+  const isMilestone = ["MILESTONE", "MILESTONE_BASED"].includes(billingTypeUpper);
+  const isRecurring = ["RECURRING", "SUBSCRIPTION", "SUBSCRIPTION_BASED"].includes(billingTypeUpper);
+  const isFixed = ["FIXED_PRICE", "FIXED"].includes(billingTypeUpper);
+
+  // ── TIME_MATERIAL: Real AR backend snapshot engine ──────────────
+  if (isTM) {
+    try {
+      const snapshot = await createBillingSnapshot(
+        context.projectId || context.id,
+        periodFrom,
+        periodTo,
+        context.billingConfigurationId,
+        context
+      );
+      if (snapshot && snapshot.snapshotId) {
+        createdSnapshotId = snapshot.snapshotId;
+        acquisitionStatus = snapshot.status || "READY";
+        results.labor = {
+          applicable: true,
+          status: "success",
+          records: snapshot.laborRecords || [],
+          amount: snapshot.subtotal || sumAmount(snapshot.laborRecords || []),
+          lastFetchedAt: fetchedAt,
+          snapshotId: snapshot.snapshotId,
+          snapshotNumber: snapshot.snapshotNumber,
+        };
+      }
     } catch (error) {
+      console.error("[BillingDataAcquisition] Snapshot acquisition failed:", error);
       results.labor = {
         applicable: true,
         status: "error",
+        error: error?.message || "Failed to acquire timesheet records",
         records: [],
         amount: 0,
         lastFetchedAt: fetchedAt,
-        errorMessage: error.message,
       };
     }
 
-    // Mark all other charge types as not applicable for T&M
+    if (!results.labor) {
+      results.labor = {
+        applicable: true,
+        status: "empty",
+        records: [],
+        amount: 0,
+        lastFetchedAt: fetchedAt,
+      };
+    }
+
     ["contract", "milestone", "recurring", "expense"].forEach((type) => {
       results[type] = { applicable: false, status: "not_applicable", records: [], amount: 0, lastFetchedAt: null };
     });
-
-    // Tool charges still use mock for now
-    const toolRecords = await mockToolProvider(context.configId, applicable.tool);
-    results.tool = {
-      applicable: applicable.tool,
-      status: !applicable.tool ? "not_applicable" : toolRecords.length > 0 ? "success" : "empty",
-      records: toolRecords,
-      amount: sumAmount(toolRecords),
-      lastFetchedAt: applicable.tool ? fetchedAt : null,
+  } else if (isMilestone) {
+    results.milestone = {
+      applicable: true,
+      status: "empty",
+      records: [],
+      amount: 0,
+      lastFetchedAt: fetchedAt,
     };
-
-    return results;
+    ["labor", "contract", "recurring", "expense"].forEach((type) => {
+      results[type] = { applicable: false, status: "not_applicable", records: [], amount: 0, lastFetchedAt: null };
+    });
+  } else if (isRecurring) {
+    results.recurring = {
+      applicable: true,
+      status: "empty",
+      records: [],
+      amount: 0,
+      lastFetchedAt: fetchedAt,
+    };
+    ["labor", "contract", "milestone", "expense"].forEach((type) => {
+      results[type] = { applicable: false, status: "not_applicable", records: [], amount: 0, lastFetchedAt: null };
+    });
+  } else {
+    results.contract = {
+      applicable: true,
+      status: "empty",
+      records: [],
+      amount: 0,
+      lastFetchedAt: fetchedAt,
+    };
+    ["labor", "milestone", "recurring", "expense"].forEach((type) => {
+      results[type] = { applicable: false, status: "not_applicable", records: [], amount: 0, lastFetchedAt: null };
+    });
   }
 
-  // ── All other billing types: use mock providers ────────────────────────────
-  await Promise.all(
-    Object.keys(PROVIDERS).map(async (chargeType) => {
-      if (!applicable[chargeType]) {
-        results[chargeType] = { applicable: false, status: "not_applicable", records: [], amount: 0, lastFetchedAt: null };
-        return;
-      }
-      const records = await PROVIDERS[chargeType](context.configId, periodFrom, periodTo);
-      results[chargeType] = {
-        applicable: true,
-        status: records.length > 0 ? "success" : "empty",
-        records,
-        amount: sumAmount(records),
-        lastFetchedAt: fetchedAt,
-      };
-    })
-  );
-
-  const toolRecords = await mockToolProvider(context.configId, applicable.tool);
   results.tool = {
     applicable: applicable.tool,
-    status: !applicable.tool ? "not_applicable" : toolRecords.length > 0 ? "success" : "empty",
-    records: toolRecords,
-    amount: sumAmount(toolRecords),
-    lastFetchedAt: applicable.tool ? fetchedAt : null,
+    status: !applicable.tool ? "not_applicable" : "empty",
+    records: [],
+    amount: 0,
+    lastFetchedAt: fetchedAt,
   };
 
-  return delay(results);
+  // Record acquisition result in backend tracking table ONLY if snapshot creation succeeded
+  if (context?.billingConfigurationId && createdSnapshotId) {
+    await acquireBillingRecord(
+      context.billingConfigurationId,
+      periodFrom,
+      periodTo,
+      createdSnapshotId,
+      acquisitionStatus,
+      context.currencyId || context.currency_id || 1
+    );
+  }
+
+  return results;
 }
 
 

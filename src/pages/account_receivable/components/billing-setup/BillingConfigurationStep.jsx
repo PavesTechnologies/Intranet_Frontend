@@ -102,6 +102,8 @@ function normalizeBillingType(type) {
       break;
 
     case "timesheet based":
+    case "time and material":
+    case "time & material":
       value = "TIME_MATERIAL";
       break;
 
@@ -145,7 +147,24 @@ function SummaryCard({ label, value }) {
 }
 
 function ReadOnlyField({ label, value }) {
-  return <FormInput label={label} value={value || "—"} disabled onChange={() => {}} />;
+  return <FormInput label={label} value={value || "—"} disabled onChange={() => { }} />;
+}
+
+function BillingSummaryHeader({ projectInfo }) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <SummaryCard
+        label="Billing Type"
+        value={BILLING_TYPE_LABELS[projectInfo.billingType] || projectInfo.billingType}
+      />
+      <SummaryCard
+        label="Billing Mode"
+        value={BILLING_MODE_LABELS[projectInfo.billingMode] || projectInfo.billingMode}
+      />
+      <SummaryCard label="Billing Frequency" value={frequencyLabel(projectInfo.billingFrequency)} />
+      <SummaryCard label="Currency" value={projectInfo.currency} />
+    </div>
+  );
 }
 
 function TimeAndMaterialForm({ value = {}, onChange, billingMode, currency, isExisting, billingConfigurationId }) {
@@ -815,7 +834,23 @@ export default function BillingConfigurationStep({ value = {}, onChange, setupMo
             <h3 className={Fonts.subheading}>Pricing model</h3>
           </div>
 
-          <RadioCardGroup name="billingMode" options={pricingModelOptions} value={billingMode || ""} onChange={(next) => update({ billingMode: next })} columns={2} />
+          <RadioCardGroup
+            name="billingMode"
+            options={
+              billingType === "TIME_MATERIAL"
+                ? [
+                  { value: "STANDARD", label: "Standard Rate", description: "One hourly rate applies to all approved billable hours." },
+                  { value: "ROLE_BASED", label: "Role-Based Rates", description: "Different hourly rates are maintained for each project role." },
+                ]
+                : [
+                  { value: "MONTHLY_RETAINER", label: "Monthly Retainer", description: "Bill a fixed recurring amount every billing period." },
+                  { value: "SUBSCRIPTION", label: "Subscription", description: "Bill a recurring subscription fee for ongoing services." },
+                ]
+            }
+            value={billingMode || ""}
+            onChange={(next) => update({ billingMode: next })}
+            columns={2}
+          />
         </div>
       )}
 
