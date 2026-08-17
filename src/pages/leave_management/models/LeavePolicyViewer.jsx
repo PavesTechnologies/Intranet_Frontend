@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button/Button";
+import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 
 /* =========================
    Leave Type Card
@@ -149,28 +150,30 @@ const LeaveTypeCard = ({ leaveData }) => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-lg p-6 mb-6 border border-gray-200">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">{title}</h2>
+    <div className="max-w-4xl mx-auto mb-6">
+      <PageCard title={title}>
+        <PageCardContent className="p-6">
+        {/* ✅ DESC1 (TOP - STATIC LIST) */}
+        {desc1 && desc1.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-600 mb-2">
+              Overview
+            </h3>
+            {renderDesc1(desc1)}
+          </div>
+        )}
 
-      {/* ✅ DESC1 (TOP - STATIC LIST) */}
-      {desc1 && desc1.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-600 mb-2">
-            Overview
-          </h3>
-          {renderDesc1(desc1)}
-        </div>
-      )}
+        {/* ✅ DESC (ACCORDION) */}
+        {renderContent(desc)}
 
-      {/* ✅ DESC (ACCORDION) */}
-      {renderContent(desc)}
-
-      <p className="text-xs text-gray-500 mt-4">
-        Created on:{" "}
-        {createdAt
-          ? new Date(createdAt).toLocaleDateString()
-          : "N/A"}
-      </p>
+        <p className="text-xs text-gray-500 mt-4">
+          Created on:{" "}
+          {createdAt
+            ? new Date(createdAt).toLocaleDateString()
+            : "N/A"}
+        </p>
+        </PageCardContent>
+      </PageCard>
     </div>
   );
 };

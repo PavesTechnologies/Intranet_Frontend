@@ -2,10 +2,11 @@ import React, { useState, useEffect } from "react";
 import { X, FileText } from "lucide-react";
 import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
-import FilterListbox from "../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button/Button";
 import { useJobProgress } from "../../../contexts/JobProgressContext";
+import FormInput from "../../../components/forms/FormInput";
+import FormSelect from "../../../components/forms/FormSelect";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -55,10 +56,11 @@ const GENDERS = [
 
 export function GenderDropdown({ value, onChange }) {
   return (
-    <FilterListbox
+    <FormSelect
+      name="gender"
       options={GENDERS}
       value={value}
-      onChange={onChange}
+      onChange={(e) => onChange(e.target.value)}
       placeholder="Select Gender"
     />
   );
@@ -347,15 +349,16 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
             {loadinglables ? (
               <p className="text-gray-500 text-sm">Loading leave labels...</p>
             ) : (
-              <FilterListbox
+              <FormSelect
+                name="leaveName"
                 options={leavelables.map((item) => ({
                   value: item.name,
                   label: item.label,
                 }))}
                 value={formData.leaveName}
                 placeholder="Select Leave Name"
-                onChange={(selectedName) =>
-                  setFormData((prev) => ({ ...prev, leaveName: selectedName }))
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, leaveName: e.target.value }))
                 }
               />
             )}
@@ -364,17 +367,16 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
           {/* Effective Dates */}
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Effective Start Date <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
+              <FormInput
+                label="Effective Start Date"
+                requiredMark
                 name="effectiveStartDate"
+                type="date"
                 value={formData.effectiveStartDate}
                 min={editData ? new Date().toISOString().split('T')[0] : undefined}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                inputClassName="focus:ring-2 focus:ring-green-500"
               />
             </div>
             {/* <div>
@@ -413,14 +415,15 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
                 Accrual Frequency <span className="text-red-500">*</span>
               </label>
 
-              <FilterListbox
+              <FormSelect
+                name="accrualFrequency"
                 options={accrualFrequency.map((freq) => ({
                   value: freq,
                   label: freq,
                 }))}
                 value={formData.accrualFrequency}
-                onChange={(value) =>
-                  setFormData((prev) => ({ ...prev, accrualFrequency: value }))
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, accrualFrequency: e.target.value }))
                 }
               />
             </div>
@@ -439,16 +442,14 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
                 "coolDownPeriod",
               ].map((key) => (
                 <div key={key}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {formatFieldLabel(key)}
-                  </label>
-                  <input
+                  <FormInput
+                    label={formatFieldLabel(key)}
                     name={key}
                     type="number"
                     min="0"
                     value={formData[key]}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    inputClassName="focus:ring-2 focus:ring-green-500"
                   />
                 </div>
               ))}
@@ -465,16 +466,14 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
                 "pastDateLimitDays",
               ].map((key) => (
                 <div key={key}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {formatFieldLabel(key)}
-                  </label>
-                  <input
+                  <FormInput
+                    label={formatFieldLabel(key)}
                     name={key}
                     type="number"
                     min="0"
                     value={formData[key]}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    inputClassName="focus:ring-2 focus:ring-green-500"
                   />
                 </div>
               ))}
@@ -528,16 +527,14 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
                   {key === "requiresDocumentation" &&
                     formData.requiresDocumentation && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Document Submission Threshold (Days)
-                        </label>
-                        <input
+                        <FormInput
+                          label="Document Submission Threshold (Days)"
                           name="documentSubmissionThresholdDays"
                           type="number"
                           min="0"
                           value={formData.documentSubmissionThresholdDays}
                           onChange={handleChange}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                          inputClassName="focus:ring-2 focus:ring-green-500"
                         />
                       </div>
                     )}
@@ -574,16 +571,14 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
                   {key === "requiresDocumentation" &&
                     formData.requiresDocumentation && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Document Submission Threshold (Days)
-                        </label>
-                        <input
+                        <FormInput
+                          label="Document Submission Threshold (Days)"
                           name="documentSubmissionThresholdDays"
                           type="number"
                           min="0"
                           value={formData.documentSubmissionThresholdDays}
                           onChange={handleChange}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                          inputClassName="focus:ring-2 focus:ring-green-500"
                         />
                       </div>
                     )}

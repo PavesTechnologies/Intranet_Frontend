@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { toast } from "react-toastify";
 import api from "../../../api/axiosInstance";
-import { PencilIcon } from "lucide-react";
+import { PencilIcon, X } from "lucide-react";
 import EditLeaveModal from "./EditLeaveModal";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationModal from "./ConfirmationModal";
 import Button from "../../../components/Button/Button";
+import DataTable from "../../../components/patterns/DataTable";
 const token = localStorage.getItem("token");
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -99,80 +100,100 @@ const PendingLeaveRequestsTable = ({
       .replace(/(^\w{1})|(\s+\w{1})/g, (letter) => letter.toUpperCase()); // Capitalizes each word
   };
 
+  const columns = [
+    {
+      key: "leaveType",
+      header: "Leave Type",
+      className: "text-center",
+      render: (leave) => getLabelFromName(leave.leaveName),
+    },
+    {
+      key: "startDate",
+      header: "Start Date",
+      className: "text-center",
+      render: (leave) => (
+        <>
+          {new Date(leave.startDate).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}
+          {leave.startSession &&
+            leave.startSession !== "none" &&
+            leave.startSession !== "fullday" && (
+              <span className="ml-1 text-gray-500">
+                ({leave.startSession})
+              </span>
+            )}
+        </>
+      ),
+    },
+    {
+      key: "endDate",
+      header: "End Date",
+      className: "text-center",
+      render: (leave) => (
+        <>
+          {new Date(leave.endDate).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}
+          {leave.endSession &&
+            leave.endSession !== "none" &&
+            leave.endSession !== "fullday" && (
+              <span className="ml-1 text-gray-500">({leave.endSession})</span>
+            )}
+        </>
+      ),
+    },
+    {
+      key: "days",
+      header: "Days",
+      className: "text-center",
+      render: (leave) => leave.daysRequested,
+    },
+    {
+      key: "reason",
+      header: "Reason",
+      className: "text-center",
+      render: (leave) => leave.reason || "-",
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      className: "text-center",
+      render: (leave) => (
+        <div className="flex items-center space-x-1 justify-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Edit leave request"
+            onClick={() => handleEdit(leave)}
+          >
+            <PencilIcon className="text-blue-700 w-4 h-4" />
+          </Button>
+          <Button
+            variant="danger"
+            size="icon"
+            aria-label="Cancel leave request"
+            onClick={() => handleCancel(leave.leaveId)}
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="overflow-x-auto w-[100%]">
+    <div className="w-full">
       <div className="w-full max-w-screen-xl mx-auto">
-        <table className="w-full border-collapse rounded-lg overflow-hidden shadow-sm ">
-          <thead>
-            <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-xs border-gray-100">
-              <th className="p-3">Leave Type</th>
-              <th className="p-3">Start Date</th>
-              <th className="p-3">End Date</th>
-              <th className="p-3">Days</th>
-              <th className="p-3">Reason</th>
-              <th className="p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* The component now just maps over the leaves it was given. */}
-            {pendingLeaves.map((leave) => (
-              <tr key={leave.leaveId} className="border-t text-xs">
-                <td className="p-3 text-center">
-                  {getLabelFromName(leave.leaveName)}
-                </td>
-                <td className="p-3 text-center">
-                  {new Date(leave.startDate).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                  {leave.startSession &&
-                    leave.startSession !== "none" &&
-                    leave.startSession !== "fullday" && (
-                      <span className="ml-1 text-gray-500">
-                        ({leave.startSession})
-                      </span>
-                    )}
-                </td>
-                <td className="p-3 text-center">
-                  {new Date(leave.endDate).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                  {leave.endSession &&
-                    leave.endSession !== "none" &&
-                    leave.endSession !== "fullday" && (
-                      <span className="ml-1 text-gray-500">
-                        ({leave.endSession})
-                      </span>
-                    )}
-                </td>
-                <td className="p-3 text-center">{leave.daysRequested}</td>
-                <td className="p-3 text-center">{leave.reason || "-"}</td>
-                <td className="p-3 text-center">
-                  <div className="flex items-center space-x-4 justify-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Edit leave request"
-                      onClick={() => handleEdit(leave)}
-                    >
-                      <PencilIcon className="text-blue-700 w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="link"
-                      className="text-red-500 hover:underline"
-                      onClick={() => handleCancel(leave.leaveId)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          columns={columns}
+          rows={pendingLeaves}
+          getRowKey={(leave) => leave.leaveId}
+        />
       </div>
 
       {isEditModalOpen && (

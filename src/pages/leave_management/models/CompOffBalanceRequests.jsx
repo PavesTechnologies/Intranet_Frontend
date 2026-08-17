@@ -4,6 +4,7 @@ import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 import Button from "../../../components/Button/Button";
+import DataTable from "../../../components/patterns/DataTable";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -105,61 +106,63 @@ const CompOffBalanceRequests = ({ managerId }) => {
                     No pending Comp-Off requests for your team.
                 </p>
             ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full border-collapse rounded-lg overflow-hidden shadow-sm">
-                        <thead>
-                            <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-xs">
-                                <th className="p-3">Employee</th>
-                                <th className="p-3">Dates</th>
-                                <th className="p-3">Duration</th>
-                                <th className="p-3">Note</th>
-                                <th className="p-3">Status</th>
-                                <th className="p-3">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-blue-100 text-center">
-                            {pendingCompOffs.map((req) => (
-                                <tr key={req.idleaveCompoff} className="hover:bg-blue-50 text-xs">
-                                    <td className="p-3">{req.employeeName}</td>
-                                    <td className="p-3">
-                                        {req.startDate}
-                                        {req.endDate && req.endDate !== req.startDate
-                                            ? ` to ${req.endDate}` : ""}
-                                    </td>
-                                    <td className="p-3">
-                                        {req.halfDay ? "Half Day" : `${req.duration} ${req.duration <= 1 ? "Day" : "Days"}`}
-                                    </td>
-                                    <td className="p-3">{req.note}</td>
-                                    <td className="p-3 capitalize">{req.status}</td>
-                                    <td className="p-3">
-                                        <div className="flex justify-center gap-2">
-                                            <Button
-                                                variant="primary"
-                                                size="icon"
-                                                onClick={() => handleApprove(req.idleaveCompoff)}
-                                                className="text-green-600 hover:text-green-800"
-                                                disabled={loading}
-                                                aria-label="Approve comp-off request"
-                                            >
-                                                <Check className="w-4 h-4" />
-                                            </Button>
-                                            <Button
-                                                variant="danger"
-                                                size="icon"
-                                                onClick={() => handleReject(req.idleaveCompoff)}
-                                                className="text-red-600 hover:text-red-800"
-                                                disabled={loading}
-                                                aria-label="Reject comp-off request"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                <DataTable
+                    getRowKey={(req) => req.idleaveCompoff}
+                    rows={pendingCompOffs}
+                    columns={[
+                        { key: "employeeName", header: "Employee", className: "text-center" },
+                        {
+                            key: "dates",
+                            header: "Dates",
+                            className: "text-center",
+                            render: (req) =>
+                                `${req.startDate}${req.endDate && req.endDate !== req.startDate ? ` to ${req.endDate}` : ""}`,
+                        },
+                        {
+                            key: "duration",
+                            header: "Duration",
+                            className: "text-center",
+                            render: (req) =>
+                                req.halfDay ? "Half Day" : `${req.duration} ${req.duration <= 1 ? "Day" : "Days"}`,
+                        },
+                        { key: "note", header: "Note", className: "text-center" },
+                        {
+                            key: "status",
+                            header: "Status",
+                            className: "text-center capitalize",
+                            render: (req) => req.status,
+                        },
+                        {
+                            key: "actions",
+                            header: "Action",
+                            className: "text-center",
+                            render: (req) => (
+                                <div className="flex justify-center gap-2">
+                                    <Button
+                                        variant="primary"
+                                        size="icon"
+                                        onClick={() => handleApprove(req.idleaveCompoff)}
+                                        className="text-green-600 hover:text-green-800"
+                                        disabled={loading}
+                                        aria-label="Approve comp-off request"
+                                    >
+                                        <Check className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                        variant="danger"
+                                        size="icon"
+                                        onClick={() => handleReject(req.idleaveCompoff)}
+                                        className="text-red-600 hover:text-red-800"
+                                        disabled={loading}
+                                        aria-label="Reject comp-off request"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            ),
+                        },
+                    ]}
+                />
             )}
 {/* 
             {loading && (

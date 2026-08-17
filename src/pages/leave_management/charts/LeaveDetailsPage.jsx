@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import beachDay from "../../../components/icons/beach-day_cnsv.svg";
 import Button from "../../../components/Button/Button";
+import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -271,7 +272,8 @@ export default function LeaveDetailsPage() {
 
 // A reusable card component to display request details
 const RequestCard = ({ request }) => (
-  <div className="bg-white p-4 rounded-lg shadow-sm border">
+  <PageCard>
+    <PageCardContent className="p-4">
     <div className="flex flex-col sm:flex-row justify-between text-sm">
       <div>
         <p className="font-semibold text-gray-900">
@@ -299,5 +301,6 @@ const RequestCard = ({ request }) => (
         </p>
       </div>
     </div>
-  </div>
+    </PageCardContent>
+  </PageCard>
 );

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import FilterListbox from "../../../components/filter/FilterListbox";
+import FormSelect from "../../../components/forms/FormSelect";
 import {
   ChevronDownIcon,
   FunnelIcon,
@@ -13,6 +13,7 @@ import { toast } from "react-toastify";
 import DateRangePicker from "./DateRangePicker";
 import { format } from "date-fns";
 import Button from "../../../components/Button/Button";
+import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 
 const skeleton = "animate-pulse bg-gray-400 rounded hover:cursor-wait";
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
@@ -522,13 +523,14 @@ export default function BlockLeaveDates({ employeeId }) {
                       {loading ? (
                         <div className={`${skeleton} h-10 w-full`} />
                       ) : (
-                        <FilterListbox
+                        <FormSelect
+                          name="project"
                           options={[
                             { value: "", label: "Select a project" },
                             ...projectOptions,
                           ]}
                           value={projectId}
-                          onChange={setProjectId}
+                          onChange={(e) => setProjectId(e.target.value)}
                         />
                       )}
                     </div>
@@ -663,8 +665,8 @@ export default function BlockLeaveDates({ employeeId }) {
           </section>
 
           <aside className="lg:col-span-1">
-            <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white shadow-sm p-6">
-              <h3 className="text-sm font-semibold  ">Summary</h3>
+            <PageCard title="Summary" className="dark:border-gray-800">
+              <PageCardContent className="p-6">
               <div className="mt-4 space-y-3 text-sm">
                 <div className="flex items-start justify-between">
                   <span className="text-gray-600 dark:text-gray-400">
@@ -731,7 +733,8 @@ export default function BlockLeaveDates({ employeeId }) {
                   </span>
                 </div>
               </div>
-            </div>
+              </PageCardContent>
+            </PageCard>
           </aside>
         </div>
       </main>

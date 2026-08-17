@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import api from "../../../api/axiosInstance";
 import Select from "react-select";
 import debounce from "lodash.debounce";
-import { X, Calendar, Calculator, Info, Link as LinkIcon } from "lucide-react";
+import { Calculator, Info, Link as LinkIcon } from "lucide-react";
 import { toast } from "react-toastify";
 import { format } from "date-fns";
 import DateRangePicker from "./DateRangePicker";
@@ -11,6 +11,8 @@ import { LeaveTypeDropdown } from "./RequestLeaveModal";
 import { useAuth } from "../../../contexts/AuthContext";
 import { countWeekdaysBetween } from "./RequestLeaveModal";
 import Button from "../../../components/Button/Button";
+import Modal from "../../../components/Modal/modal";
+import FormSelect from "../../../components/forms/FormSelect";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -149,12 +151,8 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
     onClose();
   }, [resetForm, onClose]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e) => { if (e.key === "Escape") handleClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [isOpen, handleClose]);
+  // Escape-to-close is now owned by the canonical Modal (closeOnEscape),
+  // wired to handleClose via the onClose prop below — no local listener needed.
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
@@ -192,22 +190,42 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden border flex flex-col max-h-[90vh]">
-
-        {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b bg-gray-50 flex-shrink-0">
-          <h2 className="text-lg font-bold text-gray-800">Apply Leave on Behalf</h2>
-          <Button onClick={handleClose} variant="ghost" size="icon" aria-label="Close" className="hover:text-gray-900">
-            <X size={20} />
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Apply Leave on Behalf"
+      size="lg"
+      maxHeight="max-h-[90vh]"
+      bodyClassName="p-0"
+      // The original overlay had no backdrop-click handler at all (inert
+      // backdrop) — preserved explicitly since canonical Modal defaults to
+      // closeOnBackdrop=true.
+      closeOnBackdrop={false}
+      footer={
+        <div className="flex justify-end gap-3">
+          <Button
+            type="button"
+            onClick={handleClose}
+            variant="outline"
+            className="text-sm font-semibold text-gray-500 hover:text-gray-700"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting || !employeeId || !leaveTypeId || weekdays <= 0}
+            variant="primary"
+            loading={submitting}
+            loadingText="Applying..."
+          >
+            Confirm & Apply
           </Button>
         </div>
-
-        {/* Scrollable Form */}
-        <form className="p-6 space-y-5 overflow-y-auto custom-scrollbar pb-10" onSubmit={handleSubmit}>
+      }
+    >
+      <form className="p-6 space-y-5" onSubmit={handleSubmit}>
 
           {/* Employee Selection */}
           <div>
@@ -300,27 +318,29 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
                 <div className="flex items-start gap-3 p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
                   <div className="flex-1 space-y-1">
                     <label className="text-[10px] font-bold text-indigo-600 uppercase">Start Day</label>
-                    <FilterListbox
+                    <FormSelect
+                      name="halfDayStart"
                       options={[
                         { value: "fullday", label: "Full Day" },
                         { value: "first", label: "First Half" },
                         { value: "second", label: "Second Half" },
                       ]}
                       value={halfDayConfig.start}
-                      onChange={(val) => setHalfDayConfig((p) => ({ ...p, start: val }))}
+                      onChange={(e) => setHalfDayConfig((p) => ({ ...p, start: e.target.value }))}
                     />
                   </div>
                   {startDate !== endDate && (
                     <div className="flex-1 space-y-1">
                       <label className="text-[10px] font-bold text-indigo-600 uppercase">End Day</label>
-                      <FilterListbox
+                      <FormSelect
+                        name="halfDayEnd"
                         options={[
                           { value: "fullday", label: "Full Day" },
                           { value: "first", label: "First Half" },
                           { value: "second", label: "Second Half" },
                         ]}
                         value={halfDayConfig.end}
-                        onChange={(val) => setHalfDayConfig((p) => ({ ...p, end: val }))}
+                        onChange={(e) => setHalfDayConfig((p) => ({ ...p, end: e.target.value }))}
                       />
                     </div>
                   )}
@@ -395,30 +415,7 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
               required
             />
           </div>
-        </form>
-
-        {/* Footer */}
-        <div className="flex justify-end gap-3 p-4 border-t border-gray-100 bg-white flex-shrink-0">
-          <Button
-            type="button"
-            onClick={handleClose}
-            variant="outline"
-            className="text-sm font-semibold text-gray-500 hover:text-gray-700"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting || !employeeId || !leaveTypeId || weekdays <= 0}
-            variant="primary"
-            loading={submitting}
-            loadingText="Applying..."
-          >
-            Confirm & Apply
-          </Button>
-        </div>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }

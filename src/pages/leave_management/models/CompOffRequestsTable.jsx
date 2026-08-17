@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import ConfirmationModal from "./ConfirmationModal";
 import Pagination from "../../../components/Pagination/pagination";
 import Button from "../../../components/Button/Button";
+import DataTable from "../../../components/patterns/DataTable";
 
 const CompOffRequestsTable = ({ requests, onCancel, loading }) => {
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
@@ -46,62 +47,78 @@ const CompOffRequestsTable = ({ requests, onCancel, loading }) => {
     startIndex + rowsPerPage
   );
 
+  const columns = [
+    {
+      key: "startDate",
+      header: "Start Date",
+      className: "text-center",
+      render: (req) => (
+        <>
+          {new Date(req.startDate).toLocaleDateString("en-US", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })}
+          {req.startSession && req.startSession !== "none" && (
+            <span className="ml-1 text-gray-500">({req.startSession})</span>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "endDate",
+      header: "End Date",
+      className: "text-center",
+      render: (req) => (
+        <>
+          {new Date(req.endDate).toLocaleDateString("en-US", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })}
+          {req.endSession && req.endSession !== "none" && (
+            <span className="ml-1 text-gray-500">({req.endSession})</span>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "duration",
+      header: "Days",
+      className: "text-center",
+      render: (req) => req.duration,
+    },
+    {
+      key: "status",
+      header: "Status",
+      className: "text-center",
+      render: (req) => req.status,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      className: "text-center",
+      render: (req) => (
+        <Button
+          variant="link"
+          onClick={() => handleCancelClick(req.idleaveCompoff)}
+          className="text-red-600 hover:underline"
+          aria-label="Cancel comp-off request"
+        >
+          Cancel
+        </Button>
+      ),
+    },
+  ];
+
   return (
-    <div className="overflow-x-auto w-full">
+    <div className="w-full">
       <div className="w-full max-w-screen-xl mx-auto">
-        {/* 🟢 Table Rendering */}
-        <table className="w-full border-collapse rounded-lg overflow-hidden shadow-sm">
-          <thead>
-            <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-xs">
-              <th className="p-3">Start Date</th>
-              <th className="p-3">End Date</th>
-              <th className="p-3">Days</th>
-              <th className="p-3">Status</th>
-              <th className="p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {currentRequests.map((req) => (
-              <tr
-                key={req.idleaveCompoff}
-                className="border-t border-gray-200 text-xs text-center justify-center"
-              >
-                <td className="p-3">
-                  {new Date(req.startDate).toLocaleDateString("en-US", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                  {req.startSession && req.startSession !== "none" && (
-                    <span className="ml-1 text-gray-500">({req.startSession})</span>
-                  )}
-                </td>
-                <td className="p-3">
-                  {new Date(req.endDate).toLocaleDateString("en-US", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                  {req.endSession && req.endSession !== "none" && (
-                    <span className="ml-1 text-gray-500">({req.endSession})</span>
-                  )}
-                </td>
-                <td className="p-3">{req.duration}</td>
-                <td className="p-3">{req.status}</td>
-                <td className="p-3">
-                  <Button
-                    variant="link"
-                    onClick={() => handleCancelClick(req.idleaveCompoff)}
-                    className="text-red-600 hover:underline"
-                    aria-label="Cancel comp-off request"
-                  >
-                    Cancel
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          columns={columns}
+          rows={currentRequests}
+          getRowKey={(req) => req.idleaveCompoff}
+        />
 
         {/* Pagination Component */}
         {totalPages > 1 && (

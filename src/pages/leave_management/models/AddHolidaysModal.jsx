@@ -20,6 +20,7 @@ import {
 import * as XLSX from "xlsx";
 import Button from "../../../components/Button/Button";
 import FilterListbox from "../../../components/filter/FilterListbox";
+import FormSelect from "../../../components/forms/FormSelect";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL || "";
 
@@ -315,15 +316,17 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
                 <label className="text-xs font-semibold text-gray-600">Type <span className="text-red-400">*</span></label>
                 <div className="relative">
                   <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400 pointer-events-none" />
-                  <select
+                  <FormSelect
+                    name="holidayType"
+                    options={[
+                      { value: "NATIONAL", label: "National" },
+                      { value: "REGIONAL", label: "Regional" },
+                      { value: "OPTIONAL", label: "Optional" },
+                    ]}
                     value={type}
                     onChange={(e) => setType(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white appearance-none"
-                  >
-                    <option value="NATIONAL">National</option>
-                    <option value="REGIONAL">Regional</option>
-                    <option value="OPTIONAL">Optional</option>
-                  </select>
+                    buttonClassName="pl-9"
+                  />
                 </div>
               </div>
 

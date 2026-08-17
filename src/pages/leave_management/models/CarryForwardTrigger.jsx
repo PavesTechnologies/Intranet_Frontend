@@ -3,6 +3,7 @@ import ConfirmationModal from "./ConfirmationModal";
 import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import Button from "../../../components/Button/Button";
+import FormInput from "../../../components/forms/FormInput";
 const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
   const [year, setYear] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -71,12 +72,13 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
       <div className="bg-white p-6 rounded-xl shadow-md w-full max-w-md">
         <h2 className="text-lg font-semibold mb-3">Process Carry Forward</h2>
 
-        <input
+        <FormInput
           type="number"
+          name="carryForwardYear"
           placeholder="Enter Year (e.g. 2025)"
           value={year}
           onChange={(e) => setYear(e.target.value)}
-          className="w-full border px-3 py-2 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          inputClassName="mb-4"
         />
 
         <div className="flex justify-end gap-2">

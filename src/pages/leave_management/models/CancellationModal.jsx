@@ -1,7 +1,7 @@
-import React, { useState, Fragment } from "react";
-import { Listbox, Transition } from "@headlessui/react";
-import { ChevronDown } from "lucide-react";
+import React, { useState } from "react";
 import Button from "../../../components/Button/Button";
+import Modal from "../../../components/Modal/modal";
+import FormSelect from "../../../components/forms/FormSelect";
 
 export default function CancellationModal({
   title,
@@ -21,8 +21,6 @@ export default function CancellationModal({
     "Other",
   ];
 
-  if (!isOpen) return null;
-
   const [selectedReason, setSelectedReason] = useState("");
   const [customReason, setCustomReason] = useState("");
   const isOther = selectedReason === "Other";
@@ -32,63 +30,61 @@ export default function CancellationModal({
     onConfirm(finalReason);
   };
 
+  const resolvedTitle =
+    title || (isRevoke ? "Confirm Revoke" : "Confirm Cancellation");
+  const resolvedSubtitle =
+    subtitle ||
+    (isRevoke
+      ? "Are you sure you want to Revoke this Leave Request?"
+      : "Are you sure you want to Cancel this Leave Request?");
+
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center p-4">
-      <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
+    <Modal
+      isOpen={isOpen}
+      onClose={onCancel}
+      title={resolvedTitle}
+      subtitle={resolvedSubtitle}
+      size="sm"
+      // This is a destructive-action confirmation with no prior backdrop/Escape/X
+      // dismiss paths — only the explicit Cancel button closed it before, so none
+      // of canonical Modal's default dismiss affordances are enabled here.
+      closeOnBackdrop={false}
+      closeOnEscape={false}
+      showCloseButton={false}
+      footer={
+        <div className="flex justify-end space-x-2">
+          <Button variant="outline" onClick={onCancel} disabled={isLoading}>
+            Cancel
+          </Button>
 
-        {/* Title */}
-        <h3 className="text-lg font-semibold mb-2">
-          {title || (isRevoke ? "Confirm Revoke" : "Confirm Cancellation")}
-        </h3>
-
-        {/* Subtitle */}
-        {subtitle ? (
-          <p className="mb-4 text-sm text-gray-600">{subtitle}</p>
-        ) : (
-          <p className="mb-4 text-sm text-gray-600">
-            {isRevoke
-              ? "Are you sure you want to Revoke this Leave Request?"
-              : "Are you sure you want to Cancel this Leave Request?"}
-          </p>
-        )}
-
+          <Button
+            variant="danger"
+            onClick={handleConfirm}
+            disabled={
+              isLoading ||
+              !selectedReason ||
+              (isOther && customReason.trim().length === 0)
+            }
+          >
+            {isLoading ? `${confirmText}ing...` : confirmText}
+          </Button>
+        </div>
+      }
+    >
+      <>
         {/* Reason Label */}
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Select a Reason <span className="text-red-500">*</span>
         </label>
 
         {/* Reason Dropdown */}
-        <Listbox value={selectedReason} onChange={setSelectedReason}>
-          <div className="relative">
-            <Listbox.Button className="w-full border px-3 py-2 rounded-lg bg-white flex justify-between items-center">
-              {selectedReason || "Choose a reason"}
-              <ChevronDown className="w-4 h-4 text-gray-600" />
-            </Listbox.Button>
-
-            <Transition
-              as={Fragment}
-              leave="transition ease-in duration-100"
-              leaveFrom="opacity-100"
-              leaveTo="opacity-0"
-            >
-              <Listbox.Options className="absolute mt-1 w-full bg-white border rounded-lg shadow-lg z-20 max-h-40 overflow-y-auto">
-                {predefinedReasons.map((r) => (
-                  <Listbox.Option
-                    key={r}
-                    value={r}
-                    className={({ active }) =>
-                      `cursor-pointer px-3 py-2 ${
-                        active ? "bg-indigo-100" : "bg-white"
-                      }`
-                    }
-                  >
-                    {r}
-                  </Listbox.Option>
-                ))}
-              </Listbox.Options>
-            </Transition>
-          </div>
-        </Listbox>
+        <FormSelect
+          name="cancellationReason"
+          options={predefinedReasons.map((r) => ({ value: r, label: r }))}
+          value={selectedReason}
+          onChange={(e) => setSelectedReason(e.target.value)}
+          placeholder="Choose a reason"
+        />
 
         {/* Custom Reason Textarea */}
         {isOther && (
@@ -107,30 +103,7 @@ export default function CancellationModal({
             />
           </div>
         )}
-
-        {/* Buttons */}
-        <div className="flex justify-end space-x-2 mt-5">
-          <Button
-            variant="outline"
-            onClick={onCancel}
-            disabled={isLoading}
-          >
-            Cancel
-          </Button>
-
-          <Button
-            variant="danger"
-            onClick={handleConfirm}
-            disabled={
-              isLoading ||
-              !selectedReason ||
-              (isOther && customReason.trim().length === 0)
-            }
-          >
-            {isLoading ? `${confirmText}ing...` : confirmText}
-          </Button>
-        </div>
-      </div>
-    </div>
+      </>
+    </Modal>
   );
 }

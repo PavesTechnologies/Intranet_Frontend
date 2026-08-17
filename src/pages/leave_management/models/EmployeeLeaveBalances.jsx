@@ -6,14 +6,14 @@ import { useNavigate } from "react-router-dom";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
-import { Listbox } from "@headlessui/react";
-import { ChevronUpDownIcon, CheckIcon } from "@heroicons/react/20/solid";
 import { Plus, Pencil } from "lucide-react";
 import LeaveUploadWizard from "./LeaveUploadWizard";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Button from "../../../components/Button/Button";
-import FilterListbox from "../../../components/filter/FilterListbox";
-import GenericTable from "../../../components/Table/table";
+import FormInput from "../../../components/forms/FormInput";
+import DataTable from "../../../components/patterns/DataTable";
+import FormSelect from "../../../components/forms/FormSelect";
+import FilterBar from "../../../components/patterns/FilterBar";
 
 export const YearDropdown = ({ value, onChange }) => {
   const currentYear = new Date().getFullYear();
@@ -21,44 +21,12 @@ export const YearDropdown = ({ value, onChange }) => {
 
   return (
     <div className="w-32">
-      <Listbox value={value} onChange={onChange}>
-        <div className="relative">
-          <Listbox.Button className="relative w-full cursor-pointer rounded border bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <span className="block truncate">{value}</span>
-            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-              <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
-            </span>
-          </Listbox.Button>
-
-          <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded border bg-white py-1 shadow-lg">
-            {years.map((year) => (
-              <Listbox.Option
-                key={year}
-                value={year}
-                className={({ active }) =>
-                  `relative cursor-pointer select-none py-2 pl-10 pr-4 ${active ? "bg-blue-100 text-blue-900" : "text-gray-900"
-                  }`
-                }
-              >
-                {({ selected }) => (
-                  <>
-                    <span
-                      className={`block truncate ${selected ? "font-medium" : "font-normal"}`}
-                    >
-                      {year}
-                    </span>
-                    {selected && (
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
-                        <CheckIcon className="h-5 w-5" />
-                      </span>
-                    )}
-                  </>
-                )}
-              </Listbox.Option>
-            ))}
-          </Listbox.Options>
-        </div>
-      </Listbox>
+      <FormSelect
+        name="year"
+        options={years.map((y) => ({ value: y, label: String(y) }))}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
     </div>
   );
 };
@@ -400,13 +368,14 @@ const EmployeeLeaveBalances = () => {
 
       {/* Search Bar + Year + Add Button */}
       <div className="flex items-center gap-3 mb-4">
-        <div ref={wrapperRef} className="relative h-9 w-full max-w-md">
-          <input
+        <FilterBar className="flex-1">
+        <div ref={wrapperRef} className="relative w-full max-w-md">
+          <FormInput
             type="text"
+            name="employeeLeaveBalanceSearch"
             placeholder="Search by Employee ID or Name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="border px-4 py-2 rounded w-full shadow-sm"
             onFocus={() => setShowSuggestions(true)}
           />
 
@@ -442,15 +411,17 @@ const EmployeeLeaveBalances = () => {
         </div>
 
         <div className="w-32">
-          <FilterListbox
+          <FormSelect
+            name="tableYear"
             options={yearOptions}
             value={currentYear}
-            onChange={(year) => {
-              setCurrentYear(year);
+            onChange={(e) => {
+              setCurrentYear(e.target.value);
               setCurrentPage(1);
             }}
           />
         </div>
+        </FilterBar>
 
         <Button
           onClick={() => setShowUploadWizard(true)}
@@ -469,24 +440,33 @@ const EmployeeLeaveBalances = () => {
             No leave balances found.
           </p>
         ) : (
-          <GenericTable
-            headers={[
-              "Employee Id",
-              "Employee Name",
-              ...leaveTypes.map((lt) => formatLeaveTypeName(lt.leaveTypeName)),
-              "Actions",
-            ]}
+          <DataTable
+            getRowKey={(emp) => emp.employeeId}
+            rows={data}
+            loading={isLoading}
             columns={[
-              "employeeId",
-              "employeeName",
-              ...leaveTypes.map((lt) => lt.leaveTypeId || lt.leaveTypeName),
-              "actions",
-            ]}
-            rows={data.map((emp) => {
-              const row = {
-                employeeId: emp.employeeId,
-                employeeName: emp.employeeName,
-                actions: (
+              {
+                key: "employeeId",
+                header: "Employee Id",
+                className: "text-center",
+              },
+              {
+                key: "employeeName",
+                header: "Employee Name",
+                className: "text-center",
+              },
+              ...leaveTypes.map(({ leaveTypeName, leaveTypeId }) => ({
+                key: String(leaveTypeId || leaveTypeName),
+                header: formatLeaveTypeName(leaveTypeName),
+                className: "text-center",
+                render: (emp) =>
+                  emp.balances[leaveTypeName]?.remainingLeaves ?? "-",
+              })),
+              {
+                key: "actions",
+                header: "Actions",
+                className: "text-center",
+                render: (emp) => (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -498,14 +478,8 @@ const EmployeeLeaveBalances = () => {
                     <Pencil size={16}></Pencil>
                   </Button>
                 ),
-              };
-              leaveTypes.forEach(({ leaveTypeName, leaveTypeId }) => {
-                const colKey = leaveTypeId || leaveTypeName;
-                row[colKey] = emp.balances[leaveTypeName]?.remainingLeaves ?? "-";
-              });
-              return row;
-            })}
-            loading={isLoading}
+              },
+            ]}
           />
         )}
 
@@ -586,10 +560,11 @@ const EmployeeLeaveBalances = () => {
                       {leaveTypeName}
                     </label>
                     <div className="flex items-center gap-2 w-full sm:w-[300px]">
-                      <input
+                      <FormInput
+                        name={`leave-balance-${leaveTypeName}`}
                         type="number"
                         disabled={isDisabled}
-                        className={`border px-3 py-2 w-full rounded shadow-sm ${isDisabled
+                        inputClassName={`shadow-sm ${isDisabled
                           ? "bg-gray-100 text-gray-500 cursor-not-allowed"
                           : ""
                           }`}

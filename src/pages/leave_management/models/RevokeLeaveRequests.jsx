@@ -4,6 +4,7 @@ import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button/Button";
+import DataTable from "../../../components/patterns/DataTable";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
@@ -108,79 +109,79 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
       {loading ? (
         <LoadingSpinner text="Loading..." />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse rounded-lg overflow-hidden shadow-sm">
-            <thead>
-              <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-xs">
-                <th className="p-3 text-center uppercase">Leave Type</th>
-                <th className="p-3 text-center uppercase">Employee</th>
-                <th className="p-3 text-center uppercase">Start Date</th>
-                <th className="p-3 text-center uppercase">End Date</th>
-                <th className="p-3 text-center uppercase">Duration</th>
-                <th className="p-3 text-center uppercase">Reason</th>
-                <th className="p-3 text-center uppercase">Action</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-blue-100 text-center">
-              {revokeRequests.map((req) => (
-                <tr
-                  key={req.revokeId}
-                  className="hover:bg-blue-50 transition-colors text-xs"
-                >
-                  <td className="p-3">{req.leaveName}</td>
-                  <td className="p-3">{req.employeeName}</td>
-                  <td className="p-3">
-                    {new Date(req.startDate).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </td>
-                  <td className="p-3">
-                    {new Date(req.endDate).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </td>
-                  <td className="p-3">
-                    {req.days <= 1 ? `${req.days} Day` : `${req.days} Days`}
-                    {/* console.log("Days requested:", req) */}
-                  </td>
-                  <td className="p-3">{req.reason}</td>
-                  <td className="p-3 flex justify-center gap-2">
-                    <Button
-                      onClick={() =>
-                        handleApprove(req.revokeId, req.employeeId, req.year)
-                      }
-                      variant="primary"
-                      size="icon"
-                      aria-label="Approve"
-                      className="p-1 pr-2 text-green-600 hover:text-green-800 transition-colors"
-                      title="Approve"
-                      disabled={loading}
-                    >
-                      <Check className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      onClick={() =>
-                        handleReject(req.revokeId, req.employeeId, req.year)
-                      }
-                      variant="danger"
-                      size="icon"
-                      aria-label="Reject"
-                      className="p-1 pl-4 text-red-600 hover:text-red-800 transition-colors"
-                      title="Reject"
-                      disabled={loading}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          getRowKey={(req) => req.revokeId}
+          rows={revokeRequests}
+          columns={[
+            { key: "leaveName", header: "Leave Type", className: "text-center" },
+            { key: "employeeName", header: "Employee", className: "text-center" },
+            {
+              key: "startDate",
+              header: "Start Date",
+              className: "text-center",
+              render: (req) =>
+                new Date(req.startDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                }),
+            },
+            {
+              key: "endDate",
+              header: "End Date",
+              className: "text-center",
+              render: (req) =>
+                new Date(req.endDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                }),
+            },
+            {
+              key: "days",
+              header: "Duration",
+              className: "text-center",
+              render: (req) =>
+                req.days <= 1 ? `${req.days} Day` : `${req.days} Days`,
+            },
+            { key: "reason", header: "Reason", className: "text-center" },
+            {
+              key: "actions",
+              header: "Action",
+              className: "text-center",
+              render: (req) => (
+                <div className="flex justify-center gap-2">
+                  <Button
+                    onClick={() =>
+                      handleApprove(req.revokeId, req.employeeId, req.year)
+                    }
+                    variant="primary"
+                    size="icon"
+                    aria-label="Approve"
+                    className="p-1 pr-2 text-green-600 hover:text-green-800 transition-colors"
+                    title="Approve"
+                    disabled={loading}
+                  >
+                    <Check className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    onClick={() =>
+                      handleReject(req.revokeId, req.employeeId, req.year)
+                    }
+                    variant="danger"
+                    size="icon"
+                    aria-label="Reject"
+                    className="p-1 pl-4 text-red-600 hover:text-red-800 transition-colors"
+                    title="Reject"
+                    disabled={loading}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ),
+            },
+          ]}
+        />
       )}
     </div>
   );

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { X, User } from "lucide-react";
 import api from "../../../api/axiosInstance";
-import FilterListbox from "../../../components/filter/FilterListbox";
 import Button from "../../../components/Button/Button";
+import FormInput from "../../../components/forms/FormInput";
+import FormSelect from "../../../components/forms/FormSelect";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -127,30 +128,26 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                First Name *
-              </label>
-              <input
-                type="text"
+              <FormInput
+                label="First Name *"
                 name="firstName"
+                type="text"
                 value={formData.firstName}
                 onChange={handleChange}
                 required
-                className="input"
+                inputClassName="input"
                 placeholder="Enter first name"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Last Name *
-              </label>
-              <input
-                type="text"
+              <FormInput
+                label="Last Name *"
                 name="lastName"
+                type="text"
                 value={formData.lastName}
                 onChange={handleChange}
                 required
-                className="input"
+                inputClassName="input"
                 placeholder="Enter last name"
               />
             </div>
@@ -158,7 +155,8 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Gender *
               </label>
-              <FilterListbox
+              <FormSelect
+                name="gender"
                 options={[
                   { value: "", label: "Select gender" },
                   { value: "Male", label: "Male" },
@@ -166,88 +164,74 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
                   { value: "Other", label: "Other" },
                 ]}
                 value={formData.gender}
-                onChange={(val) =>
-                  handleChange({ target: { name: "gender", value: val } })
-                }
+                onChange={handleChange}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone
-              </label>
-              <input
-                type="tel"
+              <FormInput
+                label="Phone"
                 name="phone"
+                type="tel"
                 value={formData.phone}
                 onChange={handleChange}
                 maxLength={10}
-                className="input"
+                inputClassName="input"
                 placeholder="Optional"
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email *
-              </label>
-              <input
-                type="email"
+              <FormInput
+                label="Email *"
                 name="email"
+                type="email"
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className="input"
+                inputClassName="input"
                 placeholder="Enter email address"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Joining Date *
-              </label>
-              <input
-                type="date"
+              <FormInput
+                label="Joining Date *"
                 name="hireDate"
+                type="date"
                 value={formData.hireDate}
                 onChange={handleChange}
                 required
-                className="input"
+                inputClassName="input"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Designation
-              </label>
-              <input
-                type="text"
+              <FormInput
+                label="Designation"
                 name="role"
+                type="text"
                 value={formData.role}
                 onChange={handleChange}
-                className="input"
+                inputClassName="input"
                 placeholder="Ex: Software Engineer"
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Manager Employee ID
-              </label>
-              <input
-                type="text"
+              <FormInput
+                label="Manager Employee ID"
                 name="managerId"
+                type="text"
                 value={formData.managerId}
                 onChange={handleChange}
-                className="input"
+                inputClassName="input"
                 placeholder="Ex: PAVEMP12345"
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password *
-              </label>
-              <input
-                type="password"
+              <FormInput
+                label="Password *"
                 name="password"
+                type="password"
                 value={formData.password}
                 onChange={handleChange}
-                className="input"
+                inputClassName="input"
                 placeholder="Enter password"
               />
             </div>

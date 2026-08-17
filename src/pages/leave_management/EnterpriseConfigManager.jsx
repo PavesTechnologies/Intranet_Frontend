@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Plus, Save, Trash2, X, CheckCircle, AlertCircle, Edit3, Search, Filter, Download, Upload, RefreshCw, ChevronDown } from 'lucide-react';
-import FilterListbox from '../../components/filter/FilterListbox';
 import Button from "../../components/Button/Button";
+import FormInput from "../../components/forms/FormInput";
+import FormSelect from "../../components/forms/FormSelect";
 
 const EnterpriseConfigManager = () => {
   const [activeTab, setActiveTab] = useState('leave');
@@ -139,13 +140,14 @@ const EnterpriseConfigManager = () => {
 
     if (field.type === 'select') {
       return (
-        <FilterListbox
+        <FormSelect
+          name={field.name}
           options={[
             { value: '', label: `Select ${field.label}` },
             ...field.options.map(opt => ({ value: opt, label: opt.replace(/_/g, ' ') })),
           ]}
           value={value || ''}
-          onChange={(val) => handleFormChange(field.name, val)}
+          onChange={(e) => handleFormChange(field.name, e.target.value)}
         />
       );
     }
@@ -191,11 +193,12 @@ const EnterpriseConfigManager = () => {
 
     if (field.type === 'number') {
       return (
-        <input
+        <FormInput
           type="number"
+          name={field.name}
           value={value || ''}
           onChange={(e) => handleFormChange(field.name, parseInt(e.target.value) || 0)}
-          className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700"
+          inputClassName="focus:border-blue-500 text-slate-700"
           placeholder={`Enter ${field.label.toLowerCase()}`}
           required={field.required}
           min="0"
@@ -204,11 +207,12 @@ const EnterpriseConfigManager = () => {
     }
 
     return (
-      <input
+      <FormInput
         type="text"
+        name={field.name}
         value={value || ''}
         onChange={(e) => handleFormChange(field.name, e.target.value)}
-        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700"
+        inputClassName="focus:border-blue-500 text-slate-700"
         placeholder={`Enter ${field.label.toLowerCase()}`}
         required={field.required}
       />

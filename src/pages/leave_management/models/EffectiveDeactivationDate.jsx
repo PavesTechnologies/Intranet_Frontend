@@ -1,5 +1,6 @@
 import React from "react";
 import Button from "../../../components/Button/Button";
+import FormInput from "../../../components/forms/FormInput";
 
 const EffectiveDeactivationDate = ({
   isOpen,
@@ -17,12 +18,13 @@ const EffectiveDeactivationDate = ({
       <div className="bg-white p-4 rounded-lg shadow-xl max-w-sm w-full">
         <h3 className="text-sm font-semibold mb-2">Effective Deactivation Date</h3>
         <p className="mb-4 text-sm text-gray-600">Are you sure you want to deactivate this leave type?</p>
-        <input
+        <FormInput
           type="date"
+          name="effectiveDate"
           value={effectiveDate || ""}
           onChange={(e) => setEffectiveDate(e.target.value)}
           min={new Date().toISOString().split("T")[0]}
-          className="border rounded w-full px-2 py-2 mb-4"
+          inputClassName="mb-4"
           required
         />
 

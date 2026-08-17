@@ -8,6 +8,7 @@ import clearingDesk from "../../../components/icons/clearing-desk_emmv.svg";
 import ConfirmationModal from "./ConfirmationModal";
 import api from "../../../api/axiosInstance";
 import Button from "../../../components/Button/Button";
+import FormInput from "../../../components/forms/FormInput";
 
 const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
@@ -217,18 +218,11 @@ const ApprovalDashboard = () => {
                     <div className="mt-6 space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label
-                            htmlFor={`reason-${request.id}`}
-                            className="block text-sm font-medium text-gray-700 mb-1"
-                          >
-                            Rejection Reason
-                          </label>
-                          <input
-                            id={`reason-${request.id}`}
-                            maxLength="100"
-                            rows="3"
-                            cols="40"
+                          <FormInput
+                            label="Rejection Reason"
+                            name={`reason-${request.id}`}
                             type="text"
+                            maxLength="100"
                             placeholder="Required for rejection..."
                             value={actionState[request.id]?.reason || ""}
                             onChange={(e) =>
@@ -238,7 +232,7 @@ const ApprovalDashboard = () => {
                                 e.target.value,
                               )
                             }
-                            className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
+                            inputClassName="focus:ring-red-500 focus:border-red-500"
                           />
                         </div>
                       </div>

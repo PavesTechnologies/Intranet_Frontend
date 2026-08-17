@@ -13,9 +13,10 @@ import DateRangePicker from "./DateRangePicker";
 import { format } from "date-fns";
 import EditBlockLeaveModal from "./EditBlockLeaveModal";
 import Button from "../../../components/Button/Button";
+import FormInput from "../../../components/forms/FormInput";
+import DataTable from "../../../components/patterns/DataTable";
+import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 
-// Tailwind tokens
-const skeleton = "animate-pulse bg-gray-400 rounded hover:cursor-wait";
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const PMS_BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
 
@@ -884,181 +885,130 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        <div className="rounded-xl border bg-white shadow-sm">
-          <div className="p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-base font-semibold">Active blocks</h2>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Search and manage current blocked date ranges.
-              </p>
-            </div>
+        <PageCard
+          title="Active blocks"
+          subtitle="Search and manage current blocked date ranges."
+          actions={
             <div className="w-full sm:w-80">
-              <input
+              <FormInput
                 type="text"
-                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                name="activeBlocksFilter"
                 placeholder="Search by project, employee, type, or date"
                 value={filterText}
                 onChange={(e) => setFilterText(e.target.value)}
+                inputClassName="border-gray-300 dark:border-gray-700 bg-white shadow-sm focus:ring-2 focus:ring-indigo-500"
               />
             </div>
-          </div>
-
-          <div className="border-t border-gray-100" />
-
-          <div className="p-4 overflow-x-auto">
-            <table className="w-full table-auto">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-3 py-2">
-                    Project
-                  </th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-3 py-2">
-                    Scope
-                  </th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-3 py-2">
-                    Employees
-                  </th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-3 py-2">
-                    Leave types
-                  </th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-3 py-2">
-                    Dates
-                  </th>
-                  <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-3 py-2">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {loading ? (
-                  <tr>
-                    <td colSpan="6" className="px-3 py-4">
-                      <div className={`${skeleton} h-10 w-full`} />
-                    </td>
-                  </tr>
-                ) : filteredBlocks.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan="6"
-                      className="px-3 py-8 text-center text-sm text-gray-500"
-                    >
-                      No active blocks
-                    </td>
-                  </tr>
-                ) : (
-                  filteredBlocks.map((b) => {
-                    // console.log("Rendering block:", b);
-                    const projectLabel =
-                      projects.find((p) => String(p.id) === String(b.projectId))
-                        ?.name || b.projectName;
-
-                    return (
-                      <tr key={b.id} className="align-top">
-                        {/* Project */}
-                        <td className="px-3 py-3 w-48">
-                          <div className="text-sm font-medium">
-                            {projectLabel}
-                          </div>
-                        </td>
-
-                        {/* Scope toggle */}
-                        <td className="px-3 py-3 w-44">
-                          <span className="text-sm">
-                            {b.scopeAll ? "All members" : "Selected"}
-                          </span>
-                        </td>
-
-                        {/* Employees */}
-                        <td className="px-3 py-3 min-w-[280px]">
-                          <div className="flex flex-wrap gap-2">
-                            {(b.memberNames || [])
-                              .slice(0, 4)
-                              .map((name, i) => (
-                                <Pill key={i}>{name}</Pill>
-                              ))}
-                            {(b.memberNames || []).length > 4 ? (
-                              <Pill>
-                                +{(b.memberNames || []).length - 4} more
-                              </Pill>
-                            ) : null}
-                            {b.scopeAll && <Pill active>All</Pill>}
-                          </div>
-                        </td>
-
-                        {/* Leave types (fixed: compute inline for read-only) */}
-                        <td className="px-3 py-3 min-w-[260px]">
-                          <div className="flex flex-wrap gap-2">
-                            {(b.leaveTypeIds || []).slice(0, 4).map((id, i) => {
-                              const found = (leaveTypes || []).find(
-                                (lt) => String(lt.value) === String(id),
-                              );
-                              return (
-                                <Pill key={i}>{found ? found.label : id}</Pill>
-                              );
-                            })}
-                            {(b.leaveTypeIds || []).length > 4 ? (
-                              <Pill>
-                                +{(b.leaveTypeIds || []).length - 4} more
-                              </Pill>
-                            ) : null}
-                          </div>
-                        </td>
-
-                        {/* Dates */}
-                        <td className="px-3 py-3 w-[360px]">
-                          <div className="text-sm">
-                            {new Date(b.startDate).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}{" "}
-                            →{" "}
-                            {new Date(b.endDate).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </div>
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-3 py-3 w-40 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              type="button"
-                              onClick={() => handleOpenEditModal(b)}
-                              variant="outline"
-                              size="sm"
-                              className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-700 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            >
-                              <PencilSquareIcon className="h-4 w-4 mr-1" /> Edit
-                            </Button>
-                            <Button
-                              type="button"
-                              onClick={() => unblock(b.id)}
-                              disabled={unblockingId === b.id}
-                              variant="danger"
-                              size="sm"
-                              className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-red-500 ${
-                                unblockingId === b.id
-                                  ? "bg-red-400 cursor-not-allowed"
-                                  : "bg-red-600 hover:bg-red-700"
-                              }`}
-                            >
-                              {unblockingId === b.id
-                                ? "Unblocking..."
-                                : "Unblock"}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          }
+        >
+          <PageCardContent className="p-4">
+            <DataTable
+              loading={loading}
+              emptyTitle="No active blocks"
+              getRowKey={(b) => b.id}
+              rows={filteredBlocks}
+              columns={[
+                {
+                  key: "project",
+                  header: "Project",
+                  render: (b) =>
+                    projects.find((p) => String(p.id) === String(b.projectId))
+                      ?.name || b.projectName,
+                },
+                {
+                  key: "scope",
+                  header: "Scope",
+                  render: (b) => (b.scopeAll ? "All members" : "Selected"),
+                },
+                {
+                  key: "employees",
+                  header: "Employees",
+                  render: (b) => (
+                    <div className="flex flex-wrap gap-2">
+                      {(b.memberNames || []).slice(0, 4).map((name, i) => (
+                        <Pill key={i}>{name}</Pill>
+                      ))}
+                      {(b.memberNames || []).length > 4 ? (
+                        <Pill>+{(b.memberNames || []).length - 4} more</Pill>
+                      ) : null}
+                      {b.scopeAll && <Pill active>All</Pill>}
+                    </div>
+                  ),
+                },
+                {
+                  key: "leaveTypes",
+                  header: "Leave types",
+                  render: (b) => (
+                    <div className="flex flex-wrap gap-2">
+                      {(b.leaveTypeIds || []).slice(0, 4).map((id, i) => {
+                        const found = (leaveTypes || []).find(
+                          (lt) => String(lt.value) === String(id),
+                        );
+                        return (
+                          <Pill key={i}>{found ? found.label : id}</Pill>
+                        );
+                      })}
+                      {(b.leaveTypeIds || []).length > 4 ? (
+                        <Pill>+{(b.leaveTypeIds || []).length - 4} more</Pill>
+                      ) : null}
+                    </div>
+                  ),
+                },
+                {
+                  key: "dates",
+                  header: "Dates",
+                  render: (b) => (
+                    <>
+                      {new Date(b.startDate).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}{" "}
+                      →{" "}
+                      {new Date(b.endDate).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </>
+                  ),
+                },
+                {
+                  key: "actions",
+                  header: "Actions",
+                  className: "text-right",
+                  render: (b) => (
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => handleOpenEditModal(b)}
+                        variant="outline"
+                        size="sm"
+                        className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-700 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <PencilSquareIcon className="h-4 w-4 mr-1" /> Edit
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => unblock(b.id)}
+                        disabled={unblockingId === b.id}
+                        variant="danger"
+                        size="sm"
+                        className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                          unblockingId === b.id
+                            ? "bg-red-400 cursor-not-allowed"
+                            : "bg-red-600 hover:bg-red-700"
+                        }`}
+                      >
+                        {unblockingId === b.id ? "Unblocking..." : "Unblock"}
+                      </Button>
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          </PageCardContent>
+        </PageCard>
       </main>
       {selectedBlock && (
         <EditBlockLeaveModal

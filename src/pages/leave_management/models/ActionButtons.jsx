@@ -13,13 +13,13 @@ const ActionButtons = ({ onRequestLeave, onRequestCompOff }) => {
         onClick={onRequestLeave}
         variant="primary"
         size="small"
-        // className="w-full sm:w-auto text-xs"
+      // className="w-full sm:w-auto text-xs"
       >
         Request Leave
       </Button>
 
       <Button onClick={onRequestCompOff} variant="secondary" size="small">
-        Request Credit for Compensatory Off
+        Request Compensatory Off
       </Button>
 
       {/* <a href="#" className={Fonts.link}>Leave Policy Explanation</a> */}

@@ -28,8 +28,11 @@ const VARIANT_CLASSES = {
     "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
   ghost:
     "bg-transparent text-gray-700 hover:bg-gray-100 border border-transparent",
+  // `!px-0 !py-0` forces the override — Tailwind's compiled stylesheet order
+  // (not source order) would otherwise let the size's own px-*/py-* utility
+  // win, leaving "link" buttons visibly padded like a chip.
   link:
-    "bg-transparent shadow-none text-brand-primary hover:underline px-0 py-0",
+    "bg-transparent text-brand-primary hover:underline !px-0 !py-0",
 };
 
 // size="icon" is a bare icon trigger, not a filled/outlined control — it must
@@ -91,6 +94,7 @@ const Button = ({
   const isDisabled = disabled || loading;
   const resolvedSize = SIZE_ALIASES[size] || size;
   const isIcon = resolvedSize === "icon";
+  const isLink = variant === "link";
   const variantClass = isIcon
     ? ICON_VARIANT_CLASSES[variant] || ICON_VARIANT_CLASSES.ghost
     : VARIANT_CLASSES[variant] || VARIANT_CLASSES.primary;
@@ -102,7 +106,7 @@ const Button = ({
       aria-busy={loading}
       className={classNames(
         "inline-flex items-center justify-center gap-2 rounded-lg transition duration-200",
-        isIcon ? "hover:scale-105" : "shadow-sm",
+        isIcon ? "hover:scale-105" : !isLink && "shadow-sm",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2",
         Fonts.button,
         SIZE_CLASSES[resolvedSize] || SIZE_CLASSES.medium,

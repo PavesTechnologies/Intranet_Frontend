@@ -351,6 +351,7 @@ import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/axiosInstance";
 import Button from "../../components/Button/Button.jsx";
+import { PageCard, PageCardContent } from "../../components/Cards/PageCard";
 import FilterListbox from "../../components/filter/FilterListbox.jsx";
 
 const EmployeeDashboard = ({ employeeId }) => {
@@ -466,16 +467,19 @@ const EmployeeDashboard = ({ employeeId }) => {
         </Button>
       </div>
 
-      <h2 className="text-small font-semibold m-4">Pending Leave Requests</h2>
       <div className="flex gap-4 flex-col md:flex-row">
-        <div className="bg-white p-6 rounded-lg shadow-sm md:w-full lg:w-[65%]">
-          {/* ✅ No refreshKey prop — PendingLeaveRequests owns its own WS subscription */}
-          <PendingLeaveRequests
-            employeeId={employeeId}
-            year={currentYear}
-            onLeaveCancel={() => setRefreshKey(prev => prev + 1)} // child can trigger refresh when a leave is cancelled
-            refresh={pendingRequests} // can be used by child to trigger manual refresh if needed
-          />
+        <div className="md:w-full lg:w-[65%]">
+          <PageCard title="Pending Leave Requests">
+            <PageCardContent className="p-6">
+              {/* ✅ No refreshKey prop — PendingLeaveRequests owns its own WS subscription */}
+              <PendingLeaveRequests
+                employeeId={employeeId}
+                year={currentYear}
+                onLeaveCancel={() => setRefreshKey(prev => prev + 1)} // child can trigger refresh when a leave is cancelled
+                refresh={pendingRequests} // can be used by child to trigger manual refresh if needed
+              />
+            </PageCardContent>
+          </PageCard>
         </div>
         <div className="md:w-full lg:w-[35%]">
           <UpcomingHolidays year={currentYear} />

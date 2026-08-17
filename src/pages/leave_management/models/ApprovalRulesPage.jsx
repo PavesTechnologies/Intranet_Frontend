@@ -6,6 +6,8 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import { toast } from "react-toastify";
 import ConfirmationModal from "./ConfirmationModal";
 import Button from "../../../components/Button/Button";
+import FormInput from "../../../components/forms/FormInput";
+import DataTable from "../../../components/patterns/DataTable";
 import { set } from "date-fns";
 import { is } from "date-fns/locale";
 
@@ -176,33 +178,27 @@ export default function ApprovalRulesPage() {
 
       {/* TABLE */}
       <div className="bg-white shadow-lg rounded-xl overflow-hidden border border-gray-100">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
-            <tr className="text-gray-600 uppercase text-xs">
-              <th className="p-3">Action</th>
-              <th className="p-3">Maker</th>
-              <th className="p-3">Checker</th>
-              <th className="p-3 text-center">Level</th>
-              <th className="p-3">Condition</th>
-              <th className="p-3">Approver Type</th>
-              <th className="p-3 text-center">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {rules.map((rule) => (
-              <tr
-                key={rule.id}
-                className="border-b hover:bg-gray-50 transition"
-              >
-                <td className="p-3 font-medium">{rule.actionType}</td>
-                <td className="p-3">{rule.makerRole}</td>
-                <td className="p-3">{rule.checkerRole}</td>
-                <td className="p-3 text-center">{rule.approvalLevel}</td>
-                <td className="p-3">{rule.approvalCondition}</td>
-                <td className="p-3">{rule.approverType}</td>
-
-                <td className="p-3 flex justify-center gap-3">
+        <DataTable
+          loading={loading}
+          emptyTitle="No approval rules found"
+          getRowKey={(rule) => rule.id}
+          columns={[
+            { key: "actionType", header: "Action" },
+            { key: "makerRole", header: "Maker" },
+            { key: "checkerRole", header: "Checker" },
+            {
+              key: "approvalLevel",
+              header: "Level",
+              className: "text-center",
+            },
+            { key: "approvalCondition", header: "Condition" },
+            { key: "approverType", header: "Approver Type" },
+            {
+              key: "actions",
+              header: "Actions",
+              className: "text-center",
+              render: (rule) => (
+                <div className="flex justify-center gap-3">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -222,11 +218,12 @@ export default function ApprovalRulesPage() {
                   >
                     <Trash2 className="w-5 h-5" />
                   </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+              ),
+            },
+          ]}
+          rows={rules}
+        />
       </div>
 
       {/* ===================== MODAL ===================== */}
@@ -350,15 +347,18 @@ export default function ApprovalRulesPage() {
 
 function InputField({ label, value, onChange, type = "text" }) {
   return (
-    <div>
-      <label className="block text-sm font-medium mb-1">{label}</label>
-      <input
-        type={type}
-        className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-indigo-500"
-        value={value}
-        onChange={onChange}
-      />
-    </div>
+    <FormInput
+      label={label}
+      name={
+        label
+          ? label.replace(/\s+/g, "").replace(/^./, (c) => c.toLowerCase())
+          : undefined
+      }
+      type={type}
+      value={value}
+      onChange={onChange}
+      inputClassName="focus:ring-2 focus:ring-indigo-500"
+    />
   );
 }
 

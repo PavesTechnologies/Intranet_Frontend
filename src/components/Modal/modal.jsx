@@ -104,6 +104,7 @@ const Modal = ({
   const sizeClass = hasMaxWidth ? "" : SIZE_MAP[size] || SIZE_MAP.lg;
   const animationClass = ANIMATION_MAP[animation] ?? ANIMATION_MAP.zoom;
   const positionClass = POSITION_MAP[position] || POSITION_MAP.center;
+  const hasHeader = showHeader && (title || subtitle || showCloseButton);
 
   const mobileClass = fullScreenMobile
     ? "max-sm:max-w-none max-sm:w-screen max-sm:h-screen max-sm:rounded-none max-sm:max-h-screen"
@@ -133,10 +134,10 @@ const Modal = ({
           ${mergedClassName}
         `}
       >
-        {showHeader && (title || subtitle || showCloseButton) && (
+        {hasHeader && (
           <div
             className={`
-              shrink-0 rounded-t-xl bg-white p-4 sm:p-5
+              shrink-0 rounded-t-xl bg-white px-4 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4
               ${headerBorder ? "border-b border-gray-100" : ""}
               ${headerClassName}
             `}
@@ -196,7 +197,12 @@ const Modal = ({
           className={`
             min-h-0 flex-1
             ${scrollable ? "overflow-y-auto" : "overflow-hidden"}
-            ${bodyClassName || "p-4 sm:p-5"}
+            ${
+              bodyClassName ||
+              (hasHeader
+                ? "px-4 pt-3 pb-4 sm:px-5 sm:pt-4 sm:pb-5"
+                : "p-4 sm:p-5")
+            }
           `}
         >
           {children}

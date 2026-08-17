@@ -11,7 +11,8 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 import Button from "../../../components/Button/Button";
-import FilterListbox from "../../../components/filter/FilterListbox";
+import FormInput from "../../../components/forms/FormInput";
+import FormSelect from "../../../components/forms/FormSelect";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
@@ -545,42 +546,45 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
       <div className="p-6 border-b border-gray-200">
         <div className="flex flex-col lg:flex-row items-center gap-4 flex-wrap">
           {/* --- SEARCH INPUT --- */}
-          {/* No changes needed here, it already matches the new style. */}
           <div className="relative flex-1 w-full lg:w-auto">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+            <FormInput
               type="text"
+              name="leaveApprovalSearch"
               placeholder="Search by Name or Leave Type"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+              inputClassName="pl-10 pr-4 py-2.5 focus:ring-indigo-500"
             />
           </div>
 
           {/* --- STATUS DROPDOWN --- */}
           <div className="w-full lg:w-auto lg:min-w-[150px]">
-            <FilterListbox
+            <FormSelect
+              name="statusFilter"
               options={STATUS_OPTIONS}
               value={selectedStatus}
-              onChange={setSelectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
             />
           </div>
 
           {/* --- YEAR DROPDOWN --- */}
           <div className="w-full lg:w-auto lg:min-w-[150px]">
-            <FilterListbox
+            <FormSelect
+              name="yearFilter"
               options={yearOptions}
               value={selectedYear}
-              onChange={setSelectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
             />
           </div>
 
           {/* --- MONTH DROPDOWN --- */}
           <div className="w-full lg:w-auto lg:min-w-[150px]">
-            <FilterListbox
+            <FormSelect
+              name="monthFilter"
               options={MONTHS}
               value={selectedMonth}
-              onChange={setSelectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
             />
           </div>
         </div>
@@ -1116,13 +1120,14 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                 </h3>
                 {(confirmation.action === "reject" ||
                   confirmation.action === "cancel") && (
-                    <input
+                    <FormInput
+                      name="confirmationComment"
                       placeholder={
                         confirmation.action === "reject"
                           ? "Manager comment"
                           : "Reason for cancellation"
                       }
-                      className="border rounded px-2 py-1 mb-3 text-sm w-full"
+                      inputClassName="mb-3 text-sm"
                       value={comments[confirmation.leaveId] || ""}
                       onChange={(e) =>
                         setComments((prev) => ({

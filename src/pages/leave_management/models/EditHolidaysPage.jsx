@@ -8,10 +8,11 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationModal from "./ConfirmationModal";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
-import { Listbox, Transition } from "@headlessui/react";
-import { Fragment } from "react";
-import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import Button from "../../../components/Button/Button";
+import FormInput from "../../../components/forms/FormInput";
+import FormSelect from "../../../components/forms/FormSelect";
+import FilterBar from "../../../components/patterns/FilterBar";
+import DataTable from "../../../components/patterns/DataTable";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -159,223 +160,211 @@ const EditHolidaysPage = () => {
       </div>
 
       {/* Search Bar */}
-      <div className="mb-4 w-full flex justify-start items-center space-x-2">
+      <FilterBar className="mb-4">
         {/* Search Input */}
-        <input
+        <FormInput
           type="text"
+          name="holidaySearch"
           placeholder="Search by Holiday Name, Type, State or Country..."
-          className="border rounded p-2 w-1/2"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          inputClassName="w-full"
+          className="flex-1 min-w-[240px]"
         />
 
         {/* Year Listbox */}
-        <Listbox value={selectedYear} onChange={setSelectedYear}>
-          <div className="relative w-32">
-            <Listbox.Button className="relative w-full cursor-pointer rounded-lg border bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-              <span className="block truncate">{selectedYear}</span>
-              <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
-              </span>
-            </Listbox.Button>
-
-            <Transition
-              as={Fragment}
-              leave="transition ease-in duration-100"
-              leaveFrom="opacity-100"
-              leaveTo="opacity-0"
-            >
-              <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md border bg-white py-1 text-base shadow-lg focus:outline-none">
-                {years.map((year) => (
-                  <Listbox.Option
-                    key={year}
-                    className={({ active }) =>
-                      `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                        active ? "bg-blue-100 text-blue-600" : "text-gray-900"
-                      }`
-                    }
-                    value={year}
-                  >
-                    {({ selected }) => (
-                      <>
-                        <span
-                          className={`block truncate ${
-                            selected ? "font-medium" : "font-normal"
-                          }`}
-                        >
-                          {year}
-                        </span>
-                        {selected ? (
-                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600">
-                            <CheckIcon className="h-5 w-5" />
-                          </span>
-                        ) : null}
-                      </>
-                    )}
-                  </Listbox.Option>
-                ))}
-              </Listbox.Options>
-            </Transition>
-          </div>
-        </Listbox>
-      </div>
+        <div className="w-32">
+          <FormSelect
+            name="holidayYear"
+            options={years.map((year) => ({ value: year, label: String(year) }))}
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+          />
+        </div>
+      </FilterBar>
 
       {/* Holidays Table */}
-      <div className="overflow-x-auto border rounded-lg">
-        <table className="min-w-full text-sm text-center">
-          <thead className="bg-gray-100 text-sm font-bolder">
-            <tr>
-              <th className="px-4 py-3 font-heading">Holiday Name</th>
-              <th className="px-4 py-3 font-heading">Date</th>
-              <th className="px-4 py-3 font-heading">Type</th>
-              <th className="px-4 py-3 font-heading">State</th>
-              <th className="px-4 py-3 font-heading">Country</th>
-              <th className="px-4 py-3 font-heading">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="text-xs">
-            {filteredHolidays.map((holiday) => (
-              <tr key={holiday.holidayId} className="border-t hover:bg-gray-50">
-                {editingHolidayId === holiday.holidayId ? (
-                  <>
-                    <td className="px-4 py-2">
-                      <input
-                        type="text"
-                        name="holidayName"
-                        value={editedData.holidayName}
-                        onChange={handleInputChange}
-                        className="border rounded p-1 w-full"
-                      />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input
-                        type="date"
-                        name="holidayDate"
-                        value={
-                          new Date(editedData.holidayDate)
-                            .toISOString()
-                            .split("T")[0]
-                        }
-                        onChange={handleInputChange}
-                        className="border rounded p-1 w-full"
-                      />
-                    </td>
-                    <td className="px-4 py-2 w-1/6">
-                      <input
-                        value={editedData.type || ""}
-                        className="border rounded p-1 w-full bg-gray-100 text-gray-400 hover:cursor-not-allowed"
-                        readOnly
-                      />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input
-                        type="text"
-                        name="state"
-                        value={editedData.state || ""}
-                        onChange={handleInputChange}
-                        placeholder="State"
-                        className="border rounded p-1 w-full bg-gray-100 text-gray-400 hover:cursor-not-allowed"
-                        readOnly
-                      />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input
-                        type="text"
-                        name="country"
-                        value={editedData.country || ""}
-                        onChange={handleInputChange}
-                        placeholder="Country"
-                        className="border rounded p-1 w-full bg-gray-100 text-gray-400 hover:cursor-not-allowed"
-                        readOnly
-                      />
-                    </td>
-                    <td className="px-4 py-2 flex justify-center gap-2">
-                      <Button
-                        variant="primary"
-                        size="icon"
-                        onClick={() => handleSaveHoliday(holiday.holidayId)}
-                        className="text-green-500 hover:text-green-800"
-                        title="Save"
-                        aria-label="Save"
-                      >
-                        <Save size={20} />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={handleCancelEdit}
-                        className="text-red-500 hover:text-red-700"
-                        title="Cancel"
-                        aria-label="Cancel"
-                      >
-                        <XCircle size={20} />
-                      </Button>
-                    </td>
-                  </>
+      <div className="border rounded-lg overflow-hidden">
+        <DataTable
+          emptyTitle="No holidays found"
+          getRowKey={(holiday) => holiday.holidayId}
+          rows={filteredHolidays}
+          columns={[
+            {
+              key: "holidayName",
+              header: "Holiday Name",
+              className: "text-center",
+              render: (holiday) =>
+                editingHolidayId === holiday.holidayId ? (
+                  <FormInput
+                    type="text"
+                    name="holidayName"
+                    value={editedData.holidayName}
+                    onChange={handleInputChange}
+                    inputClassName="w-full"
+                  />
                 ) : (
-                  <>
-                    <td className="px-4 py-2">{holiday.holidayName}</td>
-                    <td className="px-4 py-2">
-                      {new Date(holiday.holidayDate).toLocaleDateString(
-                        "en-US",
-                        { month: "short", day: "numeric", year: "numeric" },
-                      )}
-                    </td>
-                    <td className="px-4 py-2">{holiday.type}</td>
-                    <td className="px-4 py-2">
-                      {holiday.state ? holiday.state : "-"}
-                    </td>
-                    <td className="px-4 py-2">
-                      {holiday.country ? holiday.country : "-"}
-                    </td>
-                    <td className="px-4 py-2 flex justify-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEditClick(holiday)}
-                        className={`text-blue-600  ${
-                          holiday.isActive
-                            ? "hover:text-blue-800"
-                            : "text-opacity-15 cursor-not-allowed"
-                        }`}
-                        title={
-                          holiday.isActive
-                            ? "Edit"
-                            : "This holiday cannot be edited."
-                        }
-                        aria-label="Edit"
-                        disabled={!holiday.isActive}
-                      >
-                        <Edit size={20} />
-                      </Button>
-                      <Button
-                        variant="danger"
-                        size="icon"
-                        onClick={() =>
-                          handleDeleteConfirmation(holiday.holidayId)
-                        }
-                        className={`text-red-600  ${
-                          holiday.isActive
-                            ? "hover:text-red-800"
-                            : "text-opacity-15 cursor-not-allowed"
-                        }`}
-                        title={
-                          holiday.isActive
-                            ? "Delete"
-                            : "This holiday cannot be deleted."
-                        }
-                        aria-label="Delete"
-                        disabled={!holiday.isActive}
-                      >
-                        <Trash2 size={20} />
-                      </Button>
-                    </td>
-                  </>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  holiday.holidayName
+                ),
+            },
+            {
+              key: "holidayDate",
+              header: "Date",
+              className: "text-center",
+              render: (holiday) =>
+                editingHolidayId === holiday.holidayId ? (
+                  <FormInput
+                    type="date"
+                    name="holidayDate"
+                    value={
+                      new Date(editedData.holidayDate)
+                        .toISOString()
+                        .split("T")[0]
+                    }
+                    onChange={handleInputChange}
+                    inputClassName="w-full"
+                  />
+                ) : (
+                  new Date(holiday.holidayDate).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                ),
+            },
+            {
+              key: "type",
+              header: "Type",
+              className: "text-center",
+              render: (holiday) =>
+                editingHolidayId === holiday.holidayId ? (
+                  <FormInput
+                    name="holidayTypeDisplay"
+                    value={editedData.type || ""}
+                    inputClassName="bg-gray-100 text-gray-400 hover:cursor-not-allowed"
+                    readOnly
+                  />
+                ) : (
+                  holiday.type
+                ),
+            },
+            {
+              key: "state",
+              header: "State",
+              className: "text-center",
+              render: (holiday) =>
+                editingHolidayId === holiday.holidayId ? (
+                  <FormInput
+                    type="text"
+                    name="state"
+                    value={editedData.state || ""}
+                    onChange={handleInputChange}
+                    placeholder="State"
+                    inputClassName="bg-gray-100 text-gray-400 hover:cursor-not-allowed"
+                    readOnly
+                  />
+                ) : holiday.state ? (
+                  holiday.state
+                ) : (
+                  "-"
+                ),
+            },
+            {
+              key: "country",
+              header: "Country",
+              className: "text-center",
+              render: (holiday) =>
+                editingHolidayId === holiday.holidayId ? (
+                  <FormInput
+                    type="text"
+                    name="country"
+                    value={editedData.country || ""}
+                    onChange={handleInputChange}
+                    placeholder="Country"
+                    inputClassName="bg-gray-100 text-gray-400 hover:cursor-not-allowed"
+                    readOnly
+                  />
+                ) : holiday.country ? (
+                  holiday.country
+                ) : (
+                  "-"
+                ),
+            },
+            {
+              key: "actions",
+              header: "Actions",
+              className: "text-center",
+              render: (holiday) =>
+                editingHolidayId === holiday.holidayId ? (
+                  <div className="flex justify-center gap-2">
+                    <Button
+                      variant="primary"
+                      size="icon"
+                      onClick={() => handleSaveHoliday(holiday.holidayId)}
+                      className="text-green-500 hover:text-green-800"
+                      title="Save"
+                      aria-label="Save"
+                    >
+                      <Save size={20} />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleCancelEdit}
+                      className="text-red-500 hover:text-red-700"
+                      title="Cancel"
+                      aria-label="Cancel"
+                    >
+                      <XCircle size={20} />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex justify-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEditClick(holiday)}
+                      className={`text-blue-600  ${
+                        holiday.isActive
+                          ? "hover:text-blue-800"
+                          : "text-opacity-15 cursor-not-allowed"
+                      }`}
+                      title={
+                        holiday.isActive
+                          ? "Edit"
+                          : "This holiday cannot be edited."
+                      }
+                      aria-label="Edit"
+                      disabled={!holiday.isActive}
+                    >
+                      <Edit size={20} />
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="icon"
+                      onClick={() =>
+                        handleDeleteConfirmation(holiday.holidayId)
+                      }
+                      className={`text-red-600  ${
+                        holiday.isActive
+                          ? "hover:text-red-800"
+                          : "text-opacity-15 cursor-not-allowed"
+                      }`}
+                      title={
+                        holiday.isActive
+                          ? "Delete"
+                          : "This holiday cannot be deleted."
+                      }
+                      aria-label="Delete"
+                      disabled={!holiday.isActive}
+                    >
+                      <Trash2 size={20} />
+                    </Button>
+                  </div>
+                ),
+            },
+          ]}
+        />
       </div>
       <ConfirmationModal
         isOpen={isDeleteConfirmationOpen}

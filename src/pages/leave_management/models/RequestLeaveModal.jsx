@@ -1,9 +1,9 @@
 import React, { useState, useEffect, Fragment, useMemo } from "react";
 import api from "../../../api/axiosInstance";
-import { X } from "lucide-react";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
-import FilterListbox from "../../../components/filter/FilterListbox";
+import FormSelect from "../../../components/forms/FormSelect";
+import FormInput from "../../../components/forms/FormInput";
 import { useAuth } from "../../../contexts/AuthContext";
 import { toast } from "react-toastify";
 import { format } from "date-fns";
@@ -11,6 +11,7 @@ import DateRangePicker from "./DateRangePicker";
 // import {useLeaveConsumption} from "../hooks/useLeaveConsumption";
 import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
 import Button from "../../../components/Button/Button";
+import Modal from "../../../components/Modal/modal";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 // const token = localStorage.getItem("token");
@@ -302,15 +303,14 @@ export default function RequestLeaveModal({
   );
 
   useEffect(() => {
-    if (!isOpen) return;
+    // Body scroll lock while open — the canonical Modal handles Escape-to-close
+    // itself (closeOnEscape), so only the scroll-lock side effect is kept here.
+    if (!isOpen) return undefined;
     document.body.style.overflow = "hidden";
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handler);
     return () => {
       document.body.style.overflow = "";
-      window.removeEventListener("keydown", handler);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   const shouldShowDriveLink = () => {
     if (!selectedLeaveType) return false;
@@ -480,33 +480,16 @@ export default function RequestLeaveModal({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
-      aria-modal="true"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Request Leave"
+      size="lg"
+      maxHeight="max-h-[90vh]"
+      bodyClassName="p-0"
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-2 sm:mx-4 max-h-[90vh] overflow-y-auto border border-gray-100 relative">
-        <div className="sticky top-0 bg-white z-10 p-3 border-b border-gray-200 ">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900">Request Leave</h2>
-            <Button
-              onClick={onClose}
-              variant="ghost"
-              className="hover:bg-accent hover:text-accent-foreground hover:bg-gray-200"
-              type="button"
-              aria-label="Close"
-              size="icon"
-            >
-              <X className="w-6 h-6" />
-            </Button>
-          </div>
-        </div>
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
+      <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
           {(error || success) && (
             <div
               className={`rounded-xl p-3 ${
@@ -624,14 +607,15 @@ export default function RequestLeaveModal({
                     <label className="text-xs font-medium text-gray-600">
                       Start Day {formatDateForDisplay(startDate)}
                     </label>
-                    <FilterListbox
+                    <FormSelect
+                      name="halfDayStart"
                       options={[
                         { value: "fullday", label: "Full Day" },
                         { value: "first", label: "First Half" },
                         { value: "second", label: "Second Half" },
                       ]}
                       value={halfDayConfig.start}
-                      onChange={(val) => setHalfDayConfig((p) => ({ ...p, start: val }))}
+                      onChange={(e) => setHalfDayConfig((p) => ({ ...p, start: e.target.value }))}
                     />
                   </div>
 
@@ -643,14 +627,15 @@ export default function RequestLeaveModal({
                         <label className="text-xs font-medium text-gray-600">
                           End Day {formatDateForDisplay(endDate)}
                         </label>
-                        <FilterListbox
+                        <FormSelect
+                          name="halfDayEnd"
                           options={[
                             { value: "fullday", label: "Full Day" },
                             { value: "first", label: "First Half" },
                             { value: "second", label: "Second Half" },
                           ]}
                           value={halfDayConfig.end}
-                          onChange={(val) => setHalfDayConfig((p) => ({ ...p, end: val }))}
+                          onChange={(e) => setHalfDayConfig((p) => ({ ...p, end: e.target.value }))}
                         />
                       </div>
                     </>
@@ -681,13 +666,14 @@ export default function RequestLeaveModal({
                 Supporting Document (Google Drive Link){" "}
                 <span className="text-red-500">*</span>
               </label>
-              <input
+              <FormInput
+                name="driveLink"
                 type="text"
                 value={driveLink}
                 onChange={(e) => setDriveLink(e.target.value)}
                 placeholder="https://drive.google.com/..."
                 required={shouldShowDriveLink()}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                inputClassName="focus:ring-2 focus:ring-indigo-500"
               />
               {selectedLeaveType?.leaveTypeId === "L-SL" && weekdays > 3 && (
                 <p className="text-xs text-gray-500 mt-1">
@@ -721,15 +707,7 @@ export default function RequestLeaveModal({
               Request Leave
             </Button>
           </div>
-        </form>
-        <style>{`
-           @keyframes fadeIn {
-             from { opacity: 0; transform: translateY(8px) scale(0.98);}
-             to {opacity: 1; transform: translateY(0) scale(1);}
-           }
-           .animate-fadeIn {animation: fadeIn 0.25s ease-out;}
-         `}</style>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }

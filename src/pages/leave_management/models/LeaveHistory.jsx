@@ -8,8 +8,11 @@ import { XCircle } from "lucide-react";
 import CancellationModal from "./CancellationModal";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 import { get } from "react-hook-form";
-import FilterListbox from "../../../components/filter/FilterListbox";
 import Button from "../../../components/Button/Button";
+import FormInput from "../../../components/forms/FormInput";
+import FormSelect from "../../../components/forms/FormSelect";
+import DataTable from "../../../components/patterns/DataTable";
+import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 
 const MONTHS = [
   { value: "", label: "All Months" },
@@ -259,127 +262,160 @@ const LeaveHistory = ({ employeeId, year }) => {
     );
 
   return (
-    <div className="w-6xl mx-auto px-6 py-8 bg-white rounded-lg shadow-md">
+    <div className="w-6xl mx-auto">
+      <PageCard>
+      <PageCardContent className="px-6 py-8">
       {/* FILTERS */}
       <div className="flex flex-wrap gap-3 mb-5">
-        <input
+        <FormInput
           type="text"
+          name="leaveHistorySearch"
           placeholder="Search..."
-          className="border px-3 py-2 rounded-lg text-sm"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          inputClassName="text-sm"
         />
 
         <div className="w-[200px]">
-          <FilterListbox
+          <FormSelect
+            name="leaveTypeFilter"
             options={leaveTypeFilterOptions}
             value={filterLeaveType}
-            onChange={setFilterLeaveType}
+            onChange={(e) => setFilterLeaveType(e.target.value)}
           />
         </div>
 
         <div className="w-[150px]">
-          <FilterListbox
+          <FormSelect
+            name="statusFilter"
             options={statusFilterOptions}
             value={filterStatus}
-            onChange={setFilterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
           />
         </div>
 
         <div className="w-[150px]">
-          <FilterListbox
+          <FormSelect
+            name="yearFilter"
             options={yearOptions}
             value={selectedYear}
-            onChange={setSelectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
           />
         </div>
 
         <div className="w-[150px]">
-          <FilterListbox
+          <FormSelect
+            name="monthFilter"
             options={MONTHS}
             value={selectedMonth}
-            onChange={setSelectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
           />
         </div>
       </div>
 
       {/* TABLE */}
       {filteredLeaves.length > 0 ? (
-        <div className="overflow-x-auto border rounded-lg">
-          <table className="w-full text-sm">
-            <thead className="bg-blue-900 text-white">
-              <tr>
-                <th className="p-3">Leave Type</th>
-                <th className="p-3">Requested By</th>
-                <th className="p-3">From</th>
-                <th className="p-3">To</th>
-                <th className="p-3">Days</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Reason</th>
-                <th className="p-3">Comment</th>
-                <th className="p-3">Approved By</th>
-                <th className="p-3">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedRequests.map((leave, index) => (
-                <tr
-                  key={leave.leaveId || index}
-                  className="text-center border-b"
-                >
-                  <td className="p-3">
-                    {getLeaveLabel(
-                      leave.leaveType?.leaveName || leave.leaveName,
-                    )}
-                  </td>
-                  <td className="p-3">
-                    {leave.employee?.fullName || leave.employeeFullName || "-"}
-                  </td>
-                  <td className="p-3">
-                    {leave.startDate
-                      ? new Date(leave.startDate).toLocaleDateString()
-                      : "-"}
-                  </td>
-                  <td className="p-3">
-                    {leave.endDate
-                      ? new Date(leave.endDate).toLocaleDateString()
-                      : "-"}
-                  </td>
-                  <td className="p-3">{leave.daysRequested}</td>
-                  <td className="p-3">
-                    <span
-                      className={`px-2 py-1 text-white rounded-full text-xs ${leave.status === "APPROVED"
-                          ? "bg-green-500"
-                          : leave.status === "REJECTED"
-                            ? "bg-red-500"
-                            : "bg-gray-500"
-                        }`}
+        <div className="rounded-lg overflow-hidden">
+          <DataTable
+            getRowKey={(leave, index) => leave.leaveId || index}
+            rows={paginatedRequests}
+            columns={[
+              {
+                key: "leaveType",
+                header: "Leave Type",
+                className: "text-center",
+                render: (leave) =>
+                  getLeaveLabel(leave.leaveType?.leaveName || leave.leaveName),
+              },
+              {
+                key: "requestedBy",
+                header: "Requested By",
+                className: "text-center",
+                render: (leave) =>
+                  leave.employee?.fullName || leave.employeeFullName || "-",
+              },
+              {
+                key: "from",
+                header: "From",
+                className: "text-center",
+                render: (leave) =>
+                  leave.startDate
+                    ? new Date(leave.startDate).toLocaleDateString()
+                    : "-",
+              },
+              {
+                key: "to",
+                header: "To",
+                className: "text-center",
+                render: (leave) =>
+                  leave.endDate
+                    ? new Date(leave.endDate).toLocaleDateString()
+                    : "-",
+              },
+              {
+                key: "days",
+                header: "Days",
+                className: "text-center",
+                render: (leave) => leave.daysRequested,
+              },
+              {
+                key: "status",
+                header: "Status",
+                className: "text-center",
+                render: (leave) => (
+                  <span
+                    className={`px-2 py-1 text-white rounded-full text-xs ${leave.status === "APPROVED"
+                        ? "bg-green-500"
+                        : leave.status === "REJECTED"
+                          ? "bg-red-500"
+                          : "bg-gray-500"
+                      }`}
+                  >
+                    {leave.status}
+                  </span>
+                ),
+              },
+              {
+                key: "reason",
+                header: "Reason",
+                className: "text-center",
+                render: (leave) => leave.reason || "-",
+              },
+              {
+                key: "comment",
+                header: "Comment",
+                className: "text-center",
+                render: (leave) => leave.managerComment || "-",
+              },
+              {
+                key: "approvedBy",
+                header: "Approved By",
+                className: "text-center",
+                render: (leave) =>
+                  !leave.approvedBy ||
+                  leave.approvedBy.toLowerCase() === "unknown"
+                    ? "-"
+                    : leave.approvedBy,
+              },
+              {
+                key: "actions",
+                header: "Action",
+                className: "text-center",
+                render: (leave) =>
+                  leave.status === "APPROVED" && (
+                    <Button
+                      variant="danger"
+                      size="icon"
+                      onClick={() => handleModalOpen(leave.leaveId)}
+                      aria-label="Cancel approved leave"
+                      className="bg-transparent shadow-none text-orange-500 hover:text-orange-700 hover:bg-orange-50"
                     >
-                      {leave.status}
-                    </span>
-                  </td>
-                  <td className="p-3">{leave.reason || "-"}</td>
-                  <td className="p-3">{leave.managerComment || "-"}</td>
-                  <td className="p-3">
-                    {!leave.approvedBy || leave.approvedBy.toLowerCase() === "unknown" ? "-" : leave.approvedBy}
-                  </td>
-                  <td className="p-3">
-                    {leave.status === "APPROVED" && (
-                      <Button
-                        variant="danger"
-                        size="icon"
-                        onClick={() => handleModalOpen(leave.leaveId)}
-                        aria-label="Cancel approved leave"
-                        className="bg-transparent shadow-none text-orange-500 hover:text-orange-700 hover:bg-orange-50"
-                      >
-                        <XCircle className="w-5 h-5" />
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      <XCircle className="w-5 h-5" />
+                    </Button>
+                  ),
+              },
+            ]}
+          />
         </div>
       ) : (
         <div className="flex justify-center items-center h-40">
@@ -395,6 +431,8 @@ const LeaveHistory = ({ employeeId, year }) => {
           onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
         />
       )}
+      </PageCardContent>
+      </PageCard>
 
       <CancellationModal
         title="Confirm Cancellation"

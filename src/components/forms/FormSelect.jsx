@@ -22,6 +22,18 @@ const FormSelect = ({
   // scrolling container (a wide table, a modal body) where an absolutely
   // positioned panel would otherwise be clipped by the overflow.
   anchorOptions = false,
+  // Whole-control disable — cannot open, no keyboard interaction, no selection
+  // change. Per-option disabling is a separate, not-yet-implemented capability.
+  disabled = false,
+  // Shows the same required-mark next to the label as FormLabel/FormField, and
+  // exposes aria-required on the button (there is no native <select> to attach
+  // a real `required` attribute to). Does not perform or block submission —
+  // that remains the form layer's responsibility.
+  required = false,
+  // Same convention as FormInput: a truthy string is both the "has error" flag
+  // and the message rendered below the control. Purely presentational — does
+  // not run or replace any validation logic.
+  error = "",
 }) => {
   const selectedOption = options.find((opt) => opt.value === value);
 
@@ -58,12 +70,28 @@ const FormSelect = ({
   return (
     <div className={`space-y-1 w-full min-w-0 ${className}`.trim()}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700">{label}</label>
+        <label className="block text-sm font-medium text-gray-700">
+          {label}
+          {required ? <span className="ml-1 text-red-500">*</span> : null}
+        </label>
       )}
-      <Listbox value={value} onChange={(val) => onChange({ target: { name, value: val } })}>
+      <Listbox
+        value={value}
+        onChange={(val) => onChange({ target: { name, value: val } })}
+        disabled={disabled}
+      >
         <div className="relative min-w-0">
           <Listbox.Button
-            className={`w-full h-10 min-w-0 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-left text-sm flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${buttonClassName}`.trim()}
+            aria-required={required || undefined}
+            aria-invalid={Boolean(error)}
+            className={classNames(
+              "w-full h-10 min-w-0 px-4 border rounded-lg shadow-sm bg-white text-left text-sm flex items-center justify-between focus:outline-none focus:ring-2 transition",
+              error
+                ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                : "border-gray-300 focus:border-blue-500 focus:ring-blue-500",
+              disabled && "cursor-not-allowed bg-gray-100 opacity-75",
+              buttonClassName,
+            )}
           >
             <span
               className={classNames(
@@ -115,6 +143,7 @@ const FormSelect = ({
           </Listbox.Options>
         </div>
       </Listbox>
+      {error ? <p className="text-xs text-red-500">{error}</p> : null}
     </div>
   );
 };
