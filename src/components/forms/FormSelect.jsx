@@ -111,8 +111,8 @@ const FormSelect = ({
             className={classNames(
               "rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
               anchorOptions
-                ? "z-[10000] w-max min-w-[var(--button-width)]"
-                : "absolute z-50 mt-1 w-max min-w-full",
+                ? "z-[10000] w-[var(--button-width)]"
+                : "absolute z-50 mt-1 w-full",
             )}
           >
             <div
@@ -132,8 +132,8 @@ const FormSelect = ({
                   }
                 >
                   {({ selected }) => (
-                    <div className="flex justify-between items-center gap-2 min-w-[12rem] pr-6">
-                      <span>{option.label}</span>
+                    <div className="flex justify-between items-center gap-2 w-full min-w-0 pr-6">
+                      <span className="truncate">{option.label}</span>
                       {selected && <Check className="w-4 h-4 text-blue-600" />}
                     </div>
                   )}

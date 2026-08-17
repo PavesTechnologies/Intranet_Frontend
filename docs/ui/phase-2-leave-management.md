@@ -3948,3 +3948,129 @@ via successful `npm run build` with zero changes to any of the 9 consumer files.
 ### Pre-existing issues
 
 None newly discovered in this step beyond what P1.1/P1.2/P1.4 already documented.
+
+---
+
+## Canonical BackButton
+
+**Date:** 2026-08-17
+
+### Why it was introduced
+
+A repository-wide audit for existing "go back" patterns (`navigate(-1)`, `ArrowLeft`, `BackButton`, `history.back`)
+found **32 files** implementing their own local back-navigation button, each with its own one-off styling, and
+**no existing canonical component** for it anywhere under `src/components/` (`PageHeader` was checked
+specifically, per its P1.1 documentation, and confirmed to have no built-in back-button slot). Rather than adding
+a 33rd bespoke implementation to `EmployeeLeaveBalances.jsx`, a small canonical component was introduced instead.
+
+### Canonical component path
+
+`src/components/patterns/BackButton.jsx` — placed alongside the other small, composable presentational
+primitives in `patterns/` (`FilterBar`, `EmptyState`, `StatusBadge`, `ConfirmDialog`), which is the closest
+existing convention for "a small reusable piece that composes canonical `Button`" rather than a full standalone
+UI system.
+
+### Intended usage
+
+```jsx
+import BackButton from "src/components/patterns/BackButton";
+
+<BackButton onClick={() => navigate(-1)} />
+```
+
+API: `{ onClick, label = "Back", className }`. `onClick` is required and supplied by the parent; `label`
+defaults to `"Back"` but can be overridden for the rare case a caller wants different wording; `className` is an
+additive escape hatch, consistent with every other canonical component's override convention.
+
+### Navigation remains owned by the parent
+
+`BackButton` has **zero React Router (or any routing) knowledge** — it does not call `useNavigate`, does not
+know what "back" means, and does not import anything from `react-router-dom`. It is composed around the
+canonical `Button` (`variant="outline"`, `size="small"`) purely for presentation, rendering an `ArrowLeft` icon
+and the `label` text as `Button`'s children. Every navigation decision (`navigate(-1)`, a specific route, closing
+a panel, anything else) is the caller's responsibility via the `onClick` prop it supplies — exactly mirroring how
+`ConfirmDialog` composes `Modal`+`Button` without owning any business logic itself.
+
+### EmployeeLeaveBalances migration
+
+`src/pages/leave_management/models/EmployeeLeaveBalances.jsx`'s local `<motion.button>` (a `framer-motion`
+hover/tap-scaled button, icon-only, with one-off `border-gray-500`/`text-blue-700` styling) was replaced with
+`<BackButton onClick={() => navigate(-1)} />`. The button was also **moved to appear before the "Employee Leave
+Balances" heading** instead of after it, and the container changed from `justify-between` (heading left, button
+right) to `items-center gap-3` (button, then heading, left-aligned together). The `navigate(-1)` call itself,
+`useNavigate()`, and every other behavior on the page were left completely untouched. The now-unused `motion`
+and `ArrowLeft` imports were removed from the page (both confirmed, via search, to have no other usage anywhere
+else in the file).
+
+### Visual/behavioral standard
+
+**Note (2026-08-17, later same day): updated after a follow-up review.** `BackButton`'s visible `"Back"` text
+was intentionally commented out post-review (`{/* {label} */}` in the component source), making the final
+canonical treatment **icon-only** (`ArrowLeft`, no visible label) rather than icon+text as first implemented.
+This was a deliberate design decision made directly on the component, not a regression — the `label` prop and
+its `"Back"` default are still fully wired through to `aria-label={label}` on the underlying `Button`, so the
+control keeps a correct accessible name for assistive technology despite having no visible text. This
+accessible-name wiring was added specifically to prevent the icon-only visual from becoming a real accessibility
+regression (an icon-only `<button>` with no `aria-label` and no visible text has no accessible name at all).
+
+Because `BackButton` composes canonical `Button` (`variant="outline"`, `size="small"`), it automatically
+inherits keyboard activation (native `<button>`), `focus-visible` ring styling, and disabled/loading semantics
+for free — nothing needed to be reimplemented. The color scheme uses `Button`'s standard `outline` variant
+tokens (`border-gray-300`, `text-gray-700`, `hover:bg-gray-50`) rather than the old page's one-off
+`border-gray-500`/`text-blue-700`, per the explicit "do not introduce arbitrary colors, use existing design
+tokens" rule.
+
+### Global canonical UI rule
+
+**All Back buttons across the Intranet must use the canonical `BackButton` visual treatment.** There is exactly
+one visual definition of "Back" for the entire application — the same icon, icon size, spacing, height,
+padding, border, radius, colors, hover behavior, focus-visible behavior, and (via the underlying `Button`)
+disabled/loading behavior, wherever it is used. A parent page controls only *where* `BackButton` appears and
+*what happens* when it's clicked (`onClick`); it has no ability to override its visual appearance beyond the
+existing generic `className` escape hatch already common to every canonical component. No module-specific prop
+(`variant="leave"`, `module="lms"`, `color="blue"`, or similar) exists or should ever be added — `BackButton`'s
+API is intentionally `{ onClick, label, className }` and nothing more.
+
+### Repository-wide Back-button audit summary (informational — not migrated in this task)
+
+The original audit (32 files, `navigate(-1)`/`ArrowLeft`/back-styled buttons, across `leave_management`,
+`resource_management`, `employee-onboarding`, `airs`, `Timesheet`, and `Projects` — `XMS`/`AP`/`AR`/`Finance`
+excluded per instruction) found no existing canonical implementation and no two files styled identically; each
+page had independently reinvented its own bordered/icon/text combination. This is the same class of duplication
+already resolved for `Button`, `Modal`, `DataTable`, `FormSelect`, and `PageCard` earlier in this initiative —
+`BackButton` closes the same gap for back-navigation controls specifically.
+
+**Only `EmployeeLeaveBalances.jsx` was migrated in this task.** The other 31 files identified in the audit
+remain on their local implementations and are **not** touched here — per explicit instruction, this task
+establishes the canonical component and its visual standard without performing a large, uncontrolled
+cross-module diff. Each module's existing Back button should be replaced with canonical `BackButton` as that
+module comes up for migration in the sequential, module-by-module process already used for every other
+canonical component in this initiative (Button → Modal → FormInput → FormSelect → Table → Pagination → Card →
+Filter, each done one module/step at a time). No other module was modified as part of this task — confirmed via
+`git status`.
+
+### EditHolidaysPage migration (2026-08-17, follow-up)
+
+`src/pages/leave_management/models/EditHolidaysPage.jsx` is the second file migrated onto canonical
+`BackButton`, following the exact same placement/style already established by `EmployeeLeaveBalances.jsx`.
+
+- **Previous implementation:** a local `<motion.button>` (icon + visible "Back" text, `text-blue-700
+  hover:text-blue-900` one-off coloring, no border) positioned in a `justify-between` header row **after** the
+  "Manage Holidays" heading (heading left, button far right).
+- **Replacement:** `<BackButton onClick={() => navigate(-1)} />`, positioned **before** the heading in a
+  `flex items-center gap-3` row, matching `EmployeeLeaveBalances.jsx`'s header structure exactly. No local
+  color/border/animation classes were carried over — the canonical component controls 100% of the visual
+  treatment, per the "no page-specific customization" rule.
+- **Heading text preserved exactly** ("Manage Holidays" — the page's actual existing heading text was kept
+  as-is; it was not renamed to "Edit Holidays" despite that being this task's descriptive shorthand for the
+  page, since renaming it was never requested and would have been an unrelated content change).
+- **Navigation behavior preserved exactly:** `onClick={() => navigate(-1)}` unchanged; `useNavigate()` remains
+  entirely owned by the page; `BackButton` still has no routing knowledge.
+- **No business/API logic changed:** holiday fetch/update/delete API calls, year-based refetching, search
+  filtering, inline row-edit state, and the delete `ConfirmationModal` were all left untouched.
+- **Import cleanup:** the now-unused `motion` (from `framer-motion`) and `ArrowLeft` (from `lucide-react`)
+  imports were removed — both confirmed, via search, to have no other usage anywhere else in the file.
+
+**`EmployeeLeaveBalances.jsx` and `EditHolidaysPage.jsx` now share the identical canonical Back-button placement
+and visual treatment.** Every future module migrated onto `BackButton` should follow this same pattern: replace
+the local implementation, move it before the page heading, and remove any now-unused icon/animation imports.

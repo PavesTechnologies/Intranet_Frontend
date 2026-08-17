@@ -6,13 +6,12 @@ import { toast } from "react-toastify";
 import { Edit, Trash2, Save, XCircle } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationModal from "./ConfirmationModal";
-import { motion } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
 import FormSelect from "../../../components/forms/FormSelect";
 import FilterBar from "../../../components/patterns/FilterBar";
 import DataTable from "../../../components/patterns/DataTable";
+import BackButton from "../../../components/patterns/BackButton";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -144,19 +143,9 @@ const EditHolidaysPage = () => {
         </div>
       )}
 
-      <div className="flex items-center justify-between px-6 mb-4 ">
-        <div className="flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-800">Manage Holidays</h1>
-        </div>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => navigate(-1)} // go back to previous page
-          className="flex items-center text-blue-700 font-medium hover:text-blue-900 transition-colors whitespace-nowrap"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
-        </motion.button>
+      <div className="flex items-center gap-3 px-6 mb-4">
+        <BackButton onClick={() => navigate(-1)} />
+        <h1 className="text-xl font-bold text-gray-800">Manage Holidays</h1>
       </div>
 
       {/* Search Bar */}

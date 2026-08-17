@@ -4,8 +4,6 @@ import { toast } from "react-toastify";
 import Pagination from "../../../components/Pagination/pagination";
 import { useNavigate } from "react-router-dom";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import { ArrowLeft } from "lucide-react";
-import { motion } from "framer-motion";
 import { Plus, Pencil } from "lucide-react";
 import LeaveUploadWizard from "./LeaveUploadWizard";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -13,7 +11,7 @@ import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
 import DataTable from "../../../components/patterns/DataTable";
 import FormSelect from "../../../components/forms/FormSelect";
-import FilterBar from "../../../components/patterns/FilterBar";
+import BackButton from "../../../components/patterns/BackButton";
 
 export const YearDropdown = ({ value, onChange }) => {
   const currentYear = new Date().getFullYear();
@@ -352,23 +350,15 @@ const EmployeeLeaveBalances = () => {
       )}
 
       {/* Title & Back Button */}
-      <div className="flex items-center justify-between px-6 mb-4">
+      <div className="flex items-center gap-3 px-6 mb-4">
+        <BackButton onClick={() => navigate(-1)} />
         <h2 className="text-xl font-bold text-gray-800">
           Employee Leave Balances
         </h2>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => navigate(-1)}
-          className="flex items-center border border-gray-500 rounded-md px-5 py-1  text-blue-700 font-medium hover:text-blue-900 transition-colors whitespace-nowrap"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-        </motion.button>
       </div>
 
       {/* Search Bar + Year + Add Button */}
       <div className="flex items-center gap-3 mb-4">
-        <FilterBar className="flex-1">
         <div ref={wrapperRef} className="relative w-full max-w-md">
           <FormInput
             type="text"
@@ -421,7 +411,6 @@ const EmployeeLeaveBalances = () => {
             }}
           />
         </div>
-        </FilterBar>
 
         <Button
           onClick={() => setShowUploadWizard(true)}
