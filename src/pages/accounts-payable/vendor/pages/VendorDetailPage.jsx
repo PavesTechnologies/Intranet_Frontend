@@ -20,12 +20,16 @@ import { AP_ROUTES } from "../../constants/routes";
 import VendorAddressList from "../components/VendorAddressList";
 import VendorBankList from "../components/VendorBankList";
 import VendorTaxTab from "../components/VendorTaxTab";
+import VendorPoTab from "../components/VendorPoTab";
+import VendorGrnTab from "../components/VendorGrnTab";
 
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "addresses", label: "Addresses" },
   { id: "banks", label: "Bank Accounts" },
   { id: "tax", label: "Tax" },
+  { id: "po", label: "PO" },
+  { id: "grn", label: "GRN" },
 ];
 
 const DetailRow = ({ label, value }) => (
@@ -171,6 +175,10 @@ export default function VendorDetailPage() {
         {activeTab === "tax" && (
           <VendorTaxTab vendorId={vendorId} addresses={addresses} onGoToAddresses={() => setActiveTab("addresses")} />
         )}
+
+        {activeTab === "po" && <VendorPoTab vendorId={vendorId} vendorName={vendor.vendor_name} />}
+
+        {activeTab === "grn" && <VendorGrnTab vendorId={vendorId} vendorName={vendor.vendor_name} />}
       </div>
 
       <ConfirmationModal
