@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import {
-  Activity, AlertOctagon, AlertTriangle, BarChart3, Briefcase, CheckCircle2,
-  FileUp, Globe, Hourglass, ScrollText, Search, Users,
+  Activity, AlertOctagon, AlertTriangle, Briefcase, CheckCircle2,
+  FileUp, Hourglass, Search, Users,
 } from "lucide-react";
 import { useAuth } from "../../../contexts/AuthContext";
 import Button from "../../../components/Button/Button";
@@ -11,11 +11,7 @@ import { KPICard } from "../../../components/kpi/KPI";
 import useDashboardSection from "./hooks/useDashboardSection";
 import CampaignTable from "./components/CampaignTable";
 import NavBadges from "./components/NavBadges";
-import CompareCampaigns from "./components/CompareCampaigns";
-import CrossCampaignSearch from "./components/CrossCampaignSearch";
 import OverrideRateAlerts from "./components/OverrideRateAlerts";
-import DsarPanel from "./components/DsarPanel";
-import CollapsibleSection from "./components/CollapsibleSection";
 import PlatformHealthStrip from "./components/PlatformHealthStrip";
 import {
   EmptyState, SectionError, SkeletonTiles,
@@ -281,47 +277,6 @@ export default function AirsDashboardPage() {
         )}
       </div>
 
-      {/* ── Tools ──────────────────────────────────────────────
-          Everything below is occasional-use, so it collapses by default and
-          stops competing with the campaign table for the top of the page. */}
-      <div className="pt-2">
-        <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">
-          Tools
-        </h2>
-        <div className="space-y-3">
-          {/* Reach is scoped server-side, so both roles can search.
-              Adding to a campaign is HR_ADMIN-only, matching M13's endpoint. */}
-          <CollapsibleSection
-            title="Cross-Campaign Candidate Search"
-            description="Find candidates by skill across every campaign you can access"
-            icon={Globe}
-          >
-            <CrossCampaignSearch canAdd={isHRAdmin} />
-          </CollapsibleSection>
-
-          {/* Pointless with fewer than two campaigns */}
-          {isHRAdmin && !campaigns.loading && !campaigns.error && cards.length >= 2 && (
-            <CollapsibleSection
-              title="Compare Campaigns"
-              description="Put two to four pipeline funnels side by side"
-              icon={BarChart3}
-            >
-              <CompareCampaigns campaigns={cards} />
-            </CollapsibleSection>
-          )}
-
-          {/* Compliance workflow, HR_ADMIN only */}
-          {isHRAdmin && (
-            <CollapsibleSection
-              title="Data Subject Access Request"
-              description="Export everything held about one candidate"
-              icon={ScrollText}
-            >
-              <DsarPanel />
-            </CollapsibleSection>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
