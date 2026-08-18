@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
 import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
-import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button/Button";
 import DataTable from "../../../components/patterns/DataTable";
 
@@ -106,10 +105,8 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
         Revoke Leave Requests
       </h3>
       <div className="border-b-2 border-blue-500 w-16 mb-4"></div>
-      {loading ? (
-        <LoadingSpinner text="Loading..." />
-      ) : (
-        <DataTable
+      <DataTable
+          loading={loading}
           getRowKey={(req) => req.revokeId}
           rows={revokeRequests}
           columns={[
@@ -182,7 +179,6 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
             },
           ]}
         />
-      )}
     </div>
   );
 };

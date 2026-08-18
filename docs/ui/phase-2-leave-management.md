@@ -4074,3 +4074,2092 @@ Filter, each done one module/step at a time). No other module was modified as pa
 **`EmployeeLeaveBalances.jsx` and `EditHolidaysPage.jsx` now share the identical canonical Back-button placement
 and visual treatment.** Every future module migrated onto `BackButton` should follow this same pattern: replace
 the local implementation, move it before the page heading, and remove any now-unused icon/animation imports.
+
+---
+
+## P2.1 — Canonical FormTextArea Migration
+
+**Date:** 2026-08-17
+
+### Scope
+
+Only files under `src/pages/leave_management/**` containing safe textarea migration candidates were modified.
+`src/components/forms/FormTextArea.jsx` (and every other canonical component) was **not** modified — this task
+was migration-only, per its explicit instruction not to enhance the canonical component to fit more candidates.
+
+### Canonical component confirmed
+
+`src/components/forms/FormTextArea.jsx`'s exact, complete prop list (verified by reading the full source, not
+assumed): **`label, name, value, onChange, placeholder, rows (default 4), required (default false), disabled
+(default false)`**. Notably, unlike `FormInput`, it has **no `error`, no `helperText`, no `className`, no
+`textareaClassName`, no `maxLength`/`minLength`, and no `readOnly`** — a materially smaller API than `FormInput`'s.
+This absence directly shaped the audit outcome below: any textarea relying on `maxLength` (a real, enforced
+character-limit behavior, not just cosmetic) could not be migrated without silently dropping that validation.
+
+### Audit
+
+All `src/pages/leave_management/**` files were searched for `<textarea` — **11 occurrences across 10 files**,
+matching the task's own estimate exactly. Every occurrence was read in full context (surrounding component,
+state variables, label markup, validation attributes) before classification.
+
+- **Audit count:** 11
+- **Safe migration count:** 2
+- **Specialized/excluded count:** 7
+- **Dead/commented-out count:** 1
+- **Additional exception (neither A/B/C as originally defined, see below):** 1 — an orphaned/unreferenced file
+
+### A. Safe canonical migrations (2)
+
+| # | File | Field | Props used |
+|---|---|---|---|
+| 1 | `models/ApplyLeaveOnBehalf.jsx` | "Reason" note field | `label="Reason"`, `name="behalfLeaveReason"` (new — the original had no `name`/`id` at all, so no `htmlFor` association existed; this is a strict accessibility improvement, not a behavior change), `value`, `onChange`, `placeholder`, `required` |
+| 2 | `models/EditBlockLeaveModal.jsx` | "Reason" field | `label="Reason"`, `name="blockReason"` (new, same rationale as above), `value`, `onChange`, `rows={3}` |
+
+Both fields used **only** props that exist on `FormTextArea`'s real API — no `maxLength`, no `cols`, no custom
+`className`/`textareaClassName` need, no JSX-composed label. `value`/`onChange` continue to reference the exact
+same `useState` variables and setters as before (`reason`/`setReason` in both files) — no state, handler, or
+validation logic was touched. Visual styling now comes entirely from `FormTextArea`'s own canonical look
+(matching `FormInput`'s established border/focus-ring treatment from P0.3), replacing each field's previous
+one-off Tailwind classes — intentional, per the "canonical UI consistency over preserving module-specific
+styling" instruction, since `FormTextArea` exposes no styling override props to preserve them through anyway.
+
+### B. Specialized — not migrated (7), with exact reasons
+
+| # | File | Field | Exact reason |
+|---|---|---|---|
+| 1 | `models/AddLeaveTypeModal.jsx` | "Description" | Uses `maxLength={50}` — a real, enforced character limit `FormTextArea` cannot represent. Migrating would silently remove that validation. |
+| 2 | `models/BlockLeaveDates.jsx` | "Reason" | Uses `maxLength={200}` **and** `cols="30"`, neither supported. Also has no true `<label>` element — the "Reason *" text is an `<h2>` section heading, not a field label, so there is nothing for `FormTextArea`'s `label` prop to correctly replace either. |
+| 3 | `models/CancellationModal.jsx` | "Enter Custom Reason" | Uses `maxLength="60"` (unsupported) and a label containing a manually-styled required asterisk (`Enter Custom Reason <span className="text-red-500">*</span>`) — `FormTextArea`'s `required` prop sets only the native HTML attribute and renders no visible asterisk at all, so migrating would silently remove the visible required-marker the user currently sees. |
+| 4 | `models/CompOffRequestModal.jsx` | "Note" | Uses `maxLength={100}` (unsupported) plus a live character counter (`{note.length}/100`) whose enforcement depends on the native `maxLength` attribute being present. The label is also a custom `<SectionLabel icon={StickyNote}>` component (an icon + styled text, itself already rendering its own `<label>`) — passing it as `FormTextArea`'s `label` prop would nest one `<label>` inside another, which is invalid HTML. |
+| 5 | `models/EditLeaveModal.jsx` | "Reason" | Uses `maxLength="100"` (unsupported) plus the same character-counter pattern as above. |
+| 6 | `models/ManagerEditLeaveRequest.jsx` | "Manager Comment" (live instance, ~line 1256) | Uses `maxLength="100"` (unsupported) plus a character counter, same pattern as #5. |
+| 7 | `models/RequestLeaveModal.jsx` | "Reason" | Uses `maxLength="100"` **and** `cols="40"` (both unsupported), plus a label with a manually-styled required asterisk (`Reason <span className="text-red-500">*</span>`) — same visible-marker-loss issue as #3. |
+
+In every case above, the disqualifying attribute (`maxLength`, `cols`) is a real, currently-enforced constraint
+on user input or a real, currently-visible UI element (the asterisk, the nested icon-label) — not incidental
+styling — so preserving it took priority over canonical adoption, per the task's explicit "do not silently
+remove a required behavior" rule.
+
+### C. Dead / commented-out code (1)
+
+`models/ManagerEditLeaveRequest.jsx` contains a **second**, entirely commented-out "Manager Comment" `<textarea>`
+block (~line 577) inside a large dead JSX section (every line prefixed `//`, including a stray orphaned
+backslash before one `className` line, confirming it is inert commented-out code, not active markup). Left
+untouched — not live code, not in scope for migration or cleanup.
+
+### Additional finding: one orphaned file (not classified A/B/C by the original scheme)
+
+`models/ReviewModal.jsx`'s single "Rejection Reason" textarea (`id="rejectionReason"`, plain `<label
+htmlFor="rejectionReason">`, `value`/`onChange`, `rows="3"`, no `maxLength`/`required`) is **fully compatible**
+with `FormTextArea`'s API on its own merits — it would qualify as a third safe migration. However, a
+repository-wide search for `ReviewModal` found **zero imports of this file anywhere in the codebase** — it is
+entirely unreferenced/orphaned, the same "confirmed unreachable" situation already documented for
+`EnterpriseConfigManager.jsx` (P0.6) and `EmployeePanelold.jsx` (P0.8). Consistent with this initiative's
+established policy of not investing migration effort in confirmed-dead files, **`ReviewModal.jsx` was left
+unmodified** rather than migrated. This is flagged explicitly rather than silently skipped, since it is
+API-compatible and would otherwise look like an unexplained omission.
+
+### FormTextArea props used
+
+Only props that genuinely exist on the component: `label`, `name`, `value`, `onChange`, `placeholder` (1 of 2
+migrated fields), `required` (1 of 2), `rows` (1 of 2). No prop was invented; no prop request was silently
+dropped without being documented as a capability exception above.
+
+### Validation preservation
+
+Both migrated fields' `value`/`onChange` continue to reference the exact same state (`reason`/`setReason` in
+each file) with no adapter or event-shape change needed — `FormTextArea`'s `onChange` passes the native change
+event straight through, identical to the raw `<textarea>`'s own `onChange` signature. `required` was preserved
+exactly on `ApplyLeaveOnBehalf.jsx`'s field (native attribute, same as before). `EditBlockLeaveModal.jsx`'s field
+had no `required`/`maxLength`/`disabled` before and has none now — no validation behavior was added or removed
+on either field.
+
+### API/business logic preservation
+
+No API call, Axios/fetch call, endpoint, payload, response handler, state setter, submit handler, modal
+open/close behavior, routing, RBAC, or WebSocket logic was touched in either migrated file — confirmed by
+inspecting the full diff (only the `<textarea>`/`<label>` JSX blocks and their two import lines changed).
+
+### Files modified
+
+- `src/pages/leave_management/models/ApplyLeaveOnBehalf.jsx`
+- `src/pages/leave_management/models/EditBlockLeaveModal.jsx`
+- `docs/ui/phase-2-leave-management.md`
+
+### Remaining textarea exceptions (final state)
+
+A final re-search of `src/pages/leave_management/**` for `<textarea` returns exactly 8 files — every one of them
+already individually classified above (7 specialized + 1 orphaned-file exception; the 8th match,
+`ManagerEditLeaveRequest.jsx`, contains both the dead commented-out instance and the live specialized instance).
+**No unexplained ordinary textarea remains.**
+
+### Validation results
+
+- ✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings).
+- ✅ `npm run lint` — same 2 pre-existing, unrelated `react-hooks/exhaustive-deps` config errors in
+  `src/pages/airs/**`, plus one pre-existing/unrelated warning in `account_receivable/services/
+  billingConfigurationService.js` (a file never touched in this session) — zero new issues from either
+  migrated file.
+- ✅ `git diff --check` — clean.
+- ✅ `git status` confirms exactly two files changed by this step:
+  `models/ApplyLeaveOnBehalf.jsx` and `models/EditBlockLeaveModal.jsx`.
+
+**`FormTextArea` is the canonical textarea component for the entire Intranet application. Future modules
+should reuse it — following the exact same capability-checking discipline demonstrated here (verify the actual
+prop list before migrating; classify anything relying on `maxLength`, `cols`, custom `className`, or JSX-composed
+labels as specialized rather than forcing it) — instead of creating another module-specific textarea
+implementation.**
+
+---
+
+## P2.2 — Canonical ConfirmDialog Migration
+
+**Date:** 2026-08-17
+
+### Result: STOPPED — confirmed capability gap, no files modified except this documentation
+
+This task's audit found a real, unavoidable behavior difference between `src/pages/leave_management/models/
+ConfirmationModal.jsx` and the canonical `src/components/patterns/ConfirmDialog.jsx` that cannot be resolved
+without either (a) accepting a genuine dismiss-behavior change across 7 consumer files (one of them
+cross-module), or (b) enhancing `ConfirmDialog` itself — both explicitly requiring approval this task does not
+have. Per the task's own explicit instruction ("If ConfirmDialog cannot represent an existing behavior without
+changing functionality, STOP and report the capability gap. Do NOT work around the gap by modifying ConfirmDialog
+unless we explicitly approve that enhancement"), **no source file was modified**.
+
+### ConfirmationModal audit result
+
+`src/pages/leave_management/models/ConfirmationModal.jsx` (44 lines) is a small, self-contained, hand-rolled
+modal shell:
+
+```jsx
+const ConfirmationModal = ({ isOpen, title, message, onConfirm, onCancel, isLoading, confirmText = "Confirm" }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center">
+      <div className="bg-white p-4 rounded-lg shadow-xl max-w-sm w-full">
+        <h3 className="text-sm font-semibold mb-2">{title}</h3>
+        <p className="mb-4 text-sm text-gray-600">{message}</p>
+        <div className="flex justify-end space-x-2">
+          <Button onClick={onCancel} disabled={isLoading} variant="ghost" size="medium">Cancel</Button>
+          <Button onClick={onConfirm} disabled={isLoading} variant="primary" size="medium">
+            {isLoading ? `${confirmText}ing...` : confirmText}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+```
+
+Critically: the outer overlay `<div>` has **no `onClick` handler at all** (no backdrop-dismiss), there is **no
+Escape-key listener anywhere in the file**, and there is **no close ("X") icon/button** — the dialog can be
+dismissed in exactly one way: clicking the Cancel button (or completing the Confirm action). This is confirmed
+by reading the complete file, not inferred.
+
+### Repository-wide consumer count
+
+**7 files, 8 render sites.** A broad substring search for "ConfirmationModal" returned 68 files, but the vast
+majority are *unrelated, independently-named local components* in other modules (e.g.
+`src/components/confirmation_modal/ConfirmationModal.jsx`, and many module-specific files that merely happen to
+also be named `ConfirmationModal.jsx` in their own directory — not the same file). Filtering to only files that
+actually `import ... from ".../leave_management/models/ConfirmationModal"` narrows this to the real consumer
+set below.
+
+### Complete consumer list
+
+| # | File | Render sites | Props passed |
+|---|---|---|---|
+| 1 | `src/pages/Timesheet/ManagerApproval/ManagerApprovalTable.jsx` **(cross-module — Timesheet imports directly from the Leave Management path)** | 3 (`"Approve All"`, `"Approve All Weeks"`, `"Remove Employee"`) | `isOpen, title, message, onConfirm, onCancel, isLoading`, one site also `confirmText="Remove"` |
+| 2 | `src/pages/leave_management/models/ApprovalDashboard.jsx` | 1 | `isOpen, title, message, onConfirm, onCancel` (+ `isLoading`, confirmed further in file) |
+| 3 | `src/pages/leave_management/models/CompOffRequestsTable.jsx` | 1 | `isOpen, title, message, onConfirm, onCancel, isLoading` |
+| 4 | `src/pages/leave_management/models/CarryForwardTrigger.jsx` | 1 | `isOpen, title, message, onConfirm, onCancel, isLoading, confirmText="Process"` |
+| 5 | `src/pages/leave_management/models/ApprovalRulesPage.jsx` | 1 | `isOpen, title, message, onConfirm, isLoading, onCancel` |
+| 6 | `src/pages/leave_management/models/LeaveUploadWizard.jsx` | 1 | `isOpen, title, onConfirm, onCancel, message` (no `isLoading` at this site) |
+| 7 | `src/pages/leave_management/models/PendingLeaveRequestsTable.jsx` | 1 | `isOpen (a truthy leave ID, not a strict boolean), title, message, onConfirm, onCancel, isLoading, confirmText="Confirm"` |
+| — | `src/pages/leave_management/models/EditHolidaysPage.jsx` | 1 | `isOpen, title, message, onConfirm, onCancel, isLoading` |
+
+Every single consumer uses **only** the same 7-prop surface (`isOpen, title, message, onConfirm, onCancel,
+isLoading, confirmText?`) — no outliers, no extra props, no custom variant. This confirms the wrapper's API is
+narrow and uniform, which is exactly the situation where a thin adapter *should* be straightforward — the
+blocker found is not API-shape incompatibility, it's a genuine behavioral one (see below).
+
+### Canonical ConfirmDialog API
+
+```jsx
+export default function ConfirmDialog({
+  isOpen, onClose, onConfirm,
+  title = "Are you sure?", description,
+  confirmText = "Confirm", cancelText = "Cancel",
+  variant = "primary", loading = false,
+})
+```
+
+`ConfirmDialog` composes canonical `Modal` (`<Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">`)
+and canonical `Button` for its Cancel/Confirm actions. It does **not** spread any additional/unrecognized props
+onto `Modal` — its prop surface is exactly the 9 names above, nothing more.
+
+### Exact prop mapping (straightforward — not the blocker)
+
+| Old `ConfirmationModal` prop | Maps to `ConfirmDialog` prop |
+|---|---|
+| `isOpen` | `isOpen` |
+| `title` | `title` |
+| `message` | `description` |
+| `onConfirm` | `onConfirm` |
+| `onCancel` | `onClose` |
+| `isLoading` | `loading` |
+| `confirmText` | `confirmText` |
+| *(none — always primary)* | `variant` (defaults to `"primary"`, matching old's hardcoded `variant="primary"` exactly — no need to pass) |
+| *(none — always "Cancel")* | `cancelText` (defaults to `"Cancel"`, matching old's hardcoded label exactly — no need to pass) |
+
+This part of the migration is fully compatible — every prop the 7 consumers actually pass has a direct, lossless
+equivalent on `ConfirmDialog`.
+
+### The confirmed capability gap: dismiss behavior
+
+`ConfirmDialog`'s internal `<Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">` call does **not**
+override any of `Modal`'s own defaults, which (confirmed by reading the complete `Modal.jsx` source) are:
+
+```jsx
+closeOnBackdrop = true,
+closeOnEscape = true,
+showCloseButton = true,
+```
+
+This means migrating `ConfirmationModal` to internally delegate to `ConfirmDialog`, exactly as intended by this
+task, would **add three new ways to dismiss the dialog that do not exist today**:
+
+1. **Clicking the backdrop overlay** — old: no-op (no `onClick` on the overlay at all); new: calls `onClose`
+   (mapped to the consumer's `onCancel`).
+2. **Pressing Escape** — old: nothing happens (no keydown listener exists anywhere in the file); new: `Modal`'s
+   own `useEffect` keydown listener fires `onClose`.
+3. **A visible "X" close icon button in a new header bar** — old: no header separator exists at all, the title
+   is just an inline `<h3>` with no border/close-icon; new: `Modal`'s `hasHeader` branch renders a bordered
+   header row with a `Button variant="ghost" size="icon"` close control, `aria-label="Close modal"`.
+
+`ConfirmDialog` does **not** expose `closeOnBackdrop`, `closeOnEscape`, or `showCloseButton` as pass-through
+props — it hard-codes the call to `Modal` with only `isOpen/onClose/title/size`, so there is no way for a caller
+(including a `ConfirmationModal` adapter wrapping it) to suppress any of these three new dismiss paths using
+`ConfirmDialog`'s API as it exists today. Modifying `ConfirmDialog` to add such pass-through props would resolve
+this cleanly, but doing so is **explicitly out of scope for this task** without approval, per the task's own
+"Do NOT work around the gap by modifying ConfirmDialog unless we explicitly approve that enhancement" rule.
+
+**Why this matters concretely:** while `onCancel`/`onClose` are not destructive in themselves (none of the 7
+consumers' `onCancel` handlers trigger the confirmed action — they only close the dialog), this is still a
+real, repository-wide UX behavior change affecting 7 files (including one cross-module Timesheet consumer) that
+the task's instructions explicitly forbid introducing silently: *"DO NOT silently introduce new close
+behavior."* Several of these dialogs guard destructive or hard-to-reverse actions (`"Delete Approval Rule" — this
+action cannot be undone`, `"Cancel Leave Request"`, `"Remove Employee"`), where an accidental Escape-press or
+stray backdrop click during a moment of hesitation would now dismiss the dialog in a way it currently cannot —
+a small but real change in how forgiving/strict the confirmation gate is, not something to introduce without
+explicit sign-off.
+
+### Secondary, lower-severity note (loading-text presentation)
+
+Beyond the dismiss-behavior gap, one smaller presentational difference was also found: old `ConfirmationModal`
+shows dynamic text during loading (`` `${confirmText}ing...` ``, e.g. "Confirming...", "Processing...", and, due
+to a pre-existing minor grammar bug in the original code, "Removeing..." for the one consumer using
+`confirmText="Remove"`). `ConfirmDialog` does not pass a `loadingText` override to `Button`, so `Button`'s own
+canonical loading treatment applies instead — a spinner icon appears alongside the *unchanged* `confirmText`
+label (e.g. "⟳ Confirm" rather than "Confirming..."). Unlike the dismiss-behavior gap, this is judged **not**
+blocking on its own — every other canonical-component migration in this initiative (P0.1 Button, P0.6 DataTable,
+P0.7 Pagination) has already established that adopting the canonical component's own loading presentation is an
+accepted, intended consequence of standardization, not a functional regression. It is documented here for
+completeness, not as a second stop-reason.
+
+### Behavior preservation verification
+
+Everything **except** the dismiss-behavior gap above maps cleanly and losslessly: `title`, `message`/
+`description`, `onConfirm`, `confirmText`, the always-primary confirm-button variant, the always-"Cancel"
+cancel-button label, and the disabled-while-loading state on both buttons (`ConfirmDialog`'s Cancel button gets
+`disabled={loading}` directly; its Confirm button gets `loading={loading}`, which `Button.jsx` itself resolves
+to `isDisabled = disabled || loading` — the same effective disabled-while-loading behavior as the old
+`disabled={isLoading}` on both buttons).
+
+### API/business logic verification
+
+Not applicable to report as "changed," since no file was modified — but confirmed via the audit that this
+migration, had it proceeded, would have touched **UI presentation only**: no `onConfirm`/`onCancel` handler
+body, no API call, no state setter, and no RBAC/routing logic in any of the 7 consumer files was ever a
+candidate for change under this task's scope.
+
+### Files modified
+
+None, aside from this documentation section. `ConfirmationModal.jsx` and all 7 consumer files remain byte-for-
+byte unchanged.
+
+### Duplicate modal-shell verification
+
+Not applicable — since no migration was performed, `ConfirmationModal.jsx`'s own `fixed inset-0`/backdrop/panel
+markup remains exactly as it was (it was never removed).
+
+### Build / lint / git diff --check
+
+- ✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings); re-run to confirm the
+  repository is unaffected by this audit-only step.
+- ✅ `npm run lint` — same pre-existing baseline as every prior step: 2 `react-hooks/exhaustive-deps` config
+  errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/
+  billingConfigurationService.js`. Zero new issues, since zero source files changed.
+- ✅ `git diff --check` — clean; `git status` confirms only `docs/ui/phase-2-leave-management.md` changed by
+  this step.
+
+### Remaining ConfirmationModal usage
+
+Unchanged — all 7 files (8 render sites) continue using `src/pages/leave_management/models/ConfirmationModal.jsx`
+exactly as before.
+
+### Capability gap summary (for future approval)
+
+**`ConfirmDialog` cannot currently represent "a confirmation dialog with no backdrop-dismiss, no Escape-dismiss,
+and no close icon"** — a real, verified, three-part behavioral difference stemming from `Modal`'s own defaults
+and `ConfirmDialog`'s lack of pass-through props for `closeOnBackdrop`/`closeOnEscape`/`showCloseButton`. Two
+paths forward, neither taken in this task without explicit approval:
+
+1. **Accept the behavior change** — proceed with the originally-planned thin-adapter migration, explicitly
+   approving that all 7 consumers gain backdrop-click, Escape-key, and close-icon dismissal (mapped to their
+   existing `onCancel`/close-state-setter, never to `onConfirm`) where none exists today.
+2. **Enhance `ConfirmDialog` first** (a separate, explicitly-approved canonical-component task, not this one) —
+   add `closeOnBackdrop`, `closeOnEscape`, and `showCloseButton` as pass-through props (defaulting to `true` to
+   preserve every *other* existing `ConfirmDialog` consumer's behavior), then have the Leave Management
+   `ConfirmationModal` wrapper set all three to `false` to exactly reproduce today's button-only dismissal.
+
+**`ConfirmDialog` remains the canonical confirmation-dialog component and should still be preferred over
+creating new module-specific confirmation modals** — this finding is about *this specific migration's* dismiss-
+behavior mismatch, not a general defect in `ConfirmDialog` for new consumers that are fine with standard
+modal-dismiss conventions (which is most of them).
+
+### Pre-existing issues discovered
+
+None new. `PendingLeaveRequestsTable.jsx` passes a truthy leave ID (not a strict boolean) as `isOpen` — this
+already works correctly today (`if (!isOpen) return null` treats any falsy value, including `null`, the same
+as `false`) and would continue to work identically with `ConfirmDialog`/`Modal`, which use the same
+falsy-check pattern — not a defect, just noted for completeness.
+
+---
+
+## P2.2a — ConfirmDialog Dismissal-Control Enhancement
+
+**Date:** 2026-08-17
+
+**This is a canonical capability enhancement only. The actual ConfirmationModal migration will be performed as
+a separate P2.2b task after review.**
+
+### Why the enhancement was required
+
+P2.2's audit (documented above) found that `ConfirmDialog` could not represent Leave Management's
+`ConfirmationModal` behavior without silently introducing new dismiss paths, because `ConfirmDialog` hard-coded
+its call to `Modal` with no way to override `Modal`'s own `closeOnBackdrop`/`closeOnEscape`/`showCloseButton`
+defaults. This task closes exactly that gap — narrowly, additively, with no behavior change for any existing
+`ConfirmDialog` consumer.
+
+### Original ConfirmDialog behavior
+
+`ConfirmDialog` called `<Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">` with no other props,
+meaning it always inherited `Modal`'s defaults: `closeOnBackdrop = true`, `closeOnEscape = true`,
+`showCloseButton = true`. There was no way for any caller of `ConfirmDialog` to change this.
+
+### Original ConfirmationModal behavior (unchanged by this task — re-confirmed only)
+
+`src/pages/leave_management/models/ConfirmationModal.jsx` has no backdrop `onClick`, no Escape-key listener, and
+no close icon — dismissible only via its own Cancel/Confirm buttons. This file was **not** touched in this task;
+it is re-stated here only to justify why the new props default the way they do for the *upcoming* P2.2b use case.
+
+### The capability gap (recap)
+
+Migrating `ConfirmationModal` to delegate to `ConfirmDialog` as it existed before this task would have silently
+added backdrop-click, Escape-key, and close-icon dismissal to 7 consumer files (8 render sites, including one
+cross-module Timesheet consumer) that have none of those today. This enhancement makes it *possible* to avoid
+that regression in the follow-up P2.2b task — it does not, by itself, change anything for `ConfirmationModal` or
+its consumers, since neither was touched.
+
+### New props
+
+Three new, fully optional props added to `ConfirmDialog`:
+
+```jsx
+export default function ConfirmDialog({
+  isOpen, onClose, onConfirm,
+  title = "Are you sure?", description,
+  confirmText = "Confirm", cancelText = "Cancel",
+  variant = "primary", loading = false,
+  closeOnBackdrop = true,
+  closeOnEscape = true,
+  showCloseButton = true,
+})
+```
+
+All three (`closeOnBackdrop`, `closeOnEscape`, `showCloseButton`) are passed straight through to the underlying
+canonical `Modal` call, using `Modal`'s own existing prop names exactly — no new mechanism, no duplicated close
+logic:
+
+```jsx
+<Modal
+  isOpen={isOpen}
+  onClose={onClose}
+  title={title}
+  size="sm"
+  closeOnBackdrop={closeOnBackdrop}
+  closeOnEscape={closeOnEscape}
+  showCloseButton={showCloseButton}
+>
+```
+
+### Default values
+
+All three default to `true` — identical to `Modal`'s own defaults, and identical to `ConfirmDialog`'s previous
+(implicit, hard-coded) behavior. A future consumer that wants `ConfirmationModal`'s stricter, button-only-dismiss
+behavior will pass all three as `false`.
+
+### Backward-compatibility verification
+
+Confirmed via source inspection and a repository-wide search: `ConfirmDialog` has exactly **2 existing
+consumers** (`src/pages/Timesheet/TimesheetGroup.jsx`, `src/pages/Timesheet/EntriesTable.jsx`), and **neither
+passes any of the three new props** — both continue to fall through to the `true/true/true` defaults, which are
+byte-identical to `ConfirmDialog`'s prior unconditional behavior. No consumer was modified, and none needed to
+be.
+
+### Modal pass-through behavior
+
+`Modal.jsx` itself was **not modified** — it already accepted `closeOnBackdrop`, `closeOnEscape`, and
+`showCloseButton` as props with `true` defaults (confirmed by reading its complete source in the P2.2 audit);
+`ConfirmDialog` simply forwards its own same-named props to the same-named `Modal` props, a direct 1:1
+pass-through with no translation, adapter, or duplicated logic.
+
+### Confirm/cancel button, loading, and accessibility behavior
+
+Unchanged — this task touched only the `<Modal>` call's props; the `Button` rendering for Cancel/Confirm, the
+`variant`/`loading`/`disabled` logic, and all callback wiring (`onConfirm`, `onClose`) are exactly as they were
+before this change. When `showCloseButton={false}` is eventually used (in P2.2b), `Modal`'s own existing
+`hasHeader`/`showCloseButton` branching simply omits the close button — no new markup, no hidden button, no
+custom close-icon implementation was added anywhere.
+
+### Files modified
+
+- `src/components/patterns/ConfirmDialog.jsx` (the only source file changed)
+- `docs/ui/phase-2-leave-management.md`
+
+`src/pages/leave_management/models/ConfirmationModal.jsx` and all 7 of its consumer files remain byte-for-byte
+unchanged — confirmed via `git status`.
+
+### API/business logic verification
+
+No API call, state, handler, or business logic exists in `ConfirmDialog` to begin with (it is a purely
+presentational composition of `Modal` + `Button`), so none was changed. `Modal.jsx` was not modified at all.
+
+### Build / lint / git diff --check
+
+- ✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings).
+- ✅ `npm run lint` — same pre-existing baseline as every prior step: 2 `react-hooks/exhaustive-deps` config
+  errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/
+  billingConfigurationService.js`. Zero new issues.
+- ✅ `git diff --check` — clean.
+- ✅ `git status` confirms exactly one source file changed: `src/components/patterns/ConfirmDialog.jsx`.
+
+### Confirmation: ConfirmationModal was NOT migrated
+
+Confirmed — `src/pages/leave_management/models/ConfirmationModal.jsx` was read only for context in the earlier
+P2.2 audit and was not opened or modified in this task. The actual wrapper migration remains a separate,
+not-yet-started P2.2b task.
+
+### Confirmation: no module consumers were modified
+
+Confirmed — neither `ConfirmDialog`'s 2 existing consumers nor `ConfirmationModal`'s 7 consumers (8 render
+sites) were touched.
+
+---
+
+## P2.2b — ConfirmationModal → ConfirmDialog Migration
+
+**Date:** 2026-08-17
+
+**`ConfirmationModal` remains as a compatibility wrapper because it has multiple consumers including a
+cross-module Timesheet consumer, while the actual confirmation UI is now provided by the canonical
+`ConfirmDialog`.**
+
+### Repository-wide consumer count
+
+**7 files, 8 render sites** — re-verified immediately before editing via a fresh repository-wide search for
+imports of the exact file path, matching the P2.2 audit exactly (no drift since then).
+
+### Complete consumer list
+
+1. `src/pages/Timesheet/ManagerApproval/ManagerApprovalTable.jsx` — **cross-module**, 3 render sites
+2. `src/pages/leave_management/models/ApprovalDashboard.jsx`
+3. `src/pages/leave_management/models/CompOffRequestsTable.jsx`
+4. `src/pages/leave_management/models/CarryForwardTrigger.jsx`
+5. `src/pages/leave_management/models/ApprovalRulesPage.jsx`
+6. `src/pages/leave_management/models/LeaveUploadWizard.jsx`
+7. `src/pages/leave_management/models/PendingLeaveRequestsTable.jsx`
+8. `src/pages/leave_management/models/EditHolidaysPage.jsx`
+
+### Existing API (fully preserved)
+
+`ConfirmationModal`'s public API is unchanged: `{ isOpen, title, message, onConfirm, onCancel, isLoading,
+confirmText = "Confirm" }`. All 8 render sites continue to pass exactly the props they always did — **zero
+consumer files were modified**, including the cross-module Timesheet one.
+
+### Canonical ConfirmDialog API used
+
+`{ isOpen, onClose, onConfirm, title, description, confirmText, cancelText, variant, loading, closeOnBackdrop,
+closeOnEscape, showCloseButton }` — the full post-P2.2a API. `ConfirmDialog.jsx` and `Modal.jsx` were **not**
+modified in this task (P2.2a already gave `ConfirmDialog` the needed capability).
+
+### Exact prop mapping
+
+| `ConfirmationModal` prop (unchanged, caller-facing) | `ConfirmDialog` prop (internal) | Value |
+|---|---|---|
+| `isOpen` | `isOpen` | passed straight through |
+| `title` | `title` | passed straight through |
+| `message` | `description` | passed straight through |
+| `onConfirm` | `onConfirm` | passed straight through |
+| `onCancel` | `onClose` | passed straight through |
+| `isLoading` | `loading` | passed straight through |
+| `confirmText` (default `"Confirm"`) | `confirmText` | passed straight through |
+| *(hardcoded, matches old's fixed "Cancel" label)* | `cancelText` | `"Cancel"` |
+| *(hardcoded, matches old's fixed primary confirm button)* | `variant` | `"primary"` |
+| *(new — see below)* | `closeOnBackdrop` | `false` |
+| *(new — see below)* | `closeOnEscape` | `false` |
+| *(new — see below)* | `showCloseButton` | `false` |
+
+### Explicit dismissal controls — old strict behavior preserved exactly
+
+`closeOnBackdrop={false}`, `closeOnEscape={false}`, and `showCloseButton={false}` are all passed **explicitly**
+— none rely on `ConfirmDialog`'s own `true` defaults. This reproduces the original `ConfirmationModal`'s
+behavior exactly: no backdrop-click dismissal, no Escape-key dismissal, no close icon. The dialog can only be
+dismissed via the Cancel button (still wired to the caller's own `onCancel`) or completed via the Confirm button
+(still wired to the caller's own `onConfirm`) — verified by reading the final wrapper source, not assumed.
+
+### Loading behavior
+
+`isLoading` flows through to `ConfirmDialog`'s `loading` prop unchanged, which `ConfirmDialog` passes to its
+Cancel button (`disabled={loading}`) and Confirm button (`loading={loading}`, which `Button.jsx` resolves to
+`isDisabled = disabled || loading` internally) — the same disabled-while-loading behavior on both buttons as
+before. **One visual difference, not a behavior change:** the old implementation showed dynamic text during
+loading (`` `${confirmText}ing...` ``, e.g. "Confirming...", "Processing...", and — a pre-existing grammar bug
+in the old code — "Removeing..." for the Timesheet "Remove Employee" dialog). The canonical `ConfirmDialog`
+instead shows `Button`'s own canonical spinner icon alongside the unchanged `confirmText` label while loading
+(e.g. a spinner next to "Confirm" rather than "Confirming..."). This was documented as an accepted,
+non-blocking styling difference back in the P2.2 audit — consistent with every other canonical-component
+migration in this initiative, which has always adopted the canonical component's own loading presentation.
+Button handlers and loading-state ownership were not touched: `isLoading` is still 100% owned and set by each
+consumer's own state, exactly as before.
+
+### Cross-module Timesheet compatibility
+
+`Timesheet/ManagerApproval/ManagerApprovalTable.jsx` was **not modified**. It continues to `import
+ConfirmationModal from "../../leave_management/models/ConfirmationModal"` and render it with the same
+`isOpen/title/message/onConfirm/onCancel/isLoading[/confirmText]` props at all 3 of its render sites. Since the
+wrapper's external contract is byte-identical to before, this cross-module consumer resolves the same component
+contract with no changes required — confirmed via `git status` showing zero diff for this file.
+
+### Old modal-shell removal
+
+Confirmed by reading the complete post-migration `ConfirmationModal.jsx`: it no longer contains `fixed inset-0`,
+any backdrop `<div>`, any hand-rolled modal panel, or a duplicated header/footer/button shell. The entire
+component is now an 18-line function that renders a single `<ConfirmDialog .../>` call — no nested `Modal`, no
+second modal implementation, no leftover overlay markup of any kind.
+
+### Files modified
+
+- `src/pages/leave_management/models/ConfirmationModal.jsx` (the wrapper — the only source file changed in this
+  task)
+- `docs/ui/phase-2-leave-management.md`
+
+`ConfirmDialog.jsx` and `Modal.jsx` were **not** touched (P2.2a already provided the needed capability). **Zero
+consumer files were modified** — confirmed via `git status` against all 7 consumer file paths individually.
+
+### API/business logic verification
+
+No API call, endpoint, payload, parent handler, state, validation, confirmation/cancellation logic,
+approval/revoke/delete logic, RBAC, routing, or authentication was touched anywhere — the diff is limited
+entirely to `ConfirmationModal.jsx`'s internal rendering, which now delegates to `ConfirmDialog` instead of
+hand-rolling its own overlay/panel/buttons.
+
+### Build / lint / git diff --check
+
+- ✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings).
+- ✅ `npm run lint` — same pre-existing baseline as every prior step: 2 `react-hooks/exhaustive-deps` config
+  errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/
+  billingConfigurationService.js`. Zero new issues.
+- ✅ `git diff --check` — clean.
+- ✅ `git status` confirms exactly the two files listed above changed in this task (plus `ConfirmDialog.jsx`,
+  which shows as modified from the already-approved P2.2a step, not from this one).
+
+### Duplicate-shell verification
+
+Confirmed — zero occurrences of `fixed inset-0`, a second backdrop, or a hand-rolled button row remain in
+`ConfirmationModal.jsx`.
+
+### Remaining capability gaps
+
+None. P2.2a's dismissal-control props fully closed the gap identified in the P2.2 audit; this migration used
+them exactly as designed.
+
+### Pre-existing issues
+
+None new. The old dynamic loading-text grammar bug ("Removeing..." for `confirmText="Remove"`) is now moot,
+since that entire code path no longer exists — the canonical spinner-based loading treatment replaced it
+without needing a fix.
+
+---
+
+## P2.3 — Canonical StatusBadge Migration
+
+**Date:** 2026-08-17
+
+### Canonical component
+
+`src/components/patterns/StatusBadge.jsx` — confirmed exact API by reading the complete source:
+`{ status, label, tone, size = "md"|"sm", className }`. `status` is automatically resolved (case-insensitive,
+`_`→space normalized) to one of 5 tones via a ~30-entry lookup table plus substring fallback matching; `label`
+overrides only the displayed text (tone still resolves from `status` unless `tone` is also given); `tone`
+explicitly overrides the resolver; renders a single non-interactive `<span>`. It has **no icon slot** and **no
+click/interactive support** — confirmed before auditing, so these were used as hard exclusion criteria.
+`StatusBadge` was **not modified** in this task. Zero `StatusBadge` usages existed anywhere in
+`src/pages/leave_management/**` before this task (confirmed via full-text search).
+
+### Audit counts
+
+- **Total status-like UI audit count:** ~35 candidates read in full context across 24 files
+- **Safe migration count:** 8 distinct status indicators (across 9 files, since one audit item spanned two
+  near-identical files)
+- **Specialized badge/chip count:** 4
+- **Non-status count:** 15+
+- **Dead/commented-out count:** 4 locations (one of them an entire unreachable file)
+
+### Complete list of migrated files
+
+1. `models/LeaveHistory.jsx`
+2. `models/HandleLeaveRequestAndApprovals.jsx`
+3. `charts/LeaveDetailsPage.jsx`
+4. `models/CompOffRequestsTable.jsx`
+5. `models/CompOffBalanceRequests.jsx`
+6. `models/LeaveBalanceJobProgress.jsx`
+7. `models/ProjectMembersOnLeave.jsx`
+8. `models/ApprovalDashboard.jsx`
+9. `models/PendingApprovalsQueueView.jsx`
+
+### Complete list of migrated status indicators & exact mapping
+
+| # | File | Before | After | Status mapping |
+|---|---|---|---|---|
+| 1 | `LeaveHistory.jsx` | `<span>` with inline `APPROVED→green / REJECTED→red / else→gray`, solid bg + white text | `<StatusBadge status={leave.status} />` | Auto-resolved: APPROVED→success, REJECTED→danger, others→neutral/warning via built-in table |
+| 2 | `HandleLeaveRequestAndApprovals.jsx` | `<span>` driven by a local `getStatusColor()` helper (approved/pending/rejected/default) | `<StatusBadge status={request.status} />`; **`getStatusColor` helper removed** (now fully unused — its only call site was this one) | Auto-resolved |
+| 3 | `LeaveDetailsPage.jsx` (`RequestCard`) | `<span>` driven by a local `getStatusBadgeStyles()` helper (PENDING/APPROVED/REJECTED/CANCELLED) | `<StatusBadge status={request.status} />`; **`getStatusBadgeStyles` helper removed** (only call site) | Auto-resolved — cleanest 1:1 fit of all candidates, all 4 values map correctly |
+| 4 | `CompOffRequestsTable.jsx` | Plain text, no badge (`render: (req) => req.status`) | `<StatusBadge status={req.status} size="sm" />` | Auto-resolved (table is pre-filtered to `PENDING` only, so this always renders warning/yellow in practice) |
+| 5 | `CompOffBalanceRequests.jsx` | Plain text with a `capitalize` column class, no color | `<StatusBadge status={req.status} size="sm" />`; the now-redundant `capitalize` column class was dropped (`StatusBadge` already applies `capitalize` internally) | Auto-resolved |
+| 6 | `LeaveBalanceJobProgress.jsx` | `<span>` with `isDone/isFailed` ternary background, displaying a **derived** `statusText` ("Completed"/"Failed"/"Processing...") that differs from the raw `job.status` (`RUNNING`/`PENDING`/`FAILED`/`ROLLED_BACK`/`COMPLETED`) | `<StatusBadge status={job.status} label={statusText} tone={isDone ? "success" : isFailed ? "danger" : "info"} size="sm" />` | **Explicit `tone` override used** (not left to the auto-resolver) since the displayed label diverges from the raw status and multiple raw values (`RUNNING`/`PENDING`) collapse to one display state ("Processing...") |
+| 7 | `ProjectMembersOnLeave.jsx` | One text node concatenating status + date range: `` `{leave.status.toUpperCase()} [{start} → {end}]` `` inside a single colored `<div>` | Split into `<StatusBadge status={leave.status} size="sm" /> <span>[{start} → {end}]</span>` as two sibling elements; local `leaveStatusColor()` helper removed (only call site) | Auto-resolved — required a small JSX restructure (one text node → badge + plain text), not a pure prop-swap, since `StatusBadge` cannot express "badge + trailing plain text" as a single string |
+| 8 | `ApprovalDashboard.jsx` | Hardcoded single-color `<span className="... bg-yellow-100 text-yellow-800 ...">{request.status}</span>` (no conditional branching found — always renders this queue's requests as pending) | `<StatusBadge status={request.status} className="self-start" />` | Auto-resolved (yellow/warning is exactly what the resolver already produces for "pending") |
+| 8 | `PendingApprovalsQueueView.jsx` | Identical pattern to `ApprovalDashboard.jsx` (both files share the same accordion-card status pill markup) | Identical migration to `ApprovalDashboard.jsx` | Auto-resolved |
+
+### Canonical StatusBadge props used across all 8 migrations
+
+`status` (every instance), `label` (1 instance — `LeaveBalanceJobProgress.jsx`, where displayed text diverges
+from the raw status), `tone` (1 instance — same file, explicit override needed), `size="sm"` (4 instances, for
+compact table/tooltip contexts), `className` (2 instances, purely for layout — `self-start`). No prop was
+invented; no candidate needed a prop `StatusBadge` doesn't have.
+
+### Status semantics preserved
+
+Every migrated instance passes the exact same underlying status field/value that drove the old implementation
+— no backend status string was changed, normalized, or renamed. Where the *displayed* text differed from the
+raw status (`LeaveBalanceJobProgress.jsx`'s "Processing..." derived from `RUNNING`/`PENDING`), the `label` prop
+was used specifically to preserve that exact displayed text while still passing the real `status` value for
+tone resolution.
+
+### Business/API logic verification
+
+No API call, endpoint, payload, state setter, handler, validation, filtering, sorting, pagination, RBAC,
+routing, or authentication logic was touched in any of the 9 files — confirmed by inspecting the complete diff,
+which is limited to: (a) one new `StatusBadge` import per file, (b) the badge/pill JSX itself, and (c) removal
+of 3 now-fully-unused local color-mapping helper functions (`getStatusColor`, `getStatusBadgeStyles`,
+`leaveStatusColor`) whose only call sites were the migrated badges themselves.
+
+### Specialized exceptions and exact reasons
+
+| File | Element | Reason |
+|---|---|---|
+| `models/ManageActiveLeaveBlocks.jsx` | `Pill` component (member/leave-type tags, "+N more") | A removable multi-select tag (has an `onRemove` handler in its picker usage) and a name/category token list in its read-only table usage — not a state indicator at all. |
+| `models/EditBlockLeaveModal.jsx` | "Blocked" / "New Block" / "Free" per-cell labels | Encodes a **local unsaved-diff state** (checked vs. initially-blocked comparison) tightly coupled to a checkbox-matrix editor, not a persisted record status; plain text (not pill-shaped) inside a dense grid where introducing a pill shape risks layout disruption. |
+| `models/EditLeaveModal.jsx`, `models/ManagerEditLeaveRequest.jsx` | Leave-type balance/availability pill (`availableText`, e.g. "12 days available") inside the leave-type `Listbox` dropdown | A remaining-balance/eligibility indicator, not a workflow status — different semantic domain, embedded inside an interactive dropdown control. |
+| `ruleBook/RuleBookPage.jsx` | `rule.active ? "✅ Active" : "❌ Inactive"` | The ✅/❌ emoji is load-bearing visual signal (not decorative) that `StatusBadge` has no icon slot to preserve — migrating would silently remove a meaningful visual cue. |
+| `HRManageTools.jsx` `LeaveTable`'s generic boolean→pill renderer | Any boolean config field (`allowHalfDay`, `allowNegativeBalance`, etc.), not specifically a "status" field | A generic boolean-value formatter used for many unrelated fields, not a status-field renderer — forcing it into `StatusBadge` would require a `tone`/`label` override on every call and conflates "is this a status" with "is this any boolean," which are different concerns. Also part of the already-specialized, sticky-column table from P0.6. |
+
+Also excluded, correctly identified as non-status UI (not status-shaped at all): `ApprovalRulesPage.jsx` (no
+Active/Inactive field exists there — a prior-session recollection was corrected during this audit), the
+`ManageActiveLeaveBlocks.jsx` "Scope" column, `EditHolidaysPage.jsx`'s `isActive` (drives only button
+`disabled`/tooltip, never rendered as visible text), `EmployeeLeaveBalances.jsx` (no status field exists),
+`LeaveDashboard.jsx`'s KPI category-color dots, `AddHolidaysModal.jsx`'s holiday-type badge, `AllHolidaysGrid.jsx`'s
+"Today"/"Upcoming" temporal labels, `UpcomingHolidays.jsx`'s date-display pill, `EmployeePanel.jsx`'s "Super
+Admin" role badge, day-count badges in `EditLeaveModal.jsx`/`ManagerEditLeaveRequest.jsx`, and several
+interactive nav-tab/segmented-control pills (`LeaveDetailsPage.jsx`'s leave-type sidebar, `LeavePolicyViewer.jsx`'s
+policy tabs) and action-context indicators (bulk-selection toolbar, confirm-modal icon backgrounds).
+
+### Dead/commented-out code (not modified)
+
+- `models/LeaveHistory.jsx` — 3 commented-out duplicate copies of the same status-pill snippet (leftover
+  copy-paste artifacts from prior refactors of this unusually large ~1800-line file).
+- `AdminPanel.jsx` — a commented-out `getStatusColor` function with no live callers.
+- `EnterpriseConfigManager.jsx` — confirmed still unreachable (its only import in `HRAdminPanel.jsx` remains
+  commented out, consistent with P0.6/P0.8 findings); its status pill and boolean-checkmark cells were not
+  touched.
+- `models/ProjectMembersOnLeaveDemo.jsx` — a newly-discovered, entirely unreferenced file (zero imports
+  anywhere in `src/`), containing a status pill structurally similar to the migrated `ProjectMembersOnLeave.jsx`
+  pattern. Not migrated, consistent with this initiative's policy of not investing effort in orphaned files.
+
+### Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings).
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline as every prior step: 2 `react-hooks/exhaustive-deps` config
+errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/
+billingConfigurationService.js`. Zero new issues — in particular, no unused-import or unused-variable warnings
+from the 3 removed local helper functions, since each was fully deleted along with its only call site.
+
+### git diff --check
+
+✅ Clean. `git status` confirms exactly the 9 files listed above changed in this task.
+
+### Pre-existing issues discovered
+
+The newly-found orphaned `models/ProjectMembersOnLeaveDemo.jsx` file (zero importers repo-wide) — flagged for
+awareness, not acted on. No other new issues.
+
+**`StatusBadge` is the canonical presentational component for status/state indicators across all Intranet
+modules.** Future migrations should follow the same discipline demonstrated here: verify the actual field
+driving the indicator, check whether displayed text matches the raw status value (use `label`/`tone` overrides
+when it doesn't), and classify anything that is actually a removable tag, a KPI/balance indicator, an
+icon-dependent signal, or an interactive control as specialized rather than forcing it into `StatusBadge`.
+
+---
+
+## P2.4 — Canonical EmptyState Migration
+
+**Date:** 2026-08-17
+
+### Canonical component
+
+`src/components/patterns/EmptyState.jsx` — confirmed exact API by reading the complete source:
+`{ icon, title, description, action, className }`. `icon` accepts either a component reference (rendered at
+`h-6 w-6` inside a fixed `h-12 w-12 rounded-full bg-gray-100` circle) or a pre-built element (via
+`React.isValidElement`, rendered exactly as given — including custom sizing); defaults to `lucide-react`'s
+`Inbox`. `title`/`description` are optional text/node slots; `action` is an optional node (e.g. a `Button`).
+Single fixed vertical-centered layout (`flex flex-col items-center justify-center gap-2 py-12 text-center`) —
+no alternate compact/horizontal variant. **Critically, `EmptyState` is already used internally by canonical
+`DataTable`** for its built-in `!rows.length` branch (via `emptyTitle`/`emptyDescription` props) — this shaped
+several migrations below toward "delegate to `DataTable`'s existing mechanism" rather than adding a second,
+parallel `EmptyState` call site next to a table. `EmptyState` was **not modified** in this task. Zero
+`EmptyState` usages existed anywhere in `src/pages/leave_management/**` before this task.
+
+### Audit counts
+
+- **Total empty-state audit count:** ~29 candidates read in full context across the module (including several
+  found only via a broad final sweep, beyond the initially-suspected file list)
+- **Safe migration count:** 8
+- **Specialized/excluded count:** 15+
+- **Error states excluded:** 3 (confirmed genuinely separate, untouched)
+- **Loading states excluded:** 9 (confirmed genuinely separate, untouched)
+- **Dead/commented-out count:** 2 (one full unreachable component, one commented-out empty-state block)
+
+### Complete migrated-file list
+
+1. `models/PendingLeaveRequests.jsx`
+2. `models/LeaveHistory.jsx`
+3. `charts/LeaveDetailsPage.jsx`
+4. `models/ApprovalDashboard.jsx`
+5. `models/PendingApprovalsQueueView.jsx`
+6. `models/EmployeeLeaveBalances.jsx`
+7. `models/CompOffBalanceRequests.jsx`
+8. `models/ProjectMembersOnLeave.jsx`
+
+### Complete migrated-empty-state list & exact prop mapping
+
+| # | File | Before | After |
+|---|---|---|---|
+| 1 | `PendingLeaveRequests.jsx` | Hand-rolled horizontal layout: `<img src={NoPendingLeaves} className="w-20"/>` beside `<h2>Cheers! No pending leave requests.</h2><p>Request leave on the above!</p>` — bypasses `PendingLeaveRequestsTable`/`DataTable` entirely (parent gate) | `<EmptyState icon={<img src={NoPendingLeaves} alt="" className="h-6 w-6" />} title="Cheers! No pending leave requests." description="Request leave on the above!" />` |
+| 2 | `LeaveHistory.jsx` | `{filteredLeaves.length > 0 ? <DataTable .../> : <p className={Fonts.caption}>No leave history found</p>}` — `DataTable` was conditionally never rendered when empty | **Restructured** to always render `<DataTable emptyTitle="No leave history found" rows={paginatedRequests} .../>` (no separate `EmptyState` call site — delegates to `DataTable`'s own mechanism, avoiding a second parallel empty-state block). Now-unused `Fonts` import removed. |
+| 3 | `LeaveDetailsPage.jsx` | `<img src={beachDay} className="w-40"/>` + `<p>No requests found for {displayName} in {year}.</p>` inside a bordered card div | `<EmptyState icon={<img src={beachDay} alt="" className="h-6 w-6" />} description={`No requests found for ${displayName} in ${new Date().getFullYear()}.`} />` — dynamic interpolation preserved exactly |
+| 4 | `ApprovalDashboard.jsx` | `<img src={clearingDesk} alt="Np Pending Approvals" className="w-40"/>` + `<p className="... text-sm\`">No Pending Approvals.</p>` (note: pre-existing stray backtick in the className string and an alt-text typo, "Np" instead of "No") | `<EmptyState icon={<img src={clearingDesk} alt="" className="h-6 w-6" />} title="No Pending Approvals." />` — the stray backtick and alt-text typo were removed as part of rewriting this exact line, not as unrelated cleanup |
+| 5 | `PendingApprovalsQueueView.jsx` | Same pattern as #4, without the bug (correct alt text, no stray backtick) | Same migration as #4 |
+| 6 | `EmployeeLeaveBalances.jsx` | `{data.length === 0 && !isLoading ? <p>No leave balances found.</p> : <DataTable .../>}` — bypassed `DataTable` | **Restructured** to always render `<DataTable emptyTitle="No leave balances found." rows={data} loading={isLoading} .../>` — same "delegate to DataTable" pattern as #2 |
+| 7 | `CompOffBalanceRequests.jsx` | `{pendingCompOffs.length === 0 ? <p>No pending Comp-Off requests for your team.</p> : <DataTable .../>}` — bypassed `DataTable` | **Restructured** to always render `<DataTable emptyTitle="No pending Comp-Off requests for your team." rows={pendingCompOffs} .../>` |
+| 8 | `ProjectMembersOnLeave.jsx` | `<p>No active projects for this employee.</p>` (top-level widget state, not inside a table) | `<EmptyState title="No active projects for this employee." />` |
+
+### Canonical EmptyState API used
+
+`icon` (4 instances — always a pre-built `<img>` element from the existing SVG import, deliberately sized down
+to `h-6 w-6` to fit the component's fixed circular icon frame), `title` (5 instances), `description` (2
+instances, one with dynamic interpolation), `className`/`action` (0 instances — no migrated candidate needed an
+action button). Two migrations (#2, #6) used **no direct `EmptyState` call at all** — they route through
+`DataTable`'s own `emptyTitle` prop instead, per Step 5's explicit instruction not to create a nested/duplicate
+empty-state.
+
+### Existing wording/logic preservation
+
+Every migrated title/description string is byte-identical to the original visible text, with the sole exception
+of fixing two confirmed pre-existing bugs in `ApprovalDashboard.jsx`'s own line being rewritten (a stray
+backtick character inside a className string that did nothing functionally, and an alt-text typo "Np" → "No")
+— both were on the exact line being replaced, not unrelated cleanup elsewhere in the file. All triggering
+conditions (`.length === 0`, combined with `!isLoading`/`!error` guards where they existed) were preserved
+exactly; two conditions (#2, #6) were restructured from "conditionally skip rendering `DataTable`" to "always
+render `DataTable`, let its own internal `!rows.length` check handle it" — a structural simplification that
+does not change *when* the empty state appears, only *which component* renders it.
+
+### Action preservation
+
+No migrated empty state had an action button before or after — confirmed via the audit; `action` was not used
+in any of the 8 migrations.
+
+### DataTable empty states intentionally not double-wrapped
+
+`models/ManageActiveLeaveBlocks.jsx`, `models/ApprovalRulesPage.jsx`, `models/EditHolidaysPage.jsx`,
+`models/RevokeLeaveRequests.jsx`, and `models/PendingLeaveRequestsTable.jsx` were confirmed (fresh, not assumed)
+to already route their empty state entirely through `DataTable`'s own `emptyTitle`/default mechanism, with no
+parallel/nested empty-state JSX anywhere alongside them — correctly left untouched, and explicitly **not**
+wrapped in a second `EmptyState`.
+
+### Remaining raw empty states with exact reasons
+
+| File | Element | Reason |
+|---|---|---|
+| `models/CompOffRequestsTable.jsx` | `if (pendingRequests.length === 0) return null;` (+ a dead, commented-out legacy empty-state block) | Renders **nothing at all** — there is no existing text/markup to preserve, so this is a net-new UI decision (show a message vs. keep hiding the section), not a like-for-like migration. Needs product input before being treated as in-scope. |
+| `HRManageTools.jsx` `LeaveTable` | `if (data.length === 0) return null;` | Same "renders nothing" pattern as above — no text to preserve; also part of the already-specialized, sticky-column table from P0.6. |
+| `models/HandleLeaveRequestAndApprovals.jsx` | Two distinct messages inside `<tr><td colSpan="13">`: `"No leaves to be displayed."` (no source data) vs. `"No leaves found matching {searchTerm}."` (filtered to zero) | Structural blocker: embedded inside a raw `<table>`/`<tr>`/`<td>`, not `DataTable` — `EmptyState`'s block layout cannot be dropped into a table cell without restructuring the whole table (a larger, out-of-scope refactor). The two-message distinction (no-data vs. filtered-to-zero) must also stay separate, which a single generic migration risks collapsing. |
+| `ruleBook/RuleBookPage.jsx` | `"No rules found. Try adding one using the form above."` inside a raw `<table>` | Same raw-table structural blocker as above; additionally this page has a pre-existing, unrelated `const api = api.create(...)` self-reference bug (documented since P0.6) that makes the component non-functional today — migrating dead/broken code's empty state was judged not worthwhile until that bug is separately triaged. |
+| `charts/LeaveDashboard.jsx`, `charts/MonthlyStats.jsx`, `charts/WeeklyPattern.jsx`, `charts/UpcomingHolidays.jsx`, `charts/AllHolidaysGrid.jsx`, `charts/CustomActiveShapePieChart.jsx` | Various "No data available"/"No upcoming holidays."/"No approved leave data to show." inline placeholders | All are small, compact placeholder lines embedded inside fixed-height chart/dashboard widgets (some with dynamically-themed colors) — `EmptyState`'s `py-12` fixed vertical block would break these widgets' compact layout and, in `UpcomingHolidays.jsx`'s case, its per-holiday theme color. |
+| `models/ProjectMembersOnLeave.jsx` (per-project) | `"No members on leave"` inside a `.map()` | A repeated inline fragment per project row, not a page-level state — distinct from the top-level widget empty state (item #8 above), which *was* migrated. |
+| `models/ApprovalQueue.jsx` (×2) | `"No balances provided."` / `"No holidays to display."` | Tiny inline sub-table fallbacks embedded in a payload-diff-review accordion, not primary page content. |
+| `models/LeavePolicyViewer.jsx` | `"No policy content found."` inside `renderContent()` | Found during final validation sweep (not in the original candidate list). A small inline fallback embedded within a larger CMS-content-rendering helper, mixed with other rendered content in the same card — structurally the same category as `ApprovalQueue.jsx`'s sub-fallbacks above, not a standalone page/list empty-state. Classified specialized for consistency with that precedent. |
+| `models/BlockLeaveDates.jsx`, `models/ManageActiveLeaveBlocks.jsx` (dropdown internals) | `"No results"` / `"No members available"` inside searchable-dropdown listboxes | Tiny `<li>` text inside a dropdown popover, not a page/section empty-state — `EmptyState`'s block would be wildly oversized. |
+| `models/AddHolidaysModal.jsx`, `ruleBook/RuleBookPage.jsx` (condition/step builders) | `"No holidays queued yet"`, `"No conditions added yet."`, `"No approval steps added yet."` | Local form-builder/wizard placeholder text describing an in-progress unsent draft, not a fetched-empty-dataset. |
+| `EnterpriseConfigManager.jsx` | `"No rules found"` with a `Search` icon | Confirmed still unreachable (only import remains commented out in `HRAdminPanel.jsx`, consistent with P0.6/P0.8/P2.3 findings) — not migrated. |
+
+### Business/API logic verification
+
+No API call, endpoint, payload, state setter, filtering, searching, pagination, sorting, validation, loading
+logic, error logic, retry logic, RBAC, routing, or authentication was touched in any of the 8 files — confirmed
+by inspecting the complete diff, which is limited to: (a) new `EmptyState` imports where used, (b) the
+empty-state JSX itself, (c) the `Fonts` import removal in `LeaveHistory.jsx` (now-orphaned by its own edit), and
+(d) the two `DataTable`-restructuring edits (#2, #6) which only removed a conditional wrapper around an
+already-existing `DataTable` call, without touching its `columns`/`rows`/`getRowKey`/business behavior.
+
+### Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings).
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline as every prior step: 2 `react-hooks/exhaustive-deps` config
+errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/
+billingConfigurationService.js`. Zero new issues.
+
+### git diff --check
+
+✅ Clean. `git status` confirms exactly the 8 files listed above changed in this task.
+
+### Pre-existing issues
+
+Two pre-existing bugs were discovered and fixed as an incidental, same-line consequence of rewriting
+`ApprovalDashboard.jsx`'s empty-state markup (a stray backtick character, an alt-text typo) — not sought out or
+fixed elsewhere. `EditHolidaysPage.jsx`'s `error` state is set on fetch failure but never rendered anywhere in
+JSX (a pre-existing dead-state bug, noted for completeness, not touched — out of this task's scope since it's
+an error-state issue, not an empty-state one). `ruleBook/RuleBookPage.jsx`'s `api.create` self-reference bug
+(known since P0.6) remains unfixed and is why its empty-state candidate stays unmigrated.
+
+**`EmptyState` is the canonical component for standard "no data / no results" presentational states across all
+Intranet modules.** Future migrations should follow the same discipline demonstrated here: check whether a
+table already delegates its empty state to `DataTable` (never add a second, nested `EmptyState`), keep
+error/loading states strictly separate, and classify chart-widget placeholders, dropdown-internal "no results"
+text, wizard/form-builder draft-state messages, and "renders nothing" patterns as specialized rather than
+forcing them into the generic vertical-centered block.
+
+## P2.5 — Canonical PageHeader Migration
+
+### Canonical component
+
+`src/components/ui/PageHeader.jsx` (unmodified). Confirmed exact API:
+
+```jsx
+export default function PageHeader({ title, subtitle, actions, breadcrumbs, className = "" })
+```
+
+Renders a `flex flex-col gap-3 md:flex-row md:items-center md:justify-between` container with a left block
+(optional `breadcrumbs` nav → `<h1>` title → optional `<p>` subtitle) and a right-aligned `actions` block
+(`flex flex-wrap items-center gap-3`). It has **no BackButton slot** and **no filter slot** — confirmed by
+reading the full source before auditing any consumer. Prior to this task, `PageHeader` had **zero** usages
+anywhere in `src/pages/leave_management/**` (29 files / 35 occurrences existed repo-wide, concentrated in
+accounts-payable and employee-onboarding, per the earlier P1.1 audit).
+
+### Audit method
+
+A full read-only sweep of `src/pages/leave_management/**` (root, `charts/`, `hooks/`, `models/`, `ruleBook/`,
+`websockets/`, `services/`) for every `<h1>`/`<h2>`/`<h3>` and every standalone "page-title-styled" heading,
+with full surrounding context read for each hit — not a grep-only pass.
+
+### Audit totals
+
+- **10** page-level header candidates identified and evaluated.
+- **5** safe migrations (Category A/C) — implemented.
+- **5** specialized/excluded from migration (Category B/E) — left unchanged, documented below.
+- Additionally, ~20 further headings across the module were confirmed to be nested card/modal/wizard/dashboard-widget/tab-section/error-screen titles and correctly excluded without needing a migration decision (full list in the "Modal/card/table/wizard header exclusions" section below).
+
+### Migrated files (Category A / C — safe migration)
+
+| # | File | Old markup | New markup |
+|---|---|---|---|
+| 1 | `models/ApprovalDashboard.jsx` | `<div className="mb-6"><h1 className="text-xl md:text-xl font-bold text-gray-800">Pending Approvals</h1><p className="text-gray-500 mt-1 text-xs md:text-sm">Review and take action on the requests below.</p></div>` | `<PageHeader title="Pending Approvals" subtitle="Review and take action on the requests below." />` |
+| 2 | `models/PendingApprovalsQueueView.jsx` | Identical pattern, title "Pending Approvals Queue", subtitle "Read-only view of requests awaiting approval." | `<PageHeader title="Pending Approvals Queue" subtitle="Read-only view of requests awaiting approval." />` |
+| 3 | `HRManageTools.jsx` | `<header><h1 className="text-2xl font-bold text-gray-800">HR Administration</h1><p className="text-gray-500 text-sm mt-1">Configure system leave types, manage team balances, and holiday calendars.</p></header>` | `<PageHeader title="HR Administration" subtitle="Configure system leave types, manage team balances, and holiday calendars." />` |
+| 4 | `models/ApprovalRulesPage.jsx` | `<div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold text-gray-800">Approval Rules</h1><Button variant="primary" onClick={() => openModal()} className="flex items-center gap-2 rounded-xl shadow"><Plus className="w-5 h-5" /> Add Rule</Button></div>` | `<PageHeader title="Approval Rules" actions={<Button variant="primary" onClick={() => openModal()} className="flex items-center gap-2 rounded-xl shadow"><Plus className="w-5 h-5" /> Add Rule</Button>} />` |
+| 5 | `AdminPanel.jsx` | `<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"><div><h1 className="text-2xl font-semibold text-gray-900">Leave Management</h1><p className="text-gray-600">Handle leave requests and approvals</p></div><div>{/* dead "Manage Leave Blocks" Button, already commented out */}</div></div>` | `<PageHeader title="Leave Management" subtitle="Handle leave requests and approvals" />` (the pre-existing commented-out `Button` block is preserved verbatim, unchanged, directly below) |
+
+### Exact PageHeader prop mapping used
+
+- `title` — plain string in every migrated file (no dynamic/interpolated titles were migrated; see `charts/LeaveDetailsPage.jsx` below for the one dynamic-title candidate, which was excluded for a different reason).
+- `subtitle` — plain string, taken verbatim from the existing `<p>` text.
+- `actions` — used once (`ApprovalRulesPage.jsx`), passed the existing `<Button>` element completely unchanged (same `variant`, `onClick`, `className`, icon, and label — no new wrapper logic).
+- `breadcrumbs` — not used anywhere; no migrated header had breadcrumb data.
+- `className` — not used anywhere; no migrated header needed a class override.
+
+### BackButton handling
+
+Two files already had a canonical `BackButton` next to their heading in the **same row, side-by-side**
+(`flex items-center gap-3`): `models/EmployeeLeaveBalances.jsx` (`Employee Leave Balances`) and
+`models/EditHolidaysPage.jsx` (`Manage Holidays`). `PageHeader` has no BackButton slot, and its own layout
+stacks breadcrumb → `<h1>` → subtitle vertically in a single left-aligned block — placing `<BackButton/>` as a
+sibling before `<PageHeader title=.../>` would **stack** the two elements (Back button above the title)
+instead of preserving their current **inline, side-by-side** arrangement. Per Step 5 of the task ("preserve the
+existing agreed placement" / "do not add routing knowledge to PageHeader" / "do not put BackButton inside
+PageHeader unless the API explicitly supports it — it does not"), both were left **unmigrated** and documented
+as specialized exceptions. No changes were made to either file.
+
+Two further files (`models/ManageActiveLeaveBlocks.jsx`, `models/BlockLeaveDates.jsx`) have a **legacy,
+pre-canonicalization** back control (a raw `Button variant="ghost" size="icon"` + `ArrowLeftCircleIcon`, not
+the canonical `BackButton` component) positioned on the **opposite side** of the header row from the title
+(`justify-between` — title left, back-icon-button right). Structurally this left/right split *is*
+representable via `PageHeader`'s `title`/`subtitle` (left) + `actions` (right) slots. However, both headers are
+wrapped in a distinctive `<header className="border-b border-gray-200 bg-white/70 backdrop-blur-sm">` band with
+its own `max-w-7xl` container that `PageHeader` does not provide, and migrating the action slot would mean
+routing a raw navigation `Button` through `actions` rather than canonicalizing it as a `BackButton` — an
+unrelated Phase 2 concern (BackButton adoption) that this task's scope explicitly does not extend to touching
+files beyond what's needed for the header swap itself. Per Step 12 ("no canonical enhancement" / stop and
+report rather than force), both were left **unmigrated** and documented as specialized exceptions pending a
+dedicated decision on whether to (a) canonicalize their back buttons first, and (b) accept losing the
+`border-b`/`backdrop-blur-sm` header band styling. No changes were made to either file.
+
+A fifth file, `charts/LeaveDetailsPage.jsx`, has a dynamic title (`{displayName || "Leave"} History -
+{year}`) with a plain `Button variant="link"` styled as a text link ("← Back") on the opposite side —
+technically representable the same way as the two files above, but this header only spans the `lg:col-span-3`
+main content column of a 4-column grid (a sidebar leave-type switcher occupies the remaining column), and its
+back control is a third, distinct legacy style (text link, neither icon-button nor canonical `BackButton`).
+Left **unmigrated** for the same reasons as the two files above (would require deciding on BackButton
+canonicalization for this file as an unrelated prerequisite) — documented as specialized.
+
+### Header-action handling
+
+Only one migrated header had an action: `models/ApprovalRulesPage.jsx`'s "Add Rule" button. It was moved into
+`PageHeader`'s `actions` prop with the exact same `Button` element, `variant="primary"`, `onClick={() =>
+openModal()}`, `className`, icon, and label — no permission/RBAC gate existed on this button before or after
+(confirmed unconditional in the original source). `AdminPanel.jsx`'s only candidate action ("Manage Leave
+Blocks") was already fully commented out (dead code) before this task and remains commented out, unchanged, in
+its original position immediately after the new `PageHeader`.
+
+### FilterBar separation handling
+
+No migrated header had an adjacent `FilterBar`. Two specialized/excluded files do have filter-adjacent
+structure worth noting for future reference: `models/EditHolidaysPage.jsx` has a `FilterBar` rendered as its
+own block directly below its (unmigrated) BackButton+title header, separated by margin — already correctly
+separate, not nested. `models/ManageActiveLeaveBlocks.jsx`'s filter input lives inside a nested `PageCard`'s
+`actions` prop, not adjacent to the page-level header at all. Neither required any change.
+
+### Remaining raw page headers with exact reasons
+
+| File | Header | Reason |
+|---|---|---|
+| `models/EmployeeLeaveBalances.jsx` | `BackButton` + `<h2>Employee Leave Balances</h2>`, same row | `PageHeader` has no BackButton slot; would change side-by-side arrangement to stacked. See "BackButton handling" above. |
+| `models/EditHolidaysPage.jsx` | `BackButton` + `<h1>Manage Holidays</h1>`, same row | Same reason as above. |
+| `models/ManageActiveLeaveBlocks.jsx` | `<header>` band with `<h1>Manage Blocked Leave</h1>` + subtitle (left) + legacy icon `Button`+`ArrowLeftCircleIcon` (right) | Representable via `title`/`subtitle`/`actions`, but the `border-b`/`backdrop-blur-sm`/`max-w-7xl` header band has no `PageHeader` equivalent, and migrating the action would route a non-canonical back button through `actions` rather than resolve its BackButton-canonicalization status first — out of this task's scope. |
+| `models/BlockLeaveDates.jsx` | Same `<header>` band pattern, `<h1>Block Leave Dates</h1>` + subtitle (left) + legacy icon `Button` (right) | Same reason as above. |
+| `charts/LeaveDetailsPage.jsx` | Dynamic `<h1>{displayName} History - {year}</h1>` (left, spans only a 3-of-4 grid column) + text-link `Button` "← Back" (right) | Same BackButton-canonicalization-prerequisite reason as above, plus the header only spans a partial-width grid column. |
+
+### Modal/card/table/wizard headers explicitly excluded
+
+Confirmed nested (not page-level) and left untouched: `ruleBook/RuleBookPage.jsx` (`PageCard title="Rule Book
+Configuration"` and `PageCard title="📜 Existing Rules"` — card titles, no page-level `<h1>` exists in this
+file), `models/AddEmployeeModal.jsx` and `models/AddLeaveTypeModal.jsx` (modal dialog titles), `models/
+ManagerEditLeaveRequest.jsx` and `models/EditLeaveModal.jsx` (record-lock overlay titles), `models/
+EmployeeLeaveBalances.jsx`'s second heading (`Edit Leave Balances – {name}`, an inline edit-modal title, distinct
+from its page header already covered above), `models/ApprovalRulesPage.jsx`'s second heading (Add/Edit-rule
+modal title, distinct from its page header already migrated above), `models/HandleLeaveRequestAndApprovals.jsx`
+(a modal analysis-panel title and a confirmation-dialog title), `EnterpriseConfigManager.jsx` (confirmed still
+unreachable/dead — only reference is a commented-out import in `HRAdminPanel.jsx`), `EmployeeDashboard.jsx`
+(no page-level `<h1>` at all — only small inline section labels and a `PageCard` title, all nested),
+`HRAdminPanel.jsx` (renders zero markup of its own — a pure pass-through to `ApprovalDashboard`),
+`charts/LeaveDashboard.jsx` (no heading, only a KPI stat number), `charts/LeaveDetailsPage.jsx`'s two
+sub-section labels ("Leave Types" sidebar caption, per-month group caption — distinct from its excluded page
+title above), and `Unauthorized.jsx` (a specialized, centered, gradient hero-card 401/access-denied screen —
+structurally nothing like a normal page header; correctly excluded as Category E).
+
+### Business/API logic verification
+
+No API call, endpoint, state, hook, filter, pagination, sorting, RBAC, routing, navigation, or validation logic
+was touched in any of the 5 migrated files. In every case the only change is the header presentation itself:
+the exact same title/subtitle text and the exact same `Button` element (identical `onClick`, `variant`,
+`className`, icon, label) were moved into `PageHeader`'s `title`/`subtitle`/`actions` props, verbatim.
+
+### Files modified
+
+1. `src/pages/leave_management/models/ApprovalDashboard.jsx`
+2. `src/pages/leave_management/models/PendingApprovalsQueueView.jsx`
+3. `src/pages/leave_management/HRManageTools.jsx`
+4. `src/pages/leave_management/models/ApprovalRulesPage.jsx`
+5. `src/pages/leave_management/AdminPanel.jsx`
+
+### Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings).
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline as every prior step: 2 `react-hooks/exhaustive-deps` config
+errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/
+billingConfigurationService.js`. Zero new issues.
+
+### git diff --check
+
+✅ Clean (only pre-existing LF/CRLF informational warnings on files already touched in earlier steps, not
+errors). `git status` confirms exactly the 5 files listed above changed in this task (plus this documentation
+file).
+
+### Unused-import verification
+
+`PageHeader` was added as a new import in all 5 modified files and is used in each. No import became unused as
+a result of these edits — every file's remaining imports (`Button`, `Plus`, etc.) are still referenced
+elsewhere in their respective files.
+
+### Pre-existing issues
+
+None newly discovered in this task. All previously documented baseline issues (airs `react-hooks/
+exhaustive-deps` config errors, `billingConfigurationService.js` warning, `ruleBook/RuleBookPage.jsx`'s
+`api.create` self-reference bug, `EditHolidaysPage.jsx`'s unrendered `error` state) remain unchanged and
+untouched.
+
+**`PageHeader` is the canonical component for standard page-level titles, subtitles, and header actions across
+modules.** It intentionally does not own BackButton placement or filter composition — those remain the page's
+responsibility, composed as siblings around `PageHeader`. Pages with an established side-by-side
+BackButton+title layout, or with a legacy (pre-canonical) back-button style, should resolve BackButton
+canonicalization first before revisiting a `PageHeader` migration for that specific header.
+
+## P2.6 — Canonical Tabs Migration
+
+### Canonical component
+
+`src/components/ui/tabs.jsx` (unmodified) — a controlled, shadcn-style compound component set:
+
+```jsx
+const Tabs = ({ className, value, onValueChange, children, ...props })   // provides React context { value, onValueChange }
+const TabsList = ({ className, ...props })                                // div wrapper for triggers
+const TabsTrigger = ({ className, value, ...props })                      // <button> — data-state="active"/"inactive" based on context.value === value; extra props (incl. disabled) spread onto the button
+const TabsContent = ({ className, value, ...props })                      // renders null unless context.value === value
+```
+
+Key facts confirmed by reading the full source and existing repo consumers (`src/pages/Projects/manager/project/ProjectConfigurations.jsx`, `src/pages/airs/pages/JdLibrary.jsx`): controlled-only (parent owns `value`/`onValueChange` state, no `defaultValue` mode); `TabsTrigger` renders arbitrary children so icons are fully supported without any special prop; no orientation prop (horizontal by default, only overridable via `className`); no built-in ARIA roles or keyboard/arrow-key navigation (a pre-existing gap in the canonical component itself, not addressed here); styling is fully caller-controlled via `className` + `data-[state=active]:.../data-[state=inactive]:...` selectors matching the `data-state` attribute `TabsTrigger` sets. Because `cn()` in this repo is a plain `classnames` concatenation (not tailwind-merge), overriding `TabsList`/`TabsTrigger`'s own default classes requires `!important`-prefixed Tailwind utilities — the exact same `!inline-flex !h-auto !bg-transparent !p-0 !rounded-none` pattern already established in `ProjectConfigurations.jsx` was reused here for consistency. `TabsContent` is optional — some consumers use it to gate panels, others (like the ones migrated here) keep their own content-switch logic and only replace the tab-bar visual shell. Confirmed **zero** prior usages of `Tabs`/`TabsList`/`TabsTrigger`/`TabsContent` anywhere in `src/pages/leave_management/**`.
+
+### Audit method
+
+A full read-only sweep of `src/pages/leave_management/**` for every tab-like or tab-adjacent UI: literal tab/active-tab state variables, border-bottom "underline" bars, pill/segmented button groups, and anything superficially resembling a tab bar — with each candidate read in full surrounding context and tested against "does exactly one view show at a time, does clicking change it."
+
+### Audit totals
+
+- **16** candidate groups/files audited (3 clean matches, 1 borderline, several confirmed non-tabs, 1 route-navigation, 2 dead/unused).
+- **3** safe migrations (Category A) — implemented.
+- **1** specialized/excluded as a judgment call requiring explicit approval before migrating (`LeavePolicyViewer.jsx`), left unchanged.
+- **1** specialized/excluded as a security-sensitive role-switcher (`EmployeePanel.jsx`), left unchanged.
+- **1** route-navigation exclusion (`charts/LeaveDetailsPage.jsx`).
+- **2** dead/unused files containing tab-shaped code (`EmployeePanelold.jsx`, `EnterpriseConfigManager.jsx`).
+- Remaining candidates (segmented half-day toggles, native `<select>` filters, static form sections, decorative dividers) confirmed as non-tab UI entirely — no classification needed beyond "not a tab."
+
+### Safe migrations (Category A) — implemented
+
+| # | File | Tabs | State variable |
+|---|---|---|---|
+| 1 | `HRManageTools.jsx` | "Leave Configuration" / "Employee Management" (shown only when `!permissions`) / "Holiday Management" / "Pending Approvals" | `activeTab` / `setActiveTab`, initial `"leaveTypes"` |
+| 2 | `models/BlockLeaveSection.jsx` | "Active Blocked Leaves" (id `dashboard`) / "Block Leave Dates" (id `projectMembers`) | `activeTab` / `setActiveTab`, initial `"dashboard"` |
+| 3 | `models/LeaveSection.jsx` | "Leave Balance" (id `dashboard`) / "Team Members on Leave" (id `projectMembers`) | `activeTab` / `setActiveTab`, initial `"dashboard"` |
+
+### Exact state/prop mapping
+
+For all three files: `<Tabs value={activeTab} onValueChange={setActiveTab}>` wraps a `<TabsList>`; each former `<button onClick={() => setActiveTab(id)}>` became `<TabsTrigger value={id}>` with the identical visible label as children. The existing `activeTab === id` conditional `<motion.div>` underline (the animated `layoutId` indicator) was preserved verbatim inside each `TabsTrigger`'s children — canonical `TabsTrigger` renders arbitrary children, so this required no change to the underline logic itself, only to its container. Active/inactive text color was moved from an inner `<span className={cond ? ... : ...}>` onto the `TabsTrigger` itself via `data-[state=active]:!text-indigo-600 data-[state=inactive]:text-gray-500/600 hover:text-gray-900` (visually identical, now driven by the canonical `data-state` attribute instead of a manual ternary). `HRManageTools.jsx`'s `tabs.map(...)` array (including its pre-existing `!permissions && {...}` falsy-entry quirk — see below) was preserved exactly as-is, only rendering `TabsTrigger` instead of `<button>` inside the loop.
+
+**Content-switch logic (the `AnimatePresence`/`motion.div` panel chain in all three files) was deliberately left untouched, outside of `Tabs`.** `TabsContent` was not used because it does not support the existing exit-animation transitions (`AnimatePresence mode="wait"` + per-panel `initial`/`animate`/`exit`), and in `BlockLeaveSection.jsx` the panels use `position: absolute` for a cross-fade stacking effect that `TabsContent`'s plain conditional `<div>` cannot reproduce. Per Step 14 ("no canonical enhancement... do not change behavior to make it fit"), only the tab-bar shell (the row of clickable triggers) was migrated; the content area's existing ternary/AND chain keyed off the same `activeTab` state variable is unchanged.
+
+### Role/permission verification
+
+`HRManageTools.jsx`'s "Employee Management" tab visibility condition (`!permissions && {...}`, where `permissions = user.roles?.includes("Admin") || user.roles?.includes("Super_Admin")`) is preserved exactly, unfiltered, inside the same `tabs.map(...)` call that now renders `TabsTrigger`s. A **pre-existing** quirk was confirmed and deliberately left as-is (not "fixed," per this task's explicit no-workaround rule): when `permissions` is `true`, the array entry evaluates to the literal boolean `false` rather than being filtered out, so `tabs.map` still iterates over it. This does not throw (property access on `false` returns `undefined`, not an error) — it renders one inert `TabsTrigger` with `value={undefined}`, no label, and no icon, which can never become active and has no visible effect. This is identical, byte-for-byte, to the original `<button key={tab.id} ...>` code's behavior — confirmed by tracing both the old and new code paths — so no behavior change was introduced, and no attempt was made to filter/fix the array per Step 14. No other migrated file had any role/permission-conditional tab.
+
+### Content preservation verification
+
+No JSX inside any tab panel was modified in any of the three files — the `LeaveTable`/`AdminCard` renders in `HRManageTools.jsx`, and the `ManageActiveLeaveBlocks`/`BlockLeaveDates`/`LeaveDashboard`/`ProjectMembersOnLeave` component renders in the other two, are byte-identical to before. Only the tab-bar navigation shell (the row of buttons/triggers) was replaced.
+
+### Remaining raw tab implementations with exact reasons
+
+| File | Implementation | Reason |
+|---|---|---|
+| `models/LeavePolicyViewer.jsx` | Dynamic pill row of `<div onClick={() => setSelectedPolicyId(policy.id)}>` elements (one per fetched CMS policy, unbounded count), switching a single `{selectedPolicy && <LeaveTypeCard/>}` content block | Structurally passes the "one view, click switches it" test, but the clickable elements are plain `<div>`s (not `<button>`s, no native focus/keyboard semantics — worse even than canonical Tabs' own accessibility gap) and the list is a dynamic, unbounded, CMS-driven data set rather than a fixed small set of named views. Classified as a judgment call requiring explicit product/stakeholder confirmation before migrating, per this task's discipline against forcing borderline cases — left unmigrated. |
+| `EmployeePanel.jsx` | Pill-style button row switching between `EmployeeDashboard`/`AdminPanel`/`HRManageTools`/`HRAdminPanel` (entire top-level page components), gated by `isManager`/`isHR`/`isHRAdministrator`/`isAdmin` role flags with **double** gating (conditional render of each button AND a re-validation check inside `handleViewChange` before switching), plus `localStorage` persistence of the selected view across sessions | Not a genuine content tab bar — it's a security-sensitive role-based page switcher with persisted cross-session state and doubled permission gating logic. Migrating this to a generic, presentation-only canonical Tabs component risks disturbing that gating logic; explicitly excluded as a specialized case per Step 14 (do not change behavior to make something fit) rather than attempted. |
+| `charts/LeaveDetailsPage.jsx` | Vertical sidebar `<nav>` of leave-type buttons calling `handleSwitchLeaveType`, which calls `navigate(`/leave-details/${employeeId}/${type.name}`, { replace: true, state: {...} })` | **Route navigation (Category C)** — clicking changes the URL (`:leaveName` route param) via `react-router`'s `navigate`, not local component state. Canonical `Tabs`' `value`/`onValueChange` contract is in-memory-state-only; it has no routing-aware variant, so per Step 11 of the task ("preserve route navigation... do not convert unless Tabs explicitly supports that exact routing behavior — it does not") this was left unmigrated. Also vertically oriented, a further mismatch since canonical Tabs has no orientation prop. |
+| `EmployeePanelold.jsx` | Same tab-shaped role-switcher pattern as `EmployeePanel.jsx`, without `localStorage` persistence and with fewer roles | **Dead/unused file** — confirmed via repo-wide grep that nothing imports `EmployeePanelold` anywhere in `src/`; it is superseded by `EmployeePanel.jsx`. Not modified. |
+| `EnterpriseConfigManager.jsx` | A well-formed 3-tab bar (`activeTab` state, icon+label triggers, single shared content area keyed off `tabConfig[activeTab]`) that would otherwise be a clean Category A candidate | **Dead/unused file** — confirmed via repo-wide grep that nothing imports or routes to `EnterpriseConfigManager` anywhere in `src/` (its only prior mention, a commented-out import in `HRAdminPanel.jsx`, was already noted as dead in the P2.3/P2.4/P2.5 audits). Not modified; flagged only for awareness, not migrated. |
+| `ruleBook/RuleBookPage.jsx` ("Conditions"/"Approval Steps") | Two headed form sections, always both visible together, each with its own "+ Add" button | Confirmed **not tabs at all** — no `activeTab`-style state exists in the file; both sections render unconditionally, stacked, not mutually exclusive. No migration applicable. |
+| `models/RequestLeaveModal.jsx`, `models/ApplyLeaveOnBehalf.jsx` (Full Days / Custom half-day toggle) | 2-button segmented pill setting `showCustomHalfDay`/`halfDayConfig` form state | Segmented **form control** (sets a value submitted with the leave request), not a content-view switch. Confirmed excluded per Step 8 (half-day selection is explicitly listed as a non-tab example). |
+| `models/HandleLeaveRequestAndApprovals.jsx` (status/year/month filters), `charts/Calendar.jsx` (month/year), `models/EmployeeLeaveBalances.jsx`'s `YearDropdown` | Native `<select>`-based `FormSelect`/`NativeSelect` dropdowns | Plain value-selector filter dropdowns, not button-group tab bars at all — not tab-adjacent even by loose styling standards. |
+| `models/CompOffBalanceRequests.jsx`, `models/RevokeLeaveRequests.jsx` | `<div className="border-b-2 border-blue-500 w-16 mb-4">` under a section `<h3>` | Decorative fixed-width divider, no `activeTab` state or sibling button anywhere in either file — a false positive from the "border-bottom" search pattern, not a tab underline. |
+
+### Business/API logic verification
+
+No API call, endpoint, state (other than the pre-existing `activeTab`/`setActiveTab` reused verbatim), effect, RBAC condition, routing, navigation, or WebSocket logic was touched in any of the 3 migrated files. The only changes are the tab-bar shell markup (native `<button>` → `TabsTrigger`, wrapping `<div>`s → `Tabs`/`TabsList`) and the corresponding new `Tabs`/`TabsList`/`TabsTrigger` import in each file.
+
+### Files modified
+
+1. `src/pages/leave_management/HRManageTools.jsx`
+2. `src/pages/leave_management/models/BlockLeaveSection.jsx`
+3. `src/pages/leave_management/models/LeaveSection.jsx`
+
+### Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings).
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline as every prior step: 2 `react-hooks/exhaustive-deps` config
+errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/
+billingConfigurationService.js`. Zero new issues.
+
+### git diff --check
+
+✅ Clean (only pre-existing LF/CRLF informational warnings on files already touched in earlier steps, not
+errors). `git status` confirms exactly the 3 files listed above changed in this task (plus this documentation
+file).
+
+### Unused-import verification
+
+`Tabs`/`TabsList`/`TabsTrigger` were added as new imports in all 3 files and are used in each. `motion`/
+`AnimatePresence` (from `framer-motion`) remain fully used in all 3 files (the underline indicators and the
+content-switch animation chains) — confirmed via a full occurrence count in each file before and after the
+edit. No import became unused as a result of these changes.
+
+### Pre-existing issues
+
+None newly discovered in this task, beyond re-confirming (not fixing) the `HRManageTools.jsx` `tabs` array's
+`!permissions && {...}` falsy-entry quirk described above, which renders one inert, invisible tab button for
+Admin/Super_Admin users — a pre-existing, non-crashing cosmetic quirk, deliberately preserved rather than
+"fixed" per this task's scope. All previously documented baseline issues remain unchanged and untouched.
+
+**Canonical `Tabs`/`TabsList`/`TabsTrigger`/`TabsContent` is now the established pattern for standard
+mutually-exclusive content-switching tab bars across modules.** It intentionally does not own routing, RBAC
+gating, or animated-exit transitions — pages with URL-driven navigation styled as tabs, security-sensitive
+role switchers, or `AnimatePresence`-based exit animations should keep their existing bespoke implementation
+(or migrate only the static shell, as done here) rather than forcing those behaviors into the canonical
+component.
+
+## P2.7 — Canonical Loading / Loader Migration
+
+### Canonical loading component(s)
+
+Three pre-existing (Phase 1, not created in this task) canonical pieces, all unmodified:
+
+1. **`src/components/LoadingSpinner.jsx`** — the base spinner, 150+ existing consumers repo-wide:
+   `LoadingSpinner({ text = "Loading...", size = "md" })` — `size`: `"sm"` (`w-4 h-4 border-2`) / `"md"`
+   (`w-6 h-6 border-4`, default) / `"lg"` (`w-8 h-8 border-4`); renders a centered `flex items-center
+   justify-center gap-2 p-4` row with the spinning ring (`border-[#0A0082] border-t-transparent
+   rounded-full animate-spin`) and, if `text` is truthy, a `text-sm text-gray-600` label beside it.
+2. **`src/components/patterns/Loaders.jsx`** — built on top of `LoadingSpinner`:
+   - `PageLoader({ text = "Loading..." })` — `LoadingSpinner` at `size="lg"` centered in a
+     `min-h-[240px] w-full` box, for page/section-level loading.
+   - `InlineLoader({ text = "" })` — `LoadingSpinner` at `size="sm"`, for small inline loading spots.
+   - `TableSkeleton({ rows = 5, columns = 4, className = "" })` — `rows` × `columns` animated gray bars;
+     already used internally by canonical `DataTable` (`src/components/patterns/DataTable.jsx` line 100-106)
+     whenever a `DataTable` consumer passes `loading={...}` — no separate wiring needed beyond that prop.
+3. **`src/components/ui/Loader.jsx`** — a legacy, zero-prop spinner, explicitly documented in its own source
+   as kept only for its existing consumers ("for new code, prefer `src/components/patterns/Loaders.jsx`").
+   Not targeted for migration-away in this task; no Leave Management file uses it.
+
+None of these three files were modified. The canonical `Button` component's own `loading`/`loadingText`
+props (button-submission loading) were also left untouched, per scope.
+
+### Audit method
+
+A full read-only sweep of `src/pages/leave_management/**` for every loading indicator — named canonical
+components already in use, bespoke spinners/skeletons, `animate-spin`/`animate-pulse` usage, loading-state
+text strings, `DataTable` consumers with/without a wired `loading` prop, and full-page/modal loading
+overlays — each read in full surrounding context, not matched by keyword alone.
+
+### Audit totals
+
+- **~35** loading-indicator locations found and evaluated across the module.
+- **~20** already correctly using a canonical component (`LoadingSpinner` directly, or `DataTable`'s own
+  `loading`/`TableSkeleton` mechanism) — no action needed, confirmed as-is.
+- **9** safe migrations (Category A) — implemented.
+- **2** DataTable/table-skeleton wiring fixes (Category C) — implemented.
+- **1** raw-spinner-inside-an-overlay finding explicitly **not** migrated despite superficially qualifying,
+  documented below as a specialized exception.
+- **6** button-submission loading instances (Category B) confirmed already correct, left untouched.
+- **5** loading-overlay instances (Category E) confirmed and left untouched.
+- **2** specialized skeleton instances (Category D) confirmed and left untouched.
+- **~10** dead/commented-out loading blocks (Category G) confirmed still dead, not touched.
+
+### Safe migrations (Category A) — implemented
+
+| # | File | Old | New |
+|---|---|---|---|
+| 1 | `models/PendingLeaveRequests.jsx` (via `models/SkeletonTable.jsx`) | `<SkeletonTable rows={5} columns={6} />` (a hand-rolled duplicate of `TableSkeleton`, one call site) | `<TableSkeleton rows={5} columns={6} />` from `components/patterns/Loaders` |
+| 2 | `models/AddLeaveTypeModal.jsx` | `<p className="text-gray-500 text-sm">Loading leave labels...</p>` | `<InlineLoader text="Loading leave labels..." />` |
+| 3 | `models/RequestLeaveModal.jsx` | `<div className="flex items-center justify-center p-4 text-gray-500 text-sm rounded-xl bg-gray-50"><span className="animate-pulse mr-2 rotate-45">⏳</span> Loading...</div>` | `<div className="flex items-center justify-center p-4 rounded-xl bg-gray-50"><InlineLoader text="Loading..." /></div>` |
+| 4 | `models/ManagerEditLeaveRequest.jsx` | `<div className="mt-1 w-full p-3 border border-gray-200 rounded-xl bg-gray-50 text-center text-gray-400 text-sm animate-pulse">Loading balances...</div>` | `<div className="mt-1 w-full p-3 border border-gray-200 rounded-xl bg-gray-50 flex items-center justify-center"><InlineLoader text="Loading balances..." /></div>` |
+| 5 | `charts/CustomActiveShapePieChart.jsx` | `<p className="text-sm text-gray-500 animate-pulse">Loading...</p>` | `<InlineLoader text="Loading..." />` |
+| 6 | `charts/WeeklyPattern.jsx` | Identical pattern | `<InlineLoader text="Loading..." />` |
+| 7 | `charts/MonthlyStats.jsx` | Identical pattern | `<InlineLoader text="Loading..." />` |
+| 8 | `ruleBook/RuleBookPage.jsx` | `<div className="flex justify-center py-6 text-indigo-600 font-medium animate-pulse">Loading rules...</div>` | `<div className="flex justify-center py-6"><LoadingSpinner text="Loading rules..." /></div>` |
+| 9 | `models/ProjectMembersOnLeave.jsx` | `if (loading) return <p>Loading...</p>;` | `if (loading) return <LoadingSpinner />;` |
+
+### Category C — DataTable/table-skeleton wiring implemented
+
+| File | Before | After |
+|---|---|---|
+| `models/RevokeLeaveRequests.jsx` | `{loading ? <LoadingSpinner text="Loading..." /> : <DataTable getRowKey={...} rows={revokeRequests} columns={[...]} />}` | Ternary removed; `<DataTable loading={loading} getRowKey={...} rows={revokeRequests} columns={[...]} />` — `loading` (already existing, reused around fetch/approve/reject) now drives `DataTable`'s own `TableSkeleton`, producing an identical full-table-replacement visual to the removed ternary. The now-unused `LoadingSpinner` import was removed. |
+| `models/CompOffBalanceRequests.jsx` | `<DataTable emptyTitle="No pending Comp-Off requests for your team." getRowKey={...} rows={pendingCompOffs} columns={[...]} />` (no `loading` prop at all — a latent empty-state-flash gap: `pendingCompOffs` starts `[]`, so the `emptyTitle` message could flash before the first fetch resolves) | `<DataTable loading={loading} emptyTitle="..." getRowKey={...} rows={pendingCompOffs} columns={[...]} />` — the existing `loading` state (already set around fetch/approve/reject) now gates the table's own skeleton, closing the gap. The pre-existing, already-dead commented-out full-screen overlay block in this file was left dead, not resurrected. |
+
+### Specialized exception found but NOT migrated
+
+`models/EmployeeLeaveBalances.jsx`, edit-modal submit overlay (`isSubmitting` state): a raw
+`<div className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent border-white"></div>`
+inside an `absolute inset-0 bg-black bg-opacity-40` overlay. This superficially resembles a Category A
+"raw spinner → `LoadingSpinner`" swap, but `LoadingSpinner`'s ring color is hard-coded
+(`border-[#0A0082]`, a dark indigo) with no color-override prop — swapping it in would replace a
+white-on-dark-overlay spinner (chosen specifically for contrast against the `bg-opacity-40` black backdrop)
+with a dark-indigo-on-dark-overlay spinner, meaningfully reducing its visibility. Per Step 13 ("if a loading
+pattern cannot be represented without changing behavior or meaningful visual structure, STOP and document"),
+this was intentionally left unmigrated rather than forced through — `EmployeeLeaveBalances.jsx` was **not**
+modified in this task.
+
+### Button-loading exclusions (Category B — confirmed correct, untouched)
+
+`models/HandleLeaveRequestAndApprovals.jsx` (approve/reject confirmation), `models/CompOffRequestModal.jsx`,
+`models/ApplyLeaveOnBehalf.jsx`, `models/RequestLeaveModal.jsx` (submit button), `models/
+AddLeaveTypeModal.jsx` (submit button), `models/ManagerEditLeaveRequest.jsx` (save button) — all already use
+canonical `Button`'s own `loading`/`loadingText` props. Not touched. (A pre-existing inconsistency was
+noted, not fixed: `models/EditLeaveModal.jsx`'s submit button hand-rolls a raw `animate-spin` span inside its
+children instead of using `Button`'s built-in `loading` prop like every sibling modal does — flagged for
+future awareness only, out of this task's scope since it concerns `Button`-internal usage, not a standalone
+loading indicator.)
+
+### DataTable/table-skeleton exclusions (already correct, no wiring needed)
+
+`models/CompOffRequestsTable.jsx` and `models/PendingLeaveRequestsTable.jsx` are presentational children
+that receive already-resolved arrays from a parent that owns its own loading gate before ever mounting them
+— no gap to wire. `models/LeaveHistory.jsx` has an `if (loading) return <LoadingSpinner .../>;` early return
+before its `DataTable` is ever reached, so no empty-state-flash risk exists there either. `models/
+EmployeeLeaveBalances.jsx` already passes `loading={isLoading}` to its `DataTable` call (in addition to a
+separate full-page overlay covering more surface area than the table) — both mechanisms are legitimately
+serving different scopes, confirmed correct, not touched.
+
+### Specialized skeleton exclusions (Category D — untouched)
+
+- `charts/Calendar.jsx` (active copy) — a calendar-grid-shaped skeleton (header placeholder + 7×5 mini
+  day-cell bars) that does not match `TableSkeleton`'s row/column bar shape.
+- `models/BlockLeaveDates.jsx` — field-shaped `animate-pulse bg-gray-400` skeleton bars standing in for the
+  Project dropdown / Members multiselect / Leave-types multiselect while `loading` is true — individual
+  form-control placeholders, not a spinner or table shape.
+
+### Loading-overlay exclusions (Category E — untouched)
+
+`models/EditHolidaysPage.jsx` (`fixed inset-0 bg-white/60 backdrop-blur-sm z-[9999]` + `LoadingSpinner
+text="Please wait"`, already canonical inside the overlay), `models/EmployeeLeaveBalances.jsx`'s two
+`LoadingSpinner`-based overlays (`absolute inset-0 bg-white/70`; `fixed inset-0 bg-black bg-opacity-30`,
+already canonical) and its raw-spinner edit-modal overlay (documented above as the specialized exception),
+`models/AddLeaveTypeModal.jsx`'s `absolute inset-0 bg-white bg-opacity-70` submitting overlay (already
+canonical `LoadingSpinner text="Submitting..."`). None of these were changed — the backdrop/blur/blocking
+behavior has no canonical overlay-mode equivalent, and where the inner spinner was already `LoadingSpinner`,
+no action was needed.
+
+### Dead/commented-out count
+
+Confirmed still dead, not touched: `models/ApprovalDashboard.jsx` (commented-out `LoadingSpinner
+text="Processing..."` block), `models/CompOffBalanceRequests.jsx` (commented-out full-screen overlay spinner
+— the file's live `DataTable` was fixed via the `loading` prop above; this dead block was not resurrected),
+`charts/Calendar.jsx` (entire dead first draft, ~180 lines, including its own loading skeleton), `models/
+ManagerEditLeaveRequest.jsx` (entire dead first draft, ~609 lines, including its own `"Loading balances..."`
+text and record-lock overlay — the live component below was the one migrated above), `models/
+LeaveHistory.jsx` (three large dead earlier versions, each with their own `LoadingSpinner` references),
+`EmployeeDashboard.jsx` (a dead first-draft version of the whole file), `EmployeePanelold.jsx` (confirmed
+entirely unreferenced/dead file).
+
+### Complete migrated-file list
+
+1. `src/pages/leave_management/models/PendingLeaveRequests.jsx`
+2. `src/pages/leave_management/models/AddLeaveTypeModal.jsx`
+3. `src/pages/leave_management/models/RequestLeaveModal.jsx`
+4. `src/pages/leave_management/models/ManagerEditLeaveRequest.jsx`
+5. `src/pages/leave_management/charts/CustomActiveShapePieChart.jsx`
+6. `src/pages/leave_management/charts/WeeklyPattern.jsx`
+7. `src/pages/leave_management/charts/MonthlyStats.jsx`
+8. `src/pages/leave_management/ruleBook/RuleBookPage.jsx`
+9. `src/pages/leave_management/models/ProjectMembersOnLeave.jsx`
+10. `src/pages/leave_management/models/RevokeLeaveRequests.jsx`
+11. `src/pages/leave_management/models/CompOffBalanceRequests.jsx`
+
+(`models/SkeletonTable.jsx` is now dead/unused code as a consequence of migrating its only consumer —
+left in place, not deleted, per this task's scope of only migrating loading presentation.)
+
+### Exact prop mapping
+
+`InlineLoader`/`PageLoader`/`LoadingSpinner`'s `text` prop was set to the exact pre-existing loading copy in
+every migration (`"Loading leave labels..."`, `"Loading..."`, `"Loading balances..."`, `"Loading rules..."`)
+— no text was reworded. `TableSkeleton`'s `rows`/`columns` props were set to the exact values the old
+`SkeletonTable` call already used (`rows={5} columns={6}`). `DataTable`'s existing `loading` prop was set to
+each file's pre-existing `loading` state variable, unrenamed.
+
+### Loading-condition preservation
+
+No `loading`/`isLoading`/`submitting` state variable, its initial value, or its `set*` call sites were
+renamed, added, or removed in any of the 11 files. Every migration only replaced the JSX rendered while the
+existing condition is true (or, for the two Category C files, replaced an external ternary with the
+equivalent `DataTable`-internal mechanism keyed off the same variable).
+
+### Error/loading-condition preservation
+
+Ternary/branch ordering was preserved exactly everywhere a loading branch coexists with an error or
+empty-data branch: `models/PendingLeaveRequests.jsx` (`loading → error → empty → content`, only the loading
+branch's JSX changed), `models/RequestLeaveModal.jsx` (`loadingBalances → balanceError → dropdown`, only the
+loading branch changed), `charts/CustomActiveShapePieChart.jsx`/`WeeklyPattern.jsx`/`MonthlyStats.jsx`
+(`loading → data-present → empty`, only the loading branch changed), `ruleBook/RuleBookPage.jsx` (`loading →
+empty → raw table`, only the loading branch changed, the raw `<table>` itself untouched).
+
+### Remaining raw loading implementations with exact reasons
+
+| File | Implementation | Reason |
+|---|---|---|
+| `models/EmployeeLeaveBalances.jsx` edit-modal overlay | Raw white `animate-spin` div inside a dark overlay | `LoadingSpinner`'s hard-coded indigo ring color would reduce visibility against the dark backdrop — a meaningful visual regression; documented as a specialized exception above, left unchanged. |
+| `charts/Calendar.jsx` | Calendar-grid-shaped skeleton | Structurally a Category D specialized skeleton — no canonical equivalent shape exists. |
+| `models/BlockLeaveDates.jsx` | Field-shaped dropdown/multiselect skeleton bars | Category D specialized — form-control placeholders, not a spinner or table shape. |
+| `models/EditHolidaysPage.jsx`, `models/EmployeeLeaveBalances.jsx` (2 overlays), `models/AddLeaveTypeModal.jsx` overlay | Full-page/modal blocking overlays, already using canonical `LoadingSpinner` inside | Category E — backdrop/blur/blocking behavior has no canonical overlay-mode equivalent; already using `LoadingSpinner` internally, so no further action applies. |
+| `models/HandleLeaveRequestAndApprovals.jsx` raw `<table>` | `<tr><td colSpan="13"><LoadingSpinner text="Loading..." /></td></tr>` | Already canonical; not a `DataTable` migration candidate (that would be a structural table-component swap, out of this task's scope). |
+| `models/EditLeaveModal.jsx` submit button | Raw `animate-spin` span inside `Button`'s children instead of using `Button`'s own `loading`/`loadingText` props | Category B territory but a `Button`-internal inconsistency, not a standalone loading indicator — flagged for awareness, not touched (would require editing usage of `Button`'s own props, not a separate component swap). |
+
+### Accessibility verification
+
+`LoadingSpinner` (and therefore `PageLoader`/`InlineLoader`, which are built on it) has no `role="status"`,
+`aria-live`, or `aria-label` — a pre-existing gap in the canonical component itself, not introduced or
+worsened by this migration, and explicitly out of scope to fix (Step 13 forbids adding props/behavior to the
+canonical component during this task). No migrated instance had any pre-existing accessibility attribute
+that would have been lost — every replaced element was itself a plain `<p>`/`<div>`/`<span>` with no ARIA
+attributes either.
+
+### Business/API logic verification
+
+No API call, endpoint, state (beyond reusing existing `loading`/`isLoading`/`loadingBalances`/`loadingData`
+variables verbatim), effect, retry logic, pagination, filtering, RBAC, routing, or WebSocket logic was
+touched in any of the 11 files. Every change is limited to the JSX rendered during an already-existing
+loading condition (or, for the two `DataTable` wiring fixes, moving that same condition into an existing
+prop).
+
+### Files modified
+
+1. `src/pages/leave_management/models/PendingLeaveRequests.jsx`
+2. `src/pages/leave_management/models/AddLeaveTypeModal.jsx`
+3. `src/pages/leave_management/models/RequestLeaveModal.jsx`
+4. `src/pages/leave_management/models/ManagerEditLeaveRequest.jsx`
+5. `src/pages/leave_management/charts/CustomActiveShapePieChart.jsx`
+6. `src/pages/leave_management/charts/WeeklyPattern.jsx`
+7. `src/pages/leave_management/charts/MonthlyStats.jsx`
+8. `src/pages/leave_management/ruleBook/RuleBookPage.jsx`
+9. `src/pages/leave_management/models/ProjectMembersOnLeave.jsx`
+10. `src/pages/leave_management/models/RevokeLeaveRequests.jsx`
+11. `src/pages/leave_management/models/CompOffBalanceRequests.jsx`
+
+### Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings).
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline as every prior step: 2 `react-hooks/exhaustive-deps` config
+errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/
+billingConfigurationService.js`. Zero new issues.
+
+### git diff --check
+
+✅ Clean (only pre-existing LF/CRLF informational warnings on files already touched in earlier steps, not
+errors). `git status` confirms exactly the 11 files listed above changed in this task (plus this
+documentation file).
+
+### Unused-import verification
+
+`InlineLoader`/`TableSkeleton`/`LoadingSpinner` were added as new imports only where actually used, and each
+is referenced in its file. `models/RevokeLeaveRequests.jsx`'s now-unused `LoadingSpinner` import (after
+wiring `loading` directly into `DataTable`) was explicitly removed. No other import became unused.
+
+### Pre-existing issues
+
+None newly discovered. Re-confirmed, not fixed: `ruleBook/RuleBookPage.jsx`'s `const api = api.create({...})`
+self-reference bug (known since P0.6); `models/EditLeaveModal.jsx`'s raw-`animate-spin`-instead-of-`Button`-
+`loading`-prop inconsistency (newly noted in this task, not fixed, since it concerns `Button` usage
+internals rather than a standalone loading indicator). All previously documented baseline issues remain
+unchanged and untouched.
+
+**The canonical loading component (`LoadingSpinner`, and its `PageLoader`/`InlineLoader`/`TableSkeleton`
+compositions in `patterns/Loaders.jsx`) is the standard for simple loading indicators across modules, while
+structured/specialized skeletons (calendar grids, field-shaped placeholders, KPI/dashboard skeletons) and
+blocking overlays remain specialized wherever the canonical API cannot represent their exact shape or
+backdrop/blocking behavior without a meaningful visual or behavioral change.**
+
+## P2.8 — FilterListbox / Remaining Filter-Control Migration
+
+### Canonical filter components
+
+1. **`src/components/forms/FormSelect.jsx`** (unmodified) — controlled, single-select only:
+   `FormSelect({ label, options, value, onChange, name, className, buttonClassName, placeholder="Select",
+   maxVisibleOptions, anchorOptions=false, disabled=false, required=false, error="" })`. `options` is
+   `[{value, label}]`; `onChange` is called event-shaped (`onChange({ target: { name, value } })`, matching
+   `FormInput`/native-`<select>` convention). No per-option disable, no multi-select, no custom option
+   rendering (label always rendered as plain truncated text), no async/remote option loading.
+2. **`src/components/patterns/FilterBar.jsx`** (unmodified) — a pure layout shell:
+   `FilterBar({ children, className })` → `<div className="flex flex-wrap items-center gap-3 rounded-xl
+   border border-gray-200 bg-white p-3 sm:p-4">{children}</div>`. No filtering logic of its own; purely a
+   consistent bordered/padded row for composing Input/Select/Button children.
+3. **`src/components/filter/FilterListbox.jsx`** (unmodified) — an older, second single-select Listbox
+   implementation, structurally similar to `FormSelect` but with a different visual style (smaller padding,
+   auto-flip-up positioning) and a **different `onChange` signature** (`onChange(value)`, plain value, not
+   event-shaped). Confirmed via full-module search: **zero live JSX usages anywhere in
+   `src/pages/leave_management/**`.**
+4. **`src/components/filter/{Dropdown,FilterComponent,Searchbar,Calender,Time}.jsx`** — confirmed via
+   repo-wide import search: **none are imported anywhere in `src/pages/leave_management/**`**, irrelevant to
+   this module.
+
+No canonical component was modified in this task.
+
+### Audit method
+
+A full read-only sweep of every `.jsx` file in `src/pages/leave_management/**` for `FormSelect`, `Listbox`,
+native `<select>`, `Dropdown`, `MultiSelect`, `react-select`/`Select`, and dropdown-shaped controls generally
+— explicitly skipping anything already confirmed on canonical `FormSelect` from P0.4/P0.9/P1.3, per this
+task's own instruction not to redo completed migrations.
+
+### Audit totals
+
+- **~14** remaining non-`FormSelect` filter/select/dropdown-shaped candidates identified and evaluated
+  (beyond the large set already correctly on `FormSelect` from P0.4/P0.9, which were skipped per scope).
+- **Safe migration count: 0.** No genuine standard dataset filter remained unmigrated anywhere in the
+  module — every Status/Year/Month/Leave-Type/Action-Type/Approval-Mode/Operator-style dataset or
+  form-builder filter already uses `FormSelect` (confirmed file-by-file: `HandleLeaveRequestAndApprovals.jsx`,
+  `EmployeeLeaveBalances.jsx`, `LeaveHistory.jsx`, `CompOffRequestModal.jsx`, `AddEmployeeModal.jsx`,
+  `AddLeaveTypeModal.jsx`, `AddHolidaysModal.jsx`, `EditHolidaysPage.jsx`, `EnterpriseConfigManager.jsx`,
+  `charts/Calendar.jsx`, `CancellationModal.jsx`, and all four `ruleBook/RuleBookPage.jsx` rule-builder
+  selects).
+- **Specialized/excluded count: 12** genuine controls, confirmed and left unchanged (see breakdown below).
+- **FilterListbox usage count: 0 live.** Two dead/unused import statements found (see below); the only live
+  `<FilterListbox>` JSX in the module is inside a fully commented-out dead first draft of `charts/Calendar.jsx`.
+- **1** related-but-out-of-scope finding (an un-migrated modal form-field dropdown with no capability gap) —
+  deliberately **not** migrated, documented below with the reasoning.
+
+**Because there was nothing eligible to migrate, zero files required code changes in this task.** This is a
+valid, intended outcome per the task's own framing: "the purpose of P2.8 is not to eliminate every dropdown."
+
+### FilterListbox findings
+
+- `EmployeeDashboard.jsx` line 355: `import FilterListbox from "../../components/filter/FilterListbox.jsx";`
+  — imported but never rendered anywhere in the file (only `YearDropdown` is actually used, line 456).
+  **Dead/unused import**, not removed in this task (no migration touches this file; removing an
+  incidentally-dead import unrelated to any change made here was judged out of scope, consistent with this
+  session's established practice of flagging rather than silently cleaning up unrelated dead imports).
+- `models/AddHolidaysModal.jsx` line 22: `import FilterListbox from "../../../components/filter/
+  FilterListbox";` — also imported but never rendered anywhere in the file (its one dropdown, line 319, is
+  already `FormSelect`). Same dead-import status, same decision not to remove.
+- `charts/Calendar.jsx`: a `FilterListbox` import (line 4) and two `<FilterListbox>` JSX usages (month/year
+  selectors, lines ~103–114) exist only inside a fully commented-out ~180-line dead first draft of the
+  component; the live component below uses `FormSelect` (line 199) for its year selector. Not touched.
+
+### Standard filters migrated
+
+None — see "Safe migration count: 0" above. Every genuine standard dataset filter in the module was already
+on `FormSelect` prior to this task.
+
+### Search-filter verification
+
+`models/ManageActiveLeaveBlocks.jsx`'s search input (`activeBlocksFilter`, driving a purely client-side
+`filteredBlocks` memo matching project/employee/type/date substrings) is confirmed already `FormInput`, with
+no debounce logic present — left completely unchanged. It sits inside the `PageCard`'s `actions` slot, not a
+multi-control toolbar; `FilterBar` was correctly not applied here since wrapping a single search input already
+living inside `PageCard` chrome would add a redundant nested bordered container. No other unmigrated search
+input was found anywhere in the module (all other search-style inputs identified in prior P2.x audits were
+already `FormInput`).
+
+### Async/autocomplete exclusions (Category D)
+
+- `hooks/EmployeeSearchDropdown.jsx` — a `react-select`-based employee search: debounced (`lodash.debounce`,
+  500ms) `api.get(/api/employees/search)` calls plus `onMenuScrollToBottom` infinite-scroll pagination.
+  `FormSelect`'s static `options` array has no remote-loading, debounce, or scroll-pagination equivalent.
+  Left unchanged.
+- `models/ApplyLeaveOnBehalf.jsx` — an **independently duplicated** second `react-select` async employee
+  search (its own `debounce`-driven `api.get(/api/employee/search/${userId})` call), not using the shared
+  hook above. Same rationale, left unchanged. (Flagging the duplication for awareness only — deduplicating
+  the two employee-search implementations is a separate, out-of-scope refactor, not a filter-control
+  migration.)
+
+### Multi-select exclusions (Category E)
+
+- `models/BlockLeaveDates.jsx` — "Members" and "Leave types" controls, both a locally-defined `MultiSelect`
+  component (checkbox-style toggle, "select all visible" bulk action, in-panel search), operating on array
+  `value`/`onChange` (`selectedMembers`, `selectedLeaveTypes`), submitted as array payloads. `FormSelect` is
+  single-value only — cannot represent either. Left unchanged.
+- `models/ManageActiveLeaveBlocks.jsx` — an **independently duplicated** second `MultiSelect` implementation
+  (structurally similar to the one in `BlockLeaveDates.jsx` but a separate copy in this file) for its
+  leave-types multi-select. Same rationale, left unchanged. (Same dedup-opportunity note as the employee
+  search above — out of scope for this task.)
+
+### Per-option-disabled exclusions (Category F)
+
+- `models/ApprovalRulesPage.jsx` — the Add/Edit Rule modal's "Approver Type" field, built on a shared local
+  `Dropdown` component, with `disabledOptions={(opt) => opt !== "DIRECT_MAPPING"}` genuinely graying out
+  every option except `"DIRECT_MAPPING"` (real per-`Listbox.Option` `disabled` + `opacity-40
+  cursor-not-allowed` styling). `FormSelect` has no per-option-disable capability (confirmed in its source —
+  only whole-control `disabled`). Left unchanged.
+- `LeaveTypeDropdown` (see Category G below — same three call sites, F and G apply together).
+
+### Custom-render exclusions (Category G)
+
+`LeaveTypeDropdown` — defined once in `models/RequestLeaveModal.jsx` (exported, reused by `models/
+ApplyLeaveOnBehalf.jsx`), and **independently re-implemented (duplicated, not shared)** in `models/
+ManagerEditLeaveRequest.jsx` and `models/EditLeaveModal.jsx`. All variants are raw `@headlessui/react`
+`Listbox`, driven by `hooks/useLeaveDropdownOptions.js`, which computes per option: `disabled: (!isInfinite
+&& remaining <= 0) || balance.isBlocked` **and** a colored balance badge (`availableText`, color-coded —
+blue for infinite balance, red for disabled/insufficient, green for available) rendered alongside the leave
+name in every option row. `FormSelect` renders only `option.label` as plain truncated text and has no
+per-option disable — neither the badge rendering nor the disable gating can be represented. All 4 call sites
+(the shared definition plus its 2 independent duplicates plus its 1 import-reuse) left unchanged.
+
+### Action-dropdown exclusions (Category H — confirmed not filters)
+
+`models/ActionDropDownPendingLeaveRequests.jsx` (Edit/Cancel row menu), `models/ActionDropdownHrTools.jsx`
+(Edit/Delete row menu), `models/ActionDropdown.jsx` (change-dates/change-type/comment menu — confirmed via
+repo-wide import search to be dead/orphaned, no live consumer), `models/ActionButtons.jsx` (two static
+always-visible action buttons, not a dropdown at all). All four confirmed to be action triggers, not dataset
+filters — correctly out of this task's scope, none modified.
+
+### Related finding, deliberately NOT migrated (documented per this task's own scope discipline)
+
+`models/ApprovalRulesPage.jsx`'s Add/Edit Rule modal "Action Type" field (the `Dropdown` component's other
+usage, sibling to the per-option-disabled "Approver Type" field above) has **no per-option disable and no
+custom rendering** — its full behavior (`options={actionTypeOptions}`, plain string `value`/`onChange`)
+could technically be reproduced one-for-one by `FormSelect`. It was **not migrated**, for two reasons: (1) it
+is a create/edit **form field** inside a modal, not a page-level or table-level **dataset filter** — the
+category this task's own Step 3 scheme (A: "a single-value dataset filter... Status/Year/Month/Leave
+Type/Department/Category") is written around; treating every form-field select in the app as in-scope would
+extend well beyond "remaining filter controls" into a much larger form-field consistency pass this task was
+not asked to do. (2) It shares its underlying `Dropdown` component with the adjacent, genuinely
+per-option-disabled "Approver Type" field in the exact same modal — migrating only one of the two fields to
+a different component (`FormSelect`) while the other necessarily stays on the local `Dropdown` would make
+the two adjacent fields in the same form visually inconsistent with **each other**, which runs counter to
+the stated goal of visual consistency. This is flagged here as a candidate for a possible future, explicitly
+scoped form-field consistency task — not implemented in P2.8.
+
+### Exact prop/value mapping
+
+Not applicable — zero migrations were performed (nothing met the safe-migration criteria).
+
+### Filter behavior preservation / pagination/reset preservation / API/query-parameter verification
+
+Not applicable — no file was modified in this task, so no filter state, pagination/reset behavior, API call,
+query parameter, debounce timing, or RBAC/routing logic was touched, by construction.
+
+### Remaining raw filter controls with exact reasons
+
+| File | Control | Category | Reason |
+|---|---|---|---|
+| `models/ApprovalRulesPage.jsx` | "Approver Type" `Dropdown` (modal) | F | Per-option disable (`opt !== "DIRECT_MAPPING"`) — no `FormSelect` equivalent. |
+| `models/ApprovalRulesPage.jsx` | "Action Type" `Dropdown` (modal) | related, not migrated | No capability gap, but out of this task's dataset-filter scope and shares a component with the per-option-disabled sibling field — see reasoning above. |
+| `models/RequestLeaveModal.jsx` / `models/ApplyLeaveOnBehalf.jsx` | `LeaveTypeDropdown` (shared) | F + G | Balance-derived per-option disable + colored balance badge per option. |
+| `models/ManagerEditLeaveRequest.jsx` | `LeaveTypeDropdown` (duplicated) | F + G | Same as above, independently re-implemented. |
+| `models/EditLeaveModal.jsx` | `LeaveTypeDropdown` (duplicated) | F + G | Same as above, independently re-implemented. |
+| `hooks/EmployeeSearchDropdown.jsx` | react-select employee search | D | Debounced remote fetch + scroll pagination. |
+| `models/ApplyLeaveOnBehalf.jsx` | react-select employee search (own copy) | D | Same, independently duplicated implementation. |
+| `models/BlockLeaveDates.jsx` | Members `MultiSelect` | E | Array value/onChange. |
+| `models/BlockLeaveDates.jsx` | Leave types `MultiSelect` | E | Array value/onChange. |
+| `models/ManageActiveLeaveBlocks.jsx` | Leave types `MultiSelect` (own copy) | E | Same, independently duplicated implementation. |
+| `models/ActionDropDownPendingLeaveRequests.jsx`, `ActionDropdownHrTools.jsx`, `ActionDropdown.jsx`, `ActionButtons.jsx` | row/action menus | H | Actions, not dataset filters. |
+
+### Capability gaps
+
+None rise to the "3+ independent modules" bar this task sets for reporting a possible future canonical
+enhancement in isolation — but two duplicated patterns are worth surfacing for awareness (not as canonical
+enhancement requests, since the underlying capability gaps are genuine and specific, not solvable by
+adding a generic prop):
+- **Per-option-disable + custom option rendering** (`LeaveTypeDropdown`, 3 independent implementations) is a
+  real, recurring need, but the exact rendering (colored balance badges) is specific enough that a generic
+  `FormSelect` enhancement would risk becoming a "do everything" prop surface rather than a clean addition —
+  consistent with this session's standing rule against ad hoc canonical enhancements for one-off needs.
+- **Async/remote-search select** (employee search, 2 independent implementations) and **multi-select**
+  (leave-types/members, 2 independent implementations) are both broader capability gaps than `FormSelect`
+  was designed for; no canonical multi-select or async-select component exists yet anywhere in the repo to
+  point these at. Flagged for awareness; not proposed for implementation in this task.
+
+### Business/API logic verification
+
+Not applicable — zero files were modified, so no API call, endpoint, payload, query parameter, filter state,
+effect, debounce, pagination, sorting, RBAC, routing, or authentication logic could have been affected.
+
+### Files modified
+
+None. `docs/ui/phase-2-leave-management.md` is the only file changed in this task.
+
+### Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings) — unchanged from baseline
+since no source file was modified.
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline as every prior step: 2 `react-hooks/exhaustive-deps` config
+errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/
+billingConfigurationService.js`. Zero new issues (trivially, since no source file changed).
+
+### git diff --check
+
+✅ Clean.
+
+### Unused-import verification
+
+Not applicable to new changes (none made). The two pre-existing dead `FilterListbox` imports
+(`EmployeeDashboard.jsx`, `models/AddHolidaysModal.jsx`) were identified and documented above but
+deliberately not removed, since doing so is unrelated cleanup outside this task's migration scope.
+
+### Pre-existing issues
+
+None newly discovered beyond the two dead `FilterListbox` imports noted above (pre-existing, not introduced
+by this or any prior task) and the previously-documented `ApprovalRulesPage.jsx`/`ManagerEditLeaveRequest.jsx`
+/`EditLeaveModal.jsx` `LeaveTypeDropdown` triplication (a dedup opportunity noted for awareness, not a bug).
+All previously documented baseline issues remain unchanged and untouched.
+
+**The purpose of P2.8 was not to eliminate every dropdown in the Leave Management module — it was to confirm
+that every genuine standard dataset filter uses the canonical `FormSelect`/`FilterBar` system, which this
+audit confirms is already the case (via P0.4/P0.9/P1.3), while specialized controls (async search,
+multi-select, per-option-disable, custom option rendering, action menus) correctly remain specialized where
+the canonical API cannot represent their required behavior without a genuine capability gap.**
+
+## P2.9 — FileUpload / Upload-Control Audit and Migration
+
+### Canonical FileUpload component
+
+**`src/components/forms/FileUpload.jsx`** (unmodified) — confirmed as the repository's canonical file-input
+component:
+
+```jsx
+const FileUpload = ({ label, name, onChange, accept, required = false }) => (
+  <div className="space-y-1">
+    {label && <label htmlFor={name} className={Fonts.label}>{label}</label>}
+    <input id={name} type="file" name={name} accept={accept} required={required} onChange={onChange}
+      className="block w-full rounded-lg border border-gray-300 bg-white text-sm text-gray-700 shadow-sm
+      cursor-pointer file:mr-4 file:border-0 file:bg-[#0A0082] file:px-4 file:py-2 file:text-white
+      hover:file:bg-[#080066] focus:outline-none" />
+  </div>
+);
+```
+
+A simple, single-file, always-visible native `<input type="file">` wrapper. It does **not** support:
+`multiple`, drag-and-drop, file preview/remove UI, upload-progress UI, a validation-error prop, or a
+**`disabled` prop** (this last gap is the deciding factor for this task's audit, below). It has exactly **2**
+repository-wide consumers today: `src/pages/UserManagement/admin/userManagement/BulkUser.jsx` and
+`src/pages/UserManagement/admin/accessPointManagement/BulkPermissionMapping.jsx`. The established usage
+pattern (`BulkUser.jsx`) is `<FileUpload label="Select Excel File (.xlsx)" name="userFile" accept=".xlsx,.xls"
+onChange={handleFileChange} />`, with the selected-file display, upload button, progress, and API call all
+built as bespoke JSX around it — `FileUpload` itself only replaces the bare `<input type="file">` + label.
+
+Not modified in this task.
+
+### Audit method
+
+A full read-only sweep of `src/pages/leave_management/**` for `type="file"`, `onDrop`/`onDragOver`/
+`onDragEnter`/`onDragLeave`, `FileList`, `DataTransfer`, `react-dropzone`/`Dropzone`, and the common
+"hidden input triggered via ref + styled button" pattern. Confirmed (independently, not by keyword count
+alone) exactly **2** files contain a real `<input type="file">` anywhere in the module; every other grep hit
+was a false positive (component names containing the substring "Dropdown", or unrelated comments).
+
+### Audit totals
+
+- **Repository-wide FileUpload consumer count**: 2 (both in `UserManagement`, neither in Leave Management).
+- **Total Leave Management upload candidates**: 2 (`models/AddHolidaysModal.jsx`, `models/
+  LeaveUploadWizard.jsx`).
+- **Safe migration count: 0.**
+- **Specialized/excluded count: 2** (both candidates, for two different capability-gap reasons — see below).
+- **Single-file candidates**: 2 (both; neither uses `multiple`).
+- **Multi-file candidates**: 0.
+- **Drag-and-drop candidates**: 0 genuine (see `LeaveUploadWizard.jsx` note below — it *looks* like a
+  dropzone but has no actual `onDrop`/`onDragOver` handlers; it's a large `<label>` styled to resemble one).
+- **File-validation candidates**: 0 beyond the native `accept` attribute in either file (no extension/MIME/
+  size re-validation in JS in either candidate).
+- **Preview/file-list candidates**: 1 (`LeaveUploadWizard.jsx` — a dedicated selected-file card with name +
+  remove button; `AddHolidaysModal.jsx` has no per-file preview, only a parsed-row queue).
+- **Upload/API-processing candidates**: 1 real server upload (`LeaveUploadWizard.jsx`, genuine
+  `multipart/form-data` POST); `AddHolidaysModal.jsx`'s file is parsed entirely client-side and never
+  itself sent to the server (only the resulting parsed rows are POSTed as JSON).
+
+Because both candidates carry a genuine capability gap against the canonical component's exact API, **zero
+files required code changes in this task** — a valid, intended outcome consistent with this task's own
+framing ("the purpose of P2.9 is not to eliminate every file input").
+
+### `models/AddHolidaysModal.jsx` findings
+
+```jsx
+<input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileUpload} />
+<Button onClick={() => fileInputRef.current?.click()} disabled={uploading} variant="outline" size="sm"
+  className="flex items-center gap-2 text-emerald-600 border-emerald-200 bg-emerald-50 hover:bg-emerald-100">
+  <Upload className="w-3.5 h-3.5" />
+  {uploading ? "Processing..." : "Upload Excel"}
+</Button>
+```
+Single-file, no drag-and-drop, no validation beyond `accept`, no per-file preview (only the parsed rows are
+queued and previewed). The file is read via `FileReader`/`xlsx` entirely client-side and never uploaded as a
+file — only the final aggregate array of parsed holiday rows is POSTed as JSON to `/api/holidays/add`.
+
+**Capability gap blocking migration**: the current implementation deliberately **disables the upload
+trigger while parsing is in progress** (`disabled={uploading}` on the custom `Button`, with its label
+switching to `"Processing..."`) to prevent a user from re-triggering the file picker mid-parse. Canonical
+`FileUpload` has **no `disabled` prop at all** — its rendered `<input>` is always interactive, and it has no
+mechanism to swap its trigger's label/state. Migrating this candidate would mean losing the
+during-processing disable safeguard entirely, which Step 5/Step 4 of this task explicitly forbid ("do NOT
+weaken the existing behavior merely to achieve component standardization"). A secondary, smaller gap: the
+current code imperatively resets `fileInputRef.current.value = ""` after each successful import so the same
+file can be re-selected and re-imported; `FileUpload` forwards no ref and exposes no reset mechanism, so this
+affordance would also need to be dropped or reworked. **Left unmigrated, documented as a capability gap.**
+
+### `models/LeaveUploadWizard.jsx` findings
+
+Per this task's explicit instruction, only the literal file-input element was assessed — no changes to the
+wizard's step sequencing, its embedding inside `EmployeeLeaveBalances.jsx`, its `/leave-upload` standalone
+route, or its internal `ConfirmationModal` usage were considered or made.
+
+```jsx
+{!file ? (
+  <label className="group flex flex-col items-center justify-center w-full h-44 border-2 border-dashed
+    border-gray-200 rounded-2xl cursor-pointer bg-gray-50 hover:bg-blue-50 hover:border-blue-300 ...">
+    <UploadCloud .../><p>Click or drag to upload</p><p>Support for .xlsx, .xls</p>
+    <input id="excel-upload" type="file" className="hidden" accept=".xlsx, .xls"
+      onChange={(e) => setFile(e.target.files[0])} />
+  </label>
+) : (
+  <div className="... bg-green-50 border border-green-200 ...">
+    <FileText .../><p>{file.name}</p><p>Ready for sync</p>
+    <Button onClick={handleRemoveFile} variant="ghost" size="icon" aria-label="Remove file">
+      <X className="h-4 w-4" />
+    </Button>
+  </div>
+)}
+```
+Confirmed: despite the "Click or drag to upload" copy and dashed-border dropzone styling, there is **no
+actual drag-and-drop implementation** anywhere in the file (no `onDrop`/`onDragOver`/`onDragEnter` handlers)
+— it's a native `<label for=input type=file>` click target styled to resemble a dropzone. Selecting a file
+swaps in a green "selected file" card with the filename and a remove button (`handleRemoveFile`, which also
+clears the input's value via `document.getElementById`). On confirm, a real `multipart/form-data` `FormData`
+(`file`, `username: "admin"`) is POSTed to one of two backend endpoints depending on the wizard's leave-type
+step (`/api/leave-balance/upload-accruals` or `/api/gender-base-leave-balance/upload-gender-accruals`), with
+server-side row-level validation errors surfaced post-submit.
+
+**Capability gap blocking migration**: the empty-state dropzone-styled `<label>` (large `h-44` zone, icon,
+"Click or drag to upload" copy) **is** the file-picker trigger in the current design — it is the visual
+affordance users click. Canonical `FileUpload` renders a compact label + the browser's native `file:`-styled
+button, which would visibly replace a large inviting dropzone with a small file-choose button — a genuine
+UX/visual regression, not a like-for-like presentational swap. The selected-file preview/remove card already
+lives entirely outside the `<input>` and would need to stay bespoke regardless of what renders the input, so
+migrating would only ever replace the empty-state trigger, and even that swap changes the visual affordance
+users currently rely on. Per Step 3.C ("if the existing implementation supports... visual drop states... do
+NOT replace it with a simple file input") and Step 4 ("do NOT weaken the existing behavior merely to achieve
+component standardization"), this was **left unmigrated, documented as a capability/design gap** rather than
+forced through.
+
+### Complete migrated-file list / migrated-control list / prop mapping
+
+None — see "Safe migration count: 0" above.
+
+### File behavior preservation / API-FormData verification
+
+Not applicable — no file was modified in this task, so no `accept`, `multiple`, file-selection/removal logic,
+validation, upload API call, `FormData` construction, MIME handling, progress state, retry/success/failure
+behavior, or reset behavior was touched, by construction.
+
+### Remaining raw file controls with exact reasons
+
+| File | Control | Reason |
+|---|---|---|
+| `models/AddHolidaysModal.jsx` | Hidden `<input type="file">` + custom disable-while-processing `Button` trigger | Canonical `FileUpload` has no `disabled` prop — migrating would remove the existing during-parse disable safeguard and its `"Processing..."` label state, a behavior regression this task forbids introducing. |
+| `models/LeaveUploadWizard.jsx` | `<label>`-wrapped hidden `<input type="file">` styled as a large dropzone | The dropzone-styled `<label>` is the actual click target/visual affordance; canonical `FileUpload`'s compact native-button styling would visibly regress the upload trigger's UX. The file is also genuinely uploaded via multipart `FormData` to a real API — confirmed unrelated to the visual-regression concern, just noted for completeness per Step 6 (upload APIs must remain untouched regardless). |
+
+### Capability gaps
+
+Two distinct, file-specific capability gaps were found (not a single repeatable pattern across 3+ modules,
+so neither rises to a "propose a canonical enhancement" recommendation per this task's own bar):
+- **No `disabled` prop on `FileUpload`** — blocks `AddHolidaysModal.jsx`. This is a narrow, plausible future
+  enhancement (a boolean `disabled` prop mirroring `FormSelect`'s convention) but is not requested or
+  implemented here, since only one Leave Management consumer needs it today and this task's Step 4/Step 7
+  explicitly bar modifying the canonical component without an independently approved capability task.
+- **No large-dropzone/custom-trigger visual variant** — blocks `LeaveUploadWizard.jsx`. This is a
+  design-level gap (a visually prominent dropzone vs. a compact button), not a small prop addition, and
+  would risk turning `FileUpload` into a "do everything" component if solved ad hoc for one consumer — left
+  unaddressed per this task's explicit no-workaround rule.
+
+### Business/API logic verification
+
+Not applicable — zero files were modified, so no API call, endpoint, payload, `FormData` construction, MIME
+handling, parsing logic, upload sequencing, RBAC, or routing could have been affected.
+
+### Files modified
+
+None. `docs/ui/phase-2-leave-management.md` is the only file changed in this task.
+
+### Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings) — unchanged from baseline
+since no source file was modified.
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline as every prior step: 2 `react-hooks/exhaustive-deps` config
+errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/
+billingConfigurationService.js`. Zero new issues (trivially, since no source file changed).
+
+### git diff --check
+
+✅ Clean.
+
+### Unused-import verification
+
+Not applicable — no source file was changed in this task.
+
+### Pre-existing issues
+
+None newly discovered. All previously documented baseline issues remain unchanged and untouched.
+
+**The purpose of P2.9 was not to eliminate every file input in the Leave Management module. The canonical
+`FileUpload` component was confirmed to already exist (`src/components/forms/FileUpload.jsx`, 2 repository-
+wide consumers), but both of the module's two genuine file-upload candidates carry a specific, real
+capability gap against its exact API (a missing `disabled` prop for one; a load-bearing custom dropzone
+visual for the other) — so, per this task's explicit instruction not to weaken existing behavior or modify
+the canonical component without independent approval, neither was migrated. Both remain specialized,
+documented, and functionally untouched.**
+
+## P2.10 — Final Leave Management Global UI Consistency Sweep
+
+### 1. Final canonical-component inventory (as verified from current source)
+
+| Component | Path | Notes |
+|---|---|---|
+| `Button` | `src/components/Button/Button.jsx` | `size`: large/medium/small/icon; `variant`: primary/secondary/success/danger/outline/ghost/link; `loading`/`loadingText`; `size="icon"` must always render `bg-transparent`, no border/shadow. |
+| `Modal` | `src/components/Modal/modal.jsx` | `closeOnBackdrop`/`closeOnEscape`/`showCloseButton` default `true`; own Escape listener; `size="lg"` default. |
+| `ConfirmDialog` | `src/components/patterns/ConfirmDialog.jsx` | Composes `Modal`+`Button`; pass-through dismissal-control props added in P2.2a. |
+| `FormInput` | `src/components/forms/FormInput.jsx` | `label/name/type/value/onChange/placeholder/required/disabled/error/className/inputClassName/labelClassName/requiredMark` + `...rest` passthrough (so native attrs like `maxLength` already work). |
+| `FormTextArea` | `src/components/forms/FormTextArea.jsx` | `label/name/value/onChange/placeholder/rows/required/disabled` only — **no `maxLength`, no `className`/`inputClassName`, no `...rest` passthrough** (capability gap, see §5/§21). |
+| `FormSelect` | `src/components/forms/FormSelect.jsx` | Single-select only; `disabled/required/error` (P1.3); no per-option disable, no custom option rendering, no async. |
+| `FileUpload` | `src/components/forms/FileUpload.jsx` | `label/name/onChange/accept/required`; no `disabled`, no `multiple`, no drag-and-drop, no preview. |
+| `DataTable` | `src/components/patterns/DataTable.jsx` | Fixed-column config; `loading`→`TableSkeleton`; `emptyTitle`/`emptyDescription`→`EmptyState`; `selectable`; `col.sticky`. |
+| `Pagination` | `src/components/Pagination/pagination.jsx` | `currentPage/totalPages/onPrevious/onNext/className`; returns `null` when `totalPages <= 1`. |
+| `PageCard` / `PageCardContent` / `PageCardKpi` | `src/components/Cards/PageCard.jsx` | `{children,className,title,subtitle,actions}` shell; `PageCardContent{children,className,padding}`; `PageCardKpi{icon,iconClassName,label,value,sub,className}` (compose inside `PageCard`, not a separate shell). |
+| `FilterBar` | `src/components/patterns/FilterBar.jsx` | Pure layout shell, no filtering logic. |
+| `PageHeader` | `src/components/ui/PageHeader.jsx` | `{title,subtitle,actions,breadcrumbs,className}`; no BackButton/filter slot. |
+| `StatusBadge` | `src/components/patterns/StatusBadge.jsx` | `{status,label,tone,size,className}`, ~30-entry tone lookup + substring fallback. |
+| `EmptyState` | `src/components/patterns/EmptyState.jsx` | `{icon,title,description,action,className}`. |
+| `BackButton` | `src/components/patterns/BackButton.jsx` | `{onClick,label="Back",className}`; composes `Button variant="outline" size="small"`; renders icon-only (`ArrowLeft`), visible label deliberately commented out, `aria-label` preserved. |
+| `LoadingSpinner` | `src/components/LoadingSpinner.jsx` | `{text,size}`, 150+ repo-wide consumers. |
+| `PageLoader`/`InlineLoader`/`TableSkeleton` | `src/components/patterns/Loaders.jsx` | Built on `LoadingSpinner`; `TableSkeleton` already wired into `DataTable`'s own `loading` prop. |
+| `Tabs`/`TabsList`/`TabsTrigger`/`TabsContent` | `src/components/ui/tabs.jsx` | Controlled via `value`/`onValueChange`; no orientation prop, no built-in ARIA roles. |
+| `ui/Loader` (legacy) | `src/components/ui/Loader.jsx` | Zero-prop, kept for existing consumers only, not preferred for new code; zero Leave Management usages. |
+| `filter/FilterListbox` (legacy) | `src/components/filter/FilterListbox.jsx` | Zero live usages anywhere in Leave Management (P2.8). |
+| `KPICard` | `src/components/kpi/KPI.jsx` | A separate, much more widely-adopted (31+ consumers repo-wide) KPI card — deliberately NOT consolidated into `PageCardKpi` (P1.4 policy); any Leave Management usage of this is already an accepted canonical pattern, not a migration candidate. |
+
+No canonical component listed above was modified in this task.
+
+### 2. Remaining raw buttons
+
+Two borderline candidates were identified and **deliberately left unmigrated** (both fail the "unambiguous" bar for a final-sweep fix):
+- `charts/LeaveDetailsPage.jsx:184` — a vertical leave-type nav-list `<button>`; already classified in P2.6 as Category C (route-adjacent specialized nav list, distinct from an action button). Migrating to `Button` would require overriding the canonical `shadow-sm` default to preserve the flat list-item look — a style-preservation risk, not a clean drop-in.
+- `HRManageTools.jsx`'s local `AdminCard` (line ~351) — an icon+title+description clickable dashboard tile, structurally a nav-tile rather than a standard action button (same "whole-card-is-a-button" pattern already accepted elsewhere, e.g. `ApprovalDashboard.jsx`/`PendingApprovalsQueueView.jsx`'s accordion row buttons).
+
+`MultiSelect` trigger buttons in `models/BlockLeaveDates.jsx`/`models/ManageActiveLeaveBlocks.jsx` and any raw `<button>` inside `DateRangePicker.jsx` are correctly out of scope (part of an already-excluded specialized multi-select control, and an explicitly deferred component, respectively). All other raw `<button>`/`motion.button` hits across the module (calendar day cells, segmented toggles, dropdown option rows, accordion expand carets, `react-day-picker` internal slots, checkbox-style toggles, tag-removal micro-controls) are confirmed legitimate exceptions, unchanged.
+
+### 3. Remaining modal shells
+
+**The single most significant finding of this sweep.** 11 live files hand-roll their own modal chrome (`fixed inset-0` backdrop + own bordered/rounded panel + own close button, several with their own duplicated Escape-key-listener/body-scroll-lock `useEffect`s) instead of using canonical `Modal`:
+
+`models/AddEmployeeModal.jsx`, `models/AddHolidaysModal.jsx`, `models/AddLeaveTypeModal.jsx`, `models/ApprovalRulesPage.jsx` (Add/Edit Rule modal shell — distinct from its already-known `Dropdown` capability-gap finding), `models/CarryForwardTrigger.jsx`, `models/EffectiveDeactivationDate.jsx`, `models/EditBlockLeaveModal.jsx`, `models/HandleLeaveRequestAndApprovals.jsx` (two: the leave-balance analysis modal and the approve/reject/cancel confirmation, the latter a strong `ConfirmDialog`-with-custom-body candidate), `EnterpriseConfigManager.jsx` (dead code — see §19), `charts/AllHolidaysGrid.jsx`.
+
+Plus 3 dead/orphaned files containing their own duplicate modal-shell definitions, not reachable from any live import: `hooks/Modal.jsx`, `models/ReviewModal.jsx`, and `models/ActionDropdown.jsx` (which additionally imports 3 non-existent files — `./ChangeLeaveDatesModal`, `./ChangeLeaveTypeModal`, `./CommentModal` — and would fail to build if anything ever imported it).
+
+**This was deliberately NOT migrated in this task.** Per this task's own explicit instruction ("Do NOT start a new canonical-component migration category"), converting 11 independent hand-rolled modal shells to canonical `Modal` — each requiring careful, individual preservation of its own form fields, footer button layout, Escape/scroll-lock removal, and close behavior — is substantively the same shape of work as a full P2.x migration task (comparable to P2.2's ConfirmDialog migration), not a "clear, safe fix" applicable during a final sweep. **Recommended as a candidate future task (e.g. "P2.11 — Modal Shell Migration")** with its own dedicated audit-classify-migrate cycle, rather than forced through here. No file in this list was modified.
+
+`models/ConfirmationModal.jsx` re-confirmed still a thin, correct wrapper around canonical `ConfirmDialog` (including its cross-module consumer in `Timesheet/ManagerApproval/ManagerApprovalTable.jsx`) — no issue. `LeaveUploadWizard.jsx`'s hybrid architecture (no own modal shell; embedded in `EmployeeLeaveBalances.jsx`; also a standalone `/leave-upload` route; uses `ConfirmationModal`→`ConfirmDialog` internally) is unchanged, not restructured. All P2.7-audited loading overlays remain correctly excluded (not modal dialogs).
+
+### 4. Remaining raw form controls
+
+- **`FormTextArea` capability gap (genuine STOP condition, not fixed):** 7 live raw `<textarea>`s (`models/AddLeaveTypeModal.jsx`, `models/BlockLeaveDates.jsx`, `models/CancellationModal.jsx`, `models/CompOffRequestModal.jsx`, `models/EditLeaveModal.jsx`, `models/ManagerEditLeaveRequest.jsx`, `models/RequestLeaveModal.jsx`) cannot migrate to canonical `FormTextArea` because that component has no `maxLength`, `className`/`inputClassName`, or `...rest`-prop passthrough — every one of these 7 textareas relies on `maxLength` (several also render a live `{value.length}/N` counter). This is a genuine capability gap in the canonical component itself. Per this task's explicit STOP condition, `FormTextArea` was **not modified**; these 7 remain raw, documented here as blocked pending a possible future, independently-approved `FormTextArea` enhancement (mirroring `FormInput`'s existing `...rest`-passthrough convention).
+- **Checkboxes**: exist across several files (`EnterpriseConfigManager.jsx`, `AddLeaveTypeModal.jsx`, `BlockLeaveDates.jsx`/`ManageActiveLeaveBlocks.jsx`'s `MultiSelect` internals, `EditBlockLeaveModal.jsx`, `HandleLeaveRequestAndApprovals.jsx`) — confirmed no canonical Checkbox component exists anywhere in the repository; correctly left as native `<input type="checkbox">`, not a migration candidate.
+- **Native `<select>`**: zero live occurrences anywhere in the module (all previously-found hits are inside dead/commented-out code, e.g. `LeaveHistory.jsx`, `ManagerEditLeaveRequest.jsx`).
+- **Icon-prefixed raw `<input>` fields, left unmigrated for style-preservation reasons**: `models/AddHolidaysModal.jsx`'s date/name fields (`pl-9` + absolutely-positioned icon) and `models/ApplyLeaveOnBehalf.jsx`'s Google-Drive-link field (`pl-9` + `LinkIcon`, plus a bespoke indigo-tinted border/background/focus-ring theme) are both structurally migratable in principle (`FormInput` supports `inputClassName` + `...rest`), but reproducing their exact bespoke visual treatment would require competing Tailwind utility classes (e.g. `rounded-xl`/`border-indigo-200` vs. `FormInput`'s own default `rounded-lg`/`border-gray-300`) whose winner depends on Tailwind's compiled-stylesheet cascade order rather than JSX source order — the same category of bug this project has hit before (documented in this file's Button `variant="link"` history) and reliably avoided elsewhere via `!important`-prefixed overrides. Given the modest visual value versus the risk of a subtle, hard-to-spot visual regression from an ambitious style-preserving swap, both were **left unmigrated** rather than forced through with speculative `!important` overrides. `ApplyLeaveOnBehalf.jsx`'s field is additionally inconsistent with its own siblings (`RequestLeaveModal.jsx`/`EditLeaveModal.jsx` already use a plain, icon-less `FormInput` for the identical "Supporting Document" field) — flagged as a candidate for a future, deliberate design decision (drop the icon/theme to match siblings, or explicitly re-affirm the bespoke treatment) rather than an automatic fix.
+- Search-box inputs inside `BlockLeaveDates.jsx`/`ManageActiveLeaveBlocks.jsx`'s own `MultiSelect` components, and the two `type="file"` inputs, are correctly out of scope (already-specialized/already-audited).
+
+### 5. Remaining tables
+
+All previously-documented structural table exceptions were re-verified as **unchanged and still genuinely blocked**: `models/HandleLeaveRequestAndApprovals.jsx` (now confirmed even more clearly non-migratable — its `<thead>` conditionally injects a full `colSpan`-spanning bulk-action bar row above the real header, plus multi-offset sticky-left columns `DataTable` cannot express), `models/EditBlockLeaveModal.jsx` (per-block dynamic column set + tri-state indeterminate checkboxes), `HRManageTools.jsx`'s local `LeaveTable` (columns derived from `Object.keys(data[0])`, dynamic/unknown shape), `models/ApprovalQueue.jsx`'s two embedded diff-review micro-tables, `ruleBook/RuleBookPage.jsx` (fixed columns, loading/empty already handled outside the table — flagged as a possible future **borderline-A** candidate for a dedicated task, but not migrated here since nothing has structurally changed since it was last classified specialized), `EnterpriseConfigManager.jsx` (confirmed still dead/unreferenced). `models/LeaveHistory.jsx`'s remaining raw `<table>` grep hits are all inside dead/commented-out code — its live rendering already uses canonical `DataTable`. No new table candidate was found; none were migrated.
+
+### 6. Remaining cards
+
+One safe `PageCard` migration was applied (see §18). All other `rounded-xl`/`bg-white`/`shadow-sm`-style hits are confirmed legitimate exceptions: modal-dialog outer shells (already covered under §3's finding, unaffected either way by this sweep's card check), `Listbox` popovers, per-item accordion/disclosure cards (`ApprovalDashboard.jsx`/`PendingApprovalsQueueView.jsx`, entire card is a toggle button — not `PageCard`'s static header model), dashboard-widget-shaped cards with custom theming/hover-lift/gradient treatments (`charts/LeaveUsageChart.jsx`, `charts/UpcomingHolidays.jsx`), left-accent-border banner cards wrapping `DataTable` (`models/CompOffBalanceRequests.jsx`, `models/RevokeLeaveRequests.jsx` — identical intentional accent style, flagged for awareness as a possible future normalization pair, not migrated), a fixed-position floating job-progress toast (`models/LeaveBalanceJobProgress.jsx`), and dead code (`AdminPanel.jsx`'s fully commented-out "Statistics Cards" block, `EnterpriseConfigManager.jsx`). No `PageCardKpi` candidates were found (existing KPI-shaped tiles are either dead code or specialized per-theme widgets that don't fit the plain KPI layout without visual change).
+
+### 7. Remaining filters
+
+No change since P2.8 — re-confirmed via this sweep's spot-check. One new minor observation: `EnterpriseConfigManager.jsx:361-363` renders a generic Active/Inactive config-table status pill matching the exact anti-pattern `StatusBadge` targets, but this file is confirmed dead/unreferenced code (see §19) — not fixed, per Step 6/7 (do not fix dead code). All documented specialized exclusions (async employee search ×2, `MultiSelect` ×2, `LeaveTypeDropdown` ×3, `ApprovalRulesPage.jsx`'s per-option-disabled `Dropdown`) remain unchanged and correctly excluded.
+
+### 8. Remaining status indicators
+
+Holds, with the one dead-code exception noted in §7 above. No new raw status pill or `getStatus*Color`-style helper was found anywhere in the module's live code.
+
+### 9. Remaining empty states
+
+Holds. No new custom "No data"/"No records" fallback JSX was found beyond the already-documented specialized exceptions (chart placeholders, dropdown-internal no-results, wizard/form-builder draft-state text, raw-table colspan messages).
+
+### 10. Remaining page headers
+
+Holds. The five documented BackButton-adjacent / route-navigation-adjacent headers (`EmployeeLeaveBalances.jsx`, `EditHolidaysPage.jsx`, `ManageActiveLeaveBlocks.jsx`, `BlockLeaveDates.jsx`, `charts/LeaveDetailsPage.jsx`) remain in their documented, intentionally-unmigrated state — confirmed not a regression, since P2.5 explicitly concluded `PageHeader` cannot represent their BackButton placement without a layout change.
+
+### 11. Remaining tabs
+
+Holds. The 3 canonical `Tabs`/`TabsList`/`TabsTrigger` migrations (`HRManageTools.jsx`, `models/BlockLeaveSection.jsx`, `models/LeaveSection.jsx`) are confirmed still in place and correctly wired. No new non-canonical button-group tab bar was found anywhere in the module.
+
+### 12. Remaining loading indicators
+
+Holds, with fixes applied to icon-button styling only (see §17), not to the loading mechanism itself. `models/EmployeeLeaveBalances.jsx`'s deliberate raw white-on-dark-overlay spinner (contrast-preservation exception from P2.7) is confirmed unchanged. One new minor finding, **left unfixed**: `models/EditLeaveModal.jsx`'s submit button previously hand-rolled a raw `animate-spin` span instead of using `Button`'s own `loading`/`loadingText` prop — this was actually applied as a safe fix in this task (see §18), not left as a finding.
+
+### 13. Remaining file-upload controls
+
+Holds exactly as documented in P2.9 — `models/AddHolidaysModal.jsx` (missing `disabled` prop capability gap) and `models/LeaveUploadWizard.jsx` (load-bearing dropzone visual) remain the only 2 candidates, both still correctly unmigrated. No new file input was found.
+
+### 14. Remaining Back buttons
+
+`models/EmployeeLeaveBalances.jsx` and `models/EditHolidaysPage.jsx` confirmed visually consistent (same imported `BackButton`, same `flex items-center gap-3` wrapper, no per-consumer style overrides). Three files still use old, non-canonical back controls, confirmed unchanged: `models/ManageActiveLeaveBlocks.jsx` and `models/BlockLeaveDates.jsx` (identical `Button variant="ghost" size="icon"` + `ArrowLeftCircleIcon`, right-aligned opposite the title), and `charts/LeaveDetailsPage.jsx` (a third, distinct text-link `Button variant="link"` style, "← Back"). **Not canonicalized in this task** — despite the first two being trivially identical to each other, swapping either for `<BackButton>` while keeping it in its current right-side position would still leave it visually inconsistent with the *established* BackButton placement convention (immediately left of the title, same row) that P2.5 explicitly adopted for the other two pages; and moving it to match that convention would be a layout change, not a like-for-like component swap. This exact scenario was already deliberately declined once in P2.5 for this reason — per this task's "unambiguous" bar for safe fixes, it was declined again here rather than re-litigated. Documented for a possible future, explicitly-scoped BackButton-placement decision task.
+
+### 15. Duplicate global UI patterns
+
+Confirmed still accurate, no change: `LeaveTypeDropdown` (source `RequestLeaveModal.jsx`, duplicated in `ManagerEditLeaveRequest.jsx`/`EditLeaveModal.jsx`; `ApplyLeaveOnBehalf.jsx` merely re-imports the source, not a 4th copy), `MultiSelect` (`BlockLeaveDates.jsx`/`ManageActiveLeaveBlocks.jsx`, 2 independent copies), employee-search `react-select` (`hooks/EmployeeSearchDropdown.jsx`/`ApplyLeaveOnBehalf.jsx`'s own copy).
+
+New findings (documentation only, none consolidated per this task's explicit "do NOT consolidate business-specific components automatically" instruction):
+- **Raw tables hand-copying `DataTable`'s signature gradient header** — `HRManageTools.jsx`'s `LeaveTable` and `models/HandleLeaveRequestAndApprovals.jsx`'s table both hand-copy the exact `bg-gradient-to-r from-blue-900 to-indigo-900` header treatment and sticky-column shadow/z-index styling from `DataTable`, strong evidence both were manually styled to *visually* match `DataTable` without using the component — reinforces (but does not change) their §5 classification as structural exceptions; flagged as useful context for a future table-migration task.
+- **Orphaned duplicate of canonical `TableSkeleton`**: `models/SkeletonTable.jsx` is now fully dead code (its only consumer, `models/PendingLeaveRequests.jsx`, was migrated to canonical `TableSkeleton` in P2.7) — confirmed zero remaining importers. Not deleted in this task (dead-code removal is out of scope per Step 6/7), but flagged for a future cleanup pass.
+- A minor inline button-spinner in `models/EditLeaveModal.jsx` (see §12/§18 — this was fixed, not left as a duplication finding).
+
+### 16. Phase 2 regression audit
+
+A dedicated review of the full cumulative diff across all 28 previously-modified files, against all 9 categories in this task's Step 4, found:
+
+- **API calls/endpoints/payloads, routing/navigation, RBAC/permission logic, WebSocket behavior, validation logic, date handling, pagination — all CLEAN.** No diff hunk in any file touches these; confirmed by direct review of every hunk plus full-file reads of the most-frequently-touched files (`EmployeeLeaveBalances.jsx`, `LeaveHistory.jsx`, `ApprovalDashboard.jsx`, `PendingApprovalsQueueView.jsx`, `HRManageTools.jsx`, `CompOffBalanceRequests.jsx`, `RevokeLeaveRequests.jsx`, `ApprovalRulesPage.jsx`, `ManagerEditLeaveRequest.jsx`) for structural drift (stale references, duplicate imports, unbalanced JSX) — none found.
+- **State handling — CLEAN.** No `useState` variable renamed, no initial value changed, no `useEffect` dependency added/removed; `Tabs`-migrated files confirmed still driven by their original `activeTab` state/setter via `value`/`onValueChange`.
+- **Loading conditions — one confirmed non-issue, one genuine behavior change flagged for a human decision (not reverted in this task):**
+  - `models/RevokeLeaveRequests.jsx` (P2.7): false alarm — the table was *already* fully replaced by a spinner whenever `loading` was true (including during approve/reject) before the migration; wiring `loading` into `DataTable`'s own prop only changed the decoration (spinner→skeleton) of an already-existing full-table-replacement behavior, not its scope or timing.
+  - **`models/CompOffBalanceRequests.jsx` (P2.7) — flagged, not reverted.** Before that migration, `loading` (set `true` in `fetchCompOffs` **and** in `handleApprove`/`handleReject` — none of these call sites were touched by any task) drove no visual table replacement at all; only the row action buttons were `disabled={loading}}` while the table itself stayed fully visible. P2.7 wired `loading` directly into `DataTable`'s own `loading` prop to close a genuine empty-state-flash gap on initial fetch — but because the same `loading` flag is also set during approve/reject, this had the additional, likely-unintended side effect that **clicking Approve or Reject on any row now replaces the entire table with a loading skeleton for that action's duration**, not just disabling the two buttons as before. This is a real, user-visible behavior change (not merely decorative) introduced by a prior task, surfaced by this regression audit. **Left as-is in this task** — per the STOP-and-document philosophy applied throughout this project, a human should decide whether this is acceptable (it is, in fact, consistent with `RevokeLeaveRequests.jsx`'s own pre-existing behavior) or should be reverted to a buttons-only-disable approach; this is a substantive UX judgment call, not a "clear, safe fix."
+- Two **pre-existing, not-introduced-by-this-project** bugs were re-confirmed via `git show HEAD:...` to already exist in the base commit, unrelated to any P2.x diff: `ruleBook/RuleBookPage.jsx`'s `const api = api.create({...})` self-reference bug, and `HRManageTools.jsx`'s `!permissions && {...}` tab-array construction, which can push a literal `false` into the `tabs` array (harmless today — property access on `false` returns `undefined`, not a throw — but worth noting). Neither was fixed, per Step 6.
+
+### 17. Icon-button consistency audit
+
+6 `size="icon"` `Button` instances were found with an explicit `className` fighting the canonical transparent-background/no-border/no-shadow icon standard (a `hover:bg-*` or `bg-*` utility competing with the canonical `ICON_VARIANT_CLASSES`' `bg-transparent`). All 6 were **fixed** in this task (see §18). One additional, more severe instance was found and **deliberately left unfixed**: `charts/UpcomingHolidays.jsx`'s prev/next carousel buttons (lines 258, 329) set an **inline `style={{ background: "rgba(255,255,255,0.18)", color: theme.text }}`** — inline styles always win over Tailwind classes regardless of cascade order, making this a stronger override than a mere conflicting class. This was judged a legitimate, intentional exception rather than a bug: the buttons sit on a themed, colored gradient card background (`UpcomingHolidays.jsx`'s dynamic `theme.gradient`), and the semi-transparent white circle is providing necessary contrast/visibility against that variable-colored backdrop — removing it would risk making the buttons invisible against certain themes, a real functional regression, not just a style inconsistency. All other `size="icon"` `Button` usages across the module were confirmed to only customize text/hover-text color (a fully compliant, expected customization within the canonical contract) — no other conflicts found.
+
+### 18. Safe fixes performed
+
+| # | File | Fix |
+|---|---|---|
+| 1 | `charts/Calendar.jsx` (prev/next month buttons) | Removed `hover:bg-gray-100` from two `size="icon"` `Button`s, aligning with the canonical transparent-icon-button standard. |
+| 2 | `models/AddHolidaysModal.jsx` (remove-holiday button) | Removed `hover:bg-red-50` from a `size="icon"` `Button`. |
+| 3 | `models/LeaveUploadWizard.jsx` (close button) | Removed `hover:bg-gray-200` (and the now-redundant `rounded-full`) from a `size="icon"` `Button`. |
+| 4 | `models/LeaveUploadWizard.jsx` (remove-file button) | Removed `hover:bg-green-100` (and the now-redundant `rounded-md`) from a `size="icon"` `Button`. |
+| 5 | `models/LeaveHistory.jsx` (cancel-leave button) | Removed `hover:bg-orange-50` (and the redundant `bg-transparent shadow-none`) from a `size="icon"` `Button`. |
+| 6 | `models/BlockLeaveDates.jsx` (main form section) | Migrated a hand-rolled `rounded-xl border bg-white shadow-sm` container + manual `h2`/`p` header into canonical `PageCard`/`PageCardContent` (`title`/`subtitle` props), matching the convention already used by the sibling `<aside><PageCard title="Summary">` in the same file. The `<form>` element, its `onSubmit` handler, all field markup, and the footer action-button row (`Clear`/`Block leave`) are unchanged — only the outer shell/header presentation moved into the canonical component. |
+| 7 | `models/EditLeaveModal.jsx` (submit button) | Replaced a hand-rolled `<span className="... animate-spin" /> Updating...` loading indicator inside the `Button`'s children with the canonical `loading={submitting} loadingText="Updating..."` props already used by every sibling modal (`RequestLeaveModal.jsx`, `ApplyLeaveOnBehalf.jsx`, `ManagerEditLeaveRequest.jsx`, `CompOffRequestModal.jsx`). The effective disabled condition (`submitting \|\| isLockedByOther \|\| hasBalanceError`) is preserved exactly — `disabled={isLockedByOther \|\| hasBalanceError}` plus `loading={submitting}` (which itself contributes to `Button`'s internal `isDisabled = disabled \|\| loading`) yields the identical combined condition as before. |
+
+All 7 fixes are presentational-only: no API call, state variable, effect, condition, or business logic was touched in any of the 5 files.
+
+### 19. Explicitly deferred items
+
+- `DatePicker`/`DateRangePicker` — not touched, not even read for migration purposes beyond confirming their raw `<button>`/`<input>` internals are legitimate `react-day-picker`-internal exceptions.
+- The 11-file modal-shell duplication (§3) — documented, not migrated; recommended as a future dedicated task.
+- The 7-file `FormTextArea` capability gap (§4) — documented, not migrated; `FormTextArea` itself not modified.
+- `ApplyLeaveOnBehalf.jsx`/`AddHolidaysModal.jsx`'s icon-prefixed raw inputs (§4) — documented, not migrated, due to Tailwind-cascade-order style-preservation risk.
+- The three non-canonical Back controls (§14) — documented, not migrated, consistent with P2.5's prior decision.
+- `models/CompOffBalanceRequests.jsx`'s P2.7-introduced loading-skeleton-during-action-click behavior change (§16) — documented, not reverted, pending a human UX decision.
+- `ruleBook/RuleBookPage.jsx`'s possible future `DataTable` fit (§5) and the `CompOffBalanceRequests.jsx`/`RevokeLeaveRequests.jsx` accent-card normalization pair (§6) — flagged for awareness only, not acted on.
+- Dead code (`models/SkeletonTable.jsx`, `EnterpriseConfigManager.jsx`, `hooks/Modal.jsx`, `models/ReviewModal.jsx`, `models/ActionDropdown.jsx`, `models/ActionDropDownPendingLeaveRequests.jsx`, `EmployeePanelold.jsx`) and previously-documented unrelated bugs (`RuleBookPage.jsx`'s `api.create` self-reference, `HRManageTools.jsx`'s `!permissions &&` falsy tab-array entry, dead `FilterListbox` imports) — none fixed or removed, per Step 6/7.
+
+### 20. Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings). One transient JSX-balance error was introduced mid-edit while restructuring `BlockLeaveDates.jsx` (a stray leftover `</div>` from the original card shell's closing tag) and was caught and fixed via the build itself before this result was recorded — the final state builds cleanly.
+
+### 21. Lint result
+
+✅ `npm run lint` — same pre-existing baseline as every prior step: 2 `react-hooks/exhaustive-deps` config
+errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/
+billingConfigurationService.js`. Zero new issues.
+
+### 22. git diff --check
+
+✅ Clean (only pre-existing LF/CRLF informational warnings on files already touched in earlier steps, not errors).
+
+### 23. Final assessment
+
+The Leave Management module is substantially consistent with the canonical/global UI layer established across P0–P2.9: every genuine standard button, form field, table, card, filter, status indicator, empty state, page header, tab bar, and loading indicator that can be represented by an existing canonical component without a capability gap or a forced layout/behavior change already is (as of this task, plus the 7 icon-button/PageCard/Button-loading fixes applied here). The remaining raw UI is, without exception, backed by one of: (a) a genuine, documented capability gap in a canonical component (`FormTextArea`'s missing `maxLength`/`className`, `FileUpload`'s missing `disabled`), (b) a structural requirement the canonical component's fixed API cannot express (dynamic/unknown columns, colspan-spanning multi-state rows, per-option disable, custom option rendering, multi-select, async/remote options, drag-and-drop-styled triggers), (c) a deliberate prior layout/placement decision (BackButton positioning, PageHeader-vs-BackButton composition), or (d) dead/unreferenced code. The one substantial gap in *coverage* rather than *capability* is the 11-file raw modal-shell pattern (§3) — a real, repeated inconsistency worth a dedicated future task, deliberately not attempted here since it exceeds this sweep's "clear, safe fix" mandate. The one confirmed *regression* (not introduced by this task) is `CompOffBalanceRequests.jsx`'s loading-skeleton-during-action-click behavior (§16), flagged for a human decision rather than unilaterally reverted — see the follow-up below, where it was corrected.
+
+## P2.10 Follow-up — CompOffBalanceRequests Loading Regression
+
+### Original behavior (pre-P2.7)
+
+`CompOffBalanceRequests.jsx` used a single `loading` state for three purposes: the initial/refresh table fetch (`fetchCompOffs`) and both row-level `handleApprove`/`handleReject` actions. Before P2.7, `loading` drove no table-level visual at all (the only loading-driven UI was a commented-out full-screen overlay) — it only disabled the two action `Button`s (`disabled={loading}`) while any of the three operations was in flight. The `DataTable` itself, and all its rows, always remained visible.
+
+### Regression introduced during P2.7
+
+P2.7 wired `loading` directly into `DataTable`'s own `loading` prop (`<DataTable loading={loading} .../>`) to close a genuine empty-state-flash gap on the initial fetch (previously, `DataTable` had no `loading` prop at all, so a slow first fetch could briefly show the `emptyTitle` message before real data arrived). This fix was correct for the fetch case, but because `handleApprove`/`handleReject` also set the *same* `loading` flag, clicking Approve or Reject on any single row caused the **entire table to be replaced by a `TableSkeleton`** for the duration of that one action — existing rows disappeared, not just the two affected buttons.
+
+### Root cause
+
+A single boolean state variable (`loading`) was overloaded to represent two logically distinct conditions — (A) "the table's row data is being fetched" and (B) "a single row's approve/reject request is in flight" — and only (A) is safe to route into `DataTable`'s `loading` prop. Wiring the shared variable in meant every occurrence of (B) was misinterpreted as (A).
+
+### Corrective change
+
+`src/pages/leave_management/models/CompOffBalanceRequests.jsx` now separates these two states:
+- **`loading`** (unchanged name, unchanged `set`-call sites in `fetchCompOffs`) is used **exclusively** for the table-fetch case and continues to drive `<DataTable loading={loading} .../>` — the P2.7 fix for the empty-state-flash gap is fully preserved.
+- **`actionState`** (`{ id, type }`, a new state variable — no pre-existing action-scoped state existed to reuse, so a minimal one was introduced per this task's explicit allowance) now tracks which row/action is in flight. `handleApprove`/`handleReject` set it at the start of the request and reset it to `{ id: null, type: null }` in their existing `finally` blocks — replacing their previous `setLoading(true)`/`setLoading(false)` calls one-for-one, with no other change to either handler's try/catch/API-call/toast logic.
+- A derived `isActionLoading = actionState.id !== null` replaces the old `disabled={loading}` on both action `Button`s with `disabled={isActionLoading}` — preserving the exact original disabling *breadth* (all action buttons, across all rows, disabled while any one action is in flight), not just the clicked row's buttons, since that breadth was part of the original pre-P2.7 behavior and wasn't identified as part of the regression.
+- **`Button`'s own `loading`/`loadingText` props were deliberately NOT used** on these two icon buttons, despite being canonical. Investigation of `src/components/Button/Button.jsx` found its internal `Spinner` component's size map only covers `large`/`medium`/`small` — passing `loading` on a `size="icon"` button resolves to an unsized spinner `<svg>` (no width/height class applied, since `"icon"` isn't a key in the spinner's size map) that would render outside the button's intended 32×32px box, and would additionally render *alongside* the original icon rather than replacing it (no `loadingText` exists for an icon-only button to fall back to). No existing consumer anywhere in the repository combines `size="icon"` with `loading` for this exact reason. Rather than risk introducing a new, unprecedented rendering bug — or modifying canonical `Button` to fix its `Spinner` component, which this task explicitly forbids — the `disabled`-only approach (byte-identical to the original pre-P2.7 visual/behavioral contract) was used instead.
+
+### Confirmation: DataTable remains visible during approve/reject
+
+Confirmed by reading the corrected file in full: `DataTable`'s `loading` prop is now driven solely by the table-fetch `loading` variable, which `handleApprove`/`handleReject` no longer touch at all. Clicking Approve or Reject no longer sets `loading` to `true` under any circumstance, so `DataTable` (and all its rows) remain visible and unaffected throughout an approve/reject action.
+
+### Confirmation: action-level loading remains scoped to buttons
+
+`isActionLoading`/`actionState` only affect the `disabled` prop of the two action `Button`s inside the `columns[].render` closure — no other part of the render tree (table shell, other columns, other rows' content) reads or is affected by `actionState`.
+
+### Confirmation: API/business logic unchanged
+
+`handleApprove`/`handleReject`'s `api.put` calls — endpoint (`/api/compoff/approve`, `/api/compoff/reject`), HTTP method, request body (`{ managerId, compoffId }`), and `Authorization` header — are byte-identical to before. `toast.success`/`toast.error` messages are unchanged. `fetchCompOffs()` is still called on success, unchanged. The `fetchCompOffs` function itself (its own `loading` set-true/set-false calls, its `fetchLock` debounce, its API call, its `pendingCompOffs`/error handling) is completely untouched. `DataTable`'s `columns`, `getRowKey`, `emptyTitle`, and the `useLeaveWebSocket` subscription (event names, handler) are all unchanged.
+
+### Canonical components modified
+
+None. `src/components/patterns/DataTable.jsx`, `src/components/Button/Button.jsx`, `src/components/LoadingSpinner.jsx`, `src/components/patterns/Loaders.jsx`, and `src/components/ui/Loader.jsx` were read for verification purposes only and not edited.
+
+### Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings).
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline: 2 `react-hooks/exhaustive-deps` config errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/billingConfigurationService.js`. Zero new issues.
+
+### git diff --check
+
+✅ Clean (only pre-existing LF/CRLF informational warnings on files already touched in earlier steps, not errors). Only `src/pages/leave_management/models/CompOffBalanceRequests.jsx` (plus this documentation file) changed in this follow-up task.

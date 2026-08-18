@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import Button from "../../components/Button/Button";
+import PageHeader from "../../components/ui/PageHeader";
+import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 
 // Modals
 import AddEmployeeModal from "./models/AddEmployeeModal";
@@ -117,33 +119,22 @@ const HRManageTools = ({ employeeId }) => {
 
   return (
     <div className="space-y-6 py-6 px-6 max-w-7xl mx-auto">
-      <header>
-        <h1 className="text-2xl font-bold text-gray-800">HR Administration</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Configure system leave types, manage team balances, and holiday
-          calendars.
-        </p>
-      </header>
+      <PageHeader
+        title="HR Administration"
+        subtitle="Configure system leave types, manage team balances, and holiday calendars."
+      />
 
       {/* TABS - Matching LeaveSection Style */}
-      <div className="flex items-center justify-between border-b border-gray-200">
-        <div className="flex space-x-8">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="!inline-flex !h-auto !bg-transparent !p-0 !rounded-none !justify-start items-center gap-8 border-b border-gray-200">
           {tabs.map((tab) => (
-            <button
+            <TabsTrigger
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className="relative pb-3 font-medium transition-colors focus:outline-none flex items-center gap-2"
+              value={tab.id}
+              className="relative pb-3 !rounded-none !bg-transparent !shadow-none font-medium transition-colors focus:outline-none flex items-center gap-2 data-[state=active]:!text-indigo-600 data-[state=inactive]:text-gray-500 hover:text-gray-900"
             >
-              <span
-                className={
-                  activeTab === tab.id
-                    ? "text-indigo-600"
-                    : "text-gray-500 hover:text-gray-900"
-                }
-              >
-                {tab.icon}
-                <span className="ml-1">{tab.label}</span>
-              </span>
+              {tab.icon}
+              <span className="ml-1">{tab.label}</span>
               {activeTab === tab.id && (
                 <motion.div
                   className="absolute bottom-[-1px] left-0 right-0 h-[2.5px] bg-indigo-600 rounded-t-full"
@@ -151,10 +142,10 @@ const HRManageTools = ({ employeeId }) => {
                   transition={{ type: "spring", stiffness: 300, damping: 25 }}
                 />
               )}
-            </button>
+            </TabsTrigger>
           ))}
-        </div>
-      </div>
+        </TabsList>
+      </Tabs>
 
       <div className="mt-4">
         <AnimatePresence mode="wait">

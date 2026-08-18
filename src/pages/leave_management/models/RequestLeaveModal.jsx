@@ -12,6 +12,7 @@ import DateRangePicker from "./DateRangePicker";
 import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/Modal/modal";
+import { InlineLoader } from "../../../components/patterns/Loaders";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 // const token = localStorage.getItem("token");
@@ -555,9 +556,8 @@ export default function RequestLeaveModal({
               Leave Type <span className="text-red-500">*</span>
             </label>
             {loadingBalances ? (
-              <div className="flex items-center justify-center p-4 text-gray-500 text-sm rounded-xl bg-gray-50">
-                <span className="animate-pulse mr-2 rotate-45">⏳</span>{" "}
-                Loading...
+              <div className="flex items-center justify-center p-4 rounded-xl bg-gray-50">
+                <InlineLoader text="Loading..." />
               </div>
             ) : balanceError ? (
               <div className="text-red-600 text-sm bg-red-50 rounded-xl p-2">

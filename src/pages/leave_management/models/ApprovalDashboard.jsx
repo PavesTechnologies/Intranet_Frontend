@@ -9,6 +9,9 @@ import ConfirmationModal from "./ConfirmationModal";
 import api from "../../../api/axiosInstance";
 import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
+import StatusBadge from "../../../components/patterns/StatusBadge";
+import EmptyState from "../../../components/patterns/EmptyState";
+import PageHeader from "../../../components/ui/PageHeader";
 
 const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
 
@@ -144,24 +147,20 @@ const ApprovalDashboard = () => {
 
   return (
     <div className="max-w">
-      <div className="mb-6">
-        <h1 className="text-xl md:text-xl font-bold text-gray-800">
-          Pending Approvals
-        </h1>
-        <p className="text-gray-500 mt-1 text-xs md:text-sm">
-          Review and take action on the requests below.
-        </p>
-      </div>
+      <PageHeader
+        title="Pending Approvals"
+        subtitle="Review and take action on the requests below."
+      />
 
       {isLoading ? (
         <div className="text-center p-10 bg-white rounded-lg shadow">
           <LoadingSpinner text="Loading Requests..." />
         </div>
       ) : requests.length === 0 ? (
-        <div className="flex flex-col justify-center items-center p-8 bg-white rounded-lg">
-          <img src={clearingDesk} alt="Np Pending Approvals" className="w-40" />
-          <p className="text-gray-500 mt-2 text-sm`">No Pending Approvals.</p>
-        </div>
+        <EmptyState
+          icon={<img src={clearingDesk} alt="" className="h-6 w-6" />}
+          title="No Pending Approvals."
+        />
       ) : (
         <div className="space-y-4">
           {" "}
@@ -200,9 +199,7 @@ const ApprovalDashboard = () => {
                       </p>
                     </div>
                     <div className="flex items-center gap-4 mt-2 sm:mt-0">
-                      <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800 self-start">
-                        {request.status}
-                      </span>
+                      <StatusBadge status={request.status} className="self-start" />
                     </div>
                   </div>
                 </button>

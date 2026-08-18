@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { toast } from "react-toastify";
 import DateRangePicker from "./DateRangePicker";
 import Button from "../../../components/Button/Button";
+import FormTextArea from "../../../components/forms/FormTextArea";
 
 export default function EditBlockLeaveModal({
   isOpen,
@@ -238,17 +239,13 @@ export default function EditBlockLeaveModal({
 
             {/* Body */}
             <div className="p-6 space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Reason
-                </label>
-                <textarea
-                  rows={3}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                />
-              </div>
+              <FormTextArea
+                label="Reason"
+                name="blockReason"
+                rows={3}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

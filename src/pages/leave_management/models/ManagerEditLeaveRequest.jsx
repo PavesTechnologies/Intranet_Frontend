@@ -627,6 +627,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/Modal/modal";
+import { InlineLoader } from "../../../components/patterns/Loaders";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -1092,8 +1093,8 @@ export default function ManagerEditLeaveRequest({
                 Leave Type
               </label>
               {loadingData ? (
-                <div className="mt-1 w-full p-3 border border-gray-200 rounded-xl bg-gray-50 text-center text-gray-400 text-sm animate-pulse">
-                  Loading balances...
+                <div className="mt-1 w-full p-3 border border-gray-200 rounded-xl bg-gray-50 flex items-center justify-center">
+                  <InlineLoader text="Loading balances..." />
                 </div>
               ) : (
                 <LeaveTypeDropdown

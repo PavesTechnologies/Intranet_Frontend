@@ -6,6 +6,8 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import beachDay from "../../../components/icons/beach-day_cnsv.svg";
 import Button from "../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+import StatusBadge from "../../../components/patterns/StatusBadge";
+import EmptyState from "../../../components/patterns/EmptyState";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -23,22 +25,6 @@ const formatLeaveNameFromParam = (name = "") => {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
-};
-
-// Helper to get styling for status badges
-const getStatusBadgeStyles = (status) => {
-  switch (status?.toUpperCase()) {
-    case "PENDING":
-      return "bg-yellow-100 text-yellow-800";
-    case "APPROVED":
-      return "bg-green-100 text-green-800";
-    case "REJECTED":
-      return "bg-red-100 text-red-800";
-    case "CANCELLED":
-      return "bg-gray-100 text-gray-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
 };
 
 export default function LeaveDetailsPage() {
@@ -255,13 +241,10 @@ export default function LeaveDetailsPage() {
               </div>
             ) : (
               // Display this message if there are no leave requests at all
-              <div className="flex flex-col justify-center items-center p-8 bg-white rounded-lg border">
-                <img src={beachDay} alt="No Leave History" className="w-40" />
-                <p className="text-gray-500 mt-5">
-                  No requests found for {displayName} in{" "}
-                  {new Date().getFullYear()}.
-                </p>
-              </div>
+              <EmptyState
+                icon={<img src={beachDay} alt="" className="h-6 w-6" />}
+                description={`No requests found for ${displayName} in ${new Date().getFullYear()}.`}
+              />
             )}
           </main>
         </div>
@@ -288,11 +271,7 @@ const RequestCard = ({ request }) => (
         </p>
       </div>
       <div className="mt-3 sm:mt-0 text-left sm:text-right flex flex-col items-start sm:items-center">
-        <span
-          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeStyles(request.status)}`}
-        >
-          {request.status}
-        </span>
+        <StatusBadge status={request.status} />
         <p className="text-sm font-bold text-gray-800 mt-2">
           -{request.daysRequested} Day{request.daysRequested !== 1 ? "s" : ""}
         </p>

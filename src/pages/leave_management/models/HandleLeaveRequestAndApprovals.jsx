@@ -13,6 +13,7 @@ import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
 import FormSelect from "../../../components/forms/FormSelect";
+import StatusBadge from "../../../components/patterns/StatusBadge";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
@@ -528,19 +529,6 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status.toLowerCase()) {
-      case "approved":
-        return "bg-green-100 text-green-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "rejected":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-200 text-gray-800";
-    }
-  };
-
   return (
     <div className="bg-white rounded-lg shadow-sm">
       <div className="p-6 border-b border-gray-200">
@@ -897,13 +885,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
-                          request.status,
-                        )}`}
-                      >
-                        {request.status}
-                      </span>
+                      <StatusBadge status={request.status} />
                     </td>
                     <td className="px-6 py-4 text-gray-500">
                       <div>

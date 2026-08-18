@@ -424,12 +424,8 @@ const EmployeeLeaveBalances = () => {
 
       {/* Table */}
       <div>
-        {data.length === 0 && !isLoading ? (
-          <p className="text-gray-500 italic font-semibold text-center mt-5">
-            No leave balances found.
-          </p>
-        ) : (
-          <DataTable
+        <DataTable
+            emptyTitle="No leave balances found."
             getRowKey={(emp) => emp.employeeId}
             rows={data}
             loading={isLoading}
@@ -470,7 +466,6 @@ const EmployeeLeaveBalances = () => {
               },
             ]}
           />
-        )}
 
         {showUploadWizard && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center">

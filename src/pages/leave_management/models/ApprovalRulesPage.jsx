@@ -8,6 +8,7 @@ import ConfirmationModal from "./ConfirmationModal";
 import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
 import DataTable from "../../../components/patterns/DataTable";
+import PageHeader from "../../../components/ui/PageHeader";
 import { set } from "date-fns";
 import { is } from "date-fns/locale";
 
@@ -164,17 +165,18 @@ export default function ApprovalRulesPage() {
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* HEADER */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Approval Rules</h1>
-
-        <Button
-          variant="primary"
-          onClick={() => openModal()}
-          className="flex items-center gap-2 rounded-xl shadow"
-        >
-          <Plus className="w-5 h-5" /> Add Rule
-        </Button>
-      </div>
+      <PageHeader
+        title="Approval Rules"
+        actions={
+          <Button
+            variant="primary"
+            onClick={() => openModal()}
+            className="flex items-center gap-2 rounded-xl shadow"
+          >
+            <Plus className="w-5 h-5" /> Add Rule
+          </Button>
+        }
+      />
 
       {/* TABLE */}
       <div className="bg-white shadow-lg rounded-xl overflow-hidden border border-gray-100">

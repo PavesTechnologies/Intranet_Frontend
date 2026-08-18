@@ -4,6 +4,7 @@ import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
 import FormSelect from "../../../components/forms/FormSelect";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const SECOND_URL = "/api/workflow/admin";
@@ -454,8 +455,8 @@ const RuleBookPage = () => {
         <PageCard className="shadow-lg" title="📜 Existing Rules">
         <PageCardContent className="p-8">
         {loading ? (
-          <div className="flex justify-center py-6 text-indigo-600 font-medium animate-pulse">
-            Loading rules...
+          <div className="flex justify-center py-6">
+            <LoadingSpinner text="Loading rules..." />
           </div>
         ) : (rules ?? []).length === 0 ? (
           <div className="text-center py-8 text-gray-500 text-sm bg-gray-50 rounded-lg">

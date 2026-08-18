@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import api from "../../../api/axiosInstance";
 import PendingLeaveRequestsTable from "./PendingLeaveRequestsTable";
-import SkeletonTable from "./SkeletonTable";
+import { TableSkeleton } from "../../../components/patterns/Loaders";
 import { useAuth } from "../../../contexts/AuthContext";
 import { toast } from "react-toastify";
 import Pagination from "../../../components/Pagination/pagination";
 import NoPendingLeaves from "../../../components/icons/no_pending_leaves.svg";
+import EmptyState from "../../../components/patterns/EmptyState";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 
 // ✅ Removed refreshKey prop — self-sufficient now
@@ -91,21 +92,15 @@ const PendingLeaveRequests = ({ refresh, year, onLeaveCancel }) => {
   return (
     <>
       {loading ? (
-        <SkeletonTable rows={5} columns={6} />
+        <TableSkeleton rows={5} columns={6} />
       ) : error ? (
         <p className="text-red-500">{error}</p>
       ) : pendingLeaves.length === 0 ? (
-        <div className="flex items-center justify-center h-32">
-          <div className="text-3xl leading-none">
-            <img src={NoPendingLeaves} alt="No Pending Leaves" className="w-20" />
-          </div>
-          <div className="pl-4 leading-snug">
-            <h2 className="text-xl font-semibold">
-              Cheers! No pending leave requests.
-            </h2>
-            <p className="text-sm text-gray-600">Request leave on the above!</p>
-          </div>
-        </div>
+        <EmptyState
+          icon={<img src={NoPendingLeaves} alt="" className="h-6 w-6" />}
+          title="Cheers! No pending leave requests."
+          description="Request leave on the above!"
+        />
       ) : (
         <>
           <PendingLeaveRequestsTable

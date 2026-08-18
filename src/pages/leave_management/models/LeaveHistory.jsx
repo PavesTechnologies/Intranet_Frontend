@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import api from "../../../api/axiosInstance";
 import Pagination from "../../../components/Pagination/pagination";
-import { Fonts } from "../../../components/Fonts/Fonts";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { XCircle } from "lucide-react";
@@ -12,6 +11,7 @@ import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
 import FormSelect from "../../../components/forms/FormSelect";
 import DataTable from "../../../components/patterns/DataTable";
+import StatusBadge from "../../../components/patterns/StatusBadge";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 
 const MONTHS = [
@@ -314,12 +314,11 @@ const LeaveHistory = ({ employeeId, year }) => {
       </div>
 
       {/* TABLE */}
-      {filteredLeaves.length > 0 ? (
-        <div className="rounded-lg overflow-hidden">
-          <DataTable
-            getRowKey={(leave, index) => leave.leaveId || index}
-            rows={paginatedRequests}
-            columns={[
+      <DataTable
+        emptyTitle="No leave history found"
+        getRowKey={(leave, index) => leave.leaveId || index}
+        rows={paginatedRequests}
+        columns={[
               {
                 key: "leaveType",
                 header: "Leave Type",
@@ -362,18 +361,7 @@ const LeaveHistory = ({ employeeId, year }) => {
                 key: "status",
                 header: "Status",
                 className: "text-center",
-                render: (leave) => (
-                  <span
-                    className={`px-2 py-1 text-white rounded-full text-xs ${leave.status === "APPROVED"
-                        ? "bg-green-500"
-                        : leave.status === "REJECTED"
-                          ? "bg-red-500"
-                          : "bg-gray-500"
-                      }`}
-                  >
-                    {leave.status}
-                  </span>
-                ),
+                render: (leave) => <StatusBadge status={leave.status} />,
               },
               {
                 key: "reason",
@@ -408,20 +396,14 @@ const LeaveHistory = ({ employeeId, year }) => {
                       size="icon"
                       onClick={() => handleModalOpen(leave.leaveId)}
                       aria-label="Cancel approved leave"
-                      className="bg-transparent shadow-none text-orange-500 hover:text-orange-700 hover:bg-orange-50"
+                      className="text-orange-500 hover:text-orange-700"
                     >
                       <XCircle className="w-5 h-5" />
                     </Button>
                   ),
               },
-            ]}
-          />
-        </div>
-      ) : (
-        <div className="flex justify-center items-center h-40">
-          <p className={Fonts.caption}>No leave history found</p>
-        </div>
-      )}
+        ]}
+      />
 
       {totalPages > 1 && (
         <Pagination

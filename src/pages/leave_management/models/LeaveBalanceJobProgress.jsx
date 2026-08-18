@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from "../../../api/axiosInstance";
 import { X, CheckCircle, XCircle, Loader } from 'lucide-react';
 import Button from "../../../components/Button/Button";
+import StatusBadge from "../../../components/patterns/StatusBadge";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -90,13 +91,12 @@ const LeaveBalanceJobProgress = ({ jobId, onClose }) => {
                     <p className="text-xs font-medium text-gray-600">
                         {job.leaveTypeName}
                     </p>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                        isDone   ? 'bg-green-100 text-green-700' :
-                        isFailed ? 'bg-red-100 text-red-700'    :
-                                   'bg-indigo-100 text-indigo-700'
-                    }`}>
-                        {statusText}
-                    </span>
+                    <StatusBadge
+                        status={job.status}
+                        label={statusText}
+                        tone={isDone ? "success" : isFailed ? "danger" : "info"}
+                        size="sm"
+                    />
                 </div>
 
                 {/* Progress bar */}

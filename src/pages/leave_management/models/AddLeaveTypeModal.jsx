@@ -3,6 +3,7 @@ import { X, FileText } from "lucide-react";
 import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import { InlineLoader } from "../../../components/patterns/Loaders";
 import Button from "../../../components/Button/Button";
 import { useJobProgress } from "../../../contexts/JobProgressContext";
 import FormInput from "../../../components/forms/FormInput";
@@ -347,7 +348,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
               Leave Name *
             </label>
             {loadinglables ? (
-              <p className="text-gray-500 text-sm">Loading leave labels...</p>
+              <InlineLoader text="Loading leave labels..." />
             ) : (
               <FormSelect
                 name="leaveName"

@@ -37,8 +37,6 @@ const STATUS_TONE_MAP = {
   reject: "danger",
   failed: "danger",
   fail: "danger",
-  cancelled: "danger",
-  canceled: "danger",
   disputed: "danger",
 
   info: "info",
@@ -51,6 +49,8 @@ const STATUS_TONE_MAP = {
   inactive: "neutral",
   unknown: "neutral",
   created: "neutral",
+  cancelled: "neutral",
+  canceled: "neutral",
 };
 
 const SIZE_CLASSES = {
@@ -68,12 +68,14 @@ function resolveTone(status) {
   if (normalized.includes("pending") || normalized.includes("draft") || normalized.includes("hold")) {
     return "warning";
   }
-  if (normalized.includes("reject") || normalized.includes("cancel") || normalized.includes("fail") || normalized.includes("dispute")) {
+  if (normalized.includes("reject") || normalized.includes("fail") || normalized.includes("dispute")) {
     return "danger";
   }
   if (normalized.includes("progress") || normalized.includes("processing")) {
     return "info";
   }
+  // "cancel"/"cancelled"/"canceled" (and anything else unmatched above) falls
+  // through to the neutral tone below.
   return "neutral";
 }
 

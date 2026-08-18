@@ -1,44 +1,41 @@
 import React from "react";
-import Button from "../../../components/Button/Button";
+import ConfirmDialog from "../../../components/patterns/ConfirmDialog";
 
+// Compatibility wrapper around the canonical ConfirmDialog — kept (not
+// deleted, not renamed) because this exact API is depended on by 7
+// consumers, including a cross-module Timesheet consumer
+// (Timesheet/ManagerApproval/ManagerApprovalTable.jsx). Every consumer
+// keeps using this component unchanged; the actual confirmation UI is now
+// rendered by the canonical ConfirmDialog underneath.
+//
+// closeOnBackdrop/closeOnEscape/showCloseButton are explicitly forced to
+// false to reproduce this component's original strict, button-only-dismiss
+// behavior exactly (see docs/ui/phase-2-leave-management.md, "P2.2b —
+// ConfirmationModal → ConfirmDialog Migration") — do not rely on
+// ConfirmDialog's own defaults here.
 const ConfirmationModal = ({
   isOpen,
   title,
   message,
   onConfirm,
   onCancel,
-  isLoading, 
-  confirmText = "Confirm", 
-}) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center">
-      <div className="bg-white p-4 rounded-lg shadow-xl max-w-sm w-full">
-        <h3 className="text-sm font-semibold mb-2">{title}</h3>
-        <p className="mb-4 text-sm text-gray-600">{message}</p>
-        <div className="flex justify-end space-x-2">
-          <Button
-            onClick={onCancel}
-            disabled={isLoading}
-            variant="ghost"
-            size="medium"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={onConfirm}
-            disabled={isLoading} // Disable button when loading
-            variant="primary"
-            size="medium"
-          >
-            {/* Change text based on loading state */}
-            {isLoading ? `${confirmText}ing...` : confirmText}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-};
+  isLoading,
+  confirmText = "Confirm",
+}) => (
+  <ConfirmDialog
+    isOpen={isOpen}
+    title={title}
+    description={message}
+    onConfirm={onConfirm}
+    onClose={onCancel}
+    confirmText={confirmText}
+    cancelText="Cancel"
+    variant="primary"
+    loading={isLoading}
+    closeOnBackdrop={false}
+    closeOnEscape={false}
+    showCloseButton={false}
+  />
+);
 
 export default ConfirmationModal;

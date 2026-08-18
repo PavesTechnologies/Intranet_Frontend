@@ -104,7 +104,7 @@ const LeaveUploadWizard = ({ onClose }) => {
           variant="ghost"
           size="icon"
           aria-label="Close"
-          className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-400"
+          className="p-2 transition-colors text-gray-400"
         >
           <X className="h-5 w-5" />
         </Button>
@@ -238,7 +238,7 @@ const LeaveUploadWizard = ({ onClose }) => {
                     variant="ghost"
                     size="icon"
                     aria-label="Remove file"
-                    className="p-1.5 hover:bg-green-100 rounded-md text-green-700"
+                    className="p-1.5 text-green-700"
                   >
                     <X className="h-4 w-4" />
                   </Button>

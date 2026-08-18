@@ -737,18 +737,13 @@ export default function EditLeaveModal({
             </Button>
             <Button
               type="submit"
-              disabled={submitting || isLockedByOther || hasBalanceError}
+              disabled={isLockedByOther || hasBalanceError}
+              loading={submitting}
+              loadingText="Updating..."
               variant="primary"
               size="medium"
             >
-              {submitting ? (
-                <>
-                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                "Update Request"
-              )}
+              Update Request
             </Button>
           </div>
         </form>

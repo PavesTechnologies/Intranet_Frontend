@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import BlockLeaveDates from "./BlockLeaveDates";
 import ManageActiveLeaveBlocks from "./ManageActiveLeaveBlocks";
+import { Tabs, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 
 export default function BlockLeaveSection({ employeeId }) {
   const [activeTab, setActiveTab] = useState("dashboard"); // "dashboard" or "projectMembers"
@@ -9,59 +10,37 @@ export default function BlockLeaveSection({ employeeId }) {
   return (
     <div className="w-full">
       {/* Tab container */}
-      <div className="flex space-x-6 border-b border-gray-200">
-        <button
-          onClick={() => setActiveTab("dashboard")}
-          // ✨ CHANGE: Added 'relative' positioning
-          className="relative pb-2 font-medium transition-colors focus:outline-none"
-        >
-          {/* Change text color based on active state */}
-          <span
-            className={
-              activeTab === "dashboard"
-                ? "text-indigo-600"
-                : "text-gray-600 hover:text-gray-900"
-            }
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="!inline-flex !h-auto !bg-transparent !p-0 !rounded-none !justify-start items-center gap-6 border-b border-gray-200">
+          <TabsTrigger
+            value="dashboard"
+            className="relative pb-2 !rounded-none !bg-transparent !shadow-none font-medium transition-colors focus:outline-none data-[state=active]:!text-indigo-600 data-[state=inactive]:text-gray-600 hover:text-gray-900"
           >
             Active Blocked Leaves
-          </span>
+            {activeTab === "dashboard" && (
+              <motion.div
+                className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-indigo-600"
+                layoutId="underline"
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              />
+            )}
+          </TabsTrigger>
 
-          {/* ✨ CHANGE: Conditional underline with layoutId */}
-          {activeTab === "dashboard" && (
-            <motion.div
-              className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-indigo-600"
-              layoutId="underline"
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            />
-          )}
-        </button>
-
-        <button
-          onClick={() => setActiveTab("projectMembers")}
-          // ✨ CHANGE: Added 'relative' positioning
-          className="relative pb-2 font-medium transition-colors focus:outline-none"
-        >
-          {/* Change text color based on active state */}
-          <span
-            className={
-              activeTab === "projectMembers"
-                ? "text-indigo-600"
-                : "text-gray-600 hover:text-gray-900"
-            }
+          <TabsTrigger
+            value="projectMembers"
+            className="relative pb-2 !rounded-none !bg-transparent !shadow-none font-medium transition-colors focus:outline-none data-[state=active]:!text-indigo-600 data-[state=inactive]:text-gray-600 hover:text-gray-900"
           >
             Block Leave Dates
-          </span>
-          
-          {/* ✨ CHANGE: Conditional underline with layoutId */}
-          {activeTab === "projectMembers" && (
-            <motion.div
-              className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-indigo-600"
-              layoutId="underline"
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            />
-          )}
-        </button>
-      </div>
+            {activeTab === "projectMembers" && (
+              <motion.div
+                className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-indigo-600"
+                layoutId="underline"
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              />
+            )}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {/* Animated content (no changes here) */}
       <div className="mt-4 relative min-h-[400px]">

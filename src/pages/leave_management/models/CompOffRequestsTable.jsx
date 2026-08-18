@@ -3,6 +3,7 @@ import ConfirmationModal from "./ConfirmationModal";
 import Pagination from "../../../components/Pagination/pagination";
 import Button from "../../../components/Button/Button";
 import DataTable from "../../../components/patterns/DataTable";
+import StatusBadge from "../../../components/patterns/StatusBadge";
 
 const CompOffRequestsTable = ({ requests, onCancel, loading }) => {
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
@@ -92,7 +93,7 @@ const CompOffRequestsTable = ({ requests, onCancel, loading }) => {
       key: "status",
       header: "Status",
       className: "text-center",
-      render: (req) => req.status,
+      render: (req) => <StatusBadge status={req.status} size="sm" />,
     },
     {
       key: "actions",

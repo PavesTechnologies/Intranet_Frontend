@@ -465,7 +465,7 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
                       variant="danger"
                       size="icon"
                       aria-label="Remove holiday"
-                      className="flex-shrink-0 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      className="flex-shrink-0 p-1.5 text-gray-300 hover:text-red-500 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

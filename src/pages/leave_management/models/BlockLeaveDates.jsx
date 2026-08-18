@@ -501,19 +501,13 @@ export default function BlockLeaveDates({ employeeId }) {
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <section className="lg:col-span-2">
-            <form
-              onSubmit={onSubmit}
-              className="rounded-xl border bg-white  shadow-sm"
+            <PageCard
+              title="Project and members"
+              subtitle="Start by picking a project to manage its members’ leave availability."
             >
-              <div className="p-6 space-y-8">
+            <form onSubmit={onSubmit}>
+              <PageCardContent className="p-6 space-y-8">
                 <div>
-                  <h2 className="text-base font-semibold">
-                    Project and members
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Start by picking a project to manage its members’ leave
-                    availability.
-                  </p>
                   <div className="mt-4 space-y-4">
                     {/* Project */}
                     <div>
@@ -635,7 +629,7 @@ export default function BlockLeaveDates({ employeeId }) {
                     className="w-full rounded-lg h-auto"
                   ></textarea>
                 </div>
-              </div>
+              </PageCardContent>
 
               <div className="flex justify-end gap-3 border-t border-gray-200 dark:border-gray-800  px-6 py-4 rounded-b-xl">
                 <Button
@@ -662,6 +656,7 @@ export default function BlockLeaveDates({ employeeId }) {
                 </Button>
               </div>
             </form>
+            </PageCard>
           </section>
 
           <aside className="lg:col-span-1">

@@ -309,7 +309,7 @@ export default function Calendar() {
             variant="ghost"
             size="icon"
             aria-label="Previous month"
-            className="w-7 h-7 hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+            className="w-7 h-7 text-gray-500 hover:text-gray-700"
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
@@ -318,7 +318,7 @@ export default function Calendar() {
             variant="ghost"
             size="icon"
             aria-label="Next month"
-            className="w-7 h-7 hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+            className="w-7 h-7 text-gray-500 hover:text-gray-700"
           >
             <ChevronRight className="w-4 h-4" />
           </Button>

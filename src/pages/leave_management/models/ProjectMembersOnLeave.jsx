@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import api from "../../../api/axiosInstance";
 import Tooltip from "../../../components/status/Tooltip";
+import StatusBadge from "../../../components/patterns/StatusBadge";
+import EmptyState from "../../../components/patterns/EmptyState";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 
 const PMS_BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
@@ -15,20 +18,6 @@ const stringToColor = (str) => {
   return `hsl(${hash % 360}, 60%, 50%)`;
 };
 
-// Get color for leave status
-const leaveStatusColor = (status) => {
-  switch (status.toLowerCase()) {
-    case "approved":
-      return "text-green-500";
-    case "pending":
-      return "text-yellow-400";
-    case "rejected":
-      return "text-red-500";
-    default:
-      return "text-gray-400";
-  }
-};
-
 // Avatar component with Tooltip
 const EmployeeAvatar = ({ employee }) => {
   const avatarColor = stringToColor(employee.name);
@@ -41,9 +30,10 @@ const EmployeeAvatar = ({ employee }) => {
         {employee.leaves.map((leave) => (
           <div
             key={leave.leaveId || leave.empId}
-            className={`mb-1 text-xs ${leaveStatusColor(leave.status)}`}
+            className="mb-1 flex items-center gap-1.5 text-xs"
           >
-            {leave.status.toUpperCase()} [{leave.startDate} → {leave.endDate}]
+            <StatusBadge status={leave.status} size="sm" />
+            <span>[{leave.startDate} → {leave.endDate}]</span>
           </div>
         ))}
       </div>
@@ -171,13 +161,13 @@ const ProjectMembersOnLeave = ({ employeeId, leaveId }) => {
     fetchData();
   }, [employeeId, leaveId]);
 
-  if (loading) return <p>Loading...</p>;
+  if (loading) return <LoadingSpinner />;
   if (error) return <p>{error}</p>;
 
   return (
     <div className="p-4 border rounded bg-white shadow-sm">
       {projectMembersOnLeave.length === 0 ? (
-        <p>No active projects for this employee.</p>
+        <EmptyState title="No active projects for this employee." />
       ) : (
         projectMembersOnLeave.map((project) => (
           <div key={project.id} className="mb-6">

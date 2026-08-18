@@ -5,6 +5,9 @@ import ApprovalQueue from "./ApprovalQueue";
 import { ChevronRight } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import clearingDesk from "../../../components/icons/clearing-desk_emmv.svg";
+import StatusBadge from "../../../components/patterns/StatusBadge";
+import EmptyState from "../../../components/patterns/EmptyState";
+import PageHeader from "../../../components/ui/PageHeader";
 
 const PendingApprovalsQueueView = () => {
   const [requests, setRequests] = useState([]);
@@ -40,24 +43,20 @@ const PendingApprovalsQueueView = () => {
 
   return (
     <div className="max-w">
-      <div className="mb-6">
-        <h1 className="text-xl md:text-xl font-bold text-gray-800">
-          Pending Approvals Queue
-        </h1>
-        <p className="text-gray-500 mt-1 text-xs md:text-sm">
-          Read-only view of requests awaiting approval.
-        </p>
-      </div>
+      <PageHeader
+        title="Pending Approvals Queue"
+        subtitle="Read-only view of requests awaiting approval."
+      />
 
       {isLoading ? (
         <div className="text-center p-10 bg-white rounded-lg shadow">
           <LoadingSpinner text="Loading Requests..." />
         </div>
       ) : requests.length === 0 ? (
-        <div className="flex flex-col justify-center items-center p-8 bg-white rounded-lg">
-          <img src={clearingDesk} alt="No Pending Approvals" className="w-40" />
-          <p className="text-gray-500 mt-2 text-sm">No Pending Approvals.</p>
-        </div>
+        <EmptyState
+          icon={<img src={clearingDesk} alt="" className="h-32 w-32" />}
+          title="No Pending Approvals."
+        />
       ) : (
         <div className="space-y-4">
           {requests.map((request) => {
@@ -75,9 +74,8 @@ const PendingApprovalsQueueView = () => {
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center">
                     <div className="flex items-center">
                       <ChevronRight
-                        className={`text-blue-800 transition-transform duration-300 ${
-                          isOpen ? "rotate-90" : ""
-                        }`}
+                        className={`text-blue-800 transition-transform duration-300 ${isOpen ? "rotate-90" : ""
+                          }`}
                         size={20}
                       />
                       <h3 className="font-semibold text-lg text-gray-900">
@@ -93,9 +91,7 @@ const PendingApprovalsQueueView = () => {
                       </p>
                     </div>
                     <div className="flex items-center gap-4 mt-2 sm:mt-0">
-                      <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800 self-start">
-                        {request.status}
-                      </span>
+                      <StatusBadge status={request.status} className="self-start" />
                     </div>
                   </div>
                 </button>

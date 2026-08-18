@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 import Button from "../../../components/Button/Button";
 import DataTable from "../../../components/patterns/DataTable";
+import StatusBadge from "../../../components/patterns/StatusBadge";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -20,6 +21,11 @@ const COMPOFF_EVENTS = [
 const CompOffBalanceRequests = ({ managerId }) => {
     const [pendingCompOffs, setPendingCompOffs] = useState([]);
     const [loading, setLoading] = useState(false);
+    // Tracks an in-flight approve/reject action (row id + action type), kept
+    // separate from `loading` (table-data fetch) so a single row action no
+    // longer replaces the whole DataTable with a skeleton — see
+    // docs/ui/phase-2-leave-management.md ("P2.10 Follow-up").
+    const [actionState, setActionState] = useState({ id: null, type: null });
     const fetchLock = useRef(false);
 
     // ✅ Stable fetch function
@@ -49,7 +55,7 @@ const CompOffBalanceRequests = ({ managerId }) => {
     }, [managerId]); // ✅ only managerId — stable
 
     const handleApprove = async (compoffId) => {
-        setLoading(true);
+        setActionState({ id: compoffId, type: "approve" });
         try {
             await api.put(
                 `${BASE_URL}/api/compoff/approve`,
@@ -61,12 +67,12 @@ const CompOffBalanceRequests = ({ managerId }) => {
         } catch {
             toast.error("Approval failed.");
         } finally {
-            setLoading(false);
+            setActionState({ id: null, type: null });
         }
     };
 
     const handleReject = async (compoffId) => {
-        setLoading(true);
+        setActionState({ id: compoffId, type: "reject" });
         try {
             await api.put(
                 `${BASE_URL}/api/compoff/reject`,
@@ -78,9 +84,11 @@ const CompOffBalanceRequests = ({ managerId }) => {
         } catch {
             toast.error("Rejection failed.");
         } finally {
-            setLoading(false);
+            setActionState({ id: null, type: null });
         }
     };
+
+    const isActionLoading = actionState.id !== null;
 
     // ✅ Initial load
     useEffect(() => {
@@ -101,12 +109,9 @@ const CompOffBalanceRequests = ({ managerId }) => {
             </h3>
             <div className="border-b-2 border-blue-500 w-16 mb-4"></div>
 
-            {pendingCompOffs.length === 0 ? (
-                <p className="text-gray-500 italic font-semibold">
-                    No pending Comp-Off requests for your team.
-                </p>
-            ) : (
-                <DataTable
+            <DataTable
+                    loading={loading}
+                    emptyTitle="No pending Comp-Off requests for your team."
                     getRowKey={(req) => req.idleaveCompoff}
                     rows={pendingCompOffs}
                     columns={[
@@ -129,8 +134,8 @@ const CompOffBalanceRequests = ({ managerId }) => {
                         {
                             key: "status",
                             header: "Status",
-                            className: "text-center capitalize",
-                            render: (req) => req.status,
+                            className: "text-center",
+                            render: (req) => <StatusBadge status={req.status} size="sm" />,
                         },
                         {
                             key: "actions",
@@ -143,7 +148,7 @@ const CompOffBalanceRequests = ({ managerId }) => {
                                         size="icon"
                                         onClick={() => handleApprove(req.idleaveCompoff)}
                                         className="text-green-600 hover:text-green-800"
-                                        disabled={loading}
+                                        disabled={isActionLoading}
                                         aria-label="Approve comp-off request"
                                     >
                                         <Check className="w-4 h-4" />
@@ -153,7 +158,7 @@ const CompOffBalanceRequests = ({ managerId }) => {
                                         size="icon"
                                         onClick={() => handleReject(req.idleaveCompoff)}
                                         className="text-red-600 hover:text-red-800"
-                                        disabled={loading}
+                                        disabled={isActionLoading}
                                         aria-label="Reject comp-off request"
                                     >
                                         <X className="w-4 h-4" />
@@ -163,8 +168,7 @@ const CompOffBalanceRequests = ({ managerId }) => {
                         },
                     ]}
                 />
-            )}
-{/* 
+{/*
             {loading && (
                 <div className="fixed inset-0 bg-white/60 backdrop-blur-sm z-50 flex items-center justify-center">
                     <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />

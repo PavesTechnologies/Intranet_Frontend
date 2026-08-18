@@ -13,6 +13,7 @@ import { countWeekdaysBetween } from "./RequestLeaveModal";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/Modal/modal";
 import FormSelect from "../../../components/forms/FormSelect";
+import FormTextArea from "../../../components/forms/FormTextArea";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -403,18 +404,14 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
           )}
 
           {/* Reason */}
-          <div>
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-              Reason
-            </label>
-            <textarea
-              placeholder="Note for the record..."
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className="w-full border border-gray-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none mt-1 min-h-[80px]"
-              required
-            />
-          </div>
+          <FormTextArea
+            label="Reason"
+            name="behalfLeaveReason"
+            placeholder="Note for the record..."
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            required
+          />
       </form>
     </Modal>
   );
