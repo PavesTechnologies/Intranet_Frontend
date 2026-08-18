@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/Modal/modal";
 import FormSelect from "../../../components/forms/FormSelect";
+import FormTextArea from "../../../components/forms/FormTextArea";
 
 export default function CancellationModal({
   title,
@@ -89,17 +90,16 @@ export default function CancellationModal({
         {/* Custom Reason Textarea */}
         {isOther && (
           <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700">
-              Enter Custom Reason <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              maxLength="60"
-              rows="2"
+            <FormTextArea
+              label="Enter Custom Reason"
+              requiredMark
+              name="customReason"
+              maxLength={60}
+              rows={2}
               value={customReason}
               onChange={(e) => setCustomReason(e.target.value)}
               placeholder="Type your reason here..."
-              className="w-full mt-1 px-4 py-3 border border-gray-300 rounded-lg
-              focus:ring-2 focus:ring-indigo-500 resize-none"
+              inputClassName="resize-none"
             />
           </div>
         )}

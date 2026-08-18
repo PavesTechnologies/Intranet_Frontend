@@ -2,6 +2,7 @@ import React, { useState, useEffect, Fragment, useMemo } from "react";
 import api from "../../../api/axiosInstance";
 import FormSelect from "../../../components/forms/FormSelect";
 import FormInput from "../../../components/forms/FormInput";
+import FormTextArea from "../../../components/forms/FormTextArea";
 import {
   Lock,
   CalendarDays,
@@ -685,16 +686,15 @@ export default function EditLeaveModal({
 
             {/* Reason */}
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
-                Reason
-              </label>
-              <textarea
-                maxLength="100"
-                rows="3"
+              <FormTextArea
+                label="Reason"
+                name="reason"
+                maxLength={100}
+                rows={3}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Add a reason for your leave..."
-                className="w-full border border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 focus:outline-none p-3 rounded-xl text-sm resize-none transition-all"
+                inputClassName="resize-none"
               />
               <p className="text-right text-xs text-gray-400 mt-0.5">
                 {reason.length}/100

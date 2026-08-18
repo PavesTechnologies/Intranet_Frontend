@@ -126,7 +126,7 @@ const HRManageTools = ({ employeeId }) => {
 
       {/* TABS - Matching LeaveSection Style */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="!inline-flex !h-auto !bg-transparent !p-0 !rounded-none !justify-start items-center gap-8 border-b border-gray-200">
+        <TabsList className="!inline-flex !h-auto !bg-transparent !p-0 !rounded-none !justify-start items-center gap-2 border-b border-gray-200">
           {tabs.map((tab) => (
             <TabsTrigger
               key={tab.id}

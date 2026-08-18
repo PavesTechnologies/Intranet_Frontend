@@ -3,8 +3,8 @@ import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import Button from "../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+import BackButton from "../../../components/patterns/BackButton";
 
 /* =========================
    Leave Type Card
@@ -246,7 +246,7 @@ export default function LeavePolicyViewer() {
           })}
         </div>
 
-        <Button variant="outline" onClick={() => navigate(-1)}>Back</Button>
+        <BackButton onClick={() => navigate(-1)} />
       </div>
 
       {/* Content */}

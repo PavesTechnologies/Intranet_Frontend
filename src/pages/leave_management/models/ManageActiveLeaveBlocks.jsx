@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ChevronDownIcon,
-  ArrowLeftCircleIcon,
   XMarkIcon,
   PencilSquareIcon,
   CheckIcon,
@@ -16,6 +15,7 @@ import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
 import DataTable from "../../../components/patterns/DataTable";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+import BackButton from "../../../components/patterns/BackButton";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const PMS_BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
@@ -862,25 +862,14 @@ export default function ManageActiveLeaveBlocks({ employeeId }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="border-b border-gray-200 bg-white/70 backdrop-blur-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between">
-          <div>
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5">
+          <div className="flex items-center gap-3">
+            <BackButton onClick={() => navigate(-1)} />
             <h1 className="text-xl font-semibold">Manage Blocked Leave</h1>
-            <p className="mt-1 text-xs">
-              View, edit, or unblock existing leave blocks set by the manager.
-            </p>
           </div>
-          <div>
-            <Button
-              type="button"
-              onClick={() => navigate(-1)}
-              variant="ghost"
-              size="icon"
-              aria-label="Go back"
-              className="text-blue-600 hover:text-blue-800"
-            >
-              <ArrowLeftCircleIcon className="mr-2 h-10 w-9" />
-            </Button>
-          </div>
+          <p className="mt-1 text-xs">
+            View, edit, or unblock existing leave blocks set by the manager.
+          </p>
         </div>
       </header>
 

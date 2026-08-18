@@ -8,6 +8,7 @@ import Button from "../../../components/Button/Button";
 import { useJobProgress } from "../../../contexts/JobProgressContext";
 import FormInput from "../../../components/forms/FormInput";
 import FormSelect from "../../../components/forms/FormSelect";
+import FormTextArea from "../../../components/forms/FormTextArea";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -482,21 +483,16 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
           )}
 
           {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              name="description"
-              type="text"
-              maxLength={50}
-              rows={2}
-              value={formData.description}
-              onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 resize-none"
-              placeholder="Describe the leave type"
-            />
-          </div>
+          <FormTextArea
+            label="Description"
+            name="description"
+            maxLength={50}
+            rows={2}
+            value={formData.description}
+            onChange={handleChange}
+            placeholder="Describe the leave type"
+            inputClassName="resize-none"
+          />
 
           {/* Boolean Fields */}
           {isGenderBasedLeave(formData.leaveName) ? (

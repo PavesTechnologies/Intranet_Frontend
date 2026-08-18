@@ -4,7 +4,6 @@ import {
   ChevronDownIcon,
   FunnelIcon,
   CalendarDaysIcon,
-  ArrowLeftCircleIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +13,7 @@ import DateRangePicker from "./DateRangePicker";
 import { format } from "date-fns";
 import Button from "../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+import BackButton from "../../../components/patterns/BackButton";
 
 const skeleton = "animate-pulse bg-gray-400 rounded hover:cursor-wait";
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
@@ -474,27 +474,14 @@ export default function BlockLeaveDates({ employeeId }) {
     <div className="min-h-screen bg-gray-50">
       <header className="border-b border-gray-200 bg-white/70 backdrop-blur-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-semibold">Block Leave Dates</h1>
-              <p className="mt-1 text-xs">
-                Choose a project, select employees and leave types, then apply a
-                date range.
-              </p>
-            </div>
-            <div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate(-1)}
-                className="text-blue-600 hover:text-blue-800"
-                aria-label="Go back"
-              >
-                <ArrowLeftCircleIcon className="mr-2 h-10 w-9" />
-              </Button>
-            </div>
+          <div className="flex items-center gap-3">
+            <BackButton onClick={() => navigate(-1)} />
+            <h1 className="text-xl font-semibold">Block Leave Dates</h1>
           </div>
+          <p className="mt-1 text-xs">
+            Choose a project, select employees and leave types, then apply a
+            date range.
+          </p>
         </div>
       </header>
 

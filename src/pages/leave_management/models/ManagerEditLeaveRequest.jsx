@@ -620,6 +620,7 @@ import { toast } from "react-toastify";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import FormSelect from "../../../components/forms/FormSelect";
+import FormTextArea from "../../../components/forms/FormTextArea";
 import { format } from "date-fns";
 import DateRangePicker from "./DateRangePicker";
 import { useRecordLock } from "../hooks/useRecordLock";
@@ -1251,16 +1252,15 @@ export default function ManagerEditLeaveRequest({
 
             {/* Manager Comment */}
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
-                Manager Comment
-              </label>
-              <textarea
-                maxLength="100"
-                rows="3"
+              <FormTextArea
+                label="Manager Comment"
+                name="managerComment"
+                maxLength={100}
+                rows={3}
                 value={managerComment}
                 onChange={(e) => setManagerComment(e.target.value)}
                 placeholder="Add a comment for the employee..."
-                className="w-full border border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 focus:outline-none p-3 rounded-xl text-sm resize-none transition-all"
+                inputClassName="resize-none"
               />
               <p className="text-right text-xs text-gray-400 mt-0.5">
                 {managerComment.length}/100

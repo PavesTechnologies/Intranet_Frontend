@@ -54,7 +54,7 @@ const PendingApprovalsQueueView = () => {
         </div>
       ) : requests.length === 0 ? (
         <EmptyState
-          icon={<img src={clearingDesk} alt="" className="h-32 w-32" />}
+          icon={<img src={clearingDesk} alt="" className="h-40 w-40" />}
           title="No Pending Approvals."
         />
       ) : (

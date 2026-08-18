@@ -4,6 +4,7 @@ import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import FormSelect from "../../../components/forms/FormSelect";
 import FormInput from "../../../components/forms/FormInput";
+import FormTextArea from "../../../components/forms/FormTextArea";
 import { useAuth } from "../../../contexts/AuthContext";
 import { toast } from "react-toastify";
 import { format } from "date-fns";
@@ -645,20 +646,17 @@ export default function RequestLeaveModal({
             </div>
           )}
 
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">
-              Reason <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              maxLength="100"
-              rows="3"
-              cols="40"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Add a reason"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 resize-none"
-            />
-          </div>
+          <FormTextArea
+            label="Reason"
+            requiredMark
+            name="reason"
+            maxLength={100}
+            rows={3}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Add a reason"
+            inputClassName="resize-none"
+          />
 
           {shouldShowDriveLink() && (
             <div className="space-y-1">

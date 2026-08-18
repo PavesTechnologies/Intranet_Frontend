@@ -25,8 +25,8 @@ export default function PageHeader({ title, subtitle, actions, breadcrumbs, clas
             ))}
           </nav>
         ) : null}
-        <h1 className={`${Fonts.heading3} md:text-3xl`}>{title}</h1>
-        {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
+        <h1 className={`${Fonts.heading3} md:text-xl`}>{title}</h1>
+        {subtitle ? <p className="mt-1 text-xs text-slate-500">{subtitle}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
     </div>

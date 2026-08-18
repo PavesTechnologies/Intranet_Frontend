@@ -4,10 +4,10 @@ import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import beachDay from "../../../components/icons/beach-day_cnsv.svg";
-import Button from "../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import StatusBadge from "../../../components/patterns/StatusBadge";
 import EmptyState from "../../../components/patterns/EmptyState";
+import BackButton from "../../../components/patterns/BackButton";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -201,17 +201,11 @@ export default function LeaveDetailsPage() {
           {/* Column 2: Main Content */}
           <main className="lg:col-span-3">
             {/* Page Header */}
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3 mb-8">
+              <BackButton onClick={() => navigate(-1)} />
               <h1 className="text-2xl font-bold text-gray-800">
                 {displayName || "Leave"} History - {new Date().getFullYear()}
               </h1>
-              <Button
-                onClick={() => navigate(-1)}
-                variant="link"
-                className="text-indigo-600 font-semibold hover:text-indigo-800"
-              >
-                &larr; Back
-              </Button>
             </div>
 
             {/* Render leave requests grouped by month */}
