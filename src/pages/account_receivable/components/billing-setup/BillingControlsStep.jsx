@@ -1,9 +1,11 @@
+import { Receipt } from "lucide-react";
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import { getActivePaymentTerms, getActiveTaxRegions, getApiErrorMessage } from "../../services/billingConfigurationService";
 import RadioCardGroup from "../common/RadioCardGroup";
+import ToggleSwitch from "../common/ToggleSwitch";
 import { useEffect, useState } from "react";
 
 const INVOICE_GENERATION_OPTIONS = [
@@ -139,14 +141,6 @@ export default function BillingControlsStep({ value = {}, onChange }) {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="border-b border-slate-100 pb-4">
-        <h2 className={Fonts.heading3}>Invoice Preferences</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Configure how invoices are generated and payment terms after the amount is calculated.
-        </p>
-      </div>
-
       {/* Section 1: Invoice generation */}
       <div className="space-y-5">
         <div>
@@ -262,30 +256,31 @@ export default function BillingControlsStep({ value = {}, onChange }) {
           </div>
           </div>
 
-          <div className="max-w-md rounded-lg border border-slate-200 p-3.5">
-            <label className="flex items-start gap-2.5 text-sm font-medium text-slate-700 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={Boolean(value.expenseBillingEligible)}
-                onChange={(event) => update({ expenseBillingEligible: event.target.checked })}
-                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-              />
-              <span>
-                Expense billing eligible
-                <span className="mt-0.5 block text-xs font-normal text-slate-400">
-                  Project expenses can be included on generated invoices.
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start gap-3 min-w-0">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-500">
+                  <Receipt className="h-4 w-4" />
                 </span>
-              </span>
-            </label>
-          </div>
-
-          {/* Payment preview summary block */}
-          {previewText && (
-            <div className="rounded-lg bg-blue-50/50 border border-blue-100 p-4 text-sm text-blue-800">
-              <span className="font-semibold block mb-1">Invoice timeline preview</span>
-              <span className="font-medium">{previewText}</span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-slate-800">Expense billing eligible</span>
+                  <span className="block text-xs text-slate-500">Project expenses can be included on generated invoices.</span>
+                </span>
+              </div>
+              <ToggleSwitch
+                checked={Boolean(value.expenseBillingEligible)}
+                onChange={(checked) => update({ expenseBillingEligible: checked })}
+              />
             </div>
-          )}
+
+            {/* Payment preview summary block */}
+            {previewText && (
+              <div className="rounded-xl border-l-4 border-l-indigo-500 border-y border-r border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <span className="mb-1 block font-semibold text-slate-900">Invoice timeline preview</span>
+                <span className="font-medium">{previewText}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

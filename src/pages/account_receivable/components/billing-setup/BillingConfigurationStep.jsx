@@ -5,8 +5,8 @@ import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
 import Button from "../../../../components/Button/Button";
-import GenericTable from "../../../../components/Table/table";
-import Modal from "../../../../components/ui/Modal";
+import ARTable from "../common/ARTable";
+import Modal from "../../../../components/Modal/modal";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { Fonts } from "../../../../components/Fonts/Fonts";
@@ -159,10 +159,45 @@ function normalizeBillingType(type) {
 
 function SectionCard({ title, children }) {
   return (
-    <div className="rounded-xl border border-slate-200 p-5">
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <h3 className="mb-4 text-sm font-semibold text-slate-900">{title}</h3>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{children}</div>
     </div>
+  );
+}
+
+function PillSelectGroup({ name, options, value, onChange, disabled = false }) {
+  return (
+    <div role="radiogroup" aria-label={name} className="flex flex-wrap gap-2">
+      {options.map((option) => {
+        const isSelected = String(value) === String(option.value);
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={isSelected}
+            disabled={disabled}
+            onClick={() => onChange?.(option.value)}
+            className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#0A0082]/30 ${
+              isSelected
+                ? "border-[#0A0082] bg-[#0A0082]/5 text-[#0A0082]"
+                : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+            } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PmsSyncedBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
+      Synced from PMS
+    </span>
   );
 }
 
@@ -471,12 +506,8 @@ function TimeAndMaterialForm({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border border-slate-200 p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">
-          Rate Configuration
-        </h3>
-
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 p-4">
         {billingMode === "STANDARD" && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <FormInput
@@ -528,14 +559,9 @@ function TimeAndMaterialForm({
         {billingMode === "ROLE_BASED" && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-semibold text-slate-900">
-                  Role-Based Rates
-                </h4>
-                <p className="text-xs text-slate-500">
-                  Define a billing rate for each role on this engagement.
-                </p>
-              </div>
+              <h4 className="text-sm font-semibold text-slate-900">
+                Role-Based Rates
+              </h4>
               {!isExisting && (
                 <Button variant="outline" size="small" onClick={addRole}>
                   <Plus className="h-3.5 w-3.5" /> Add Role
@@ -544,27 +570,25 @@ function TimeAndMaterialForm({
             </div>
 
             {loadingRows ? (
-              <p className="text-sm text-slate-500">
-                Loading role-based rates…
-              </p>
+              <p className="text-sm text-slate-500">Loading…</p>
             ) : null}
 
             {rows.length === 0 ? (
               <p className="rounded-xl border border-dashed border-slate-200 py-6 text-center text-sm text-slate-500">
-                No roles added yet. Click "Add Role" to define your first rate.
+                No roles added yet.
               </p>
             ) : (
               <div className="w-full overflow-x-auto rounded-xl border border-slate-200">
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                   <thead>
-                    <tr className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      <th className="px-4 py-3 text-left">Role</th>
-                      <th className="px-4 py-3 text-left">Rate ({currency})</th>
-                      <th className="px-4 py-3 text-left">Rate Period</th>
-                      <th className="px-4 py-3 text-left">Effective From</th>
-                      <th className="px-4 py-3 text-left">Effective To</th>
+                    <tr className="border-b border-slate-200 bg-slate-50">
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Role</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Rate ({currency})</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Rate Period</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Effective From</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Effective To</th>
                       {!isExisting && (
-                        <th className="px-4 py-3 text-center w-24">Actions</th>
+                        <th className="px-4 py-3 text-center w-24 font-semibold text-slate-600">Actions</th>
                       )}
                     </tr>
                   </thead>
@@ -572,7 +596,7 @@ function TimeAndMaterialForm({
                     {rows.map((item, index) => (
                       <tr
                         key={index}
-                        className="align-top hover:bg-slate-50/60 transition-colors"
+                        className="align-top transition-colors hover:bg-slate-50"
                       >
                         <td className="px-4 py-3 min-w-[160px]">
                           <FormInput
@@ -848,25 +872,12 @@ function MilestoneForm({
           </Button>
         </div>
 
-        {milestones.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-500">
-            No milestones added yet. Add at least one milestone.
-          </p>
-        ) : (
-          <div className="w-full overflow-x-auto">
-            <GenericTable
-              headers={[
-                "Milestone Name",
-                "Amount",
-                "Due Date",
-                "Status",
-                "Actions",
-              ]}
-              columns={["name", "amount", "dueDate", "status", "actions"]}
-              rows={tableRows}
-            />
-          </div>
-        )}
+        <ARTable
+          headers={["Milestone Name", "Amount", "Due Date", "Status", "Actions"]}
+          columns={["name", "amount", "dueDate", "status", "actions"]}
+          rows={tableRows}
+          emptyMessage="No milestones added yet. Add at least one milestone."
+        />
       </div>
 
       <div className="space-y-4 rounded-xl border border-slate-200 p-5">
@@ -896,7 +907,7 @@ function MilestoneForm({
         isOpen={Boolean(modalState)}
         onClose={() => setModalState(null)}
         title={modalState?.mode === "add" ? "Add Milestone" : "Edit Milestone"}
-        width="420px"
+        size="sm"
       >
         {modalState && (
           <div className="space-y-4">
@@ -1187,132 +1198,103 @@ export default function BillingConfigurationStep({
 
   return (
     <div className="space-y-5">
-      <div className="border-b border-slate-100 pb-4">
-        <h2 className={Fonts.heading3}>Commercial Configuration</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Configure pricing, currency, and rate calculation for this billing
-          setup.
-        </p>
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-slate-900">Project Financials</h3>
+          {(isPmsSourced || hasPmsBudget) && <PmsSyncedBadge />}
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {isPmsSourced ? (
+            <ReadOnlyField label="Billing Currency *" value={currency} />
+          ) : (
+            <FormSelect
+              label="Billing Currency *"
+              name="currency"
+              value={currency}
+              onChange={(e) =>
+                onProjectInfoChange({
+                  ...projectInfo,
+                  currency: e.target.value,
+                  projectBudgetCurrency: e.target.value,
+                })
+              }
+              options={CURRENCY_OPTIONS}
+            />
+          )}
+
+          {hasPmsBudget ? (
+            <ReadOnlyField label="Project Budget" value={projectInfo.projectBudget} />
+          ) : (
+            <FormInput
+              label="Project Budget"
+              name="projectBudget"
+              type="number"
+              min="0"
+              step="0.01"
+              value={projectInfo.projectBudget ?? ""}
+              onChange={(e) =>
+                onProjectInfoChange({
+                  ...projectInfo,
+                  projectBudget: e.target.value,
+                })
+              }
+              placeholder="e.g. 45678"
+            />
+          )}
+        </div>
       </div>
 
-      <div className="space-y-5">
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-          <div className="max-w-xs space-y-1.5">
-            {isPmsSourced ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <label className="block text-sm font-medium text-slate-700">
-                    Billing Currency *
-                  </label>
-                  <PmsSyncedBadge />
-                </div>
-                <ReadOnlyField value={currency} />
-              </>
-            ) : (
-              <FormSelect
-                label="Billing Currency *"
-                name="currency"
-                value={currency}
-                onChange={(e) =>
-                  onProjectInfoChange({
-                    ...projectInfo,
-                    currency: e.target.value,
-                    projectBudgetCurrency: e.target.value,
-                  })
-                }
-                options={CURRENCY_OPTIONS}
-              />
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            {hasPmsBudget ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <label className="block text-sm font-medium text-slate-700">
-                    Project Budget
-                  </label>
-                  <PmsSyncedBadge />
-                </div>
-                <ReadOnlyField value={projectInfo.projectBudget} />
-              </>
-            ) : (
-              <FormInput
-                label="Project Budget"
-                name="projectBudget"
-                type="number"
-                min="0"
-                step="0.01"
-                value={projectInfo.projectBudget ?? ""}
-                onChange={(e) =>
-                  onProjectInfoChange({
-                    ...projectInfo,
-                    projectBudget: e.target.value,
-                  })
-                }
-                placeholder="e.g. 45678"
-              />
-            )}
-          </div>
-
-          <div className="md:col-span-2 space-y-2">
-            <label className="block text-sm font-medium text-slate-700">
-              Billing Type <span className="text-red-500">*</span>
-            </label>
-            <div className="space-y-2">
-              {loadingBillingData ? (
-                <p className="text-sm text-slate-500">
-                  Loading billing types and frequencies...
-                </p>
-              ) : null}
-              <RadioCardGroup
-                name="billingTypeId"
-                options={activeBillingTypeOptions.map((type) => ({
-                  value: type.billingTypeId,
-                  label: type.label,
-                }))}
-                value={billingTypeId}
-                onChange={handleBillingTypeChange}
-                columns={3}
-              />
-            </div>
-          </div>
-
-          <div className="md:col-span-2 space-y-2">
-            <label className="block text-sm font-medium text-slate-700">
-              Billing Frequency <span className="text-red-500">*</span>
-            </label>
-            <RadioCardGroup
-              name="billingFrequencyId"
-              options={frequencyOptions.map((f) => ({
-                value: f.billingFrequencyId,
-                label: f.label,
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-slate-700">
+            Billing Type <span className="text-red-500">*</span>
+          </label>
+          {loadingBillingData ? (
+            <p className="text-sm text-slate-500">Loading…</p>
+          ) : (
+            <PillSelectGroup
+              name="billingTypeId"
+              options={activeBillingTypeOptions.map((type) => ({
+                value: type.billingTypeId,
+                label: type.label,
               }))}
-              value={billingFrequencyId}
-              onChange={(next) => {
-                const selectedFrequency = activeBillingFrequencyOptions.find(
-                  (option) =>
-                    String(option.billingFrequencyId) === String(next),
-                );
-                update({
-                  billingFrequency: selectedFrequency?.value || "",
-                  billingFrequencyId:
-                    selectedFrequency?.billingFrequencyId ||
-                    selectedFrequency?.id ||
-                    "",
-                });
-              }}
-              columns={3}
+              value={billingTypeId}
+              onChange={handleBillingTypeChange}
             />
-          </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-slate-700">
+            Billing Frequency <span className="text-red-500">*</span>
+          </label>
+          <PillSelectGroup
+            name="billingFrequencyId"
+            options={frequencyOptions.map((f) => ({
+              value: f.billingFrequencyId,
+              label: f.label,
+            }))}
+            value={billingFrequencyId}
+            onChange={(next) => {
+              const selectedFrequency = activeBillingFrequencyOptions.find(
+                (option) =>
+                  String(option.billingFrequencyId) === String(next),
+              );
+              update({
+                billingFrequency: selectedFrequency?.value || "",
+                billingFrequencyId:
+                  selectedFrequency?.billingFrequencyId ||
+                  selectedFrequency?.id ||
+                  "",
+              });
+            }}
+          />
         </div>
       </div>
 
       {!isExisting && pricingModelOptions.length > 0 && (
-        <div className="space-y-6 pt-6 border-t border-slate-100">
-          <div>
-            <h3 className={Fonts.subheading}>Pricing model</h3>
-          </div>
+        <div className="space-y-3 pt-5 border-t border-slate-100">
+          <h3 className={Fonts.subheading}>Pricing Model</h3>
 
           <RadioCardGroup
             name="billingMode"
@@ -1335,10 +1317,8 @@ export default function BillingConfigurationStep({
       )}
 
       {billingType !== "" ? (
-        <div className="space-y-6 pt-6 border-t border-slate-100">
-          <div>
-            <h3 className={Fonts.subheading}>Rate details</h3>
-          </div>
+        <div className="space-y-3 pt-5 border-t border-slate-100">
+          <h3 className={Fonts.subheading}>Rate Details</h3>
           <div>
             {billingType === "TIME_MATERIAL" && (
               <TimeAndMaterialForm

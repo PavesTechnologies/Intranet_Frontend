@@ -53,22 +53,22 @@ export default function BillingSummaryGrid({ config = {} }) {
   ];
 
   return (
-    <div className="rounded-2xl bg-white p-5 border border-slate-200/90 shadow-sm space-y-3">
-      <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
         <Layers className="h-4 w-4 text-indigo-600" />
         Enterprise Setup Parameters
       </h3>
 
-      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6 text-xs bg-slate-50/70 p-4 rounded-xl border border-slate-200/80">
+      <div className="grid grid-cols-2 gap-3.5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs sm:grid-cols-3 lg:grid-cols-6">
         {fields.map((f, i) => (
           <div key={i} className="space-y-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block flex items-center gap-1">
+            <span className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
               <f.icon className="h-3 w-3 text-slate-400" />
               {f.label}
             </span>
             <span
-              className={`font-bold text-slate-900 block truncate ${
-                f.isMono ? "font-mono text-indigo-700 font-extrabold" : ""
+              className={`block truncate font-semibold text-slate-900 ${
+                f.isMono ? "font-mono tabular-nums text-indigo-700" : ""
               }`}
             >
               {f.value}

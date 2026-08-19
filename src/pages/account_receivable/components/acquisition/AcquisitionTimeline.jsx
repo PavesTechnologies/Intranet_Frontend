@@ -39,32 +39,32 @@ export default function AcquisitionTimeline({ history = [] }) {
   const events = history.length > 0 ? history : defaultHistory;
 
   return (
-    <div className="rounded-2xl bg-white p-5 border border-slate-200/90 shadow-sm space-y-4">
+    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-indigo-600" />
-          <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
-            Recent Acquisition Activity & Operational Audit Log
+          <h3 className="text-sm font-semibold text-slate-900">
+            Recent Acquisition Activity &amp; Operational Audit Log
           </h3>
         </div>
-        <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full font-mono">
+        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-mono text-xs font-medium text-slate-500">
           System Audit Log
         </span>
       </div>
 
       <div className="space-y-3 pt-1">
         {events.map((evt, idx) => (
-          <div key={evt.id || idx} className="flex items-start gap-3 text-xs group">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 flex-shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+          <div key={evt.id || idx} className="group flex items-start gap-3 text-xs">
+            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 text-indigo-600 transition-colors group-hover:bg-indigo-600 group-hover:text-white">
               <Activity className="h-3.5 w-3.5" />
             </div>
-            <div className="flex-1 space-y-0.5 bg-slate-50/60 group-hover:bg-indigo-50/30 p-3 rounded-xl border border-slate-200/70 transition-colors">
+            <div className="flex-1 space-y-0.5 rounded-xl border border-slate-200 bg-slate-50/60 p-3 transition-colors group-hover:bg-indigo-50/30">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-900 text-xs">{evt.event}</span>
-                <span className="text-[10px] text-slate-400 font-mono">{evt.timestamp}</span>
+                <span className="text-xs font-semibold text-slate-900">{evt.event}</span>
+                <span className="font-mono text-[11px] text-slate-400">{evt.timestamp}</span>
               </div>
-              <p className="text-[11px] text-slate-600">{evt.details}</p>
-              <div className="text-[10px] text-slate-400 pt-1 font-mono flex items-center gap-1">
+              <p className="text-xs text-slate-600">{evt.details}</p>
+              <div className="flex items-center gap-1 pt-1 font-mono text-[11px] text-slate-400">
                 <UserCheck className="h-3 w-3 text-slate-400" /> Actor: {evt.actor}
               </div>
             </div>

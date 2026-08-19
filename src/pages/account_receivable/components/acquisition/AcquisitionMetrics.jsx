@@ -21,7 +21,7 @@ export default function AcquisitionMetrics({ configs = [] }) {
       value: activeCount,
       helper: "Configured projects",
       icon: FolderKanban,
-      color: "blue",
+      color: "bg-slate-500 text-white",
     },
     {
       key: "readyAcquire",
@@ -29,7 +29,7 @@ export default function AcquisitionMetrics({ configs = [] }) {
       value: readyToAcquire,
       helper: "Awaiting snapshot creation",
       icon: Play,
-      color: "amber",
+      color: "bg-amber-500 text-white",
     },
     {
       key: "snapshotsReady",
@@ -37,7 +37,7 @@ export default function AcquisitionMetrics({ configs = [] }) {
       value: snapshotsReady,
       helper: "Acquired for invoicing",
       icon: CheckCircle2,
-      color: "green",
+      color: "bg-emerald-600 text-white",
     },
     {
       key: "billed",
@@ -45,7 +45,7 @@ export default function AcquisitionMetrics({ configs = [] }) {
       value: alreadyBilled,
       helper: "Completed cycles",
       icon: FileCheck,
-      color: "indigo",
+      color: "bg-indigo-600 text-white",
     },
     {
       key: "auto",
@@ -53,7 +53,7 @@ export default function AcquisitionMetrics({ configs = [] }) {
       value: autoCycles,
       helper: "Scheduled generation",
       icon: Clock,
-      color: "emerald",
+      color: "bg-orange-500 text-white",
     },
   ];
 

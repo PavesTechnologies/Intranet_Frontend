@@ -773,6 +773,11 @@ export const deactivateBillingConfiguration = async (billingConfigurationId) => 
   return unwrapData(response);
 };
 
+export const deleteBillingConfiguration = async (billingConfigurationId) => {
+  const response = await api.delete(`${BILLING_CONFIGURATIONS_URL}/${billingConfigurationId}`);
+  return unwrapData(response);
+};
+
 export const activateBillingConfiguration = async (billingConfigurationId) => {
   const id = extractBillingConfigurationId(billingConfigurationId);
   if (!id) {
@@ -1019,6 +1024,7 @@ export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
   const requestPayload = {
     clientId: projectInfo.clientId || wizardPayload.clientId || "",
     projectId: projectInfo.projectId || wizardPayload.projectId || "",
+    projectCode: projectInfo.projectCode || wizardPayload.projectCode || "",
     billingTypeId: billingConfig.billingTypeId || wizardPayload.billingTypeId || "",
     billingFrequencyId: billingConfig.billingFrequencyId || wizardPayload.billingFrequencyId || "",
     paymentTermId: controls.paymentTermId || wizardPayload.paymentTermId || "",

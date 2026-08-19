@@ -64,17 +64,17 @@ export default function AcquisitionQueue({
   ];
 
   return (
-    <div className="flex flex-col h-full rounded-2xl bg-white border border-slate-200/90 shadow-sm overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       {/* Panel Header */}
-      <div className="p-4 border-b border-slate-100 bg-slate-50/50 space-y-3">
+      <div className="space-y-3 border-b border-slate-100 bg-slate-50/50 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Layers className="h-4 w-4 text-indigo-600" />
-            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+            <h2 className="text-sm font-semibold text-slate-900">
               Acquisition Queue
             </h2>
           </div>
-          <span className="text-[11px] font-bold text-slate-500 font-mono bg-slate-200/60 px-2 py-0.5 rounded-full">
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-xs font-medium text-slate-500">
             {filteredConfigs.length} / {configs.length}
           </span>
         </div>
@@ -87,27 +87,27 @@ export default function AcquisitionQueue({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search project or client..."
-            className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+            className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 transition-all focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
           />
         </div>
 
         {/* Status Filter Pills */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar text-xs">
+        <div className="no-scrollbar flex items-center gap-1 overflow-x-auto pb-1 text-xs">
           {tabs.map((tab) => {
             const isActive = selectedStatusTab === tab.key;
             return (
               <button
                 key={tab.key}
                 onClick={() => setSelectedStatusTab(tab.key)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all whitespace-nowrap cursor-pointer ${
+                className={`inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
                   isActive
-                    ? "bg-indigo-600 text-white shadow-xs"
-                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                    ? "bg-[#0A0082] text-white shadow-sm"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
                 }`}
               >
                 {tab.label}
                 <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
                     isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
                   }`}
                 >
@@ -120,71 +120,70 @@ export default function AcquisitionQueue({
       </div>
 
       {/* Queue Item List */}
-      <div className="flex-1 overflow-y-auto divide-y divide-slate-100 p-2 space-y-1.5 max-h-[640px]">
+      <div className="max-h-[640px] flex-1 space-y-1.5 overflow-y-auto p-2">
         {loading ? (
-          <div className="p-8 text-center text-xs text-slate-400 space-y-2">
-            <div className="animate-spin h-5 w-5 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto" />
+          <div className="space-y-2 p-8 text-center text-xs text-slate-400">
+            <div className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
             <p>Loading projects...</p>
           </div>
         ) : filteredConfigs.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-400 space-y-1">
+          <div className="space-y-1 p-8 text-center text-xs text-slate-400">
             <p className="font-semibold text-slate-600">No matching projects</p>
-            <p className="text-[11px]">Adjust your search or status filter.</p>
+            <p>Adjust your search or status filter.</p>
           </div>
         ) : (
           filteredConfigs.map((cfg) => {
             const isSelected = selectedConfigId === cfg.projectId;
-            const isReady = cfg.billingStatus === "READY" || cfg.billingStatus === "Ready" || Boolean(cfg.snapshotNumber);
 
             return (
               <div
                 key={cfg.projectId}
                 onClick={() => onSelectConfig(cfg)}
-                className={`group relative rounded-xl p-3.5 transition-all cursor-pointer border ${
+                className={`group relative cursor-pointer rounded-xl border p-3.5 transition-all ${
                   isSelected
-                    ? "bg-indigo-50/80 border-indigo-500 shadow-sm ring-1 ring-indigo-400/40"
-                    : "bg-white border-slate-200/70 hover:border-slate-300 hover:bg-slate-50/80"
+                    ? "border-indigo-300 bg-indigo-50/60 shadow-sm ring-1 ring-indigo-200"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                 }`}
               >
                 {/* Active Indicator Strip */}
                 {isSelected && (
-                  <span className="absolute left-0 top-3 bottom-3 w-1 rounded-r-full bg-indigo-600" />
+                  <span className="absolute bottom-3 left-0 top-3 w-1 rounded-r-full bg-indigo-600" />
                 )}
 
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs text-slate-900 group-hover:text-indigo-900 transition-colors">
+                      <span className="text-xs font-semibold text-slate-900 transition-colors group-hover:text-indigo-900">
                         {cfg.projectName}
                       </span>
-                      <span className="font-mono text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                      <span className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
                         {cfg.projectCode}
                       </span>
                     </div>
-                    <p className="text-[11px] font-medium text-slate-500">{cfg.client}</p>
+                    <p className="text-xs font-medium text-slate-500">{cfg.client}</p>
                   </div>
                   <ChevronRight
                     className={`h-4 w-4 flex-shrink-0 transition-transform ${
-                      isSelected ? "text-indigo-600 translate-x-0.5" : "text-slate-300 group-hover:text-slate-500"
+                      isSelected ? "translate-x-0.5 text-indigo-600" : "text-slate-300 group-hover:text-slate-500"
                     }`}
                   />
                 </div>
 
-                <div className="mt-3 flex items-center justify-between text-[11px] pt-2 border-t border-slate-100">
+                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-xs">
                   <div className="flex items-center gap-1.5 text-slate-500">
                     <Calendar className="h-3 w-3 text-slate-400" />
-                    <span className="font-mono text-[10px]">{cfg.billingPeriod}</span>
+                    <span className="font-mono text-[11px]">{cfg.billingPeriod}</span>
                   </div>
-                  <StatusBadge label={cfg.billingStatus} size="xs" />
+                  <StatusBadge label={cfg.billingStatus} size="sm" />
                 </div>
 
                 {/* Sub-label tags */}
-                <div className="mt-2 flex items-center gap-2 text-[10px]">
-                  <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold">
+                <div className="mt-2 flex items-center gap-2 text-[11px]">
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
                     {BILLING_TYPE_LABELS[cfg.billingType] || cfg.billingType}
                   </span>
                   {cfg.snapshotNumber && (
-                    <span className="inline-flex items-center gap-1 text-emerald-700 font-mono bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-bold">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono font-semibold text-emerald-700">
                       <CheckCircle2 className="h-2.5 w-2.5" />
                       {cfg.snapshotNumber}
                     </span>
