@@ -282,6 +282,7 @@ import Overview from "./pages/account_receivable/pages/Overview.jsx";
 import BillingConfigurations from "./pages/account_receivable/pages/BillingConfigurations.jsx";
 import NewConfigurationWizard from "./pages/account_receivable/pages/NewConfigurationWizard.jsx";
 import BillingDataAcquisition from "./pages/account_receivable/pages/BillingDataAcquisition.jsx";
+import AcquisitionDetail from "./pages/account_receivable/pages/AcquisitionDetail.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -631,6 +632,10 @@ const AppRoutes = () => {
             <Route
               path="billing-data-acquisition/workspace"
               element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingDataAcquisition /></ProtectedRoute>}
+            />
+            <Route
+              path="billing-data-acquisition/:projectId"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><AcquisitionDetail /></ProtectedRoute>}
             />
             {/* Configuration history removed — not supported by backend */}
           </Route>

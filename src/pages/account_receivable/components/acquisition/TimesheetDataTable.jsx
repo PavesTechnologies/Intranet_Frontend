@@ -54,7 +54,7 @@ export default function TimesheetDataTable({
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center space-y-3 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+      <div className="flex h-full flex-col items-center justify-center space-y-3 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
         <Loader />
         <p className="text-xs font-medium text-slate-500">Fetching source timesheets from TMS integration...</p>
       </div>
@@ -62,19 +62,14 @@ export default function TimesheetDataTable({
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       {/* Header & Controls */}
-      <div className="flex flex-col justify-between gap-3 border-b border-slate-100 pb-3 sm:flex-row sm:items-center">
-        <div>
-          <div className="flex items-center gap-2">
-            <FileSpreadsheet className="h-4 w-4 text-indigo-600" />
-            <h3 className="text-sm font-semibold text-slate-900">
-              Acquired Source Data (Timesheets)
-            </h3>
-          </div>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Verified billable records synchronized from Time Management System (TMS).
-          </p>
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-2">
+          <FileSpreadsheet className="h-4 w-4 text-indigo-600" />
+          <h3 className="text-sm font-semibold text-slate-900">
+            Source Timesheets
+          </h3>
         </div>
 
         <div className="flex items-center gap-3">
@@ -95,7 +90,7 @@ export default function TimesheetDataTable({
       </div>
 
       {/* Table */}
-      <div className="max-h-72 w-full overflow-x-auto overflow-y-auto rounded-xl border border-slate-200">
+      <div className="max-h-[28rem] w-full overflow-x-auto overflow-y-auto rounded-xl border border-slate-200">
         <table className="min-w-full divide-y divide-slate-200 text-xs">
           <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
             <tr className="text-slate-600">
@@ -166,8 +161,8 @@ export default function TimesheetDataTable({
         </table>
       </div>
 
-      <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-500">
-        <Info className="h-4 w-4 flex-shrink-0 text-indigo-600" />
+      <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+        <Info className="h-3 w-3 flex-shrink-0" />
         <span>
           TMS timesheets are automatically merged with commercial billing configuration rates during snapshot acquisition.
         </span>
