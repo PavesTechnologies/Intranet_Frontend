@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { Plus, Pencil, Trash2, Eye, FileStack, FilePlus2, Landmark, Layers, AlertCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, FileStack, FilePlus2, Landmark, Layers, AlertCircle, X } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import { PageCard, PageCardContent } from "@/components/Cards/PageCard";
 import GenericTable from "@/components/Table/table";
@@ -461,37 +462,61 @@ export default function MyExpensesPage() {
         )}
       </div>
 
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Edit Expense Report"
-        subtitle="Modify the selected expense report's properties."
-        size="lg"
-        fullScreenMobile
-        closeOnBackdrop={false}
-        footer={
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={submitting} className="w-full sm:w-auto">
-              Cancel
-            </Button>
-            <Button type="submit" form="report-edit-form" variant="primary" loading={submitting} loadingText="Saving..." disabled={submitting} className="w-full sm:w-auto">
-              Save Changes
-            </Button>
-          </div>
-        }
-      >
-        <form id="report-edit-form" onSubmit={handleFormSubmit} className="py-2">
-          <ReportFormFields
-            formData={formData}
-            formErrors={formErrors}
-            onInputChange={handleInputChange}
-            onSelectChange={handleSelectChange}
-            costCenterOptions={costCenterOptions}
-            currencyOptions={currencyOptions}
-            disabled={submitting}
+      {isModalOpen && createPortal(
+        <>
+          {/* Backdrop overlay */}
+          <div 
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] animate-in fade-in duration-200"
+            onClick={() => setIsModalOpen(false)}
           />
-        </form>
-      </Modal>
+          {/* Drawer Panel */}
+          <div 
+            className="fixed inset-y-0 right-0 z-[10000] w-full max-w-lg bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Edit Expense Report</h2>
+                <p className="text-xs text-gray-500 font-medium mt-0.5">Modify the selected expense report's properties.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable Form Content */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <form id="report-edit-form" onSubmit={handleFormSubmit} className="py-2">
+                <ReportFormFields
+                  formData={formData}
+                  formErrors={formErrors}
+                  onInputChange={handleInputChange}
+                  onSelectChange={handleSelectChange}
+                  costCenterOptions={costCenterOptions}
+                  currencyOptions={currencyOptions}
+                  disabled={submitting}
+                />
+              </form>
+            </div>
+
+            {/* Footer */}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end px-6 py-4 border-t border-gray-100 bg-gray-50 shrink-0">
+              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={submitting} className="w-full sm:w-auto">
+                Cancel
+              </Button>
+              <Button type="submit" form="report-edit-form" variant="primary" loading={submitting} loadingText="Saving..." disabled={submitting} className="w-full sm:w-auto">
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
 
       <ConfirmationModal
         isOpen={isConfirmOpen}
