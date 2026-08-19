@@ -686,7 +686,7 @@ export default function RequestLeaveModal({
             <Button
               type="button"
               onClick={onClose}
-              variant="ghost"
+              variant="outline"
               size="medium"
               disabled={submitting}
             >

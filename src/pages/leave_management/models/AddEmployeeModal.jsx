@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { X, User } from "lucide-react";
+import React, { useState } from "react";
+import { User } from "lucide-react";
 import api from "../../../api/axiosInstance";
 import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
 import FormSelect from "../../../components/forms/FormSelect";
+import Modal from "../../../components/Modal/modal";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -24,17 +25,6 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
-  useEffect(() => {
-    if (!isOpen) return;
-    document.body.style.overflow = "hidden";
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handler);
-    return () => {
-      document.body.style.overflow = "";
-      window.removeEventListener("keydown", handler);
-    };
-  }, [isOpen, onClose]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -98,31 +88,19 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
     });
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-2">
-      <div className="bg-white w-full max-w-lg sm:max-w-xl rounded-xl shadow-xl overflow-y-auto max-h-[90vh]">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <div className="flex items-center">
-            <User className="w-6 h-6 text-indigo-600 mr-3" />
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-              Add New Employee
-            </h2>
-          </div>
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            size="icon"
-            aria-label="Close"
-            className="text-gray-400 hover:text-gray-600"
-            type="button"
-          >
-            <X className="w-6 h-6" />
-          </Button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Add New Employee"
+      titleIcon={<User className="w-6 h-6 text-indigo-600" />}
+      panelClassName="max-w-lg sm:max-w-xl"
+      closeOnBackdrop={false}
+      closeOnEscape={true}
+      showCloseButton={true}
+      disableBodyScroll={true}
+    >
+        <form onSubmit={handleSubmit} className="space-y-5">
           {error && <div className="text-red-600 text-sm">{error}</div>}
           {success && <div className="text-green-600 text-sm">{success}</div>}
 
@@ -256,7 +234,6 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
             </Button>
           </div>
         </form>
-      </div>
       {/* Tailwind CSS input and btn class shorthands for clarity */}
       <style>{`
         .input {
@@ -279,7 +256,7 @@ const AddEmployeeModal = ({ isOpen, onClose }) => {
           transition: background 0.2s, color 0.2s;
         }
       `}</style>
-    </div>
+    </Modal>
   );
 };
 

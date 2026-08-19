@@ -12,6 +12,7 @@ import FormSelect from "../../../components/forms/FormSelect";
 import FilterBar from "../../../components/patterns/FilterBar";
 import DataTable from "../../../components/patterns/DataTable";
 import BackButton from "../../../components/patterns/BackButton";
+import PageContainer from "../../../components/patterns/PageContainer";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -135,7 +136,7 @@ const EditHolidaysPage = () => {
   });
 
   return (
-    <div className="relative p-6 space-y-4">
+    <PageContainer density="comfortable" className="relative space-y-4">
       {/* 🔹 Full-Screen Loading Spinner Overlay */}
       {isLoading && (
         <div className="fixed inset-0 bg-white/60 backdrop-blur-sm flex justify-center items-center z-[9999] animate-fadeIn">
@@ -173,8 +174,7 @@ const EditHolidaysPage = () => {
       </FilterBar>
 
       {/* Holidays Table */}
-      <div className="border rounded-lg overflow-hidden">
-        <DataTable
+      <DataTable
           emptyTitle="No holidays found"
           getRowKey={(holiday) => holiday.holidayId}
           rows={filteredHolidays}
@@ -354,7 +354,6 @@ const EditHolidaysPage = () => {
             },
           ]}
         />
-      </div>
       <ConfirmationModal
         isOpen={isDeleteConfirmationOpen}
         title="Confirm Deletion"
@@ -363,7 +362,7 @@ const EditHolidaysPage = () => {
         onCancel={() => setIsDeleteConfirmationOpen(false)}
         isLoading={isDeleting}
       />
-    </div>
+    </PageContainer>
   );
 };
 

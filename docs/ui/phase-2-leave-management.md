@@ -6163,3 +6163,774 @@ None. `src/components/patterns/DataTable.jsx`, `src/components/Button/Button.jsx
 ### git diff --check
 
 ✅ Clean (only pre-existing LF/CRLF informational warnings on files already touched in earlier steps, not errors). Only `src/pages/leave_management/models/CompOffBalanceRequests.jsx` (plus this documentation file) changed in this follow-up task.
+
+## P2.16 — Canonical PageContainer Migration
+
+### Canonical PageContainer API
+
+`src/components/patterns/PageContainer.jsx` (unmodified) — confirmed to have **zero prior consumers repository-wide** before this task:
+
+```jsx
+const DENSITY_CLASSES = {
+  comfortable: "p-4 md:p-6",
+  compact: "p-3 md:p-4",
+};
+export default function PageContainer({ children, className = "", density = "comfortable" }) {
+  return (
+    <div className={classNames("w-full min-h-full", DENSITY_CLASSES[density] || DENSITY_CLASSES.comfortable, className)}>
+      {children}
+    </div>
+  );
+}
+```
+
+It is a pure outer spacing wrapper: `w-full min-h-full` plus responsive padding (two density options) plus whatever `className` the caller adds. It has **no** `max-width`/`mx-auto` centering, **no** background-color capability, **no** `min-h-screen` (viewport-relative height — only `min-h-full`, relative to a sized ancestor), and no way to express asymmetric or single-axis (margin-only) spacing. These are documented capability gaps below, not fixed in this task.
+
+### Audit method
+
+A full read-only sweep of `src/pages/leave_management/**`, cross-referenced against `src/App.jsx`'s actual route table, to distinguish true routed page roots from embedded sub-components (embedding a second page-level spacing wrapper inside an already-spaced parent would create incorrect double-padding).
+
+### Audit totals
+
+- **Total page-root candidates audited**: ~26 files/components evaluated (routed pages, embedded sub-components, and dead files).
+- **Safe migration count**: 4.
+- **Specialized/excluded count**: ~22, spanning every classification category (specialized layout, embedded component, full-bleed/background page, modal/wizard content, dead code, capability gap).
+
+### Complete migrated-file list (Category A)
+
+1. `src/pages/leave_management/HRManageTools.jsx` — routed at `/leave-management/hr` (also embedded as a role-switched child of `EmployeePanel.jsx`, but since it's the *same* JSX regardless of which route renders it, migrating its own internal wrapper does not create nested containers).
+2. `src/pages/leave_management/models/EmployeeLeaveBalances.jsx` — routed at `/employee-leave-balance`.
+3. `src/pages/leave_management/models/EditHolidaysPage.jsx` — routed at `/edit-holidays`.
+4. `src/pages/leave_management/models/ApprovalRulesPage.jsx` — routed at `/approval-rules`.
+
+### Density selected per page
+
+All four used **`density="comfortable"`** (`p-4 md:p-6`), the closest available match to each page's original **uniform `p-6`** outer padding (`py-6 px-6`/`p-6`, applied at every breakpoint with no responsive variation). This is not a byte-for-byte match: `comfortable` applies `p-4` (16px) below the `md:` breakpoint instead of the original's constant `p-6` (24px) — an 8px mobile-padding reduction. This was accepted as the correct, non-arbitrary choice per this task's own guidance ("choose the density that most closely matches the existing page... do not introduce arbitrary spacing classes to recreate every legacy pixel value") rather than treated as a blocking regression, and is called out explicitly here for visibility rather than silently assumed identical.
+
+Exact mapping:
+| File | Original wrapper | Migrated to |
+|---|---|---|
+| `HRManageTools.jsx` | `<div className="space-y-6 py-6 px-6 max-w-7xl mx-auto">` | `<PageContainer density="comfortable" className="space-y-6 max-w-7xl mx-auto">` |
+| `EmployeeLeaveBalances.jsx` | `<div className="p-6 overflow-auto">` | `<PageContainer density="comfortable" className="overflow-auto">` |
+| `EditHolidaysPage.jsx` | `<div className="relative p-6 space-y-4">` | `<PageContainer density="comfortable" className="relative space-y-4">` |
+| `ApprovalRulesPage.jsx` | `<div className="p-6 max-w-6xl mx-auto">` | `<PageContainer density="comfortable" className="max-w-6xl mx-auto">` |
+
+`max-w-*`/`mx-auto`/`overflow-auto`/`relative`/`space-y-*` were all preserved via the `className` prop, since `PageContainer` provides none of these itself — exactly the additive-`className` pattern this task's own instructions anticipated.
+
+### Layout preservation verification
+
+No file's internal content structure, component tree, or nested spacing was touched — only the single outermost wrapper element (and its matching closing tag) was swapped in each of the 4 files. `EmployeeLeaveBalances.jsx`'s absolutely-positioned loading overlay (`absolute inset-0 bg-white/70`) was verified to rely on the same positioning-context ancestor as before (neither the original `<div>` nor `PageContainer` sets `position: relative`, so behavior is unchanged either way).
+
+### Nested-container verification
+
+Confirmed via a repo-wide grep for `PageContainer`: exactly 4 usages, one per migrated file, no file contains more than one `<PageContainer>`, and no migrated file is rendered inside another migrated file's `PageContainer` (or vice versa). `EmployeePanel.jsx` (the role-switching parent that embeds `HRManageTools.jsx`/`AdminPanel.jsx`) was deliberately **not** migrated in this task specifically to avoid a nested-`PageContainer` risk if `AdminPanel.jsx` were migrated in a future pass while `EmployeePanel.jsx` already wrapped it.
+
+### Full-width/layout exceptions
+
+- **`charts/LeaveDetailsPage.jsx`** — a full-bleed `bg-gray-50 min-h-screen` band wrapping a `max-w-7xl mx-auto` column, itself a 4-column CSS Grid with a `sticky` sidebar and a 3-column main region. `PageContainer` cannot express the full-bleed background+viewport-height band, and forcibly nesting it around only the inner grid would be a structurally invasive partial migration, not a drop-in swap. Left unmigrated.
+- **`EmployeePanel.jsx`** (routed at `/leave-management`, the true top-level shell) — `p-6 bg-gray-100 min-h-screen`; capability gap (no background, no `min-h-screen`) plus the nested-container risk described above. Left unmigrated.
+- **`models/LeavePolicy.jsx`** (routed at `/leave-policy`) — `min-h-screen bg-gray-50 py-8 px-4`; asymmetric, non-responsive padding (`py-8` ≠ `px-4`) that neither density value reproduces, plus the same background/`min-h-screen` gap. Left unmigrated.
+- **`AdminPanel.jsx`** (routed at `/leave-management/manager`, also embedded in `EmployeePanel.jsx`) — `space-y-6 py-4`, vertical-only padding with zero horizontal padding; neither density option cleanly maps to this (both add horizontal padding that doesn't exist today). Left unmigrated.
+- **`ManageBlockLeave.jsx`** (routed at `/block-leave-dates/:employeeId`) — `w-full mt-2`, a top-only **margin**, not padding at all; `PageContainer` always applies all-sides padding with no opt-out. Left unmigrated.
+- **`Unauthorized.jsx`** (routed at `/unauthorized`) — a full-viewport gradient splash screen with a centered card; not a spacing-only wrapper. Left unmigrated.
+
+### Modal/wizard exclusions
+
+- **`models/ApplyLeaveOnBehalf.jsx`** (routed at `/behalf-leave`) — its actual rendered root is a `<Modal>` component, not a page-shell `<div>`; there is no page-level container to migrate.
+- **`models/LeaveUploadWizard.jsx`** (routed at `/leave-upload`) — a self-contained modal "card" (`bg-white rounded-2xl shadow-xl max-w-md ...`) that assumes an ancestor overlay supplies the backdrop/centering (confirmed via its other call site inside `EmployeeLeaveBalances.jsx`'s own `fixed inset-0` wrapper); this is dialog body content, not a page shell.
+- **`models/LeaveBalanceJobProgress.jsx`** — a globally-mounted floating toast/progress widget (`fixed bottom-6 right-6 ...`), not routed, not a page.
+
+### Remaining raw page containers with exact reasons
+
+All non-migrated files fall into one of these documented categories (full detail in the audit): specialized full-bleed/background pages (`EmployeePanel.jsx`, `LeavePolicy.jsx`, `charts/LeaveDetailsPage.jsx`, `Unauthorized.jsx`), margin-only or padding-asymmetric roots (`AdminPanel.jsx`, `ManageBlockLeave.jsx`), modal/wizard content (`ApplyLeaveOnBehalf.jsx`, `LeaveUploadWizard.jsx`, `LeaveBalanceJobProgress.jsx`), embedded sub-components rendered only inside another page (`EmployeeDashboard.jsx`, `HRAdminPanel.jsx`, `ApprovalDashboard.jsx`, `CompOffBalanceRequests.jsx`, `CompOffPage.jsx`, `BlockLeaveSection.jsx`, `BlockLeaveDates.jsx`, `ManageActiveLeaveBlocks.jsx`, `LeavePolicyViewer.jsx`, `LeaveDashboard.jsx`, `LeaveSection.jsx`, `HandleLeaveRequestAndApprovals.jsx`), and dead/unreferenced files (`ruleBook/RuleBookPage.jsx`, `EnterpriseConfigManager.jsx`, `EmployeePanelold.jsx`).
+
+### Capability gaps (documented, `PageContainer` not modified)
+
+1. No background-color prop — several pages need `bg-gray-50`/`bg-gray-100`/gradient backgrounds at the page-root level.
+2. Only `min-h-full` (relative to a sized ancestor), no `min-h-screen` (viewport-relative) — several pages depend on true full-viewport height.
+3. No `max-w-*`/`mx-auto` capability — addressed additively via `className` in all 4 migrations, but means `PageContainer` alone never fully replaces these wrappers.
+4. The 2-value density enum only covers symmetric, responsive padding — several pages use asymmetric (`py-8 px-4`) or single-axis (`py-4` with no horizontal, or `mt-2` margin-only) spacing that cannot be reproduced without `!important` overrides.
+5. No support for a full-bleed band + constrained inner column in a single component instance (`charts/LeaveDetailsPage.jsx`'s structure).
+
+None of these gaps were addressed by modifying `PageContainer` — each blocked page was simply left unmigrated and documented, per this task's explicit stop condition.
+
+### Business/API logic verification
+
+No API call, endpoint, state, hook, effect, RBAC check, routing logic, WebSocket subscription, validation rule, pagination, or filter was touched in any of the 4 files — every change is limited to swapping the single outermost wrapper element (and its matching closing tag) for `<PageContainer density="comfortable" className="...">`.
+
+### Files modified
+
+1. `src/pages/leave_management/HRManageTools.jsx`
+2. `src/pages/leave_management/models/EmployeeLeaveBalances.jsx`
+3. `src/pages/leave_management/models/EditHolidaysPage.jsx`
+4. `src/pages/leave_management/models/ApprovalRulesPage.jsx`
+
+### Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings).
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline: 2 `react-hooks/exhaustive-deps` config errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/billingConfigurationService.js`. Zero new issues.
+
+### git diff --check
+
+✅ Clean.
+
+**`PageContainer` is now the canonical outer page-spacing wrapper for standard, uniformly-padded Leave Management page roots. It intentionally does not own background color, viewport-relative height, width-centering, or asymmetric spacing — pages needing those remain composed with `className` additions where the fit is close (as in these 4 migrations) or stay unmigrated where the gap is structural (full-bleed backgrounds, margin-only roots, embedded sub-components).**
+
+## P2.17 — Canonical Modal Audit and Migration
+
+### Canonical Modal path and API
+
+`src/components/Modal/modal.jsx` (unmodified). Full, re-verified API (richer than earlier session summaries assumed — notably it **does** have a `footer` prop):
+
+```jsx
+const Modal = ({
+  isOpen, onClose, title, subtitle, children,
+  className = "", bodyClassName = "",
+  size = "lg",                    // xs|sm|md|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|full|screen
+  position = "center",            // center|top|bottom
+  maxHeight = "max-h-[85vh]",
+  fullScreenMobile = false,
+  zIndex = "z-[9999]",
+  closeOnBackdrop = true,
+  closeOnEscape = true,
+  scrollable = true,
+  showCloseButton = true,
+  showHeader = true,              // hasHeader = showHeader && (title || subtitle || showCloseButton)
+  headerBorder = true,
+  headerClassName = "", footerClassName = "", backdropClassName = "", panelClassName = "",
+  panelStyle,                     // inline style passthrough, for content-driven widths
+  titleClassName = "", subtitleClassName = "",
+  overlayColor = "bg-black/60",
+  footer,                         // arbitrary footer content, own bordered-top section
+  closeIcon, titleIcon,
+  animation = "zoom",             // zoom|slide-up|slide-down|fade|none
+}) => { ... }
+```
+Own `useEffect` handles Escape-key closing (`closeOnEscape`). Backdrop click closes via `onClick={closeOnBackdrop ? onClose : undefined}`. Close button (`showCloseButton`) is a hard-coded `Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 p-0"` — not independently stylable or individually disable-able beyond the boolean. No body-scroll-lock of any kind.
+
+### Audit method
+
+A full read-only sweep of every modal/dialog shell in `src/pages/leave_management/**`, re-verifying the 11-file list originally surfaced by the P2.10 final sweep (that list was based on an incomplete understanding of Modal's API — specifically, it did not know about the `footer` prop — so every finding was independently re-derived from current source, not trusted as-is) plus 3 previously-flagged dead files and the known `LeaveUploadWizard` hybrid case.
+
+### Audit totals
+
+- **Total modal-shell audit count**: 15 (11 previously-flagged live candidates + `LeaveUploadWizard`'s hybrid host overlay + 3 dead/orphaned files).
+- **Safe migration count**: 6 modal shells across 5 files.
+- **Confirmation-dialog count**: 0 new (all genuine confirm/cancel-only dialogs in the module already route through canonical `ConfirmDialog`/`ConfirmationModal`, confirmed unchanged).
+- **Specialized/excluded count**: 5 live shells (4 blocked by a genuine capability gap, 1 by double-chrome risk).
+- **Dead/orphaned count**: 4 files.
+
+### Complete migrated-file list
+
+1. `src/pages/leave_management/models/EffectiveDeactivationDate.jsx`
+2. `src/pages/leave_management/models/CarryForwardTrigger.jsx`
+3. `src/pages/leave_management/models/ApprovalRulesPage.jsx` (its Add/Edit Rule modal — a different part of the file from its already-migrated `PageHeader`/`PageContainer` page shell)
+4. `src/pages/leave_management/models/EditBlockLeaveModal.jsx`
+5. `src/pages/leave_management/models/HandleLeaveRequestAndApprovals.jsx` (two independent modals: the leave-balance analysis modal, and the approve/reject/cancel confirmation dialog)
+
+### Exact prop mapping per migrated modal
+
+| File / modal | `title` | `size` | `closeOnBackdrop` | `closeOnEscape` | `showCloseButton` | `footer` |
+|---|---|---|---|---|---|---|
+| `EffectiveDeactivationDate.jsx` | `"Effective Deactivation Date"` + `subtitle="Are you sure you want to deactivate this leave type?"` | `sm` (exact match for `max-w-sm`) | `false` (no backdrop-close today) | `false` (none today) | `false` (no X today) | Cancel/Confirm row |
+| `CarryForwardTrigger.jsx` | `"Process Carry Forward"` | `md` (exact match for `max-w-md`) | `false` | `false` | `false` (no X today) | Close/Confirm row; nested `ConfirmationModal` stays as `children`, unchanged |
+| `ApprovalRulesPage.jsx` (Add/Edit Rule) | `{editingRule ? "Edit Rule" : "Add New Rule"}` | `md` (exact match) | `false` | `false` | `true` | *(none — the whole `<form>`, including its Cancel/Save row, was kept as `children` rather than split into `footer`, to avoid any risk to the `type="submit"` form-association)* |
+| `EditBlockLeaveModal.jsx` | `<>Edit Leave Block – <span className="text-indigo-600">{block.projectName}</span></>` (JSX, not a string — confirmed Modal's `title` renders `{title}` directly with no string coercion) | `6xl` (exact match) | `false` | `false` | `true` | Cancel/Save Changes row |
+| `HandleLeaveRequestAndApprovals.jsx` — analysis modal | `` `Analysis for - ${leaveBalanceModal.employeeName}` `` | `4xl` (exact match) | `false` | `false` | `true` | *(none — display-only, no footer buttons existed)* |
+| `HandleLeaveRequestAndApprovals.jsx` — confirmation dialog | *(none — `showHeader={false}`, the centered icon-badge/title/input/buttons layout was kept entirely as `children` to preserve its exact centered presentation, which Modal's left-aligned header model would not reproduce)* | `panelClassName="w-[90vw] max-w-[360px]"` (content-driven, bypasses the `size` enum) | `false` | `false` | `false` (no X today) | *(none — buttons kept in `children`)* |
+
+### Close/backdrop/Escape behavior verification
+
+Every migrated modal's `closeOnBackdrop`/`closeOnEscape` was set to match its **pre-migration** behavior exactly — all 6 had no backdrop-click-to-close and no Escape-to-close before this task, so all 6 explicitly pass `closeOnBackdrop={false} closeOnEscape={false}`, preserving byte-identical dismissal semantics (button-only dismissal) rather than silently inheriting Modal's more permissive defaults (`true`/`true`).
+
+### Close-button behavior verification
+
+`EffectiveDeactivationDate.jsx`, `CarryForwardTrigger.jsx`, and the `HandleLeaveRequestAndApprovals.jsx` confirmation dialog had no header X button before migration — all three explicitly pass `showCloseButton={false}` to preserve that. `ApprovalRulesPage.jsx`, `EditBlockLeaveModal.jsx`, and the analysis modal all had a functionally plain dismiss-only X before migration — all three pass `showCloseButton={true}`, and their `onClose`/equivalent handler is unchanged. The analysis modal's previous close trigger was a literal `&times;` HTML entity inside a text `Button` (no icon, no `aria-label`) — migrating to canonical Modal's default `<X/>` icon button (with a built-in `aria-label="Close modal"`) is a minor, net-positive visual/accessibility change, not a regression, and was accepted as such rather than forced to preserve the literal glyph.
+
+### Form/action behavior verification
+
+`ApprovalRulesPage.jsx`'s Add/Edit Rule `<form onSubmit={handleSubmit}>` — including its `type="submit"` Save button — was kept entirely intact as Modal's `children` (not split into the `footer` prop) specifically to avoid any risk of breaking the native HTML form-association between the submit button and its form. No other migrated modal had a `<form>` element to worry about (all other footers use `type="button"` handlers calling explicit submit functions, safely relocatable into `footer`).
+
+### Loading/disabled behavior verification
+
+Every button's `disabled`/`loading`/`loadingText` condition was copied verbatim, unchanged, including two known pre-existing quirks that were **deliberately preserved, not "fixed"**: `ApprovalRulesPage.jsx`'s Save button disables on `disabled={loading}`, where `loading` is actually the page's *list-fetch* loading flag, not a dedicated per-modal submit-in-flight flag (a pre-existing quirk, unrelated to this migration); and `HandleLeaveRequestAndApprovals.jsx`'s confirmation dialog title ternary shows "Reject this leave request?" even when `confirmation.action === "cancel"` (a pre-existing copy bug) — both left exactly as they were.
+
+### Nested-modal verification
+
+`CarryForwardTrigger.jsx` still nests canonical `ConfirmationModal` inside its own (now-canonical) `Modal`'s `children` — this nesting pre-dates this task (it was already nested inside the raw `<div>` shell before migration) and is not a new pattern introduced here; `ConfirmationModal` renders its own independent `fixed inset-0` overlay via `ConfirmDialog`, layered above via z-index, not truly DOM-constrained inside the outer `Modal`'s panel. No new nested-`Modal`-inside-`Modal` case was introduced anywhere in this task's 6 migrations.
+
+### Remaining raw modal shells with exact reasons
+
+| File | Reason |
+|---|---|
+| `models/AddEmployeeModal.jsx` | **Capability gap (H)** — currently locks `document.body.style.overflow = "hidden"` while open; canonical `Modal` has no body-scroll-lock mechanism at all, so migrating would silently allow the page behind the modal to scroll (a real behavior regression, not merely cosmetic). |
+| `models/AddHolidaysModal.jsx` | Same body-scroll-lock capability gap, **plus** a `bg-indigo-600` colored header with a white close icon — canonical Modal's close button has a hard-coded, non-overridable `className`, so the icon cannot be recolored to read against a dark header via any existing prop. |
+| `models/AddLeaveTypeModal.jsx` | Same body-scroll-lock capability gap. Also has a single-consumer nuance (its header X button is `disabled={submitting}`, which `showCloseButton`'s boolean-only API cannot express) — not independently gap-worthy, but compounds the case for leaving it specialized. |
+| `charts/AllHolidaysGrid.jsx` | Same body-scroll-lock capability gap (the 4th and final confirming consumer — see capability gap below), **plus** the same dark-header (`bg-indigo-900`)/white-close-icon issue as `AddHolidaysModal.jsx`. |
+| `models/EmployeeLeaveBalances.jsx` (its wrapping overlay around `LeaveUploadWizard`) | **Specialized — double-chrome risk.** `LeaveUploadWizard` already renders its own fully-styled card shell (`bg-white rounded-2xl shadow-xl border`). Canonical `Modal`'s own panel independently renders `bg-white rounded-xl border shadow-2xl` — nesting the former inside the latter would produce a visible "box within a box" (double rounded/shadowed panel), which would require speculative `!important` overrides (`panelClassName="!bg-transparent !border-none !shadow-none !rounded-none"`) to neutralize. Per this task's own guidance ("if any of these are uncertain, classify the modal as specialized rather than guessing"), this was left unmigrated rather than risking an unverified visual regression. `LeaveUploadWizard.jsx`'s own internal architecture was not touched, consistent with its known hybrid-architecture status. |
+
+### Capability gaps
+
+**Body-scroll-lock** (`document.body.style.overflow = "hidden"` while open, restored on close) appears in **4 independent live consumers** — `models/AddEmployeeModal.jsx`, `models/AddHolidaysModal.jsx`, `models/AddLeaveTypeModal.jsx`, `charts/AllHolidaysGrid.jsx` — meeting this task's own bar for reporting a capability gap (same missing capability in 3+ independent consumers, genuinely reusable, not application-specific). **Per this task's explicit instruction, canonical `Modal` was NOT modified to add this capability.** All 4 affected files were left as specialized/unmigrated and are documented above, rather than migrating them and silently accepting the scroll-lock behavior loss. This is flagged as a candidate for a future, independently-approved enhancement to `Modal` (an optional `lockBodyScroll` prop) — not implemented in this task.
+
+A secondary, narrower observation (not yet gap-worthy): a colored/dark modal header with a light close icon appears in exactly 2 consumers (`AddHolidaysModal.jsx`, `AllHolidaysGrid.jsx`) — below the 3-consumer bar, so not reported as a capability gap, just noted alongside their body-scroll-lock exclusion.
+
+### Business/API logic verification
+
+No API call, endpoint, payload, state variable, effect (other than removing the now-redundant Escape/scroll-lock `useEffect`s that the migrated files previously rolled themselves — see below), RBAC check, or validation rule was changed in any of the 6 migrated modals — every `onClick`/`onChange`/`onSubmit` handler, every API call inside those handlers, and every toast message is untouched.
+
+Two migrated files (`EditBlockLeaveModal.jsx` via its `if (!isOpen || !block) return null;` guard clause, and both `HandleLeaveRequestAndApprovals.jsx` modals via their pre-existing `{state && (...)}` short-circuit JSX) already had a null/falsy guard preventing the modal's title expression (which dereferences `block.projectName`/`leaveBalanceModal.employeeName`) from ever evaluating when its underlying data is absent — these guards were kept exactly as-is (not removed or altered) specifically because canonical `Modal`'s props are evaluated eagerly by React before the component runs its own `if (!isOpen) return null` check internally, so removing the file's own guard could crash on a null dereference. This was verified explicitly for both files, not assumed.
+
+### Files modified
+
+1. `src/pages/leave_management/models/EffectiveDeactivationDate.jsx`
+2. `src/pages/leave_management/models/CarryForwardTrigger.jsx`
+3. `src/pages/leave_management/models/ApprovalRulesPage.jsx`
+4. `src/pages/leave_management/models/EditBlockLeaveModal.jsx`
+5. `src/pages/leave_management/models/HandleLeaveRequestAndApprovals.jsx`
+
+### Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings).
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline: 2 `react-hooks/exhaustive-deps` config errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/billingConfigurationService.js`. Zero new issues.
+
+### git diff --check
+
+✅ Clean (only pre-existing LF/CRLF informational warnings on files already touched in earlier steps, not errors).
+
+### Unused-import verification
+
+`X` (lucide-react) was removed from `models/ApprovalRulesPage.jsx` after its raw close-button icon was replaced by canonical Modal's own close button. `XMarkIcon` (`@heroicons/react/24/outline`) was removed from `models/EditBlockLeaveModal.jsx` for the same reason. `useEffect` was removed from `models/CarryForwardTrigger.jsx`'s import (it was already unused before this task — only referenced inside a dead, commented-out body-scroll-lock effect — and was cleaned up incidentally since that import line was already being edited). `Modal` was added to all 5 files and is used in each. No other import was affected.
+
+### Pre-existing issues
+
+Two pre-existing quirks were identified and deliberately preserved (not fixed), per this task's explicit instruction not to alter business logic during a presentational migration: `ApprovalRulesPage.jsx`'s Save button's `disabled={loading}` referencing the page's list-fetch flag rather than a dedicated submit-in-flight flag, and `HandleLeaveRequestAndApprovals.jsx`'s confirmation-dialog title ternary showing "Reject this leave request?" for the `cancel` action. The already-known `EnterpriseConfigManager.jsx` (dead/unreferenced), `hooks/Modal.jsx` (dead), `models/ReviewModal.jsx` (dead), and `models/ActionDropdown.jsx` (dead, plus unrelated broken imports to non-existent files) were all reconfirmed still dead via fresh import searches — not modified.
+
+**Canonical `Modal` is now used by 11 Leave Management consumers (up from 6 before this task), covering every genuine standard dialog shell whose existing behavior it can represent without a capability gap or a visual regression. The remaining raw shells are backed by a documented, repeatable capability gap (body-scroll-lock, 4 consumers) or a specific, evidence-based visual-regression risk (double-chrome nesting) — not migrated blindly, and `Modal` itself was not modified.**
+
+## P2.18 — Canonical Modal Body Scroll-Lock Enhancement
+
+### Canonical Modal path
+
+`src/components/Modal/modal.jsx`.
+
+### Previous API
+
+```jsx
+const Modal = ({
+  isOpen, onClose, title, subtitle, children, className, bodyClassName,
+  size, position, maxHeight, fullScreenMobile, zIndex,
+  closeOnBackdrop, closeOnEscape, scrollable,
+  showCloseButton, showHeader, headerBorder,
+  headerClassName, footerClassName, backdropClassName, panelClassName, panelStyle,
+  titleClassName, subtitleClassName, overlayColor,
+  footer, closeIcon, titleIcon, animation,
+})
+```
+No body-scroll manipulation of any kind existed before this task.
+
+### New API
+
+One new optional prop, `disableBodyScroll = false`, inserted alongside `closeOnBackdrop`/`closeOnEscape`/`scrollable`. Every other prop and all rendering logic is unchanged.
+
+### Exact semantics of `disableBodyScroll`
+
+- `disableBodyScroll={false}` (default, omitted) — identical to pre-task behavior; the page behind the modal can still scroll.
+- `disableBodyScroll={true}` — while this `Modal` instance is open (`isOpen === true`), `document.body`'s scrolling is disabled. On close, unmount, or `disableBodyScroll` being toggled back to `false`, the body's scroll is restored to whatever it was **before this feature ever touched it** — not blindly cleared to `""`. If it is already `hidden` for an unrelated reason when the first Modal locks it, that value is captured and restored, not overwritten and lost.
+
+### Why the capability was needed
+
+P2.17 found 4 independent live Leave Management modal consumers that each independently roll their own `document.body.style.overflow = "hidden"` / `""` toggle inside a `useEffect`, naively clearing the property on close rather than restoring a captured prior value — the exact anti-pattern this task's own instructions warned against. This met the project's repeated 3+-independent-consumer bar for a canonical capability, so P2.17 deliberately left all 4 unmigrated rather than silently drop the behavior, and flagged it for a dedicated follow-up (this task).
+
+### Number of consumers requiring the capability
+
+4 confirmed via a fresh re-read of each file's current source (not assumed from the P2.17 report): `models/AddEmployeeModal.jsx`, `models/AddHolidaysModal.jsx`, `models/AddLeaveTypeModal.jsx`, `charts/AllHolidaysGrid.jsx`. All 4 still used the exact naive `document.body.style.overflow = "hidden"` → `""` pattern at the time of this task's audit.
+
+### Complete affected-consumer list and disposition
+
+Per this task's own "unless the body-scroll audit proves otherwise" carve-out on the standing "do not migrate remaining raw shells" instruction, each of the 4 was individually re-evaluated now that the specific blocker (body-scroll-lock) is resolved, to see whether it was ALSO the *only* blocker:
+
+- **`models/AddEmployeeModal.jsx` — migrated.** This file's only P2.17 blocker was body-scroll-lock; it has no colored header, no in-panel overlay, and no other structural complication. Converted to canonical `Modal` with `disableBodyScroll={true}`, `closeOnBackdrop={false}` (no backdrop-close previously), `closeOnEscape={true}` (matches its prior own Escape listener), `showCloseButton={true}`, `titleIcon` for its `User` icon, and `panelClassName="max-w-lg sm:max-w-xl"` to preserve its exact responsive width (note: `size` was omitted rather than set, since passing both `size` and a `max-w-*`-containing `panelClassName` would have silently no-opped `size` — `Modal`'s own `hasMaxWidth` check skips `SIZE_MAP` whenever the merged className already contains `"max-w-"`). Its entire `<form>` — including the `type="submit"` button — was kept intact as `children` (not split into `footer`) to avoid any risk to the native form/submit-button association. Its `<style>` block defining the `.input`/`.btn` shorthand classes (still referenced by several `FormInput`s via `inputClassName="input"`) was preserved unchanged as a sibling inside `children`.
+- **`models/AddLeaveTypeModal.jsx` — NOT migrated; newly-discovered blocker.** This file has an in-panel `{submitting && (<div className="absolute inset-0 ...">...)}` loading overlay that today sits as a direct sibling of the (non-scrolling) panel `<div>`. If migrated, this overlay would have to live inside canonical `Modal`'s own scrollable body region (`overflow-y-auto`) — CSS overflow clipping applies to descendants regardless of their own positioning scheme, so the overlay risks being clipped or scrolling away with the form content instead of reliably covering the entire panel as it does today. This is a genuine architecture mismatch, not merely a style-preservation nicety, so per this task's own stop condition ("an affected consumer requires behavior that conflicts with Modal's existing architecture"), it was left unmigrated and the body-scroll-lock capability gap remains open for this file specifically, now compounded by this second, independent blocker. (A single-consumer nuance also noted, not gap-worthy on its own: its header X button is `disabled={submitting}`, which `showCloseButton`'s boolean-only API cannot express.)
+- **`models/AddHolidaysModal.jsx` — NOT migrated; original P2.17 blocker still stands.** Still has its `bg-indigo-600` colored header with a white close icon that canonical `Modal`'s hard-coded, non-overridable close-button `className` cannot reproduce — unrelated to and unresolved by this task.
+- **`charts/AllHolidaysGrid.jsx` — NOT migrated; original P2.17 blocker still stands.** Same dark-header (`bg-indigo-900`)/white-close-icon issue as `AddHolidaysModal.jsx`.
+- **`models/EmployeeLeaveBalances.jsx`'s `LeaveUploadWizard` host overlay** — out of scope for this task entirely (it never needed body-scroll-lock in the first place); its P2.17 double-chrome classification stands unchanged.
+
+### Implementation approach
+
+A module-level (not per-`Modal`-instance) reference count plus a single saved "previous value," defined once above the `Modal` component:
+```jsx
+let bodyScrollLockCount = 0;
+let previousBodyOverflow = "";
+
+function lockBodyScroll() {
+  if (bodyScrollLockCount === 0) {
+    previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+  }
+  bodyScrollLockCount += 1;
+}
+
+function unlockBodyScroll() {
+  bodyScrollLockCount = Math.max(0, bodyScrollLockCount - 1);
+  if (bodyScrollLockCount === 0) {
+    document.body.style.overflow = previousBodyOverflow;
+  }
+}
+```
+wired into a new `useEffect` inside `Modal`, alongside (not replacing) its existing Escape-key effect:
+```jsx
+useEffect(() => {
+  if (!isOpen || !disableBodyScroll) return undefined;
+  lockBodyScroll();
+  return () => unlockBodyScroll();
+}, [isOpen, disableBodyScroll]);
+```
+This is the smallest reliable solution available: no portal, no global modal-manager/context, no new dependency — just a shared counter and a single captured value, scoped to this one file.
+
+### Nested-modal verification
+
+Because the lock count and saved value are **module-level, shared across every `Modal` instance** (not local per-instance state), the scenario explicitly called out in this task — an outer `disableBodyScroll` modal with an inner `disableBodyScroll` modal, where the inner closes first — is handled correctly: the inner's `unlockBodyScroll()` only decrements the shared count (2→1) and does **not** restore `document.body.style.overflow`, since the restore only happens when the count reaches exactly `0`. The body remains locked until the outer modal (the last remaining locker) also closes. `previousBodyOverflow` is captured only once, at the very first `0→1` transition, so it always reflects the value from *before any* locking modal opened — not an intermediate value from a nested modal opening after the first lock was already in effect. Verified by reading the full call chain; no live consumer currently opens two `disableBodyScroll={true}` modals simultaneously (the only migrated consumer, `AddEmployeeModal.jsx`, has no nested modal of its own), so this is a forward-looking correctness guarantee, not something exercised by today's Leave Management consumers.
+
+### Previous body overflow restoration verification
+
+Confirmed by code inspection: `previousBodyOverflow = document.body.style.overflow` is captured inside `lockBodyScroll()` **before** the property is overwritten, and is only ever read back (never re-captured) inside `unlockBodyScroll()`'s `if (bodyScrollLockCount === 0)` branch — satisfying this task's explicit "capture the previous value and restore it exactly" requirement, rather than the naive hard-coded `""` pattern the 4 original consumers used.
+
+### Unmount cleanup verification
+
+The `useEffect`'s cleanup function (`return () => unlockBodyScroll()`) fires identically whether the effect is torn down because `isOpen`/`disableBodyScroll` changed **or** because the component unmounts entirely — this is standard React `useEffect` cleanup semantics, requiring no special-case unmount handling. Verified this holds for `AddEmployeeModal.jsx`'s actual mount pattern (it is not conditionally mounted/unmounted by its parent — `HRManageTools.jsx` always renders `<AddEmployeeModal isOpen={isAddEmployeeModalOpen} .../>` and lets `Modal`'s own `if (!isOpen) return null` gate visibility — so in practice the effect's cleanup fires on close, not on unmount, for this specific consumer, but the unmount path is equally correct if a future consumer conditionally mounts/unmounts instead).
+
+### Modal internal scrolling verification
+
+`Modal`'s own internal body region (`<div className="min-h-0 flex-1 overflow-y-auto ...">{children}</div>`) is a completely separate scroll container from `document.body` — locking `document.body.style.overflow` has no effect on this inner container's own `overflow-y-auto`, confirmed by inspection (they are unrelated CSS properties on unrelated elements). `AddEmployeeModal.jsx`'s form content (9 form fields) remains scrollable within the modal exactly as before.
+
+### Mobile behavior verification
+
+`fullScreenMobile` (unused by `AddEmployeeModal.jsx`, left at its default `false`) only toggles sizing/rounding classes on the panel (`max-sm:max-w-none max-sm:w-screen max-sm:h-screen max-sm:rounded-none max-sm:max-h-screen`) and is completely independent of the new body-scroll-lock effect — confirmed no interaction between the two features by inspection of the render logic.
+
+### Backward compatibility verification
+
+A repository-wide search for `disableBodyScroll` confirms exactly one consumer (`models/AddEmployeeModal.jsx`) passes the new prop; every other `Modal` usage anywhere in the repository (both inside and outside Leave Management) omits it, so `disableBodyScroll` defaults to `false`, the new `useEffect` returns `undefined` immediately (`!disableBodyScroll` short-circuits), and no locking/unlocking code ever runs for them — their behavior is provably unchanged.
+
+### Business/API logic verification
+
+No API call, state variable, RBAC check, routing logic, validation rule, or toast message was touched. `AddEmployeeModal.jsx`'s `handleSubmit`/`handleChange`/`api.post` call and its full payload construction are untouched — only the modal's outer shell (backdrop/panel/header/close-button, and its own now-redundant Escape/scroll-lock `useEffect`, since canonical `Modal` provides both) was replaced.
+
+### Files modified
+
+1. `src/components/Modal/modal.jsx`
+2. `src/pages/leave_management/models/AddEmployeeModal.jsx`
+
+### Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings).
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline: 2 `react-hooks/exhaustive-deps` config errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/billingConfigurationService.js`. Zero new issues.
+
+### git diff --check
+
+✅ Clean (only pre-existing LF/CRLF informational warnings on files already touched in earlier steps, not errors).
+
+### Pre-existing issues
+
+None newly discovered. `AddLeaveTypeModal.jsx`'s close-button-disabled-while-submitting nuance (already noted in P2.17) was reconfirmed, not fixed. `AddHolidaysModal.jsx`/`charts/AllHolidaysGrid.jsx`'s dark-header/close-icon issue was reconfirmed unchanged.
+
+**Canonical `Modal` now supports an opt-in, generic, reusable `disableBodyScroll` capability, implemented with a minimal module-level ref-count that correctly handles nested/simultaneous scroll-locking modals without a global modal manager. Exactly one Leave Management consumer (`AddEmployeeModal.jsx`) was migrated to canonical `Modal` and opted into it in this task; the other 3 originally-flagged consumers remain unmigrated for their own independent, still-unresolved reasons (a newly-identified overlay-clipping architecture mismatch for `AddLeaveTypeModal.jsx`, and the pre-existing dark-header capability gap for `AddHolidaysModal.jsx`/`AllHolidaysGrid.jsx`) — not migrated blindly just because the scroll-lock blocker was resolved.**
+
+## P2.19 — Final Phase 2 Regression & Canonical UI Audit
+
+### Audit method
+
+Three parallel, independent read-only audits swept every canonical component category established across P2.1–P2.18 against **current** source (not prior reports): (1) `FormTextArea`, `ConfirmDialog`/`ConfirmationModal`, `StatusBadge`, `EmptyState`; (2) `BackButton`, `PageHeader`, `Tabs`, Loading (`LoadingSpinner`/`PageLoader`/`InlineLoader`/`TableSkeleton`); (3) `DataTable`, `PageCard`/`PageCardKpi`, `PageContainer`, `FilterBar`/`FormSelect`, `Modal`. Every consumer in `src/pages/leave_management/**` was re-located via fresh grep (not trusted from memory) and its current JSX quoted and verified against expected behavior.
+
+### 1. Total candidates audited
+
+~70 individual consumer call-sites across 23 canonical-component categories, plus a fresh raw-pattern sweep (raw buttons/inputs/selects/textareas/modals/status pills/empty-states/loaders/headers/back-controls/cards/filters/tabs/tables/pagination/page-roots/file-uploads).
+
+### 2. Already-canonical count
+
+The overwhelming majority — every consumer listed as "PASS" below was already correctly using its canonical component with unchanged props, exactly as documented in P2.1–P2.18.
+
+### 3. Safe migrations/fixes performed
+
+**One.** `models/EditHolidaysPage.jsx` — removed a redundant hand-rolled `<div className="border rounded-lg overflow-hidden">` wrapper around its `<DataTable>` call. `DataTable`'s own canonical shell already renders `rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden` — the extra wrapper produced a visible double-border/double-rounded-corner effect around the table, a classic "accidental duplicate wrapper" per this task's own safe-fix criteria (unambiguous, presentational-only, backward-compatible, no new capability). Both the opening wrapper `<div>` and its matching closing `</div>` were removed; `DataTable`'s own props (`columns`/`rows`/`getRowKey`/`emptyTitle`) are untouched.
+
+### 4. Specialized exceptions (re-confirmed unchanged)
+
+All previously-documented specialized/excluded patterns were re-verified against current source and found still accurately classified: `Unauthorized.jsx`'s full-width "Go Back" splash CTA; `LeavePolicyViewer.jsx`'s right-aligned `BackButton` (no page heading to pair with); `AddHolidaysModal.jsx`/`charts/AllHolidaysGrid.jsx`'s dark-header/close-icon capability gap; `AddLeaveTypeModal.jsx`'s in-panel-overlay architecture mismatch; `LeaveDashboard.jsx`'s themed KPI-shaped tiles (not generic `PageCardKpi` candidates); `EmployeeLeaveBalances.jsx`'s search+year row (plain, correctly un-chromed).
+
+### 5. Structural exceptions (re-confirmed unchanged)
+
+`HandleLeaveRequestAndApprovals.jsx` (colspan bulk-action header + multi-offset sticky columns), `EditBlockLeaveModal.jsx` (dynamic per-block columns + tri-state checkboxes), `HRManageTools.jsx`'s local `LeaveTable` (columns derived from `Object.keys(data[0])`), `ApprovalQueue.jsx` (6 tiny diff-review micro-tables) — all still raw `<table>`s with their original stated structural blockers intact, none touched.
+
+### 6. Capability gaps
+
+**Zero new capability gaps met this task's 3-independent-consumer bar.** The pre-existing, already-documented gaps (Modal's dark-header/non-overridable-close-icon, appearing in exactly 2 consumers; the in-panel-overlay/scrollable-body architecture mismatch, appearing in exactly 1 consumer) remain below the reporting threshold and were left as specialized exclusions, unchanged.
+
+### 7. Dead/commented-out findings
+
+Re-confirmed still dead via fresh import searches: `ruleBook/RuleBookPage.jsx`, `EnterpriseConfigManager.jsx`, `hooks/Modal.jsx`, `models/ReviewModal.jsx`, `EmployeePanelold.jsx`, `models/ActionDropdown.jsx`. Two of these surfaced fresh, individually-interesting-looking artifacts during this audit that resolved to "no action" specifically because the file is dead:
+- `models/ReviewModal.jsx` has a live-looking raw `<textarea>` with a genuine, migratable `<label>` (no icon/heading workaround blocking it) — but the file itself has zero importers anywhere in the repo, so migrating its `FormTextArea` usage would be dead-code cleanup, explicitly out of this task's scope.
+- `EnterpriseConfigManager.jsx` contains a fully non-canonical hand-rolled tab bar (`activeTab` state + raw `<button>` row + manual underline `<div>`, no `Tabs`/`TabsList`/`TabsTrigger`) — again, the file has zero importers (only a commented-out render call in `HRAdminPanel.jsx`), so this is not a live Tabs-consistency gap, just an artifact of dead code.
+
+### 8. Every file modified
+
+`src/pages/leave_management/models/EditHolidaysPage.jsx` (the one safe fix, §3) plus `docs/ui/phase-2-leave-management.md` (this section).
+
+### 9. Every safe fix with before/after explanation
+
+| File | Before | After | Why |
+|---|---|---|---|
+| `EditHolidaysPage.jsx` | `<div className="border rounded-lg overflow-hidden"><DataTable .../></div>` | `<DataTable .../>` (wrapper removed) | `DataTable`'s own shell already supplies `rounded-xl border ... overflow-hidden`; the extra wrapper caused a visible double border/corner-radius around the table. |
+
+### 10. Regression checks performed
+
+**A — FormTextArea**: all 7 migrated consumers (`AddLeaveTypeModal.jsx`, `CancellationModal.jsx`, `EditLeaveModal.jsx`, `ManagerEditLeaveRequest.jsx`, `RequestLeaveModal.jsx`, plus earlier `ApplyLeaveOnBehalf.jsx`/`EditBlockLeaveModal.jsx`) verified PASS: `maxLength` values, `resize-none` styling, `requiredMark` placement (present only on `CancellationModal.jsx`/`RequestLeaveModal.jsx`, matching their original visual-asterisk-only, no-real-`required`-attribute behavior), `rows`, character counters (`EditLeaveModal.jsx`/`ManagerEditLeaveRequest.jsx`), and `onChange` handlers all confirmed byte-identical to their documented post-migration state. No duplicate/nested labels found anywhere. The 2 documented capability-gap exclusions (`BlockLeaveDates.jsx` — no real label; `CompOffRequestModal.jsx` — icon-prefixed `SectionLabel`) re-verified still accurate.
+
+**B — ConfirmDialog/ConfirmationModal**: `ConfirmDialog`'s API (`isOpen, onClose, onConfirm, title, description, confirmText, cancelText, variant, loading, closeOnBackdrop, closeOnEscape, showCloseButton`) confirmed current. `ConfirmationModal` still force-sets `closeOnBackdrop={false} closeOnEscape={false} showCloseButton={false}`, preserving strict button-only dismissal. All 8 real consumers of `ConfirmationModal` repo-wide (7 in leave_management + 1 cross-module in `Timesheet/ManagerApproval/ManagerApprovalTable.jsx`) pass only `isOpen/title/message/onConfirm/onCancel/isLoading/confirmText` — no renamed/dropped props, no cross-module regression. PASS.
+
+**C — StatusBadge**: `cancelled`/`canceled` → `neutral`, `rejected`/`reject` → `danger`, substring fallback no longer groups "cancel" with danger, explicit `tone` prop still short-circuits resolution — all confirmed via direct read of `resolveTone()`. All 9 consumers pass props unchanged. Confirmed the distinction is exercised in real UI: `HandleLeaveRequestAndApprovals.jsx`'s `STATUS_OPTIONS` includes a real `"CANCELLED"` value rendered through `<StatusBadge status={request.status}/>`. PASS.
+
+**D — EmptyState**: current sizing (`h-16 w-16` circle / `h-8 w-8` glyph) confirmed as the post-enhancement values, not stale pre-enhancement ones. All 5 direct consumers + `DataTable`'s internal usage checked; 4 of 5 custom-icon consumers use small (`h-6 w-6`) icons that render correctly inside the larger circle. One consumer (`PendingApprovalsQueueView.jsx`) currently passes an oversized `h-40 w-40` icon — **this was an explicit, deliberate user/IDE edit made directly in the working tree** (confirmed via this session's own system-provided change log, not a Phase 2 migration artifact), and per standing instructions to respect intentional user edits, it was **not** altered or reverted in this audit. Documented below as a known, intentional deviation from the sibling consumers' sizing, not a regression.
+
+**E — BackButton**: all 6 consumers (`EmployeeLeaveBalances.jsx`, `EditHolidaysPage.jsx`, `ManageActiveLeaveBlocks.jsx`, `BlockLeaveDates.jsx`, `LeaveDetailsPage.jsx`, `LeavePolicyViewer.jsx`) confirmed exactly one `BackButton` each, `onClick={() => navigate(-1)}` unchanged, and consistent `flex items-center gap-3`-before-heading placement in the 5 page-heading-bearing files; `LeavePolicyViewer.jsx` confirmed still deliberately right-aligned (no heading on that page to place it before). `Unauthorized.jsx`'s full-width "Go Back" CTA reconfirmed a legitimate, unmigrated exception (no page heading, semantically a stacked-button-pair CTA, not a header-adjacent nav control).
+
+**F — PageHeader**: all 5 consumers (`AdminPanel.jsx`, `HRManageTools.jsx`, `ApprovalDashboard.jsx`, `ApprovalRulesPage.jsx`, `PendingApprovalsQueueView.jsx`) confirmed correct `title`/`subtitle`/`actions`, no nesting. The 4 BackButton-adjacent pages confirmed still correctly NOT using `PageHeader` (plain heading beside `BackButton`, since `PageHeader` has no BackButton slot).
+
+**G — Tabs**: all 3 canonical consumers (`HRManageTools.jsx`, `LeaveSection.jsx`, `BlockLeaveSection.jsx`) confirmed `value`/`onValueChange` still wired to original state, animated underline intact. `HRManageTools.jsx`'s current `TabsList` className was read fresh (not assumed from an earlier report) and is `"!inline-flex !h-auto !bg-transparent !p-0 !rounded-none !justify-start items-center gap-2 border-b border-gray-200"` — the `gap-2` value reflects a subsequent, out-of-band edit made directly in the working tree after the original P2.6 migration (visible in this session's own change log as an intentional adjustment, not something this audit should alter). One dead-code artifact noted in §7 (`EnterpriseConfigManager.jsx`'s non-canonical tab bar) — no action, file unreferenced.
+
+**H — Loading**: the P2.10-follow-up fix in `CompOffBalanceRequests.jsx` was re-verified line-by-line against current source and is **fully and correctly in place**: `loading`'s `setLoading` calls exist only inside `fetchCompOffs`; `handleApprove`/`handleReject` use a separate `actionState({id,type})`; `<DataTable loading={loading}>` only reads the fetch-scoped flag; both action buttons use `disabled={isActionLoading}` (derived from `actionState`), not `disabled={loading}`; all API calls/toasts/refetch-on-success unchanged. **A separate, structurally similar-looking pattern was found in `models/RevokeLeaveRequests.jsx`**, where a single `loading` state (set only inside `handleApprove`/`handleReject`, since this component has no fetch of its own) drives both `<DataTable loading={loading}>` and both action buttons' `disabled` — meaning an approve/reject click today replaces the whole table with a skeleton, not just disabling the two buttons. **This was investigated and deliberately NOT fixed in this task**: unlike `CompOffBalanceRequests.jsx` (where P2.7 demonstrably changed pre-existing "buttons-only-disable" behavior into "whole-table-skeleton" behavior), `RevokeLeaveRequests.jsx`'s pre-P2.7 code already used a manual ternary (`loading ? <Spinner/> : <DataTable/>`) driven by the exact same single `loading` variable toggled inside its action handlers — meaning the whole-table-hide-during-action behavior **predates any Phase 2 change** to this file; P2.7 only re-skinned the visual (spinner → skeleton) of an already-existing full-replacement behavior, confirmed by this session's own P2.10 regression audit at the time (documented there as a "false alarm," not a regression). Per this task's explicit instruction ("do not fix pre-existing bugs unless the bug is directly caused by a Phase 2 change"), this was left unchanged and is documented below as a known, pre-existing (non-Phase-2) inconsistency. The 6 icon-button className fixes were spot-checked (`charts/Calendar.jsx`'s prev/next buttons) and remain correctly free of conflicting `hover:bg-*` classes.
+
+**I — DataTable**: canonical gradient header/rounded shell/zebra rows/hover/selection/sticky-columns/loading/empty-state all confirmed unchanged in the canonical component itself. All 9 consumers' `columns`/`rows`/`getRowKey` confirmed unchanged. One pre-existing, non-regression inconsistency noted: `LeaveHistory.jsx` gates its entire render (filters + table) behind an early `if (loading) return <LoadingSpinner/>`, so `DataTable`'s own `loading`-prop skeleton path is never exercised there — a different-but-valid loading pattern than other consumers use, predating any Phase 2 DataTable work, not fixed (out of this task's "do not fix pre-existing, non-Phase-2 bugs" scope).
+
+**J — PageCard/PageCardKpi**: `BlockLeaveDates.jsx`'s prior `PageCard` migration re-verified intact (`title`/`subtitle`, `<form>` preserved inside `PageCardContent`, footer action row present and functional). Zero `PageCardKpi` usages confirmed still accurate (no missed KPI-tile candidates). No new hand-rolled card wrapper found needing migration.
+
+**K — PageContainer**: all 4 consumers confirmed exactly one `<PageContainer>` each with the correct `density="comfortable"` and preserved extra `className` (`max-w-*`/`mx-auto`/`overflow-auto`/`relative space-y-4`), no nesting, no stray leftover closing tags. `EmployeePanel.jsx` confirmed still deliberately unmigrated (raw `<div className="p-6 bg-gray-100 min-h-screen">`), avoiding the previously-identified double-padding/nested-container risk with its embedded `HRManageTools.jsx`/`AdminPanel.jsx` children.
+
+**L — FilterBar/FormSelect**: **correction to prior documentation** — `FilterBar` is not actually zero-consumer in Leave Management; `EditHolidaysPage.jsx` correctly uses it around its search input + year `FormSelect` (composed cleanly, no double-chrome with a surrounding `PageCard`/`PageContainer`). A prior task's summary asserting "zero FilterBar consumers in leave_management" was inaccurate — corrected here for the record; no code change was needed since the actual usage is itself correct and non-duplicative. `EmployeeLeaveBalances.jsx`'s un-chromed search+year row (the pattern the prior documentation was describing) remains correctly un-chromed. `FormSelect`'s default (non-anchored) dropdown-width mechanism (`w-full`, matching the `w-full h-10` trigger button) confirmed still in place and relied upon by `EmployeeLeaveBalances.jsx`'s year selector.
+
+**M — Modal**: all 4 button-only-dismissal migrations (`EffectiveDeactivationDate.jsx`, `CarryForwardTrigger.jsx`, `ApprovalRulesPage.jsx`, `EditBlockLeaveModal.jsx`) confirmed `closeOnBackdrop={false} closeOnEscape={false}` still present, unchanged. `AddEmployeeModal.jsx` confirmed `disableBodyScroll={true}` present, its `<form>`/`type="submit"` button still intact as `children` (not split into `footer`). A repo-wide grep confirms `disableBodyScroll` has exactly 1 consumer total — no accidental cross-module or additional leave_management usage. `HandleLeaveRequestAndApprovals.jsx`'s confirmation dialog confirmed `showHeader={false}`/`closeOnBackdrop={false}`/`closeOnEscape={false}` intact, icon badge/title-ternary(including its pre-existing, deliberately-unfixed "Reject this leave request?" copy bug for the `cancel` action)/Cancel-Yes buttons all unchanged.
+
+### 11. Known remaining inconsistencies
+
+- `models/RevokeLeaveRequests.jsx` — approve/reject actions replace the entire table with a skeleton rather than only disabling the two row buttons. Pre-existing (predates Phase 2), not fixed.
+- `models/LeaveHistory.jsx` — uses an early full-component `return` for its loading state (hiding filters too) rather than `DataTable`'s own `loading` prop. Pre-existing, not fixed.
+- `models/PendingApprovalsQueueView.jsx` — its `EmptyState` icon is deliberately sized `h-40 w-40`, larger than its sibling consumers' `h-6 w-6`. This was a direct, intentional user/IDE edit made in the working tree, not altered.
+- `HRManageTools.jsx`'s `TabsList` currently uses `gap-2` (a direct, intentional out-of-band edit made after the original P2.6 migration), not the `gap-6`/`gap-8` values used by its sibling `Tabs` consumers (`LeaveSection.jsx`/`BlockLeaveSection.jsx`) — a minor spacing inconsistency between otherwise-identical canonical Tabs usages, left as-is since it reflects a deliberate user change, not a migration defect.
+- `EnterpriseConfigManager.jsx` contains a non-canonical hand-rolled tab bar — irrelevant in practice since the file is dead/unreferenced.
+
+### 12. Why each remaining inconsistency is intentionally left unchanged
+
+`RevokeLeaveRequests.jsx` and `LeaveHistory.jsx`: both predate any Phase 2 change to their respective files (confirmed via this session's own prior audit history), so fixing them now would be exactly the "unrelated pre-existing bug" this task explicitly says not to fix. `PendingApprovalsQueueView.jsx`'s icon size and `HRManageTools.jsx`'s `TabsList` gap: both are direct, intentional edits made by the user/IDE in the working tree during this session (not artifacts of any P2.x migration), and this session's standing instructions require respecting such edits rather than reverting them. `EnterpriseConfigManager.jsx`: dead/unreferenced code, explicitly out of scope per this task's "do not perform dead-code cleanup" rule.
+
+### 13. Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings).
+
+### 14. Lint result
+
+✅ `npm run lint` — same pre-existing baseline: 2 `react-hooks/exhaustive-deps` config errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/billingConfigurationService.js`. Zero new issues.
+
+### 15. git diff --check result
+
+✅ Clean (only pre-existing LF/CRLF informational warnings on files already touched in earlier steps, not errors).
+
+### 16. Confirmation DatePicker/DateRangePicker were untouched
+
+Confirmed — neither file was read for modification purposes, referenced only incidentally as an import in files already open for other reasons, never edited.
+
+### 17. Confirmation no business/API logic changed
+
+Confirmed — the single safe fix (§3/§9) touched only a presentational wrapper `<div>`; no API call, state variable, handler, effect, validation rule, RBAC check, routing logic, or WebSocket subscription was modified anywhere in this task.
+
+### 18. Confirmation no commit/push was performed
+
+Confirmed — the one file change plus this documentation update remain in the working tree for review.
+
+### Deferred / Future Work
+
+Documented for awareness, not implemented in this or any prior task:
+- A dedicated fix for `models/RevokeLeaveRequests.jsx`'s whole-table-skeleton-during-action behavior (apply the same `actionState`-style separation used in `CompOffBalanceRequests.jsx`), if the team decides the long-standing pre-Phase-2 behavior should change.
+- `models/LeaveHistory.jsx`'s early-return loading pattern could be normalized to route through `DataTable`'s own `loading` prop for consistency with sibling consumers, if desired.
+- The previously-documented 11-file raw-modal-shell backlog beyond P2.17's 6 migrations (`AddHolidaysModal.jsx`, `AddLeaveTypeModal.jsx`, `charts/AllHolidaysGrid.jsx`, `EmployeeLeaveBalances.jsx`'s `LeaveUploadWizard` host overlay) remains open, each blocked by its own already-documented capability gap or architecture mismatch.
+- Dead-code cleanup candidates accumulated across the whole Phase 2 project (`ruleBook/RuleBookPage.jsx`, `EnterpriseConfigManager.jsx`, `hooks/Modal.jsx`, `models/ReviewModal.jsx`, `models/ActionDropdown.jsx`, `EmployeePanelold.jsx`, `models/SkeletonTable.jsx`) were repeatedly reconfirmed dead but never removed, per this project's consistent policy of not performing unrequested deletions.
+- `LeaveTypeDropdown` (3 near-duplicate implementations) and the employee-search `react-select` (2 near-duplicate implementations) remain flagged from earlier audits as dedup opportunities, not attempted.
+
+**This concludes the Leave Management Phase 2 Canonical UI Unification project (P0 through P2.19). No further Phase 2 work is planned for this module.**
+
+## P2.20 — Canonical Modal Sticky Header Fix
+
+### Problem (as reported)
+
+The canonical Modal's title/header and close (X) button were reported to scroll upward together with the modal body when the body content is long enough to scroll, instead of remaining fixed at the top of the modal panel.
+
+### Audit method
+
+Read the complete, current `src/components/Modal/modal.jsx` fresh (unchanged since P2.18/P2.19 — verified via direct re-read, not assumed from a prior report), traced its exact DOM/flexbox structure, and reasoned through all 9 required scenarios (A–I) plus a repo-wide search for any consumer-supplied `className`/`panelClassName`/`bodyClassName` override that could plausibly reproduce the reported symptom.
+
+### Root cause
+
+**None found in the canonical component.** The current implementation already renders the header, body, and footer as three independent **sibling** elements inside the modal panel — not as a single scrolling block:
+
+```jsx
+<div className="relative flex w-full flex-col ... ${maxHeight} ...">  {/* panel: flex column, height capped by maxHeight */}
+  {hasHeader && (
+    <div className="shrink-0 rounded-t-xl bg-white ...">            {/* header: flex-shrink:0, sized to content */}
+      {/* title / subtitle / titleIcon / close button */}
+    </div>
+  )}
+
+  <div className="min-h-0 flex-1 ${scrollable ? "overflow-y-auto" : "overflow-hidden"} ...">  {/* body: the ONLY scrolling element */}
+    {children}
+  </div>
+
+  {footer && (
+    <div className="shrink-0 rounded-b-xl border-t border-gray-100 bg-white ...">  {/* footer: flex-shrink:0, sized to content */}
+      {footer}
+    </div>
+  )}
+</div>
+```
+
+Because the header and footer are `shrink-0` **siblings** of the body — not descendants of it — they structurally cannot participate in the body's `overflow-y-auto` scrolling, regardless of how much content `children` contains. This is the standard, correct flexbox "fixed-header/scrollable-middle/fixed-footer" pattern (`flex-col` container with a `max-height`, `shrink-0` header/footer, `flex-1 min-h-0 overflow-y-auto` body) and was already present in the component before this task — it predates every P2.x change made in this project. A repo-wide search for any consumer passing a `panelClassName`/`className` containing an `overflow-*` class that might land on the *panel* itself (which would be the one way to accidentally break this separation) found none — the handful of consumers that do override `bodyClassName` with their own `overflow-*` value are only affecting the already-independent body element, not the panel or header.
+
+**Conclusion: the described bug does not reproduce against the current code.** The header (title, subtitle, icon, and close button together, as one unit) is already guaranteed to remain visible at the top of the modal, unaffected by body scroll position, in every one of the 9 required scenarios (verified by code-level reasoning below, since no dev server was used for this task — see "Browser/visual QA" below).
+
+### Exact structural/CSS change
+
+**None. `src/components/Modal/modal.jsx` was not modified.** Per this project's standing principle (also stated explicitly in the P2.19 task: "if there are ZERO safe changes, that is completely acceptable — do not manufacture changes simply to make the task look productive"), no change was made to a component that was found, on evidence, to already implement the requested behavior. Introducing a "fix" (e.g. adding `position: sticky` to the header) on top of an already-correct sibling-based separation would be redundant at best and could introduce a regression (e.g. `sticky` interacting unexpectedly with the panel's own lack of an explicit `overflow` value) at worst — exactly the kind of unnecessary, unverified change this task's own instructions caution against ("Do not blindly add `position: fixed`... Do not add `sticky` to a header if an ancestor's overflow structure prevents it from functioning correctly").
+
+### Header behavior before/after
+
+Unchanged — the header (title + subtitle + titleIcon + close button, together as one `shrink-0` block) was already, and remains, structurally outside the scrolling body element in every scenario.
+
+### Body scrolling behavior — scenario walkthrough
+
+- **A. `scrollable=true`** (default): body has `overflow-y-auto`; when content exceeds the panel's available height, only the body scrolls; header/footer stay fixed. Confirmed by structure.
+- **B. `scrollable=false`**: body has `overflow-hidden` instead; no scrollbar is introduced, overflowing content is clipped — matches "preserve existing behavior, do not unexpectedly introduce scrolling."
+- **C. `maxHeight`**: applied to the panel (`flex-col` container) via the `maxHeight` prop (default `max-h-[85vh]`); the body's `flex-1 min-h-0` lets it shrink to fill only the space left after the header/footer's own natural height, so the panel never exceeds `maxHeight` and the body absorbs all overflow. Unaffected by this audit.
+- **D. `fullScreenMobile`**: only changes sizing classes on the panel (`max-sm:w-screen max-sm:h-screen max-sm:rounded-none max-sm:max-h-screen`); the same flex-column/shrink-0/flex-1 relationship applies identically at that size, so the header remains fixed on mobile too.
+- **E. short content**: body's content is shorter than its available flex space, so `overflow-y-auto` never produces a visible scrollbar; header looks identical to the "no scrolling needed" case.
+- **F. long content**: only the body scrolls, confirmed by the sibling-DOM structure — header/footer cannot be affected by the body's internal scroll offset.
+- **G. footer present**: the `footer` prop renders as its own `shrink-0` sibling, after the body in DOM order but a structurally separate flex item — it does not get embedded inside the scrolling body and its own behavior (padding, border, background) is unchanged.
+- **H. `showHeader=false`**: `hasHeader = showHeader && (title || subtitle || showCloseButton)` evaluates false, so the entire header `<div>` is omitted from the render tree — no empty or invisible sticky header region is introduced.
+- **I. `showCloseButton=false`**: only affects the `{showCloseButton && <Button>...}` conditional inside the header; if a `title`/`subtitle` is still present the header renders without the close button, laid out via the same `flex items-start justify-between` row (the title block just doesn't have a sibling to justify against) — no layout break.
+
+### Footer behavior
+
+Unchanged — confirmed still rendered as its own `shrink-0` block, structurally independent of body scrolling, exactly as it was before this task.
+
+### API compatibility
+
+No prop was added, removed, or renamed. Every prop listed in this task's "preserve existing API" section (`isOpen, onClose, title, subtitle, children, className, bodyClassName, size, position, maxHeight, fullScreenMobile, zIndex, closeOnBackdrop, closeOnEscape, scrollable, showCloseButton, showHeader, headerBorder, headerClassName, footerClassName, backdropClassName, panelClassName, panelStyle, titleClassName, subtitleClassName, overlayColor, footer, closeIcon, titleIcon, animation, disableBodyScroll`) is unchanged, since the file itself was not edited.
+
+### Repository-wide consumer verification
+
+A fresh repo-wide search found canonical `Modal` is used by roughly 75 files outside Leave Management (spanning `accounts-payable`, `account_receivable`, `airs`, `employee-onboarding`, `expense-management`, `Projects`, `resource_management`, `Timesheet`, `UserManagement`, and shared `components/`), in addition to the 11 Leave Management consumers from P2.17/P2.18. A targeted search across all of these for `panelClassName`/`className` values that could place an `overflow-*` class on the *panel* itself (the one way this bug pattern could actually manifest) found none — the only `bodyClassName` overrides found (`p-0 overflow-hidden`, `overflow-y-auto max-h-[60vh]`, etc., in a handful of `UserManagement`/`resource_management` files) affect only the already-independent body element and, in some cases, appear to be consumers implementing their *own* nested sticky-header-within-modal-body pattern for embedded tables — an unrelated, consumer-owned concern, not a defect in the canonical shell. Since `Modal.jsx` was not modified, every one of these ~86 total consumers is unaffected by this task, by construction.
+
+### Files modified
+
+None.
+
+### Business/API logic verification
+
+Not applicable — no file was modified in this task.
+
+### Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings). Ran to confirm the working tree's pre-existing state was unaffected by this audit-only task, not because any change was made.
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline: 2 `react-hooks/exhaustive-deps` config errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/billingConfigurationService.js`. Zero new issues.
+
+### git diff --check
+
+✅ Clean (only pre-existing LF/CRLF informational warnings on files already touched in earlier tasks, not errors). `git status` confirms no new file changes from this task.
+
+### Browser/visual QA result
+
+**Not performed.** No development server or browser was launched during this task. This audit's conclusion (that the header/body/footer are structurally independent DOM siblings, and therefore the header cannot scroll with body content regardless of content length) is based entirely on static code/CSS-flexbox reasoning against the current source, not on live visual confirmation. If a live-rendered discrepancy is later observed in a specific consumer, it would most likely stem from that consumer's own passed `className`/`children` structure (e.g., nested `overflow`/`height` rules inside `children` interacting unexpectedly with the body's `min-h-0 flex-1`), not from the canonical Modal shell itself — recommend browser verification with one or two concrete Leave Management long-form modals (e.g. `models/AddEmployeeModal.jsx`, `models/EditBlockLeaveModal.jsx`) before considering this fully closed.
+
+### Confirmation DatePicker/DateRangePicker untouched
+
+Confirmed — neither file was read or modified.
+
+### Confirmation no business/API logic changed
+
+Confirmed — no file was modified in this task at all.
+
+### Confirmation no commit/push performed
+
+Confirmed — only this documentation update exists in the working tree from this task.
+
+## P2.20a — Add/Edit Leave Type Modal Sticky Header Fix
+
+### Affected modal(s) confirmed
+
+**`src/pages/leave_management/models/AddLeaveTypeModal.jsx` only.** This single component handles BOTH "Add New Leave Type" and "Edit Leave Type" via its `editData` prop (`title={editData ? "Edit Leave Type" : "Add New Leave Type"}`) — there is no separate "EditLeaveType" file. `src/pages/leave_management/models/EditLeaveModal.jsx` was read and confirmed to be an unrelated component (it edits an employee's individual leave *request* — `leaveId`, `recordId: initialData?.leaveId` — not a leave *type* configuration entity) and was correctly **not modified**, per this task's explicit warning not to assume from the filename alone.
+
+### Canonical Modal implementation audited
+
+Re-read `src/components/Modal/modal.jsx` fresh in full. Confirmed the header/body/footer sibling-based sticky architecture established (and already present) as of P2.20 is structurally sound: `shrink-0` header, `flex-1 min-h-0 overflow-y-auto` body, `shrink-0` footer.
+
+### Root cause
+
+**`AddLeaveTypeModal.jsx` was never using canonical `Modal` at all.** It was still a raw, hand-rolled shell:
+```jsx
+<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
+  <div className="bg-white rounded-xl shadow-xl w-full max-w-lg sm:max-w-xl max-h-[90vh] overflow-y-auto relative">
+    {submitting && <div className="absolute inset-0 ...">...</div>}
+    <div className="flex items-center justify-between p-4 border-b ...">{/* header */}</div>
+    <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5">{/* fields + footer buttons, all one block */}</form>
+  </div>
+</div>
+```
+The header and the scrollable form content were both direct children of the **same single `overflow-y-auto` element** — there was no separation between them at all, so the header necessarily scrolled away with the form. This has nothing to do with a defect in canonical `Modal`'s sticky-header structure (confirmed correct in P2.20) — this consumer simply never adopted it. This exact non-migration was a deliberate decision made in P2.18, which found a genuine blocker at the time (see below) and left the file unmigrated rather than force it through.
+
+### Whether canonical Modal or consumer override caused the issue
+
+**Neither, precisely — the consumer was never on canonical Modal to begin with.** However, actually completing the migration required one small, genuinely reusable addition to canonical `Modal` itself, not a consumer-specific hack (see next section).
+
+### Exact fix
+
+Two changes, both minimal:
+
+1. **`src/components/Modal/modal.jsx`** — added `relative` to the body/content container's className (alongside its existing `min-h-0 flex-1 overflow-y-auto`). This is the one canonical-component change made in this task. Rationale: `AddLeaveTypeModal.jsx` has a `{submitting && <div className="absolute inset-0 ...">}` full-cover loading overlay that must render somewhere inside the modal. In the original raw shell, this overlay's containing block (nearest `position: relative` ancestor) and the scrolling `overflow-y-auto` element were the *same* single `<div>`, so `inset-0` correctly sized the overlay to match the visible scrolling viewport. Before this fix, canonical `Modal`'s body div had `overflow-y-auto` but **no** `position: relative`, meaning an `absolute inset-0` element placed inside `children` would resolve its containing block to the *panel* (the next positioned ancestor up), not the body — causing it to size/overlap starting from the very top of the panel (behind the header) rather than just covering the body area, and risking being clipped unpredictably by the intervening `overflow-y-auto` body element (a well-known CSS interaction where an ancestor's overflow clipping can still apply to a descendant whose containing block sits further up the tree). Adding `relative` to the body div makes it both the overflow-clipping element *and* the containing block for the overlay, in the same relationship the original raw shell relied on — this reproduces the original overlay behavior exactly, and is a generically useful, non-module-specific capability (any consumer wanting a full-cover overlay over just the modal's content area, not its header/footer, benefits from this).
+2. **`src/pages/leave_management/models/AddLeaveTypeModal.jsx`** — migrated its outer shell to canonical `Modal`:
+   - `isOpen`, `onClose` — unchanged wiring.
+   - `title={editData ? "Edit Leave Type" : "Add New Leave Type"}` — unchanged dynamic text, now via the canonical `title` prop instead of a raw `<h2>`.
+   - `titleIcon={<FileText className="w-6 h-6 text-green-600" />}` — the header icon, now via the canonical `titleIcon` slot.
+   - `panelClassName="max-w-lg sm:max-w-xl"` — preserves the original responsive width exactly (`size` was intentionally omitted, since Modal's own `hasMaxWidth` check skips its `size`-driven `SIZE_MAP` class whenever the merged className already contains `"max-w-"`, matching the same pattern used for `AddEmployeeModal.jsx` in P2.18).
+   - `closeOnBackdrop={false}` — preserves the original's lack of backdrop-dismiss (the raw shell's outer overlay div had no `onClick`).
+   - `closeOnEscape={true}` — preserves the original's own Escape-key listener (now removed and replaced by Modal's built-in equivalent).
+   - `showCloseButton={true}` — preserves the header X.
+   - `disableBodyScroll={true}` — preserves the original's own `document.body.style.overflow = "hidden"` effect (now removed and replaced by Modal's built-in, previously-added-in-P2.18 body-scroll-lock mechanism).
+   - The now-redundant self-rolled `useEffect` (Escape listener + body-scroll-lock, lines 134–145 of the pre-migration file) was removed, since canonical `Modal` now owns both behaviors.
+   - The submitting overlay and the entire `<form onSubmit={handleSubmit}>` (all fields, through to the `type="submit"` button) were kept together as `children` — the form was **not** split into the `footer` prop, to avoid any risk to the native form/submit-button association (same precedent as `AddEmployeeModal.jsx`).
+   - The now-unused `X` icon import (`lucide-react`) was removed, since canonical Modal's own default close icon replaces the raw one.
+
+### Why the fix is safe
+
+The `relative` addition to Modal's body div is purely additive — `position: relative` has no visual effect on an element unless a descendant is absolutely positioned relative to it, so every existing Modal consumer that does *not* place an absolutely-positioned element inside `children` is completely unaffected (confirmed no `size class change, no spacing change, no layering change for the ~86 other consumers of `Modal` repo-wide). The `AddLeaveTypeModal.jsx` migration itself follows the exact, already-validated pattern used for `AddEmployeeModal.jsx` in P2.18 (form-as-children, no footer split, matching close/backdrop/Escape/body-scroll-lock prop mapping) — no new architectural pattern was invented.
+
+### Header sticky behavior
+
+Now correct for both "Add New Leave Type" and "Edit Leave Type": the title, icon, and close button render inside canonical Modal's `shrink-0` header block, structurally separate from the scrollable body — the header cannot scroll away regardless of form length, for the same structural reason established and verified in P2.20.
+
+### Body scroll behavior
+
+The `<form>` (all fields) now lives inside canonical Modal's `flex-1 min-h-0 overflow-y-auto` body region — only this region scrolls when content exceeds the modal's available height (governed by `maxHeight`, default `max-h-[85vh]`, unchanged). The submitting overlay (now correctly contained by the newly-`relative` body div) covers exactly the body's content area, not the header, matching its original visual intent.
+
+### Close-button behavior
+
+The header X now uses canonical Modal's default `<X className="h-4 w-4" />` icon (previously a locally-imported `lucide-react` `X` at `w-6 h-6`) — a minor icon-size visual change consistent with every other canonical-Modal-migrated consumer in this project, not a behavior change. One previously-documented, single-consumer nuance was **not** preserved: the original raw X button had `disabled={submitting}` (X un-clickable while submitting); canonical Modal's `showCloseButton` is a boolean with no per-instance disable condition, so this minor loss was accepted — consistent with the exact same accepted tradeoff already documented for this file in P2.17/P2.18 (the X remains clickable during submission, whereas before it did not).
+
+### Form/validation/loading behavior
+
+Unchanged. `handleChange`, `handleSubmit`, `isFormValid`, the `submitting` state and its `LoadingSpinner` overlay, the Cancel/Submit footer buttons (`disabled={submitting}` / `loading={submitting}` / `loadingText`), and every field (`FormSelect`, `FormInput`, `FormTextArea` with its `maxLength={50}` `rows={2}` `resize-none` description field, checkboxes) are byte-identical to before — only the outer shell and its own two self-rolled effects were touched.
+
+### API/business logic verification
+
+Confirmed unchanged — `handleSubmit`'s payload construction (gender-based vs. regular, add vs. update), the `url`/`method` selection (`PATCH .../update-leave-type/:id` vs `POST .../add-leave-type` vs `POST .../gender-base-leave/add-leave`), the `startJob`/`onSuccess`/`onClose` calls, and all toast messages are untouched.
+
+### Other Modal consumer regression verification
+
+Confirmed via fresh reads that the following remain untouched and correct: `models/EditBlockLeaveModal.jsx` (footer present, `closeOnBackdrop={false}`/`closeOnEscape={false}` intact), `models/EffectiveDeactivationDate.jsx`/`models/CarryForwardTrigger.jsx` (no footer split, button-only dismissal intact), `models/HandleLeaveRequestAndApprovals.jsx`'s confirmation dialog (`showCloseButton={false}`, `showHeader={false}` intact), `models/ApprovalRulesPage.jsx` (subtitle-less header, form-as-children intact), and `models/AddEmployeeModal.jsx` (its own `disableBodyScroll={true}` migration from P2.18 — confirmed still present and unaffected by the new `relative` class on the shared body div, since `AddEmployeeModal.jsx` has no absolutely-positioned content inside its `children`).
+
+### Files modified
+
+1. `src/components/Modal/modal.jsx`
+2. `src/pages/leave_management/models/AddLeaveTypeModal.jsx`
+
+### Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings).
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline: 2 `react-hooks/exhaustive-deps` config errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/billingConfigurationService.js`. Zero new issues.
+
+### git diff --check
+
+✅ Clean (only pre-existing LF/CRLF informational warnings on files already touched in earlier tasks, not errors).
+
+### Browser/visual QA result
+
+**Not performed.** No development server or browser was launched during this task. The conclusion that the header now stays fixed and the submitting-overlay correctly covers only the body is based on static code/CSS reasoning against the current source (the same sibling-based architecture verified in P2.20, plus the `relative`-on-body containing-block analysis above), not live visual confirmation. Recommend a live check of both the "Add New Leave Type" and "Edit Leave Type" flows (short and long content, and triggering the submitting-overlay) before considering this fully closed.
+
+### DatePicker/DateRangePicker confirmation
+
+Confirmed — neither file was read or modified.
+
+### Pre-existing issues
+
+One previously-documented, deliberately-unresolved nuance carried forward: the header close (X) button can no longer be individually disabled while `submitting` (canonical Modal's `showCloseButton` has no per-instance disable condition) — this exact tradeoff was already anticipated and accepted for this file in P2.17/P2.18's audits, not newly introduced here.
+
+### Confirmation no commit/push was performed
+
+Confirmed — all changes remain in the working tree for local review.
+
+## P2.21 — Request/Comp-Off Cancel Button Consistency
+
+### Previous UI difference
+
+`RequestLeaveModal.jsx`'s Cancel button used `<Button variant="ghost" size="medium">` (transparent background, no visible border — `bg-transparent text-gray-700 hover:bg-gray-100 border border-transparent`). `CompOffRequestModal.jsx`'s Cancel button used `<Button variant="outline">` (visible gray border, white background — `border border-gray-300 bg-white text-gray-700 hover:bg-gray-50`). Both already used canonical `Button` — the inconsistency was a variant mismatch, not a raw-vs-canonical issue.
+
+### Exact cause
+
+Both Cancel buttons were already canonical `Button` instances with no other structural difference (both `type="button"`, both disabled during their respective loading state, both sitting in a `justify-end gap-3` footer row) — the only actual difference was the `variant` prop (`ghost` vs `outline`).
+
+### Canonical Cancel-button convention selected
+
+**`variant="outline"`** — selected based on actual repository evidence, not invented. A fresh audit of every Cancel button across live Leave Management modal consumers found:
+- `variant="outline"` (6 files): `AddEmployeeModal.jsx`, `EditBlockLeaveModal.jsx`, `ApprovalRulesPage.jsx`, `ApplyLeaveOnBehalf.jsx`, `CancellationModal.jsx`, `CompOffRequestModal.jsx`
+- `variant="ghost" size="medium"` (4 files, including the one changed here): `AddLeaveTypeModal.jsx`, `EditLeaveModal.jsx`, `ManagerEditLeaveRequest.jsx`, `RequestLeaveModal.jsx`
+
+`outline` is both the majority existing convention across the module and already `CompOffRequestModal.jsx`'s own treatment, making it the correct target for aligning these two specific files per this task's scope (normalizing every `ghost`-variant Cancel button module-wide was explicitly out of scope for this task and was not attempted).
+
+### Exact changes made
+
+`src/pages/leave_management/models/RequestLeaveModal.jsx` — changed its Cancel `Button`'s `variant` from `"ghost"` to `"outline"`. No other prop, no surrounding footer container class, and no other button was touched. `size="medium"` was left explicit (unnecessary to remove — `CompOffRequestModal.jsx`'s Cancel button omits `size` entirely, which defaults to `Button`'s own `"medium"`, so both already render identically in size; changing this would be a no-op edit, not a fix). `src/pages/leave_management/models/CompOffRequestModal.jsx` was **not modified** — its Cancel button already matched the selected convention.
+
+The surrounding footer containers were deliberately left as-is: `RequestLeaveModal.jsx`'s Cancel/Submit row lives inside its `<form onSubmit={handleSubmit}>` (required so the `type="submit"` button stays natively associated with the form), while `CompOffRequestModal.jsx`'s row is passed via canonical `Modal`'s own `footer` prop. This is a legitimate architectural difference (moving `RequestLeaveModal.jsx`'s buttons into Modal's `footer` slot would remove them from the `<form>` element entirely, breaking native submit-button association) — not part of the reported Cancel-button visual inconsistency, and per this task's explicit instruction not to restructure the footer unnecessarily, it was left untouched.
+
+### Behavior preservation
+
+`onClick={onClose}` (both files), `type="button"` (both files, preventing accidental form submission), and each modal's own disabled condition (`disabled={submitting}` in `RequestLeaveModal.jsx`, `disabled={loading}` in `CompOffRequestModal.jsx`) are all unchanged — only the `variant` string was edited.
+
+### Files modified
+
+`src/pages/leave_management/models/RequestLeaveModal.jsx` (one line changed) + `docs/ui/phase-2-leave-management.md`.
+
+### Build result
+
+✅ `npm run build` — succeeds (only pre-existing, unrelated chunk-size warnings).
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline: 2 `react-hooks/exhaustive-deps` config errors in `src/pages/airs/**`, plus the pre-existing unrelated warning in `account_receivable/services/billingConfigurationService.js`. Zero new issues.
+
+### git diff --check
+
+✅ Clean (only pre-existing LF/CRLF informational warnings on files already touched in earlier tasks, not errors). `git diff` confirms the entire change is a single `variant="ghost"` → `variant="outline"` line swap.
+
+### Confirmation DatePicker/DateRangePicker untouched
+
+Confirmed — neither file was read or modified.
+
+### Confirmation no business/API logic changed
+
+Confirmed — `onClose`, `submitting`/`loading` state, form validation, and every API call in both files are untouched; the change is a single presentational prop value.
+
+### Confirmation no commit/push performed
+
+Confirmed — the one-line change remains in the working tree for local review.

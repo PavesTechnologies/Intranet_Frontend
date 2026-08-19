@@ -1,7 +1,7 @@
 import React, { useEffect, useState, Fragment } from "react";
 import api from "../../../api/axiosInstance";
 import { Listbox, Transition } from "@headlessui/react";
-import { Check, Plus, ChevronDown, Pencil, Trash2, X } from "lucide-react";
+import { Check, Plus, ChevronDown, Pencil, Trash2 } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { toast } from "react-toastify";
 import ConfirmationModal from "./ConfirmationModal";
@@ -9,6 +9,8 @@ import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
 import DataTable from "../../../components/patterns/DataTable";
 import PageHeader from "../../../components/ui/PageHeader";
+import PageContainer from "../../../components/patterns/PageContainer";
+import Modal from "../../../components/Modal/modal";
 import { set } from "date-fns";
 import { is } from "date-fns/locale";
 
@@ -163,7 +165,7 @@ export default function ApprovalRulesPage() {
   //                            UI START
   // ================================================================
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <PageContainer density="comfortable" className="max-w-6xl mx-auto">
       {/* HEADER */}
       <PageHeader
         title="Approval Rules"
@@ -229,24 +231,15 @@ export default function ApprovalRulesPage() {
       </div>
 
       {/* ===================== MODAL ===================== */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl w-full max-w-md max-h-[85vh] overflow-y-auto shadow-xl border p-6 space-y-5">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-800">
-                {editingRule ? "Edit Rule" : "Add New Rule"}
-              </h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={closeModal}
-                className="text-gray-500 hover:text-gray-700"
-                aria-label="Close"
-              >
-                <X size={20} width={20} />
-              </Button>
-            </div>
-
+      <Modal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        title={editingRule ? "Edit Rule" : "Add New Rule"}
+        size="md"
+        closeOnBackdrop={false}
+        closeOnEscape={false}
+        showCloseButton={true}
+      >
             <form onSubmit={handleSubmit} className="space-y-5">
               <Dropdown
                 label="Action Type"
@@ -327,9 +320,7 @@ export default function ApprovalRulesPage() {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {showConfirmModal && (
         <ConfirmationModal
@@ -341,7 +332,7 @@ export default function ApprovalRulesPage() {
           onCancel={() => setShowConfirmModal(false)}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 

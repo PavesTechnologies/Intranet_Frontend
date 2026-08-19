@@ -14,6 +14,7 @@ import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
 import FormSelect from "../../../components/forms/FormSelect";
 import StatusBadge from "../../../components/patterns/StatusBadge";
+import Modal from "../../../components/Modal/modal";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const RMS_BASE_URL = window.__APP_CONFIG__.RMS_BASE_URL;
@@ -1057,31 +1058,33 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
         )}
 
         {leaveBalanceModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[100vh] overflow-y-auto p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">
-                  Analysis for - {leaveBalanceModal.employeeName}
-                </h2>
-                <Button
-                  onClick={() => setLeaveBalaceModel(null)}
-                  variant="ghost"
-                  size="medium"
-                >
-                  &times;
-                </Button>
-              </div>
-              <LeaveSection
-                employeeId={leaveBalanceModal.employeeId}
-                leaveId={leaveBalanceModal.leaveId}
-              />
-            </div>
-          </div>
+          <Modal
+            isOpen={!!leaveBalanceModal}
+            onClose={() => setLeaveBalaceModel(null)}
+            title={`Analysis for - ${leaveBalanceModal.employeeName}`}
+            size="4xl"
+            closeOnBackdrop={false}
+            closeOnEscape={false}
+            showCloseButton={true}
+          >
+            <LeaveSection
+              employeeId={leaveBalanceModal.employeeId}
+              leaveId={leaveBalanceModal.leaveId}
+            />
+          </Modal>
         )}
 
         {confirmation && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-40 backdrop-blur">
-            <div className="bg-white p-8 rounded-xl shadow-2xl w-[90vw] max-w-[360px] border border-gray-200 animate-fade-in">
+          <Modal
+            isOpen={!!confirmation}
+            onClose={() => setConfirmation(null)}
+            showHeader={false}
+            closeOnBackdrop={false}
+            closeOnEscape={false}
+            panelClassName="w-[90vw] max-w-[360px]"
+            bodyClassName="p-8"
+            animation="fade"
+          >
               <div className="flex flex-col items-center">
                 <div
                   className={`flex items-center justify-center w-16 h-16 rounded-full mb-4 ${confirmation.action === "approve"
@@ -1155,8 +1158,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                   </Button>
                 </div>
               </div>
-            </div>
-          </div>
+          </Modal>
         )}
       </div>
     </div>

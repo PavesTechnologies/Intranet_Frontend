@@ -45,6 +45,29 @@ const ANIMATION_MAP = {
   none: "",
 };
 
+// Module-level (not per-instance) ref count + saved value, so that when
+// multiple Modals with disableBodyScroll are open at once (e.g. a
+// confirmation nested inside another modal), the body is only unlocked
+// once the LAST one closes — and is restored to whatever it was before the
+// FIRST one locked it, not blindly cleared.
+let bodyScrollLockCount = 0;
+let previousBodyOverflow = "";
+
+function lockBodyScroll() {
+  if (bodyScrollLockCount === 0) {
+    previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+  }
+  bodyScrollLockCount += 1;
+}
+
+function unlockBodyScroll() {
+  bodyScrollLockCount = Math.max(0, bodyScrollLockCount - 1);
+  if (bodyScrollLockCount === 0) {
+    document.body.style.overflow = previousBodyOverflow;
+  }
+}
+
 const Modal = ({
   isOpen,
   onClose,
@@ -63,6 +86,11 @@ const Modal = ({
   closeOnBackdrop = true,
   closeOnEscape = true,
   scrollable = true,
+  // Optional, off by default so every existing consumer is unaffected.
+  // When true, prevents the page behind the modal from scrolling while it
+  // is open (restoring whatever the body's overflow was before, not just
+  // clearing it) — see lockBodyScroll/unlockBodyScroll above.
+  disableBodyScroll = false,
 
   showCloseButton = true,
   showHeader = true,
@@ -96,6 +124,13 @@ const Modal = ({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, closeOnEscape, onClose]);
+
+  useEffect(() => {
+    if (!isOpen || !disableBodyScroll) return undefined;
+
+    lockBodyScroll();
+    return () => unlockBodyScroll();
+  }, [isOpen, disableBodyScroll]);
 
   if (!isOpen) return null;
 
@@ -195,7 +230,7 @@ const Modal = ({
 
         <div
           className={`
-            min-h-0 flex-1
+            relative min-h-0 flex-1
             ${scrollable ? "overflow-y-auto" : "overflow-hidden"}
             ${
               bodyClassName ||

@@ -12,6 +12,7 @@ import FormInput from "../../../components/forms/FormInput";
 import DataTable from "../../../components/patterns/DataTable";
 import FormSelect from "../../../components/forms/FormSelect";
 import BackButton from "../../../components/patterns/BackButton";
+import PageContainer from "../../../components/patterns/PageContainer";
 
 export const YearDropdown = ({ value, onChange }) => {
   const currentYear = new Date().getFullYear();
@@ -341,7 +342,7 @@ const EmployeeLeaveBalances = () => {
   ).map((y) => ({ value: y, label: String(y) }));
 
   return (
-    <div className="p-6 overflow-auto">
+    <PageContainer density="comfortable" className="overflow-auto">
       {/* Loading Spinner Overlay */}
       {(isLoading || isFetching) && (
         <div className="absolute inset-0 bg-white/70 flex justify-center items-center z-50`">
@@ -592,7 +593,7 @@ const EmployeeLeaveBalances = () => {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 };
 

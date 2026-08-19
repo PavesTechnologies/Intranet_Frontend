@@ -1,19 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import ConfirmationModal from "./ConfirmationModal";
 import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
+import Modal from "../../../components/Modal/modal";
 const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
   const [year, setYear] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const BASE_URL = window.__APP_CONFIG__.BASE_URL;
-
-  // ❗ Hooks ABOVE return
-
-  if (!isOpen) return null;
 
   const handleConfirmClick = () => {
     if (!year) {
@@ -68,19 +65,15 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-xl shadow-md w-full max-w-md">
-        <h2 className="text-lg font-semibold mb-3">Process Carry Forward</h2>
-
-        <FormInput
-          type="number"
-          name="carryForwardYear"
-          placeholder="Enter Year (e.g. 2025)"
-          value={year}
-          onChange={(e) => setYear(e.target.value)}
-          inputClassName="mb-4"
-        />
-
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Process Carry Forward"
+      size="md"
+      closeOnBackdrop={false}
+      closeOnEscape={false}
+      showCloseButton={false}
+      footer={
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose} size="medium">
             Close
@@ -90,18 +83,26 @@ const CarryForwardTrigger = ({ isOpen, onClose, onSuccess }) => {
             Confirm
           </Button>
         </div>
+      }
+    >
+      <FormInput
+        type="number"
+        name="carryForwardYear"
+        placeholder="Enter Year (e.g. 2025)"
+        value={year}
+        onChange={(e) => setYear(e.target.value)}
+      />
 
-        <ConfirmationModal
-          isOpen={isModalOpen}
-          title="Confirm Carry Forward"
-          message={`Are you sure you want to process carry forward for year ${year}?`}
-          onConfirm={handleConfirm}
-          onCancel={handleCancel}
-          isLoading={isLoading}
-          confirmText="Process"
-        />
-      </div>
-    </div>
+      <ConfirmationModal
+        isOpen={isModalOpen}
+        title="Confirm Carry Forward"
+        message={`Are you sure you want to process carry forward for year ${year}?`}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+        isLoading={isLoading}
+        confirmText="Process"
+      />
+    </Modal>
   );
 };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -9,6 +9,7 @@ import { useJobProgress } from "../../../contexts/JobProgressContext";
 import FormInput from "../../../components/forms/FormInput";
 import FormSelect from "../../../components/forms/FormSelect";
 import FormTextArea from "../../../components/forms/FormTextArea";
+import Modal from "../../../components/Modal/modal";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -130,19 +131,6 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
       setFormData((prev) => ({ ...prev, gender: "" }));
     }
   }, [formData.leaveName]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-      window.removeEventListener("keydown", handler);
-    };
-  }, [isOpen, onClose]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -313,36 +301,25 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
     formData.effectiveStartDate &&
     (isGenderBased ? formData.gender : formData.accrualFrequency);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg sm:max-w-xl max-h-[90vh] overflow-y-auto relative">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={editData ? "Edit Leave Type" : "Add New Leave Type"}
+      titleIcon={<FileText className="w-6 h-6 text-green-600" />}
+      panelClassName="max-w-lg sm:max-w-xl"
+      closeOnBackdrop={false}
+      closeOnEscape={true}
+      showCloseButton={true}
+      disableBodyScroll={true}
+    >
         {submitting && (
           <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center rounded-xl z-50">
             <LoadingSpinner text="Submitting..." />
           </div>
         )}
 
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <div className="flex items-center">
-            <FileText className="w-6 h-6 text-green-600 mr-3" />
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-              {editData ? "Edit Leave Type" : "Add New Leave Type"}
-            </h2>
-          </div>
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            type="button"
-            size="icon"
-            disabled={submitting}
-          >
-            <X className="w-6 h-6" />
-          </Button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {/* Leave Name Dropdown */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1 placeholder:text-gray-400">
@@ -607,8 +584,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 };
 
