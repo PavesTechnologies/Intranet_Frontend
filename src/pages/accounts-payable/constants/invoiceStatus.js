@@ -27,6 +27,15 @@ export const INVOICE_STATUS_OPTIONS = Object.values(INVOICE_STATUS).map((value) 
   label: value,
 }));
 
+/**
+ * Numeric status_master ids for the INVOICE module, for use with
+ * PUT /apm/invoice/status-update/{invoice_id}?status_id={status_id}. Only the id actually
+ * confirmed against a working call is captured here — don't add more from guesswork.
+ */
+export const INVOICE_STATUS_ID = {
+  PENDING_APPROVAL: 8,
+};
+
 /** Ordered stops for InvoicePipelineStepper — deliberately excludes the exception statuses. */
 export const INVOICE_PIPELINE_STAGES = [
   INVOICE_STATUS.DRAFT,

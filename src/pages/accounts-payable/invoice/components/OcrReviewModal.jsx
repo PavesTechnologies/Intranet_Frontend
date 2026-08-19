@@ -23,7 +23,8 @@ function toNumberOrNull(value) {
 /**
  * Correction form for one OCR review-queue item — Path A (already has an invoice_id, status
  * OCR_REVIEW_PENDING) or Path B (extracted, no vendor match, invoice_id still null). Both save
- * through the same endpoint, keyed by inbound_document_id, not invoice_id.
+ * through the same endpoint, keyed by inbound_document_id, not invoice_id. For Path A, saving
+ * also advances the invoice to Pending Approval (see useSaveOcrReviewMutation).
  *
  * There's no "get full extracted fields" endpoint to pre-populate this form from — the review
  * queue row only carries a summary (file name, tentative invoice number/amount/confidence), so
@@ -101,10 +102,12 @@ export default function OcrReviewModal({ item, isOpen, onClose, onViewDocument }
     };
 
     saveReview.mutate(
-      { inboundDocumentId: item.inbound_document_id, payload },
+      { inboundDocumentId: item.inbound_document_id, payload, invoiceId: item.invoice_id },
       {
         onSuccess: () => {
-          toast.success("OCR review saved.");
+          toast.success(
+            item.invoice_id ? "OCR review saved — invoice moved to Pending Approval." : "OCR review saved.",
+          );
           onClose();
         },
         onError: (error) => toast.error(getApiErrorMessage(error, "Could not save OCR review.")),
