@@ -44,6 +44,7 @@ import PaymentHistoryPage from "./pages/accounts-payable/payment/pages/PaymentHi
 import PaymentMarkAsPaidPage from "./pages/accounts-payable/payment/pages/PaymentMarkAsPaidPage.jsx";
 import APReportsPage from "./pages/accounts-payable/reports/pages/APReportsPage.jsx";
 import APSettingsPage from "./pages/accounts-payable/settings/pages/APSettingsPage.jsx";
+import SystemConfigurationPage from "./pages/accounts-payable/system-configuration/pages/SystemConfigurationPage.jsx";
 
 
 // Resource Management
@@ -556,6 +557,14 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
                 <APSettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.SYSTEM_CONFIG}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <SystemConfigurationPage />
               </ProtectedRoute>
             }
           />
