@@ -24,4 +24,5 @@ export const AP_ROUTES = {
 
   REPORTS: `${BASE}/reports`,
   SETTINGS: `${BASE}/settings`,
+  SYSTEM_CONFIG: `${BASE}/system-configuration`,
 };
