@@ -23,13 +23,15 @@ export const INVOICE_ACTIONS = {
  * The invoice status each action transitions *to* on success — drives optimistic UI updates.
  *
  * Only actions with a real backend endpoint and a confirmed resulting status are listed.
- * SAVE_OCR_CORRECTIONS, RESUBMIT_OCR, VALIDATE and REJECT_VALIDATION are deliberately absent:
- * the first has no documented response shape yet, and the other three have no corresponding
- * backend endpoint at all (see the AP Integration Ledger) — inventing a target status for them
- * would fabricate a transition the backend doesn't perform.
+ * RESUBMIT_OCR, VALIDATE and REJECT_VALIDATION are deliberately absent: they have no
+ * corresponding backend endpoint at all (see the AP Integration Ledger) — inventing a target
+ * status for them would fabricate a transition the backend doesn't perform. SAVE_OCR_CORRECTIONS
+ * only reaches PENDING_APPROVAL for Path A items (invoice already exists) — see
+ * useSaveOcrReviewMutation.
  */
 export const INVOICE_ACTION_RESULT_STATUS = {
   [INVOICE_ACTIONS.UPLOAD]: INVOICE_STATUS.OCR_REVIEW_PENDING,
+  [INVOICE_ACTIONS.SAVE_OCR_CORRECTIONS]: INVOICE_STATUS.PENDING_APPROVAL,
   [INVOICE_ACTIONS.APPROVE_INVOICE]: INVOICE_STATUS.APPROVED,
   [INVOICE_ACTIONS.REJECT_INVOICE]: INVOICE_STATUS.REJECTED,
   [INVOICE_ACTIONS.MARK_PAID]: INVOICE_STATUS.PAID,
