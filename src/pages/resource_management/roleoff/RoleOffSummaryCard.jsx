@@ -11,19 +11,31 @@ import { KPICard } from "../../../components/kpi/KPI";
 const cardConfig = {
   "Active Allocations": {
     icon: LayersIcon,
-    colorClass: "bg-slate-100 text-slate-600",
+    colorClass: "bg-blue-100 text-blue-700",
+  },
+  "Roll-Off Process": {
+    icon: UserMinusIcon,
+    colorClass: "bg-amber-100 text-amber-700",
   },
   "Pending Roll-Offs": {
     icon: UserMinusIcon,
-    colorClass: "bg-amber-100 text-amber-600",
+    colorClass: "bg-amber-100 text-amber-700",
+  },
+  "Fulfilled Roll-Off": {
+    icon: DoubleCheckIcon,
+    colorClass: "bg-emerald-100 text-emerald-700",
+  },
+  "Rejected Roll-Off": {
+    icon: WarningIcon,
+    colorClass: "bg-rose-100 text-rose-700",
   },
   "High Impact Allocations": {
     icon: WarningIcon,
-    colorClass: "bg-rose-100 text-rose-600",
+    colorClass: "bg-rose-100 text-rose-700",
   },
   "Total Roll-Off": {
     icon: DoubleCheckIcon,
-    colorClass: "bg-indigo-100 text-indigo-600",
+    colorClass: "bg-indigo-100 text-indigo-700",
   },
 };
 

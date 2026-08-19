@@ -1,17 +1,18 @@
+import { useState } from "react";
 import {
   Sparkles,
   MousePointerClick,
-  CheckCircle2,
   FileCheck2,
   ArrowRight,
-  TrendingUp,
   ShieldCheck,
   AlertCircle,
   Play,
+  ChevronDown,
 } from "lucide-react";
-import Button from "../../../../components/Button/Button";
 
-export default function EmptyWorkspaceState({ configs = [], onSelectConfig }) {
+export default function EmptyWorkspaceState({ configs = [], onViewConfig }) {
+  const [sopOpen, setSopOpen] = useState(false);
+
   const pendingConfigs = configs.filter(
     (c) => c.billingStatus === "NOT_ACQUIRED" || c.billingStatus === "Not Acquired"
   );
@@ -23,7 +24,7 @@ export default function EmptyWorkspaceState({ configs = [], onSelectConfig }) {
     {
       num: "01",
       title: "Select Queue Item",
-      desc: "Pick an active project configuration from the left acquisition queue.",
+      desc: "Pick an active project configuration from the acquisition queue.",
       icon: MousePointerClick,
     },
     {
@@ -47,128 +48,96 @@ export default function EmptyWorkspaceState({ configs = [], onSelectConfig }) {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Cockpit Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 p-6 text-white shadow-md border border-indigo-800/40 relative overflow-hidden">
-        <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 h-48 w-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+    <div className="space-y-4">
+      {/* Clean, centered empty state */}
+      <div className="rounded-xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+          <Sparkles className="h-5 w-5" />
+        </span>
+        <h2 className="mt-3 text-base font-semibold text-slate-900">Select a project to begin</h2>
+        <p className="mx-auto mt-1 max-w-md text-sm leading-relaxed text-slate-500">
+          Choose a setup from the Acquisition Queue above to inspect source timesheets, build a
+          commercial snapshot, and generate the invoice draft.
+        </p>
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-xl">
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-bold text-indigo-200 border border-indigo-400/30">
-              <Sparkles className="h-3.5 w-3.5 text-indigo-300" />
-              Financial Control Cockpit
-            </div>
-            <h2 className="text-2xl font-extrabold text-white">
-              Billing Data Acquisition Console
-            </h2>
-            <p className="text-xs sm:text-sm text-indigo-200/90 leading-relaxed">
-              Select a project setup from the queue on the left to inspect source timesheets, create commercial billing snapshots, and trigger invoice generation.
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/15 shadow-inner text-xs">
-            <div>
-              <span className="text-slate-300 block text-[10px] uppercase font-bold tracking-wider">Pending Acquisition</span>
-              <span className="text-lg font-bold text-amber-300 font-mono">{pendingConfigs.length} Projects</span>
-            </div>
-            <div className="sm:border-l sm:border-white/20 sm:pl-3">
-              <span className="text-slate-300 block text-[10px] uppercase font-bold tracking-wider">Snapshots Ready</span>
-              <span className="text-lg font-bold text-emerald-300 font-mono">{readyConfigs.length} Ready</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Start 4-Step Process */}
-      <div className="rounded-2xl bg-white p-6 border border-slate-200/90 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-indigo-600" />
-            Acquisition Lifecycle Standard Operating Procedure
-          </h3>
-          <span className="text-[11px] text-slate-500 font-medium">Snapshot-Driven Billing Standard</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
-          {steps.map((s) => (
-            <div
-              key={s.num}
-              className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 space-y-2 hover:bg-indigo-50/40 hover:border-indigo-200 transition-all duration-200 group"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black font-mono text-indigo-600 bg-indigo-100/80 px-2 py-0.5 rounded">
-                  {s.num}
-                </span>
-                <s.icon className="h-5 w-5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
-              </div>
-              <h4 className="font-bold text-xs text-slate-900 group-hover:text-indigo-900 transition-colors">
-                {s.title}
-              </h4>
-              <p className="text-[11px] text-slate-500 leading-relaxed">{s.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* High Priority Ready Items List */}
-      <div className="rounded-2xl bg-white p-6 border border-slate-200/90 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="mx-auto mt-5 flex w-fit gap-6 rounded-lg bg-slate-50 px-6 py-3 text-xs">
           <div>
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-amber-500" />
-              Pending Acquisition Worklist
-            </h3>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              Projects awaiting source data snapshot generation for the active billing cycle.
-            </p>
+            <span className="block text-[11px] font-medium uppercase tracking-wide text-slate-400">Pending</span>
+            <span className="text-lg font-bold text-amber-600">{pendingConfigs.length}</span>
           </div>
-          {pendingConfigs.length > 0 && (
-            <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
-              {pendingConfigs.length} Action Required
-            </span>
-          )}
+          <div className="border-l border-slate-200 pl-6">
+            <span className="block text-[11px] font-medium uppercase tracking-wide text-slate-400">Ready</span>
+            <span className="text-lg font-bold text-emerald-600">{readyConfigs.length}</span>
+          </div>
         </div>
+      </div>
 
-        {pendingConfigs.length === 0 ? (
-          <div className="rounded-xl bg-emerald-50/60 border border-emerald-200/80 p-5 text-center space-y-1">
-            <CheckCircle2 className="h-6 w-6 text-emerald-600 mx-auto" />
-            <h4 className="font-bold text-xs text-emerald-900">All Project Snapshots Acquired</h4>
-            <p className="text-[11px] text-emerald-700">
-              There are no pending acquisitions for the current billing cycle.
-            </p>
+      {/* Pending worklist — only shown when there is something to act on */}
+      {pendingConfigs.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 shadow-sm sm:p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="flex items-center gap-1.5 text-xs font-semibold text-amber-900">
+              <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+              Pending Acquisition
+            </h3>
+            <span className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+              {pendingConfigs.length} action{pendingConfigs.length > 1 ? "s" : ""} required
+            </span>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-            {pendingConfigs.slice(0, 4).map((cfg) => (
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {pendingConfigs.slice(0, 6).map((cfg) => (
               <div
                 key={cfg.projectId}
-                onClick={() => onSelectConfig(cfg)}
-                className="group flex items-center justify-between p-3.5 rounded-xl border border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/50 transition-all cursor-pointer shadow-2xs"
+                onClick={() => onViewConfig(cfg)}
+                className="group flex cursor-pointer items-center justify-between gap-2 rounded-lg border border-amber-100 bg-white p-3 transition-colors hover:border-indigo-200 hover:bg-indigo-50/40"
               >
-                <div className="space-y-1">
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-xs text-slate-900 group-hover:text-indigo-900">
-                      {cfg.projectName}
-                    </span>
-                    <span className="font-mono text-[10px] text-slate-500 bg-white px-1.5 py-0.2 rounded border border-slate-200">
-                      {cfg.projectCode}
-                    </span>
+                    <span className="truncate text-xs font-semibold text-slate-900">{cfg.projectName}</span>
                   </div>
-                  <div className="text-[11px] text-slate-500">
-                    {cfg.client} • <span className="font-mono text-[10px]">{cfg.billingPeriod}</span>
+                  <div className="truncate text-[11px] text-slate-500">
+                    {cfg.client} &middot; <span className="font-mono">{cfg.projectCode}</span>
                   </div>
                 </div>
+                <ArrowRight className="h-3.5 w-3.5 flex-shrink-0 text-slate-300 transition-colors group-hover:text-indigo-600" />
+              </div>
+            ))}
+          </div>
 
-                <Button
-                  variant="secondary"
-                  className="text-xs font-bold text-indigo-700 bg-white border-slate-200 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-all"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectConfig(cfg);
-                  }}
-                >
-                  Acquire <ArrowRight className="h-3.5 w-3.5 ml-1 inline" />
-                </Button>
+          {pendingConfigs.length > 6 && (
+            <p className="mt-2.5 text-[11px] text-amber-700">
+              +{pendingConfigs.length - 6} more in the &ldquo;Pending&rdquo; queue filter
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Collapsible SOP / help */}
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <button
+          type="button"
+          onClick={() => setSopOpen((v) => !v)}
+          className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left sm:px-5"
+        >
+          <span className="text-xs font-semibold text-slate-600">How acquisition works</span>
+          <ChevronDown
+            className={`h-4 w-4 text-slate-400 transition-transform ${sopOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+
+        {sopOpen && (
+          <div className="grid grid-cols-1 gap-4 border-t border-slate-100 p-4 pt-3 sm:grid-cols-2 sm:px-5 lg:grid-cols-4">
+            {steps.map((s) => (
+              <div key={s.num} className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="rounded bg-indigo-100 px-1.5 py-0.5 font-mono text-[11px] font-bold text-indigo-600">
+                    {s.num}
+                  </span>
+                  <s.icon className="h-3.5 w-3.5 text-slate-400" />
+                  <h4 className="text-xs font-semibold text-slate-900">{s.title}</h4>
+                </div>
+                <p className="text-[11px] leading-relaxed text-slate-500">{s.desc}</p>
               </div>
             ))}
           </div>
