@@ -83,8 +83,8 @@ function getBillingFrequencyOptions(billingType, frequencies = []) {
   const scoped =
     billingType === "RECURRING"
       ? withoutHalfYearly.filter((option) =>
-          ["MONTHLY", "QUARTERLY", "ANNUALLY"].includes(option.value),
-        )
+        ["MONTHLY", "QUARTERLY", "ANNUALLY"].includes(option.value),
+      )
       : withoutHalfYearly;
 
   return sortByOrder(scoped, BILLING_FREQUENCY_ORDER);
@@ -131,6 +131,8 @@ function normalizeBillingType(type) {
       break;
 
     case "timesheet based":
+    case "time and material":
+    case "time & material":
       value = "TIME_MATERIAL";
       break;
 
@@ -178,21 +180,23 @@ function SummaryCard({ label, value }) {
 }
 
 function ReadOnlyField({ label, value }) {
-  return (
-    <FormInput
-      label={label}
-      value={value || "—"}
-      disabled
-      onChange={() => {}}
-    />
-  );
+  return <FormInput label={label} value={value || "—"} disabled onChange={() => { }} />;
 }
 
-function PmsSyncedBadge() {
+function BillingSummaryHeader({ projectInfo }) {
   return (
-    <span className="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">
-      Synced from PMS
-    </span>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <SummaryCard
+        label="Billing Type"
+        value={BILLING_TYPE_LABELS[projectInfo.billingType] || projectInfo.billingType}
+      />
+      <SummaryCard
+        label="Billing Mode"
+        value={BILLING_MODE_LABELS[projectInfo.billingMode] || projectInfo.billingMode}
+      />
+      <SummaryCard label="Billing Frequency" value={frequencyLabel(projectInfo.billingFrequency)} />
+      <SummaryCard label="Currency" value={projectInfo.currency} />
+    </div>
   );
 }
 
@@ -1312,7 +1316,17 @@ export default function BillingConfigurationStep({
 
           <RadioCardGroup
             name="billingMode"
-            options={pricingModelOptions}
+            options={
+              billingType === "TIME_MATERIAL"
+                ? [
+                  { value: "STANDARD", label: "Standard Rate", description: "One hourly rate applies to all approved billable hours." },
+                  { value: "ROLE_BASED", label: "Role-Based Rates", description: "Different hourly rates are maintained for each project role." },
+                ]
+                : [
+                  { value: "MONTHLY_RETAINER", label: "Monthly Retainer", description: "Bill a fixed recurring amount every billing period." },
+                  { value: "SUBSCRIPTION", label: "Subscription", description: "Bill a recurring subscription fee for ongoing services." },
+                ]
+            }
             value={billingMode || ""}
             onChange={(next) => update({ billingMode: next })}
             columns={2}

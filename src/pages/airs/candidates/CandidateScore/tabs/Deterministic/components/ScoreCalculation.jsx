@@ -40,6 +40,9 @@ export default function ScoreCalculation({ scoreCalculation, configuration }) {
           {isEmpty(sc.final_score) ? "-" : `${Number(sc.final_score).toFixed(2)} / 100`}
         </span>
       </div>
+
     </div>
   );
+
+
 }
