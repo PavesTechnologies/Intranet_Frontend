@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { exportApprovalPdf } from "../approvalPdf";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import api from "../../../api/axiosInstance";
 import { reviewTimesheet, handleBulkReview, handleMixedReview } from "../api";
@@ -484,54 +483,12 @@ const ManagerApprovalTable = ({
     document.body.removeChild(link);
   };
 
-  const exportPDF = () => {
-    const doc = new jsPDF();
-    doc.text("Manager Timesheet Report", 14, 10);
-    const body = [];
-
-    enrichedGroupedData.forEach((user) =>
-      user.weeklySummary.forEach((week) =>
-        week.timesheets.forEach((sheet) =>
-          sheet.entries.forEach((entry) =>
-            body.push([
-              user.userId,
-              user.userName,
-              entry.projectName,
-              entry.taskName,
-              new Date(entry.fromTime).toLocaleTimeString(),
-              new Date(entry.toTime).toLocaleTimeString(),
-              entry.workLocation || "-",
-              entry.description || "",
-              entry.hoursWorked?.toFixed(2) || 0,
-              new Date(sheet.workDate).toLocaleDateString(),
-              sheet.status,
-            ]),
-          ),
-        ),
-      ),
-    );
-
-    autoTable(doc, {
-      head: [
-        [
-          "User ID",
-          "User Name",
-          "Project",
-          "Task",
-          "Start",
-          "End",
-          "Work Type",
-          "Description",
-          "Hours",
-          "Date",
-          "Status",
-        ],
-      ],
-      body,
-      startY: 20,
+  const exportPDF = () =>
+    exportApprovalPdf({
+      roleLabel: "Manager View",
+      users: enrichedGroupedData,
+      fileSlug: "manager",
     });
-    doc.save("manager_timesheets.pdf");
-  };
 
   const renderUserWeeks = (user) =>
     user.weeklySummary
