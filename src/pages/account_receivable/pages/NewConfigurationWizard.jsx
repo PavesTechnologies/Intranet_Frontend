@@ -1,15 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ChevronRight, Pencil, FolderKanban, Coins, Receipt, ShieldCheck, Check } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Pencil, FolderKanban, Coins, Receipt, ShieldCheck } from "lucide-react";
 
-import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import WizardStepper from "../components/common/WizardStepper";
 import WizardNavigation from "../components/common/WizardNavigation";
-import ActivationSuccessDialog from "../components/billing-setup/ActivationSuccessDialog";
+import BackIconButton from "../components/common/BackIconButton";
 import ProjectStep from "../components/billing-setup/ProjectStep";
 import BillingConfigurationStep from "../components/billing-setup/BillingConfigurationStep";
 import BillingControlsStep from "../components/billing-setup/BillingControlsStep";
@@ -20,6 +19,7 @@ import {
   getApiErrorMessage,
   saveDraftConfiguration,
   activateConfiguration,
+  ensureBillingConfigurationDraft,
 } from "../services/billingConfigService";
 
 const INITIAL_WIZARD_DATA = {
@@ -37,7 +37,6 @@ const INITIAL_WIZARD_DATA = {
       ratePeriod: "HOURLY",
       effectiveFrom: "",
       effectiveTo: "",
-      remarks: "",
       rateCardId: null,
       roles: [],
       overtimeRule: "NONE",
@@ -87,99 +86,17 @@ const INITIAL_WIZARD_DATA = {
 };
 
 const STEPS = [
-  { id: 1, label: "Project Selection", desc: "Select project and basic info", icon: <FolderKanban className="h-5 w-5" /> },
-  { id: 2, label: "Commercial Configuration", desc: "Define pricing and rate details", icon: <Coins className="h-5 w-5" /> },
-  { id: 3, label: "Invoice Preferences", desc: "Configure billing rules and terms", icon: <Receipt className="h-5 w-5" /> },
-  { id: 4, label: "Review & Activate", desc: "Verify setup before activating", icon: <ShieldCheck className="h-5 w-5" /> },
+  { id: 1, label: "Project Selection", shortLabel: "Project", desc: "Select project and basic info", icon: <FolderKanban className="h-5 w-5" /> },
+  { id: 2, label: "Commercial Configuration", shortLabel: "Commercial", desc: "Define pricing and rate details", icon: <Coins className="h-5 w-5" /> },
+  { id: 3, label: "Invoice Preferences", shortLabel: "Invoice", desc: "Configure billing rules and terms", icon: <Receipt className="h-5 w-5" /> },
+  { id: 4, label: "Review & Activate", shortLabel: "Review", desc: "Verify setup before activating", icon: <ShieldCheck className="h-5 w-5" /> },
 ];
 
 const CONFIGURATIONS_PATH = "/account-receivable/project-billing-setup/configurations";
 
-function isStepValid(step, data) {
-  switch (step) {
-    case 1: {
-      const project = data.projectInfo || {};
-      const source = project.projectSource || "ENTERPRISE";
-      if (source === "ENTERPRISE") {
-        return Boolean(
-          project.clientId &&
-          project.projectId &&
-          project.projectCode &&
-          project.startDate &&
-          project.endDate
-        );
-      } else {
-        const required = ["clientName", "projectName", "projectCode", "startDate", "endDate"];
-        const hasAllRequired = required.every((field) => Boolean(project[field]));
-        const datesValid = !project.startDate || !project.endDate || project.endDate >= project.startDate;
-        return hasAllRequired && datesValid;
-      }
-    }
-    case 2: {
-      const config = data.billingConfig || {};
-      const project = data.projectInfo || {};
-      if (!(project.projectBudgetCurrency || project.currency)) return false;
-      if (!config.billingType) return false;
-      if (!config.billingTypeId) return false;
-      if (!config.billingFrequency) return false;
-      if (!config.billingFrequencyId) return false;
-
-      if (config.billingType === "TIME_MATERIAL") {
-        if (!config.billingMode) return false;
-        if (config.billingMode === "STANDARD") {
-          return Boolean(config.timeAndMaterial?.rate && config.timeAndMaterial?.ratePeriod);
-        }
-        if (config.billingMode === "ROLE_BASED") {
-          const roles = config.timeAndMaterial?.roles || [];
-          if (roles.length === 0) return false;
-          return roles.every((r) => Boolean(r.role && r.rate && r.ratePeriod));
-        }
-      }
-
-      if (config.billingType === "RECURRING") {
-        if (!config.billingMode) return false;
-        if (config.billingMode === "MONTHLY_RETAINER") {
-          return Boolean(config.monthlyRetainer?.amount && config.monthlyRetainer?.billingStartDate);
-        }
-        if (config.billingMode === "SUBSCRIPTION") {
-          return Boolean(
-            config.subscription?.plan &&
-            config.subscription?.amount &&
-            config.subscription?.billingCycle &&
-            config.subscription?.startDate &&
-            config.subscription?.endDate
-          );
-        }
-      }
-
-      if (config.billingType === "FIXED_PRICE") {
-        return Boolean(config.fixedPrice?.totalContractValue);
-      }
-
-      if (config.billingType === "MILESTONE") {
-        return (config.milestones || []).length > 0;
-      }
-
-      return true;
-    }
-    case 3: {
-      const controls = data.controls || {};
-      if (controls.autoInvoiceGeneration === undefined || controls.autoInvoiceGeneration === null) {
-        return false;
-      }
-      if (!controls.invoiceGenerationType) return false;
-      if (!controls.taxRegionId) return false;
-      if (controls.autoInvoiceGeneration === true) {
-        const day = parseInt(controls.invoiceGenerationDay, 10);
-        if (Number.isNaN(day) || day < 1 || day > 31) {
-          return false;
-        }
-      }
-      return Boolean(controls.paymentTermId);
-    }
-    default:
-      return true;
-  }
+// eslint-disable-next-line no-unused-vars
+function isStepValid(_step, _data) {
+  return true;
 }
 
 // Mirrors isStepValid but reports which required fields are still missing,
@@ -283,8 +200,12 @@ export default function NewConfigurationWizard() {
   const [viewOnly, setViewOnly] = useState(initialMode === "view");
   const [saving, setSaving] = useState(false);
   const [activating, setActivating] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
   const [savedConfigId, setSavedConfigId] = useState(extractBillingConfigurationId(configId));
+  const [configStatus, setConfigStatus] = useState(null);
+
+  // Editing an already-created (non-Draft) configuration should only ever
+  // update that record, never re-run the create/activate flow.
+  const isEditingExisting = Boolean(configId) && Boolean(configStatus) && configStatus !== "Draft";
 
   useEffect(() => {
     if (!configId) return;
@@ -300,6 +221,7 @@ export default function NewConfigurationWizard() {
           setWizardData((prev) => ({ ...prev, ...detail }));
         }
         setSavedConfigId(summary.id || configId);
+        setConfigStatus(summary.status || null);
         setCurrentStep(summary.status === "Draft" ? Math.min(summary.currentStep || 1, STEPS.length) : STEPS.length);
       } catch (error) {
         if (!isMounted) return;
@@ -368,26 +290,48 @@ export default function NewConfigurationWizard() {
   const handleBillingConfigChange = (billingConfig) => setWizardData((prev) => ({ ...prev, billingConfig }));
   const handleControlsChange = (controls) => setWizardData((prev) => ({ ...prev, controls }));
 
+  // Merges a newly-assigned billingConfigurationId into wizard state and returns it.
+  const applyBillingConfigurationId = (nextId) => {
+    if (!nextId) return nextId;
+    setSavedConfigId(nextId);
+    setWizardData((prev) => ({
+      ...prev,
+      billingConfigurationId: nextId,
+      billingConfig: {
+        ...prev.billingConfig,
+        billingConfigurationId: nextId,
+        id: nextId,
+      },
+    }));
+    return nextId;
+  };
+
+  const persistDraft = async () => {
+    const result = await saveDraftConfiguration(wizardData, savedConfigId);
+    const nextId =
+      extractBillingConfigurationId(result) ||
+      extractBillingConfigurationId(wizardData.billingConfigurationId) ||
+      savedConfigId;
+    return applyBillingConfigurationId(nextId);
+  };
+
+  // Returns the existing billingConfigurationId immediately, or creates just the
+  // parent billing configuration record (not a full draft save) and returns the
+  // id it's assigned. Used by the TM rate card save buttons so they never have to
+  // block on a separate "Save Draft" click when the parent config doesn't exist yet.
+  // Deliberately avoids saveDraftConfiguration here: that also bulk-syncs every TM
+  // rate card row (and deletes any absent from wizard state), which would race with
+  // the single-row create/update the rate card button is about to perform itself.
+  const ensureBillingConfigurationId = async () => {
+    if (savedConfigId) return savedConfigId;
+    const nextId = await ensureBillingConfigurationDraft(wizardData);
+    return applyBillingConfigurationId(nextId);
+  };
+
   const handleSaveDraft = async () => {
     setSaving(true);
     try {
-      const result = await saveDraftConfiguration(wizardData, savedConfigId);
-      const nextId =
-        extractBillingConfigurationId(result) ||
-        extractBillingConfigurationId(wizardData.billingConfigurationId) ||
-        savedConfigId;
-      if (nextId) {
-        setSavedConfigId(nextId);
-        setWizardData((prev) => ({
-          ...prev,
-          billingConfigurationId: nextId,
-          billingConfig: {
-            ...prev.billingConfig,
-            billingConfigurationId: nextId,
-            id: nextId,
-          },
-        }));
-      }
+      await persistDraft();
       showStatusToast("Draft saved successfully.", "success");
     } catch (error) {
       showStatusToast(getApiErrorMessage(error, "Failed to save draft."), "error");
@@ -398,18 +342,22 @@ export default function NewConfigurationWizard() {
 
   const handleCancel = () => navigate(CONFIGURATIONS_PATH);
 
-  const handleActivate = async () => {
+  const handleFinalSubmit = async () => {
     setActivating(true);
     try {
-      const saveResult = await saveDraftConfiguration(wizardData, savedConfigId);
-      const billingConfigurationId =
-        extractBillingConfigurationId(saveResult) ||
-        extractBillingConfigurationId(wizardData.billingConfigurationId) ||
-        savedConfigId;
+      let billingConfigurationId = savedConfigId;
+      try {
+        const saveResult = await saveDraftConfiguration(wizardData, savedConfigId);
+        billingConfigurationId =
+          extractBillingConfigurationId(saveResult) ||
+          extractBillingConfigurationId(wizardData.billingConfigurationId) ||
+          savedConfigId;
+      } catch (saveError) {
+        console.warn("Save before activate failed, proceeding with existing ID:", saveError);
+      }
 
       if (!billingConfigurationId) {
-        showStatusToast("Unable to activate billing configuration: missing billingConfigurationId.", "error");
-        return;
+        throw new Error("Unable to save billing configuration — missing configuration id.");
       }
 
       setSavedConfigId(billingConfigurationId);
@@ -422,19 +370,21 @@ export default function NewConfigurationWizard() {
           id: billingConfigurationId,
         },
       }));
-
       await activateConfiguration(billingConfigurationId);
-      setShowSuccess(true);
+
+      showStatusToast(
+        isEditingExisting ? "Billing setup updated successfully." : "Billing setup created successfully.",
+        "success"
+      );
+      navigate(CONFIGURATIONS_PATH);
     } catch (error) {
-      showStatusToast(getApiErrorMessage(error, "Failed to activate billing configuration."), "error");
+      showStatusToast(
+        getApiErrorMessage(error, `Failed to ${isEditingExisting ? "update" : "activate"} billing configuration.`),
+        "error"
+      );
     } finally {
       setActivating(false);
     }
-  };
-
-  const handleActivationClose = () => {
-    setShowSuccess(false);
-    navigate(CONFIGURATIONS_PATH);
   };
 
   const isLastStep = currentStep === STEPS.length;
@@ -442,16 +392,6 @@ export default function NewConfigurationWizard() {
   // fields stays clickable so onNext can explain what's missing via toast.
   const nextDisabled = isLastStep && activating;
   const nextIncomplete = !isLastStep && !isStepValid(currentStep, wizardData);
-
-  const breadcrumbItems = useMemo(
-    () => [
-      { label: "Account Receivable", to: "/account-receivable/dashboard" },
-      { label: "Project Billing Setup", to: "/account-receivable/project-billing-setup/overview" },
-      { label: "Billing Config Workspace", to: null },
-      { label: configId ? (viewOnly ? "View Workspace" : "Edit Workspace") : "New Setup", to: null },
-    ],
-    [configId, viewOnly]
-  );
 
   if (loadingExisting) {
     return (
@@ -463,89 +403,42 @@ export default function NewConfigurationWizard() {
 
   if (viewOnly) {
     return (
-      <div className="space-y-6 p-6">
-        <nav className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500">
-          {breadcrumbItems.map((item, index) => (
-            <span key={item.label} className="flex items-center gap-2">
-              {item.to ? (
-                <Link to={item.to} className="hover:text-slate-800">
-                  {item.label}
-                </Link>
-              ) : (
-                <span className="text-slate-900">{item.label}</span>
-              )}
-              {index < breadcrumbItems.length - 1 && <ChevronRight className="h-3.5 w-3.5 text-slate-300" />}
-            </span>
-          ))}
-        </nav>
-
-        <PageHeader
-          title={wizardData.projectInfo?.projectName || "Billing Configuration"}
-          subtitle="Viewing an active project billing configuration in read-only mode."
-          actions={
-            <Button variant="outline" onClick={() => setViewOnly(false)}>
-              <Pencil className="h-4 w-4" /> Edit Configuration
-            </Button>
-          }
-        />
+      <div className="space-y-3 p-4 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <BackIconButton onClick={() => navigate(CONFIGURATIONS_PATH)} label="Back to Billing Setups" />
+            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
+              {wizardData.projectInfo?.projectName || "Billing Configuration"}
+            </h1>
+          </div>
+          <Button variant="outline" size="small" onClick={() => setViewOnly(false)}>
+            <Pencil className="h-4 w-4" /> Edit Configuration
+          </Button>
+        </div>
 
         <ReviewActivateStep wizardData={wizardData} />
       </div>
     );
   }
 
-  const progressValue = Math.round(((currentStep - 1) / (STEPS.length - 1)) * 100);
-
   return (
     <div className="space-y-3">
-      {/* Page Header */}
-      <PageHeader
-        title={configId ? "Edit Billing Configuration Workspace" : "Billing Configuration Workspace"}
-        subtitle="Configure commercial terms, pricing models, and billing rules for customer projects."
-      />
-
-      {/* Segmented Flow Stepper Path */}
-      <div className="flex flex-wrap items-center gap-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/60 shadow-inner">
-        {STEPS.map((step, index) => {
-          const isCompleted = currentStep > step.id;
-          const isActive = currentStep === step.id;
-          const isLast = index === STEPS.length - 1;
-          const isClickable = isCompleted && Boolean(handleStepClick);
-
-          return (
-            <div key={step.id} className="flex-1 min-w-[130px] flex items-center">
-              <button
-                type="button"
-                disabled={!isClickable}
-                onClick={() => isClickable && handleStepClick(step.id)}
-                className={`w-full flex items-center justify-center gap-2 py-1.5 px-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 focus:outline-none ${isActive
-                  ? "bg-white text-slate-900 shadow-sm border border-slate-200/80"
-                  : isCompleted
-                    ? "text-slate-700 hover:text-slate-900 hover:bg-white/60 cursor-pointer"
-                    : "text-slate-400 cursor-default"
-                  }`}
-              >
-                <span className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold border transition-all ${isActive
-                  ? "border-indigo-600 bg-indigo-600 text-white"
-                  : isCompleted
-                    ? "border-emerald-600 bg-emerald-600 text-white"
-                    : "border-slate-300 bg-slate-50 text-slate-400"
-                  }`}>
-                  {isCompleted ? "✓" : step.id}
-                </span>
-                <span className="truncate">{step.label}</span>
-              </button>
-              {!isLast && (
-                <span className="text-slate-300 px-1 font-normal text-xs select-none">➔</span>
-              )}
-            </div>
-          );
-        })}
+      {/* Minimal Header */}
+      <div>
+        <div className="mb-1 flex items-center gap-2">
+          <BackIconButton onClick={handleCancel} label="Back to Billing Setups" />
+          <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
+            {configId ? "Edit Billing Configuration" : "Create Billing Configuration"}
+          </h1>
+        </div>
+        <p className="mt-0.5 text-sm text-slate-500">Configure billing details for a project</p>
       </div>
 
+      <WizardStepper steps={STEPS} currentStep={currentStep} onStepClick={handleStepClick} />
+
       {/* Active Form Step Container */}
-      <PageCard className="border-slate-200/80 shadow-sm">
-        <PageCardContent className="p-4 sm:p-5 space-y-4">
+      <PageCard className="border-slate-200/80 shadow-sm rounded-2xl">
+        <PageCardContent className="p-4 sm:p-6 space-y-4">
           {currentStep === 1 && (
             <ProjectStep value={wizardData.projectInfo} onChange={handleProjectInfoChange} />
           )}
@@ -557,6 +450,7 @@ export default function NewConfigurationWizard() {
               setupMode={wizardData.setupMode}
               projectInfo={wizardData.projectInfo}
               onProjectInfoChange={handleProjectInfoChange}
+              ensureBillingConfigurationId={ensureBillingConfigurationId}
             />
           )}
 
@@ -572,24 +466,18 @@ export default function NewConfigurationWizard() {
               isLastStep={isLastStep}
               nextDisabled={nextDisabled}
               nextIncomplete={nextIncomplete}
+              finalLabel={isEditingExisting ? "Update Billing Setup" : "Create Billing Setup"}
+              finalLoadingText={isEditingExisting ? "Updating..." : "Creating..."}
               showSaveDraft={currentStep > 1}
               saving={saving}
               activating={activating}
               onBack={handleBack}
-              onNext={isLastStep ? handleActivate : handleNext}
+              onNext={isLastStep ? handleFinalSubmit : handleNext}
               onSaveDraft={handleSaveDraft}
-              onCancel={handleCancel}
             />
           </div>
         </PageCardContent>
       </PageCard>
-
-      <ActivationSuccessDialog
-        isOpen={showSuccess}
-        projectName={wizardData.projectInfo?.projectName}
-        clientName={wizardData.projectInfo?.clientName}
-        onClose={handleActivationClose}
-      />
     </div>
   );
 }

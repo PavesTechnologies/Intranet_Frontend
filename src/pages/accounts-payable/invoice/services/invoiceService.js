@@ -172,6 +172,25 @@ export const invoiceService = {
   },
 
   /**
+   * Transitions an invoice to a new status via its numeric status_master id.
+   * @param {string|number} invoiceId
+   * @param {number} statusId
+   */
+  async updateInvoiceStatus(invoiceId, statusId) {
+    try {
+      const response = await api.put(
+        `${AP_BASE_URL}/invoice/status-update/${Number(invoiceId)}`,
+        null,
+        { params: { status_id: statusId } },
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error in invoiceService.updateInvoiceStatus:", error);
+      throw withNormalizedStatus(error);
+    }
+  },
+
+  /**
    * Aggregate KPIs for the Invoice Management header cards, computed over the full fetched list
    * (not the current page/filter). "Paid This Month" will read 0 until the backend exposes
    * payment records — that's an honest reflection of missing data, not a bug.

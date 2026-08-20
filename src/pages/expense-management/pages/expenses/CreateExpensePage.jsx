@@ -182,7 +182,12 @@ export default function CreateExpensePage() {
                 placeholder="Search and select cost center..."
                 isSearchable
                 isLoading={lookupsLoading}
-                styles={customSelectStyles}
+                menuPortalTarget={document.body}
+                menuPosition="fixed"
+                styles={{
+                  ...customSelectStyles,
+                  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                }}
                 isDisabled={submitting}
               />
               {formErrors.costCenterId && <span className="text-xs text-red-600 block mt-1">{formErrors.costCenterId}</span>}
