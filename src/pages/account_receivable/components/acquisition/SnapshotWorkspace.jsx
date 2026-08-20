@@ -14,6 +14,8 @@ import { showStatusToast } from "../../../../components/toastfy/toast";
 import BillingSummaryGrid from "./BillingSummaryGrid";
 import TimesheetDataTable from "./TimesheetDataTable";
 import CommercialCalculationCard from "./CommercialCalculationCard";
+import BillingReadinessCard from "./BillingReadinessCard";
+import PendingTimesheetsModal from "./PendingTimesheetsModal";
 
 export default function SnapshotWorkspace({
   config,
@@ -22,8 +24,12 @@ export default function SnapshotWorkspace({
   onAcquire,
   onReAcquire,
   onContinueToTax,
+  onRemindPM,
+  onReValidate,
+  remindingPM = false,
 }) {
   const [downloading, setDownloading] = useState(false);
+  const [showPendingModal, setShowPendingModal] = useState(false);
 
   if (!config) return null;
 
@@ -35,6 +41,7 @@ export default function SnapshotWorkspace({
 
   const timesheetRecords = acquisitionResults?.labor?.records || [];
   const laborAmount = acquisitionResults?.labor?.amount || 0;
+  const pendingTimesheets = acquisitionResults?.labor?.readiness?.pendingTimesheets || [];
 
   const handleExport = () => {
     setDownloading(true);
@@ -101,6 +108,10 @@ export default function SnapshotWorkspace({
             <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
               <CheckCircle2 className="h-3.5 w-3.5" /> Ready for Tax Calculation
             </span>
+          ) : config.billingStatus === "PARTIALLY_READY" ? (
+            <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+              <AlertTriangle className="h-3.5 w-3.5" /> Partially Ready
+            </span>
           ) : config.billingStatus === "NO_DATA" ? (
             <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
               <AlertTriangle className="h-3.5 w-3.5" /> No Billing Data
@@ -117,36 +128,17 @@ export default function SnapshotWorkspace({
         </div>
       </div>
 
-      {/* State Feedback Notice Banner */}
-      {config.billingStatus === "NO_DATA" && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 shadow-sm">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
-            <div className="space-y-1">
-              <h4 className="font-bold text-amber-900 text-sm">No timesheets found</h4>
-              <p className="text-xs text-amber-800">
-                {acquisitionResults?.message ||
-                  "No approved timesheets were found for the selected billing period. Please verify the billing period and timesheet data, then try again."}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {config.billingStatus === "ACQUISITION_FAILED" && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-900 shadow-sm">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-600" />
-            <div className="space-y-1">
-              <h4 className="font-bold text-rose-900 text-sm">Unable to acquire billing data</h4>
-              <p className="text-xs text-rose-800">
-                {acquisitionResults?.message ||
-                  "We couldn't retrieve billing data at this time. Please try again."}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Enterprise Readiness & Validation Control Panel */}
+      <BillingReadinessCard
+        config={config}
+        acquisitionResults={acquisitionResults}
+        onViewPending={() => setShowPendingModal(true)}
+        onRemindPM={onRemindPM}
+        onReValidate={onReValidate}
+        onReAcquire={onReAcquire}
+        loading={acquiring}
+        reminding={remindingPM}
+      />
 
       {/* Source data (main) + Commercial summary (sidebar) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 items-start">
@@ -171,6 +163,16 @@ export default function SnapshotWorkspace({
           />
         </div>
       </div>
+
+      {/* Pending Approvals Modal */}
+      <PendingTimesheetsModal
+        isOpen={showPendingModal}
+        onClose={() => setShowPendingModal(false)}
+        pendingTimesheets={pendingTimesheets}
+        config={config}
+        onRemindPM={onRemindPM}
+        reminding={remindingPM}
+      />
     </div>
   );
 }

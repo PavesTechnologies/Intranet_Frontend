@@ -70,6 +70,11 @@ export default function AcquisitionQueue({
       count: configs.filter((c) => c.billingStatus === "NOT_ACQUIRED" || c.billingStatus === "Not Acquired").length,
     },
     {
+      key: "PARTIALLY_READY",
+      label: "Partially Ready",
+      count: configs.filter((c) => c.billingStatus === "PARTIALLY_READY" || c.billingStatus === "Partially Ready").length,
+    },
+    {
       key: "READY",
       label: "Ready",
       count: configs.filter((c) => c.billingStatus === "READY" || c.billingStatus === "Ready").length,

@@ -14,6 +14,7 @@ import {
   acquireBillingData,
   generateInvoiceDraft,
   getBillingSnapshotByPeriod,
+  sendProjectManagerReminder,
 } from "../services/billingDataAcquisitionService";
 
 import SnapshotWorkspace from "../components/acquisition/SnapshotWorkspace";
@@ -30,6 +31,7 @@ export default function AcquisitionDetail() {
   const [loadingConfig, setLoadingConfig] = useState(!location.state?.config);
   const [acquisitionResults, setAcquisitionResults] = useState(null);
   const [acquiring, setAcquiring] = useState(false);
+  const [remindingPM, setRemindingPM] = useState(false);
 
   // Subview for draft invoice preview
   const [subView, setSubView] = useState("WORKSPACE");
@@ -44,86 +46,89 @@ export default function AcquisitionDetail() {
   useEffect(() => {
     let isMounted = true;
 
-    const applyExistingSnapshot = async (cfg) => {
-      if (cfg.existingSnapshot && cfg.existingSnapshot.laborRecords && cfg.existingSnapshot.laborRecords.length > 0) {
-        setAcquisitionResults({
-          success: true,
-          billingStatus: "READY",
-          labor: {
-            applicable: true,
-            status: "success",
-            records: cfg.existingSnapshot.laborRecords || [],
-            amount: cfg.existingSnapshot.subtotal || 0,
-            snapshotId: cfg.existingSnapshot.snapshotId,
-            snapshotNumber: cfg.existingSnapshot.snapshotNumber,
-          },
-        });
-        return;
-      }
-
-      setAcquiring(true);
-      try {
-        const existing = await getBillingSnapshotByPeriod(cfg.projectId, cfg.periodStart, cfg.periodEnd);
-        if (!isMounted) return;
-        if (existing && existing.laborRecords && existing.laborRecords.length > 0) {
-          setAcquisitionResults({
-            success: true,
-            billingStatus: "READY",
-            labor: {
-              applicable: true,
-              status: "success",
-              records: existing.laborRecords || [],
-              amount: existing.subtotal || 0,
-              snapshotId: existing.snapshotId,
-              snapshotNumber: existing.snapshotNumber,
-            },
-          });
-          setConfig((prev) =>
-            prev ? { ...prev, billingStatus: "READY", snapshotNumber: existing.snapshotNumber } : prev
+    async function applyExistingSnapshot(targetConfig) {
+      if (
+        (targetConfig.billingStatus === "READY" || targetConfig.billingStatus === "Ready") &&
+        targetConfig.periodStart &&
+        targetConfig.periodEnd
+      ) {
+        try {
+          setAcquiring(true);
+          const numericProjId = Number(targetConfig.projectId || targetConfig.id) || 9;
+          const snapshotData = await getBillingSnapshotByPeriod(
+            numericProjId,
+            targetConfig.periodStart,
+            targetConfig.periodEnd
           );
-        } else {
-          setConfig((prev) =>
-            prev ? { ...prev, billingStatus: prev.billingStatus === "READY" ? "NOT_ACQUIRED" : (prev.billingStatus || "NOT_ACQUIRED") } : prev
+
+          if (isMounted && snapshotData && snapshotData.laborRecords?.length > 0) {
+            setAcquisitionResults({
+              labor: {
+                applicable: true,
+                status: "success",
+                records: snapshotData.laborRecords,
+                amount: snapshotData.subtotal,
+                lastFetchedAt: new Date().toISOString(),
+                snapshotId: snapshotData.snapshotId,
+                snapshotNumber: snapshotData.snapshotNumber,
+                readiness: snapshotData.readiness,
+              },
+              success: true,
+              billingStatus: "READY",
+            });
+            setConfig((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    billingStatus: "READY",
+                    snapshotNumber: snapshotData.snapshotNumber,
+                    snapshotId: snapshotData.snapshotId,
+                  }
+                : prev
+            );
+          }
+        } catch (err) {
+          console.warn("[AcquisitionDetail] Error hydrating existing snapshot:", err);
+        } finally {
+          if (isMounted) setAcquiring(false);
+        }
+      }
+    }
+
+    async function initialize() {
+      if (!config) {
+        try {
+          const list = await fetchActiveBillingConfigurations();
+          const match = list.find(
+            (item) => String(item.projectId || item.id) === String(projectId)
           );
+          if (isMounted && match) {
+            setConfig(match);
+            setPeriodStart(match.periodStart || "");
+            setPeriodEnd(match.periodEnd || "");
+            applyExistingSnapshot(match);
+          } else if (isMounted) {
+            showStatusToast("Project configuration not found.", "error");
+            navigate(QUEUE_PATH, { replace: true });
+          }
+        } catch (err) {
+          console.error("Failed to load project billing configuration", err);
+        } finally {
+          if (isMounted) setLoadingConfig(false);
         }
-      } catch (err) {
-        console.error("[AcquisitionDetail] Snapshot fetch error:", err);
-      } finally {
-        if (isMounted) setAcquiring(false);
+      } else {
+        setPeriodStart(config.periodStart || "");
+        setPeriodEnd(config.periodEnd || "");
+        applyExistingSnapshot(config);
+        setLoadingConfig(false);
       }
-    };
-
-    const initialize = async () => {
-      if (config) {
-        await applyExistingSnapshot(config);
-        return;
-      }
-
-      setLoadingConfig(true);
-      try {
-        const configs = await fetchActiveBillingConfigurations();
-        const found = configs.find((c) => String(c.projectId) === String(projectId));
-        if (!found) {
-          showStatusToast("Project configuration not found.", "error");
-          navigate(QUEUE_PATH, { replace: true });
-          return;
-        }
-        if (isMounted) setConfig(found);
-        await applyExistingSnapshot(found);
-      } catch (err) {
-        console.error("[AcquisitionDetail] Load error:", err);
-      } finally {
-        if (isMounted) setLoadingConfig(false);
-      }
-    };
+    }
 
     initialize();
 
     return () => {
       isMounted = false;
     };
-    // Runs once per mounted projectId — deliberately ignores config/navigate identity churn.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
   const handleTriggerAcquire = (cfg) => {
@@ -164,6 +169,21 @@ export default function AcquisitionDetail() {
           );
 
           showStatusToast("Billing snapshot acquired successfully.", "success");
+        } else if (results?.billingStatus === "PARTIALLY_READY") {
+          setConfig((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  billingStatus: "PARTIALLY_READY",
+                  snapshotNumber: null,
+                  snapshotId: null,
+                }
+              : prev
+          );
+          showStatusToast(
+            results.message || "Timesheet approvals pending. Billing snapshot is partially ready.",
+            "warning"
+          );
         } else if (results?.billingStatus === "NO_DATA") {
           setConfig((prev) =>
             prev
@@ -215,6 +235,31 @@ export default function AcquisitionDetail() {
       });
   };
 
+  const handleRemindPM = () => {
+    if (!config) return;
+    setRemindingPM(true);
+    const pendingTimesheets = acquisitionResults?.labor?.readiness?.pendingTimesheets || [];
+    sendProjectManagerReminder(config, pendingTimesheets)
+      .then((res) => {
+        setRemindingPM(false);
+        if (res.rateLimited) {
+          showStatusToast(res.message, "warning");
+        } else {
+          showStatusToast(res.message, "success");
+        }
+      })
+      .catch((err) => {
+        setRemindingPM(false);
+        showStatusToast(err.message || "Failed to send reminder to Project Manager.", "error");
+      });
+  };
+
+  const handleReValidate = () => {
+    if (!config) return;
+    showStatusToast("Re-validating timesheet approvals...", "info");
+    executeAcquisition(config, periodStart || config.periodStart, periodEnd || config.periodEnd);
+  };
+
   const handleContinueToTax = () => {
     setGenerating(true);
     generateInvoiceDraft(config, acquisitionResults).then((result) => {
@@ -229,11 +274,24 @@ export default function AcquisitionDetail() {
     navigate(QUEUE_PATH);
   };
 
-  if (loadingConfig || !config) {
+  if (loadingConfig) {
     return (
-      <div className="flex h-[500px] items-center justify-center">
-        <Loader />
+      <div className="flex h-64 items-center justify-center">
+        <Loader size="lg" text="Loading Project Billing Configuration..." />
       </div>
+    );
+  }
+
+  if (!config) {
+    return (
+      <PageCard>
+        <PageCardContent className="p-8 text-center">
+          <p className="text-slate-600">Project configuration not found.</p>
+          <Button className="mt-4" onClick={() => navigate(QUEUE_PATH)}>
+            Back to Acquisition Console
+          </Button>
+        </PageCardContent>
+      </PageCard>
     );
   }
 
@@ -340,6 +398,9 @@ export default function AcquisitionDetail() {
         onAcquire={handleTriggerAcquire}
         onReAcquire={(cfg) => executeAcquisition(cfg, cfg.periodStart, cfg.periodEnd)}
         onContinueToTax={handleContinueToTax}
+        onRemindPM={handleRemindPM}
+        onReValidate={handleReValidate}
+        remindingPM={remindingPM}
       />
 
       {/* Manual Date Period Config Modal */}
