@@ -730,7 +730,7 @@ export default function EditLeaveModal({
               type="button"
               onClick={handleClose}
               disabled={submitting || isLockedByOther}
-              variant="ghost"
+              variant="outline"
               size="medium"
             >
               Cancel

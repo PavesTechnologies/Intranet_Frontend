@@ -6,20 +6,20 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { toast } from "react-toastify";
 import Pagination from "../../../components/Pagination/pagination";
 import NoPendingLeaves from "../../../components/icons/no_pending_leaves.svg";
-import EmptyState from "../../../components/patterns/EmptyState";
+import { Fonts } from "../../../components/Fonts/Fonts";
 import { useLeaveWebSocket } from "../websockets/useLeaveWebSocket";
 
 // ✅ Removed refreshKey prop — self-sufficient now
 const PendingLeaveRequests = ({ refresh, year, onLeaveCancel }) => {
-  const [pendingLeaves, setPendingLeaves]   = useState([]);
-  const [leaveTypes, setLeaveTypes]         = useState([]);
-  const [leaveBalances, setLeaveBalances]   = useState({});
-  const [loading, setLoading]               = useState(true);
-  const [error, setError]                   = useState(null);
-  const [currentPage, setCurrentPage]       = useState(1);
+  const [pendingLeaves, setPendingLeaves] = useState([]);
+  const [leaveTypes, setLeaveTypes] = useState([]);
+  const [leaveBalances, setLeaveBalances] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const employeeId   = useAuth()?.user?.user_id;
-  const BASE_URL     = window.__APP_CONFIG__.BASE_URL;
+  const employeeId = useAuth()?.user?.user_id;
+  const BASE_URL = window.__APP_CONFIG__.BASE_URL;
   const ITEMS_PER_PAGE = 5;
 
   // ─── Single stable fetchData ──────────────────────────────────────────
@@ -83,7 +83,7 @@ const PendingLeaveRequests = ({ refresh, year, onLeaveCancel }) => {
   }, [fetchData]);
 
   // ─── Pagination ───────────────────────────────────────────────────────
-  const totalPages      = Math.ceil(pendingLeaves.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(pendingLeaves.length / ITEMS_PER_PAGE);
   const paginatedLeaves = pendingLeaves.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
@@ -96,11 +96,15 @@ const PendingLeaveRequests = ({ refresh, year, onLeaveCancel }) => {
       ) : error ? (
         <p className="text-red-500">{error}</p>
       ) : pendingLeaves.length === 0 ? (
-        <EmptyState
-          icon={<img src={NoPendingLeaves} alt="" className="h-6 w-6" />}
-          title="Cheers! No pending leave requests."
-          description="Request leave on the above!"
-        />
+        <div className="flex flex-row items-center justify-center gap-4 py-6 text-left">
+          <div className="flex items-center justify-center">
+            <img src={NoPendingLeaves} alt="" className="h-24 w-24 object-contain" />
+          </div>
+          <div>
+            <p className={Fonts.subheading}>Cheers! No pending leave requests.</p>
+            <p className="max-w-sm text-sm text-gray-500">Request leave on the above!</p>
+          </div>
+        </div>
       ) : (
         <>
           <PendingLeaveRequestsTable

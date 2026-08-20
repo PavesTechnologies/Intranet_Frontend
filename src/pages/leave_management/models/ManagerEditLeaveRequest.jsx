@@ -1274,7 +1274,7 @@ export default function ManagerEditLeaveRequest({
               type="button"
               onClick={handleClose}
               disabled={submitting || isLockedByOther}
-              variant="ghost"
+              variant="outline"
               size="medium"
             >
               Cancel

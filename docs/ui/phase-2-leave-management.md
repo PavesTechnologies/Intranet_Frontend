@@ -6934,3 +6934,194 @@ Confirmed — `onClose`, `submitting`/`loading` state, form validation, and ever
 ### Confirmation no commit/push performed
 
 Confirmed — the one-line change remains in the working tree for local review.
+
+## P2.22 — EditLeaveModal/ManagerEditLeaveRequest Cancel Button Consistency
+
+### Previous UI difference
+
+Both `EditLeaveModal.jsx` and `ManagerEditLeaveRequest.jsx` used `<Button variant="ghost" size="medium">` for their Cancel button — the same outlier pattern identified (but explicitly left unmigrated) during P2.21. Both were already canonical `Button` instances; the difference was purely the `variant` prop relative to the module's established Cancel convention.
+
+### Canonical Cancel-button convention selected
+
+`variant="outline"` — the same convention established in P2.21 based on majority repository evidence, now extended to these two files to complete the module-wide normalization.
+
+### Exact changes made
+
+- `src/pages/leave_management/models/EditLeaveModal.jsx` — changed the live Cancel button's `variant` from `"ghost"` to `"outline"` (single line).
+- `src/pages/leave_management/models/ManagerEditLeaveRequest.jsx` — same single-line `variant` change on its live Cancel button. A separate, fully commented-out dead-code block earlier in the file (a raw `<button>` Cancel/Save pair) was identified and correctly left untouched — it is inert dead code, not a live consumer, and out of scope for a UI-consistency task.
+
+No other prop (`onClick`, `type`, `disabled`, `size`) or surrounding footer container was touched in either file.
+
+### Behavior preservation
+
+`onClick={handleClose}`, `type="button"`, `disabled={submitting || isLockedByOther}`, and `size="medium"` are unchanged in both files. Cancel remains `type="button"`, never `type="submit"`.
+
+### Files modified
+
+`src/pages/leave_management/models/EditLeaveModal.jsx`, `src/pages/leave_management/models/ManagerEditLeaveRequest.jsx`, and `docs/ui/phase-2-leave-management.md`.
+
+### Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### git diff --check
+
+✅ Clean.
+
+### Note on repository state
+
+Between P2.21 and this task, the prior Phase 2 working-tree changes (through P2.21) were committed upstream (`4fd84e9f Phase 2, LMS UI-unification`, merged via `c6476ef7`), so `git status` now shows only changes made in this task plus one unrelated, pre-existing indentation/reformatting diff in `src/pages/leave_management/models/CompOffBalanceRequests.jsx` (no logic change) that was not made as part of this task and was left untouched.
+
+### DatePicker/DateRangePicker confirmation
+
+Confirmed — neither component was read or modified.
+
+### Confirmation no business/API logic changed
+
+Confirmed — `handleClose`, `submitting`/`isLockedByOther` state, form validation, and all API calls in both files are untouched.
+
+### Confirmation no commit/push performed
+
+Confirmed — both one-line changes remain in the working tree for local review.
+
+## P2.23 — EmptyState Icon Size Increase and Height Reduction
+
+### Objective
+
+Increase the visual size of the canonical `EmptyState` icon/image so it reads as clearly larger, and reduce the excessive vertical height of the empty-state area, specifically as experienced in Pending Leave Requests and Comp-Off Balance Requests.
+
+### Audit findings
+
+- `src/components/patterns/EmptyState.jsx` rendered its icon inside a `h-16 w-16` circle with a default `h-8 w-8` icon size, and used `py-12` vertical padding around the whole block.
+- `PendingLeaveRequests.jsx` passes its own `<img>` as the `icon` prop (`NoPendingLeaves` svg) at an explicit `h-6 w-6` — since `EmptyState` renders a valid passed-in element as-is (it does not impose its own sizing on caller-supplied elements), this rendered smaller than the circle around it and smaller than the default icon sizing, making the empty state visually undersized here specifically.
+- `CompOffBalanceRequests.jsx` does not render `EmptyState` directly — its empty state comes from `DataTable`'s built-in empty-row branch (`src/components/patterns/DataTable.jsx`), which renders the same canonical `EmptyState` with only `emptyTitle`/`emptyDescription` (no icon override, so it used the default `Inbox` icon at the previous `h-8 w-8`/`h-16 w-16` sizing). Its "excessive height" complaint traced to `EmptyState`'s own `py-12` padding, not to anything specific to this file.
+
+### Changes made
+
+- `src/components/patterns/EmptyState.jsx`: icon circle enlarged from `h-16 w-16` to `h-24 w-24`; default icon size enlarged from `h-8 w-8` to `h-12 w-12`; vertical padding reduced from `py-12` to `py-6` (net effect: markedly larger icon, shorter overall empty-state block).
+- `src/pages/leave_management/models/PendingLeaveRequests.jsx`: its explicit `<img>` icon override updated from `h-6 w-6` to `h-12 w-12` to match the new default icon size, per user confirmation.
+- `src/pages/leave_management/models/CompOffBalanceRequests.jsx`: no direct change needed or made — its empty state renders via `DataTable`'s use of the same canonical `EmptyState`, so the icon/padding changes above apply automatically.
+
+### Blast radius note
+
+`EmptyState.jsx`'s padding/sizing change is used by every consumer of the canonical component app-wide, including every `DataTable` empty state across the entire application (not just Leave Management), plus `PendingApprovalsQueueView.jsx`, `LeaveDetailsPage.jsx`, `ApprovalDashboard.jsx`, and `ProjectMembersOnLeave.jsx` within Leave Management. This was called out to the user before making the change; they confirmed the module-wide default change was the desired approach over a per-instance `className` override. `PendingApprovalsQueueView.jsx`'s deliberately oversized `h-40 w-40` icon override (a prior explicit user/IDE edit) is unaffected, since it supplies its own sized `<img>` element which `EmptyState` renders as-is.
+
+### Out of scope (left untouched)
+
+`LeaveDetailsPage.jsx` and `ApprovalDashboard.jsx` both pass the same undersized `h-6 w-6` `<img>` icon pattern as `PendingLeaveRequests.jsx` did, but neither was named in this task's target files, so neither was modified — left as a known, documented inconsistency for a future task if desired.
+
+### Behavior preservation
+
+No business logic, state, API calls, loading/error handling, or `EmptyState` prop contract (`icon`, `title`, `description`, `action`, `className`) changed — only Tailwind sizing/padding classes.
+
+### Files modified
+
+`src/components/patterns/EmptyState.jsx`, `src/pages/leave_management/models/PendingLeaveRequests.jsx`, `docs/ui/phase-2-leave-management.md`.
+
+### Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### git diff --check
+
+✅ Clean — only pre-existing LF/CRLF informational notices.
+
+### Confirmation no commit/push performed
+
+Confirmed — all changes remain in the working tree for local review.
+
+## P2.24 — EmptyState Icon/Image Visual Unification
+
+### Problem
+
+The canonical `EmptyState` treated its `icon` prop very differently depending on type:
+
+- A lucide icon **component** (the default, or `CompOffBalanceRequests.jsx`'s implicit `Inbox` via `DataTable`) was always force-sized by `EmptyState` itself: `<Icon className="h-12 w-12" />`.
+- A caller-supplied **element** (e.g. `PendingLeaveRequests.jsx`'s custom `<img src={NoPendingLeaves} />`) was rendered completely as-is — `EmptyState` applied zero sizing/fit of its own, leaving 100% of the visual weight up to whatever className the caller happened to set. Even after P2.23 numerically matched the `<img>`'s class to the icon default (`h-12 w-12`), the two still didn't read as the same size — the custom illustration (`no_pending_leaves.svg`, an undraw.co full-scene composition with significant internal whitespace/ground-shadow elements) occupies far less of its bounding box than a bold monochrome lucide glyph does, so identical CSS classes did not produce identical *visual* weight.
+
+### Canonical capability decision
+
+Rather than hardcoding a one-off fix into `PendingLeaveRequests.jsx`, `EmptyState.jsx` gained a new **opt-in** prop: `uniformIconTreatment` (default `false`, fully backward compatible). When a caller passes both a custom element `icon` and `uniformIconTreatment`, `EmptyState` now clones that element and force-applies `h-16 w-16 object-contain` (larger than the icon-component default of `h-12 w-12`, to visually compensate for the illustration's internal whitespace) instead of trusting the caller's own className.
+
+This was deliberately made opt-in rather than the new default because `PendingApprovalsQueueView.jsx` already passes a custom `<img>` icon deliberately sized `h-40 w-40` (a prior explicit user/IDE edit that must not be reverted — see P2.19). Forcing this sizing behavior onto every element-type `icon` unconditionally would have silently overridden that consumer's deliberate treatment. Making it opt-in keeps every existing consumer's rendered output byte-for-byte unchanged unless it explicitly requests the new behavior.
+
+### Exact changes made
+
+- `src/components/patterns/EmptyState.jsx`: added the `uniformIconTreatment` prop; when `true` and `icon` is a valid React element, the element is cloned with a forced `className="h-16 w-16 object-contain"`. All other cases (no `icon`, a component `icon`, or an element `icon` without the new prop) render exactly as before.
+- `src/pages/leave_management/models/PendingLeaveRequests.jsx`: its `EmptyState` call now passes `uniformIconTreatment`, and the manual `className="h-12 w-12"` on its `<img>` was removed (the size is now owned entirely by `EmptyState`, so the caller no longer needs to manually track/guess the correct size class).
+- `src/pages/leave_management/models/CompOffBalanceRequests.jsx`: no change needed — its empty state (rendered via `DataTable`'s internal `EmptyState` call) uses the default `Inbox` icon component, which was already force-sized by `EmptyState` and is unaffected by the new prop.
+
+### Behavior preservation
+
+No business logic, API call, loading state, or `EmptyState`'s existing prop contract changed. Every other `EmptyState`/`DataTable`-empty-state consumer (including `PendingApprovalsQueueView.jsx`'s `h-40 w-40` icon) renders identically to before, since `uniformIconTreatment` is opt-in and defaults to `false`.
+
+### Files modified
+
+`src/components/patterns/EmptyState.jsx`, `src/pages/leave_management/models/PendingLeaveRequests.jsx`, `docs/ui/phase-2-leave-management.md`.
+
+### Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### git diff --check
+
+✅ Clean — only pre-existing LF/CRLF informational notices.
+
+### Confirmation no commit/push performed
+
+Confirmed — all changes remain in the working tree for local review.
+
+## P2.25 — PendingLeaveRequests EmptyState Horizontal Layout
+
+### Objective
+
+Change the empty-state presentation in `PendingLeaveRequests.jsx` from the canonical `EmptyState`'s vertically-stacked layout (icon above title above description, all centered) to a horizontal layout (icon beside a left-aligned title/description block).
+
+### Scope decision
+
+No other consumer of canonical `EmptyState.jsx` needs a horizontal layout — it is a single, page-specific presentational request, not a shared need. Per this project's standing rule (a canonical capability is only added once the same need appears in 3+ independent consumers), a `layout="horizontal"` mode was **not** added to `EmptyState.jsx`. Instead, `PendingLeaveRequests.jsx` now renders its own inline empty-state markup, directly reusing `EmptyState`'s existing visual tokens (the `h-24 w-24 rounded-full bg-gray-100 text-gray-400` icon circle, `Fonts.subheading` for the title, `text-sm text-gray-500` for the description) so it still reads as the same design system, just arranged horizontally instead of vertically.
+
+### Superseding note — P2.24's `uniformIconTreatment` prop reverted
+
+P2.24 added an opt-in `uniformIconTreatment` prop to `EmptyState.jsx` specifically so `PendingLeaveRequests.jsx` could force-size its custom image icon. Since this task removes `PendingLeaveRequests.jsx`'s `EmptyState` usage entirely (replacing it with inline markup), that prop lost its only consumer. A repo-wide grep confirmed zero remaining references, so it was removed — `EmptyState.jsx` is now back to its exact P2.23 state (icon circle `h-24 w-24`, default icon `h-12 w-12`, `py-6` padding), with no leftover unused capability.
+
+### Exact changes made
+
+- `src/pages/leave_management/models/PendingLeaveRequests.jsx`: replaced the `<EmptyState icon={...} title=... description=... />` call with an inline `<div className="flex flex-row items-center justify-center gap-4 py-6 text-left">` containing the icon circle (custom `<img src={NoPendingLeaves} className="h-16 w-16 object-contain" />` inside the same-styled circle) beside a text column (`Fonts.subheading` title + `text-sm text-gray-500` description). The `EmptyState` import was replaced with a direct `Fonts` import (the only thing still needed from that dependency chain).
+- `src/components/patterns/EmptyState.jsx`: reverted the P2.24 `uniformIconTreatment` prop addition (now unused) back to its P2.23 form. No other `EmptyState` consumer is affected — the final diff against the pre-P2.24 state is a no-op for every other file.
+
+### Behavior preservation (P2.25)
+
+No business logic, loading/error branches, API calls, or conditional rendering (`loading` / `error` / `pendingLeaves.length === 0`) changed — only the empty-state branch's JSX markup and layout direction.
+
+### Files modified (P2.25)
+
+`src/pages/leave_management/models/PendingLeaveRequests.jsx`, `src/components/patterns/EmptyState.jsx`, `docs/ui/phase-2-leave-management.md`.
+
+### Build result (P2.25)
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### Lint result (P2.25)
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### git diff --check (P2.25)
+
+✅ Clean — only pre-existing LF/CRLF informational notices.
+
+### Confirmation no commit/push performed (P2.25)
+
+Confirmed — all changes remain in the working tree for local review.

@@ -110,65 +110,65 @@ const CompOffBalanceRequests = ({ managerId }) => {
             <div className="border-b-2 border-blue-500 w-16 mb-4"></div>
 
             <DataTable
-                    loading={loading}
-                    emptyTitle="No pending Comp-Off requests for your team."
-                    getRowKey={(req) => req.idleaveCompoff}
-                    rows={pendingCompOffs}
-                    columns={[
-                        { key: "employeeName", header: "Employee", className: "text-center" },
-                        {
-                            key: "dates",
-                            header: "Dates",
-                            className: "text-center",
-                            render: (req) =>
-                                `${req.startDate}${req.endDate && req.endDate !== req.startDate ? ` to ${req.endDate}` : ""}`,
-                        },
-                        {
-                            key: "duration",
-                            header: "Duration",
-                            className: "text-center",
-                            render: (req) =>
-                                req.halfDay ? "Half Day" : `${req.duration} ${req.duration <= 1 ? "Day" : "Days"}`,
-                        },
-                        { key: "note", header: "Note", className: "text-center" },
-                        {
-                            key: "status",
-                            header: "Status",
-                            className: "text-center",
-                            render: (req) => <StatusBadge status={req.status} size="sm" />,
-                        },
-                        {
-                            key: "actions",
-                            header: "Action",
-                            className: "text-center",
-                            render: (req) => (
-                                <div className="flex justify-center gap-2">
-                                    <Button
-                                        variant="primary"
-                                        size="icon"
-                                        onClick={() => handleApprove(req.idleaveCompoff)}
-                                        className="text-green-600 hover:text-green-800"
-                                        disabled={isActionLoading}
-                                        aria-label="Approve comp-off request"
-                                    >
-                                        <Check className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                        variant="danger"
-                                        size="icon"
-                                        onClick={() => handleReject(req.idleaveCompoff)}
-                                        className="text-red-600 hover:text-red-800"
-                                        disabled={isActionLoading}
-                                        aria-label="Reject comp-off request"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                            ),
-                        },
-                    ]}
-                />
-{/*
+                loading={loading}
+                emptyTitle="No pending Comp-Off requests for your team."
+                getRowKey={(req) => req.idleaveCompoff}
+                rows={pendingCompOffs}
+                columns={[
+                    { key: "employeeName", header: "Employee", className: "text-center" },
+                    {
+                        key: "dates",
+                        header: "Dates",
+                        className: "text-center",
+                        render: (req) =>
+                            `${req.startDate}${req.endDate && req.endDate !== req.startDate ? ` to ${req.endDate}` : ""}`,
+                    },
+                    {
+                        key: "duration",
+                        header: "Duration",
+                        className: "text-center",
+                        render: (req) =>
+                            req.halfDay ? "Half Day" : `${req.duration} ${req.duration <= 1 ? "Day" : "Days"}`,
+                    },
+                    { key: "note", header: "Note", className: "text-center" },
+                    {
+                        key: "status",
+                        header: "Status",
+                        className: "text-center",
+                        render: (req) => <StatusBadge status={req.status} size="sm" />,
+                    },
+                    {
+                        key: "actions",
+                        header: "Action",
+                        className: "text-center",
+                        render: (req) => (
+                            <div className="flex justify-center gap-2">
+                                <Button
+                                    variant="primary"
+                                    size="icon"
+                                    onClick={() => handleApprove(req.idleaveCompoff)}
+                                    className="text-green-600 hover:text-green-800"
+                                    disabled={isActionLoading}
+                                    aria-label="Approve comp-off request"
+                                >
+                                    <Check className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                    variant="danger"
+                                    size="icon"
+                                    onClick={() => handleReject(req.idleaveCompoff)}
+                                    className="text-red-600 hover:text-red-800"
+                                    disabled={isActionLoading}
+                                    aria-label="Reject comp-off request"
+                                >
+                                    <X className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        ),
+                    },
+                ]}
+            />
+            {/*
             {loading && (
                 <div className="fixed inset-0 bg-white/60 backdrop-blur-sm z-50 flex items-center justify-center">
                     <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
