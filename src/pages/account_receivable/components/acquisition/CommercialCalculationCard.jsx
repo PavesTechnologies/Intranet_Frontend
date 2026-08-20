@@ -7,14 +7,11 @@ export default function CommercialCalculationCard({
   currency = "INR",
 }) {
   const subtotal = Number(laborAmount) + Number(expenseAmount) + Number(adjustments);
-  const taxRate = 0.18; // Standard GST 18%
-  const estimatedTax = Math.round(subtotal * taxRate);
-  const grandTotal = subtotal + estimatedTax;
+  const grandTotal = subtotal;
 
   const lineItems = [
-    { label: "Labor", value: laborAmount },
+    { label: "Billable Hours", value: laborAmount },
     { label: "Expenses", value: expenseAmount },
-    { label: "Adjustments", value: adjustments },
   ];
 
   return (
@@ -38,12 +35,6 @@ export default function CommercialCalculationCard({
             <span>Subtotal</span>
             <span className="font-mono text-slate-900">
               {currency} {subtotal.toLocaleString()}
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-slate-500">
-            <span>GST (18%)</span>
-            <span className="font-mono text-slate-700">
-              {currency} {estimatedTax.toLocaleString()}
             </span>
           </div>
         </div>
