@@ -148,6 +148,7 @@ export default function AcquisitionDetail() {
 
   const executeAcquisition = (cfg, start, end) => {
     setAcquiring(true);
+    setConfig((prev) => (prev ? { ...prev, billingStatus: "VALIDATING" } : prev));
     acquireBillingData(cfg, start, end)
       .then((results) => {
         setAcquisitionResults(results);
@@ -168,7 +169,7 @@ export default function AcquisitionDetail() {
               : prev
           );
 
-          showStatusToast("Billing snapshot acquired successfully.", "success");
+          showStatusToast("Billing snapshot acquired successfully. All required timesheets are approved.", "success");
         } else if (results?.billingStatus === "PARTIALLY_READY") {
           setConfig((prev) =>
             prev
@@ -181,23 +182,38 @@ export default function AcquisitionDetail() {
               : prev
           );
           showStatusToast(
-            results.message || "Timesheet approvals pending. Billing snapshot is partially ready.",
+            results.message || "Billing is blocked: timesheets are still awaiting manager approval.",
             "warning"
           );
-        } else if (results?.billingStatus === "NO_DATA") {
+        } else if (results?.billingStatus === "PENDING_APPROVAL") {
           setConfig((prev) =>
             prev
               ? {
                   ...prev,
-                  billingStatus: "NO_DATA",
+                  billingStatus: "PENDING_APPROVAL",
                   snapshotNumber: null,
                   snapshotId: null,
                 }
               : prev
           );
           showStatusToast(
-            results.message || "No timesheets were acquired for the requested billing period",
-            "error"
+            results.message || "Timesheets were found for this billing period, but none are approved yet.",
+            "warning"
+          );
+        } else if (results?.billingStatus === "NO_BILLABLE_DATA" || results?.billingStatus === "NO_DATA") {
+          setConfig((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  billingStatus: "NO_BILLABLE_DATA",
+                  snapshotNumber: null,
+                  snapshotId: null,
+                }
+              : prev
+          );
+          showStatusToast(
+            results.message || "No billable data was found for this billing period.",
+            "info"
           );
         } else {
           setConfig((prev) =>
@@ -211,7 +227,7 @@ export default function AcquisitionDetail() {
               : prev
           );
           showStatusToast(
-            results.message || "We couldn't retrieve billing data at this time. Please try again.",
+            results.message || "Billing data could not be retrieved due to a system error.",
             "error"
           );
         }

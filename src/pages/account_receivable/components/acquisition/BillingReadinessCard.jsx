@@ -3,12 +3,14 @@ import {
   CheckCircle2,
   AlertTriangle,
   Clock,
-  UserCheck,
   Eye,
   BellRing,
   RefreshCw,
   XCircle,
   FileCheck,
+  Info,
+  SlidersHorizontal,
+  FileSpreadsheet,
 } from "lucide-react";
 import StatusBadge from "../../../../components/status/statusbadge";
 import Button from "../../../../components/Button/Button";
@@ -33,152 +35,164 @@ export default function BillingReadinessCard({
   const pendingCount = readiness.pendingCount ?? 0;
   const approvedHours = readiness.approvedHours ?? (status === "READY" ? laborRes.records?.reduce((acc, r) => acc + Number(r.hours || 0), 0) : 0);
   const pendingHours = readiness.pendingHours ?? 0;
-  const pendingTimesheets = readiness.pendingTimesheets || [];
-
-  const pendingEmployees = Array.from(new Set(pendingTimesheets.map((t) => t.employee).filter(Boolean)));
-  const pmName = config.projectManager || "Alex Morgan (Project Lead)";
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-      {/* Top Header */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3">
-        <div className="flex items-center gap-2">
-          <FileCheck className="h-5 w-5 text-indigo-600" />
-          <h3 className="text-base font-bold text-slate-900">Billing Readiness Control</h3>
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+        <div className="flex items-center gap-1.5">
+          <FileCheck className="h-4 w-4 text-indigo-600" />
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Billing Readiness</h3>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500 font-medium">Readiness Status:</span>
-          <StatusBadge label={status} size="sm" />
-        </div>
+        <StatusBadge label={status} size="sm" />
       </div>
 
-      {/* Main Readiness Content according to state */}
-      {status === "READY" ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-4 text-emerald-900 space-y-2">
-          <div className="flex items-center gap-2 font-bold text-emerald-800 text-sm">
-            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-            100% Approved — Billing Snapshot Ready
+      {/* State-driven Content */}
+      {status === "NOT_ACQUIRED" ? (
+        <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 text-slate-800 space-y-1.5">
+          <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+            <Info className="h-4 w-4 text-slate-500 flex-shrink-0" />
+            Snapshot Not Acquired
+          </div>
+          <p className="text-xs text-slate-600">
+            Billing data has not been acquired for this billing period yet.
+          </p>
+        </div>
+      ) : status === "VALIDATING" ? (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50/70 p-3 text-indigo-900 space-y-1">
+          <div className="flex items-center gap-1.5 font-bold text-indigo-900 text-xs">
+            <RefreshCw className="h-4 w-4 text-indigo-600 animate-spin flex-shrink-0" />
+            Validating Readiness...
+          </div>
+          <p className="text-xs text-indigo-800">
+            Checking timesheet approval readiness and billing configuration rules...
+          </p>
+        </div>
+      ) : status === "READY" ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-emerald-900 space-y-2">
+          <div className="flex items-center gap-1.5 font-bold text-emerald-800 text-xs">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+            100% Approved — Ready for Billing
           </div>
           <p className="text-xs text-emerald-700">
-            All required timesheets for this billing period have passed approval validation. Billing data is ready for tax calculation and downstream invoice processing.
+            All required timesheets are approved and billing is ready.
           </p>
-          <div className="flex items-center gap-4 text-xs font-semibold text-emerald-900 pt-1">
-            <span>Approved Timesheets: <strong className="font-mono text-emerald-800">{approvedCount}</strong></span>
+          <div className="flex items-center gap-3 text-xs font-semibold text-emerald-800 border-t border-emerald-200/60 pt-1.5">
+            <span>Approved: <strong className="font-mono">{approvedCount}</strong></span>
             <span>&middot;</span>
-            <span>Total Billable Hours: <strong className="font-mono text-emerald-800">{approvedHours} hrs</strong></span>
+            <span>Billable Hours: <strong className="font-mono">{approvedHours} hrs</strong></span>
           </div>
         </div>
       ) : status === "PARTIALLY_READY" ? (
-        <div className="space-y-3">
-          <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-4 text-amber-900 space-y-2">
-            <div className="flex items-center gap-2 font-bold text-amber-900 text-sm">
-              <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
-              Billing Blocked — Timesheet Approvals Pending
+        <div className="space-y-2.5">
+          <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-amber-900 space-y-1">
+            <div className="flex items-center gap-1.5 font-bold text-amber-900 text-xs">
+              <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+              Approvals Pending
             </div>
             <p className="text-xs text-amber-800">
-              {acquisitionResults?.message ||
-                `Billing snapshot cannot become READY. ${pendingCount} timesheet(s) totaling ${pendingHours} hours are still awaiting manager approval.`}
+              Some required timesheets are still awaiting approval.
             </p>
           </div>
 
-          {/* Metrics Grid */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 text-xs">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div className="text-slate-500 font-medium">Approved Timesheets</div>
-              <div className="mt-1 text-lg font-bold font-mono text-emerald-700">{approvedCount}</div>
-              <div className="text-[11px] text-slate-400 font-mono">{approvedHours} hrs</div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-md border border-emerald-200 bg-emerald-50/50 p-2 text-center">
+              <div className="text-[11px] text-slate-500 font-medium">Approved</div>
+              <div className="font-mono font-bold text-emerald-700">{approvedCount} ({approvedHours}h)</div>
             </div>
-
-            <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
-              <div className="text-amber-700 font-medium">Pending Approvals</div>
-              <div className="mt-1 text-lg font-bold font-mono text-amber-800">{pendingCount}</div>
-              <div className="text-[11px] text-amber-600 font-mono">{pendingHours} hrs</div>
-            </div>
-
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 col-span-2">
-              <div className="text-slate-500 font-medium">Assigned Project Manager</div>
-              <div className="mt-1 font-semibold text-slate-800">{pmName}</div>
-              <div className="text-[11px] text-slate-400">
-                {pendingEmployees.length > 0
-                  ? `Pending employees: ${pendingEmployees.join(", ")}`
-                  : "Awaiting approval action"}
-              </div>
+            <div className="rounded-md border border-amber-200 bg-amber-50/50 p-2 text-center">
+              <div className="text-[11px] text-amber-700 font-medium">Pending</div>
+              <div className="font-mono font-bold text-amber-800">{pendingCount} ({pendingHours}h)</div>
             </div>
           </div>
         </div>
-      ) : status === "NO_DATA" ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 space-y-2">
-          <div className="flex items-center gap-2 font-bold text-amber-900 text-sm">
-            <Clock className="h-5 w-5 text-amber-600 flex-shrink-0" />
-            No Approved Timesheets Found
+      ) : status === "PENDING_APPROVAL" ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900 space-y-1.5">
+          <div className="flex items-center gap-1.5 font-bold text-amber-900 text-xs">
+            <Clock className="h-4 w-4 text-amber-600 flex-shrink-0" />
+            Timesheets Awaiting Approval
           </div>
           <p className="text-xs text-amber-800">
-            {acquisitionResults?.message ||
-              "No approved billable timesheets are available for the selected billing period. Please verify dates or remind the Project Manager to approve submitted timesheets."}
+            Timesheets were found, but approval is required before billing can proceed ({pendingCount} pending, {pendingHours} hrs).
+          </p>
+        </div>
+      ) : status === "NO_BILLABLE_DATA" || status === "NO_DATA" ? (
+        <div className="rounded-lg border border-slate-200 bg-slate-50/90 p-3 text-slate-800 space-y-1.5">
+          <div className="flex items-center gap-1.5 font-bold text-slate-900 text-xs">
+            <Info className="h-4 w-4 text-slate-500 flex-shrink-0" />
+            No Billable Activity
+          </div>
+          <p className="text-xs text-slate-600">
+            No billable timesheet activity was found for this billing period.
+          </p>
+        </div>
+      ) : status === "CONFIGURATION_REQUIRED" ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900 space-y-1.5">
+          <div className="flex items-center gap-1.5 font-bold text-amber-900 text-xs">
+            <SlidersHorizontal className="h-4 w-4 text-amber-600 flex-shrink-0" />
+            Billing Setup Incomplete
+          </div>
+          <p className="text-xs text-amber-800">
+            Billing configuration is incomplete. Complete setup before acquiring billing data.
+          </p>
+        </div>
+      ) : status === "ALREADY_BILLED" ? (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-900 space-y-1">
+          <div className="flex items-center gap-1.5 font-bold text-blue-900 text-xs">
+            <FileSpreadsheet className="h-4 w-4 text-blue-600 flex-shrink-0" />
+            Billing Period Invoiced
+          </div>
+          <p className="text-xs text-blue-800">
+            This billing period has already been invoiced.
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-rose-900 space-y-2">
-          <div className="flex items-center gap-2 font-bold text-rose-900 text-sm">
-            <XCircle className="h-5 w-5 text-rose-600 flex-shrink-0" />
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-900 space-y-1">
+          <div className="flex items-center gap-1.5 font-bold text-rose-900 text-xs">
+            <XCircle className="h-4 w-4 text-rose-600 flex-shrink-0" />
             Acquisition Failed
           </div>
           <p className="text-xs text-rose-800">
-            {acquisitionResults?.message || "We couldn't retrieve billing data at this time. Please try again."}
+            We couldn't retrieve billing data at this time.
           </p>
         </div>
       )}
 
-      {/* Control Actions Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {status === "PARTIALLY_READY" && (
-            <>
-              <Button variant="outline" size="small" onClick={onViewPending}>
-                <Eye className="h-3.5 w-3.5" />
-                View Pending ({pendingCount})
-              </Button>
+      {/* Control Actions */}
+      <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
+        {(status === "PARTIALLY_READY" || status === "PENDING_APPROVAL") && (
+          <>
+            <Button variant="outline" size="small" onClick={onViewPending} className="text-xs py-1">
+              <Eye className="h-3 w-3" />
+              View Pending ({pendingCount})
+            </Button>
 
-              <Button
-                variant="primary"
-                size="small"
-                onClick={onRemindPM}
-                disabled={reminding}
-                className="bg-amber-600 hover:bg-amber-700 text-white border-amber-600"
-              >
-                <BellRing className={`h-3.5 w-3.5 ${reminding ? "animate-spin" : ""}`} />
-                {reminding ? "Sending..." : "Remind Project Manager"}
-              </Button>
-            </>
-          )}
-
-          {status === "NO_DATA" && pendingCount > 0 && (
             <Button
               variant="primary"
               size="small"
               onClick={onRemindPM}
               disabled={reminding}
-              className="bg-amber-600 hover:bg-amber-700 text-white border-amber-600"
+              className="bg-amber-600 hover:bg-amber-700 text-white border-amber-600 text-xs py-1"
             >
-              <BellRing className={`h-3.5 w-3.5 ${reminding ? "animate-spin" : ""}`} />
-              Remind Project Manager
+              <BellRing className={`h-3 w-3 ${reminding ? "animate-spin" : ""}`} />
+              {reminding ? "Sending..." : "Remind PM"}
             </Button>
-          )}
+          </>
+        )}
 
-          <Button variant="outline" size="small" onClick={onReValidate} disabled={loading}>
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+        {status === "READY" && (
+          <Button variant="outline" size="small" onClick={() => onReAcquire(config)} disabled={loading} className="text-xs py-1">
+            <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+            Refresh Snapshot
+          </Button>
+        )}
+
+        {(status === "PARTIALLY_READY" || status === "PENDING_APPROVAL") && (
+          <Button variant="outline" size="small" onClick={onReValidate} disabled={loading} className="text-xs py-1">
+            <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
             Re-Validate
           </Button>
-
-          <Button variant="outline" size="small" onClick={() => onReAcquire(config)} disabled={loading}>
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            Re-Acquire
-          </Button>
-        </div>
-
-        <div className="text-[11px] font-medium text-slate-400">
-          Rule: 100% timesheet approval required for READY status
-        </div>
+        )}
       </div>
     </div>
   );

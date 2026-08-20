@@ -52,9 +52,9 @@ export default function SnapshotWorkspace({
   };
 
   return (
-    <div className="space-y-4 animate-fade-in">
+    <div className="space-y-3.5 animate-fade-in">
       {/* Project Header + Meta + Primary Actions */}
-      <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div className="space-y-1">
             <h2 className="text-lg font-bold tracking-tight text-slate-900">{config.projectName}</h2>
@@ -86,17 +86,43 @@ export default function SnapshotWorkspace({
         {/* Primary actions — kept near the top so they stay visible */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3.5">
           <div className="flex flex-wrap items-center gap-2.5">
-            {!isAcquired && (
+            {config.billingStatus === "NOT_ACQUIRED" || !config.billingStatus ? (
               <Button variant="primary" onClick={() => onAcquire(config)} disabled={acquiring}>
                 <Play className={`h-4 w-4 ${acquiring ? "animate-spin" : ""}`} />
                 {acquiring ? "Acquiring Snapshot..." : "Acquire Source Snapshot"}
               </Button>
-            )}
+            ) : acquiring || config.billingStatus === "VALIDATING" ? (
+              <Button variant="primary" disabled className="bg-indigo-600 border-indigo-600 text-white">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Validating Billing Data...
+              </Button>
+            ) : config.billingStatus === "NO_BILLABLE_DATA" || config.billingStatus === "NO_DATA" ? (
+              <Button variant="primary" onClick={() => onAcquire(config)} disabled={acquiring}>
+                <RefreshCw className={`h-4 w-4 ${acquiring ? "animate-spin" : ""}`} />
+                Check Again
+              </Button>
+            ) : config.billingStatus === "PARTIALLY_READY" || config.billingStatus === "PENDING_APPROVAL" ? (
+              <Button variant="primary" onClick={onReValidate} disabled={acquiring} className="bg-amber-600 hover:bg-amber-700 text-white border-amber-600">
+                <RefreshCw className={`h-4 w-4 ${acquiring ? "animate-spin" : ""}`} />
+                Re-Validate Approvals
+              </Button>
+            ) : config.billingStatus === "ACQUISITION_FAILED" ? (
+              <Button variant="primary" onClick={() => onAcquire(config)} disabled={acquiring} className="bg-rose-600 hover:bg-rose-700 text-white border-rose-600">
+                <RefreshCw className={`h-4 w-4 ${acquiring ? "animate-spin" : ""}`} />
+                Retry Acquisition
+              </Button>
+            ) : config.billingStatus === "CONFIGURATION_REQUIRED" ? (
+              <Button variant="primary" onClick={() => showStatusToast("Opening Billing Configuration Setup...", "info")} disabled={acquiring} className="bg-amber-600 hover:bg-amber-700 text-white border-amber-600">
+                Review Billing Setup
+              </Button>
+            ) : null}
 
-            <Button variant="outline" size="small" onClick={() => onReAcquire(config)} disabled={acquiring}>
-              <RefreshCw className={`h-3.5 w-3.5 ${acquiring ? "animate-spin" : ""}`} />
-              Re-Acquire
-            </Button>
+            {isAcquired && (
+              <Button variant="outline" size="small" onClick={() => onReAcquire(config)} disabled={acquiring}>
+                <RefreshCw className={`h-3.5 w-3.5 ${acquiring ? "animate-spin" : ""}`} />
+                Re-Acquire
+              </Button>
+            )}
 
             <Button variant="outline" size="small" onClick={handleExport} disabled={downloading || !isAcquired}>
               <Download className="h-3.5 w-3.5" />
@@ -112,9 +138,13 @@ export default function SnapshotWorkspace({
             <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
               <AlertTriangle className="h-3.5 w-3.5" /> Partially Ready
             </span>
-          ) : config.billingStatus === "NO_DATA" ? (
+          ) : config.billingStatus === "PENDING_APPROVAL" ? (
             <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-              <AlertTriangle className="h-3.5 w-3.5" /> No Billing Data
+              <AlertTriangle className="h-3.5 w-3.5" /> Pending Approval
+            </span>
+          ) : config.billingStatus === "NO_BILLABLE_DATA" || config.billingStatus === "NO_DATA" ? (
+            <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+              <AlertTriangle className="h-3.5 w-3.5" /> No Billable Data
             </span>
           ) : config.billingStatus === "ACQUISITION_FAILED" ? (
             <span className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
@@ -128,21 +158,10 @@ export default function SnapshotWorkspace({
         </div>
       </div>
 
-      {/* Enterprise Readiness & Validation Control Panel */}
-      <BillingReadinessCard
-        config={config}
-        acquisitionResults={acquisitionResults}
-        onViewPending={() => setShowPendingModal(true)}
-        onRemindPM={onRemindPM}
-        onReValidate={onReValidate}
-        onReAcquire={onReAcquire}
-        loading={acquiring}
-        reminding={remindingPM}
-      />
-
-      {/* Source data (main) + Commercial summary (sidebar) */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 items-start">
-        <div className="lg:col-span-8">
+      {/* Two-Column Financial Operations Workspace */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 items-start">
+        {/* Left Column: Source Timesheets (dominant working area ~68% width) */}
+        <div className="lg:col-span-8 min-w-0">
           <TimesheetDataTable
             records={timesheetRecords}
             currency={config.currency}
@@ -151,7 +170,22 @@ export default function SnapshotWorkspace({
             billingStatus={config.billingStatus}
           />
         </div>
-        <div className="lg:col-span-4">
+
+        {/* Right Column: Financial Control Rail (~32% width, sticky on desktop) */}
+        <aside className="lg:col-span-4 space-y-4 lg:sticky lg:top-6 self-start">
+          {/* 1. Billing Readiness Control */}
+          <BillingReadinessCard
+            config={config}
+            acquisitionResults={acquisitionResults}
+            onViewPending={() => setShowPendingModal(true)}
+            onRemindPM={onRemindPM}
+            onReValidate={onReValidate}
+            onReAcquire={onReAcquire}
+            loading={acquiring}
+            reminding={remindingPM}
+          />
+
+          {/* 2. Commercial Value */}
           <CommercialCalculationCard
             laborAmount={laborAmount}
             expenseAmount={0}
@@ -159,9 +193,10 @@ export default function SnapshotWorkspace({
             currency={config.currency}
             onContinueToTax={onContinueToTax}
             isAcquired={isAcquired}
+            billingStatus={config.billingStatus}
             disabled={acquiring}
           />
-        </div>
+        </aside>
       </div>
 
       {/* Pending Approvals Modal */}
