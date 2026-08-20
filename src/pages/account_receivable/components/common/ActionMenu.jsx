@@ -70,12 +70,18 @@ export default function ActionMenu({ items }) {
                 key={item.label}
                 type="button"
                 role="menuitem"
+                disabled={item.disabled}
                 onClick={() => {
+                  if (item.disabled) return;
                   setOpen(false);
                   item.onClick?.();
                 }}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 ${
-                  item.danger ? "text-red-600" : "text-slate-700"
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${
+                  item.disabled
+                    ? "opacity-50 cursor-not-allowed text-slate-400"
+                    : item.danger
+                    ? "hover:bg-slate-50 text-red-600"
+                    : "hover:bg-slate-50 text-slate-700"
                 }`}
               >
                 {item.icon}

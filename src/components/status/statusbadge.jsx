@@ -8,7 +8,23 @@ const StatusBadge = ({ label, size = "md" }) => {
   let bgColor = "bg-gray-200";
   let textColor = "text-gray-700";
 
-  if (normalized === "joining pending") {
+  // Account Receivable Billing Statuses
+  if (normalized === "not acquired") {
+    bgColor = "bg-slate-100 border border-slate-300";
+    textColor = "text-slate-700 font-medium";
+  } else if (normalized === "ready") {
+    bgColor = "bg-emerald-100 border border-emerald-300";
+    textColor = "text-emerald-800 font-bold";
+  } else if (normalized.includes("partially")) {
+    bgColor = "bg-amber-100 border border-amber-300";
+    textColor = "text-amber-800 font-bold";
+  } else if (normalized.includes("waiting")) {
+    bgColor = "bg-amber-100 border border-amber-300";
+    textColor = "text-amber-800 font-bold";
+  } else if (normalized.includes("billed")) {
+    bgColor = "bg-blue-100 border border-blue-300";
+    textColor = "text-blue-800 font-bold";
+  } else if (normalized === "joining pending") {
     bgColor = "bg-red-100";
     textColor = "text-red-700";
   } else if (normalized === "joining") {

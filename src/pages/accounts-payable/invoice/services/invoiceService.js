@@ -52,12 +52,6 @@ function withNormalizedStatus(error) {
   return error;
 }
 
-function notImplementedError(action) {
-  const error = new Error(`${action} isn't connected to a backend endpoint yet.`);
-  error.status = 501;
-  return error;
-}
-
 export const invoiceService = {
   /**
    * @param {Object} [params]
@@ -178,17 +172,22 @@ export const invoiceService = {
   },
 
   /**
-   * No backend endpoint exists yet for partial invoice updates (OCR corrections, validation
-   * submit/reject, approve/reject). Throws a clear, honest error instead of silently mutating a
-   * mock store — callers' existing onError toasts will surface this message.
+   * Transitions an invoice to a new status via its numeric status_master id.
+   * @param {string|number} invoiceId
+   * @param {number} statusId
    */
-  async updateInvoice(_invoiceId, _payload = {}) {
-    throw notImplementedError("Updating an invoice");
-  },
-
-  /** No backend endpoint exists yet for resolving an invoice issue. */
-  async resolveInvoiceIssue(_issueId, _payload = {}) {
-    throw notImplementedError("Resolving an invoice issue");
+  async updateInvoiceStatus(invoiceId, statusId) {
+    try {
+      const response = await api.put(
+        `${AP_BASE_URL}/invoice/status-update/${Number(invoiceId)}`,
+        null,
+        { params: { status_id: statusId } },
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error in invoiceService.updateInvoiceStatus:", error);
+      throw withNormalizedStatus(error);
+    }
   },
 
   /**
@@ -214,7 +213,9 @@ export const invoiceService = {
       const totalInvoicesThisMonth = all.filter((invoice) => isThisMonth(invoice.invoiceDate)).length;
       const pendingApprovalCount = all.filter((invoice) => invoice.status === INVOICE_STATUS.PENDING_APPROVAL).length;
 
-      const readyForPayment = all.filter((invoice) => invoice.status === INVOICE_STATUS.READY_FOR_PAYMENT);
+      // "Ready for payment" is a UI-level grouping over Approved invoices with an outstanding
+      // balance — there is no distinct READY_FOR_PAYMENT status on the backend.
+      const readyForPayment = all.filter((invoice) => invoice.status === INVOICE_STATUS.APPROVED);
       const readyForPaymentBalance = readyForPayment.reduce(
         (sum, invoice) => sum + calculateBalance(invoice.netAmount, invoice.amountPaid),
         0

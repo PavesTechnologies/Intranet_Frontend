@@ -46,6 +46,7 @@ import PaymentQueuePage from "./pages/accounts-payable/payment/pages/PaymentQueu
 import PaymentDetailsPage from "./pages/accounts-payable/payment/pages/PaymentDetailsPage.jsx";
 import APReportsPage from "./pages/accounts-payable/reports/pages/APReportsPage.jsx";
 import APSettingsPage from "./pages/accounts-payable/settings/pages/APSettingsPage.jsx";
+import SystemConfigurationPage from "./pages/accounts-payable/system-configuration/pages/SystemConfigurationPage.jsx";
 
 
 // Resource Management
@@ -283,6 +284,8 @@ import AccountReceivableDashboard from "./pages/account_receivable/pages/Dashboa
 import Overview from "./pages/account_receivable/pages/Overview.jsx";
 import BillingConfigurations from "./pages/account_receivable/pages/BillingConfigurations.jsx";
 import NewConfigurationWizard from "./pages/account_receivable/pages/NewConfigurationWizard.jsx";
+import BillingDataAcquisition from "./pages/account_receivable/pages/BillingDataAcquisition.jsx";
+import AcquisitionDetail from "./pages/account_receivable/pages/AcquisitionDetail.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -369,12 +372,12 @@ const ProjectManager = () => {
 const RoleOffEntry = () => {
   const { user } = useAuth();
 
-  if (user?.roles?.includes("Delivery_Manager")) {
-    return <Navigate to="/resource-management/roleoff/dm" replace />;
-  }
-
   if (user?.roles?.includes("Resource_Manager")) {
     return <Navigate to="/resource-management/roleoff/rm" replace />;
+  }
+
+  if (user?.roles?.includes("Delivery_Manager")) {
+    return <Navigate to="/resource-management/roleoff/dm" replace />;
   }
 
   return <Navigate to="/resource-management/roleoff/pm" replace />;
@@ -577,6 +580,14 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+          <Route
+            path={AP_ROUTES.SYSTEM_CONFIG}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <SystemConfigurationPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* <Route path="/projects/manager" element={<ProjectManager />} /> */}
           <Route path="/calendar" element={<Calendar />} />
@@ -633,8 +644,19 @@ const AppRoutes = () => {
               path="project-billing-setup/configurations/:configId"
               element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><NewConfigurationWizard /></ProtectedRoute>}
             />
+            <Route
+              path="billing-data-acquisition"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingDataAcquisition /></ProtectedRoute>}
+            />
+            <Route
+              path="billing-data-acquisition/workspace"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingDataAcquisition /></ProtectedRoute>}
+            />
+            <Route
+              path="billing-data-acquisition/:projectId"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><AcquisitionDetail /></ProtectedRoute>}
+            />
             {/* Configuration history removed — not supported by backend */}
-            {/* Removed unsupported billing data & tool management pages — not backed by BillingConfigurationController */}
           </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />
           <Route path="/profile" element={<Profile />} />

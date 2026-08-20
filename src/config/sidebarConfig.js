@@ -272,17 +272,23 @@ export const XMS_SUBMENU = [
  * additionally gates the entire flyout <li> on hasRole(AP_ALL_ROLES) (see Sidebar.jsx),
  * matching the Account Receivable module's pattern rather than EO/XMS's ungated one.
  *
- * Deliberately 4 flat items, not 9 — each links to that area's primary list/overview page,
+ * Deliberately 5 flat items, not 9 — each links to that area's primary list/overview page,
  * which carries its own "create new" action as a page-level button (e.g. VendorListPage's
  * "Register Vendor", InvoiceListPage's "Upload Invoice") rather than as a separate sidebar
  * entry. Sub-views reached from within a page (Vendor Onboarding/Detail/Update, OCR Review
  * Queue, Validation Queue, Payment History, Mark as Paid) still have their own routes from
- * Phase 2 — they're just no longer direct sidebar destinations.
+ * Phase 2 — they're just no longer direct sidebar destinations. System Configuration is the
+ * exception: it's a masters/admin screen, not a business-object list, so it stays a direct
+ * sidebar destination on its own.
  *
  * Per-item role differentiation (e.g. Vendor Management restricted to Admin/Vendor_Intake)
  * is deferred to the business-logic phases — see constants/permissions.js's
  * AP_PERMISSION_ROLES map for the intended per-capability breakdown.
  */
 export const AP_SUBMENU = [
-  { label: "Payment Queue", to: AP_ROUTES.PAYMENT_QUEUE, allowedRoles: ["AP_Executive", "Admin", "Super_Admin"] },
+  { label: "Dashboard", to: AP_ROUTES.DASHBOARD, allowedRoles: AP_ALL_ROLES },
+  { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
+  { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, allowedRoles: AP_ALL_ROLES },
+  { label: "Payments", to: AP_ROUTES.PAYMENT_READY, allowedRoles: AP_ALL_ROLES },
+  { label: "System Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: AP_ALL_ROLES },
 ];

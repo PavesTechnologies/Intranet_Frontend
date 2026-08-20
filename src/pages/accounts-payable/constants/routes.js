@@ -24,8 +24,5 @@ export const AP_ROUTES = {
 
   REPORTS: `${BASE}/reports`,
   SETTINGS: `${BASE}/settings`,
-
-  PAYMENT_QUEUE: `${BASE}/payment-queue`,
-  PAYMENT_QUEUE_DETAIL: (reportId = ":reportId") =>
-    `${BASE}/payment-queue/${reportId}`,
+  SYSTEM_CONFIG: `${BASE}/system-configuration`,
 };

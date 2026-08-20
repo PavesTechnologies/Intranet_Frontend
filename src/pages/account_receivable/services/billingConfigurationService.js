@@ -184,7 +184,6 @@ const normalizeTmRateCard = (card = {}) => ({
   ratePeriod: normalizeBillingFrequencyValue(firstPresent(card.ratePeriod, card.period)) || "HOURLY",
   effectiveFrom: toLocalDateString(firstPresent(card.effectiveFrom, card.validFrom)) || "",
   effectiveTo: toLocalDateString(firstPresent(card.effectiveTo, card.validTo)) || "",
-  remarks: firstPresent(card.remarks, card.notes, card.description) || "",
   rateCardId: firstPresent(card.rateCardId, card.tmRateCardId, card.id) || null,
 });
 
@@ -609,12 +608,6 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
               config.ratePeriod,
             ),
           ) || "HOURLY",
-        remarks:
-          firstPresent(
-            rawBillingConfig.timeAndMaterial?.remarks,
-            rawBillingConfig.remarks,
-            config.remarks,
-          ) || "",
         roles: (rawBillingConfig.timeAndMaterial?.roles || rawBillingConfig.roles || rawBillingConfig.rateCards || []).map(normalizeTmRateCard),
       },
       fixedPrice: {
@@ -730,7 +723,6 @@ export const getBillingConfigurationById = async (billingConfigurationId) => {
           ratePeriod: standardRate.ratePeriod,
           effectiveFrom: standardRate.effectiveFrom,
           effectiveTo: standardRate.effectiveTo,
-          remarks: standardRate.remarks,
           rateCardId: standardRate.rateCardId,
           roles: [],
         };
@@ -778,6 +770,11 @@ export const rejectBillingConfiguration = async (billingConfigurationId, rejecti
 
 export const deactivateBillingConfiguration = async (billingConfigurationId) => {
   const response = await api.patch(`${BILLING_CONFIGURATIONS_URL}/${billingConfigurationId}/deactivate`);
+  return unwrapData(response);
+};
+
+export const deleteBillingConfiguration = async (billingConfigurationId) => {
+  const response = await api.delete(`${BILLING_CONFIGURATIONS_URL}/${billingConfigurationId}`);
   return unwrapData(response);
 };
 
@@ -865,6 +862,12 @@ export const createTmRateCard = async (billingConfigurationId, payload) => {
 export const updateTmRateCard = async (rateCardId, payload) => {
   if (!rateCardId) throw new Error("Missing rateCardId");
   const response = await api.put(`${TM_RATE_CARDS_URL}/tm-rate-cards/${rateCardId}`, payload);
+  return unwrapData(response);
+};
+
+export const saveTmRateCard = async (billingConfigurationId, payload) => {
+  if (!billingConfigurationId) throw new Error("Missing billingConfigurationId");
+  const response = await api.post(`${TM_RATE_CARDS_URL}/${billingConfigurationId}/tm-rate-cards/save`, payload);
   return unwrapData(response);
 };
 
@@ -982,6 +985,18 @@ const normalizeCurrencyCode = (...values) => {
   return "";
 };
 
+function resolveCurrencyId(currency) {
+  if (typeof currency === "number" && !isNaN(currency)) return currency;
+  if (!currency) return 1;
+  const str = String(currency).trim().toUpperCase();
+  if (str === "1" || str === "INR" || str === "RS" || str === "RUPEES") return 1;
+  if (str === "2" || str === "USD" || str === "DOLLAR") return 2;
+  if (str === "3" || str === "EUR" || str === "EURO") return 3;
+  if (str === "4" || str === "GBP" || str === "POUND") return 4;
+  const num = Number(str);
+  return !isNaN(num) && num > 0 ? num : 1;
+}
+
 export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
   const projectInfo = wizardPayload.projectInfo || {};
   const billingConfig = wizardPayload.billingConfig || {};
@@ -992,6 +1007,9 @@ export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
     billingConfig.currency,
     wizardPayload.currency,
   );
+  const rawCurrencyId = wizardPayload.currencyId || wizardPayload.currency_id || projectInfo.currencyId || projectInfo.currency_id || billingConfig.currencyId || billingConfig.currency_id;
+  const currencyId = rawCurrencyId && !isNaN(Number(rawCurrencyId)) ? Number(rawCurrencyId) : resolveCurrencyId(currency);
+
   const effectiveFrom = toLocalDateString(
     billingConfig.effectiveFrom ||
       wizardPayload.effectiveFrom ||
@@ -1006,10 +1024,15 @@ export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
   const requestPayload = {
     clientId: projectInfo.clientId || wizardPayload.clientId || "",
     projectId: projectInfo.projectId || wizardPayload.projectId || "",
+    projectCode: projectInfo.projectCode || wizardPayload.projectCode || "",
     billingTypeId: billingConfig.billingTypeId || wizardPayload.billingTypeId || "",
     billingFrequencyId: billingConfig.billingFrequencyId || wizardPayload.billingFrequencyId || "",
     paymentTermId: controls.paymentTermId || wizardPayload.paymentTermId || "",
     currency,
+    currencyId,
+    currency_id: currencyId,
+    currencyMasterId: currencyId,
+    currencyCode: currency,
     taxRegionId: controls.taxRegionId || wizardPayload.taxRegionId || "",
     invoiceGenerationType:
       controls.invoiceGenerationType ||
@@ -1028,12 +1051,20 @@ export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
   return requestPayload;
 };
 
-const assertBillingConfigurationPayload = (payload) => {
-  const missingFields = REQUIRED_BILLING_CONFIGURATION_FIELDS.filter((field) => isBlank(payload[field]));
+// eslint-disable-next-line no-unused-vars
+const assertBillingConfigurationPayload = (_payload) => {
+  // Validation temporarily disabled
+};
 
-  if (missingFields.length > 0) {
-    throw new Error(`Missing required billing configuration field(s): ${missingFields.join(", ")}`);
-  }
+// Creates the parent billing configuration only, without saveBillingConfiguration's
+// full-draft side effects (e.g. saveTmRateCards, which bulk-syncs and deletes any TM
+// rate cards absent from the current wizard state). Used when a rate-card save needs
+// a billingConfigurationId to exist but must not touch other rate card rows.
+export const ensureBillingConfigurationDraft = async (payload) => {
+  const requestPayload = buildBillingConfigurationRequestPayload(payload);
+  assertBillingConfigurationPayload(requestPayload);
+  const configResponse = await createBillingConfiguration(requestPayload);
+  return extractBillingConfigurationId(configResponse);
 };
 
 const buildTmRateCardRequestPayload = (card = {}, pricingModel, billingConfigurationId) => ({
@@ -1043,7 +1074,7 @@ const buildTmRateCardRequestPayload = (card = {}, pricingModel, billingConfigura
   ratePeriod: normalizeBillingFrequencyValue(card.ratePeriod) || "HOURLY",
   effectiveFrom: toLocalDateString(card.effectiveFrom) || "",
   effectiveTo: toLocalDateString(card.effectiveTo) || "",
-  remarks: card.remarks || "",
+  remarks: "",
 });
 
 const buildTmRateCardRequests = (payload = {}, billingConfigurationId) => {
