@@ -62,7 +62,7 @@ export default function TimesheetDataTable({
   }
 
   return (
-    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       {/* Header & Controls */}
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div className="flex items-center gap-2">
@@ -89,8 +89,8 @@ export default function TimesheetDataTable({
         </div>
       </div>
 
-      {/* Table */}
-      <div className="max-h-[28rem] w-full overflow-x-auto overflow-y-auto rounded-xl border border-slate-200">
+      {/* Table Container with max 550px scroll height */}
+      <div className="max-h-[550px] w-full overflow-x-auto overflow-y-auto rounded-xl border border-slate-200">
         <table className="min-w-full divide-y divide-slate-200 text-xs">
           <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
             <tr className="text-slate-600">
@@ -153,10 +153,20 @@ export default function TimesheetDataTable({
             ) : (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-xs text-slate-500">
-                  {billingStatus === "NO_DATA"
-                    ? "No approved timesheets were found for the selected billing period."
+                  {billingStatus === "NOT_ACQUIRED"
+                    ? "No billing snapshot has been acquired yet. Click 'Acquire Source Snapshot' above to check available billing data."
+                    : billingStatus === "VALIDATING"
+                    ? "Checking available billing data and timesheet approval readiness..."
+                    : billingStatus === "NO_BILLABLE_DATA" || billingStatus === "NO_DATA"
+                    ? "No billable timesheet activity was found for this project during the selected billing period."
+                    : billingStatus === "PENDING_APPROVAL"
+                    ? "Timesheets were found for this billing period, but none have been approved for billing yet."
+                    : billingStatus === "CONFIGURATION_REQUIRED"
+                    ? "Billing configuration is incomplete. Please complete setup in Project Configuration to enable billing acquisition."
+                    : billingStatus === "ALREADY_BILLED"
+                    ? "Timesheet records for this billing period have already been processed into an invoice."
                     : billingStatus === "ACQUISITION_FAILED"
-                    ? "Unable to acquire billing data at this time. Please try again."
+                    ? "Source billing data could not be retrieved due to a system error. Click 'Retry Acquisition' to try again."
                     : "No source timesheet records match the criteria or acquired snapshot."}
                 </td>
               </tr>

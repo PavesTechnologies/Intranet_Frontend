@@ -287,8 +287,10 @@ export async function createBillingSnapshot(projectId, periodFrom, periodTo, bil
     if (!allLaborRecords || allLaborRecords.length === 0) {
       return {
         success: false,
-        status: "NO_DATA",
-        message: json?.message || "No approved timesheets were found for the selected billing period.",
+        status: "NO_BILLABLE_DATA",
+        billingStatus: "NO_BILLABLE_DATA",
+        reasonCode: "NO_TIMESHEETS_FOR_PERIOD",
+        message: "No billable timesheet activity was found for this project during the selected billing period.",
         data: snapshot,
         laborRecords: [],
         subtotal: 0,
@@ -316,10 +318,30 @@ export async function createBillingSnapshot(projectId, periodFrom, periodTo, bil
       approvedTimesheets,
     };
 
+    if (approvedCount === 0 && pendingCount > 0) {
+      return {
+        success: false,
+        status: "PENDING_APPROVAL",
+        billingStatus: "PENDING_APPROVAL",
+        reasonCode: "ALL_TIMESHEETS_PENDING",
+        message: `Timesheets were found for this billing period, but none have been approved for billing yet (${pendingCount} pending, ${pendingHours} hrs).`,
+        data: snapshot,
+        laborRecords: [],
+        allRecords: allLaborRecords,
+        subtotal: 0,
+        totalAmount: 0,
+        snapshotId: snapshot?.snapshotId || null,
+        snapshotNumber: snapshot?.snapshotNumber || null,
+        readiness,
+      };
+    }
+
     if (pendingCount > 0) {
       return {
         success: false,
         status: "PARTIALLY_READY",
+        billingStatus: "PARTIALLY_READY",
+        reasonCode: "SOME_TIMESHEETS_PENDING",
         message: `${pendingCount} timesheet(s) totaling ${pendingHours} hrs require manager approval before billing snapshot can be completed.`,
         data: snapshot,
         laborRecords: approvedTimesheets,
@@ -339,10 +361,11 @@ export async function createBillingSnapshot(projectId, periodFrom, periodTo, bil
       subtotal: snapshot?.subtotal || sumAmount(approvedTimesheets),
       totalAmount: snapshot?.totalAmount || sumAmount(approvedTimesheets),
       status: "READY",
+      billingStatus: "READY",
       laborRecords: approvedTimesheets,
       allRecords: allLaborRecords,
       isExisting: Boolean(json?.message?.includes("already exists")),
-      message: json?.message || "Billing snapshot acquired successfully",
+      message: json?.message || "Billing snapshot acquired successfully. All required timesheets are approved.",
       readiness,
     };
   } catch (error) {
@@ -443,7 +466,7 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
         };
         results.success = true;
         results.billingStatus = "READY";
-        results.message = snapshot.message || "Billing snapshot acquired successfully.";
+        results.message = snapshot.message || "Billing snapshot acquired successfully. All required timesheets are approved.";
       } else if (snapshot && snapshot.status === "PARTIALLY_READY") {
         results.labor = {
           applicable: true,
@@ -458,8 +481,19 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
         results.success = false;
         results.billingStatus = "PARTIALLY_READY";
         results.message = snapshot.message || "Timesheet approvals pending.";
+      } else if (snapshot && snapshot.status === "PENDING_APPROVAL") {
+        results.labor = {
+          applicable: true,
+          status: "pending_approval",
+          records: [],
+          amount: 0,
+          lastFetchedAt: fetchedAt,
+          readiness: snapshot.readiness,
+        };
+        results.success = false;
+        results.billingStatus = "PENDING_APPROVAL";
+        results.message = snapshot.message || "Timesheets found, but none are approved yet.";
       } else {
-        // Business failure or no billing data found
         results.labor = {
           applicable: true,
           status: "no_data",
@@ -468,8 +502,8 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
           lastFetchedAt: fetchedAt,
         };
         results.success = false;
-        results.billingStatus = "NO_DATA";
-        results.message = snapshot?.message || "No timesheets were acquired for the requested billing period";
+        results.billingStatus = "NO_BILLABLE_DATA";
+        results.message = snapshot?.message || "No billable timesheet activity was found for this project during the selected billing period.";
       }
     } catch (error) {
       console.error("[BillingDataAcquisition] Snapshot acquisition failed:", error);
@@ -729,3 +763,52 @@ export function generateInvoiceDraft(context, acquisitionResults) {
 
   return delay(draft);
 }
+
+/**
+ * Single source of truth for AR Acquisition Status Normalization.
+ */
+export function normalizeAcquisitionStatus(rawStatus) {
+  if (!rawStatus) return "NOT_ACQUIRED";
+  const s = String(rawStatus).trim().toUpperCase().replace(/\s+/g, "_");
+  if (["NOT_ACQUIRED", "NOTACQUIRED", "NOT_ACQUIRED_YET"].includes(s)) return "NOT_ACQUIRED";
+  if (["VALIDATING", "ACQUIRING", "IN_PROGRESS"].includes(s)) return "VALIDATING";
+  if (["READY", "SUCCESS", "ACQUIRED"].includes(s)) return "READY";
+  if (["PARTIALLY_READY", "PARTIALLYREADY", "PARTIAL"].includes(s)) return "PARTIALLY_READY";
+  if (["PENDING_APPROVAL", "PENDINGAPPROVAL", "NEEDS_APPROVAL", "AWAITING_APPROVAL"].includes(s)) return "PENDING_APPROVAL";
+  if (["NO_BILLABLE_DATA", "NO_DATA", "NO_TIMESHEETS", "NO_ACTIVITY"].includes(s)) return "NO_BILLABLE_DATA";
+  if (["CONFIGURATION_REQUIRED", "SETUP_REQUIRED", "CONFIG_REQUIRED"].includes(s)) return "CONFIGURATION_REQUIRED";
+  if (["ALREADY_BILLED", "BILLED", "INVOICED"].includes(s)) return "ALREADY_BILLED";
+  if (["ACQUISITION_FAILED", "FAILED", "ERROR"].includes(s)) return "ACQUISITION_FAILED";
+  return s;
+}
+
+/**
+ * Calculates executive KPI counts over the total active project population.
+ */
+export function getAcquisitionKpis(configs = []) {
+  const totalSetups = configs.length;
+
+  let notAcquiredCount = 0;
+  let needsApprovalCount = 0;
+  let readyCount = 0;
+
+  configs.forEach((c) => {
+    const st = normalizeAcquisitionStatus(c.billingStatus);
+    if (st === "NOT_ACQUIRED") {
+      notAcquiredCount++;
+    } else if (st === "PARTIALLY_READY" || st === "PENDING_APPROVAL") {
+      needsApprovalCount++;
+    } else if (st === "READY") {
+      readyCount++;
+    }
+  });
+
+  return {
+    totalSetups,
+    notAcquired: notAcquiredCount,
+    needsApproval: needsApprovalCount,
+    ready: readyCount,
+  };
+}
+
+
