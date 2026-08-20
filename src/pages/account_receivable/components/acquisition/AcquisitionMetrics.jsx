@@ -1,7 +1,7 @@
 import { FolderKanban, Play, CheckCircle2, FileCheck, Clock } from "lucide-react";
 import { KPICard } from "../../../../components/kpi/KPI";
 
-export default function AcquisitionMetrics({ configs = [] }) {
+export default function AcquisitionMetrics({ configs = [], loading = false }) {
   const activeCount = configs.length;
   const readyToAcquire = configs.filter(
     (c) => c.billingStatus === "NOT_ACQUIRED" || c.billingStatus === "Not Acquired"
@@ -19,56 +19,50 @@ export default function AcquisitionMetrics({ configs = [] }) {
       key: "active",
       label: "Active Setups",
       value: activeCount,
-      helper: "Configured projects",
       icon: FolderKanban,
-      color: "blue",
+      color: "bg-slate-500 text-white",
     },
     {
       key: "readyAcquire",
       label: "Ready to Acquire",
       value: readyToAcquire,
-      helper: "Awaiting snapshot creation",
       icon: Play,
-      color: "amber",
+      color: "bg-amber-500 text-white",
     },
     {
       key: "snapshotsReady",
       label: "Snapshots Ready",
       value: snapshotsReady,
-      helper: "Acquired for invoicing",
       icon: CheckCircle2,
-      color: "green",
+      color: "bg-emerald-600 text-white",
     },
     {
       key: "billed",
       label: "Already Billed",
       value: alreadyBilled,
-      helper: "Completed cycles",
       icon: FileCheck,
-      color: "indigo",
+      color: "bg-indigo-600 text-white",
     },
     {
       key: "auto",
       label: "Auto Cycles",
       value: autoCycles,
-      helper: "Scheduled generation",
       icon: Clock,
-      color: "emerald",
+      color: "bg-orange-500 text-white",
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {kpis.map((kpi) => (
-        <div key={kpi.key} className="h-full">
-          <KPICard
-            label={kpi.label}
-            value={kpi.value}
-            icon={<kpi.icon className="h-5 w-5" />}
-            color={kpi.color}
-            className="h-full bg-white shadow-sm border border-slate-200/80 hover:shadow-md transition-shadow duration-200"
-          />
-        </div>
+        <KPICard
+          key={kpi.key}
+          label={kpi.label}
+          value={loading ? "…" : kpi.value}
+          icon={<kpi.icon className="h-5 w-5" />}
+          color={kpi.color}
+          className="h-full w-full bg-white shadow-sm"
+        />
       ))}
     </div>
   );

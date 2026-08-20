@@ -184,7 +184,6 @@ const normalizeTmRateCard = (card = {}) => ({
   ratePeriod: normalizeBillingFrequencyValue(firstPresent(card.ratePeriod, card.period)) || "HOURLY",
   effectiveFrom: toLocalDateString(firstPresent(card.effectiveFrom, card.validFrom)) || "",
   effectiveTo: toLocalDateString(firstPresent(card.effectiveTo, card.validTo)) || "",
-  remarks: firstPresent(card.remarks, card.notes, card.description) || "",
   rateCardId: firstPresent(card.rateCardId, card.tmRateCardId, card.id) || null,
 });
 
@@ -609,12 +608,6 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
               config.ratePeriod,
             ),
           ) || "HOURLY",
-        remarks:
-          firstPresent(
-            rawBillingConfig.timeAndMaterial?.remarks,
-            rawBillingConfig.remarks,
-            config.remarks,
-          ) || "",
         roles: (rawBillingConfig.timeAndMaterial?.roles || rawBillingConfig.roles || rawBillingConfig.rateCards || []).map(normalizeTmRateCard),
       },
       fixedPrice: {
@@ -730,7 +723,6 @@ export const getBillingConfigurationById = async (billingConfigurationId) => {
           ratePeriod: standardRate.ratePeriod,
           effectiveFrom: standardRate.effectiveFrom,
           effectiveTo: standardRate.effectiveTo,
-          remarks: standardRate.remarks,
           rateCardId: standardRate.rateCardId,
           roles: [],
         };
@@ -778,6 +770,11 @@ export const rejectBillingConfiguration = async (billingConfigurationId, rejecti
 
 export const deactivateBillingConfiguration = async (billingConfigurationId) => {
   const response = await api.patch(`${BILLING_CONFIGURATIONS_URL}/${billingConfigurationId}/deactivate`);
+  return unwrapData(response);
+};
+
+export const deleteBillingConfiguration = async (billingConfigurationId) => {
+  const response = await api.delete(`${BILLING_CONFIGURATIONS_URL}/${billingConfigurationId}`);
   return unwrapData(response);
 };
 
@@ -865,6 +862,12 @@ export const createTmRateCard = async (billingConfigurationId, payload) => {
 export const updateTmRateCard = async (rateCardId, payload) => {
   if (!rateCardId) throw new Error("Missing rateCardId");
   const response = await api.put(`${TM_RATE_CARDS_URL}/tm-rate-cards/${rateCardId}`, payload);
+  return unwrapData(response);
+};
+
+export const saveTmRateCard = async (billingConfigurationId, payload) => {
+  if (!billingConfigurationId) throw new Error("Missing billingConfigurationId");
+  const response = await api.post(`${TM_RATE_CARDS_URL}/${billingConfigurationId}/tm-rate-cards/save`, payload);
   return unwrapData(response);
 };
 
@@ -1021,6 +1024,7 @@ export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
   const requestPayload = {
     clientId: projectInfo.clientId || wizardPayload.clientId || "",
     projectId: projectInfo.projectId || wizardPayload.projectId || "",
+    projectCode: projectInfo.projectCode || wizardPayload.projectCode || "",
     billingTypeId: billingConfig.billingTypeId || wizardPayload.billingTypeId || "",
     billingFrequencyId: billingConfig.billingFrequencyId || wizardPayload.billingFrequencyId || "",
     paymentTermId: controls.paymentTermId || wizardPayload.paymentTermId || "",
@@ -1052,6 +1056,17 @@ const assertBillingConfigurationPayload = (_payload) => {
   // Validation temporarily disabled
 };
 
+// Creates the parent billing configuration only, without saveBillingConfiguration's
+// full-draft side effects (e.g. saveTmRateCards, which bulk-syncs and deletes any TM
+// rate cards absent from the current wizard state). Used when a rate-card save needs
+// a billingConfigurationId to exist but must not touch other rate card rows.
+export const ensureBillingConfigurationDraft = async (payload) => {
+  const requestPayload = buildBillingConfigurationRequestPayload(payload);
+  assertBillingConfigurationPayload(requestPayload);
+  const configResponse = await createBillingConfiguration(requestPayload);
+  return extractBillingConfigurationId(configResponse);
+};
+
 const buildTmRateCardRequestPayload = (card = {}, pricingModel, billingConfigurationId) => ({
   billingConfigurationId,
   roleName: pricingModel === "ROLE_BASED" ? String(card.roleName || card.role || "").trim() : null,
@@ -1059,7 +1074,7 @@ const buildTmRateCardRequestPayload = (card = {}, pricingModel, billingConfigura
   ratePeriod: normalizeBillingFrequencyValue(card.ratePeriod) || "HOURLY",
   effectiveFrom: toLocalDateString(card.effectiveFrom) || "",
   effectiveTo: toLocalDateString(card.effectiveTo) || "",
-  remarks: card.remarks || "",
+  remarks: "",
 });
 
 const buildTmRateCardRequests = (payload = {}, billingConfigurationId) => {
