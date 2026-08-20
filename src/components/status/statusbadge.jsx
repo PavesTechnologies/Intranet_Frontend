@@ -15,6 +15,12 @@ const StatusBadge = ({ label, size = "md" }) => {
   } else if (normalized === "ready") {
     bgColor = "bg-emerald-100 border border-emerald-300";
     textColor = "text-emerald-800 font-bold";
+  } else if (normalized === "no data") {
+    bgColor = "bg-amber-100 border border-amber-300";
+    textColor = "text-amber-800 font-bold";
+  } else if (normalized === "acquisition failed") {
+    bgColor = "bg-rose-100 border border-rose-300";
+    textColor = "text-rose-800 font-bold";
   } else if (normalized.includes("partially")) {
     bgColor = "bg-amber-100 border border-amber-300";
     textColor = "text-amber-800 font-bold";

@@ -27,14 +27,11 @@ export default function SnapshotWorkspace({
 
   if (!config) return null;
 
-  const isAcquired =
-    config.billingStatus === "READY" ||
-    config.billingStatus === "Ready" ||
-    Boolean(config.snapshotNumber) ||
-    Boolean(acquisitionResults?.labor?.snapshotNumber);
+  const isAcquired = config.billingStatus === "READY" || config.billingStatus === "Ready";
 
-  const snapshotNumber =
-    acquisitionResults?.labor?.snapshotNumber || config.snapshotNumber || (isAcquired ? "BS-20260814120000" : null);
+  const snapshotNumber = isAcquired
+    ? acquisitionResults?.labor?.snapshotNumber || config.snapshotNumber || null
+    : null;
 
   const timesheetRecords = acquisitionResults?.labor?.records || [];
   const laborAmount = acquisitionResults?.labor?.amount || 0;
@@ -65,7 +62,7 @@ export default function SnapshotWorkspace({
 
           <div className="flex flex-shrink-0 items-center gap-2">
             <StatusBadge label={config.billingStatus} size="sm" />
-            {snapshotNumber && (
+            {isAcquired && snapshotNumber && (
               <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-700">
                 <CheckCircle2 className="h-3 w-3" />
                 {snapshotNumber}
@@ -82,15 +79,10 @@ export default function SnapshotWorkspace({
         {/* Primary actions — kept near the top so they stay visible */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3.5">
           <div className="flex flex-wrap items-center gap-2.5">
-            {!isAcquired ? (
+            {!isAcquired && (
               <Button variant="primary" onClick={() => onAcquire(config)} disabled={acquiring}>
                 <Play className={`h-4 w-4 ${acquiring ? "animate-spin" : ""}`} />
                 {acquiring ? "Acquiring Snapshot..." : "Acquire Source Snapshot"}
-              </Button>
-            ) : (
-              <Button variant="success" onClick={onContinueToTax}>
-                <FileText className="h-4 w-4" />
-                Generate Invoice Draft <ArrowRight className="ml-1 inline h-4 w-4" />
               </Button>
             )}
 
@@ -109,13 +101,52 @@ export default function SnapshotWorkspace({
             <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
               <CheckCircle2 className="h-3.5 w-3.5" /> Ready for Tax Calculation
             </span>
-          ) : (
+          ) : config.billingStatus === "NO_DATA" ? (
             <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+              <AlertTriangle className="h-3.5 w-3.5" /> No Billing Data
+            </span>
+          ) : config.billingStatus === "ACQUISITION_FAILED" ? (
+            <span className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
+              <AlertTriangle className="h-3.5 w-3.5" /> Acquisition Failed
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
               <AlertTriangle className="h-3.5 w-3.5" /> Awaiting Snapshot Creation
             </span>
           )}
         </div>
       </div>
+
+      {/* State Feedback Notice Banner */}
+      {config.billingStatus === "NO_DATA" && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 shadow-sm">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+            <div className="space-y-1">
+              <h4 className="font-bold text-amber-900 text-sm">No timesheets found</h4>
+              <p className="text-xs text-amber-800">
+                {acquisitionResults?.message ||
+                  "No approved timesheets were found for the selected billing period. Please verify the billing period and timesheet data, then try again."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {config.billingStatus === "ACQUISITION_FAILED" && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-900 shadow-sm">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-600" />
+            <div className="space-y-1">
+              <h4 className="font-bold text-rose-900 text-sm">Unable to acquire billing data</h4>
+              <p className="text-xs text-rose-800">
+                {acquisitionResults?.message ||
+                  "We couldn't retrieve billing data at this time. Please try again."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Source data (main) + Commercial summary (sidebar) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 items-start">
@@ -125,6 +156,7 @@ export default function SnapshotWorkspace({
             currency={config.currency}
             loading={acquiring}
             billingType={config.billingType}
+            billingStatus={config.billingStatus}
           />
         </div>
         <div className="lg:col-span-4">
@@ -133,6 +165,9 @@ export default function SnapshotWorkspace({
             expenseAmount={0}
             adjustments={0}
             currency={config.currency}
+            onContinueToTax={onContinueToTax}
+            isAcquired={isAcquired}
+            disabled={acquiring}
           />
         </div>
       </div>

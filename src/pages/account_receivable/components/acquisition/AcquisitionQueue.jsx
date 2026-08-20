@@ -36,9 +36,9 @@ export default function AcquisitionQueue({
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !q ||
-        c.projectName.toLowerCase().includes(q) ||
-        c.projectCode.toLowerCase().includes(q) ||
-        c.client.toLowerCase().includes(q);
+        String(c.projectName || "").toLowerCase().includes(q) ||
+        String(c.projectCode || "").toLowerCase().includes(q) ||
+        String(c.client || "").toLowerCase().includes(q);
 
       const status = c.billingStatus?.toUpperCase();
       let matchesStatus = true;
@@ -46,7 +46,7 @@ export default function AcquisitionQueue({
       if (selectedStatusTab === "NOT_ACQUIRED") {
         matchesStatus = status === "NOT_ACQUIRED" || status === "NOT ACQUIRED";
       } else if (selectedStatusTab === "READY") {
-        matchesStatus = status === "READY" || Boolean(c.snapshotNumber);
+        matchesStatus = status === "READY";
       } else if (selectedStatusTab === "PARTIALLY_READY") {
         matchesStatus = status === "PARTIALLY_READY" || status === "PARTIALLY READY";
       } else if (selectedStatusTab === "ALREADY_BILLED") {
@@ -66,13 +66,13 @@ export default function AcquisitionQueue({
     { key: "ALL", label: "All", count: configs.length },
     {
       key: "NOT_ACQUIRED",
-      label: "Pending",
+      label: "Not Acquired",
       count: configs.filter((c) => c.billingStatus === "NOT_ACQUIRED" || c.billingStatus === "Not Acquired").length,
     },
     {
       key: "READY",
       label: "Ready",
-      count: configs.filter((c) => c.billingStatus === "READY" || c.billingStatus === "Ready" || Boolean(c.snapshotNumber)).length,
+      count: configs.filter((c) => c.billingStatus === "READY" || c.billingStatus === "Ready").length,
     },
     {
       key: "ALREADY_BILLED",
@@ -113,7 +113,7 @@ export default function AcquisitionQueue({
           reference: (
             <div className="text-left">
               <div className="font-mono text-xs text-slate-600">{cfg.id}</div>
-              {cfg.snapshotNumber && (
+              {(cfg.billingStatus === "READY" || cfg.billingStatus === "Ready") && cfg.snapshotNumber && (
                 <div className="font-mono text-[11px] font-semibold text-emerald-600">{cfg.snapshotNumber}</div>
               )}
             </div>

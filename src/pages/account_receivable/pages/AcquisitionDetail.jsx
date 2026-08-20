@@ -45,8 +45,10 @@ export default function AcquisitionDetail() {
     let isMounted = true;
 
     const applyExistingSnapshot = async (cfg) => {
-      if (cfg.existingSnapshot) {
+      if (cfg.existingSnapshot && cfg.existingSnapshot.laborRecords && cfg.existingSnapshot.laborRecords.length > 0) {
         setAcquisitionResults({
+          success: true,
+          billingStatus: "READY",
           labor: {
             applicable: true,
             status: "success",
@@ -63,8 +65,10 @@ export default function AcquisitionDetail() {
       try {
         const existing = await getBillingSnapshotByPeriod(cfg.projectId, cfg.periodStart, cfg.periodEnd);
         if (!isMounted) return;
-        if (existing) {
+        if (existing && existing.laborRecords && existing.laborRecords.length > 0) {
           setAcquisitionResults({
+            success: true,
+            billingStatus: "READY",
             labor: {
               applicable: true,
               status: "success",
@@ -76,6 +80,10 @@ export default function AcquisitionDetail() {
           });
           setConfig((prev) =>
             prev ? { ...prev, billingStatus: "READY", snapshotNumber: existing.snapshotNumber } : prev
+          );
+        } else {
+          setConfig((prev) =>
+            prev ? { ...prev, billingStatus: prev.billingStatus === "READY" ? "NOT_ACQUIRED" : (prev.billingStatus || "NOT_ACQUIRED") } : prev
           );
         }
       } catch (err) {
@@ -139,25 +147,71 @@ export default function AcquisitionDetail() {
       .then((results) => {
         setAcquisitionResults(results);
         setAcquiring(false);
-        const laborRes = results?.labor;
-        const snapshotNum = laborRes?.snapshotNumber;
 
+        if (results?.success && results?.billingStatus === "READY") {
+          const laborRes = results?.labor;
+          const snapshotNum = laborRes?.snapshotNumber;
+
+          setConfig((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  billingStatus: "READY",
+                  snapshotNumber: snapshotNum || prev.snapshotNumber,
+                  snapshotId: laborRes?.snapshotId || prev.snapshotId,
+                }
+              : prev
+          );
+
+          showStatusToast("Billing snapshot acquired successfully.", "success");
+        } else if (results?.billingStatus === "NO_DATA") {
+          setConfig((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  billingStatus: "NO_DATA",
+                  snapshotNumber: null,
+                  snapshotId: null,
+                }
+              : prev
+          );
+          showStatusToast(
+            results.message || "No timesheets were acquired for the requested billing period",
+            "error"
+          );
+        } else {
+          setConfig((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  billingStatus: "ACQUISITION_FAILED",
+                  snapshotNumber: null,
+                  snapshotId: null,
+                }
+              : prev
+          );
+          showStatusToast(
+            results.message || "We couldn't retrieve billing data at this time. Please try again.",
+            "error"
+          );
+        }
+      })
+      .catch((err) => {
+        setAcquiring(false);
         setConfig((prev) =>
           prev
             ? {
                 ...prev,
-                billingStatus: "READY",
-                snapshotNumber: snapshotNum || prev.snapshotNumber,
-                snapshotId: laborRes?.snapshotId || prev.snapshotId,
+                billingStatus: "ACQUISITION_FAILED",
+                snapshotNumber: null,
+                snapshotId: null,
               }
             : prev
         );
-
-        showStatusToast("Billing snapshot acquired successfully.", "success");
-      })
-      .catch((err) => {
-        setAcquiring(false);
-        showStatusToast(err.message || "Snapshot acquisition failed.", "error");
+        showStatusToast(
+          err.message || "We couldn't retrieve billing data at this time. Please try again.",
+          "error"
+        );
       });
   };
 
