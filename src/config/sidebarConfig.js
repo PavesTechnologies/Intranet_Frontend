@@ -32,10 +32,10 @@ const HR_MANAGEMENT    = [ROLES.HR, ROLES.REPORTING_MANAGER];
 // the /expense-management/* routes in App.jsx.
 const XMS_EMPLOYEE   = [ROLES.GENERAL];
 const XMS_MANAGER    = [ROLES.MANAGER];
-const XMS_FINANCE    = [ROLES.FINANCE];
+const XMS_FINANCE    = [ROLES.FINANCE, "Finance_Executive"];
 const XMS_ADMIN      = ADMIN_ROLES;
-export const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, ...ADMIN_ROLES];
-const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, ...ADMIN_ROLES];
+export const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
+const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
 
 /**
  * Union of every role that can see at least one Finance Management module
@@ -177,16 +177,11 @@ export const XMS_SUBMENU = [
   },
   {
     label: "Approvals",
-    to: "/expense-management/approvals/pending",
+    to: "/expense-management/approvals",
     // Not XMS_MANAGER-only (§1.5): any employee can be a resolved approver (NAMED_USER/
     // DEPARTMENT_OWNER/COST_CENTER_OWNER), so a General-role approver still needs a way in.
     // "My Approvals" is presence-based - visible to everyone, empty for anyone with nothing pending.
     allowedRoles: XMS_EVERYONE,
-    children: [
-      { label: "Pending",  to: "/expense-management/approvals/pending" },
-      { label: "Approved", to: "/expense-management/approvals/approved" },
-      { label: "Rejected", to: "/expense-management/approvals/rejected" },
-    ],
   },
   {
     label: "Finance",
@@ -289,8 +284,5 @@ export const XMS_SUBMENU = [
  * AP_PERMISSION_ROLES map for the intended per-capability breakdown.
  */
 export const AP_SUBMENU = [
-  { label: "Dashboard", to: AP_ROUTES.DASHBOARD, allowedRoles: AP_ALL_ROLES },
-  { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
-  { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, allowedRoles: AP_ALL_ROLES },
-  { label: "Payments", to: AP_ROUTES.PAYMENT_READY, allowedRoles: AP_ALL_ROLES },
+  { label: "Payment Queue", to: AP_ROUTES.PAYMENT_QUEUE, allowedRoles: ["AP_Executive", "Admin", "Super_Admin"] },
 ];
