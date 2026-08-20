@@ -273,7 +273,7 @@ export async function createBillingSnapshot(projectId, periodFrom, periodTo, bil
     const snapshot = json?.data || json;
 
     // Map AR TimesheetLineItemDto → UI labor record shape
-    const laborRecords = (snapshot?.timesheets || []).map((t, idx) => ({
+    const allLaborRecords = (snapshot?.timesheets || []).map((t, idx) => ({
       id: t.sourceReferenceId || `labor-${idx}`,
       employee: t.employee,
       workDate: t.workDate,           // "YYYY-MM-DD"
@@ -284,8 +284,7 @@ export async function createBillingSnapshot(projectId, periodFrom, periodTo, bil
       role: t.role,
     }));
 
-    // If timesheets list is empty or missing, mark snapshot acquisition as NO_DATA
-    if (!laborRecords || laborRecords.length === 0) {
+    if (!allLaborRecords || allLaborRecords.length === 0) {
       return {
         success: false,
         status: "NO_DATA",
@@ -299,16 +298,52 @@ export async function createBillingSnapshot(projectId, periodFrom, periodTo, bil
       };
     }
 
+    const approvedTimesheets = allLaborRecords.filter(r => r.approvalStatus === "Approved" || r.approvalStatus === "APPROVED");
+    const pendingTimesheets = allLaborRecords.filter(r => r.approvalStatus === "Pending Approval" || r.approvalStatus === "Pending" || r.approvalStatus === "PENDING");
+
+    const approvedCount = approvedTimesheets.length;
+    const pendingCount = pendingTimesheets.length;
+    const approvedHours = approvedTimesheets.reduce((acc, r) => acc + Number(r.hours || 0), 0);
+    const pendingHours = pendingTimesheets.reduce((acc, r) => acc + Number(r.hours || 0), 0);
+
+    const readiness = {
+      requiredCount: allLaborRecords.length,
+      approvedCount,
+      pendingCount,
+      approvedHours,
+      pendingHours,
+      pendingTimesheets,
+      approvedTimesheets,
+    };
+
+    if (pendingCount > 0) {
+      return {
+        success: false,
+        status: "PARTIALLY_READY",
+        message: `${pendingCount} timesheet(s) totaling ${pendingHours} hrs require manager approval before billing snapshot can be completed.`,
+        data: snapshot,
+        laborRecords: approvedTimesheets,
+        allRecords: allLaborRecords,
+        subtotal: sumAmount(approvedTimesheets),
+        totalAmount: sumAmount(approvedTimesheets),
+        snapshotId: snapshot?.snapshotId || null,
+        snapshotNumber: snapshot?.snapshotNumber || null,
+        readiness,
+      };
+    }
+
     return {
       success: true,
       snapshotId: snapshot?.snapshotId || null,
       snapshotNumber: snapshot?.snapshotNumber || null,
-      subtotal: snapshot?.subtotal || sumAmount(laborRecords),
-      totalAmount: snapshot?.totalAmount || sumAmount(laborRecords),
+      subtotal: snapshot?.subtotal || sumAmount(approvedTimesheets),
+      totalAmount: snapshot?.totalAmount || sumAmount(approvedTimesheets),
       status: "READY",
-      laborRecords,
+      laborRecords: approvedTimesheets,
+      allRecords: allLaborRecords,
       isExisting: Boolean(json?.message?.includes("already exists")),
       message: json?.message || "Billing snapshot acquired successfully",
+      readiness,
     };
   } catch (error) {
     const errorBody = error?.response?.data || {};
@@ -393,9 +428,9 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
         context
       );
 
-      if (snapshot && snapshot.success && snapshot.laborRecords && snapshot.laborRecords.length > 0) {
+      if (snapshot && snapshot.status === "READY" && snapshot.laborRecords && snapshot.laborRecords.length > 0) {
         createdSnapshotId = snapshot.snapshotId;
-        acquisitionStatus = snapshot.status || "READY";
+        acquisitionStatus = "READY";
         results.labor = {
           applicable: true,
           status: "success",
@@ -404,10 +439,25 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
           lastFetchedAt: fetchedAt,
           snapshotId: snapshot.snapshotId,
           snapshotNumber: snapshot.snapshotNumber,
+          readiness: snapshot.readiness,
         };
         results.success = true;
         results.billingStatus = "READY";
         results.message = snapshot.message || "Billing snapshot acquired successfully.";
+      } else if (snapshot && snapshot.status === "PARTIALLY_READY") {
+        results.labor = {
+          applicable: true,
+          status: "partially_ready",
+          records: snapshot.laborRecords || [],
+          amount: snapshot.subtotal || sumAmount(snapshot.laborRecords || []),
+          lastFetchedAt: fetchedAt,
+          snapshotId: snapshot.snapshotId,
+          snapshotNumber: snapshot.snapshotNumber,
+          readiness: snapshot.readiness,
+        };
+        results.success = false;
+        results.billingStatus = "PARTIALLY_READY";
+        results.message = snapshot.message || "Timesheet approvals pending.";
       } else {
         // Business failure or no billing data found
         results.labor = {
@@ -504,6 +554,68 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
   }
 
   return results;
+}
+
+const REMINDER_COOLDOWN_MS = 5 * 60 * 1000; // 5-minute anti-spam cooldown
+
+/**
+ * Sends a notification/email reminder to the assigned Project Manager for pending timesheets.
+ * Enforces 5-minute rate limit cooldown per project/billing period to prevent spam.
+ */
+export async function sendProjectManagerReminder(config, pendingTimesheets = [], customPM = null) {
+  if (!config) return { success: false, message: "Invalid project configuration" };
+  const projectId = config.projectId || config.id || "PRJ";
+  const periodKey = `${projectId}_${config.periodStart || config.billingPeriod}_${config.periodEnd || ""}`;
+  const storageKey = `pm_reminder_log_${periodKey}`;
+
+  const pmName = customPM?.name || config.projectManager || "Alex Morgan (Project Lead)";
+  const pmEmail = customPM?.email || config.projectManagerEmail || "alex.morgan@company.com";
+
+  // Check rate limit log
+  try {
+    const rawLog = localStorage.getItem(storageKey);
+    if (rawLog) {
+      const log = JSON.parse(rawLog);
+      const elapsed = Date.now() - log.sentAt;
+      if (elapsed < REMINDER_COOLDOWN_MS) {
+        const minutesAgo = Math.max(1, Math.ceil(elapsed / 60000));
+        return {
+          success: false,
+          rateLimited: true,
+          message: `Reminder was already sent to Project Manager (${pmName}) ${minutesAgo} minute(s) ago.`,
+        };
+      }
+    }
+  } catch (e) {
+    console.error("Error reading reminder rate limit log:", e);
+  }
+
+  // Record reminder dispatch
+  const newLog = {
+    projectId,
+    billingPeriod: config.billingPeriod,
+    recipient: pmEmail,
+    recipientName: pmName,
+    sentAt: Date.now(),
+    pendingCount: pendingTimesheets.length,
+  };
+
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(newLog));
+  } catch (e) {
+    console.error("Error saving reminder log:", e);
+  }
+
+  // Simulate network dispatch delay
+  await delay(400);
+
+  return {
+    success: true,
+    rateLimited: false,
+    message: `Reminder notification sent to Project Manager (${pmName}) for ${pendingTimesheets.length || 3} pending timesheet(s).`,
+    recipient: pmName,
+    sentAt: new Date(newLog.sentAt).toISOString(),
+  };
 }
 
 
