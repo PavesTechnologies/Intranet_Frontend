@@ -206,7 +206,12 @@ export async function getBillingSnapshotByPeriod(projectId, billingPeriodStart, 
       role: t.role,
     }));
 
+    if (laborRecords.length === 0) {
+      return null;
+    }
+
     return {
+      success: true,
       snapshotId: snapshot.snapshotId,
       snapshotNumber: snapshot.snapshotNumber,
       subtotal: snapshot.subtotal,
@@ -249,6 +254,22 @@ export async function createBillingSnapshot(projectId, periodFrom, periodTo, bil
   try {
     const response = await api.post(endpoint, payload);
     const json = response.data;
+
+    // Check if business logic response explicitly indicates failure (e.g. success: false)
+    if (json && json.success === false) {
+      return {
+        success: false,
+        status: "NO_DATA",
+        message: json.message || "No timesheets were acquired for the requested billing period",
+        data: null,
+        laborRecords: [],
+        subtotal: 0,
+        totalAmount: 0,
+        snapshotId: null,
+        snapshotNumber: null,
+      };
+    }
+
     const snapshot = json?.data || json;
 
     // Map AR TimesheetLineItemDto → UI labor record shape
@@ -263,23 +284,39 @@ export async function createBillingSnapshot(projectId, periodFrom, periodTo, bil
       role: t.role,
     }));
 
+    // If timesheets list is empty or missing, mark snapshot acquisition as NO_DATA
+    if (!laborRecords || laborRecords.length === 0) {
+      return {
+        success: false,
+        status: "NO_DATA",
+        message: json?.message || "No approved timesheets were found for the selected billing period.",
+        data: snapshot,
+        laborRecords: [],
+        subtotal: 0,
+        totalAmount: 0,
+        snapshotId: snapshot?.snapshotId || null,
+        snapshotNumber: snapshot?.snapshotNumber || null,
+      };
+    }
+
     return {
+      success: true,
       snapshotId: snapshot?.snapshotId || null,
       snapshotNumber: snapshot?.snapshotNumber || null,
-      subtotal: snapshot?.subtotal || 0,
-      totalAmount: snapshot?.totalAmount || 0,
-      status: snapshot?.status || "READY",
+      subtotal: snapshot?.subtotal || sumAmount(laborRecords),
+      totalAmount: snapshot?.totalAmount || sumAmount(laborRecords),
+      status: "READY",
       laborRecords,
       isExisting: Boolean(json?.message?.includes("already exists")),
-      message: json?.message || "",
+      message: json?.message || "Billing snapshot acquired successfully",
     };
   } catch (error) {
     const errorBody = error?.response?.data || {};
     if (errorBody?.message?.includes("already exists")) {
       const existing = await getBillingSnapshotByPeriod(finalProjectId, periodFrom, periodTo);
-      if (existing) return existing;
+      if (existing && existing.laborRecords && existing.laborRecords.length > 0) return existing;
     }
-    throw new Error(errorBody?.message || error?.message || "Snapshot creation failed");
+    throw new Error(errorBody?.message || error?.message || "We couldn't retrieve billing data at this time. Please try again.");
   }
 }
 
@@ -355,7 +392,8 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
         context.billingConfigurationId,
         context
       );
-      if (snapshot && snapshot.snapshotId) {
+
+      if (snapshot && snapshot.success && snapshot.laborRecords && snapshot.laborRecords.length > 0) {
         createdSnapshotId = snapshot.snapshotId;
         acquisitionStatus = snapshot.status || "READY";
         results.labor = {
@@ -367,27 +405,35 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
           snapshotId: snapshot.snapshotId,
           snapshotNumber: snapshot.snapshotNumber,
         };
+        results.success = true;
+        results.billingStatus = "READY";
+        results.message = snapshot.message || "Billing snapshot acquired successfully.";
+      } else {
+        // Business failure or no billing data found
+        results.labor = {
+          applicable: true,
+          status: "no_data",
+          records: [],
+          amount: 0,
+          lastFetchedAt: fetchedAt,
+        };
+        results.success = false;
+        results.billingStatus = "NO_DATA";
+        results.message = snapshot?.message || "No timesheets were acquired for the requested billing period";
       }
     } catch (error) {
       console.error("[BillingDataAcquisition] Snapshot acquisition failed:", error);
       results.labor = {
         applicable: true,
         status: "error",
-        error: error?.message || "Failed to acquire timesheet records",
+        error: error?.message || "We couldn't retrieve billing data at this time. Please try again.",
         records: [],
         amount: 0,
         lastFetchedAt: fetchedAt,
       };
-    }
-
-    if (!results.labor) {
-      results.labor = {
-        applicable: true,
-        status: "empty",
-        records: [],
-        amount: 0,
-        lastFetchedAt: fetchedAt,
-      };
+      results.success = false;
+      results.billingStatus = "ACQUISITION_FAILED";
+      results.message = error?.message || "We couldn't retrieve billing data at this time. Please try again.";
     }
 
     ["contract", "milestone", "recurring", "expense"].forEach((type) => {
@@ -401,6 +447,9 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
       amount: 0,
       lastFetchedAt: fetchedAt,
     };
+    results.success = false;
+    results.billingStatus = "NO_DATA";
+    results.message = "No billable milestone records found for the selected billing period.";
     ["labor", "contract", "recurring", "expense"].forEach((type) => {
       results[type] = { applicable: false, status: "not_applicable", records: [], amount: 0, lastFetchedAt: null };
     });
@@ -412,6 +461,9 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
       amount: 0,
       lastFetchedAt: fetchedAt,
     };
+    results.success = false;
+    results.billingStatus = "NO_DATA";
+    results.message = "No billable recurring charges found for the selected billing period.";
     ["labor", "contract", "milestone", "expense"].forEach((type) => {
       results[type] = { applicable: false, status: "not_applicable", records: [], amount: 0, lastFetchedAt: null };
     });
@@ -423,6 +475,9 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
       amount: 0,
       lastFetchedAt: fetchedAt,
     };
+    results.success = false;
+    results.billingStatus = "NO_DATA";
+    results.message = "No billable contract records found for the selected billing period.";
     ["labor", "milestone", "recurring", "expense"].forEach((type) => {
       results[type] = { applicable: false, status: "not_applicable", records: [], amount: 0, lastFetchedAt: null };
     });
@@ -436,8 +491,8 @@ export async function acquireBillingData(context, periodFrom, periodTo) {
     lastFetchedAt: fetchedAt,
   };
 
-  // Record acquisition result in backend tracking table ONLY if snapshot creation succeeded
-  if (context?.billingConfigurationId && createdSnapshotId) {
+  // Record acquisition result in backend tracking table ONLY if snapshot creation succeeded with valid data
+  if (results.success && context?.billingConfigurationId && createdSnapshotId) {
     await acquireBillingRecord(
       context.billingConfigurationId,
       periodFrom,

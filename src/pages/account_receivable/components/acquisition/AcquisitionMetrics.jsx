@@ -7,7 +7,7 @@ export default function AcquisitionMetrics({ configs = [], loading = false }) {
     (c) => c.billingStatus === "NOT_ACQUIRED" || c.billingStatus === "Not Acquired"
   ).length;
   const snapshotsReady = configs.filter(
-    (c) => c.billingStatus === "READY" || c.billingStatus === "Ready" || Boolean(c.snapshotNumber)
+    (c) => c.billingStatus === "READY" || c.billingStatus === "Ready"
   ).length;
   const alreadyBilled = configs.filter(
     (c) => c.billingStatus === "ALREADY_BILLED" || c.billingStatus === "Already Billed"

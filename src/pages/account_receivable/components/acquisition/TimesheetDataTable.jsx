@@ -8,6 +8,7 @@ export default function TimesheetDataTable({
   currency = "INR",
   loading = false,
   billingType = "TIME_MATERIAL",
+  billingStatus = "NOT_ACQUIRED",
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState("workDate");
@@ -25,12 +26,11 @@ export default function TimesheetDataTable({
   const filteredAndSorted = useMemo(() => {
     let result = records.filter((r) => {
       if (!searchTerm) return true;
-      const q = searchTerm.toLowerCase();
-      return (
-        (r.employee && r.employee.toLowerCase().includes(q)) ||
-        (r.role && r.role.toLowerCase().includes(q)) ||
-        (r.workDate && r.workDate.toLowerCase().includes(q))
-      );
+      const q = searchTerm.toLowerCase().trim();
+      const emp = String(r.employee || "").toLowerCase();
+      const role = String(r.role || "").toLowerCase();
+      const date = String(r.workDate || "").toLowerCase();
+      return emp.includes(q) || role.includes(q) || date.includes(q);
     });
 
     result.sort((a, b) => {
@@ -153,7 +153,11 @@ export default function TimesheetDataTable({
             ) : (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-xs text-slate-500">
-                  No source timesheet records match the criteria.
+                  {billingStatus === "NO_DATA"
+                    ? "No approved timesheets were found for the selected billing period."
+                    : billingStatus === "ACQUISITION_FAILED"
+                    ? "Unable to acquire billing data at this time. Please try again."
+                    : "No source timesheet records match the criteria or acquired snapshot."}
                 </td>
               </tr>
             )}
