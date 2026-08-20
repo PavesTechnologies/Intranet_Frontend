@@ -9,7 +9,8 @@ const isPdfFile = (fileName = "") => /\.pdf$/i.test(fileName);
 const extractUrl = (data) => {
   if (!data) return null;
   if (typeof data === "string") return data;
-  return data.url || data.viewUrl || data.downloadUrl || data.presignedUrl || null;
+  const target = data.data || data;
+  return target.url || target.viewUrl || target.downloadUrl || target.presignedUrl || null;
 };
 
 function EmptyState() {
