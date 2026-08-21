@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   X,
   Check,
@@ -10,6 +10,7 @@ import {
   User,
   Layers,
   AlertTriangle,
+  ArrowRight,
 } from "lucide-react";
 import Button from "@/components/Button/Button";
 import { showStatusToast } from "@/components/toastfy/toast";
@@ -44,9 +45,10 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
   const [selectedLineItemId, setSelectedLineItemId] = useState(null);
   const [queryingLine, setQueryingLine] = useState(null);
 
+  const queryClient = useQueryClient();
   const { data: approvalStatus } = useFinanceStatus(isOpen ? reportId : null);
   const { data: lineItemReviews } = useFinanceReviews(isOpen ? reportId : null);
-  
+
   const verifyLineItem = useVerifyLineItem();
   const queryLineItem = useQueryLineItem();
 
@@ -70,8 +72,17 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
     staleTime: 30_000,
   });
 
-  const reportStatus = fullReport?.reportStatus || "PENDING_FINANCE_VERIFICATION";
+  // fullReport is refetched after every action below (see refetchReviewData) - queueItem is a
+  // point-in-time snapshot from when this panel was opened and never updates again, so it's only a
+  // same-render fallback until fullReport loads. Mirrors the identical fix in ExpenseReviewPanel.jsx.
+  const reportStatus = fullReport?.reportStatus || queueItem?.reportStatus || "PENDING_FINANCE_VERIFICATION";
   const lineItems = queueItem?.pendingLineItems || [];
+  const hasMovedPastFinance = !!reportStatus && reportStatus !== "PENDING_FINANCE_VERIFICATION";
+
+  const refetchReviewData = () => {
+    queryClient.invalidateQueries({ queryKey: ["expenseReviewReport", reportId] });
+    queryClient.invalidateQueries({ queryKey: ["expenseReviewLineItems", reportId] });
+  };
 
   // Match queue items or full items
   const mergedLineItems = useMemo(() => {
@@ -125,7 +136,7 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
   const title = fullReport?.title;
   const businessPurpose = fullReport?.businessPurpose;
   const costCenterName = queueItem?.costCenterName || fullReport?.costCenterName;
-  const submittedAt = fullReport?.createdAt;
+  const submittedAt = queueItem?.submittedAt || fullReport?.createdAt;
   const totalAmount = queueItem?.totalAmount ?? fullReport?.totalAmount;
   const currencyCode = queueItem?.currencyCode || fullReport?.currencyCode;
 
@@ -139,8 +150,22 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
     verifyLineItem.mutate(
       { reportId, lineItemId: selectedLine.lineItemId },
       {
-        onSuccess: () => showStatusToast("Line item verified successfully", "success"),
-        onError: (err) => showStatusToast(err.response?.data?.message || "Failed to verify line item", "error"),
+        // Read straight off the mutation response (freshest possible signal) - if this was the
+        // last required line item, the backend has already moved the report to APPROVED in this
+        // same call, so close immediately instead of leaving stale Verify/Query buttons up until
+        // some other render happens to notice.
+        onSuccess: (data) => {
+          refetchReviewData();
+          showStatusToast("Line item verified successfully", "success");
+          if (data?.reportStatus && data.reportStatus !== "PENDING_FINANCE_VERIFICATION") {
+            showStatusToast("Every required line item is verified - this report is now Approved.", "success");
+            onClose();
+          }
+        },
+        onError: (err) => {
+          refetchReviewData();
+          showStatusToast(err.response?.data?.message || "Failed to verify line item", "error");
+        },
       }
     );
   };
@@ -159,6 +184,20 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
           <X className="h-5 w-5" />
         </button>
       </header>
+
+      {hasMovedPastFinance && (
+        <div className="shrink-0 border-b border-blue-200 bg-blue-50 px-4 py-3 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-blue-800">
+              <ArrowRight className="h-4 w-4" />
+              This report has moved past Finance Verification - no further action is possible here.
+            </p>
+            <Button size="small" variant="outline" onClick={onClose}>
+              Back to Finance Queue
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
         <div className="h-[42vh] shrink-0 border-b border-gray-200 p-3 md:h-auto md:w-[42%] md:border-b-0 md:border-r md:p-4">
@@ -317,10 +356,14 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
             { reportId, lineItemId: queryingLine.lineItemId, reason },
             {
               onSuccess: () => {
+                refetchReviewData();
                 showStatusToast("Query raised successfully", "success");
                 setQueryingLine(null);
               },
-              onError: (err) => showStatusToast(err.response?.data?.message || "Failed to raise query", "error"),
+              onError: (err) => {
+                refetchReviewData();
+                showStatusToast(err.response?.data?.message || "Failed to raise query", "error");
+              },
             }
           );
         }}
