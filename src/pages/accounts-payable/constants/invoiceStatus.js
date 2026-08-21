@@ -7,8 +7,9 @@
  *
  * "Ready for payment" is a UI-level grouping over APPROVED invoices with an outstanding balance
  * (see PAYMENT_QUEUE_STATUSES below), not a status of its own. There is no standalone backend
- * validation stage either — validate-fields runs only inline during upload, before an invoice is
- * ever persisted (see VALIDATION_QUEUE_STATUSES below).
+ * invoice status for validation either — extract-fields/validate-fields run as a job during
+ * upload (see InvoiceUploadPage), before an invoice is ever persisted, and that job's stage
+ * results aren't retained on the invoice record afterward (see VALIDATION_QUEUE_STATUSES below).
  */
 export const INVOICE_STATUS = {
   DRAFT: "Draft",
