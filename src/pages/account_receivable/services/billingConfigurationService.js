@@ -1,4 +1,5 @@
 import api from "../../../api/axiosInstance";
+import { fetchActiveBillingConfigurations } from "./billingDataAcquisitionService";
 
 const BASE_URL = window.__APP_CONFIG__.AR_BASE_URL;
 
@@ -730,18 +731,39 @@ export const normalizeProject = (project = {}) => {
   };
 };
 
-export const getApiErrorMessage = (error, fallback = "Something went wrong. Please try again.") =>
-  error?.response?.data?.message ||
-  error?.response?.data?.detail ||
-  error?.response?.data?.error ||
-  error?.message ||
-  fallback;
+export const getApiErrorMessage = (error, fallback = "Something went wrong. Please try again.") => {
+  const rawMsg =
+    error?.response?.data?.message ||
+    error?.response?.data?.detail ||
+    error?.response?.data?.error ||
+    error?.message ||
+    "";
+
+  if (typeof rawMsg === "string" && rawMsg.includes("paymentTerm") && rawMsg.includes("is null")) {
+    return "Backend error: A billing configuration record in database has a null Payment Term reference. Please assign payment terms in backend or re-save billing setup.";
+  }
+
+  return rawMsg || fallback;
+};
 
 export const getBillingConfigurations = async () => {
-  const response = await api.get(BILLING_CONFIGURATIONS_URL);
-  return asArray(unwrapData(response))
-    .filter(shouldDisplayBillingConfiguration)
-    .map(normalizeBillingConfiguration);
+  try {
+    const response = await api.get(BILLING_CONFIGURATIONS_URL);
+    return asArray(unwrapData(response))
+      .filter(shouldDisplayBillingConfiguration)
+      .map(normalizeBillingConfiguration);
+  } catch (error) {
+    console.warn("[billingConfigurationService] GET /api/billing-configurations failed, attempting active fallback:", error);
+    try {
+      const activeConfigs = await fetchActiveBillingConfigurations();
+      if (Array.isArray(activeConfigs) && activeConfigs.length > 0) {
+        return activeConfigs.map((cfg) => normalizeBillingConfiguration(cfg));
+      }
+    } catch (fallbackErr) {
+      console.warn("[billingConfigurationService] Active configurations fallback failed:", fallbackErr);
+    }
+    throw error;
+  }
 };
 
 export const getBillingConfigurationById = async (billingConfigurationId) => {

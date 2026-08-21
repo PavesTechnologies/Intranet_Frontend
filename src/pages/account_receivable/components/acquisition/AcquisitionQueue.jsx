@@ -64,8 +64,8 @@ export default function AcquisitionQueue({
         matchesStatus = st === "NOT_ACQUIRED";
       } else if (activeStatusFilter === "NEEDS_APPROVAL") {
         matchesStatus = st === "PARTIALLY_READY" || st === "PENDING_APPROVAL";
-      } else if (activeStatusFilter === "READY") {
-        matchesStatus = st === "READY";
+      } else if (activeStatusFilter === "READY" || activeStatusFilter === "READY_TO_TAX") {
+        matchesStatus = st === "READY_TO_TAX" || st === "IN_TAX" || st === "TAX_COMPLETED";
       } else if (activeStatusFilter === "NO_BILLABLE_DATA") {
         matchesStatus = st === "NO_BILLABLE_DATA";
       } else if (activeStatusFilter === "ACQUISITION_FAILED") {
@@ -106,7 +106,7 @@ export default function AcquisitionQueue({
       const st = normalizeAcquisitionStatus(c.billingStatus);
       if (st === "NOT_ACQUIRED") notAcquired++;
       else if (st === "PARTIALLY_READY" || st === "PENDING_APPROVAL") needsApproval++;
-      else if (st === "READY") ready++;
+      else if (st === "READY_TO_TAX" || st === "IN_TAX" || st === "TAX_COMPLETED") ready++;
       else if (st === "NO_BILLABLE_DATA") noData++;
       else if (st === "ACQUISITION_FAILED") failed++;
       else if (st === "CONFIGURATION_REQUIRED") configReq++;
@@ -127,7 +127,7 @@ export default function AcquisitionQueue({
     { key: "ALL", label: "All Setups", count: populationCounts.totalSetups },
     { key: "NOT_ACQUIRED", label: "Not Acquired", count: populationCounts.notAcquired },
     { key: "NEEDS_APPROVAL", label: "Needs Approval", count: populationCounts.needsApproval },
-    { key: "READY", label: "Ready", count: populationCounts.ready },
+    { key: "READY_TO_TAX", label: "Ready for Tax", count: populationCounts.ready },
     { key: "NO_BILLABLE_DATA", label: "No Billable Data", count: populationCounts.noData },
     { key: "ACQUISITION_FAILED", label: "Acquisition Failed", count: populationCounts.failed },
     { key: "CONFIGURATION_REQUIRED", label: "Configuration Required", count: populationCounts.configReq },
@@ -149,8 +149,9 @@ export default function AcquisitionQueue({
         return "Not Acquired";
       case "NEEDS_APPROVAL":
         return "Needs Approval";
+      case "READY_TO_TAX":
       case "READY":
-        return "Ready";
+        return "Ready for Tax";
       case "NO_BILLABLE_DATA":
         return "No Billable Data";
       case "ACQUISITION_FAILED":
@@ -187,7 +188,7 @@ export default function AcquisitionQueue({
           reference: (
             <div className="text-left">
               <div className="font-mono text-xs text-slate-600">{cfg.id}</div>
-              {st === "READY" && cfg.snapshotNumber && (
+              {(st === "READY_TO_TAX" || st === "IN_TAX" || st === "TAX_COMPLETED") && cfg.snapshotNumber && (
                 <div className="font-mono text-[11px] font-semibold text-emerald-600">{cfg.snapshotNumber}</div>
               )}
             </div>
@@ -201,7 +202,11 @@ export default function AcquisitionQueue({
               }}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
             >
-              {isPending ? (
+              {st === "TAX_COMPLETED" ? (
+                <>
+                  <Eye className="h-3 w-3" /> View Tax Calculation
+                </>
+              ) : isPending ? (
                 <>
                   <Play className="h-3 w-3" /> Acquire
                 </>
