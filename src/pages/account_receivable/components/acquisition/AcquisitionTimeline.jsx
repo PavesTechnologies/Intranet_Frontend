@@ -1,6 +1,9 @@
-import { Clock, CheckCircle2, FileText, UserCheck, ShieldCheck, Activity } from "lucide-react";
+import { useState } from "react";
+import { Clock, ChevronDown, Activity } from "lucide-react";
 
 export default function AcquisitionTimeline({ history = [] }) {
+  const [expanded, setExpanded] = useState(false);
+
   const defaultHistory = [
     {
       id: 1,
@@ -37,40 +40,59 @@ export default function AcquisitionTimeline({ history = [] }) {
   ];
 
   const events = history.length > 0 ? history : defaultHistory;
+  const [latest, ...rest] = events;
 
   return (
-    <div className="rounded-2xl bg-white p-5 border border-slate-200/90 shadow-sm space-y-4">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-indigo-600" />
-          <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
-            Recent Acquisition Activity & Operational Audit Log
-          </h3>
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left sm:px-5"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <Clock className="h-4 w-4 flex-shrink-0 text-slate-400" />
+          <span className="text-sm font-semibold text-slate-900">Audit Log</span>
+          {latest && !expanded && (
+            <span className="truncate text-xs text-slate-400">
+              &middot; {latest.event} &middot; {latest.timestamp}
+            </span>
+          )}
         </div>
-        <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full font-mono">
-          System Audit Log
-        </span>
-      </div>
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-medium text-slate-500">
+            {events.length}
+          </span>
+          <ChevronDown
+            className={`h-4 w-4 text-slate-400 transition-transform ${expanded ? "rotate-180" : ""}`}
+          />
+        </div>
+      </button>
 
-      <div className="space-y-3 pt-1">
-        {events.map((evt, idx) => (
-          <div key={evt.id || idx} className="flex items-start gap-3 text-xs group">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 flex-shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-              <Activity className="h-3.5 w-3.5" />
-            </div>
-            <div className="flex-1 space-y-0.5 bg-slate-50/60 group-hover:bg-indigo-50/30 p-3 rounded-xl border border-slate-200/70 transition-colors">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-900 text-xs">{evt.event}</span>
-                <span className="text-[10px] text-slate-400 font-mono">{evt.timestamp}</span>
-              </div>
-              <p className="text-[11px] text-slate-600">{evt.details}</p>
-              <div className="text-[10px] text-slate-400 pt-1 font-mono flex items-center gap-1">
-                <UserCheck className="h-3 w-3 text-slate-400" /> Actor: {evt.actor}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      {expanded && (
+        <div className="border-t border-slate-100 px-4 pb-4 pt-3 sm:px-5">
+          <ol className="relative space-y-4 border-l border-slate-200 pl-4">
+            {events.map((evt, idx) => (
+              <li key={evt.id || idx} className="relative">
+                <span
+                  className={`absolute -left-[1.15rem] top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white ring-1 ${
+                    evt.type === "success"
+                      ? "bg-emerald-500 ring-emerald-200"
+                      : "bg-indigo-500 ring-indigo-200"
+                  }`}
+                >
+                  <Activity className="h-2 w-2 text-white" />
+                </span>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                  <span className="text-xs font-semibold text-slate-900">{evt.event}</span>
+                  <span className="font-mono text-[11px] text-slate-400">{evt.timestamp}</span>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500">{evt.details}</p>
+                <p className="mt-0.5 font-mono text-[11px] text-slate-400">{evt.actor}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
     </div>
   );
 }

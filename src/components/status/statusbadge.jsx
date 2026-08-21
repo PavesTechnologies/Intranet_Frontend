@@ -12,18 +12,30 @@ const StatusBadge = ({ label, size = "md" }) => {
   if (normalized === "not acquired") {
     bgColor = "bg-slate-100 border border-slate-300";
     textColor = "text-slate-700 font-medium";
+  } else if (normalized === "validating") {
+    bgColor = "bg-indigo-50 border border-indigo-200";
+    textColor = "text-indigo-700 font-medium";
   } else if (normalized === "ready") {
     bgColor = "bg-emerald-100 border border-emerald-300";
     textColor = "text-emerald-800 font-bold";
-  } else if (normalized.includes("partially")) {
+  } else if (normalized === "partially ready" || normalized === "needs approval") {
     bgColor = "bg-amber-100 border border-amber-300";
     textColor = "text-amber-800 font-bold";
-  } else if (normalized.includes("waiting")) {
+  } else if (normalized === "pending approval") {
     bgColor = "bg-amber-100 border border-amber-300";
     textColor = "text-amber-800 font-bold";
-  } else if (normalized.includes("billed")) {
+  } else if (normalized === "no billable data" || normalized === "no data") {
+    bgColor = "bg-slate-100 border border-slate-300";
+    textColor = "text-slate-700 font-medium";
+  } else if (normalized === "configuration required" || normalized === "setup required") {
+    bgColor = "bg-amber-100 border border-amber-300";
+    textColor = "text-amber-800 font-bold";
+  } else if (normalized.includes("billed") || normalized === "already billed") {
     bgColor = "bg-blue-100 border border-blue-300";
     textColor = "text-blue-800 font-bold";
+  } else if (normalized === "acquisition failed") {
+    bgColor = "bg-rose-100 border border-rose-300";
+    textColor = "text-rose-800 font-bold";
   } else if (normalized === "joining pending") {
     bgColor = "bg-red-100";
     textColor = "text-red-700";

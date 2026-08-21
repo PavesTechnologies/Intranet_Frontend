@@ -1,6 +1,12 @@
-import { useState, useMemo } from "react";
-import { Search, Filter, Calendar, ChevronRight, Layers, CheckCircle2, Clock } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Layers, Play, Eye, RotateCcw, FilterX } from "lucide-react";
 import StatusBadge from "../../../../components/status/statusbadge";
+import SearchInput from "../../../../components/filter/Searchbar";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
+import Pagination from "../../../../components/Pagination/pagination";
+import ARTable from "../common/ARTable";
+import { normalizeAcquisitionStatus } from "../../services/billingDataAcquisitionService";
 
 const BILLING_TYPE_LABELS = {
   TIME_MATERIAL: "Time & Material",
@@ -9,192 +15,305 @@ const BILLING_TYPE_LABELS = {
   RECURRING: "Recurring",
 };
 
+const PAGE_SIZE = 8;
+
+const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Billing Period", "Status", "Reference", "Action"];
+const TABLE_COLUMNS = ["client", "project", "billingType", "billingPeriod", "status", "reference", "action"];
+
+const FILTER_BUTTON_CLASS =
+  "flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-left text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/30";
+
 export default function AcquisitionQueue({
   configs = [],
-  selectedConfigId = null,
-  onSelectConfig,
+  onViewConfig,
   loading = false,
+  selectedStatusFilter = "ALL",
+  onStatusFilterChange,
+  searchQuery = "",
+  onSearchQueryChange,
+  onClearFilters,
 }) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStatusTab, setSelectedStatusTab] = useState("ALL");
+  // Local state fallbacks if parent does not manage state directly
+  const [localSearch, setLocalSearch] = useState("");
+  const [localStatusFilter, setLocalStatusFilter] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
 
+  const activeSearch = onSearchQueryChange ? searchQuery : localSearch;
+  const handleSearchChange = onSearchQueryChange || setLocalSearch;
+
+  const activeStatusFilter = onStatusFilterChange ? selectedStatusFilter : localStatusFilter;
+  const handleStatusFilterChange = onStatusFilterChange || setLocalStatusFilter;
+
+  const handleResetFilters = () => {
+    if (onClearFilters) {
+      onClearFilters();
+    } else {
+      setLocalSearch("");
+      setLocalStatusFilter("ALL");
+    }
+  };
+
+  // Canonical composable filtering pipeline
   const filteredConfigs = useMemo(() => {
     return configs.filter((c) => {
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
-        c.projectName.toLowerCase().includes(q) ||
-        c.projectCode.toLowerCase().includes(q) ||
-        c.client.toLowerCase().includes(q);
+      const st = normalizeAcquisitionStatus(c.billingStatus);
 
-      const status = c.billingStatus?.toUpperCase();
+      // 1. Status Filter (from active KPI card or status dropdown)
       let matchesStatus = true;
-
-      if (selectedStatusTab === "NOT_ACQUIRED") {
-        matchesStatus = status === "NOT_ACQUIRED" || status === "NOT ACQUIRED";
-      } else if (selectedStatusTab === "READY") {
-        matchesStatus = status === "READY" || Boolean(c.snapshotNumber);
-      } else if (selectedStatusTab === "PARTIALLY_READY") {
-        matchesStatus = status === "PARTIALLY_READY" || status === "PARTIALLY READY";
-      } else if (selectedStatusTab === "ALREADY_BILLED") {
-        matchesStatus = status === "ALREADY_BILLED" || status === "ALREADY BILLED";
+      if (activeStatusFilter === "NOT_ACQUIRED") {
+        matchesStatus = st === "NOT_ACQUIRED";
+      } else if (activeStatusFilter === "NEEDS_APPROVAL") {
+        matchesStatus = st === "PARTIALLY_READY" || st === "PENDING_APPROVAL";
+      } else if (activeStatusFilter === "READY") {
+        matchesStatus = st === "READY";
+      } else if (activeStatusFilter === "NO_BILLABLE_DATA") {
+        matchesStatus = st === "NO_BILLABLE_DATA";
+      } else if (activeStatusFilter === "ACQUISITION_FAILED") {
+        matchesStatus = st === "ACQUISITION_FAILED";
+      } else if (activeStatusFilter === "CONFIGURATION_REQUIRED") {
+        matchesStatus = st === "CONFIGURATION_REQUIRED";
       }
 
-      return matchesSearch && matchesStatus;
+      // 2. Search Filter (case-insensitive on projectName, projectCode, client)
+      let matchesSearch = true;
+      if (activeSearch) {
+        const q = activeSearch.toLowerCase().trim();
+        const pName = String(c.projectName || "").toLowerCase();
+        const pCode = String(c.projectCode || "").toLowerCase();
+        const client = String(c.client || "").toLowerCase();
+        matchesSearch = pName.includes(q) || pCode.includes(q) || client.includes(q);
+      }
+
+      return matchesStatus && matchesSearch;
     });
-  }, [configs, searchQuery, selectedStatusTab]);
+  }, [configs, activeSearch, activeStatusFilter]);
+
+  // Reset back to page 1 whenever search or status filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeSearch, activeStatusFilter, configs.length]);
+
+  // Status option counts calculated over TOTAL population (configs)
+  const populationCounts = useMemo(() => {
+    let notAcquired = 0;
+    let needsApproval = 0;
+    let ready = 0;
+    let noData = 0;
+    let failed = 0;
+    let configReq = 0;
+
+    configs.forEach((c) => {
+      const st = normalizeAcquisitionStatus(c.billingStatus);
+      if (st === "NOT_ACQUIRED") notAcquired++;
+      else if (st === "PARTIALLY_READY" || st === "PENDING_APPROVAL") needsApproval++;
+      else if (st === "READY") ready++;
+      else if (st === "NO_BILLABLE_DATA") noData++;
+      else if (st === "ACQUISITION_FAILED") failed++;
+      else if (st === "CONFIGURATION_REQUIRED") configReq++;
+    });
+
+    return {
+      totalSetups: configs.length,
+      notAcquired,
+      needsApproval,
+      ready,
+      noData,
+      failed,
+      configReq,
+    };
+  }, [configs]);
 
   const tabs = [
-    { key: "ALL", label: "All", count: configs.length },
-    {
-      key: "NOT_ACQUIRED",
-      label: "Pending",
-      count: configs.filter((c) => c.billingStatus === "NOT_ACQUIRED" || c.billingStatus === "Not Acquired").length,
-    },
-    {
-      key: "READY",
-      label: "Ready",
-      count: configs.filter((c) => c.billingStatus === "READY" || c.billingStatus === "Ready" || Boolean(c.snapshotNumber)).length,
-    },
-    {
-      key: "ALREADY_BILLED",
-      label: "Billed",
-      count: configs.filter((c) => c.billingStatus === "ALREADY_BILLED" || c.billingStatus === "Already Billed").length,
-    },
+    { key: "ALL", label: "All Setups", count: populationCounts.totalSetups },
+    { key: "NOT_ACQUIRED", label: "Not Acquired", count: populationCounts.notAcquired },
+    { key: "NEEDS_APPROVAL", label: "Needs Approval", count: populationCounts.needsApproval },
+    { key: "READY", label: "Ready", count: populationCounts.ready },
+    { key: "NO_BILLABLE_DATA", label: "No Billable Data", count: populationCounts.noData },
+    { key: "ACQUISITION_FAILED", label: "Acquisition Failed", count: populationCounts.failed },
+    { key: "CONFIGURATION_REQUIRED", label: "Configuration Required", count: populationCounts.configReq },
   ];
 
+  const statusFilterOptions = tabs.map((tab) => ({
+    value: tab.key,
+    label: `${tab.label} (${tab.count})`,
+  }));
+
+  const totalPages = Math.ceil(filteredConfigs.length / PAGE_SIZE) || 1;
+  const paginatedConfigs = filteredConfigs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const isFilterActive = activeStatusFilter !== "ALL" || activeSearch !== "";
+
+  const getStatusLabelText = (key) => {
+    switch (key) {
+      case "NOT_ACQUIRED":
+        return "Not Acquired";
+      case "NEEDS_APPROVAL":
+        return "Needs Approval";
+      case "READY":
+        return "Ready";
+      case "NO_BILLABLE_DATA":
+        return "No Billable Data";
+      case "ACQUISITION_FAILED":
+        return "Acquisition Failed";
+      case "CONFIGURATION_REQUIRED":
+        return "Configuration Required";
+      default:
+        return "All Setups";
+    }
+  };
+
+  const tableRows = useMemo(
+    () =>
+      paginatedConfigs.map((cfg) => {
+        const st = normalizeAcquisitionStatus(cfg.billingStatus);
+        const isPending = st === "NOT_ACQUIRED";
+
+        return {
+          onRowClick: () => onViewConfig(cfg),
+          client: <span className="font-medium text-slate-700">{cfg.client}</span>,
+          project: (
+            <div className="text-left">
+              <div className="font-semibold text-slate-900">{cfg.projectName}</div>
+              <div className="text-xs text-slate-400">{cfg.projectCode}</div>
+            </div>
+          ),
+          billingType: (
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+              {BILLING_TYPE_LABELS[cfg.billingType] || cfg.billingType}
+            </span>
+          ),
+          billingPeriod: <span className="font-mono text-xs text-slate-600">{cfg.billingPeriod}</span>,
+          status: <StatusBadge label={cfg.billingStatus} size="sm" />,
+          reference: (
+            <div className="text-left">
+              <div className="font-mono text-xs text-slate-600">{cfg.id}</div>
+              {st === "READY" && cfg.snapshotNumber && (
+                <div className="font-mono text-[11px] font-semibold text-emerald-600">{cfg.snapshotNumber}</div>
+              )}
+            </div>
+          ),
+          action: (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewConfig(cfg);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
+            >
+              {isPending ? (
+                <>
+                  <Play className="h-3 w-3" /> Acquire
+                </>
+              ) : (
+                <>
+                  <Eye className="h-3 w-3" /> View
+                </>
+              )}
+            </button>
+          ),
+        };
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [paginatedConfigs]
+  );
+
   return (
-    <div className="flex flex-col h-full rounded-2xl bg-white border border-slate-200/90 shadow-sm overflow-hidden">
-      {/* Panel Header */}
-      <div className="p-4 border-b border-slate-100 bg-slate-50/50 space-y-3">
+    <PageCard>
+      <PageCardContent className="space-y-4 p-4 sm:p-5">
+        {/* Header Title & Result Counter */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Layers className="h-4 w-4 text-indigo-600" />
-            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
-              Acquisition Queue
-            </h2>
+            <h2 className="text-sm font-semibold text-slate-900">Acquisition Queue</h2>
           </div>
-          <span className="text-[11px] font-bold text-slate-500 font-mono bg-slate-200/60 px-2 py-0.5 rounded-full">
-            {filteredConfigs.length} / {configs.length}
-          </span>
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+            <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 font-mono font-semibold text-slate-700">
+              {filteredConfigs.length} {filteredConfigs.length === 1 ? "project" : "projects"}
+            </span>
+          </div>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative">
-          <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search project or client..."
-            className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
-          />
-        </div>
+        {/* Controls Bar: Search Input + Global FilterListbox + Clear Button */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex-1">
+            <SearchInput
+              value={activeSearch}
+              onSearch={handleSearchChange}
+              placeholder="Search project, code or client..."
+            />
+          </div>
 
-        {/* Status Filter Pills */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar text-xs">
-          {tabs.map((tab) => {
-            const isActive = selectedStatusTab === tab.key;
-            return (
+          <div className="flex items-center gap-2">
+            <div className="w-56 sm:w-64">
+              <FilterListbox
+                options={statusFilterOptions}
+                value={activeStatusFilter}
+                onChange={handleStatusFilterChange}
+                buttonClassName={FILTER_BUTTON_CLASS}
+                placeholder="Filter status"
+              />
+            </div>
+
+            {isFilterActive && (
               <button
-                key={tab.key}
-                onClick={() => setSelectedStatusTab(tab.key)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all whitespace-nowrap cursor-pointer ${
-                  isActive
-                    ? "bg-indigo-600 text-white shadow-xs"
-                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
-                }`}
+                type="button"
+                onClick={handleResetFilters}
+                title="Clear all search and status filters"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
               >
-                {tab.label}
-                <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-                    isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
-                  }`}
-                >
-                  {tab.count}
-                </span>
+                <FilterX className="h-3.5 w-3.5 text-slate-500" />
+                <span>Clear</span>
               </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Queue Item List */}
-      <div className="flex-1 overflow-y-auto divide-y divide-slate-100 p-2 space-y-1.5 max-h-[640px]">
-        {loading ? (
-          <div className="p-8 text-center text-xs text-slate-400 space-y-2">
-            <div className="animate-spin h-5 w-5 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto" />
-            <p>Loading projects...</p>
+            )}
           </div>
-        ) : filteredConfigs.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-400 space-y-1">
-            <p className="font-semibold text-slate-600">No matching projects</p>
-            <p className="text-[11px]">Adjust your search or status filter.</p>
+        </div>
+
+        {/* Table or Contextual Empty State */}
+        {filteredConfigs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 py-10 text-center space-y-3">
+            <div className="rounded-full bg-slate-100 p-3 text-slate-400">
+              <Layers className="h-6 w-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-slate-800">No matching projects found</h3>
+              <p className="max-w-md text-xs text-slate-500">
+                {activeSearch && activeStatusFilter !== "ALL"
+                  ? `No projects matching "${activeSearch}" found under status "${getStatusLabelText(activeStatusFilter)}".`
+                  : activeSearch
+                  ? `No active billing setup projects match "${activeSearch}".`
+                  : `No projects currently in status "${getStatusLabelText(activeStatusFilter)}".`}
+              </p>
+            </div>
+            {isFilterActive && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 transition-colors hover:text-indigo-800"
+              >
+                <RotateCcw className="h-3 w-3" /> Clear filters to show all projects
+              </button>
+            )}
           </div>
         ) : (
-          filteredConfigs.map((cfg) => {
-            const isSelected = selectedConfigId === cfg.projectId;
-            const isReady = cfg.billingStatus === "READY" || cfg.billingStatus === "Ready" || Boolean(cfg.snapshotNumber);
+          <>
+            <ARTable
+              headers={TABLE_HEADERS}
+              columns={TABLE_COLUMNS}
+              rows={tableRows}
+              loading={loading}
+              emptyMessage="No matching projects. Adjust your search or status filter."
+            />
 
-            return (
-              <div
-                key={cfg.projectId}
-                onClick={() => onSelectConfig(cfg)}
-                className={`group relative rounded-xl p-3.5 transition-all cursor-pointer border ${
-                  isSelected
-                    ? "bg-indigo-50/80 border-indigo-500 shadow-sm ring-1 ring-indigo-400/40"
-                    : "bg-white border-slate-200/70 hover:border-slate-300 hover:bg-slate-50/80"
-                }`}
-              >
-                {/* Active Indicator Strip */}
-                {isSelected && (
-                  <span className="absolute left-0 top-3 bottom-3 w-1 rounded-r-full bg-indigo-600" />
-                )}
-
-                <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs text-slate-900 group-hover:text-indigo-900 transition-colors">
-                        {cfg.projectName}
-                      </span>
-                      <span className="font-mono text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
-                        {cfg.projectCode}
-                      </span>
-                    </div>
-                    <p className="text-[11px] font-medium text-slate-500">{cfg.client}</p>
-                  </div>
-                  <ChevronRight
-                    className={`h-4 w-4 flex-shrink-0 transition-transform ${
-                      isSelected ? "text-indigo-600 translate-x-0.5" : "text-slate-300 group-hover:text-slate-500"
-                    }`}
-                  />
-                </div>
-
-                <div className="mt-3 flex items-center justify-between text-[11px] pt-2 border-t border-slate-100">
-                  <div className="flex items-center gap-1.5 text-slate-500">
-                    <Calendar className="h-3 w-3 text-slate-400" />
-                    <span className="font-mono text-[10px]">{cfg.billingPeriod}</span>
-                  </div>
-                  <StatusBadge label={cfg.billingStatus} size="xs" />
-                </div>
-
-                {/* Sub-label tags */}
-                <div className="mt-2 flex items-center gap-2 text-[10px]">
-                  <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold">
-                    {BILLING_TYPE_LABELS[cfg.billingType] || cfg.billingType}
-                  </span>
-                  {cfg.snapshotNumber && (
-                    <span className="inline-flex items-center gap-1 text-emerald-700 font-mono bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-bold">
-                      <CheckCircle2 className="h-2.5 w-2.5" />
-                      {cfg.snapshotNumber}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+              onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+            />
+          </>
         )}
-      </div>
-    </div>
+      </PageCardContent>
+    </PageCard>
   );
 }

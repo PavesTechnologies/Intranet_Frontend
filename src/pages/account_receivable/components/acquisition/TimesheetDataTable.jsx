@@ -8,6 +8,7 @@ export default function TimesheetDataTable({
   currency = "INR",
   loading = false,
   billingType = "TIME_MATERIAL",
+  billingStatus = "NOT_ACQUIRED",
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState("workDate");
@@ -25,12 +26,11 @@ export default function TimesheetDataTable({
   const filteredAndSorted = useMemo(() => {
     let result = records.filter((r) => {
       if (!searchTerm) return true;
-      const q = searchTerm.toLowerCase();
-      return (
-        (r.employee && r.employee.toLowerCase().includes(q)) ||
-        (r.role && r.role.toLowerCase().includes(q)) ||
-        (r.workDate && r.workDate.toLowerCase().includes(q))
-      );
+      const q = searchTerm.toLowerCase().trim();
+      const emp = String(r.employee || "").toLowerCase();
+      const role = String(r.role || "").toLowerCase();
+      const date = String(r.workDate || "").toLowerCase();
+      return emp.includes(q) || role.includes(q) || date.includes(q);
     });
 
     result.sort((a, b) => {
@@ -54,27 +54,22 @@ export default function TimesheetDataTable({
 
   if (loading) {
     return (
-      <div className="rounded-2xl bg-white p-8 border border-slate-200 shadow-sm flex flex-col items-center justify-center space-y-3">
+      <div className="flex h-full flex-col items-center justify-center space-y-3 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
         <Loader />
-        <p className="text-xs font-semibold text-slate-500">Fetching source timesheets from TMS integration...</p>
+        <p className="text-xs font-medium text-slate-500">Fetching source timesheets from TMS integration...</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl bg-white p-5 border border-slate-200/90 shadow-sm space-y-4">
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       {/* Header & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <FileSpreadsheet className="h-4 w-4 text-indigo-600" />
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
-              Acquired Source Data (Timesheets)
-            </h3>
-          </div>
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            Verified billable records synchronized from Time Management System (TMS).
-          </p>
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-2">
+          <FileSpreadsheet className="h-4 w-4 text-indigo-600" />
+          <h3 className="text-sm font-semibold text-slate-900">
+            Source Timesheets
+          </h3>
         </div>
 
         <div className="flex items-center gap-3">
@@ -85,23 +80,23 @@ export default function TimesheetDataTable({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search employee / role..."
-              className="w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 py-1 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-100"
+              className="w-full rounded-lg border border-slate-200 bg-white py-1 pl-8 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-100"
             />
           </div>
-          <div className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 font-mono">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 font-mono text-xs font-semibold text-slate-600">
             {records.length} records ({totalHours} hrs)
           </div>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="w-full overflow-x-auto border border-slate-200/80 rounded-xl shadow-2xs max-h-72 overflow-y-auto">
+      {/* Table Container with max 550px scroll height */}
+      <div className="max-h-[550px] w-full overflow-x-auto overflow-y-auto rounded-xl border border-slate-200">
         <table className="min-w-full divide-y divide-slate-200 text-xs">
-          <thead className="bg-slate-100/90 sticky top-0 z-10 backdrop-blur-xs">
-            <tr className="text-slate-700 font-bold uppercase tracking-wider text-[10px]">
+          <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
+            <tr className="text-slate-600">
               <th
                 onClick={() => handleSort("employee")}
-                className="px-4 py-3 text-left cursor-pointer hover:bg-slate-200/60 transition-colors"
+                className="cursor-pointer px-4 py-3 text-left font-semibold transition-colors hover:bg-slate-100"
               >
                 <div className="flex items-center gap-1">
                   Employee <ArrowUpDown className="h-3 w-3 text-slate-400" />
@@ -109,45 +104,45 @@ export default function TimesheetDataTable({
               </th>
               <th
                 onClick={() => handleSort("workDate")}
-                className="px-4 py-3 text-left cursor-pointer hover:bg-slate-200/60 transition-colors"
+                className="cursor-pointer px-4 py-3 text-left font-semibold transition-colors hover:bg-slate-100"
               >
                 <div className="flex items-center gap-1">
                   Work Date <ArrowUpDown className="h-3 w-3 text-slate-400" />
                 </div>
               </th>
-              <th className="px-4 py-3 text-left">Role</th>
+              <th className="px-4 py-3 text-left font-semibold">Role</th>
               <th
                 onClick={() => handleSort("hours")}
-                className="px-4 py-3 text-center cursor-pointer hover:bg-slate-200/60 transition-colors"
+                className="cursor-pointer px-4 py-3 text-center font-semibold transition-colors hover:bg-slate-100"
               >
                 <div className="flex items-center justify-center gap-1">
                   Hours <ArrowUpDown className="h-3 w-3 text-slate-400" />
                 </div>
               </th>
-              <th className="px-4 py-3 text-right">Hourly Rate</th>
+              <th className="px-4 py-3 text-right font-semibold">Hourly Rate</th>
               <th
                 onClick={() => handleSort("amount")}
-                className="px-4 py-3 text-right cursor-pointer hover:bg-slate-200/60 transition-colors"
+                className="cursor-pointer px-4 py-3 text-right font-semibold transition-colors hover:bg-slate-100"
               >
                 <div className="flex items-center justify-end gap-1">
                   Commercial Amount <ArrowUpDown className="h-3 w-3 text-slate-400" />
                 </div>
               </th>
-              <th className="px-4 py-3 text-center">Approval Status</th>
+              <th className="px-4 py-3 text-center font-semibold">Approval Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
             {filteredAndSorted.length > 0 ? (
               filteredAndSorted.map((rec, idx) => (
-                <tr key={rec.id || idx} className="hover:bg-indigo-50/40 transition-colors">
-                  <td className="px-4 py-2.5 font-bold text-slate-900">{rec.employee || "Employee"}</td>
-                  <td className="px-4 py-2.5 text-slate-600 font-mono text-[11px]">{rec.workDate}</td>
-                  <td className="px-4 py-2.5 text-slate-500 font-medium text-[11px]">{rec.role || "Software Engineer"}</td>
-                  <td className="px-4 py-2.5 text-center font-bold text-slate-900">{rec.hours} hrs</td>
-                  <td className="px-4 py-2.5 text-right font-mono text-slate-700">
+                <tr key={rec.id || idx} className="transition-colors hover:bg-slate-50">
+                  <td className="px-4 py-2.5 font-semibold text-slate-900">{rec.employee || "Employee"}</td>
+                  <td className="px-4 py-2.5 font-mono text-slate-600">{rec.workDate}</td>
+                  <td className="px-4 py-2.5 text-slate-500">{rec.role || "Software Engineer"}</td>
+                  <td className="px-4 py-2.5 text-center font-semibold text-slate-900">{rec.hours} hrs</td>
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">
                     {currency} {Number(rec.rate || 0).toLocaleString()}
                   </td>
-                  <td className="px-4 py-2.5 text-right font-extrabold text-indigo-900 font-mono">
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-indigo-900">
                     {currency} {Number(rec.amount || rec.hours * rec.rate || 0).toLocaleString()}
                   </td>
                   <td className="px-4 py-2.5 text-center">
@@ -157,8 +152,22 @@ export default function TimesheetDataTable({
               ))
             ) : (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-400 text-xs italic">
-                  No source timesheet records match the criteria.
+                <td colSpan={7} className="px-4 py-8 text-center text-xs text-slate-500">
+                  {billingStatus === "NOT_ACQUIRED"
+                    ? "No billing snapshot has been acquired yet. Click 'Acquire Source Snapshot' above to check available billing data."
+                    : billingStatus === "VALIDATING"
+                    ? "Checking available billing data and timesheet approval readiness..."
+                    : billingStatus === "NO_BILLABLE_DATA" || billingStatus === "NO_DATA"
+                    ? "No billable timesheet activity was found for this project during the selected billing period."
+                    : billingStatus === "PENDING_APPROVAL"
+                    ? "Timesheets were found for this billing period, but none have been approved for billing yet."
+                    : billingStatus === "CONFIGURATION_REQUIRED"
+                    ? "Billing configuration is incomplete. Please complete setup in Project Configuration to enable billing acquisition."
+                    : billingStatus === "ALREADY_BILLED"
+                    ? "Timesheet records for this billing period have already been processed into an invoice."
+                    : billingStatus === "ACQUISITION_FAILED"
+                    ? "Source billing data could not be retrieved due to a system error. Click 'Retry Acquisition' to try again."
+                    : "No source timesheet records match the criteria or acquired snapshot."}
                 </td>
               </tr>
             )}
@@ -166,8 +175,8 @@ export default function TimesheetDataTable({
         </table>
       </div>
 
-      <div className="flex items-center gap-2 text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-        <Info className="h-4 w-4 text-indigo-600 flex-shrink-0" />
+      <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+        <Info className="h-3 w-3 flex-shrink-0" />
         <span>
           TMS timesheets are automatically merged with commercial billing configuration rates during snapshot acquisition.
         </span>
