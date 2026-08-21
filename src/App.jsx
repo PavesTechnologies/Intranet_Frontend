@@ -42,6 +42,8 @@ import InvoiceDetailPage from "./pages/accounts-payable/invoice/pages/InvoiceDet
 import PaymentReadyPage from "./pages/accounts-payable/payment/pages/PaymentReadyPage.jsx";
 import PaymentHistoryPage from "./pages/accounts-payable/payment/pages/PaymentHistoryPage.jsx";
 import PaymentMarkAsPaidPage from "./pages/accounts-payable/payment/pages/PaymentMarkAsPaidPage.jsx";
+import PaymentQueuePage from "./pages/accounts-payable/payment/pages/PaymentQueuePage.jsx";
+import PaymentDetailsPage from "./pages/accounts-payable/payment/pages/PaymentDetailsPage.jsx";
 import APReportsPage from "./pages/accounts-payable/reports/pages/APReportsPage.jsx";
 import APSettingsPage from "./pages/accounts-payable/settings/pages/APSettingsPage.jsx";
 import SystemConfigurationPage from "./pages/accounts-payable/system-configuration/pages/SystemConfigurationPage.jsx";
@@ -197,6 +199,7 @@ import XmsMyAdvancesPage from "./pages/expense-management/pages/cash-advance/MyA
 import XmsSettlementPage from "./pages/expense-management/pages/cash-advance/SettlementPage.jsx";
 import XmsPendingApprovalsPage from "./pages/expense-management/approval-engine/pages/PendingApprovalsPage.jsx";
 import XmsApprovalHistoryPage from "./pages/expense-management/approval-engine/pages/ApprovalHistoryPage.jsx";
+import XmsApprovalsPage from "./pages/expense-management/approval-engine/pages/ApprovalsPage.jsx";
 import XmsApprovalFlowsPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowsPage.jsx";
 import XmsApprovalFlowBuilderPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowBuilderPage.jsx";
 import XmsCatchAllFlowPage from "./pages/expense-management/approval-engine/pages/CatchAllFlowPage.jsx";
@@ -518,6 +521,22 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
                 <InvoiceDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.PAYMENT_QUEUE}
+            element={
+              <ProtectedRoute allowedRoles={["AP_Executive", "Admin", "Super_Admin"]}>
+                <PaymentQueuePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.PAYMENT_QUEUE_DETAIL()}
+            element={
+              <ProtectedRoute allowedRoles={["AP_Executive", "Admin", "Super_Admin"]}>
+                <PaymentDetailsPage />
               </ProtectedRoute>
             }
           />
@@ -1444,9 +1463,10 @@ const AppRoutes = () => {
           {/* No role gate (§1.5): any employee can be a resolved approver (NAMED_USER/DEPARTMENT_OWNER/
               COST_CENTER_OWNER), not just "Manager" - the backend itself has no role restriction on
               these endpoints either, "My Approvals" is presence-based, not role-based. */}
-          <Route path="/expense-management/approvals/pending" element={<ProtectedRoute><XmsPendingApprovalsPage /></ProtectedRoute>} />
-          <Route path="/expense-management/approvals/approved" element={<ProtectedRoute><XmsApprovalHistoryPage outcome="APPROVED" title="Approved" breadcrumbLabel="Approved" /></ProtectedRoute>} />
-          <Route path="/expense-management/approvals/rejected" element={<ProtectedRoute><XmsApprovalHistoryPage outcome="REJECTED" title="Rejected" breadcrumbLabel="Rejected" /></ProtectedRoute>} />
+          <Route path="/expense-management/approvals/pending" element={<Navigate to="/expense-management/approvals" replace />} />
+          <Route path="/expense-management/approvals/approved" element={<Navigate to="/expense-management/approvals" replace />} />
+          <Route path="/expense-management/approvals/rejected" element={<Navigate to="/expense-management/approvals" replace />} />
+          <Route path="/expense-management/approvals" element={<ProtectedRoute><XmsApprovalsPage /></ProtectedRoute>} />
 
           {/* Approval Rules (Admin config) - ADMIN-only, matching the Masters section's own role gate. */}
           <Route path="/expense-management/approval-rules/flows" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsApprovalFlowsPage /></ProtectedRoute>} />
@@ -1456,13 +1476,13 @@ const AppRoutes = () => {
           <Route path="/expense-management/approval-rules/department-approvers" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsDepartmentApproversPage /></ProtectedRoute>} />
           <Route path="/expense-management/approval-rules/delegations" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsDelegationsPage /></ProtectedRoute>} />
 
-          <Route path="/expense-management/finance/verification" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsVerificationPage /></ProtectedRoute>} />
-          <Route path="/expense-management/finance/reimbursements" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsReimbursementsPage /></ProtectedRoute>} />
-          <Route path="/expense-management/finance/payment-status" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsPaymentStatusPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/verification" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsVerificationPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/reimbursements" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsReimbursementsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/payment-status" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsPaymentStatusPage /></ProtectedRoute>} />
 
-          <Route path="/expense-management/client-billing/billable-expenses" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsBillableExpensesPage /></ProtectedRoute>} />
-          <Route path="/expense-management/client-billing/invoice-handoff" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsInvoiceHandoffPage /></ProtectedRoute>} />
-          <Route path="/expense-management/client-billing/invoice-status" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsInvoiceStatusPage /></ProtectedRoute>} />
+          <Route path="/expense-management/client-billing/billable-expenses" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsBillableExpensesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/client-billing/invoice-handoff" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsInvoiceHandoffPage /></ProtectedRoute>} />
+          <Route path="/expense-management/client-billing/invoice-status" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsInvoiceStatusPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/masters/expense-categories" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsExpenseCategoriesPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/gl-accounts" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsGlAccountsPage /></ProtectedRoute>} />

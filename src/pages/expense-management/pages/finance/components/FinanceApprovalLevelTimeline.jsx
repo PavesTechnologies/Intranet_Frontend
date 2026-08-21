@@ -1,8 +1,8 @@
 import React from "react";
 import { CheckCircle2, XCircle, Circle, Clock } from "lucide-react";
-import { useApprovalStatus, useLineItemReviews } from "../hooks/useApprovalWorkflow";
-import { useEmployeeDirectory, resolveEmployeeName } from "../hooks/useEmployeeDirectory";
-import { formatDateTime } from "../constants/approvalLabels";
+import { useFinanceStatus, useFinanceReviews } from "../hooks/useFinanceVerification";
+import { useEmployeeDirectory, resolveEmployeeName } from "../../../approval-engine/hooks/useEmployeeDirectory";
+import { formatDateTime } from "../../../approval-engine/constants/approvalLabels";
 
 const NODE_META = {
   done: { Icon: CheckCircle2, dot: "bg-emerald-500 text-white", line: "bg-emerald-200", title: "text-emerald-800" },
@@ -31,17 +31,9 @@ function TimelineNode({ title, subtitle, state, isLast }) {
   );
 }
 
-/**
- * Visual approval path for a single report: one node per configured level (name, most recent
- * actor/decision at that level, when), the current level highlighted, and a terminal Approved/
- * Rejected node once the report is resolved. Built entirely from useApprovalStatus +
- * useLineItemReviews (§ both already fetched elsewhere in this module) - there is no dedicated
- * "approval history" endpoint, so the per-level actor summary is derived client-side from the
- * per-line-item review records.
- */
-export default function ApprovalLevelTimeline({ reportId, reportStatus }) {
-  const { data: status, isLoading } = useApprovalStatus(reportId);
-  const { data: reviews } = useLineItemReviews(reportId);
+export default function FinanceApprovalLevelTimeline({ reportId, reportStatus }) {
+  const { data: status, isLoading } = useFinanceStatus(reportId);
+  const { data: reviews } = useFinanceReviews(reportId);
   const { data: directory } = useEmployeeDirectory();
 
   const isApproved = reportStatus === "APPROVED";
@@ -60,7 +52,7 @@ export default function ApprovalLevelTimeline({ reportId, reportStatus }) {
   }
 
   if (!totalLevels && !isApproved && !isRejected) {
-    return <p className="text-sm text-gray-400">No approval progress to show yet.</p>;
+    return <p className="text-sm text-gray-400">No verification progress to show yet.</p>;
   }
 
   const reviewsByLevel = new Map();

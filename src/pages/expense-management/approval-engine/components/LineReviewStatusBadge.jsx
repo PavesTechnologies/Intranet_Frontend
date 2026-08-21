@@ -7,6 +7,8 @@ const META = {
   NEEDS_CORRECTION: { label: "Needs Correction", tone: "bg-orange-100 text-orange-800", Icon: MessageSquareWarning },
   POLICY_WARNING: { label: "Policy Warning", tone: "bg-amber-100 text-amber-800", Icon: AlertTriangle },
   PENDING: { label: "Pending", tone: "bg-gray-100 text-gray-700", Icon: Clock },
+  VERIFIED: { label: "Verified", tone: "bg-emerald-100 text-emerald-800", Icon: CheckCircle2 },
+  QUERIED: { label: "Queried", tone: "bg-orange-100 text-orange-800", Icon: MessageSquareWarning },
 };
 
 /**
@@ -20,6 +22,8 @@ const META = {
 export function deriveLineReviewState(review, hasPolicyIssue) {
   if (review?.status === "APPROVED") return "APPROVED";
   if (review?.status === "NEEDS_CORRECTION") return "NEEDS_CORRECTION";
+  if (review?.status === "VERIFIED") return "VERIFIED";
+  if (review?.status === "QUERIED") return "QUERIED";
   if (hasPolicyIssue) return "POLICY_WARNING";
   return "PENDING";
 }
