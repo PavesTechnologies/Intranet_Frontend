@@ -27,13 +27,18 @@ export default function SnapshotWorkspace({
   onRemindPM,
   onReValidate,
   remindingPM = false,
+  calculatingTax = false,
 }) {
   const [downloading, setDownloading] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
 
-  if (!config) return null;
-
-  const isAcquired = config.billingStatus === "READY" || config.billingStatus === "Ready";
+  const statusUpper = (config.billingStatus || "").toUpperCase();
+  const isAcquired =
+    statusUpper === "READY_TO_TAX" ||
+    statusUpper === "READY_FOR_TAX" ||
+    statusUpper === "READY" ||
+    statusUpper === "IN_TAX" ||
+    statusUpper === "TAX_COMPLETED";
 
   const snapshotNumber = isAcquired
     ? acquisitionResults?.labor?.snapshotNumber || config.snapshotNumber || null
@@ -194,7 +199,8 @@ export default function SnapshotWorkspace({
             onContinueToTax={onContinueToTax}
             isAcquired={isAcquired}
             billingStatus={config.billingStatus}
-            disabled={acquiring}
+            disabled={acquiring || calculatingTax}
+            calculatingTax={calculatingTax}
           />
         </aside>
       </div>

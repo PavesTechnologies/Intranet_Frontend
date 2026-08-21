@@ -16,6 +16,7 @@ import {
   getBillingSnapshotByPeriod,
   sendProjectManagerReminder,
 } from "../services/billingDataAcquisitionService";
+import { calculateTax, getTaxCalculationErrorMessage } from "../services/taxCalculationService";
 
 import SnapshotWorkspace from "../components/acquisition/SnapshotWorkspace";
 import BackIconButton from "../components/common/BackIconButton";
@@ -32,6 +33,7 @@ export default function AcquisitionDetail() {
   const [acquisitionResults, setAcquisitionResults] = useState(null);
   const [acquiring, setAcquiring] = useState(false);
   const [remindingPM, setRemindingPM] = useState(false);
+  const [calculatingTax, setCalculatingTax] = useState(false);
 
   // Subview for draft invoice preview
   const [subView, setSubView] = useState("WORKSPACE");
@@ -276,13 +278,51 @@ export default function AcquisitionDetail() {
     executeAcquisition(config, periodStart || config.periodStart, periodEnd || config.periodEnd);
   };
 
-  const handleContinueToTax = () => {
-    setGenerating(true);
-    generateInvoiceDraft(config, acquisitionResults).then((result) => {
-      setDraft(result);
-      setGenerating(false);
-      setSubView("DRAFT");
-    });
+  const handleContinueToTax = async () => {
+    const snapshotId =
+      config?.snapshotId ||
+      acquisitionResults?.labor?.snapshotId ||
+      config?.id ||
+      projectId;
+
+    if (!snapshotId) {
+      showStatusToast("Billing snapshot could not be found.", "error");
+      return;
+    }
+
+    const currentStatus = (config?.billingStatus || "").toUpperCase();
+
+    if (currentStatus === "TAX_COMPLETED") {
+      navigate(`/account-receivable/tax-calculation/${snapshotId}`, {
+        state: { config, acquisitionResults },
+      });
+      return;
+    }
+
+    if (currentStatus === "IN_TAX" || calculatingTax) return;
+
+    setCalculatingTax(true);
+    try {
+      const calcResult = await calculateTax(snapshotId);
+      showStatusToast("Tax calculation completed successfully.", "success");
+      setConfig((prev) => (prev ? { ...prev, billingStatus: "TAX_COMPLETED" } : prev));
+      navigate(`/account-receivable/tax-calculation/${snapshotId}`, {
+        state: { taxCalculation: calcResult, config, acquisitionResults },
+      });
+    } catch (error) {
+      const errorMsg = getTaxCalculationErrorMessage(error);
+      if (errorMsg && errorMsg.toLowerCase().includes("already")) {
+        showStatusToast("Tax calculation has already been completed for this billing snapshot.", "info");
+        setConfig((prev) => (prev ? { ...prev, billingStatus: "TAX_COMPLETED" } : prev));
+        navigate(`/account-receivable/tax-calculation/${snapshotId}`, {
+          state: { config, acquisitionResults },
+        });
+      } else {
+        showStatusToast(errorMsg, "error");
+      }
+    } finally {
+      setCalculatingTax(false);
+    }
   };
 
   const handleSaveInvoiceDraft = () => {
@@ -417,6 +457,7 @@ export default function AcquisitionDetail() {
         onRemindPM={handleRemindPM}
         onReValidate={handleReValidate}
         remindingPM={remindingPM}
+        calculatingTax={calculatingTax}
       />
 
       {/* Manual Date Period Config Modal */}
