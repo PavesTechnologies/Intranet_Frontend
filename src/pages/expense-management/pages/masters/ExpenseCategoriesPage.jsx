@@ -75,25 +75,13 @@ const expenseCategoryService = {
 };
 
 const glAccountService = {
-  getActive: async () => {
-    try {
-      // First try /xms/admin/gl-accounts/active which is the mapped backend endpoint
-      return await api.get("/xms/admin/gl-accounts/active", {
-        baseURL: EXPENSE_API_BASE,
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-    } catch (e) {
-      console.warn("Primary endpoint /xms/admin/gl-accounts/active failed, trying fallback /api/v1/gl-accounts/active...");
-      return await api.get("/api/v1/gl-accounts/active", {
-        baseURL: EXPENSE_API_BASE,
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-    }
-  },
+  getActive: () =>
+    api.get("/xms/admin/gl-accounts/active", {
+      baseURL: EXPENSE_API_BASE,
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    }),
 };
 
 const ITEMS_PER_PAGE = 10;
