@@ -5,6 +5,7 @@ import { ChevronRight, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import BackButton from "../../../components/patterns/BackButton";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 
 /* =========================
    Leave Type Card
@@ -217,7 +218,7 @@ export default function LeavePolicyViewer() {
     fetchPolicies();
   }, []);
 
-  if (loading) return <p className="text-center mt-6">Loading...</p>;
+  if (loading) return <div className="mt-6"><LoadingSpinner text="Loading..." /></div>;
 
   const selectedPolicy = leavePolicies.find(
     (p) => p.id === selectedPolicyId

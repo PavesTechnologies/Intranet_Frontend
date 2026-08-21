@@ -13,6 +13,7 @@ import FilterBar from "../../../components/patterns/FilterBar";
 import DataTable from "../../../components/patterns/DataTable";
 import BackButton from "../../../components/patterns/BackButton";
 import PageContainer from "../../../components/patterns/PageContainer";
+import PageHeader from "../../../components/ui/PageHeader";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -146,7 +147,7 @@ const EditHolidaysPage = () => {
 
       <div className="flex items-center gap-3 px-6 mb-4">
         <BackButton onClick={() => navigate(-1)} />
-        <h1 className="text-xl font-bold text-gray-800">Manage Holidays</h1>
+        <PageHeader className="!mb-0" title="Manage Holidays" />
       </div>
 
       {/* Search Bar */}

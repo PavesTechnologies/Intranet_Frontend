@@ -629,6 +629,7 @@ import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/Modal/modal";
 import { InlineLoader } from "../../../components/patterns/Loaders";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -1078,7 +1079,7 @@ export default function ManagerEditLeaveRequest({
           <fieldset disabled={isLockedByOther} className="space-y-4">
             {/* Employee Reason — read only */}
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
+              <label className={`${Fonts.eyebrow} mb-1 block`}>
                 Employee's Reason
               </label>
               <div className="w-full min-h-[42px] px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-700 text-sm break-words">
@@ -1090,7 +1091,7 @@ export default function ManagerEditLeaveRequest({
 
             {/* Leave Type */}
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
+              <label className={`${Fonts.eyebrow} mb-1 block`}>
                 Leave Type
               </label>
               {loadingData ? (
@@ -1125,7 +1126,7 @@ export default function ManagerEditLeaveRequest({
 
             {/* Date Range */}
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
+              <label className={`${Fonts.eyebrow} mb-2 block`}>
                 Leave Period
               </label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1180,7 +1181,7 @@ export default function ManagerEditLeaveRequest({
             {/* Half day toggle */}
             {selectedLeaveType?.allowHalfDay && !isMaternityLeave && (
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block">
+                <label className={`${Fonts.eyebrow} block`}>
                   Day Type
                 </label>
                 <div className="p-1 inline-flex items-center bg-gray-100 rounded-lg">

@@ -21,6 +21,7 @@ import * as XLSX from "xlsx";
 import Button from "../../../components/Button/Button";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import FormSelect from "../../../components/forms/FormSelect";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL || "";
 
@@ -278,7 +279,7 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
 
           {/* Form section */}
           <div className="border border-gray-100 rounded-xl p-5 space-y-4 bg-gray-50/60">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Holiday Details</p>
+            <p className={Fonts.eyebrow}>Holiday Details</p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Date */}
@@ -437,7 +438,7 @@ export default function AddHolidaysModal({ isOpen, onClose, onSuccess }) {
           {/* Holiday queue list */}
           {holidays.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">
+              <p className={Fonts.eyebrow}>
                 Queued Holidays ({holidays.length})
               </p>
               <ul className="border border-gray-100 rounded-xl divide-y divide-gray-50 overflow-hidden">

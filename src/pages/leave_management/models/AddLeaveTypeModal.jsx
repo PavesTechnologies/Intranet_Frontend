@@ -90,6 +90,7 @@ const defaultForm = {
   maxCarryForwardPerYear: "",
   maxCarryForward: "",
   accrualFrequency: "",
+  accrualRate: "",
   requiresDocumentation: false,
   expiryDays: "",
   waitingPeriodDays: "",
@@ -101,6 +102,8 @@ const defaultForm = {
   weekendsAndHolidaysAllowed: false,
   active: true,
   effectiveStartDate: "",
+  createAt: "",
+  lastUpdatedAt: "",
   maxLeaveDays: "",
   minLeaveDays: "",
   coolDownPeriod: "",
@@ -122,7 +125,11 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
 
   useEffect(() => {
     if (isOpen) {
-      setFormData(editData ? { ...defaultForm, ...editData } : defaultForm);
+      setFormData({
+        ...defaultForm,
+        ...(editData || {}),
+        effectiveStartDate: new Date().toISOString().split("T")[0],
+      });
     }
   }, [isOpen, editData]);
 
@@ -186,6 +193,7 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
             leaveName: formData.leaveName,
             description: formData.description || "", // Optional field for regular leave types
             accrualFrequency: formData.accrualFrequency,
+            accrualRate: formData.accrualRate,
             maxDaysPerYear: Number(formData.maxDaysPerYear) || 0,
             maxCarryForward: Number(formData.maxCarryForward) || 0,
             maxCarryForwardPerYear:
@@ -199,6 +207,8 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
             noticePeriodRestriction: formData.noticePeriodRestriction,
             weekendsAndHolidaysAllowed: formData.weekendsAndHolidaysAllowed,
             requiresDocumentation: formData.requiresDocumentation,
+            createAt: formData.createAt,
+            lastUpdatedAt: formData.lastUpdatedAt,
             active: formData.active,
             effectiveStartDate: formData.effectiveStartDate,
             thresholdForDocs:
@@ -313,52 +323,52 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
       showCloseButton={true}
       disableBodyScroll={true}
     >
-        {submitting && (
-          <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center rounded-xl z-50">
-            <LoadingSpinner text="Submitting..." />
-          </div>
-        )}
+      {submitting && (
+        <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center rounded-xl z-50">
+          <LoadingSpinner text="Submitting..." />
+        </div>
+      )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Leave Name Dropdown */}
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Leave Name Dropdown */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1 placeholder:text-gray-400">
+            Leave Name *
+          </label>
+          {loadinglables ? (
+            <InlineLoader text="Loading leave labels..." />
+          ) : (
+            <FormSelect
+              name="leaveName"
+              options={leavelables.map((item) => ({
+                value: item.name,
+                label: item.label,
+              }))}
+              value={formData.leaveName}
+              placeholder="Select Leave Name"
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, leaveName: e.target.value }))
+              }
+            />
+          )}
+        </div>
+
+        {/* Effective Dates */}
+        <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1 placeholder:text-gray-400">
-              Leave Name *
-            </label>
-            {loadinglables ? (
-              <InlineLoader text="Loading leave labels..." />
-            ) : (
-              <FormSelect
-                name="leaveName"
-                options={leavelables.map((item) => ({
-                  value: item.name,
-                  label: item.label,
-                }))}
-                value={formData.leaveName}
-                placeholder="Select Leave Name"
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, leaveName: e.target.value }))
-                }
-              />
-            )}
+            <FormInput
+              label="Effective Start Date"
+              requiredMark
+              name="effectiveStartDate"
+              type="date"
+              value={formData.effectiveStartDate}
+              min={new Date().toISOString().split('T')[0]}
+              onChange={handleChange}
+              required
+              inputClassName="focus:ring-2 focus:ring-green-500"
+            />
           </div>
-
-          {/* Effective Dates */}
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <FormInput
-                label="Effective Start Date"
-                requiredMark
-                name="effectiveStartDate"
-                type="date"
-                value={formData.effectiveStartDate}
-                min={editData ? new Date().toISOString().split('T')[0] : undefined}
-                onChange={handleChange}
-                required
-                inputClassName="focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-            {/* <div>
+          {/* <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Deactivation Effective Date
               </label>
@@ -370,220 +380,220 @@ const AddLeaveTypeModal = ({ isOpen, onClose, editData = null, onSuccess }) => {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
               />
             </div> */}
+        </div>
+
+        {/* accrualFrequency */}
+        {isGenderBasedLeave(formData.leaveName) ? (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Gender <span className="text-red-500">*</span>
+            </label>
+            <GenderDropdown
+              value={formData.gender}
+              onChange={(val) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  gender: val,
+                }))
+              }
+            />
           </div>
+        ) : (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Accrual Frequency <span className="text-red-500">*</span>
+            </label>
 
-          {/* accrualFrequency */}
-          {isGenderBasedLeave(formData.leaveName) ? (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Gender <span className="text-red-500">*</span>
-              </label>
-              <GenderDropdown
-                value={formData.gender}
-                onChange={(val) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    gender: val,
-                  }))
-                }
-              />
-            </div>
-          ) : (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Accrual Frequency <span className="text-red-500">*</span>
-              </label>
-
-              <FormSelect
-                name="accrualFrequency"
-                options={accrualFrequency.map((freq) => ({
-                  value: freq,
-                  label: freq,
-                }))}
-                value={formData.accrualFrequency}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, accrualFrequency: e.target.value }))
-                }
-              />
-            </div>
-          )}
-
-          {/* Numeric Fields */}
-          {formData.leaveName.toLowerCase() === "paternity_leave" ||
-            formData.leaveName.toLowerCase() === "maternity_leave" ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[
-                "maxLeaveDays",
-                "minLeaveDays",
-                "maxNoOfTimes",
-                "waitingPeriodDays",
-                "advanceNoticePeriod",
-                "coolDownPeriod",
-              ].map((key) => (
-                <div key={key}>
-                  <FormInput
-                    label={formatFieldLabel(key)}
-                    name={key}
-                    type="number"
-                    min="0"
-                    value={formData[key]}
-                    onChange={handleChange}
-                    inputClassName="focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[
-                "maxDaysPerYear",
-                "maxCarryForward",
-                "maxCarryForwardPerYear",
-                "expiryDays",
-                "waitingPeriodDays",
-                "advanceNoticeDays",
-                "pastDateLimitDays",
-              ].map((key) => (
-                <div key={key}>
-                  <FormInput
-                    label={formatFieldLabel(key)}
-                    name={key}
-                    type="number"
-                    min="0"
-                    value={formData[key]}
-                    onChange={handleChange}
-                    inputClassName="focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Description */}
-          <FormTextArea
-            label="Description"
-            name="description"
-            maxLength={50}
-            rows={2}
-            value={formData.description}
-            onChange={handleChange}
-            placeholder="Describe the leave type"
-            inputClassName="resize-none"
-          />
-
-          {/* Boolean Fields */}
-          {isGenderBasedLeave(formData.leaveName) ? (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {[
-                "requiresDocumentation",
-                // "allowNegativeBalance",
-                "noticePeriodRestriction",
-                "weekendsAndHolidaysAllowed",
-                "active",
-              ].map((key) => (
-                <React.Fragment key={key}>
-                  <div className="flex items-center gap-2">
-                    <input
-                      id={key}
-                      type="checkbox"
-                      name={key}
-                      checked={formData[key]}
-                      onChange={handleChange}
-                      className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                    />
-                    <label
-                      htmlFor={key}
-                      className="text-sm font-medium text-gray-700"
-                    >
-                      {formatFieldLabel(key)}
-                    </label>
-                  </div>
-                  {key === "requiresDocumentation" &&
-                    formData.requiresDocumentation && (
-                      <div>
-                        <FormInput
-                          label="Document Submission Threshold (Days)"
-                          name="documentSubmissionThresholdDays"
-                          type="number"
-                          min="0"
-                          value={formData.documentSubmissionThresholdDays}
-                          onChange={handleChange}
-                          inputClassName="focus:ring-2 focus:ring-green-500"
-                        />
-                      </div>
-                    )}
-                </React.Fragment>
-              ))}
-            </div>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {[
-                "requiresDocumentation",
-                "allowHalfDay",
-                // "allowNegativeBalance",
-                "noticePeriodRestriction",
-                "weekendsAndHolidaysAllowed",
-                "active",
-              ].map((key) => (
-                <React.Fragment key={key}>
-                  <div className="flex items-center gap-2">
-                    <input
-                      id={key}
-                      type="checkbox"
-                      name={key}
-                      checked={formData[key]}
-                      onChange={handleChange}
-                      className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                    />
-                    <label
-                      htmlFor={key}
-                      className="text-sm font-medium text-gray-700"
-                    >
-                      {formatFieldLabel(key)}
-                    </label>
-                  </div>
-                  {key === "requiresDocumentation" &&
-                    formData.requiresDocumentation && (
-                      <div>
-                        <FormInput
-                          label="Document Submission Threshold (Days)"
-                          name="documentSubmissionThresholdDays"
-                          type="number"
-                          min="0"
-                          value={formData.documentSubmissionThresholdDays}
-                          onChange={handleChange}
-                          inputClassName="focus:ring-2 focus:ring-green-500"
-                        />
-                      </div>
-                    )}
-                </React.Fragment>
-              ))}
-            </div>
-          )}
-
-          {/* Buttons */}
-          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200">
-            <Button
-              type="button"
-              onClick={onClose}
-              variant="ghost"
-              size="medium"
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              size="medium"
-              loading={submitting}
-              loadingText={editData ? "Updating..." : "Adding..."}
-              disabled={!isFormValid}
-            >
-              {editData ? "Update Leave Type" : "Add Leave Type"}
-            </Button>
+            <FormSelect
+              name="accrualFrequency"
+              options={accrualFrequency.map((freq) => ({
+                value: freq,
+                label: freq,
+              }))}
+              value={formData.accrualFrequency}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, accrualFrequency: e.target.value }))
+              }
+            />
           </div>
-        </form>
+        )}
+
+        {/* Numeric Fields */}
+        {formData.leaveName.toLowerCase() === "paternity_leave" ||
+          formData.leaveName.toLowerCase() === "maternity_leave" ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[
+              "maxLeaveDays",
+              "minLeaveDays",
+              "maxNoOfTimes",
+              "waitingPeriodDays",
+              "advanceNoticePeriod",
+              "coolDownPeriod",
+            ].map((key) => (
+              <div key={key}>
+                <FormInput
+                  label={formatFieldLabel(key)}
+                  name={key}
+                  type="number"
+                  min="0"
+                  value={formData[key]}
+                  onChange={handleChange}
+                  inputClassName="focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[
+              "maxDaysPerYear",
+              "maxCarryForward",
+              "maxCarryForwardPerYear",
+              "expiryDays",
+              "waitingPeriodDays",
+              "advanceNoticeDays",
+              "pastDateLimitDays",
+            ].map((key) => (
+              <div key={key}>
+                <FormInput
+                  label={formatFieldLabel(key)}
+                  name={key}
+                  type="number"
+                  min="0"
+                  value={formData[key]}
+                  onChange={handleChange}
+                  inputClassName="focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Description */}
+        <FormTextArea
+          label="Description"
+          name="description"
+          maxLength={50}
+          rows={2}
+          value={formData.description}
+          onChange={handleChange}
+          placeholder="Describe the leave type"
+          inputClassName="resize-none"
+        />
+
+        {/* Boolean Fields */}
+        {isGenderBasedLeave(formData.leaveName) ? (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              "requiresDocumentation",
+              // "allowNegativeBalance",
+              "noticePeriodRestriction",
+              "weekendsAndHolidaysAllowed",
+              "active",
+            ].map((key) => (
+              <React.Fragment key={key}>
+                <div className="flex items-center gap-2">
+                  <input
+                    id={key}
+                    type="checkbox"
+                    name={key}
+                    checked={formData[key]}
+                    onChange={handleChange}
+                    className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  />
+                  <label
+                    htmlFor={key}
+                    className="text-sm font-medium text-gray-700"
+                  >
+                    {formatFieldLabel(key)}
+                  </label>
+                </div>
+                {key === "requiresDocumentation" &&
+                  formData.requiresDocumentation && (
+                    <div>
+                      <FormInput
+                        label="Document Submission Threshold (Days)"
+                        name="documentSubmissionThresholdDays"
+                        type="number"
+                        min="0"
+                        value={formData.documentSubmissionThresholdDays}
+                        onChange={handleChange}
+                        inputClassName="focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                  )}
+              </React.Fragment>
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              "requiresDocumentation",
+              "allowHalfDay",
+              // "allowNegativeBalance",
+              "noticePeriodRestriction",
+              "weekendsAndHolidaysAllowed",
+              "active",
+            ].map((key) => (
+              <React.Fragment key={key}>
+                <div className="flex items-center gap-2">
+                  <input
+                    id={key}
+                    type="checkbox"
+                    name={key}
+                    checked={formData[key]}
+                    onChange={handleChange}
+                    className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  />
+                  <label
+                    htmlFor={key}
+                    className="text-sm font-medium text-gray-700"
+                  >
+                    {formatFieldLabel(key)}
+                  </label>
+                </div>
+                {key === "requiresDocumentation" &&
+                  formData.requiresDocumentation && (
+                    <div>
+                      <FormInput
+                        label="Document Submission Threshold (Days)"
+                        name="documentSubmissionThresholdDays"
+                        type="number"
+                        min="0"
+                        value={formData.documentSubmissionThresholdDays}
+                        onChange={handleChange}
+                        inputClassName="focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                  )}
+              </React.Fragment>
+            ))}
+          </div>
+        )}
+
+        {/* Buttons */}
+        <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200">
+          <Button
+            type="button"
+            onClick={onClose}
+            variant="ghost"
+            size="medium"
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            size="medium"
+            loading={submitting}
+            loadingText={editData ? "Updating..." : "Adding..."}
+            disabled={!isFormValid}
+          >
+            {editData ? "Update Leave Type" : "Add Leave Type"}
+          </Button>
+        </div>
+      </form>
     </Modal>
   );
 };

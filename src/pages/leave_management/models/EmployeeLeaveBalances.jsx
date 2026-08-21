@@ -13,6 +13,9 @@ import DataTable from "../../../components/patterns/DataTable";
 import FormSelect from "../../../components/forms/FormSelect";
 import BackButton from "../../../components/patterns/BackButton";
 import PageContainer from "../../../components/patterns/PageContainer";
+import PageHeader from "../../../components/ui/PageHeader";
+import { Fonts } from "../../../components/Fonts/Fonts";
+import FormLabel from "../../../components/forms/FormLabel";
 
 export const YearDropdown = ({ value, onChange }) => {
   const currentYear = new Date().getFullYear();
@@ -353,9 +356,7 @@ const EmployeeLeaveBalances = () => {
       {/* Title & Back Button */}
       <div className="flex items-center gap-3 px-6 mb-4">
         <BackButton onClick={() => navigate(-1)} />
-        <h2 className="text-xl font-bold text-gray-800">
-          Employee Leave Balances
-        </h2>
+        <PageHeader className="!mb-0" title="Employee Leave Balances" />
       </div>
 
       {/* Search Bar + Year + Add Button */}
@@ -508,7 +509,7 @@ const EmployeeLeaveBalances = () => {
           )}
 
           <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
-            <h3 className="text-xl font-bold mb-6">
+            <h3 className={`${Fonts.heading4} mb-6`}>
               Edit Leave Balances – {selectedEmployee.employeeName}
             </h3>
 
@@ -541,9 +542,9 @@ const EmployeeLeaveBalances = () => {
                     key={leaveTypeId || leaveTypeName}
                     className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
                   >
-                    <label className="font-medium min-w-[150px]">
+                    <FormLabel className="min-w-[150px]">
                       {leaveTypeName}
-                    </label>
+                    </FormLabel>
                     <div className="flex items-center gap-2 w-full sm:w-[300px]">
                       <FormInput
                         name={`leave-balance-${leaveTypeName}`}

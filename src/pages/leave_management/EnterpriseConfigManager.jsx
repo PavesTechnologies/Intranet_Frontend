@@ -3,6 +3,7 @@ import { Plus, Save, Trash2, X, CheckCircle, AlertCircle, Edit3, Search, Filter,
 import Button from "../../components/Button/Button";
 import FormInput from "../../components/forms/FormInput";
 import FormSelect from "../../components/forms/FormSelect";
+import FormLabel from "../../components/forms/FormLabel";
 
 const EnterpriseConfigManager = () => {
   const [activeTab, setActiveTab] = useState('leave');
@@ -291,7 +292,7 @@ const EnterpriseConfigManager = () => {
             {/* Header with inline stats */}
             <div className="flex items-start justify-between mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-slate-900 mb-1">{config.title}</h2>
+                <h2 className="text-xl font-bold text-slate-900 mb-1">{config.title}</h2>
                 <p className="text-sm text-slate-500 mb-3">{config.description}</p>
                 <div className="flex items-center gap-4 text-sm">
                   <span className="text-slate-600">
@@ -444,10 +445,9 @@ const EnterpriseConfigManager = () => {
             <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(90vh-180px)]">
               {config.fields.map(field => (
                 <div key={field.name}>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  <FormLabel className="mb-2" required={field.required}>
                     {field.label}
-                    {field.required && <span className="text-red-500 ml-1">*</span>}
-                  </label>
+                  </FormLabel>
                   {renderFormField(field)}
                 </div>
               ))}

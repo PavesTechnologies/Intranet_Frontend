@@ -4,6 +4,7 @@ import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
 import FormSelect from "../../../components/forms/FormSelect";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+import FormLabel from "../../../components/forms/FormLabel";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
@@ -216,9 +217,7 @@ const RuleBookPage = () => {
         <PageCardContent className="p-8 space-y-6">
         {/* Action Type */}
         <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">
-            Action Type
-          </label>
+          <FormLabel className="mb-1">Action Type</FormLabel>
           <div className="flex gap-2">
             <div className="flex-1">
               <FormSelect

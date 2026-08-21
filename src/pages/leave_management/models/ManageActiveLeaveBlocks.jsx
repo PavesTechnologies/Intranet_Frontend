@@ -16,6 +16,7 @@ import FormInput from "../../../components/forms/FormInput";
 import DataTable from "../../../components/patterns/DataTable";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import BackButton from "../../../components/patterns/BackButton";
+import FormLabel from "../../../components/forms/FormLabel";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const PMS_BASE_URL = window.__APP_CONFIG__.PMS_BASE_URL;
@@ -126,9 +127,7 @@ const MultiSelect = ({
 
   return (
     <div className="w-full" id={id}>
-      {label ? (
-        <label className="block text-sm font-medium mb-1">{label}</label>
-      ) : null}
+      {label ? <FormLabel className="mb-1">{label}</FormLabel> : null}
 
       <button
         type="button"

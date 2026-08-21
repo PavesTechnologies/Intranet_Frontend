@@ -345,7 +345,7 @@ export default function EditBlockLeaveModal({
                         const mainState = getEmployeeCheckState(empId);
                         return (
                           <tr key={empId}>
-                            <td className="px-4 py-3 text-sm font-medium text-gray-800">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-700">
                               {member.label}
                             </td>
 

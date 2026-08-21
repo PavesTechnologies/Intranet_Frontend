@@ -656,7 +656,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
             )}
             <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-sm">
               <th
-                className="px-4 py-3 text-center text-xs sticky left-1 z-20 bg-blue-900 whitespace-nowrap"
+                className="px-4 py-3 text-center sticky left-1 z-20 bg-blue-900 whitespace-nowrap"
                 style={{ width: "4%" }}
               >
                 <input
@@ -672,67 +672,67 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                 />
               </th>
               <th
-                className="px-4 py-3 text-center text-xs sticky left-[4.5%] z-20 bg-blue-900 whitespace-nowrap"
+                className="px-4 py-3 text-center sticky left-[4.5%] z-20 bg-blue-900 whitespace-nowrap"
                 style={{ width: "12%" }}
               >
                 Employee
               </th>
               <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
+                className="px-4 py-3 text-center whitespace-nowrap"
                 style={{ width: "12%" }}
               >
                 From
               </th>
               <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
+                className="px-4 py-3 text-center whitespace-nowrap"
                 style={{ width: "12%" }}
               >
                 To
               </th>
               <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
+                className="px-4 py-3 text-center whitespace-nowrap"
                 style={{ width: "5%" }}
               >
                 Days
               </th>
               <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
+                className="px-4 py-3 text-center whitespace-nowrap"
                 style={{ width: "8%" }}
               >
                 Requested On
               </th>
               <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
+                className="px-4 py-3 text-center whitespace-nowrap"
                 style={{ width: "10%" }}
               >
                 Leave Type
               </th>
               <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
+                className="px-4 py-3 text-center whitespace-nowrap"
                 style={{ width: "16%" }}
               >
                 Reason
               </th>
               <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
+                className="px-4 py-3 text-center whitespace-nowrap"
                 style={{ width: "8%" }}
               >
                 Status
               </th>
               <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
+                className="px-4 py-3 text-center whitespace-nowrap"
                 style={{ width: "15%" }}
               >
                 Last Action By
               </th>
               <th
-                className="px-4 py-3 text-center text-xs whitespace-nowrap"
+                className="px-4 py-3 text-center whitespace-nowrap"
                 style={{ width: "8%" }}
               >
                 Documents
               </th>
               <th
-                className="px-4 py-3 text-center text-xs sticky right-0 z-20 bg-indigo-900 whitespace-nowrap"
+                className="px-4 py-3 text-center sticky right-0 z-20 bg-indigo-900 whitespace-nowrap"
                 style={{ width: "8%" }}
               >
                 Actions
@@ -772,7 +772,7 @@ const HandleLeaveRequestAndApprovals = forwardRef(({ employeeId }, ref) => {
                 return (
                   <tr
                     key={request.leaveId}
-                    className="hover:bg-gray-50 transition-colors text-xs"
+                    className="hover:bg-gray-50 transition-colors text-sm"
                   >
                     {/* Your existing <td> elements go here, no changes needed inside the map */}
                     <td className="sticky left-1 z-10 bg-white">

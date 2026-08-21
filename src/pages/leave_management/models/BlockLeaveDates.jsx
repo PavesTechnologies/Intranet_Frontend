@@ -14,6 +14,7 @@ import { format } from "date-fns";
 import Button from "../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import BackButton from "../../../components/patterns/BackButton";
+import FormLabel from "../../../components/forms/FormLabel";
 
 const skeleton = "animate-pulse bg-gray-400 rounded hover:cursor-wait";
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
@@ -121,9 +122,7 @@ const MultiSelect = ({
 
   return (
     <div className="w-full" id={id}>
-      {label ? (
-        <label className="block text-sm font-medium   mb-1">{label}</label>
-      ) : null}
+      {label ? <FormLabel className="mb-1">{label}</FormLabel> : null}
       <button
         type="button"
         onClick={() => setOpen((s) => !s)}
@@ -498,9 +497,7 @@ export default function BlockLeaveDates({ employeeId }) {
                   <div className="mt-4 space-y-4">
                     {/* Project */}
                     <div>
-                      <label className="block text-sm font-medium  mb-1">
-                        Project
-                      </label>
+                      <FormLabel className="mb-1">Project</FormLabel>
                       {loading ? (
                         <div className={`${skeleton} h-10 w-full`} />
                       ) : (
@@ -551,9 +548,7 @@ export default function BlockLeaveDates({ employeeId }) {
                           />
                         ) : (
                           <div>
-                            <label className="block text-sm font-medium   mb-1">
-                              Members
-                            </label>
+                            <FormLabel className="mb-1">Members</FormLabel>
                             <div className={`${skeleton} h-10 w-full`} />
                           </div>
                         )}

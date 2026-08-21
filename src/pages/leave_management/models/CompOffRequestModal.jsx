@@ -6,6 +6,7 @@ import { useNotification } from "../../../contexts/NotificationContext";
 import { CalendarDays, StickyNote, Clock } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/Modal/modal";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 function formatDateForDisplay(date) {
   if (!date) return "";
@@ -17,7 +18,7 @@ function formatDateForDisplay(date) {
 }
 
 const SectionLabel = ({ icon: Icon, children }) => (
-  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+  <label className={`flex items-center gap-1.5 ${Fonts.eyebrow} mb-1.5`}>
     {Icon && <Icon className="w-3.5 h-3.5" />}
     {children}
   </label>

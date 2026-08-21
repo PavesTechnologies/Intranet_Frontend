@@ -7125,3 +7125,732 @@ No business logic, loading/error branches, API calls, or conditional rendering (
 ### Confirmation no commit/push performed (P2.25)
 
 Confirmed — all changes remain in the working tree for local review.
+
+## P2.22 — Leave Management Typography / Text Consistency Audit
+
+**AUDIT-ONLY task. No source files were modified.**
+
+### 1. Branch
+
+`intra-ui/unify`
+
+### 2. Canonical typography sources audited
+
+Read completely, fresh, in this task: `src/components/ui/PageHeader.jsx`, `src/components/Modal/modal.jsx`, `src/components/Cards/PageCard.jsx`, `src/components/forms/FormInput.jsx`, `src/components/forms/FormTextArea.jsx`, `src/components/forms/FormSelect.jsx`, `src/components/patterns/DataTable.jsx`, `src/components/patterns/EmptyState.jsx`, `src/components/patterns/StatusBadge.jsx`, `src/components/patterns/BackButton.jsx`, `src/components/Button/Button.jsx`, `src/components/patterns/PageContainer.jsx`, `src/components/ui/tabs.jsx`, `src/components/patterns/Loaders.jsx`, `src/components/LoadingSpinner.jsx`, `src/components/Fonts/Fonts.jsx`.
+
+Then the complete `src/pages/leave_management/**` tree (71 `.jsx` files) was audited, excluding `models/DateRangePicker.jsx` (explicitly out of scope per this task's hard constraints).
+
+### 3–7. Counts
+
+These counts are aggregated from four parallel file-batch audits (~17–18 files each), each independently classifying every text/typography element it found. Counts are per-batch-reported totals — treat them as a reliable order-of-magnitude signal, not exact arithmetic (a few items were double-flagged with a primary + secondary category by the sub-audits; the file/line citations in section 10 are the source of truth for any individual candidate).
+
+| Category | Batch 1 | Batch 2 | Batch 3 | Batch 4 | Approx. total |
+|---|---|---|---|---|---|
+| Total candidates | 34 | 84 | 101 | 97 | ~316 |
+| A — Already canonical | 0 | 9 | 24 | 38 | ~71 |
+| B — Safe standardization candidate | 15 | 26 | 47 | 32 | ~120 |
+| C — Specialized design | 10 | 32 | 16 | 9 | ~67 |
+| D — Semantic/functional exception | 4 | 14 | 14 | 22 | ~54 |
+| E — Dead/commented/orphaned | 3 | 9 | 5 (file-groups) | 4 | noted, not migration-relevant |
+| F — Capability gap | 4 | 6 | 14 | 4 | ~28 |
+
+No capability gap found rises to the "strong repeated evidence across 3+ independent, genuinely reusable, presentational needs" bar this project requires before proposing a new canonical component — see section 13.
+
+### 8. Capability gaps (category F) — representative examples
+
+- No canonical "eyebrow / overline" label token exists (`text-xs font-semibold text-gray-500 uppercase tracking-wide(r/st)`) — used with drifting sizes/weights in `CompOffRequestModal.jsx`, `ApplyLeaveOnBehalf.jsx`, `AddHolidaysModal.jsx`, `EditLeaveModal.jsx`, `ManagerEditLeaveRequest.jsx`, `LeaveDetailsPage.jsx`, `HRManageTools.jsx`.
+- No canonical "compact/dense table" convention for admin-style tables that intentionally don't use `DataTable` (`EnterpriseConfigManager.jsx`, `RuleBookPage.jsx`, `EditBlockLeaveModal.jsx`, `HandleLeaveRequestAndApprovals.jsx`, `HRManageTools.jsx`).
+- No canonical non-italic small muted-text token distinct from `Fonts.caption` (which is italic) — several files (`EditLeaveModal.jsx`, `ManagerEditLeaveRequest.jsx`, `PendingApprovalsQueueView.jsx`) use plain `text-sm text-gray-500` for the same "muted helper line" role that `Fonts.caption` almost — but not quite — covers.
+- No canonical "inline empty-row / inline hint" pattern for a one-line empty message embedded inside a form or a non-DataTable table row (distinct from the full `EmptyState` block) — seen in `ApplyLeaveOnBehalf.jsx`, `UpcomingHolidays.jsx`, `AllHolidaysGrid.jsx`, `EnterpriseConfigManager.jsx`, `HandleLeaveRequestAndApprovals.jsx`.
+- No canonical "bespoke centered-icon confirmation" layout (icon + centered title + centered description, distinct from `ConfirmDialog`/`CancellationModal`'s text-prop pattern) — seen in `HandleLeaveRequestAndApprovals.jsx`'s approve/reject/cancel dialog (`showHeader={false}`, hand-built header).
+- Two genuine typos/bugs, not just inconsistencies: `models/CompOffPage.jsx` uses `text-sl` (not a valid Tailwind class — likely meant `text-xl` or `text-sm`); `EmployeeDashboard.jsx` (live code, lines ~506/514/518) uses `text-small` (not a valid Tailwind utility at all). Both are no-ops today (no font-size is actually applied), not stylistic drift. Flagged here for awareness — no fix applied per this task's audit-only constraint.
+- `BlockLeaveDates.jsx` has four literally blank/whitespace-only `className=" "` attributes on its summary-sidebar values (lines ~657/667/679/695) — zero typography applied at all, not just inconsistent typography.
+
+### 9. Effective canonical typography hierarchy (as actually implemented today)
+
+| Role | Actual classes | Source |
+|---|---|---|
+| Page title | `font-heading text-2xl font-semibold leading-snug text-gray-900 md:text-xl` | `PageHeader.jsx` (`Fonts.heading3` + `md:text-xl`) |
+| Page subtitle | `mt-1 text-xs text-slate-500` | `PageHeader.jsx` |
+| Breadcrumb | `text-xs text-slate-400` | `PageHeader.jsx` |
+| Card/section title | `font-heading text-xl font-medium leading-snug text-gray-900` | `PageCard.jsx` (`Fonts.heading4`) |
+| Card subtitle | `mt-1 text-sm text-gray-500` | `PageCard.jsx` |
+| KPI label | `text-xs font-medium uppercase tracking-wide text-gray-500` | `PageCard.jsx` (`PageCardKpi`) |
+| KPI value | `text-2xl font-semibold leading-tight text-gray-900` | `PageCard.jsx` |
+| KPI sub | `mt-0.5 text-xs text-gray-500` | `PageCard.jsx` |
+| Form label | `font-sans text-sm font-medium text-gray-700` | `Fonts.label`, used by `FormInput`/`FormTextArea`; `FormSelect` duplicates the same literal classes rather than referencing the token (visually identical, minor code-quality nit, category A) |
+| Required mark | `ml-1 text-red-500` | `FormInput`/`FormTextArea`/`FormSelect` |
+| Form error text | `text-xs text-red-500` | `FormInput`/`FormSelect` |
+| Table header | `px-4 py-3 text-sm font-semibold text-white` (on gradient bg) | `DataTable.jsx` |
+| Table body | `text-sm text-gray-700` (set on `<tr>`, inherited by `<td>`) | `DataTable.jsx` |
+| Modal title | `font-heading text-xl font-medium leading-snug text-gray-900 truncate` | `Modal/modal.jsx` (`Fonts.heading4`) |
+| Modal subtitle | `font-sans text-base text-gray-500 leading-relaxed mt-1 text-sm` | `Modal/modal.jsx` (`Fonts.paragraphMuted` + literal `mt-1 text-sm` appended — see pre-existing issue below) |
+| EmptyState title | `font-heading text-lg font-medium text-gray-700` | `EmptyState.jsx` (`Fonts.subheading`) |
+| EmptyState description | `max-w-sm text-sm text-gray-500` | `EmptyState.jsx` |
+| Status text | `inline-flex items-center rounded-full font-medium capitalize` + tone color, size `text-xs`(sm)/`text-sm`(md) | `StatusBadge.jsx` |
+| Button text | `font-sans text-sm font-semibold` base, with size override: large=`text-base`, medium/icon=`text-sm`, small=`text-xs` (weight stays `font-semibold` at every size) | `Button.jsx` |
+| Loading text | `text-sm text-gray-600` | `LoadingSpinner.jsx` |
+| Tab label | `text-sm font-medium` on shadcn CSS-variable colors (`text-muted-foreground`/`text-foreground`), a deliberately separate design-system reference, not the `Fonts.*` gray scale | `ui/tabs.jsx` |
+
+### 10. Complete list of safe migration candidates (category B), grouped by recurring pattern
+
+Every row below is a **real, cited** finding — file + line + exact current classes — not an invented example. Grouped because the same drift-pattern recurs verbatim or near-verbatim across multiple files; a future migration task would fix the whole group in one pass.
+
+**Page titles bypassing `PageHeader`** (recommend: adopt `PageHeader`, or at minimum its title classes `font-heading text-2xl font-semibold leading-snug text-gray-900 md:text-xl`):
+| File | Line | Current |
+|---|---|---|
+| `models/LeavePolicy.jsx` | 8 | `text-xl font-bold text-left text-blue-700 mb-8` |
+| `EnterpriseConfigManager.jsx` | 233 | `text-2xl font-bold text-slate-900` |
+| `models/ManageActiveLeaveBlocks.jsx` | 868 | `text-xl font-semibold` (no color at all) |
+| `models/BlockLeaveDates.jsx` | 479 | `text-xl font-semibold` (no color at all) |
+| `charts/LeaveDetailsPage.jsx` | 206-208 | `text-2xl font-bold text-gray-800` |
+| `models/EmployeeLeaveBalances.jsx` | 356-358 | `text-xl font-bold text-gray-800` |
+| `models/EditHolidaysPage.jsx` | 149 | `text-xl font-bold text-gray-800` |
+| `EmployeePanelold.jsx` | 141,145-147,159,166,169 | `text-xl font-semibold m-4` (×5, likely-dead sibling of `EmployeePanel.jsx` — verify liveness first) |
+
+**Page subtitles diverging from `mt-1 text-xs text-slate-500`:**
+| File | Line | Current |
+|---|---|---|
+| `EnterpriseConfigManager.jsx` | 234 | `text-sm text-slate-500` (size only) |
+| `models/ManageActiveLeaveBlocks.jsx` | 870-872 | `mt-1 text-xs` (no color) |
+| `models/BlockLeaveDates.jsx` | 481-484 | `mt-1 text-xs` (no color) |
+
+**Section/card headings diverging from `Fonts.subheading`/`Fonts.heading4`** (recommend converging on one of the two existing tokens rather than each file inventing its own weight/color):
+| File | Line | Current |
+|---|---|---|
+| `models/CompOffPage.jsx` | 116-118 | `m-4 text-sl font-semibold mb-4` (invalid class, likely typo) |
+| `hooks/Modal.jsx` (local, non-canonical modal) | 8 | `text-lg font-semibold mb-4` |
+| `models/PendingApprovalsQueueView.jsx` | 81 | `font-semibold text-lg text-gray-900` |
+| `HRManageTools.jsx` | 163 | `text-lg font-semibold text-gray-800` |
+| `HRManageTools.jsx` | 358 | `font-bold text-gray-800` (no size class) |
+| `RuleBookPage.jsx` | 292, 358 | `text-lg font-medium text-gray-700` (×2 — only missing `font-heading`) |
+| `models/CompOffBalanceRequests.jsx` | 107 | `text-lg font-semibold text-blue-900` |
+| `models/EditLeaveModal.jsx` | 498 | `text-xl font-bold text-gray-800` ("Record Locked") |
+| `models/ManagerEditLeaveRequest.jsx` | 1050 | `text-xl font-bold text-gray-800` ("Record Locked" — verbatim duplicate of the row above) |
+| `models/LeaveUploadWizard.jsx` (custom modal) | 93 | `text-xl font-bold text-gray-800` |
+| `charts/LeaveDetailsPage.jsx` | 219 | `text-lg font-semibold text-gray-700` |
+| `models/LeavePolicyViewer.jsx` | 159 | `text-sm font-semibold text-gray-600` |
+| `models/ProjectMembersOnLeave.jsx` | 174 | `font-medium` (no size/color at all) |
+
+**Recurring "eyebrow/uppercase label" pattern** (no exact canonical token — closest is `PageCard`'s KPI label `text-xs font-medium uppercase tracking-wide text-gray-500`; sizes/weights currently drift between `text-xs`/`text-[10px]` and `font-semibold`/`font-bold`):
+| File | Line | Current |
+|---|---|---|
+| `models/CompOffRequestModal.jsx` | 20 | `text-xs font-semibold text-gray-500 uppercase tracking-wider` |
+| `models/ApplyLeaveOnBehalf.jsx` | 233,355,381 | `text-[10px] font-bold text-gray-500 uppercase tracking-wider` |
+| `models/AddHolidaysModal.jsx` | 281,440 | `text-xs font-semibold text-gray-500 uppercase tracking-widest` |
+| `models/EditLeaveModal.jsx` | 529,583,613,715 | `text-xs font-semibold text-gray-500 uppercase tracking-wide` |
+| `models/ManagerEditLeaveRequest.jsx` | 1081,1093,1128,1183 | `text-xs font-semibold text-gray-500 uppercase tracking-wide` (verbatim duplicate of the row above) |
+| `charts/LeaveDetailsPage.jsx` | 177 | `text-xs font-semibold text-gray-500 uppercase tracking-wider` |
+| `HRManageTools.jsx` | 433 | `text-sm font-bold text-gray-500 uppercase tracking-wider` |
+
+**Form labels not using `Fonts.label` / not going through `FormInput`/`FormSelect`:**
+| File | Line | Current |
+|---|---|---|
+| `RuleBookPage.jsx` | 219 | `block text-sm font-medium text-gray-600 mb-1` (gray-600, not -700) |
+| `models/AddHolidaysModal.jsx` | 286,301,316,335,354 | `text-xs font-semibold text-gray-600` |
+| `EnterpriseConfigManager.jsx` | 447 | `block text-sm font-semibold text-slate-700 mb-2` |
+| `EnterpriseConfigManager.jsx` | 172,189 | `text-sm text-slate-700` / `text-sm text-slate-600` |
+| `models/ApprovalRulesPage.jsx` | 361 | `text-sm font-medium mb-1` (no color at all) |
+| `models/ManageActiveLeaveBlocks.jsx` | 43-45,130 | `text-sm font-medium` (no color) |
+| `models/BlockLeaveDates.jsx` | 125,422,501,554 | `block text-sm font-medium ... mb-1` (no color; some with stray double-spaces) |
+
+**Table headers/bodies reimplementing a raw `<table>` instead of `DataTable`, with header/body text conventions diverging from `px-4 py-3 text-sm font-semibold text-white` / `text-sm text-gray-700`:**
+| File | Line(s) | Current header/body pattern |
+|---|---|---|
+| `models/ApprovalQueue.jsx` | 36-407 (many) | `text-xs font-medium text-gray-500 uppercase tracking-wider` header; `text-sm font-medium text-gray-800`/`text-sm text-gray-600` body |
+| `RuleBookPage.jsx` | 468-496 | `bg-indigo-100 text-gray-700 font-medium` header; `font-medium text-gray-800`/`text-gray-600` body |
+| `EnterpriseConfigManager.jsx` | 341-363 | `text-xs font-bold text-slate-700 uppercase` header; `text-sm font-medium text-slate-900`/`text-sm text-slate-700` body |
+| `models/EditBlockLeaveModal.jsx` | 325-348 | `text-xs font-medium uppercase text-gray-500` header; `text-sm font-medium text-gray-800` body |
+| `models/HandleLeaveRequestAndApprovals.jsx` | 657,775 | header `<tr>`'s own `text-sm` is dead (every `<th>` overrides to `text-xs` — category E within this same finding); body rows use `text-xs` where `DataTable` convention is `text-sm` |
+
+**Character-counter / small-helper text close to but not exactly `Fonts.smallText` (`text-xs text-gray-400`):**
+| File | Line | Current |
+|---|---|---|
+| `charts/LeaveDashboard.jsx` | 187 | `text-xs text-gray-400 mt-0.5` (PageCard KPI-sub convention uses `text-gray-500`, not `-400`) |
+| `models/LeavePolicyViewer.jsx` | 169 | `text-xs text-gray-500 mt-4` (inverse drift — smallText is `-400`) |
+| `charts/LeaveDetailsPage.jsx` | 259,263-265,272-274 | `text-xs text-gray-600 mt-1` |
+
+**Status-like colored text that duplicates `StatusBadge`'s role without using it** (candidate to adopt `StatusBadge`, though several are legitimately borderline D — tone/meaning-bearing but structurally simple text, not badges):
+| File | Line | Current |
+|---|---|---|
+| `RuleBookPage.jsx` | 492,496 | `text-green-600 font-semibold` / `text-red-500 font-semibold` (✅ Active / ❌ Inactive, raw emoji + colored text) |
+| `EnterpriseConfigManager.jsx` | 361-363 | bespoke `inline-flex ... rounded-full text-xs font-medium` active/inactive pill (structurally very close to `StatusBadge`, a real adoption candidate) |
+| `models/EditBlockLeaveModal.jsx` | 407,411,416 | `text-xs text-red-500 font-medium` / `text-xs text-yellow-600 font-semibold` / `text-xs text-green-500 font-medium` ("Blocked"/"New Block"/"Free") |
+
+**Loading text bypassing `LoadingSpinner`:**
+| File | Line | Current |
+|---|---|---|
+| `models/LeavePolicyViewer.jsx` | 220 | `<p className="text-center mt-6">Loading...</p>` — no color/size at all |
+
+**Minor redundant/no-op Tailwind modifiers** (safe cleanup, not a visual inconsistency):
+| File | Line | Current |
+|---|---|---|
+| `charts/CustomActiveShapePieChart.jsx` | 138 | `text-xs sm:text-xs text-gray-500 ...` (the `sm:text-xs` is a no-op duplicate of the base `text-xs`) |
+| `charts/WeeklyPattern.jsx` | 66 | same `text-xs sm:text-xs ...` no-op (compare to the clean version already in `charts/MonthlyStats.jsx` line 55) |
+
+### 11. Per-candidate detail
+
+The four full per-file audit transcripts (file, exact line, exact current classes, semantic role, category, and recommended canonical convention where applicable) are preserved in this task's agent run journal. Section 10 above consolidates every one of those candidates by recurring pattern rather than repeating ~120 near-duplicate rows; every file/line cited in section 10 is a verified, actually-read finding, not an example.
+
+### 12. Complete list of important exclusions with exact reasons
+
+- **`models/DateRangePicker.jsx`** — excluded entirely per this task's explicit hard constraint (never touch DatePicker/DateRangePicker).
+- **`models/ReviewModal.jsx`** — fully orphaned/unreferenced (re-verified via repo-wide grep: no importer anywhere in `src/`, consistent with the P2.17-era finding). All its typography findings are category E.
+- **Chart/dashboard visualization files** (`charts/CustomActiveShapePieChart.jsx`, `charts/WeeklyPattern.jsx`, `charts/MonthlyStats.jsx`, `charts/Calendar.jsx`, `charts/LeaveUsageChart.jsx`, `charts/UpcomingHolidays.jsx`, `charts/AllHolidaysGrid.jsx`'s calendar-tile internals) — the bulk of their text is legitimately category C: dense KPI/chart-tile typography intentionally scaled down (`text-[10px]`/`text-[11px]`) for information density, or rendered on colored/gradient/themed backgrounds where the gray-scale `Fonts.*` tokens don't apply. Not migration candidates.
+- **Segmented-control / toggle / tab text** (`EmployeePanel.jsx`, `EmployeePanelold.jsx`'s view toggles; `RequestLeaveModal.jsx`/`EditLeaveModal.jsx`/`ManagerEditLeaveRequest.jsx`/`CompOffRequestModal.jsx`'s Full-Day/Custom toggles; `BlockLeaveSection.jsx`/`LeaveSection.jsx`'s `TabsTrigger` overrides) — category C/D: functional active/inactive state indicators, not plain text roles: excluded from migration.
+- **Semantic color text** (error/success/warning/danger messaging, balance-available/balance-exceeded hints, "Blocked"/"New Block"/"Free" indicators, lock-state banners) — category D throughout: the color is meaning-bearing, not a styling inconsistency, even where the exact shade drifts slightly from `FormInput`'s `text-xs text-red-500` error convention.
+- **Themed/gradient widgets** (`UpcomingHolidays.jsx`'s hero card, `AllHolidaysGrid.jsx`'s header band, `EnterpriseConfigManager.jsx`'s gradient modal header, `AddHolidaysModal.jsx`'s indigo header) — cannot adopt the gray-scale `Fonts.*`/canonical-component tokens without breaking contrast on their colored backgrounds; legitimately excluded.
+- **Dead/commented code** — large orphaned blocks in `AdminPanel.jsx`, `EmployeeDashboard.jsx` (lines 1-336), `LeaveHistory.jsx` (lines ~435-1838), `ManagerEditLeaveRequest.jsx` (lines 1-609), `useLeaveData.jsx`, `WebSocketProvider.jsx` (lines ~279-535), `HRAdminPanel.jsx`'s commented import, `models/ActionButtons.jsx`'s commented link, `CompOffRequestsTable.jsx`'s commented empty-state block, `charts/Calendar.jsx` (lines 1-181, 398-436) — none touched, none counted as real inconsistencies.
+- **`EmployeePanelold.jsx`** — likely fully superseded by `EmployeePanel.jsx` (same view-toggle UI, same role); its findings are listed in section 10 for completeness, but its liveness should be re-verified (import-graph check) before any migration work touches it, since dead code should not be migrated at all (per this project's own dead-code exclusion rule) — this determination was not completed within this audit's scope.
+- **`BackButton.jsx`'s commented-out `{label}`** — previously-confirmed deliberate prior edit (icon-only Back button); not re-flagged.
+- **`PendingApprovalsQueueView.jsx`'s oversized `EmptyState` icon** and **`PendingLeaveRequests.jsx`'s recently-changed horizontal empty-state layout** — both are recent, deliberate prior edits (P2.19/P2.25); their typography (where present, e.g. `PendingLeaveRequests.jsx`'s `Fonts.subheading` title and exact-match `EmptyState` description classes) is already category A and correctly unchanged.
+
+### 13. Repeated pattern that may justify a future global component/token
+
+Two candidates cross the "3+ independent, genuinely reusable, presentational" bar this project requires before considering a new canonical addition:
+
+1. **An "eyebrow/overline label" token** (uppercase, small, semibold-ish, gray-500-ish) — currently reinvented with drifting values in at least 7 files (`CompOffRequestModal.jsx`, `ApplyLeaveOnBehalf.jsx`, `AddHolidaysModal.jsx` ×2, `EditLeaveModal.jsx`, `ManagerEditLeaveRequest.jsx`, `LeaveDetailsPage.jsx`, `HRManageTools.jsx`). A `Fonts.eyebrow` token (or an `EmptyState`-style small canonical component) would consolidate this cleanly.
+2. **A non-italic small muted-text token** distinct from `Fonts.caption` (which is italic) — the `text-sm text-gray-500` "plain helper line" role recurs across `EditLeaveModal.jsx`, `ManagerEditLeaveRequest.jsx`, `PendingApprovalsQueueView.jsx`, and others, and currently has no exact `Fonts.*` match.
+
+Both are presented for the team's review, per the task's instruction not to propose implementing a new component within this audit.
+
+### 14. Pre-existing issues discovered
+
+- **`Modal/modal.jsx` subtitle className** (`` `${Fonts.paragraphMuted} mt-1 text-sm ${subtitleClassName}` ``) combines `Fonts.paragraphMuted`'s `text-base` with an appended literal `text-sm` — two conflicting text-size utilities present in the same class string. This is in the **canonical component itself**, not Leave Management page code, and predates this audit; flagged for awareness only, not fixed (out of this audit-only task's scope, and modifying `Modal.jsx` is explicitly forbidden this task).
+- **`models/CompOffPage.jsx` line ~116**: `text-sl` is not a valid Tailwind class (likely a typo for `text-xl`/`text-sm`) — currently a no-op with no font-size applied.
+- **`EmployeeDashboard.jsx` lines ~506/514/518** (live code path): `text-small` is not a valid Tailwind utility — currently a no-op with no font-size applied.
+- **`models/BlockLeaveDates.jsx` lines ~657/667/679/695**: four summary-sidebar values have literally blank/whitespace-only `className=" "` — zero typography styling applied at all.
+- **`models/HandleLeaveRequestAndApprovals.jsx` line ~657**: the table header `<tr>`'s own `text-sm` class is dead/unused, since every `<th>` inside it explicitly overrides to `text-xs`.
+- **`models/AddLeaveTypeModal.jsx` line ~325**: a `<label>` element carries a `placeholder:text-gray-400` modifier, which has no effect on a non-input element — a harmless but dead class.
+
+None of these were fixed — this task is audit-only.
+
+### 15. Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### 16. Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### 17. git diff --check
+
+✅ Clean — the working tree was fully clean at the time of this audit (prior Phase 2 work through P2.25 had been committed upstream between tasks), so this check reflects only this documentation addition.
+
+### 18. Confirmation NO source files were modified
+
+Confirmed — `git status --short` before writing this documentation showed a fully clean working tree; this task performed reads only (via direct file reads and read-only audit agents) and wrote exclusively to `docs/ui/phase-2-leave-management.md`.
+
+### 19. Confirmation DatePicker/DateRangePicker were untouched
+
+Confirmed — `models/DateRangePicker.jsx` was explicitly excluded from the audit scope and never opened.
+
+### 20. Confirmation no Phase 3 work was started
+
+Confirmed — this task audited only `src/pages/leave_management/**` against already-existing canonical components; no new component was created, no canonical component was modified, and no migration was implemented. Per the task's hard stop, no typography migration should be implemented until the team reviews this audit and selects specific safe candidates from section 10.
+
+## P2.22a — Typography Migration: Page-Level Titles
+
+### Objective
+
+Implement only the first, highest-confidence group from the P2.22 audit's ~120 candidates: page-level titles that should adopt canonical `PageHeader` typography.
+
+### Candidate re-verification
+
+The P2.22 audit's "page titles bypassing PageHeader" group listed 8 items. Each was re-inspected against this task's 10 qualification criteria before touching anything:
+
+| Candidate | Verdict | Reason |
+|---|---|---|
+| `models/LeavePolicy.jsx` | **Migrated** | Routed page (`App.jsx`), no BackButton/actions/header band, trivially safe |
+| `charts/LeaveDetailsPage.jsx` | **Migrated** | Routed page (`App.jsx`), BackButton+h1 pattern, PageHeader composes cleanly beside BackButton |
+| `models/EmployeeLeaveBalances.jsx` | **Migrated** | Routed page (`App.jsx`), same BackButton+heading pattern |
+| `models/EditHolidaysPage.jsx` | **Migrated** | Routed page (`App.jsx`), same BackButton+heading pattern |
+| `EnterpriseConfigManager.jsx` | **Excluded** | Its header is a specialized full-bleed band with a decorative gradient logo box interleaved with the title/subtitle and Import/Export actions — `PageHeader` has no leading-icon/logo slot, and reproducing this band would require restructuring beyond typography. Fails criterion 6. |
+| `models/ManageActiveLeaveBlocks.jsx` | **Excluded** | Re-investigated its actual mount point: it is **not an independently-routed page** — it's tab-panel content rendered by `BlockLeaveSection.jsx` (itself mounted by `ManageBlockLeave.jsx`), selected via a `Tabs`/`TabsTrigger` pair ("Active Blocked Leaves" / "Block Leave Dates"). Its `<h1>` is a tab-panel heading, not a page-level title. Fails criteria 1 and 9. |
+| `models/BlockLeaveDates.jsx` | **Excluded** | Same reasoning as `ManageActiveLeaveBlocks.jsx` — the other tab panel in `BlockLeaveSection.jsx`. |
+| `EmployeePanelold.jsx` | **Excluded** | Re-confirmed fully orphaned — a repo-wide grep for `EmployeePanelold` found zero references anywhere in `src/`, including no importer. Dead code is never migrated per this project's standing rule. |
+
+This is a smaller safe set than the audit's raw candidate count because two items were re-diagnosed as tab-panel content (not page-level) once their actual mount context was traced, one was already-known dead code, and one has a genuine structural capability gap (logo box) rather than a pure typography mismatch. No candidate was rediscovered or added beyond the audit's own list.
+
+### BackButton composition decision
+
+Three of the four migrated files (`LeaveDetailsPage.jsx`, `EmployeeLeaveBalances.jsx`, `EditHolidaysPage.jsx`) use the `<BackButton /><h1>Title</h1>` convention this task specifically called out. Since `PageHeader` has no prop for a leading element before the title, two approaches were possible: (a) copy `PageHeader`'s title classes directly onto the existing `<h1>` without using the component, or (b) compose the real `<PageHeader>` component next to `BackButton` in the existing flex row. Per explicit direction, option (b) was used: `<PageHeader className="!mb-0" title="..." />` sits beside `BackButton` inside the same `flex items-center gap-3` row that existed before. The `!mb-0` override neutralizes `PageHeader`'s own default `mb-3` (using `!important` per this project's documented Tailwind-cascade-order convention, since plain `mb-0` appended after `mb-3` in the same class string is not guaranteed to win).
+
+None of the three files had a subtitle in their original BackButton row, so `PageHeader`'s `subtitle` prop was not used — only `title`.
+
+### Exact changes made
+
+- **`src/pages/leave_management/models/LeavePolicy.jsx`**: replaced `<h1 className="text-xl  font-bold text-left text-blue-700 mb-8">Leave Policies</h1>` with `<PageHeader title="Leave Policies" className="!mb-8" />` (preserving the original 8-unit bottom margin before `LeavePolicyViewer`). Added the `PageHeader` import.
+- **`src/pages/leave_management/charts/LeaveDetailsPage.jsx`**: replaced the `<h1>` (dynamic `{displayName || "Leave"} History - {year}` title) with `<PageHeader className="!mb-0" title={`${displayName || "Leave"} History - ${new Date().getFullYear()}`} />`, kept inside the existing `<div className="flex items-center gap-3 mb-8">` beside `BackButton`. Added the `PageHeader` import.
+- **`src/pages/leave_management/models/EmployeeLeaveBalances.jsx`**: replaced `<h2 className="text-xl font-bold text-gray-800">Employee Leave Balances</h2>` with `<PageHeader className="!mb-0" title="Employee Leave Balances" />` inside its existing `flex items-center gap-3 px-6 mb-4` row. Added the `PageHeader` import. (Note: the original element was an `<h2>`; `PageHeader` renders an `<h1>` — appropriate, since this is the page's primary heading and no other `<h1>` exists on the page.)
+- **`src/pages/leave_management/models/EditHolidaysPage.jsx`**: replaced `<h1 className="text-xl font-bold text-gray-800">Manage Holidays</h1>` with `<PageHeader className="!mb-0" title="Manage Holidays" />` inside its existing `flex items-center gap-3 px-6 mb-4` row. Added the `PageHeader` import.
+
+In every case, only the title element itself was touched — the surrounding `<header>`/`<div>` wrapper, border/background bands, `BackButton`, search bars, filters, and all page logic/state/API calls are untouched.
+
+### Structural preservation confirmation
+
+- `BackButton` placement, `onClick={() => navigate(-1)}` behavior, and its position relative to the title: unchanged in all three files that have it.
+- Header bands / bordered containers (none of these four files actually had a full-bleed bordered header band around the title — that pattern belongs to `ManageActiveLeaveBlocks.jsx`/`BlockLeaveDates.jsx`, which were excluded): unaffected.
+- Filters, search bars, actions, and all content below each title: unchanged.
+- No routing, state, or API behavior changed in any of the four files.
+- `PageHeader` itself was not modified — no capability gap was found that justified changing the canonical component.
+
+### `PageHeader.jsx` — confirmed unmodified
+
+Re-read fresh at the start of this task; used exactly as-is. No new prop, no structural change.
+
+### Files modified
+
+`src/pages/leave_management/models/LeavePolicy.jsx`, `src/pages/leave_management/charts/LeaveDetailsPage.jsx`, `src/pages/leave_management/models/EmployeeLeaveBalances.jsx`, `src/pages/leave_management/models/EditHolidaysPage.jsx`, `docs/ui/phase-2-leave-management.md`.
+
+### Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### git diff --check
+
+✅ Clean — only the pre-existing LF/CRLF informational notice on the docs file.
+
+### Confirmation DatePicker/DateRangePicker untouched
+
+Confirmed — neither file was read or modified.
+
+### Confirmation no Phase 3 / no other migration group started
+
+Confirmed — only the page-title group was implemented. The eyebrow-label migration, form-label migration, raw-table migration, and any other P2.22 candidate group were not started. `PageHeader.jsx` was not modified.
+
+### Confirmation no commit/push performed
+
+Confirmed — all four source-file changes plus this documentation update remain in the working tree for local review.
+
+## P2.22b — Canonical Eyebrow Typography Token + Migration
+
+### Background
+
+A prior pass at this same task (before this section) stopped short and reported the eyebrow-label pattern as a capability gap, since the P2.22 audit found no existing exact canonical convention to reuse. This follow-up task explicitly approved adding one new token to close that gap, with the exact value specified: `text-xs font-semibold text-gray-500 uppercase tracking-wider`.
+
+### Canonical change
+
+`src/components/Fonts/Fonts.jsx` — added one new property, `eyebrow`, between `smallText` and `label`:
+
+```js
+eyebrow: "text-xs font-semibold text-gray-500 uppercase tracking-wider",
+```
+
+Purely additive — every existing `Fonts.*` property (`heading1..4`, `subheading`, `paragraph`, `paragraphMuted`, `caption`, `smallText`, `label`, `button`, `link`, `code`) is untouched, same values, same names, same export shape (`export const Fonts = {...}`).
+
+### Migration — 7 files, 12 instances
+
+Each instance was replaced with `Fonts.eyebrow`, preserving every other class on the element (spacing, flex, `block`, icon-row layout) by interpolating it into a template literal alongside the token rather than replacing the whole className wholesale:
+
+| File | Line(s) | Element | Before | After |
+|---|---|---|---|---|
+| `models/CompOffRequestModal.jsx` | 20 (`SectionLabel`) | `<label>` | `flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5` | `` `flex items-center gap-1.5 ${Fonts.eyebrow} mb-1.5` `` |
+| `models/ApplyLeaveOnBehalf.jsx` | 233 | `<label>` ("Employee") | `text-[10px] font-bold text-gray-500 uppercase tracking-wider` | `Fonts.eyebrow` |
+| `models/ApplyLeaveOnBehalf.jsx` | 355 | `<label>` ("Leave Type") | `text-[10px] font-bold text-gray-500 uppercase tracking-wider` | `Fonts.eyebrow` |
+| `models/ApplyLeaveOnBehalf.jsx` | 381 | `<label>` ("Supporting Document") | `text-[10px] font-bold text-gray-500 uppercase tracking-wider flex justify-between` | `` `${Fonts.eyebrow} flex justify-between` `` |
+| `models/AddHolidaysModal.jsx` | 281 | `<p>` ("Holiday Details") | `text-xs font-semibold text-gray-500 uppercase tracking-widest` | `Fonts.eyebrow` |
+| `models/AddHolidaysModal.jsx` | 440 | `<p>` ("Queued Holidays") | `text-xs font-semibold text-gray-500 uppercase tracking-widest` | `Fonts.eyebrow` |
+| `models/EditLeaveModal.jsx` | 529 | `<label>` ("Leave Period") | `text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block` | `` `${Fonts.eyebrow} mb-2 block` `` |
+| `models/EditLeaveModal.jsx` | 583 | `<label>` ("Leave Type") | `... tracking-wide mb-1 block` | `` `${Fonts.eyebrow} mb-1 block` `` |
+| `models/EditLeaveModal.jsx` | 613 | `<label>` ("Day Type") | `... tracking-wide block` | `` `${Fonts.eyebrow} block` `` |
+| `models/EditLeaveModal.jsx` | 715 | `FormInput`'s `labelClassName` prop (Drive Link) | `"... tracking-wide mb-1 block"` (plain string) | `` `${Fonts.eyebrow} mb-1 block` `` (template literal) |
+| `models/ManagerEditLeaveRequest.jsx` | 1081, 1093, 1128, 1183 | `<label>` (×4: "Employee's Reason"/"Leave Type"/"Leave Period"/"Day Type") | same 4 patterns as `EditLeaveModal.jsx` | same 4 replacements as `EditLeaveModal.jsx` |
+| `charts/LeaveDetailsPage.jsx` | 178 | `<h2>` ("Leave Types") | `text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3` | `` `${Fonts.eyebrow} mb-3` `` |
+| `HRManageTools.jsx` | 433 | `<h4>` (dynamic `{title}`) | `text-sm font-bold text-gray-500 uppercase tracking-wider` | `Fonts.eyebrow` |
+
+Every file needed a new `import { Fonts } from "../../../components/Fonts/Fonts";` (or `"../../components/Fonts/Fonts"` for `HRManageTools.jsx`, one directory shallower) — none of the 7 files imported `Fonts` before this task.
+
+### Deliberate value changes as part of adopting the canonical token
+
+Per the task's own explicit approval, three of the seven files' pre-migration values differed from the new token and were intentionally normalized: `ApplyLeaveOnBehalf.jsx`'s `text-[10px] font-bold` → the canonical `text-xs font-semibold`; `AddHolidaysModal.jsx`'s `tracking-widest` → `tracking-wider`; `HRManageTools.jsx`'s `text-sm font-bold` → `text-xs font-semibold`. These are visually small, deliberate convergences, not errors.
+
+### Semantic HTML preservation
+
+No tag was changed — `<label>` stayed `<label>` (9 instances), `<p>` stayed `<p>` (2 instances), `<h2>` stayed `<h2>`, `<h4>` stayed `<h4>`. Only the typography class expression was replaced in every case.
+
+### DatePicker/DateRangePicker caution
+
+`CompOffRequestModal.jsx` imports `react-datepicker` directly, and `ApplyLeaveOnBehalf.jsx`/`EditLeaveModal.jsx`/`ManagerEditLeaveRequest.jsx` all import the local `DateRangePicker.jsx`. None of those imports or any date-picker-related code were touched — only the unrelated eyebrow-label `<label>`/`<p>`/`<h2>`/`<h4>` elements in each file were edited, confirmed via per-file diff review.
+
+### Scope discipline
+
+No other typography migration group was started (no page titles beyond P2.22a's already-completed set, no form labels, no raw tables, no modal typography, no helper/error text). `PageHeader.jsx`, `EmptyState.jsx`, `StatusBadge.jsx`, `Button.jsx`, `DataTable.jsx`, `Tabs`, `Modal.jsx`, `PageContainer.jsx`, and `BackButton.jsx` were not modified. No unrelated cleanup was performed.
+
+### Files modified
+
+`src/components/Fonts/Fonts.jsx`, `src/pages/leave_management/models/CompOffRequestModal.jsx`, `src/pages/leave_management/models/ApplyLeaveOnBehalf.jsx`, `src/pages/leave_management/models/AddHolidaysModal.jsx`, `src/pages/leave_management/models/EditLeaveModal.jsx`, `src/pages/leave_management/models/ManagerEditLeaveRequest.jsx`, `src/pages/leave_management/charts/LeaveDetailsPage.jsx`, `src/pages/leave_management/HRManageTools.jsx`, `docs/ui/phase-2-leave-management.md`.
+
+### Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### git diff --check
+
+✅ Clean — only the pre-existing LF/CRLF informational notice on the docs file.
+
+### Confirmation no commit/push performed
+
+Confirmed — all source-file changes plus this documentation update remain in the working tree for local review.
+
+## P2.22c — Form Label Typography Consistency
+
+### Canonical form-label sources read
+
+`FormInput.jsx`/`FormTextArea.jsx` already render `Fonts.label` (`font-sans text-sm font-medium text-gray-700`) for their built-in labels — unchanged, not touched. `FormSelect.jsx` duplicates the same literal classes rather than referencing the token (a pre-existing, purely cosmetic code-quality nit, not a visual inconsistency — left alone, out of this task's scope). A separate "form foundation" layer already exists and was the real target for this task's candidates: `FormLabel.jsx` (`<label className={`${Fonts.label} ${className}`}>{children}{required asterisk}</label>`), `FormField.jsx` (composes `FormLabel`+`FormError`/`FormHelperText` around arbitrary children), and `FormError.jsx`. All three were read fresh and used exactly as-is — none were modified.
+
+### Candidate source
+
+Used only the P2.22 audit's own "Form labels not using `Fonts.label` / not going through `FormInput`/`FormSelect`" table. No new candidates were discovered or added.
+
+### Per-candidate disposition
+
+| File | Line(s) | Verdict | Reason |
+|---|---|---|---|
+| `ruleBook/RuleBookPage.jsx` | 219 | **Migrated** | Standalone `<label>` sitting directly above a `FormSelect` ("Action Type") — a genuine, simple field label with no embedded control. Swapped to `<FormLabel className="mb-1">Action Type</FormLabel>`. |
+| `EnterpriseConfigManager.jsx` | 447 | **Migrated** | Standalone label for a dynamically-rendered form field (`config.fields.map`), each in its own full-width row (`space-y-5`), not a dense grid. Its manual `{field.required && <span className="text-red-500 ml-1">*</span>}` is functionally and visually identical to `FormLabel`'s own built-in `required` prop, so this was a clean drop-in: `<FormLabel className="mb-2" required={field.required}>{field.label}</FormLabel>`. |
+| `EnterpriseConfigManager.jsx` | 172 | **EXCLUDE — specialized label structure** | This `<span>` is the option text for a checkbox inside a `<label>` that wraps the embedded `<input type="checkbox">` itself (multi-select option row), not a standalone field label. `FormLabel` doesn't support wrapping a control as `children`; migrating would require restructuring the checkbox/label association. |
+| `EnterpriseConfigManager.jsx` | 189 | **EXCLUDE — specialized label structure** | Same reasoning — this is a toggle-switch's caption `<span>` inside a `<label>` that wraps the toggle's hidden checkbox input ("Enable parallel approval"). Embedded-control pattern, not a plain field label. |
+| `models/ApprovalRulesPage.jsx` | 361 | **Migrated** | Standalone label in a local `Dropdown` component (Headless UI `Listbox`-based), missing only the canonical gray-700 color. Swapped to `<FormLabel className="mb-1">{label}</FormLabel>`. |
+| `models/ManageActiveLeaveBlocks.jsx` | 43-45 | **EXCLUDE — specialized label structure** | This is the `Toggle` sub-component's caption `<span id={`${id}-label`}>`, associated with its custom switch `<button aria-labelledby={`${id}-label`}>` via ARIA, not via `<label for>`. It isn't even a `<label>` element, and swapping to `FormLabel` (which always renders a `<label>`) would change the accessibility wiring for no visual gain. |
+| `models/ManageActiveLeaveBlocks.jsx` | 130 | **Migrated** | The local `MultiSelect` component's own standalone label (conditionally rendered `{label ? <label>...</label> : null}`), not tied to any embedded control. Swapped to `{label ? <FormLabel className="mb-1">{label}</FormLabel> : null}` — `FormLabel`'s own `if (!children) return null` guard reproduces the same conditional behavior. |
+| `models/BlockLeaveDates.jsx` | 41 (Toggle caption, not in the audit's own line list but the same pattern) | **EXCLUDE — specialized label structure** | Same `Toggle`/`aria-labelledby` pattern as `ManageActiveLeaveBlocks.jsx` above; not touched (and wasn't part of the audit's cited line list for this file). |
+| `models/BlockLeaveDates.jsx` | 125 | **Migrated** | Same `MultiSelect` standalone-label pattern as `ManageActiveLeaveBlocks.jsx` line 130. Migrated identically. |
+| `models/BlockLeaveDates.jsx` | 422 | **EXCLUDE — DatePicker/DateRangePicker caution** | This label sits immediately above a `<DateRangePicker>` usage in the same local component. Although the label itself is a generic, reusable pattern and not part of `DateRangePicker.jsx`'s own code, this task explicitly forbids touching anything DatePicker/DateRangePicker-adjacent — left untouched out of caution rather than argue the boundary. |
+| `models/BlockLeaveDates.jsx` | 501 | **Migrated** | Standalone "Project" label above a `FormSelect`, in its own full-width row (not a dense grid). Migrated to `<FormLabel className="mb-1">Project</FormLabel>`. |
+| `models/BlockLeaveDates.jsx` | 554 | **Migrated** | Standalone "Members" label above a loading skeleton for the members `MultiSelect`. Migrated to `<FormLabel className="mb-1">Members</FormLabel>`. |
+| `models/AddHolidaysModal.jsx` | 286, 301, 316, 335, 354 | **EXCLUDE — specialized dense-form labels** | On closer read, these 5 labels (`text-xs font-semibold text-gray-600`) sit inside a tight `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3` quick-add layout, each paired with an icon-prefixed input. This is a deliberately compact, internally-consistent mini-convention across all 5 fields in the same modal — not accidental drift. `Fonts.label`/`FormLabel` render at `text-sm font-medium`, visibly larger; forcing that into a 3-column dense grid risks vertical rhythm/layout regression (criterion 6). Their embedded required marks also use a non-canonical `text-red-400` (vs. the standard `text-red-500`), but since the label typography itself is being left alone as intentionally compact, no partial fix was made either — left fully untouched, documented here as a known finding for a future, more targeted "dense-form" decision if the team wants one. |
+
+### Semantic HTML / behavior preservation
+
+No tag types were changed for any migrated instance beyond `<label>` → `FormLabel`'s own rendered `<label>` (same element, same DOM output shape). Every migrated instance's conditional-render guard (`{label ? ... : null}`, `{field.required && ...}`) is reproduced exactly by `FormLabel`'s own internal logic (`if (!children) return null`, `{required ? <span className="ml-1 text-red-500">*</span> : null}`). No `htmlFor` was introduced on any migrated label — none of the originals had a working `htmlFor` association either (a pre-existing gap already documented in this project's history for `FormSelect`/custom-dropdown labels), so no behavior was gained or lost.
+
+### DatePicker/DateRangePicker caution
+
+`ManageActiveLeaveBlocks.jsx` and `BlockLeaveDates.jsx` both import `DateRangePicker`. Every edit in both files was verified to be in a separate, unrelated local component (`MultiSelect`, or the "Project"/"Members" field labels) — never inside `DateRangePicker.jsx` itself and never touching its props or usage. The one label that sits directly above a `DateRangePicker` call (`BlockLeaveDates.jsx` line 422) was excluded entirely out of caution, as documented above.
+
+### Files modified
+
+`src/pages/leave_management/ruleBook/RuleBookPage.jsx`, `src/pages/leave_management/EnterpriseConfigManager.jsx`, `src/pages/leave_management/models/ApprovalRulesPage.jsx`, `src/pages/leave_management/models/ManageActiveLeaveBlocks.jsx`, `src/pages/leave_management/models/BlockLeaveDates.jsx`, `docs/ui/phase-2-leave-management.md`.
+
+### Scope discipline
+
+`Fonts.eyebrow` was not modified. `PageHeader`, `EmptyState`, `StatusBadge`, `Button`, `DataTable`, `Tabs`, `Modal`, `PageContainer`, and `BackButton` were not touched. No page titles, eyebrow labels, raw tables, modal typography, or helper/error text were migrated in this task. No new component or token was created — every migration reused the existing `FormLabel` component as-is.
+
+### Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### git diff --check
+
+✅ Clean — only the pre-existing LF/CRLF informational notice on the docs file.
+
+### Confirmation no commit/push performed
+
+Confirmed — all source-file changes plus this documentation update remain in the working tree for local review.
+
+## P2.22d — Raw Table Typography Consistency
+
+### Canonical DataTable typography (source of truth)
+
+Re-read `src/components/patterns/DataTable.jsx` fresh. Effective typography: header `<th>` = `px-4 py-3 text-sm font-semibold text-white`, rendered on a `bg-gradient-to-r from-blue-900 to-indigo-900` `<tr>`; body = `text-sm text-gray-700` set once at the `<tr>` level (no explicit per-`<td>` font classes). Critically, the canonical header's `text-white` is only legible because it sits on that specific dark gradient — it is not a portable "header text" value on its own.
+
+### Candidate source and re-verification
+
+Started from the P2.22 audit's "Table headers/bodies reimplementing a raw `<table>`" list (`models/ApprovalQueue.jsx`, `ruleBook/RuleBookPage.jsx`, `EnterpriseConfigManager.jsx`, `models/EditBlockLeaveModal.jsx`, `models/HandleLeaveRequestAndApprovals.jsx`) plus the separately-noted `HRManageTools.jsx` `LeaveTable`. Every file was re-read fresh at its current line numbers before any change.
+
+### Key finding: header background determines whether header typography can be migrated at all
+
+Of the 6 candidate files, only two already sit on the canonical dark `blue-900`/`indigo-900` gradient: `HRManageTools.jsx`'s `LeaveTable` and `HandleLeaveRequestAndApprovals.jsx`. The other four (`ApprovalQueue.jsx`: `bg-gray-50`; `RuleBookPage.jsx`: `bg-indigo-100`; `EnterpriseConfigManager.jsx`: `bg-gradient-to-r from-slate-50 to-slate-100`; `EditBlockLeaveModal.jsx`: `bg-gray-50`) use light header backgrounds. Applying canonical `text-white` header text to a light background would make the header text disappear — a real accessibility/visibility regression, not a typography nuance. Since changing the background is a color/structural change outside this task's typography-only scope, **header text in all four light-header files was left untouched** — this is a genuine capability mismatch, not an oversight.
+
+### Migrations made
+
+| File | Change | Reason it's safe |
+|---|---|---|
+| `HRManageTools.jsx` (`LeaveTable`) | Header `<tr>`: `text-white text-xs font-semibold tracking-wider` → `text-white text-sm font-semibold` (dropped `tracking-wider`, fixed `text-xs`→`text-sm`) | Already on the canonical dark gradient — this brings it to a byte-for-byte match with `DataTable`'s header text convention. Body already inherited `text-sm text-gray-700` from the table/td classes — no change needed there. |
+| `models/HandleLeaveRequestAndApprovals.jsx` | Header: removed the dead `text-xs` class from all 11 `<th>` elements (the audit's own finding — the `<tr>` already correctly declares `text-sm`, but every individual `<th>` was overriding it to `text-xs`, which is what actually rendered). Body: `<tr className="hover:bg-gray-50 transition-colors text-xs">` → `... text-sm` | Already on the canonical dark gradient (header) / already gray-based (body). No `<td>` overrides its own text size, so a single class change on the row cleanly fixes every cell without touching each one individually. |
+| `models/EditBlockLeaveModal.jsx` | Body `<td>` (employee name column): `text-gray-800` → `text-gray-700` | Single-tone body column (no dual-tone hierarchy to preserve), already `text-sm`; only the exact gray shade differed from canonical. Header light background (`bg-gray-50`) left untouched per the finding above. |
+
+### Excluded — capability mismatch or intentional design, with reasons
+
+| File | Exclusion reason |
+|---|---|
+| `models/ApprovalQueue.jsx` (3 raw tables: `KeyValueTable`, `DiffTable`, `BalancesTable`) | **Header:** light `bg-gray-50` — can't take canonical white header text without a background change (out of scope). **Body:** uses a deliberate two-tone convention (`font-medium text-gray-800` for the key/label column, plain `text-gray-600` for the value column) to visually distinguish label from value across all 3 tables in this file — `DataTable`'s own body convention is a single flat `text-gray-700` with no equivalent two-tone concept, so flattening these would remove an intentional visual hierarchy, not just fix an inconsistency. |
+| `ruleBook/RuleBookPage.jsx` | **Header:** light `bg-indigo-100` — same contrast issue. **Body:** same deliberate two-tone pattern (`font-medium text-gray-800` name / `text-gray-600` description) as `ApprovalQueue.jsx` — left intact for the same reason. |
+| `EnterpriseConfigManager.jsx` | **Header:** light gradient (`from-slate-50 to-slate-100`, not the canonical dark blue/indigo one) — same contrast issue. **Body:** uses the `slate` color palette (`text-slate-900`/`text-slate-700`) consistently across this entire page (buttons, badges, the header band itself, form labels already noted in P2.22c) — this table's colors match the rest of its own page, not `DataTable`'s `gray` palette; fixing only the table in isolation would make it inconsistent with its own surrounding page rather than more consistent. Already flagged in the P2.22 audit as a broader page-level slate-vs-gray divergence, not a table-specific one. |
+
+### Semantic HTML / structure preservation
+
+No `<table>` was converted to `DataTable`. No `<thead>`/`<tbody>`/`<tr>`/`<th>`/`<td>` element was added, removed, or reordered. Sticky-column behavior, checkbox columns, row click handlers, and all business logic in `HandleLeaveRequestAndApprovals.jsx` (selection state, pagination, loading/empty branches) are untouched — verified by diff review showing only `className` edits.
+
+### Files modified
+
+`src/pages/leave_management/HRManageTools.jsx`, `src/pages/leave_management/models/HandleLeaveRequestAndApprovals.jsx`, `src/pages/leave_management/models/EditBlockLeaveModal.jsx`, `docs/ui/phase-2-leave-management.md`.
+
+### Scope discipline
+
+`DataTable.jsx` itself was not modified. No table was restructured or converted. No other typography group (page titles, eyebrow labels, form labels, modal typography, helper/error text) was touched in this task.
+
+### Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### git diff --check
+
+✅ Clean — only the pre-existing LF/CRLF informational notice on the docs file.
+
+### Confirmation no commit/push performed
+
+Confirmed — all source-file changes plus this documentation update remain in the working tree for local review.
+
+## P2.23 — Complete Leave Management Typography Consistency Audit
+
+**AUDIT-ONLY task. Zero source files were modified.** This is a fresh, from-scratch re-audit — findings from the P2.22 audit were deliberately not trusted or reused; every file below was re-read against current source (i.e. after P2.22a–d's migrations).
+
+### 1. Branch
+
+`intra-ui/unify`
+
+### 2. Canonical typography sources re-read fresh
+
+`PageHeader.jsx`, `FormLabel.jsx`, `FormInput.jsx`, `FormTextArea.jsx`, `FormSelect.jsx`, `FormField.jsx`, `FormError.jsx`, `DataTable.jsx`, `Button/Button.jsx`, `Modal/modal.jsx`, `ConfirmDialog.jsx`, `EmptyState.jsx`, `StatusBadge.jsx`, `BackButton.jsx`, `PageContainer.jsx`, `ui/tabs.jsx`, `LoadingSpinner.jsx`, `patterns/Loaders.jsx`, `Fonts/Fonts.jsx`. (Actual paths differ from the task's assumed `src/components/DataTable.jsx`/`Button.jsx`/`Fonts.jsx` — the real locations are under `patterns/`, `Button/`, and `Fonts/` respectively; used the real paths.)
+
+### Global font family — traced from actual configuration, not assumed
+
+- `tailwind.config.js`: `fontFamily: { sans: ['Inter','sans-serif'], heading: ['Poppins','sans-serif'], mono: ['Fira Code','monospace'] }` (under `theme.extend`).
+- `index.html` loads the matching Google Fonts: Inter (300–700), Poppins (400–700), Fira Code (400–500).
+- `src/index.css`'s `body` rule is only `@apply bg-background text-foreground` — **no explicit font-family class anywhere on `body`/`#root`/`App.jsx`**.
+- **Finding:** because `fontFamily.sans` is customized (not left at Tailwind's default), Tailwind's own Preflight base layer automatically applies it to the global `html` selector. This means **Inter is the actual, real default font for the entire application, including every Leave Management screen, with zero explicit `font-sans` classes required anywhere.** `font-heading` (Poppins) and `font-mono` (Fira Code) are opt-in, used only where a component explicitly requests them (all `Fonts.heading1-4`/`subheading` tokens, `Fonts.code`).
+- **Deviations found in Leave Management:** none live. `models/ToastMsg.jsx` has an inline `fontFamily: "sans-serif"` style, but that file is confirmed dead code (see below) — not a live deviation. No other inline `fontFamily`, no arbitrary `font-family-[...]` utility, no `font-serif` usage anywhere in the module.
+- **Conclusion:** font-family is 100% consistent across all live Leave Management code — this dimension has zero findings.
+
+### 3. File classification (live vs. dead) — full module, 71 files
+
+**Confirmed dead/unreferenced (zero importers found via fresh repo-wide grep):**
+`ProtectedRoutes.jsx`, `models/ProjectMembersOnLeaveDemo.jsx`, `models/SkeletonTable.jsx`, `hooks/EmployeeSearchDropdown.jsx`, `EmployeePanelold.jsx`, `models/ActionDropdown.jsx` (distinct from the live `ActionDropdownHrTools.jsx`/`ActionDropDownPendingLeaveRequests.jsx`), `hooks/Modal.jsx` (a legacy local modal, distinct from canonical `Modal/modal.jsx`), `models/ReviewModal.jsx`, `models/ToastMsg.jsx`.
+
+**Orphaned-in-practice (only reachable through a dead file):** `models/CompOffPage.jsx` — its only importer is the dead `EmployeePanelold.jsx`; not reachable from any live route today, though not literally zero-importer. Its typography (including a `text-sl` typo, see below) is moot until/unless it's revived.
+
+**Live, with large dead/commented-out blocks inside them (block itself out of scope, rest of file live and audited):** `HRAdminPanel.jsx` (commented import), `hooks/useLeaveData.jsx` (commented websocket block), `websockets/WebSocketProvider.jsx` (commented duplicate provider, ~lines 279-535), `AdminPanel.jsx` (commented stat-cards block), `charts/Calendar.jsx` (commented legacy top half), `models/LeaveHistory.jsx` (~1400-line commented trailing history of old versions), `EmployeeDashboard.jsx` (~330-line commented legacy version at top), `models/ManagerEditLeaveRequest.jsx` (lines 1-609 commented legacy version), `models/CompOffRequestsTable.jsx` (a commented empty-state block that — notably — already correctly references `Fonts.heading4`/`Fonts.caption`, dead but not wrong), `models/ActionButtons.jsx` (a commented link).
+
+**Everything else (~58 files) is live** — either directly routed via `App.jsx`, a live nested component, or an imported utility/UI component. No new dead files were found beyond what's listed above; this matches (and in a couple of cases sharpens) prior findings.
+
+### 4–5. Typography dimensions and semantic hierarchy — consolidated findings
+
+Font-family: no findings (see above). Font-smoothing (`antialiased`): not used anywhere in the module (not a gap — the app doesn't use this utility anywhere as a matter of house style, so there's no inconsistency to flag). Text-style (italic/underline/strikethrough): used exactly where expected (`Fonts.caption`'s italic, `Fonts.link`'s hover:underline) — no inconsistent use found. Opacity/muted treatment: secondary text is conveyed via color (gray-400/500) rather than `opacity-*` utilities almost everywhere, consistently; a few themed widgets (`UpcomingHolidays.jsx`) use `opacity-70/75/90` on white text over a colored gradient — legitimate, specialized, not a gray-scale-muted-text situation.
+
+The remaining dimensions (font-size, font-weight, text-color, letter-spacing, text-transform, line-height) surfaced real findings, folded into the per-role comparison in section 6 below rather than listed dimension-by-dimension, since nearly every genuine finding is a multi-dimension drift (e.g. a label wrong in both size and weight at once).
+
+### 6. Compare equivalent elements — the actual findings
+
+| Role | Canonical pattern | Outliers (file:line) | Severity | Recommendation |
+|---|---|---|---|---|
+| Section heading (generic) | No single token — `Fonts.subheading` (`font-heading text-lg font-medium text-gray-700`) is the closest fit | `models/CompOffPage.jsx:116` — literal `text-sl` (invalid Tailwind class, silently no-ops) | Med (file is orphaned-in-practice, so real-world impact is currently zero) | Not actionable until the file is revived; note only |
+| Section heading | Same | `EmployeeDashboard.jsx:506,514,518` (live, routed) — literal `text-small` (invalid Tailwind class, silently no-ops on 3 headings: "My Leave Stats"/"Leave Balances"/"Leave History") | **High** — live, routed, visibly under-styled | Genuine bug (typo), not a design choice; candidate for a future fix task (not this audit) |
+| Subsection heading | `Fonts.subheading` | `HRManageTools.jsx:164` (`text-lg font-semibold text-gray-800`), `ruleBook/RuleBookPage.jsx:291,357` (`text-lg font-medium text-gray-700` — closer but still not the token), `charts/LeaveDetailsPage.jsx:222` (`text-lg font-semibold text-gray-700`) — 3 different weight/color combinations for the same role across 3 files | Med | Candidate for a future "subsection heading" migration pass, same shape as P2.22a's page-title work |
+| Subsection/tab-panel heading | N/A (not a `PageHeader` case — these are tab-panel content, confirmed non-routed) | `models/ManageActiveLeaveBlocks.jsx:867`, `models/BlockLeaveDates.jsx:478` — both `text-xl font-semibold` with **no color and no font-heading at all** | Med | Independent of the (already-decided) page-title-migration exclusion — this is about the raw class itself lacking any color, not about which component renders it |
+| Section heading (form group) | `Fonts.subheading` | `models/BlockLeaveDates.jsx:561,583,601` — `text-base font-semibold` with no color class (renders default black) | Low | Minor, repeated (3×) |
+| Heading with zero typography classes | any heading token | `models/ProjectMembersOnLeave.jsx:174` — `<h3 className="font-medium">` (no size, no color) | Low-Med | Only heading in the module with zero size/color classes |
+| Eyebrow / section label | `Fonts.eyebrow` (added P2.22b) | `models/ApplyLeaveOnBehalf.jsx` half-day sub-labels ("Start Day"/"End Day", ~lines 321,335) — `text-[10px] font-bold text-indigo-600 uppercase` — a **leftover instance P2.22b did not migrate**, sitting right next to 3 already-migrated siblings in the same file | Med | Genuine gap in the P2.22b migration — same file, same semantic role, unmigrated |
+| Form label (value-correct, component-incorrect) | `Fonts.label` via `FormLabel` | Recurring across ≥7 files: `CancellationModal.jsx:77`, `EditBlockLeaveModal.jsx:268,317`, `AddEmployeeModal.jsx:133`, `AddLeaveTypeModal.jsx` (6+ instances), `RequestLeaveModal.jsx:556,663`, `EmployeeLeaveBalances.jsx:543` (missing size/color entirely) | Low (cosmetically invisible — value matches `Fonts.label` byte-for-byte in most cases) | Not a visible bug today; a maintenance-risk note only — if `Fonts.label` ever changes, these literal copies won't follow |
+| Form label (dense-grid, already assessed) | `Fonts.label` | `models/AddHolidaysModal.jsx` — 5 instances, `text-xs font-semibold text-gray-600` | Low | **Already evaluated and deliberately excluded in P2.22c** — intentional compact style in a tight 3-column grid; re-confirmed here, not a new finding |
+| Modal title (hand-rolled modals bypassing canonical `Modal`) | `Fonts.heading4` via `Modal/modal.jsx` | `models/LeaveUploadWizard.jsx:93` (`text-xl font-bold text-gray-800`), `charts/AllHolidaysGrid.jsx:45` (`text-lg font-bold text-white tracking-tight`, on colored header), `EnterpriseConfigManager.jsx:434` (`text-xl font-bold text-white`), `models/EmployeeLeaveBalances.jsx:510` (`text-xl font-bold`, in a fully hand-rolled `fixed inset-0` modal, not the `Modal` component at all), `models/HandleLeaveRequestAndApprovals.jsx:1101` (`text-xl font-semibold text-gray-800`, `showHeader={false}` custom title) | Med (5 instances is a real recurring pattern) | These 5 hand-rolled modal titles share the same drift (bold/semibold instead of `Fonts.heading4`'s medium weight, no `font-heading`) — a genuine repeated pattern, though 2 sit on colored backgrounds (specialized) and can't literally reuse the token's dark-gray color even if weight were aligned |
+| Table header (raw tables) | `DataTable.jsx`: `text-sm font-semibold text-white` on dark gradient | `models/ApprovalQueue.jsx` (~30 `<th>`, light `bg-gray-50` header), `EnterpriseConfigManager.jsx:342-348` (light slate gradient header) | Low | **Already evaluated and deliberately excluded in P2.22d** — light backgrounds can't take white header text without a contrast break; re-confirmed here |
+| Table body (raw tables, two-tone) | `DataTable.jsx`: flat `text-sm text-gray-700` | `models/ApprovalQueue.jsx` (`text-gray-800`/`text-gray-600` two-tone), `EnterpriseConfigManager.jsx` (`slate-900`/`slate-700`, page-consistent palette) | Low | **Already evaluated and deliberately excluded in P2.22c/d** — intentional two-tone hierarchy / page-consistent slate palette; re-confirmed |
+| Page title vs. section heading (hierarchy collision) | `Fonts.heading3` (page) should read larger/heavier than `Fonts.heading4` (section) | `EnterpriseConfigManager.jsx:234` (page title) and `:295` (section heading "Leave Approval Rules") both use the **identical** `text-2xl font-bold text-slate-900` — no visual hierarchy between the two levels | Med-High | Whole-file finding — this page never touches `Fonts.jsx`/canonical components anywhere (title, table, form labels, modals) — the most systemically divergent file in the module, consistent with what P2.22 already flagged, now confirmed to also affect heading hierarchy specifically |
+| Loading text | `LoadingSpinner.jsx`: `text-sm text-gray-600`, used everywhere else in the module | `models/LeavePolicyViewer.jsx:220` — `<p className="text-center mt-6">Loading...</p>`, zero typography classes, not using `LoadingSpinner` at all | Med | Sole exception in the entire module — every other loading state uses `LoadingSpinner` |
+| Warning/error/success message | `FormError.jsx`: `text-xs text-danger` | `models/AddEmployeeModal.jsx:104-105` (`text-sm` not `text-xs`, literal `red-600`/`green-600` not the `danger` token), `models/PendingLeaveRequests.jsx:97` (bare `text-red-500`, no size at all) | Low | Colors are semantically correct in both cases (this is not a "flatten error colors" situation) — only the size/token-vs-literal mismatch is the finding |
+| Status text (colored tag, same file) | N/A (bespoke tags, not `StatusBadge`) | `models/EditBlockLeaveModal.jsx:407-417` — "Blocked"/"New Block"/"Free" use `font-medium`/`font-semibold`/`font-medium` respectively — 3 sibling states, inconsistent weight | Low | Cosmetic, very low impact |
+| Card/row title (no canonical mapping) | Closest: `Fonts.subheading` | `models/PendingApprovalsQueueView.jsx:81` (`font-semibold text-lg text-gray-900`), `HRManageTools.jsx:359` (`font-bold`, no size at all, AdminCard title) | Low | No canonical "card row title" component exists to migrate to; noted for awareness only |
+| Branded/themed heading (blue accent) | N/A — intentional accent, not gray-scale | `models/RevokeLeaveRequests.jsx` (`text-blue-900`, on a `border-l-4 border-blue-500` card), `models/CompOffBalanceRequests.jsx:107` (`text-blue-900`, same accent-strip pattern) | n/a | **Specialized/intentional**, not a finding — both tie their heading color to their own visible accent border |
+| Full-bleed error page | N/A — intentionally distinct branding | `Unauthorized.jsx` (h1 "401" at `text-6xl md:text-7xl`, h2 "Access Denied" with a gradient-text treatment) | Low (borderline) | Standalone splash page, reasonably read as deliberate branding rather than an oversight — noted for completeness only |
+| Blank/missing typography (literal bug, not drift) | any explicit class | `models/BlockLeaveDates.jsx` — 4 `className=" "` (whitespace-only) summary-sidebar values, already found in the original P2.22 audit and still present (never fixed, since P2.22a-d didn't target this file's summary sidebar) | Med | Genuine, unambiguous gap — no classes applied at all, not merely inconsistent ones |
+
+### 7. Canonical component consumers — override check
+
+No Leave Management consumer of `PageHeader`, `FormLabel`, `FormInput`, `FormTextArea`, `FormSelect`, `DataTable`, `Button`, `Modal`, `ConfirmDialog`, `EmptyState`, `StatusBadge`, `BackButton`, `PageContainer`, `Tabs`, `PageLoader`/`InlineLoader`/`TableSkeleton` was found passing a `className`/`labelClassName`/etc. override that fights the component's own typography (e.g. no `<PageHeader className="text-...">` pattern exists anywhere in the module). The one confirmed **pre-existing conflict lives inside a canonical component itself, not a consumer override**: `Modal/modal.jsx`'s subtitle className (`` `${Fonts.paragraphMuted} mt-1 text-sm` ``) combines `paragraphMuted`'s `text-base` with an appended `text-sm` in the same string — already documented in the original P2.22 audit, re-confirmed present and unfixed (out of scope to touch `Modal.jsx` in an audit task). Also re-confirmed: `ConfirmDialog.jsx`'s description text is `text-sm text-gray-600`, not the `Fonts.caption`/`paragraphMuted` gray-500 family — a small, canonical-component-level drift, not a consumer issue.
+
+### 8. Capability gaps
+
+None rise to this project's "3+ genuinely reusable, presentational, structural" bar for a *new* canonical addition. The closest candidate is the "hand-rolled modal title" pattern (5 instances, section 6 above) — but the fix there is "use the existing `Modal` component," not "build a new capability," so it's a migration opportunity, not a gap.
+
+### 9. Pre-existing issues discovered (not fixed — audit only)
+
+- `Modal/modal.jsx` subtitle's conflicting `text-base`/`text-sm` classes (carried over from the original P2.22 audit).
+- `ConfirmDialog.jsx` description uses `gray-600` instead of the `Fonts.caption`/`paragraphMuted` `gray-500`.
+- Two invalid Tailwind classes acting as silent no-ops: `models/CompOffPage.jsx:116` (`text-sl`, orphaned-in-practice) and `EmployeeDashboard.jsx:506,514,518` (`text-small`, live and routed).
+- `models/BlockLeaveDates.jsx`'s 4 blank `className=" "` summary values (carried over, unfixed).
+- `models/AddLeaveTypeModal.jsx:325` — a `placeholder:text-gray-400` modifier on a `<label>` element, which can never apply (harmless dead class, carried over).
+
+### 10-11. DatePicker/DateRangePicker
+
+Confirmed excluded from all four audit batches. Files that import `DateRangePicker`/`react-datepicker` (`CompOffRequestModal.jsx`, `ApplyLeaveOnBehalf.jsx`, `EditLeaveModal.jsx`, `ManagerEditLeaveRequest.jsx`, `ManageActiveLeaveBlocks.jsx`, `BlockLeaveDates.jsx`) were still audited for their *unrelated* typography, with DatePicker/DateRangePicker internals explicitly skipped in every case.
+
+### 12. Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings (no source file was touched by this audit, so this reconfirms the baseline already established by P2.22d).
+
+### 13. Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### 14. git diff --check
+
+✅ Clean — only the pre-existing LF/CRLF informational notice on the docs file.
+
+### 15. Confirmation NO source files were modified
+
+Confirmed — `git status --short` before and after this audit shows the identical set of files already modified by P2.22a–d (none touched further), plus only this documentation addition on top.
+
+### 16. Confirmation DatePicker/DateRangePicker untouched
+
+Confirmed per section 10-11 above.
+
+### 17. Confirmation no new component/token was created
+
+Confirmed — no `Typography.jsx`/`Text.jsx`/`Label.jsx`/`Heading.jsx`/`BodyText.jsx`, no new `Fonts.jsx` entry, no new utility class. `Fonts.eyebrow` (added in P2.22b) was read as an existing reference, not modified or duplicated.
+
+### 18. Confirmation no canonical component was modified
+
+Confirmed — `PageHeader`, `FormLabel`, `FormInput`, `FormTextArea`, `FormSelect`, `DataTable`, `Button`, `Modal`, `ConfirmDialog`, `EmptyState`, `StatusBadge`, `BackButton`, `PageContainer`, `Tabs`, `Loaders`/`LoadingSpinner`, `Fonts.jsx` were all read-only.
+
+### 19. Summary tally
+
+- Files audited: 71 (all of `src/pages/leave_management/**`, excluding `DateRangePicker.jsx`)
+- Dead/unreferenced: 9 confirmed, 1 orphaned-in-practice
+- Genuine new outliers found (not already known/excluded from P2.22/P2.22a-d): ~14, spanning 2 invalid-class typos (1 live/high-severity, 1 orphaned), 1 missed eyebrow-migration instance, 1 unmigrated edit-modal, 1 unstyled loading state, 1 heading-hierarchy collision, and several low-severity weight/color drifts
+- Already-assessed-and-excluded findings re-confirmed (no change in disposition): raw-table headers/bodies (P2.22d), dense-grid form labels (P2.22c), tab-panel BackButton headings (P2.22a)
+- Most severe live finding: `EmployeeDashboard.jsx`'s `text-small` typo (3 instances, live routed page, silently strips styling)
+
+### 20. Next step
+
+This is audit-only — no migration was performed. The findings in section 6 are presented for review; none were auto-fixed, cleaned up, or normalized, per this task's hard rules.
+
+## P2.23a — Typography Outlier Remediation
+
+### Files audited
+
+The 5 files named in the task (A–E below), each re-read completely and fresh before editing. Plus a post-fix repo-wide grep sweep across all of `src/pages/leave_management/**` for the two known invalid-class typos (`text-small`, `text-sl`) to confirm no live instance was missed.
+
+### Files modified
+
+`src/pages/leave_management/EmployeeDashboard.jsx`, `src/pages/leave_management/models/ApplyLeaveOnBehalf.jsx`, `src/pages/leave_management/models/EmployeeLeaveBalances.jsx`, `src/pages/leave_management/models/LeavePolicyViewer.jsx`, `src/pages/leave_management/EnterpriseConfigManager.jsx`, `docs/ui/phase-2-leave-management.md`.
+
+### A. EmployeeDashboard.jsx — `text-small` typo
+
+**Before:** 3 live `<h2 className="text-small font-semibold m-4">` headings ("My Leave Stats", "Leave Balances", "Leave History") — `text-small` is not a valid Tailwind utility, so these silently rendered with no explicit font-size at all.
+
+**Investigation:** these are subsection headings introducing groups of dashboard widgets — the same semantic role as `Fonts.subheading` (`font-heading text-lg font-medium text-gray-700`), which is already the canonical token for this exact role elsewhere in the module (e.g. `EmptyState` titles).
+
+**After:** `<h2 className={`${Fonts.subheading} m-4`}>` — the invalid class replaced with the canonical token; the `m-4` spacing (not part of the defect) preserved unchanged. Added `import { Fonts } from "../../components/Fonts/Fonts";`.
+
+**Dead code left untouched:** 4 identical `text-small` occurrences exist inside this same file's ~330-line commented-out legacy block (lines 228, 245, 280, 299, 306) — confirmed still commented (`//`), not rendered, correctly left alone (fixing dead code would be out-of-scope cleanup).
+
+### B. ApplyLeaveOnBehalf.jsx — missed eyebrow migration
+
+**Before:** two `<label className="text-[10px] font-bold text-indigo-600 uppercase">` ("Start Day", "End Day") — a leftover pre-`Fonts.eyebrow` pattern sitting beside 3 already-migrated sibling labels in the same file.
+
+**After:** `<label className={Fonts.eyebrow}>` for both. No other classes existed on these two labels to preserve (no flex/spacing/layout utilities were present) — the entire className was the typography itself. Tag (`<label>`) and all surrounding structure (the `FormSelect` half-day dropdowns, the `showCustomHalfDay` conditional, state handlers) untouched. `Fonts` was already imported in this file (from the original P2.22b migration) — no new import needed.
+
+### C. EmployeeLeaveBalances.jsx — unmigrated edit-modal typography
+
+Investigated the edit-modal section (a hand-rolled `fixed inset-0` modal, not the canonical `Modal` component). Per this task's hard-stop rule 5 ("a change would require restructuring a modal"), **the modal shell itself was NOT converted to canonical `Modal`** — only its internal typography was corrected:
+
+- **Modal title:** `<h3 className="text-xl font-bold mb-6">` → `<h3 className={`${Fonts.heading4} mb-6`}>`. `Fonts.heading4` (`font-heading text-xl font-medium leading-snug text-gray-900`) is the same token the canonical `Modal` component itself uses for its title — this brings the hand-rolled title to visual parity with every canonical-Modal title in the app, without touching the modal's structure, open/close state, or the `isSubmitting` overlay above it.
+- **Field label:** `<label className="font-medium min-w-[150px]">{leaveTypeName}</label>` (missing explicit size/color entirely) → `<FormLabel className="min-w-[150px]">{leaveTypeName}</FormLabel>`. This is a genuine standalone form label (per section 4's mapping table) with no embedded control and no structural complexity — a safe, non-restructuring component swap, same as the ones done in P2.22c. Added imports for `Fonts` and `FormLabel`.
+- **Left unchanged:** the `isSubmitting` spinner overlay, the disabled-state logic for maternity/paternity leave types, the `FormInput` fields themselves (already canonical), all state/API/validation code.
+
+### D. LeavePolicyViewer.jsx — loading state normalization
+
+**Before:** `if (loading) return <p className="text-center mt-6">Loading...</p>;` — the sole loading state in the entire module that didn't use `LoadingSpinner`, with zero typography classes on the text itself.
+
+**After:** `if (loading) return <div className="mt-6"><LoadingSpinner text="Loading..." /></div>;` — reuses the canonical `LoadingSpinner` (`text-sm text-gray-600` internally) exactly as used everywhere else in Leave Management. `LoadingSpinner` has no `className`/margin prop, so the original `mt-6` top spacing was preserved by wrapping it in a plain `<div className="mt-6">` rather than dropped or forced into the component. The early-return condition, the `loading` state itself, and the `fetchPolicies` effect above it are completely untouched.
+
+### E. EnterpriseConfigManager.jsx — hierarchy fix, header left alone
+
+Per the task's explicit instruction, **this file's specialized top-navigation header (logo box, title, Import/Export actions) was NOT touched and was NOT forced into `PageHeader`** — that exclusion from P2.22a/d stands.
+
+Investigated the flagged hierarchy collision independent of the header: the page-level title (`text-2xl font-bold text-slate-900`, in the top nav) and a subsection title inside the tab content (`config.title`, e.g. "Leave Approval Rules") used the **identical** `text-2xl font-bold text-slate-900` class, producing no visual hierarchy between a page title and a subsection title.
+
+**Fix (typography-only, no layout change):** the subsection heading's size was reduced one step, `text-2xl` → `text-xl`, keeping `font-bold text-slate-900 mb-1` exactly as-is. This restores a visible size hierarchy (page title now reads larger than the subsection title beneath it) using only this file's own existing slate palette/weight — no `Fonts.jsx` token was introduced, no restructuring, no change to the specialized header band.
+
+Also migrated, as a genuine drive-by finding directly adjacent to this fix and matching this task's own "standalone form label → FormLabel" rule: the dynamic per-field label at the bottom of this same file (`<label className="block text-sm font-semibold text-slate-700 mb-2">{field.label}{field.required && <span className="text-red-500 ml-1">*</span>}</label>`) → `<FormLabel className="mb-2" required={field.required}>{field.label}</FormLabel>`, which reproduces the exact same visual asterisk behavior via `FormLabel`'s own built-in `required` prop. Added `import FormLabel from "../../components/forms/FormLabel";`.
+
+**Left unchanged, with reason:** the raw `<table>` (light slate gradient header, `slate-900`/`slate-700` body) — already assessed and deliberately excluded in P2.22d (light background can't take canonical white header text; body uses this page's own consistent slate palette). The two hand-rolled modal titles (`text-xl font-bold text-white` on colored headers) — colored backgrounds are a legitimate specialized case, and per this task's scope these were not named as an item to fix in E's instructions, so left untouched pending a possible future "hand-rolled modal title" pass (noted as a capability/pattern observation in the P2.23 audit, not actioned here).
+
+### Post-fix full-module safety sweep
+
+Re-ran a repo-wide grep for the two known invalid-typography-class typos across all of `src/pages/leave_management/**`:
+
+- `text-small`: 5 remaining hits, all inside `EmployeeDashboard.jsx`'s confirmed-dead commented-out legacy block — correctly left alone (hard-stop rule 6: a dead file/block is not fixed).
+- `text-sl`: 1 remaining hit, in `models/CompOffPage.jsx:116` — this file is orphaned-in-practice (only reachable via the dead `EmployeePanelold.jsx`, confirmed via fresh grep in P2.23). Per hard-stop rule 6 ("a dead/orphaned file is the only place containing the inconsistency"), **this was not fixed** — documented here rather than actioned.
+
+No other item from the P2.23 findings list was touched — the eyebrow/form-label/table findings already assessed as "SPECIALIZED EXCEPTION" in P2.22c/d (dense-grid `AddHolidaysModal.jsx` labels, `ApprovalQueue.jsx`/light-header raw tables) were re-confirmed unchanged, not re-litigated.
+
+### Canonical components/tokens reused
+
+`Fonts.subheading`, `Fonts.eyebrow`, `Fonts.heading4`, `FormLabel`, `LoadingSpinner`. No canonical component was modified. No new token or component was created.
+
+### Remaining intentional typography differences (left untouched, with reason)
+
+- `EnterpriseConfigManager.jsx`'s raw table (light header, slate palette) — P2.22d finding, contrast/page-consistency reasons stand.
+- `EnterpriseConfigManager.jsx`'s two hand-rolled modal titles on colored headers — specialized (white-on-color), out of this task's named scope.
+- `AddHolidaysModal.jsx`'s 5 dense-grid form labels — P2.22c finding, intentional compact style.
+- `ApprovalQueue.jsx`'s raw tables (light header, two-tone body) — P2.22d finding, intentional visual hierarchy + contrast constraint.
+- `ManageActiveLeaveBlocks.jsx`/`BlockLeaveDates.jsx` tab-panel headings and `BlockLeaveDates.jsx`'s blank `className=" "` summary values — flagged in P2.23 but not named in this task's A–E scope; left untouched pending a future dedicated pass.
+
+### Remaining capability gaps
+
+None. Every fix in this task reused an existing canonical token/component; no new capability was required.
+
+### Remaining dead/orphaned findings
+
+`EmployeeDashboard.jsx`'s commented-out `text-small` duplicates (dead, unreachable) and `models/CompOffPage.jsx`'s `text-sl` typo (orphaned-in-practice) — both documented above, neither fixed, per hard-stop rule 6.
+
+### Business/API logic verification
+
+Confirmed unchanged in all 5 files — every edit was a `className`/element-swap only. No state variable, event handler, API call, validation rule, or conditional-rendering branch was added, removed, or altered. Verified via the full `git diff` review (see below).
+
+### Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### git diff --check
+
+✅ Clean — only the pre-existing LF/CRLF informational notice on the docs file.
+
+### Unused-import verification
+
+Every import added (`Fonts` in `EmployeeDashboard.jsx`; `Fonts`/`FormLabel`/`PageHeader`* in `EmployeeLeaveBalances.jsx`; `LoadingSpinner` in `LeavePolicyViewer.jsx`; `FormLabel` in `EnterpriseConfigManager.jsx`) is used at least once in its file, confirmed by the diff review above. (*`PageHeader` in `EmployeeLeaveBalances.jsx` was already added by the earlier P2.22a task, not new to this task — re-confirmed still in use, not orphaned.) No import was removed. No unused import was introduced.
+
+### DatePicker/DateRangePicker confirmation
+
+Confirmed untouched — none of the 5 files' `DateRangePicker`/`react-datepicker` usages (where present) were read or modified; only unrelated typography elsewhere in those files was touched.
+
+### Confirmation no unrelated Phase 3 work was started
+
+Confirmed — this task touched only the 5 named files' specific flagged typography issues, plus the one directly-adjacent `FormLabel` swap in `EnterpriseConfigManager.jsx` explicitly justified above. No other module, no other typography category, no Phase 3 work was started.
+
+### Confirmation no commit/push was performed
+
+Confirmed — all changes remain in the working tree for local review.

@@ -14,6 +14,7 @@ import Button from "../../../components/Button/Button";
 import Modal from "../../../components/Modal/modal";
 import FormSelect from "../../../components/forms/FormSelect";
 import FormTextArea from "../../../components/forms/FormTextArea";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -230,7 +231,7 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
 
           {/* Employee Selection */}
           <div>
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className={Fonts.eyebrow}>
               Employee
             </label>
             <Select
@@ -318,7 +319,7 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
               {showCustomHalfDay && (
                 <div className="flex items-start gap-3 p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
                   <div className="flex-1 space-y-1">
-                    <label className="text-[10px] font-bold text-indigo-600 uppercase">Start Day</label>
+                    <label className={Fonts.eyebrow}>Start Day</label>
                     <FormSelect
                       name="halfDayStart"
                       options={[
@@ -332,7 +333,7 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
                   </div>
                   {startDate !== endDate && (
                     <div className="flex-1 space-y-1">
-                      <label className="text-[10px] font-bold text-indigo-600 uppercase">End Day</label>
+                      <label className={Fonts.eyebrow}>End Day</label>
                       <FormSelect
                         name="halfDayEnd"
                         options={[
@@ -352,7 +353,7 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
 
           {/* Leave Type Selection */}
           <div>
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <label className={Fonts.eyebrow}>
               Leave Type
             </label>
             {!employeeId ? (
@@ -378,7 +379,7 @@ export default function ApplyLeaveOnBehalf({ isOpen, onClose, onSuccess, year })
           {/* Drive Link */}
           {shouldShowDriveLink() && (
             <div className="space-y-1 animate-in zoom-in-95 duration-200">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex justify-between">
+              <label className={`${Fonts.eyebrow} flex justify-between`}>
                 <span>Supporting Document (Drive Link)</span>
                 <span className="text-red-500 text-xs">* Required</span>
               </label>

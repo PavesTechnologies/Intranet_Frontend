@@ -8,6 +8,8 @@ import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import StatusBadge from "../../../components/patterns/StatusBadge";
 import EmptyState from "../../../components/patterns/EmptyState";
 import BackButton from "../../../components/patterns/BackButton";
+import PageHeader from "../../../components/ui/PageHeader";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 
@@ -174,7 +176,7 @@ export default function LeaveDetailsPage() {
           {/* Column 1: Sidebar Navigation */}
           <aside className="lg:col-span-1">
             <div className="sticky top-6">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              <h2 className={`${Fonts.eyebrow} mb-3`}>
                 Leave Types
               </h2>
               <nav className="space-y-1">
@@ -203,9 +205,10 @@ export default function LeaveDetailsPage() {
             {/* Page Header */}
             <div className="flex items-center gap-3 mb-8">
               <BackButton onClick={() => navigate(-1)} />
-              <h1 className="text-2xl font-bold text-gray-800">
-                {displayName || "Leave"} History - {new Date().getFullYear()}
-              </h1>
+              <PageHeader
+                className="!mb-0"
+                title={`${displayName || "Leave"} History - ${new Date().getFullYear()}`}
+              />
             </div>
 
             {/* Render leave requests grouped by month */}

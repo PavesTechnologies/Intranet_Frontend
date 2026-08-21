@@ -16,6 +16,7 @@ import Button from "../../components/Button/Button";
 import PageHeader from "../../components/ui/PageHeader";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import PageContainer from "../../components/patterns/PageContainer";
+import { Fonts } from "../../components/Fonts/Fonts";
 
 // Modals
 import AddEmployeeModal from "./models/AddEmployeeModal";
@@ -430,14 +431,14 @@ const LeaveTable = ({ title, data, onEdit, onDelete }) => {
 
   return (
     <div className="space-y-3">
-      <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider">
+      <h4 className={Fonts.eyebrow}>
         {title}
       </h4>
 
       <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm bg-white">
         <table className="w-full text-sm text-left border-collapse">
           <thead>
-            <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-xs font-semibold tracking-wider">
+            <tr className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white text-sm font-semibold">
               {headers.map((h, i) => (
                 <th
                   key={h}

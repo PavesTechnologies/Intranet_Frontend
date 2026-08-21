@@ -353,6 +353,7 @@ import api from "../../api/axiosInstance";
 import Button from "../../components/Button/Button.jsx";
 import { PageCard, PageCardContent } from "../../components/Cards/PageCard";
 import FilterListbox from "../../components/filter/FilterListbox.jsx";
+import { Fonts } from "../../components/Fonts/Fonts";
 
 const EmployeeDashboard = ({ employeeId }) => {
   const [isRequestLeaveModalOpen, setIsRequestLeaveModalOpen] = useState(false);
@@ -503,7 +504,7 @@ const EmployeeDashboard = ({ employeeId }) => {
         />
       )}
 
-      <h2 className="text-small font-semibold m-4">My Leave Stats</h2>
+      <h2 className={`${Fonts.subheading} m-4`}>My Leave Stats</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* ✅ No refreshKey — each owns its own WS subscription */}
         <WeeklyPattern employeeId={employeeId} year={currentYear} refreshKey={refreshKey} />
@@ -511,11 +512,11 @@ const EmployeeDashboard = ({ employeeId }) => {
         <MonthlyStats employeeId={employeeId} year={currentYear} refreshKey={refreshKey} />
       </div>
 
-      <h2 className="text-small font-semibold m-4">Leave Balances</h2>
+      <h2 className={`${Fonts.subheading} m-4`}>Leave Balances</h2>
       {/* ✅ No refreshKey — LeaveDashboard subscribes to "employee-update" directly */}
       <LeaveDashboard employeeId={employeeId} year={currentYear} refreshKey={refreshKey} />
 
-      <h2 className="text-small font-semibold m-4">Leave History</h2>
+      <h2 className={`${Fonts.subheading} m-4`}>Leave History</h2>
       {/* ✅ No refreshKey — LeaveHistory subscribes to "employee-update" directly */}
       <LeaveHistory employeeId={employeeId} year={currentYear} />
 

@@ -20,6 +20,7 @@ import DateRangePicker from "./DateRangePicker";
 import { useLeaveDropdownOptions } from "../hooks/useLeaveDropdownOptions";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/Modal/modal";
+import { Fonts } from "../../../components/Fonts/Fonts";
 
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
 const GENDER_BASED_IDS = ["L-ML", "L-PL"];
@@ -526,7 +527,7 @@ export default function EditLeaveModal({
           <fieldset disabled={isLockedByOther} className="space-y-4">
             {/* Date pickers */}
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
+              <label className={`${Fonts.eyebrow} mb-2 block`}>
                 Leave Period
               </label>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -580,7 +581,7 @@ export default function EditLeaveModal({
 
             {/* Leave type */}
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
+              <label className={`${Fonts.eyebrow} mb-1 block`}>
                 Leave Type
               </label>
               <LeaveTypeDropdown
@@ -610,7 +611,7 @@ export default function EditLeaveModal({
             {/* Half day toggle */}
             {selectedLeaveType?.allowHalfDay && !isMaternityLeave && (
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block">
+                <label className={`${Fonts.eyebrow} block`}>
                   Day Type
                 </label>
                 <div className="p-1 inline-flex items-center bg-gray-100 rounded-lg">
@@ -712,7 +713,7 @@ export default function EditLeaveModal({
                   onChange={(e) => setDriveLink(e.target.value)}
                   placeholder="https://drive.google.com/..."
                   inputClassName="bg-gray-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 focus:outline-none transition-all"
-                  labelClassName="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block"
+                  labelClassName={`${Fonts.eyebrow} mb-1 block`}
                 />
                 {selectedLeaveType?.leaveTypeId === "L-SL" && weekdays > 3 && (
                   <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">

@@ -124,7 +124,7 @@ export default function WebSocketProvider({ children }) {
       // beforeConnect ensures fresh token on every attempt
       reconnectDelay: 5000,
 
-      debug: () => {}, // Silence the console flood
+      debug: () => { }, // Silence the console flood
 
       // ─────────────────────────────────────────────────────────────────
       // ON CONNECT — register all subscriptions

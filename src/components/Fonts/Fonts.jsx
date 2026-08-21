@@ -11,6 +11,7 @@ export const Fonts = {
 
   caption: "font-sans text-sm text-gray-500 italic",
   smallText: "font-sans text-xs text-gray-400",
+  eyebrow: "text-xs font-semibold text-gray-500 uppercase tracking-wider",
 
   label: "font-sans text-sm font-medium text-gray-700",
 

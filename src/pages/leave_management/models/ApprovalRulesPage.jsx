@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import ConfirmationModal from "./ConfirmationModal";
 import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
+import FormLabel from "../../../components/forms/FormLabel";
 import DataTable from "../../../components/patterns/DataTable";
 import PageHeader from "../../../components/ui/PageHeader";
 import PageContainer from "../../../components/patterns/PageContainer";
@@ -358,7 +359,7 @@ function InputField({ label, value, onChange, type = "text" }) {
 function Dropdown({ label, value, options, onChange, disabledOptions }) {
   return (
     <div>
-      <label className="block text-sm font-medium mb-1">{label}</label>
+      <FormLabel className="mb-1">{label}</FormLabel>
 
       <Listbox value={value} onChange={onChange}>
         <div className="relative">
