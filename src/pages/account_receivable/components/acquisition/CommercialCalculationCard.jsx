@@ -1,4 +1,4 @@
-import { Calculator, Sparkles, ArrowRight, Info } from "lucide-react";
+import { Calculator, Sparkles, ArrowRight, Info, Loader2, CheckCircle2 } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 
 export default function CommercialCalculationCard({
@@ -10,6 +10,7 @@ export default function CommercialCalculationCard({
   isAcquired = false,
   billingStatus = "NOT_ACQUIRED",
   disabled = false,
+  calculatingTax = false,
 }) {
   const subtotal = Number(laborAmount) + Number(expenseAmount) + Number(adjustments);
   const grandTotal = subtotal;
@@ -20,29 +21,41 @@ export default function CommercialCalculationCard({
     { label: "Adjustments", value: adjustments },
   ];
 
-  const isReady = billingStatus === "READY" || isAcquired;
+  const normalizedStatus = (billingStatus || "").toUpperCase();
+  const isReadyForTax =
+    normalizedStatus === "READY_TO_TAX" ||
+    normalizedStatus === "READY_FOR_TAX" ||
+    normalizedStatus === "READY" ||
+    isAcquired;
+  const isInTax = normalizedStatus === "IN_TAX" || calculatingTax;
+  const isTaxCompleted = normalizedStatus === "TAX_COMPLETED";
+
+  const isButtonEnabled = (isReadyForTax || isTaxCompleted) && !disabled && !isInTax;
 
   const getDisabledReason = () => {
-    switch (billingStatus) {
+    switch (normalizedStatus) {
       case "NOT_ACQUIRED":
         return "Acquire the billing snapshot before proceeding.";
       case "VALIDATING":
-        return "Billing readiness is being validated.";
+      case "IN_PROGRESS":
+        return "Billing readiness is being processed.";
       case "PARTIALLY_READY":
-        return "Complete the pending timesheet approvals before proceeding.";
       case "PENDING_APPROVAL":
-        return "Required timesheet approvals are still pending.";
+        return "Complete the pending timesheet approvals before proceeding.";
       case "NO_BILLABLE_DATA":
       case "NO_DATA":
         return "No billable data is available for this billing period.";
       case "CONFIGURATION_REQUIRED":
+      case "SETUP_REQUIRED":
         return "Complete the billing configuration before proceeding.";
       case "ALREADY_BILLED":
         return "This billing period has already been invoiced.";
       case "ACQUISITION_FAILED":
         return "Resolve the acquisition issue before proceeding.";
+      case "IN_TAX":
+        return "Tax calculation is currently in progress.";
       default:
-        return "Complete billing validation before proceeding.";
+        return "Complete billing validation before proceeding to tax calculation.";
     }
   };
 
@@ -82,17 +95,47 @@ export default function CommercialCalculationCard({
           </div>
         </div>
 
-        <div className="space-y-1">
-          <Button
-            variant="success"
-            className="w-full justify-center text-xs py-2 font-bold shadow-sm"
-            onClick={onContinueToTax}
-            disabled={!isReady || disabled}
-          >
-            Proceed to Tax Calculation <ArrowRight className="ml-1 inline h-3.5 w-3.5" />
-          </Button>
+        <div className="space-y-2">
+          {isTaxCompleted ? (
+            <>
+              <button
+                type="button"
+                disabled
+                className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-100 py-2 px-3 text-xs font-semibold text-slate-500 cursor-not-allowed"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5 text-slate-400" />
+                Tax Calculation Completed
+              </button>
 
-          {!isReady && (
+              <Button
+                variant="primary"
+                className="w-full justify-center text-xs py-2 font-bold shadow-sm bg-indigo-600 hover:bg-indigo-700 text-white"
+                onClick={onContinueToTax}
+              >
+                View Tax Calculation <ArrowRight className="ml-1 inline h-3.5 w-3.5" />
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="success"
+              className="w-full justify-center text-xs py-2 font-bold shadow-sm"
+              onClick={onContinueToTax}
+              disabled={!isButtonEnabled}
+            >
+              {isInTax ? (
+                <>
+                  <Loader2 className="mr-1.5 inline h-3.5 w-3.5 animate-spin" />
+                  Calculating Tax...
+                </>
+              ) : (
+                <>
+                  Proceed to Tax Calculation <ArrowRight className="ml-1 inline h-3.5 w-3.5" />
+                </>
+              )}
+            </Button>
+          )}
+
+          {!isReadyForTax && !isTaxCompleted && (
             <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium px-0.5 pt-0.5">
               <Info className="h-3 w-3 flex-shrink-0 text-slate-400" />
               <span className="truncate">{getDisabledReason()}</span>
