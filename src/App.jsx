@@ -197,8 +197,6 @@ import XmsOcrProcessingPage from "./pages/expense-management/pages/receipts/OcrP
 import XmsRequestAdvancePage from "./pages/expense-management/pages/cash-advance/RequestAdvancePage.jsx";
 import XmsMyAdvancesPage from "./pages/expense-management/pages/cash-advance/MyAdvancesPage.jsx";
 import XmsSettlementPage from "./pages/expense-management/pages/cash-advance/SettlementPage.jsx";
-import XmsPendingApprovalsPage from "./pages/expense-management/approval-engine/pages/PendingApprovalsPage.jsx";
-import XmsApprovalHistoryPage from "./pages/expense-management/approval-engine/pages/ApprovalHistoryPage.jsx";
 import XmsApprovalsPage from "./pages/expense-management/approval-engine/pages/ApprovalsPage.jsx";
 import XmsApprovalFlowsPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowsPage.jsx";
 import XmsApprovalFlowBuilderPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowBuilderPage.jsx";
@@ -208,6 +206,7 @@ import XmsDelegationsPage from "./pages/expense-management/approval-engine/pages
 import XmsVerificationPage from "./pages/expense-management/pages/finance/VerificationPage.jsx";
 import XmsReimbursementsPage from "./pages/expense-management/pages/finance/ReimbursementsPage.jsx";
 import XmsPaymentStatusPage from "./pages/expense-management/pages/finance/PaymentStatusPage.jsx";
+import XmsApPaymentQueuePage from "./pages/expense-management/pages/ap-payments/ApPaymentQueuePage.jsx";
 import XmsBillableExpensesPage from "./pages/expense-management/pages/client-billing/BillableExpensesPage.jsx";
 import XmsInvoiceHandoffPage from "./pages/expense-management/pages/client-billing/InvoiceHandoffPage.jsx";
 import XmsInvoiceStatusPage from "./pages/expense-management/pages/client-billing/InvoiceStatusPage.jsx";
@@ -532,14 +531,14 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
-          <Route
+          {/* <Route
             path={AP_ROUTES.PAYMENT_QUEUE_DETAIL()}
             element={
               <ProtectedRoute allowedRoles={["AP_Executive", "Admin", "Super_Admin"]}>
                 <PaymentDetailsPage />
               </ProtectedRoute>
             }
-          />
+          /> */}
           <Route
             path={AP_ROUTES.PAYMENT_READY}
             element={
@@ -1479,6 +1478,7 @@ const AppRoutes = () => {
           <Route path="/expense-management/finance/verification" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsVerificationPage /></ProtectedRoute>} />
           <Route path="/expense-management/finance/reimbursements" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsReimbursementsPage /></ProtectedRoute>} />
           <Route path="/expense-management/finance/payment-status" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsPaymentStatusPage /></ProtectedRoute>} />
+          <Route path="/expense-management/ap-payments/queue" element={<ProtectedRoute allowedRoles={["AP_Executive"]}><XmsApPaymentQueuePage /></ProtectedRoute>} />
 
           <Route path="/expense-management/client-billing/billable-expenses" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsBillableExpensesPage /></ProtectedRoute>} />
           <Route path="/expense-management/client-billing/invoice-handoff" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsInvoiceHandoffPage /></ProtectedRoute>} />

@@ -1,4 +1,4 @@
-import { AP_ALL_ROLES } from "../pages/accounts-payable/constants/apRoles";
+import { AP_ALL_ROLES, AP_ROLES } from "../pages/accounts-payable/constants/apRoles";
 import { AP_ROUTES } from "../pages/accounts-payable/constants/routes";
 
 /**
@@ -192,6 +192,14 @@ export const XMS_SUBMENU = [
       { label: "Reimbursements",  to: "/expense-management/finance/reimbursements" },
       { label: "Payment Status",  to: "/expense-management/finance/payment-status" },
     ],
+  },
+  {
+    // AP_EXECUTIVE-only (matches ApPaymentController's own @PreAuthorize("hasRole('AP_EXECUTIVE')")
+    // exactly, with no Admin override) - the backend endpoints this page calls give Admin no
+    // access either, so gating the entry any wider would just show a page whose actions 403.
+    label: "AP Payments",
+    to: "/expense-management/ap-payments/queue",
+    allowedRoles: [AP_ROLES.AP_EXECUTIVE],
   },
   {
     label: "Client Billing",
