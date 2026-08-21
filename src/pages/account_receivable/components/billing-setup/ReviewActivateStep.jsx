@@ -3,6 +3,7 @@ import { FolderKanban, Coins, Wallet, Receipt, Pencil, Search, ChevronRight } fr
 
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Modal from "../../../../components/Modal/modal";
+import { BILLING_MODE_LABELS } from "../../data/wizardOptions";
 
 const RATE_DISPLAY_LIMIT = 5;
 const RATE_PREVIEW_COUNT = 4;
@@ -116,6 +117,25 @@ function ReviewSection({ icon, title, stepId, onEdit, rows }) {
         ))}
       </div>
     </SectionShell>
+  );
+}
+
+function PricingTable({ rows }) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-slate-100">
+      <table className="w-full text-sm">
+        <tbody className="divide-y divide-slate-100">
+          {rows.map((row, index) => (
+            <tr key={`${row.label}-${index}`}>
+              <td className="w-1/2 px-4 py-2 text-slate-500">{row.label}</td>
+              <td className="w-1/2 px-4 py-2 text-right font-semibold text-slate-800">
+                {row.value ?? "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -286,65 +306,106 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
 
       {/* Full form width so role-based rate tables have room to breathe instead of scrolling horizontally. */}
       <SectionShell icon={Wallet} title="Pricing" stepId={2} onEdit={onEditStep}>
-        <div>
-          {["RECURRING", "TIME_MATERIAL"].includes(billingConfig.billingType) && (
-            <InfoRow
-              label={billingConfig.billingType === "TIME_MATERIAL" ? "Rate Model" : "Billing Mode"}
-              value={pricingModel}
-            />
-          )}
+        <div className="space-y-3 py-3.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+              {billingTypeLabel}
+            </span>
+            {pricingModel && ["TIME_MATERIAL", "RECURRING"].includes(billingConfig.billingType) && (
+              <span className="text-xs font-medium text-slate-400">
+                {BILLING_MODE_LABELS[pricingModel] || pricingModel}
+              </span>
+            )}
+          </div>
 
           {billingConfig.billingType === "TIME_MATERIAL" &&
             (pricingModel === "STANDARD" || !pricingModel) && (
-              <div className="flex items-start justify-between gap-3 border-b border-slate-100 py-2.5 text-sm last:border-0">
-                <div className="min-w-0">
-                  <p className="font-semibold text-slate-800">Standard Rate</p>
-                  {standardRateDateRange && <p className="mt-0.5 text-xs text-slate-400">{standardRateDateRange}</p>}
-                </div>
-                <span className="shrink-0 text-right font-bold text-slate-900">
-                  {formatMoney(standardRate.rate, currency) || "—"}{" "}
-                  <span className="text-xs font-medium text-slate-400">{ratePeriodSuffix(standardRate.ratePeriod)}</span>
-                </span>
-              </div>
+              <PricingTable
+                rows={[
+                  {
+                    label: "Standard Rate",
+                    value: `${formatMoney(standardRate.rate, currency) || "—"} ${ratePeriodSuffix(standardRate.ratePeriod)}`,
+                  },
+                  { label: "Effective Period", value: standardRateDateRange },
+                ]}
+              />
             )}
 
           {billingConfig.billingType === "TIME_MATERIAL" && pricingModel === "ROLE_BASED" && (
             <RoleRatesList roles={roleRateRows} currency={currency} />
           )}
 
-          {billingConfig.billingType === "FIXED_PRICE" && (
-            <InfoRow
-              label="Total Contract Value"
-              value={formatMoney(billingConfig.fixedPrice?.totalContractValue, currency)}
-            />
-          )}
+          {billingConfig.billingType === "FIXED_PRICE" && (() => {
+            const fixedPrice = billingConfig.fixedPrice || {};
+            const contractValue = Number(fixedPrice.totalContractValue) || 0;
+            const retentionPercent = Number(fixedPrice.retentionPercent) || 0;
+            const hasRetention = Boolean(fixedPrice.retentionPercent) && retentionPercent > 0;
+            const retentionAmount = hasRetention ? contractValue * (retentionPercent / 100) : 0;
+            const billableAmount = contractValue - retentionAmount;
+            const advanceReceived = Number(fixedPrice.advanceReceived) || 0;
+            const hasAdvance = Boolean(fixedPrice.advanceReceived) && advanceReceived > 0;
+            const remainingReceivable = billableAmount - (hasAdvance ? advanceReceived : 0);
+            const isOneTime = billingConfig.billingFrequency === "ONE_TIME";
+
+            return (
+              <PricingTable
+                rows={[
+                  { label: "Contract Value", value: formatMoney(fixedPrice.totalContractValue, currency) },
+                  { label: "Retention %", value: hasRetention ? `${retentionPercent}%` : "—" },
+                  {
+                    label: "Retention Amount",
+                    value: hasRetention ? `-${formatMoney(retentionAmount, currency)}` : formatMoney(0, currency),
+                  },
+                  { label: "Billable Amount", value: formatMoney(billableAmount, currency) },
+                  {
+                    label: "Advance Received",
+                    value: hasAdvance ? `-${formatMoney(advanceReceived, currency)}` : formatMoney(0, currency),
+                  },
+                  { label: "Remaining Receivable", value: formatMoney(remainingReceivable, currency) },
+                  {
+                    label: "Billing Frequency / Billing Event",
+                    value: `${billingFrequencyLabel} — ${isOneTime ? "Single (One-Time)" : "Scheduled per billing frequency"}`,
+                  },
+                  ...(fixedPrice.effectiveFrom || fixedPrice.effectiveTo
+                    ? [
+                        {
+                          label: "Effective Period",
+                          value: `${formatDisplayDate(fixedPrice.effectiveFrom) || "—"} - ${
+                            formatDisplayDate(fixedPrice.effectiveTo) || "Ongoing"
+                          }`,
+                        },
+                      ]
+                    : []),
+                  ...(fixedPrice.remarks ? [{ label: "Remarks", value: fixedPrice.remarks }] : []),
+                ]}
+              />
+            );
+          })()}
 
           {billingConfig.billingType === "MILESTONE" && (
-            <InfoRow label="Milestones" value={`${(billingConfig.milestones || []).length} defined`} />
+            <PricingTable rows={[{ label: "Milestones", value: `${(billingConfig.milestones || []).length} defined` }]} />
           )}
 
           {billingConfig.billingType === "RECURRING" && billingConfig.billingMode === "MONTHLY_RETAINER" && (
-            <>
-              <InfoRow
-                label="Monthly Retainer Amount"
-                value={formatMoney(billingConfig.monthlyRetainer?.amount, currency)}
-              />
-              <InfoRow
-                label="Auto Invoice Generation"
-                value={formatBoolean(billingConfig.monthlyRetainer?.autoInvoiceGeneration)}
-              />
-            </>
+            <PricingTable
+              rows={[
+                { label: "Monthly Retainer Amount", value: formatMoney(billingConfig.monthlyRetainer?.amount, currency) },
+                {
+                  label: "Auto Invoice Generation",
+                  value: formatBoolean(billingConfig.monthlyRetainer?.autoInvoiceGeneration),
+                },
+              ]}
+            />
           )}
 
           {billingConfig.billingType === "RECURRING" && billingConfig.billingMode === "SUBSCRIPTION" && (
-            <>
-              <InfoRow
-                label="Subscription Amount"
-                value={formatMoney(billingConfig.subscription?.amount, currency)}
-              />
-              <InfoRow label="Billing Cycle" value={billingConfig.subscription?.billingCycle} />
-              <InfoRow label="Auto Renewal" value={formatBoolean(billingConfig.subscription?.autoRenewal)} />
-            </>
+            <PricingTable
+              rows={[
+                { label: "Subscription Amount", value: formatMoney(billingConfig.subscription?.amount, currency) },
+                { label: "Billing Cycle", value: billingConfig.subscription?.billingCycle },
+                { label: "Auto Renewal", value: formatBoolean(billingConfig.subscription?.autoRenewal) },
+              ]}
+            />
           )}
         </div>
       </SectionShell>
