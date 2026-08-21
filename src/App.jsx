@@ -532,14 +532,14 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
-          <Route
+          {/* <Route
             path={AP_ROUTES.PAYMENT_QUEUE_DETAIL()}
             element={
               <ProtectedRoute allowedRoles={["AP_Executive", "Admin", "Super_Admin"]}>
                 <PaymentDetailsPage />
               </ProtectedRoute>
             }
-          />
+          /> */}
           <Route
             path={AP_ROUTES.PAYMENT_READY}
             element={
