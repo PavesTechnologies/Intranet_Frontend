@@ -190,7 +190,7 @@ export default function ResumeIntakePage() {
           )}
         </>
       ) : activeListTab === "processing" ? (
-        <InProcessingList files={inProcessingFiles} isLoading={inProcessingLoading} />
+        <InProcessingList files={inProcessingFiles} isLoading={inProcessingLoading} onRefresh={refreshInProcessing} />
       ) : campaignFilter ? (
         <BulkUploadJobsList jobs={bulkJobs} isLoading={isBulkJobsLoading} onSelectJob={handleOpenJobDetail} />
       ) : (

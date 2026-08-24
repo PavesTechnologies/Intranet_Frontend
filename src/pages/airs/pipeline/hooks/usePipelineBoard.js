@@ -3,6 +3,8 @@ import { toast } from "react-toastify";
 import { getCampaignBoard, moveCampaignCandidateStage, formatApiError } from "../../campaigns/services/campaignservice";
 import { initialsFromName } from "../../candidates/utils/candidateDataUtils";
 import { PIPELINE_STAGES } from "../constants/pipelineConstants";
+import useAirsSocket from "../../websockets/useAirsSocket";
+import { dispatchAirsEvent } from "../../websockets/airsEventDispatch";
 
 // PipelineTransitionReasonRequiredException surfaces as this exact
 // combination — see pipeline_transition_service.py / campaign_candidate_service.py
@@ -66,6 +68,78 @@ export default function usePipelineBoard(campaignId) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Live updates after the initial REST load — patches only the affected
+  // candidate/column, never a full board reload, so an in-flight drag isn't
+  // stomped by someone else's event arriving mid-gesture.
+  useAirsSocket(campaignId ? `/ws/campaign-candidates/campaign/${campaignId}/board` : null, {
+    onOpen: load, // reconnect only: reconcile any missed events
+    onEvent: (message) =>
+      dispatchAirsEvent(message, {
+        "board.candidate_added": (data) => {
+          const stage = data?.stage || data?.candidate?.pipeline_stage;
+          if (!stage || !data?.candidate) return;
+          const card = mapCandidate(data.candidate);
+          setColumnsByStage((prev) => {
+            const existing = prev[stage] || [];
+            if (existing.some((c) => c.id === card.id)) return prev;
+            return { ...prev, [stage]: [...existing, card] };
+          });
+        },
+        "board.stage_changed": (data) => {
+          const id = data?.id ?? data?.campaign_candidate_id ?? data?.candidate?.id ?? data?.candidate?.campaign_candidate_id;
+          const toStage = data?.to_stage ?? data?.stage ?? data?.candidate?.pipeline_stage;
+          if (id == null || !toStage) return;
+          setColumnsByStage((prev) => {
+            let movedCard = null;
+            const next = {};
+            Object.entries(prev).forEach(([stage, cards]) => {
+              next[stage] = cards.filter((c) => {
+                if (c.id === id) {
+                  movedCard = data.candidate ? mapCandidate(data.candidate) : { ...c, stage: toStage };
+                  return false;
+                }
+                return true;
+              });
+            });
+            if (!movedCard) return prev;
+            next[toStage] = [...(next[toStage] || []), movedCard];
+            return next;
+          });
+        },
+        "board.candidate_updated": (data) => {
+          const candidate = data?.candidate || data;
+          const id = candidate?.id ?? candidate?.campaign_candidate_id;
+          if (id == null) return;
+          const updated = mapCandidate(candidate);
+          setColumnsByStage((prev) => {
+            const currentStage = Object.keys(prev).find((stage) => (prev[stage] || []).some((c) => c.id === id));
+            if (!currentStage) return prev;
+            if (updated.stage && updated.stage !== currentStage) {
+              const next = { ...prev };
+              next[currentStage] = prev[currentStage].filter((c) => c.id !== id);
+              next[updated.stage] = [...(prev[updated.stage] || []), updated];
+              return next;
+            }
+            return {
+              ...prev,
+              [currentStage]: prev[currentStage].map((c) => (c.id === id ? updated : c)),
+            };
+          });
+        },
+        "board.candidate_removed": (data) => {
+          const id = data?.id ?? data?.campaign_candidate_id;
+          if (id == null) return;
+          setColumnsByStage((prev) => {
+            const next = {};
+            Object.entries(prev).forEach(([stage, cards]) => {
+              next[stage] = cards.filter((c) => c.id !== id);
+            });
+            return next;
+          });
+        },
+      }),
+  });
 
   const columns = PIPELINE_STAGES.map((stage) => ({ stage, cards: columnsByStage[stage] || [] }));
 
