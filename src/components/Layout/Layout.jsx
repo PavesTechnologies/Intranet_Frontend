@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
-import { getApplicationFromPath } from "../../utils/applicationRoutes";
+import { getApplicationFromPath, isCanonicalPageShellRoute } from "../../utils/applicationRoutes";
 
 const Layout = () => {
   const [isCollapsed, setIsCollapsed] = useState(true); // default collapsed
@@ -15,6 +15,10 @@ const Layout = () => {
   // Application Switcher: URL is the source of truth for which app (Intranet
   // vs Finance Management) is active, so Sidebar/Header stay in sync on refresh.
   const activeApplication = getApplicationFromPath(location.pathname);
+  // P2.24a: canonical routes already own their own content padding via
+  // PageContainer, so <main> must not add a second layer of p-4 for them —
+  // see isCanonicalPageShellRoute's own doc comment for the full rationale.
+  const isCanonicalShell = isCanonicalPageShellRoute(location.pathname);
 
   // Collapse automatically on small screens
   useEffect(() => {
@@ -51,7 +55,7 @@ const Layout = () => {
           isSidebarOpen={isSidebarOpen}
           activeApplication={activeApplication}
         />
-        <main className={`flex-1 overflow-y-auto bg-gray-50 rounded-tl-xl shadow-inner ${isXms ? "p-3" : "p-4"}`}>
+        <main className={`flex-1 overflow-y-auto bg-gray-50 rounded-tl-xl shadow-inner ${isCanonicalShell ? "" : isXms ? "p-3" : "p-4"}`}>
           <Outlet />
         </main>
       </div>

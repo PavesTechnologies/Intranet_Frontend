@@ -225,7 +225,7 @@ export default function LeavePolicyViewer() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <>
       {/* Tabs */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex flex-wrap gap-3">
@@ -254,6 +254,6 @@ export default function LeavePolicyViewer() {
       {selectedPolicy && (
         <LeaveTypeCard leaveData={selectedPolicy} />
       )}
-    </div>
+    </>
   );
 }

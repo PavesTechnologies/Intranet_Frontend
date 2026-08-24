@@ -7854,3 +7854,263 @@ Confirmed — this task touched only the 5 named files' specific flagged typogra
 ### Confirmation no commit/push was performed
 
 Confirmed — all changes remain in the working tree for local review.
+
+## P2.24 — Global Page Shell / PageContainer Unification
+
+### 1. Current Layout/page-shell architecture (read fresh)
+
+`src/components/Layout/Layout.jsx` is the single shared shell for the **entire application**, not just Leave Management:
+
+```jsx
+<div className="min-h-screen bg-gray-50 ...">
+  <Sidebar .../>
+  <div className="flex-1 flex flex-col ...">
+    <Header .../>
+    <main className="flex-1 overflow-y-auto bg-gray-50 rounded-tl-xl shadow-inner p-4">
+      <Outlet />
+    </main>
+  </div>
+</div>
+```
+
+`<main>` already applies `p-4` and `bg-gray-50` to **every routed page in the app**, via React Router's `<Outlet />`. There is one existing precedent for route-scoped Layout behavior: `isXms = location.pathname.startsWith("/expense-management")`, which swaps in a denser `.xms-density` padding scale for that one module only.
+
+### 2. Existing PageContainer behavior (read fresh)
+
+```jsx
+const DENSITY_CLASSES = { comfortable: "p-4 md:p-6", compact: "p-3 md:p-4" };
+export default function PageContainer({ children, className = "", density = "comfortable" }) {
+  return <div className={classNames("w-full min-h-full", DENSITY_CLASSES[density] || DENSITY_CLASSES.comfortable, className)}>{children}</div>;
+}
+```
+
+No background of its own — purely a padding/width wrapper. Its own code comment ("Not yet adopted by any module page") is stale — it already has 4 real consumers in Leave Management from earlier Phase 2 work (`HRManageTools.jsx`, `EmployeeLeaveBalances.jsx`, `ApprovalRulesPage.jsx`, `EditHolidaysPage.jsx`).
+
+### 3. The duplication problem, confirmed
+
+Because Layout's `<main>` already applies `p-4`/`bg-gray-50` to every route, and `PageContainer` independently applies `p-4 md:p-6`, the 4 existing `PageContainer` consumers already had a real "Layout `p-4` + PageContainer `p-4`/`md:p-6`" double-padding stack before this task touched anything — confirmed by reading their current source, not assumed. Separately, several other Leave Management page roots hand-roll their own `min-h-screen`/`bg-gray-50`/`bg-gray-100`/`p-6`/`p-8` wrapper, fully duplicating Layout's own role a second time.
+
+### 4. Canonical page-shell contract adopted
+
+- **Layout** owns: application chrome (sidebar/header), the scroll container, and the global surface background (`bg-gray-50`). **Not changed in this task.**
+- **PageContainer** owns: standard page content padding/density, and (via its existing `className` passthrough) page-specific content width (e.g. `max-w-7xl mx-auto`).
+- **Normal page components** must not re-declare `min-h-screen`/`bg-gray-*`/their own outer `p-*` — they use `<PageContainer density="...">` as their single outermost element instead.
+
+**No new component was created.** `PageContainer.jsx` itself was **not modified** — its existing `{children, className, density}` API already fully represents this contract; no genuine capability gap was found across the audited pages that would justify extending it.
+
+### 5. Hard-stop finding — Layout's own `p-4` was deliberately NOT touched, NOT cancelled
+
+Layout is shared by every module in the application, and Leave Management's own routes have no common URL prefix to scope a Layout-level change safely (unlike `/expense-management/*`'s clean prefix backing `isXms` — Leave Management's routes are scattered: `/leave-management`, `/leave-management/manager`, `/leave-management/hr`, `/employee-leave-balance`, `/edit-holidays`, `/block-leave-dates/:employeeId`, `/leave-upload`, `/leave-policy`, `/leave-details/:employeeId/:leaveName`, `/approval-rules`, `/behalf-leave`). A route-list-based special case in the shared `Layout.jsx` would be fragile and would touch a file every other module depends on — this **triggers hard-stop rule 1 and rule 9**, so it was not attempted. A clever `PageContainer`-side negative-margin trick to cancel Layout's `p-4` was considered and explicitly **rejected**: several Leave Management components (`HRManageTools.jsx`, `AdminPanel.jsx`) are dual-use — sometimes an independent route, sometimes nested inside `EmployeePanel.jsx`'s own view-switcher — so a margin trick that assumes "always a direct child of Layout's `<main>`" would silently break the nested case. **Net effect: the ~16px "Layout `p-4` + PageContainer's own padding" layering remains a known, accepted characteristic of the current architecture, not something this task solved.** It is not a regression — it already existed in all 4 pre-existing `PageContainer` consumers — and is far less visually significant than the `min-h-screen`/duplicate-background issue this task did fix. A real fix would require either consolidating Leave Management's routes under one path prefix (so Layout can scope off its own padding the same way `isXms` does) or a broader, cross-module decision — out of scope for a Leave-Management-only task.
+
+### 6. Full audit — Leave Management page roots (routing-verified, not assumed)
+
+Cross-referenced every candidate against `App.jsx`'s actual `<Route>` table and its actual import/render graph (not the task's suggested list at face value) before touching anything.
+
+| File | Classification | Verdict |
+|---|---|---|
+| `EmployeePanel.jsx` | Routed `/leave-management`, never nested elsewhere | **Migrated** |
+| `models/LeavePolicy.jsx` | Routed `/leave-policy`, never nested elsewhere | **Migrated** |
+| `charts/LeaveDetailsPage.jsx` | Routed `/leave-details/:employeeId/:leaveName`, never nested elsewhere | **Migrated** |
+| `models/LeavePolicyViewer.jsx` | Not routed — always nested inside `LeavePolicy.jsx` (its only consumer) | **Migrated** (its own duplicate shell removed, since its sole parent now owns the shell) |
+| `HRManageTools.jsx` | Already used `PageContainer` (earlier Phase 2 work) — **but also dual-use**: routed at `/leave-management/hr` **and** nested inside `EmployeePanel.jsx`'s view-switcher (`activeView === 'hr'`) | **Left as-is** — pre-existing, not touched further; documented as a known dual-use case, not solved here |
+| `models/EmployeeLeaveBalances.jsx`, `models/ApprovalRulesPage.jsx`, `models/EditHolidaysPage.jsx` | Already used `PageContainer`, confirmed never nested elsewhere | **Left as-is** — already correct |
+| `AdminPanel.jsx` | Routed `/leave-management/manager` **and** nested inside `EmployeePanel.jsx` (`activeView === 'admin'`) | **EXCLUDED — hard-stop rule 4** (ambiguous nested-shell ownership); also its current wrapper (`space-y-6 py-4`) isn't a duplicate-global case to begin with |
+| `EmployeeDashboard.jsx` | Not independently routed — only ever nested inside `EmployeePanel.jsx` | **EXCLUDED** — nested view content, not a page root |
+| `HRAdminPanel.jsx` | Not independently routed — only ever nested inside `EmployeePanel.jsx` (`activeView === 'hr_manager'`) | **EXCLUDED** — nested view content, not a page root |
+| `models/ManageBlockLeave.jsx` | Routed `/block-leave-dates/:employeeId`, never nested | **EXCLUDED** — its current wrapper (`w-full mt-2`) has no duplicate-global padding/background to fix; migrating would *add* new visual padding that doesn't exist today, which is redesigning the page, not deduplicating it |
+| `models/ManageActiveLeaveBlocks.jsx`, `models/BlockLeaveDates.jsx` | Confirmed (per P2.22a) tab-panel content inside `BlockLeaveSection.jsx`, itself rendered by `ManageBlockLeave.jsx` | **EXCLUDED** — not page roots |
+| `models/LeaveUploadWizard.jsx` | Routed `/leave-upload` **and** nested inside `EmployeeLeaveBalances.jsx` as an `onClose`-driven modal card; its own root markup is a modal card (`bg-white rounded-2xl shadow-xl max-w-md mx-auto`), not a page shell | **EXCLUDED — section 10** (modal/wizard root) |
+| `models/ApplyLeaveOnBehalf.jsx` | Routed `/behalf-leave`, but renders as a canonical `Modal` overlay, not a page shell | **EXCLUDED — section 10** (modal root) |
+| `Unauthorized.jsx` | Routed `/unauthorized` | **EXCLUDED — section 10** (explicit error-splash exception) |
+| `models/LeaveBalanceJobProgress.jsx` | Imported by `App.jsx` but used as a floating toast-like widget, not a route target | **EXCLUDED — section 10** (floating widget) |
+| `models/PendingApprovalsQueueView.jsx`, `models/PendingLeaveRequests.jsx`, `models/LeaveHistory.jsx`, `models/ApprovalDashboard.jsx` | All confirmed nested-only (inside `HRManageTools.jsx`/`EmployeeDashboard.jsx`/`HRAdminPanel.jsx`) | **EXCLUDED** — not page roots |
+| `EmployeePanelold.jsx`, `ProtectedRoutes.jsx`, and other dead files (per P2.23) | Confirmed dead/unreferenced | **EXCLUDED** — dead code is never migrated |
+
+### 7. Files migrated (exact before → after)
+
+**`EmployeePanel.jsx`** (page root, `/leave-management`):
+- Padding/background before: `<div className="p-6 bg-gray-100 min-h-screen">` — note `bg-gray-100`, a slightly *different* shade from Layout's canonical `bg-gray-50` (an accidental drift, category 3 from section 9).
+- After: `<PageContainer density="comfortable">` — the accidental `gray-100` shade is gone; Layout's `bg-gray-50` now shows through uniformly. Internal structure (view-toggle buttons, `EmployeeDashboard`/`AdminPanel`/`HRManageTools`/`HRAdminPanel` conditional rendering) completely untouched.
+
+**`models/LeavePolicy.jsx`** (page root, `/leave-policy`):
+- Before: `<div className="min-h-screen  bg-gray-50 py-8 px-4">` (duplicate global, canonical gray shade).
+- After: `<PageContainer density="comfortable">`. `PageHeader`/`LeavePolicyViewer` children untouched.
+
+**`models/LeavePolicyViewer.jsx`** (nested-only, sole consumer is `LeavePolicy.jsx`):
+- Before: its own `<div className="min-h-screen bg-gray-100 p-6">` — a *second*, nested duplicate-global shell (and again the accidental `gray-100` shade) sitting inside what is now `LeavePolicy.jsx`'s `PageContainer`.
+- After: replaced with a React Fragment (`<>...</>`) — since its sole parent now owns the page shell, this internal wrapper was pure duplication, not a specialized layout. All internal tab/back-button/`LeaveTypeCard` content and logic untouched.
+
+**`charts/LeaveDetailsPage.jsx`** (page root, `/leave-details/:employeeId/:leaveName`):
+- Before: two nested wrapper divs — `<div className="bg-gray-50 min-h-screen"><div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">`.
+- After: merged into one `<PageContainer density="comfortable" className="max-w-7xl mx-auto">`, preserving the intentional `max-w-7xl mx-auto` content-width constraint via the `className` prop exactly as section 11 prescribes. The internal `grid grid-cols-1 lg:grid-cols-4 gap-8` sidebar/main layout, `BackButton`+`PageHeader` row, and the separate loading-state early return (`h-screen` centered spinner, unrelated to this wrapper) are all untouched.
+
+### 8. Background standardization — classification
+
+| Background instance | Classification | Action |
+|---|---|---|
+| Layout's `<main>` `bg-gray-50` | CANONICAL GLOBAL | Unchanged |
+| `EmployeePanel.jsx`'s old `bg-gray-100` | DUPLICATE GLOBAL (accidental off-shade) | Removed via migration |
+| `LeavePolicy.jsx`'s old `bg-gray-50` | DUPLICATE GLOBAL (correct shade, still redundant) | Removed via migration |
+| `LeavePolicyViewer.jsx`'s old `bg-gray-100` | DUPLICATE GLOBAL (accidental off-shade, nested) | Removed via migration |
+| `LeaveDetailsPage.jsx`'s old `bg-gray-50` | DUPLICATE GLOBAL (correct shade, still redundant) | Removed via migration |
+| `AddHolidaysModal.jsx`, `AllHolidaysGrid.jsx`, `UpcomingHolidays.jsx`, `EnterpriseConfigManager.jsx` colored headers/gradients | INTENTIONAL SPECIALIZED | Not touched |
+| `Unauthorized.jsx`'s gradient splash background | INTENTIONAL SPECIALIZED | Not touched |
+| `AdminPanel.jsx` (no background at all today) | N/A — nothing to fix | Not touched |
+| `HRManageTools.jsx`'s background (via its existing `PageContainer`, no bg of its own — inherits Layout's) | CANONICAL GLOBAL (already correct) | Not touched |
+
+### 9. Responsive/behavioral verification
+
+- No `overflow-x`/horizontal-scroll change: `PageContainer` is `w-full`, same as the divs it replaced.
+- `DataTable` horizontal scroll containers, `Modal`/`ApplyLeaveOnBehalf` overlay positioning, `BlockLeaveSection`'s `Tabs`, and all `absolute`/`fixed` overlays (loading spinners in `EmployeeLeaveBalances.jsx`/`EditHolidaysPage.jsx`) sit **inside** the migrated `PageContainer`s exactly as they sat inside the old divs — no positioning context changed (all migrated wrappers were plain non-positioned `<div>`s before, and `PageContainer`'s own div is likewise non-positioned).
+- `BackButton`+`PageHeader` rows in `LeaveDetailsPage.jsx` are untouched internal structure — same flex row, same alignment.
+- Mobile: `PageContainer`'s `comfortable` density (`p-4 md:p-6`) matches or exceeds every replaced wrapper's mobile padding, so no content became flush-edge on small screens.
+
+### 10. No Layout-level change
+
+`Layout.jsx` was read but **not modified** — see section 5's hard-stop reasoning.
+
+### 11. Business/API logic verification
+
+Confirmed unchanged in all 4 modified files — every edit was an outer-wrapper `className`/element swap. No state, effect, API call, WebSocket subscription, RBAC check, or routing logic was touched. Verified via full diff review (shown in the tool output; each diff touches only the outermost wrapper lines).
+
+### 12. Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### 13. Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### 14. git diff --check
+
+✅ Clean.
+
+### 15. Remaining Leave Management exceptions (documented, not fixed)
+
+- The residual Layout-`p-4`-plus-`PageContainer`-padding layering (section 5) — an accepted, pre-existing architectural characteristic, not a regression.
+- `HRManageTools.jsx`/`AdminPanel.jsx`'s dual routed/nested usage inside `EmployeePanel.jsx` — a genuine architectural ambiguity flagged for a future, dedicated decision (e.g. should the view-switcher's nested renders stop reusing the same components that are also full routes?), not resolved in this task.
+- Every file listed as EXCLUDED in section 6, with its specific reason.
+
+### 16. Future module migration inventory (documentation only — NOT implemented)
+
+| Module | Likely page-shell candidates | Current pattern (spot-checked) | PageContainer-ready? | Specialized exceptions expected |
+|---|---|---|---|---|
+| Timesheet | Weekly/monthly timesheet views, approval views | Own `p-*`/`bg-*` wrappers per page (not audited in depth) | Likely yes for standard pages | Dense/grid timesheet views may need `compact` density |
+| User Management | User list, role/access-point admin pages | Uses `ui/Modal.jsx`/`GenericTable` heavily (legacy stack, per earlier Phase 1 audit) | Needs its own audit first | Access-point mapping screens may be data-dense |
+| Project Management | Project list/detail pages | Not audited | Needs its own audit first | — |
+| Resource Management | Bench/role-off tables, resource views | Uses `GenericTable` with manually-injected selection (per Phase 1 audit) | Needs its own audit first | Dense allocation tables |
+| AIRS | Dashboard, talent-pool, skill-ontology pages | Has its own dashboard-heavy layout (per Phase 1 notes) | Needs its own audit first | Dashboard/KPI-dense pages likely specialized |
+| Employee Onboarding | Employee profile, onboarding checklist pages | Not audited | Needs its own audit first | — |
+| Expense Management | Policy dashboard, bundle/assignment pages | **Already has its own route-scoped density system** (`isXms`/`.xms-density` in `index.css`, applied by `Layout.jsx` itself) | Needs care — already has a working, different route-scoped pattern; must not conflict with `.xms-density` | The `isXms` mechanism is itself evidence that route-scoped Layout behavior is possible and already precedented — relevant prior art for any future Layout-level fix to the Layout-padding question in section 5 |
+| Accounts Receivable | Invoice/dashboard pages | Not audited | Needs its own audit first | — |
+| Accounts Payable | Invoice processing pipeline pages | Not audited | Needs its own audit first | — |
+
+No file in any of these modules was opened or modified — this table is based on names/imports visible from this session's own investigation (e.g. `.xms-density`, `GenericTable` usage from earlier Phase 1 documentation) and is intentionally marked "needs its own audit first" wherever this task did not verify current source.
+
+### 17. DatePicker/DateRangePicker confirmation
+
+Confirmed untouched — no file containing `DatePicker`/`DateRangePicker`/`react-datepicker` code was opened or edited in this task.
+
+### 18. Confirmation no other module was modified
+
+Confirmed — `git status --short` shows only the 4 Leave Management files plus this documentation update; `PageContainer.jsx` and `Layout.jsx` are unmodified (read-only); no file outside `src/pages/leave_management/**` was touched.
+
+### 19. Confirmation no Phase 3 work was started
+
+Confirmed — this task implemented P2.24 for Leave Management only, per its own explicit instruction to stop after this module.
+
+### 20. Confirmation no commit/push was performed
+
+Confirmed — all changes remain in the working tree for local review.
+
+## P2.24a — Global Layout / PageContainer Integration
+
+### 1. Original Layout padding behavior
+
+`src/components/Layout/Layout.jsx`'s `<main>` unconditionally applied `p-4` (or `p-3` under `.xms-density` for `/expense-management/*`) to every routed page, regardless of whether that page also used `PageContainer`.
+
+### 2. Why it caused double-padding
+
+Every P2.24-migrated Leave Management page (and the 4 pre-existing `PageContainer` consumers) rendered `PageContainer`'s own `p-4 md:p-6` **inside** Layout's `<main>`, which already had its own `p-4`. Net effect: roughly 32px of padding stacked at mobile, ~40px at desktop, instead of the single `p-4`/`md:p-6` the canonical component intends.
+
+### 3. New canonical/legacy shell contract
+
+- **Legacy routes** (everything not explicitly listed): completely unchanged — Layout keeps applying `p-4`/`p-3` exactly as before.
+- **Canonical routes** (explicitly listed, one at a time, only once a page's component uses `PageContainer`): Layout applies **no** padding of its own; the page's own `PageContainer` (rendered either inside the page component or, for dual-use components, at the route element in `App.jsx`) is the sole source of content padding.
+- Layout continues to own `bg-gray-50`, `rounded-tl-xl`, `shadow-inner`, and `overflow-y-auto` for **every** route, canonical or legacy — background/chrome ownership never changed.
+
+### 4. Exact implementation approach
+
+**Why not React Router route metadata (`handle`/`useMatches`):** confirmed by reading `App.jsx` fresh — this app uses a plain `<BrowserRouter>` + JSX `<Routes>/<Route>` tree, not a data router created via `createBrowserRouter`/`createHashRouter`. Route `handle` metadata and `useMatches()` only exist on that latter API. Migrating the whole app's router to adopt it purely to solve this one problem would be a large, out-of-scope, high-risk change.
+
+**Why not a negative-margin trick:** rejected in P2.24 already, and confirmed again here — it would silently break whenever a canonical, `PageContainer`-owning component is also rendered nested (not as a direct child of Layout's `<main>`), which is exactly the `HRManageTools`/`AdminPanel` dual-use case (see section 7).
+
+**Why not React Context flowing from route to Layout:** considered and rejected — Layout renders `<Outlet />`, so any context a nested route element provides is a *descendant* of Layout in the render tree; Layout (the ancestor) cannot consume a value supplied by its own descendant. There is no context mechanism here that flows the "am I canonical" flag from a matched leaf route back up to its own parent `<Layout>`.
+
+**What was implemented instead:** `src/utils/applicationRoutes.js` already established the exact precedent needed — `getApplicationFromPath()`/`FINANCE_ROUTE_PREFIXES`, a maintained pathname allow-list consumed by `Layout.jsx` via `useLocation()`. A new sibling export, `isCanonicalPageShellRoute(pathname)`, follows the identical pattern: an explicit, exact-match list of the 7 Leave Management routes that are genuinely canonical today, plus one prefix-matched entry for the one dynamic-segment route (`/leave-details/:employeeId/:leaveName`). This is a **pathname allow-list, not a hardcoded module-name/prefix check** (`pathname.startsWith("/leave_management")` would have been wrong and was explicitly avoided, since Leave Management's own routes don't share a prefix) — each canonical route is listed individually, and a route is only added once its page component genuinely uses `PageContainer`. `Layout.jsx` calls this one function once per render; the resulting boolean only ever removes a padding class, never adds one, so legacy routes are provably unaffected (verified by spot-checking real legacy route paths like `/timesheets`, `/timesheet/dashboard`, `/employee-onboarding` against the list — none match).
+
+Future modules opt in by adding their own routes to the same list once their pages adopt `PageContainer` — no further `Layout.jsx` change is ever needed.
+
+### 5. PageContainer behavior
+
+**Not modified.** Its `{children, className, density}` API is unchanged. No new prop, no background prop, no capability gap was found or introduced.
+
+### 6. Leave Management routed pages affected
+
+| Route | Component | Canonical? | Where `PageContainer` lives |
+|---|---|---|---|
+| `/leave-management` | `EmployeePanel` | Yes | Inside the component (from P2.24) |
+| `/leave-management/hr` | `HRManageTools` | Yes | **Moved** to the route element in `App.jsx` (dual-use fix) |
+| `/leave-management/manager` | `AdminPanel` | Yes | **Added** at the route element in `App.jsx` (dual-use fix); component itself untouched |
+| `/employee-leave-balance` | `EmployeeLeaveBalances` | Yes | Inside the component (pre-existing) |
+| `/edit-holidays` | `EditHolidaysPage` | Yes | Inside the component (pre-existing) |
+| `/approval-rules` | `ApprovalRulesPage` | Yes | Inside the component (pre-existing) |
+| `/leave-policy` | `LeavePolicy` | Yes | Inside the component (from P2.24) |
+| `/leave-details/:employeeId/:leaveName` | `LeaveDetailsPage` | Yes | Inside the component (from P2.24) |
+| `/block-leave-dates/:employeeId`, `/leave-upload`, `/behalf-leave`, `/unauthorized` | `ManageBlockLeave`, `LeaveUploadWizard`, `ApplyLeaveOnBehalf`, `Unauthorized` | No | N/A — unchanged, still receive Layout's original padding |
+
+### 7. Dual-use components handled
+
+`HRManageTools.jsx` and `AdminPanel.jsx` are both rendered two ways: as their own direct route, **and** nested inside `EmployeePanel.jsx`'s internal view-switcher (`activeView === 'hr'` / `'admin'`). Per this task's own explicit guidance (section 7–8), the fix was to **stop letting the reusable component own its shell** and instead apply `PageContainer` at the routed boundary only:
+
+- `HRManageTools.jsx`: its internal `<PageContainer density="comfortable" className="space-y-6 max-w-7xl mx-auto">` was replaced with a plain `<div className="space-y-6 max-w-7xl mx-auto">` — the component itself no longer owns any page-level padding. Its now-unused `PageContainer` import was removed.
+- `AdminPanel.jsx`: **left completely untouched** — it never owned a `PageContainer` and still doesn't.
+- `App.jsx`: both routes (`/leave-management/hr`, `/leave-management/manager`) now wrap their element in `<PageContainer density="comfortable">` at the `<Route>` definition itself, **outside** the `ProtectedRoute`'s children but still inside it (`<ProtectedRoute><PageContainer><HRManageTools/></PageContainer></ProtectedRoute>`), so RBAC gating is unaffected.
+
+Result: when reached via their own routes, both components get exactly one layer of `PageContainer` padding (applied externally). When nested inside `EmployeePanel.jsx` (which owns its own single `PageContainer`), both components now render as plain, unshelled content directly inside `EmployeePanel`'s padding — no nested `PageContainer`, no double shell, in either usage path.
+
+### 8. Legacy module compatibility verification
+
+`isCanonicalPageShellRoute()` is an **exact-match allow-list** (plus one explicit prefix entry) — not a fuzzy/substring check — so a legacy route can only ever be affected if its exact pathname were added to the list, which none are. Verified directly against `App.jsx`'s actual route table: sampled legacy paths from Timesheet (`/timesheets`, `/timesheet/dashboard`, `/timesheets/managerdashboard`, etc.) and Employee Onboarding (`/employee-onboarding`, commented-out) — none match any entry, confirmed by inspection of the list against these strings. No Timesheet/User Management/AIRS/Project Management/Resource Management/Employee Onboarding/Expense Management source file was opened or modified. Expense Management's own existing `isXms`/`.xms-density` route-scoped mechanism is untouched and takes precedence exactly as before for its own routes (the `isCanonicalShell ? "" : isXms ? "p-3" : "p-4"` ternary preserves `isXms`'s branch unchanged for any non-canonical route).
+
+### 9. Background ownership
+
+Unchanged — Layout's `<main>` still always applies `bg-gray-50 rounded-tl-xl shadow-inner overflow-y-auto` regardless of canonical/legacy status. Only the padding utility classes are now conditional. No page declares its own competing background (that was already resolved for the 4 migrated pages in P2.24); this task did not touch background classes anywhere.
+
+### 10. Mobile/responsive verification
+
+`PageContainer`'s own responsive behavior (`p-4 md:p-6`) is completely unchanged and is now the *only* padding layer for canonical routes (previously it was additive to Layout's flat `p-4`), so canonical pages get **less** total padding than before at every breakpoint, never more — no risk of new horizontal overflow. `overflow-y-auto`, sticky/fixed elements, modal positioning (`ApplyLeaveOnBehalf`'s `Modal`), absolute overlays (loading spinners in `EmployeeLeaveBalances.jsx`/`EditHolidaysPage.jsx`), `DataTable`'s own horizontal scroll container, and `BlockLeaveSection`'s `Tabs` are all unaffected — none of these edits touched anything below the outermost page-shell/route-element level.
+
+### 11. Any intentionally preserved exceptions
+
+`ManageBlockLeave.jsx`, `LeaveUploadWizard.jsx`, `ApplyLeaveOnBehalf.jsx`, `Unauthorized.jsx` remain non-canonical (per P2.24's own reasoning) and are unaffected by this task — their routes are absent from the allow-list, so Layout's original padding still applies to them.
+
+### 12. Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings. Run twice (once before, once after removing the now-unused `PageContainer` import from `HRManageTools.jsx`), both green.
+
+### 13. Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues, confirmed after the import cleanup.
+
+### 14. git diff --check
+
+✅ Clean.
+
+### 15. DatePicker/DateRangePicker confirmation
+
+Confirmed untouched — no file containing `DatePicker`/`DateRangePicker`/`react-datepicker` code was opened or edited.
+
+### 16. Confirmation no other modules were modified
+
+Confirmed — `git status --short` shows changes only in `src/utils/applicationRoutes.js`, `src/components/Layout/Layout.jsx`, `src/App.jsx` (route wiring only, for the 2 named Leave Management routes), `src/pages/leave_management/HRManageTools.jsx`, plus this documentation update. No Timesheet/User Management/AIRS/Project Management/Resource Management/Employee Onboarding/Expense Management/Accounts Payable/Accounts Receivable source file was touched.

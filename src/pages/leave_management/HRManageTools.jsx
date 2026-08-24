@@ -15,7 +15,6 @@ import { toast } from "react-toastify";
 import Button from "../../components/Button/Button";
 import PageHeader from "../../components/ui/PageHeader";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import PageContainer from "../../components/patterns/PageContainer";
 import { Fonts } from "../../components/Fonts/Fonts";
 
 // Modals
@@ -120,7 +119,7 @@ const HRManageTools = ({ employeeId }) => {
   ];
 
   return (
-    <PageContainer density="comfortable" className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       <PageHeader
         title="HR Administration"
         subtitle="Configure system leave types, manage team balances, and holiday calendars."
@@ -343,7 +342,7 @@ const HRManageTools = ({ employeeId }) => {
         onClose={() => setOnBehalfOpen(false)}
         year={new Date().getFullYear()}
       />
-    </PageContainer>
+    </div>
   );
 };
 

@@ -5,6 +5,7 @@ import AdminPanel from './AdminPanel';
 import HRManageTools from './HRManageTools';
 import HRAdminPanel from './HRAdminPanel';
 import EmployeeDashboard from './EmployeeDashboard';
+import PageContainer from '../../components/patterns/PageContainer';
 
 const EmployeePanel = () => {
   const employee = useAuth();
@@ -41,11 +42,11 @@ const EmployeePanel = () => {
     if (isAdmin) {
       setActiveView('employee'); // super admin starts on employee view, can switch to any
     } else if (isHRAdministrator && !isManager) {
-      setActiveView('hr_manager');
+      setActiveView('employee');
     } else if (isManager) {
-      setActiveView('admin');
+      setActiveView('employee');
     } else if (isHR) {
-      setActiveView('hr');
+      setActiveView('employee');
     } else {
       setActiveView('employee');
     }
@@ -62,7 +63,7 @@ const EmployeePanel = () => {
   };
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
+    <PageContainer density="comfortable">
       {showToggle && (
         <div className="mb-6 flex justify-end">
           <div className="inline-flex bg-gray-200 rounded-lg p-1 shadow-inner">
@@ -142,7 +143,7 @@ const EmployeePanel = () => {
           <HRAdminPanel />
         )}
       </div>
-    </div>
+    </PageContainer>
   );
 };
 
