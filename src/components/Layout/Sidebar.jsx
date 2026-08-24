@@ -97,6 +97,14 @@ const accountReceivableSubmenu = [
       },
     ],
   },
+  {
+    label: "Tax Configuration",
+    to: "/account-receivable/tax-configuration",
+  },
+  {
+    label: "Tax Calculation",
+    to: "/account-receivable/tax-calculation",
+  },
 ];
 
 const airsSubmenu = [
