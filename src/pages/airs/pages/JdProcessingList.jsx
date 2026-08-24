@@ -14,7 +14,7 @@ import { Badge } from "../../../components/ui/badge";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ExpandableList from "../../../components/List/List";
 import Pagination from "../../../components/Pagination/pagination";
-import StageStepper, { overallStatusMeta, buildStageMap } from "../components/ProcessingStageStepper";
+import StageStepper, { overallStatusMeta, buildStageMap, deriveOverallStatus } from "../components/ProcessingStageStepper";
 import useAirsSocket from "../websockets/useAirsSocket";
 import { dispatchAirsEvent } from "../websockets/airsEventDispatch";
 
@@ -125,18 +125,17 @@ export default function JdProcessingList() {
               const stageEntry = { stage: data.stage, status: data.status, error_message: data.error_message };
               if (idx >= 0) stages[idx] = { ...stages[idx], ...stageEntry };
               else stages.push(stageEntry);
-              return {
-                ...u,
-                stages,
-                status: data.overall_status || data.status_overall || u.status,
-              };
+              // No overall_status field on this event — derive it from the
+              // accumulated per-stage statuses instead.
+              const status = deriveOverallStatus(buildStageMap(stages), ALL_STAGES, u.status);
+              return { ...u, stages, status };
             })
           );
         },
         "task.linked": (data) => {
           if (!data?.task_id) return;
           setUploads((prev) =>
-            prev.map((u) => (u.task_id === data.task_id ? { ...u, ...data } : u))
+            prev.map((u) => (u.task_id === data.task_id ? { ...u, jd_id: data.document_id ?? u.jd_id } : u))
           );
         },
       }),

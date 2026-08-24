@@ -42,12 +42,15 @@ export default function usePipelineBoard(campaignId) {
   // asking for a reason; drives StageReasonModal.
   const [pendingReason, setPendingReason] = useState(null);
 
-  const load = useCallback(async () => {
+  // silent=true skips the loading spinner — used when a WS event tells us
+  // to reconcile from REST in the background (e.g. another user's action),
+  // as opposed to the page's own first load.
+  const load = useCallback(async (silent = false) => {
     if (!campaignId) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const res = await getCampaignBoard(campaignId);
@@ -59,9 +62,10 @@ export default function usePipelineBoard(campaignId) {
       setColumnsByStage(byStage);
       setOtherCount(data?.other_count || 0);
     } catch (err) {
-      setError(err);
+      if (!silent) setError(err);
+      else console.warn("Silent board reconciliation failed; keeping last known state.", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [campaignId]);
 
@@ -72,64 +76,53 @@ export default function usePipelineBoard(campaignId) {
   // Live updates after the initial REST load — patches only the affected
   // candidate/column, never a full board reload, so an in-flight drag isn't
   // stomped by someone else's event arriving mid-gesture.
+  // Per app/websocket/events.py, every board event is an id-level signal —
+  // { campaign_id, campaign_candidate_id, candidate_id, pipeline_stage } for
+  // added/stage_changed, or just { campaign_id, campaign_candidate_id } for
+  // updated/removed. None embed the REST board's full candidate object, so
+  // "added" and "updated" can't be patched locally (no name/role/score to
+  // show) and fall back to a silent REST reconcile; "stage_changed" and
+  // "removed" carry enough (an id, and for stage_changed the new stage) to
+  // patch the already-held card in place without a refetch.
   useAirsSocket(campaignId ? `/ws/campaign-candidates/campaign/${campaignId}/board` : null, {
     onOpen: load, // reconnect only: reconcile any missed events
     onEvent: (message) =>
       dispatchAirsEvent(message, {
-        "board.candidate_added": (data) => {
-          const stage = data?.stage || data?.candidate?.pipeline_stage;
-          if (!stage || !data?.candidate) return;
-          const card = mapCandidate(data.candidate);
-          setColumnsByStage((prev) => {
-            const existing = prev[stage] || [];
-            if (existing.some((c) => c.id === card.id)) return prev;
-            return { ...prev, [stage]: [...existing, card] };
-          });
+        "board.candidate_added": () => {
+          load(true);
         },
         "board.stage_changed": (data) => {
-          const id = data?.id ?? data?.campaign_candidate_id ?? data?.candidate?.id ?? data?.candidate?.campaign_candidate_id;
-          const toStage = data?.to_stage ?? data?.stage ?? data?.candidate?.pipeline_stage;
-          if (id == null || !toStage) return;
+          const id = data?.campaign_candidate_id;
+          const toStage = data?.pipeline_stage;
+          if (!id || !toStage) return;
+          let foundLocally = false;
           setColumnsByStage((prev) => {
             let movedCard = null;
             const next = {};
             Object.entries(prev).forEach(([stage, cards]) => {
               next[stage] = cards.filter((c) => {
                 if (c.id === id) {
-                  movedCard = data.candidate ? mapCandidate(data.candidate) : { ...c, stage: toStage };
+                  movedCard = { ...c, stage: toStage };
                   return false;
                 }
                 return true;
               });
             });
             if (!movedCard) return prev;
+            foundLocally = true;
             next[toStage] = [...(next[toStage] || []), movedCard];
             return next;
           });
+          // Card wasn't in our local state (e.g. a missed candidate_added) —
+          // reconcile via REST instead of silently dropping the move.
+          if (!foundLocally) load(true);
         },
-        "board.candidate_updated": (data) => {
-          const candidate = data?.candidate || data;
-          const id = candidate?.id ?? candidate?.campaign_candidate_id;
-          if (id == null) return;
-          const updated = mapCandidate(candidate);
-          setColumnsByStage((prev) => {
-            const currentStage = Object.keys(prev).find((stage) => (prev[stage] || []).some((c) => c.id === id));
-            if (!currentStage) return prev;
-            if (updated.stage && updated.stage !== currentStage) {
-              const next = { ...prev };
-              next[currentStage] = prev[currentStage].filter((c) => c.id !== id);
-              next[updated.stage] = [...(prev[updated.stage] || []), updated];
-              return next;
-            }
-            return {
-              ...prev,
-              [currentStage]: prev[currentStage].map((c) => (c.id === id ? updated : c)),
-            };
-          });
+        "board.candidate_updated": () => {
+          load(true);
         },
         "board.candidate_removed": (data) => {
-          const id = data?.id ?? data?.campaign_candidate_id;
-          if (id == null) return;
+          const id = data?.campaign_candidate_id;
+          if (!id) return;
           setColumnsByStage((prev) => {
             const next = {};
             Object.entries(prev).forEach(([stage, cards]) => {
