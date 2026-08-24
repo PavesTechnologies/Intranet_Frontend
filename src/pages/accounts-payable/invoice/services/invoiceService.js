@@ -209,6 +209,23 @@ export const invoiceService = {
   },
 
   /**
+   * Persists the invoice once extraction/validation have finished — the invoice does not exist
+   * until this call succeeds. Takes the same payload that was sent to validateInvoiceFields.
+   * @param {Object} extractionResult - the raw extract-fields response, forwarded as-is
+   * @returns {Promise<Object>} { invoice_id, invoice_number, vendor_id, inbound_document_id,
+   *   invoice_attachment_id, status_code, line_count, skipped_line_count, warnings }
+   */
+  async createInvoice(extractionResult) {
+    try {
+      const response = await api.post(`${AP_BASE_URL}/invoice-extract/create-invoice`, extractionResult);
+      return response.data;
+    } catch (error) {
+      console.error("Error in invoiceService.createInvoice:", error);
+      throw withNormalizedStatus(error);
+    }
+  },
+
+  /**
    * Transitions an invoice to a new status via its numeric status_master id.
    * @param {string|number} invoiceId
    * @param {number} statusId
