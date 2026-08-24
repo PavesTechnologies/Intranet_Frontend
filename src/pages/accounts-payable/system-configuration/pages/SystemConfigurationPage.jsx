@@ -1,15 +1,23 @@
 import { useState } from "react";
 import PageHeader from "../../../../components/ui/PageHeader";
 import GeneralConfigurationTab from "../components/GeneralConfigurationTab";
+import FiscalYearTab from "../components/FiscalYearTab";
+import TaxComplianceTab from "../components/TaxComplianceTab";
 import StatusMasterTab from "../components/StatusMasterTab";
 import TaxTypesTab from "../components/TaxTypesTab";
+import TaxRulesTab from "../components/TaxRulesTab";
+import ApprovalRulesTab from "../components/ApprovalRulesTab";
 import PaymentTermsTab from "../components/PaymentTermsTab";
 
 const TABS = [
   { id: "general", label: "General Configuration" },
-  { id: "status", label: "Status Master" },
+  { id: "fiscalYear", label: "Fiscal Years" },
+  { id: "taxCompliance", label: "Tax & Compliance" },
   { id: "tax", label: "Tax Types" },
+  { id: "taxRules", label: "Tax Rules" },
+  { id: "approvalRules", label: "Approval Rules" },
   { id: "paymentTerms", label: "Payment Terms" },
+  { id: "status", label: "Status Master" },
 ];
 
 export default function SystemConfigurationPage() {
@@ -19,7 +27,7 @@ export default function SystemConfigurationPage() {
     <div className="p-6">
       <PageHeader
         title="System Configuration"
-        subtitle="Manage AP master data — general settings, statuses, tax types, and payment terms."
+        subtitle="Manage AP master data — general settings, fiscal years, tax compliance, tax rules, approval thresholds, payment terms, and statuses."
       />
 
       <div className="flex gap-6 border-b border-gray-200">
@@ -41,8 +49,12 @@ export default function SystemConfigurationPage() {
 
       <div className="mt-4">
         {activeTab === "general" && <GeneralConfigurationTab />}
+        {activeTab === "fiscalYear" && <FiscalYearTab />}
+        {activeTab === "taxCompliance" && <TaxComplianceTab />}
         {activeTab === "status" && <StatusMasterTab />}
         {activeTab === "tax" && <TaxTypesTab />}
+        {activeTab === "taxRules" && <TaxRulesTab />}
+        {activeTab === "approvalRules" && <ApprovalRulesTab />}
         {activeTab === "paymentTerms" && <PaymentTermsTab />}
       </div>
     </div>

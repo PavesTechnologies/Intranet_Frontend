@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Pencil, FolderKanban, Coins, Receipt, ShieldCheck } from "lucide-react";
 
@@ -20,7 +20,9 @@ import {
   saveDraftConfiguration,
   activateConfiguration,
   ensureBillingConfigurationDraft,
+  saveBillingConfigurationRecord,
 } from "../services/billingConfigService";
+import { getActiveCurrencies } from "../services/toolPricingService";
 
 const INITIAL_WIZARD_DATA = {
   setupMode: "EXISTING",
@@ -49,11 +51,21 @@ const INITIAL_WIZARD_DATA = {
       billingCutoffDay: "",
     },
     fixedPrice: {
+      // Actual client-agreed commercial value — seeded from the PMS Project Budget
+      // once, then freely editable by Finance. contractValueSource tracks whether
+      // it still reflects that PMS seed ("PMS") or has been overridden ("MANUAL").
+      fixedPriceConfigurationId: null,
       totalContractValue: "",
+      contractValueSource: "",
       advanceReceived: "",
       retentionPercent: "",
-      invoiceScheduleType: "",
-      recognitionTrigger: "",
+      effectiveFrom: "",
+      effectiveTo: "",
+      remarks: "",
+      // Backend-calculated, populated after save/fetch.
+      retentionAmount: "",
+      billableAmount: "",
+      remainingAmount: "",
     },
     milestones: [],
     milestoneSettings: { billOnlyCompletedMilestones: false, allowPartialMilestoneBilling: false },
@@ -157,7 +169,40 @@ function getMissingFields(step, data) {
           if (!config.subscription?.endDate) missing.push("Subscription End Date");
         }
       } else if (config.billingType === "FIXED_PRICE") {
-        if (!config.fixedPrice?.totalContractValue) missing.push("Total Contract Value");
+        const fixedPrice = config.fixedPrice || {};
+        if (!fixedPrice.totalContractValue) missing.push("Contract Value");
+        // Fixed Price details are persisted immediately by their own "Save Fixed
+        // Price Details" button, not by the final Create/Submit — so the user must
+        // have successfully saved before this step lets them continue.
+        else if (!fixedPrice.fixedPriceConfigurationId) missing.push("Save Fixed Price Details before continuing");
+
+        const contractValue = Number(fixedPrice.totalContractValue) || 0;
+        const retentionPercent = Number(fixedPrice.retentionPercent);
+        const hasRetention =
+          fixedPrice.retentionPercent !== "" &&
+          fixedPrice.retentionPercent !== null &&
+          fixedPrice.retentionPercent !== undefined;
+        if (hasRetention && (Number.isNaN(retentionPercent) || retentionPercent < 0 || retentionPercent > 100)) {
+          missing.push("Retention % must be between 0 and 100");
+        }
+
+        const advanceReceived = Number(fixedPrice.advanceReceived);
+        const hasAdvance =
+          fixedPrice.advanceReceived !== "" &&
+          fixedPrice.advanceReceived !== null &&
+          fixedPrice.advanceReceived !== undefined;
+        if (hasAdvance) {
+          if (Number.isNaN(advanceReceived) || advanceReceived < 0) {
+            missing.push("Advance Received cannot be negative");
+          } else {
+            const retentionAmount =
+              hasRetention && retentionPercent > 0 ? contractValue * (retentionPercent / 100) : 0;
+            const billableAmount = contractValue - retentionAmount;
+            if (advanceReceived > billableAmount) {
+              missing.push("Advance Received cannot exceed the Billable Amount");
+            }
+          }
+        }
       } else if (config.billingType === "MILESTONE") {
         if ((config.milestones || []).length === 0) missing.push("At least one Milestone");
       }
@@ -188,6 +233,19 @@ function getStepValidationMessage(step, data) {
   return `Please complete the following before continuing: ${missing.join(", ")}.`;
 }
 
+// The backend's minimum requirement for POST .../draft — clientId, projectId, and
+// billingTypeId. Called before every draft-creation attempt so a wizard with empty
+// or partially-filled data never reaches the API (see the empty-payload bug this
+// guards against).
+function getDraftGuardMessage(wizardData) {
+  const projectInfo = wizardData.projectInfo || {};
+  const billingConfig = wizardData.billingConfig || {};
+  if (!projectInfo.clientId) return "Please select a Client before continuing.";
+  if (!projectInfo.projectId) return "Please select a Project before continuing.";
+  if (!billingConfig.billingTypeId) return "Please select a Billing Type before continuing.";
+  return null;
+}
+
 export default function NewConfigurationWizard() {
   const navigate = useNavigate();
   const { configId } = useParams();
@@ -202,6 +260,10 @@ export default function NewConfigurationWizard() {
   const [activating, setActivating] = useState(false);
   const [savedConfigId, setSavedConfigId] = useState(extractBillingConfigurationId(configId));
   const [configStatus, setConfigStatus] = useState(null);
+  const [creatingDraft, setCreatingDraft] = useState(false);
+  // Currency master list (real UUID currencyId per currency code) — the only
+  // currency master source in this codebase, see toolPricingService.getActiveCurrencies.
+  const [currencyMasterList, setCurrencyMasterList] = useState([]);
 
   // Editing an already-created (non-Draft) configuration should only ever
   // update that record, never re-run the create/activate flow.
@@ -239,18 +301,87 @@ export default function NewConfigurationWizard() {
     };
   }, [configId, navigate]);
 
+  useEffect(() => {
+    let isMounted = true;
+    getActiveCurrencies()
+      .then((currencies) => {
+        if (isMounted) setCurrencyMasterList(Array.isArray(currencies) ? currencies : []);
+      })
+      .catch(() => {
+        if (isMounted) setCurrencyMasterList([]);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // The backend's CurrencyMaster.currencyId is a UUID, not the small integer this
+  // wizard used to fabricate from the currency code. Once the currency master list
+  // has loaded and the project's/user's currency code is known, resolve it to the
+  // real currencyId and stamp it onto projectInfo so buildBillingConfigurationRequestPayload
+  // can send it verbatim instead of guessing.
+  useEffect(() => {
+    if (currencyMasterList.length === 0) return;
+
+    const code = String(
+      wizardData.projectInfo?.projectBudgetCurrency || wizardData.projectInfo?.currency || ""
+    )
+      .trim()
+      .toUpperCase();
+    if (!code) return;
+
+    const match = currencyMasterList.find(
+      (currency) => String(currency.currencyCode || "").trim().toUpperCase() === code
+    );
+    const matchedId = match?.currencyId || null;
+    if (!matchedId || matchedId === wizardData.projectInfo?.currencyId) return;
+
+    setWizardData((prev) => ({
+      ...prev,
+      projectInfo: {
+        ...prev.projectInfo,
+        currencyId: matchedId,
+      },
+    }));
+  }, [
+    currencyMasterList,
+    wizardData.projectInfo?.projectBudgetCurrency,
+    wizardData.projectInfo?.currency,
+    wizardData.projectInfo?.currencyId,
+  ]);
+
   const handleBack = () => setCurrentStep((step) => Math.max(step - 1, 1));
 
-  const handleNext = () => {
+  // Safety net: if for some reason the automatic draft creation effect (below,
+  // near ensureBillingConfigurationId) hasn't produced a billingConfigurationId by
+  // the time the user leaves Step 2 — where billing type and frequency are chosen —
+  // make one more attempt before letting them reach Fixed Price Save, since that
+  // button never creates the draft itself.
+  const ensureDraftBeforeLeavingStep2 = async () => {
+    if (savedConfigId) return true;
+    setCreatingDraft(true);
+    try {
+      const newId = await ensureBillingConfigurationId();
+      return Boolean(newId);
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Failed to create billing configuration draft."), "error");
+      return false;
+    } finally {
+      setCreatingDraft(false);
+    }
+  };
+
+  const handleNext = async () => {
     const validationMessage = getStepValidationMessage(currentStep, wizardData);
     if (validationMessage) {
       showStatusToast(validationMessage, "warning");
       return;
     }
+    if (currentStep === 2 && !(await ensureDraftBeforeLeavingStep2())) return;
     setCurrentStep((step) => Math.min(step + 1, STEPS.length));
   };
 
-  const handleStepClick = (stepId) => {
+  const handleStepClick = async (stepId) => {
     if (stepId < currentStep) {
       setCurrentStep(stepId);
       return;
@@ -260,6 +391,7 @@ export default function NewConfigurationWizard() {
       showStatusToast(validationMessage, "warning");
       return;
     }
+    if (currentStep === 2 && stepId > 2 && !(await ensureDraftBeforeLeavingStep2())) return;
     setCurrentStep(stepId);
   };
 
@@ -303,6 +435,9 @@ export default function NewConfigurationWizard() {
         id: nextId,
       },
     }));
+    // [5] Stored in savedConfigId + wizardData.billingConfigurationId +
+    // wizardData.billingConfig.{billingConfigurationId,id}.
+    console.log("[NewConfigurationWizard] billingConfigurationId stored in wizard state:", nextId);
     return nextId;
   };
 
@@ -324,9 +459,76 @@ export default function NewConfigurationWizard() {
   // the single-row create/update the rate card button is about to perform itself.
   const ensureBillingConfigurationId = async () => {
     if (savedConfigId) return savedConfigId;
+    const guardMessage = getDraftGuardMessage(wizardData);
+    if (guardMessage) {
+      showStatusToast(guardMessage, "warning");
+      return null;
+    }
     const nextId = await ensureBillingConfigurationDraft(wizardData);
     return applyBillingConfigurationId(nextId);
   };
+
+  // BillingConfigurationDraftRequestDto only actually requires clientId, projectId,
+  // and billingTypeId (see getDraftGuardMessage) — billingFrequencyId/currency/
+  // currencyId are NOT required by the draft endpoint. Gating draft creation on
+  // currencyId in particular was wrong: that UUID comes from a cross-service lookup
+  // (Expense Management's /xms/admin/currencies, a different backend entirely — see
+  // the currency-master effect above) which can fail or never resolve for reasons
+  // unrelated to this wizard, and doing so silently blocked the draft POST forever,
+  // which is why billingConfigurationId was never created and FixedPriceForm's
+  // "billing configuration id is missing" guard tripped. Fire as soon as the three
+  // DTO-required fields are present; currencyId/billingFrequencyId ride along in the
+  // payload if already resolved by then, and reach the backend later via Save Draft/
+  // Next otherwise.
+  const draftCreationInFlightRef = useRef(false);
+
+  useEffect(() => {
+    if (configId || savedConfigId || draftCreationInFlightRef.current) return;
+
+    const projectInfo = wizardData.projectInfo || {};
+    const billingConfig = wizardData.billingConfig || {};
+    const clientId = projectInfo.clientId;
+    const projectId = projectInfo.projectId;
+    const billingTypeId = billingConfig.billingTypeId;
+
+    if (!clientId || !projectId || !billingTypeId) return;
+
+    // [1] clientId/projectId/billingTypeId available — draft creation can proceed.
+    console.log("[NewConfigurationWizard] draft-required fields ready:", {
+      clientId,
+      projectId,
+      billingTypeId,
+      billingFrequencyId: billingConfig.billingFrequencyId,
+      currency: projectInfo.projectBudgetCurrency || projectInfo.currency,
+      currencyId: projectInfo.currencyId,
+    });
+
+    let cancelled = false;
+    draftCreationInFlightRef.current = true;
+    setCreatingDraft(true);
+
+    ensureBillingConfigurationId()
+      .catch((error) => {
+        if (!cancelled) {
+          showStatusToast(getApiErrorMessage(error, "Failed to create billing configuration draft."), "error");
+        }
+      })
+      .finally(() => {
+        draftCreationInFlightRef.current = false;
+        if (!cancelled) setCreatingDraft(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    configId,
+    savedConfigId,
+    wizardData.projectInfo?.clientId,
+    wizardData.projectInfo?.projectId,
+    wizardData.billingConfig?.billingTypeId,
+  ]);
 
   const handleSaveDraft = async () => {
     setSaving(true);
@@ -343,21 +545,62 @@ export default function NewConfigurationWizard() {
   const handleCancel = () => navigate(CONFIGURATIONS_PATH);
 
   const handleFinalSubmit = async () => {
+    // Fixed Price creation is its own flow: the Fixed Price record itself is already
+    // saved (immediately, via the "Save Fixed Price Details" button on the Fixed
+    // Price screen) before the user can even reach this step — see the
+    // fixedPriceConfigurationId check in getMissingFields. So final submit here only
+    // persists the Billing Configuration record; it never calls the Fixed Price API
+    // or the Activate API. Editing an already-active config (isEditingExisting) keeps
+    // the original save+activate flow below unchanged.
+    const isFixedPriceCreate = wizardData.billingConfig?.billingType === "FIXED_PRICE" && !isEditingExisting;
+
     setActivating(true);
     try {
-      let billingConfigurationId = savedConfigId;
-      try {
-        const saveResult = await saveDraftConfiguration(wizardData, savedConfigId);
-        billingConfigurationId =
-          extractBillingConfigurationId(saveResult) ||
+      if (isFixedPriceCreate) {
+        // finalize: true tells the backend to flip status to ACTIVE/isActive=true on
+        // this same PUT — this is the only call site that should ever send it.
+        const { configResponse, configId } = await saveBillingConfigurationRecord(wizardData, savedConfigId, {
+          finalize: true,
+        });
+        const billingConfigurationId =
+          configId ||
+          extractBillingConfigurationId(configResponse) ||
           extractBillingConfigurationId(wizardData.billingConfigurationId) ||
           savedConfigId;
-      } catch (saveError) {
-        console.warn("Save before activate failed, proceeding with existing ID:", saveError);
+
+        if (!billingConfigurationId) {
+          throw new Error("Billing configuration was saved, but the response did not include a configuration id.");
+        }
+
+        setSavedConfigId(billingConfigurationId);
+        setWizardData((prev) => ({
+          ...prev,
+          billingConfigurationId,
+          billingConfig: {
+            ...prev.billingConfig,
+            billingConfigurationId,
+            id: billingConfigurationId,
+          },
+        }));
+
+        showStatusToast("Billing setup created successfully.", "success");
+        navigate(CONFIGURATIONS_PATH);
+        return;
       }
 
+      // Let a real save failure (e.g. a backend validation error) surface as-is via
+      // the outer catch below — swallowing it here and falling through to the
+      // "missing configuration id" message would hide the actual error from the user.
+      // finalize: true tells the backend to flip status to ACTIVE/isActive=true on
+      // this same PUT — this is the only call site that should ever send it.
+      const saveResult = await saveDraftConfiguration(wizardData, savedConfigId, { finalize: true });
+      const billingConfigurationId =
+        extractBillingConfigurationId(saveResult) ||
+        extractBillingConfigurationId(wizardData.billingConfigurationId) ||
+        savedConfigId;
+
       if (!billingConfigurationId) {
-        throw new Error("Unable to save billing configuration — missing configuration id.");
+        throw new Error("Billing configuration was saved, but the response did not include a configuration id.");
       }
 
       setSavedConfigId(billingConfigurationId);
@@ -378,10 +621,10 @@ export default function NewConfigurationWizard() {
       );
       navigate(CONFIGURATIONS_PATH);
     } catch (error) {
-      showStatusToast(
-        getApiErrorMessage(error, `Failed to ${isEditingExisting ? "update" : "activate"} billing configuration.`),
-        "error"
-      );
+      const fallbackMessage = isFixedPriceCreate
+        ? "Failed to create billing configuration."
+        : `Failed to ${isEditingExisting ? "update" : "activate"} billing configuration.`;
+      showStatusToast(getApiErrorMessage(error, fallbackMessage), "error");
     } finally {
       setActivating(false);
     }
@@ -390,7 +633,7 @@ export default function NewConfigurationWizard() {
   const isLastStep = currentStep === STEPS.length;
   // Native `disabled` only reflects an in-flight request — a step with missing
   // fields stays clickable so onNext can explain what's missing via toast.
-  const nextDisabled = isLastStep && activating;
+  const nextDisabled = (isLastStep && activating) || creatingDraft;
   const nextIncomplete = !isLastStep && !isStepValid(currentStep, wizardData);
 
   if (loadingExisting) {
@@ -470,7 +713,7 @@ export default function NewConfigurationWizard() {
               finalLoadingText={isEditingExisting ? "Updating..." : "Creating..."}
               showSaveDraft={currentStep > 1}
               saving={saving}
-              activating={activating}
+              activating={activating || creatingDraft}
               onBack={handleBack}
               onNext={isLastStep ? handleFinalSubmit : handleNext}
               onSaveDraft={handleSaveDraft}

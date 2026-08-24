@@ -5,13 +5,14 @@ import PageHeader from "../../../components/ui/PageHeader";
 import Loader from "../../../components/ui/Loader";
 import { showStatusToast } from "../../../components/toastfy/toast";
 
-import { fetchActiveBillingConfigurations, getBillingSnapshotByPeriod } from "../services/billingDataAcquisitionService";
+import {
+  fetchActiveBillingConfigurations,
+  getBillingSnapshotByPeriod,
+} from "../services/billingDataAcquisitionService";
 
 import AcquisitionHeader from "../components/acquisition/AcquisitionHeader";
 import AcquisitionMetrics from "../components/acquisition/AcquisitionMetrics";
 import AcquisitionQueue from "../components/acquisition/AcquisitionQueue";
-import EmptyWorkspaceState from "../components/acquisition/EmptyWorkspaceState";
-import AcquisitionTimeline from "../components/acquisition/AcquisitionTimeline";
 
 export default function BillingDataAcquisition() {
   const navigate = useNavigate();
@@ -20,6 +21,10 @@ export default function BillingDataAcquisition() {
   const [loadingConfigs, setLoadingConfigs] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState("");
+
+  // Centralized filter state shared between KPI cards and Acquisition Queue
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const loadData = async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
@@ -84,6 +89,11 @@ export default function BillingDataAcquisition() {
     navigate(`/account-receivable/billing-data-acquisition/${config.projectId}`, { state: { config } });
   };
 
+  const handleClearFilters = () => {
+    setSelectedStatusFilter("ALL");
+    setSearchQuery("");
+  };
+
   if (loadingConfigs) {
     return (
       <div className="flex h-[500px] items-center justify-center">
@@ -106,21 +116,25 @@ export default function BillingDataAcquisition() {
         }
       />
 
-      {/* KPI Metrics Summary */}
-      <AcquisitionMetrics configs={activeConfigs} loading={loadingConfigs} />
+      {/* KPI Metrics Summary (Interactive cards synchronized with Queue filter) */}
+      <AcquisitionMetrics
+        configs={activeConfigs}
+        loading={loadingConfigs}
+        selectedStatusFilter={selectedStatusFilter}
+        onSelectStatusFilter={setSelectedStatusFilter}
+      />
 
       {/* Acquisition Queue — full-width, scalable enterprise table */}
       <AcquisitionQueue
         configs={activeConfigs}
         onViewConfig={handleViewConfig}
         loading={loadingConfigs}
+        selectedStatusFilter={selectedStatusFilter}
+        onStatusFilterChange={setSelectedStatusFilter}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        onClearFilters={handleClearFilters}
       />
-
-      {/* Guidance + pending worklist — the detail for a selected record now lives on its own page */}
-      <EmptyWorkspaceState configs={activeConfigs} onViewConfig={handleViewConfig} />
-
-      {/* Bottom Operational Audit Timeline — compact, collapsed by default */}
-      <AcquisitionTimeline />
     </div>
   );
 }

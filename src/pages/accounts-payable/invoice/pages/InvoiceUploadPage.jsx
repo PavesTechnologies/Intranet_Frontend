@@ -1,14 +1,15 @@
-import { useRef, useState } from "react";
+// src/pages/accounts-payable/invoice/pages/InvoiceUploadPage.jsx
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import { UploadCloud, FileText, X, CheckCircle2, Loader2 } from "lucide-react";
+import { UploadCloud, FileText, X } from "lucide-react";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
-import { useUploadInvoiceMutation } from "../hooks/useInvoiceMutations";
-import { invoiceService } from "../services/invoiceService";
-import { INVOICE_DETAIL_KEY } from "../hooks/useInvoiceDetail";
+import { useExtractInvoiceFieldsMutation, useValidateInvoiceFieldsMutation, invalidateInvoices } from "../hooks/useInvoiceMutations";
+import { useInvoiceValidationProgress, isValidationTerminal } from "../hooks/useInvoiceValidationProgress";
+import InvoiceProcessingPipeline from "../components/InvoiceProcessingPipeline";
 import { AP_ROUTES } from "../../constants/routes";
 import { getApiErrorMessage } from "../../utils/apiError";
 
@@ -16,10 +17,9 @@ const ACCEPTED_MIME_TYPES = ["application/pdf", "image/png", "image/jpeg"];
 const ACCEPTED_EXTENSIONS = [".pdf", ".png", ".jpg", ".jpeg"];
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
-const PROCESSING_STEPS = [
-  { key: "uploading", label: "Uploading & processing document" },
-  { key: "confirming", label: "Confirming invoice record" },
-];
+// Only the job id + display metadata needed to resume the pipeline UI after a refresh — never
+// the source document or extracted invoice fields.
+const VALIDATION_SESSION_KEY = "ap.invoiceUpload.validationJob";
 
 function getExtension(fileName) {
   const index = fileName.lastIndexOf(".");
@@ -43,6 +43,40 @@ function formatFileSize(bytes) {
   return kb < 1024 ? `${kb.toFixed(1)} KB` : `${(kb / 1024).toFixed(2)} MB`;
 }
 
+function readStoredValidationJob() {
+  try {
+    const raw = sessionStorage.getItem(VALIDATION_SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredValidationJob(job) {
+  try {
+    sessionStorage.setItem(VALIDATION_SESSION_KEY, JSON.stringify(job));
+  } catch {
+    // best-effort only (private browsing / quota) — resume-on-refresh just won't work this time
+  }
+}
+
+function clearStoredValidationJob() {
+  try {
+    sessionStorage.removeItem(VALIDATION_SESSION_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/** True while a submission is in flight and the upload form should stay hidden/disabled. */
+function isPipelineActive(pipeline) {
+  if (!pipeline) return false;
+  if (pipeline.extraction.status === "RUNNING") return true;
+  if (pipeline.extraction.status === "FAILED") return false;
+  if (!pipeline.validation) return true; // extracted, about to queue validation
+  return !isValidationTerminal(pipeline.validation.status);
+}
+
 /** Route: /accounts-payable/invoices/upload */
 export default function InvoiceUploadPage() {
   const navigate = useNavigate();
@@ -51,8 +85,81 @@ export default function InvoiceUploadPage() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [validationError, setValidationError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
-  const [processingStep, setProcessingStep] = useState(null); // null | "uploading" | "ocr" | "validating"
-  const uploadInvoice = useUploadInvoiceMutation();
+  const [pipeline, setPipeline] = useState(null);
+
+  const extractFields = useExtractInvoiceFieldsMutation();
+  const validateFields = useValidateInvoiceFieldsMutation();
+  const validationQuery = useInvoiceValidationProgress(pipeline?.jobId ?? null, {
+    enabled: Boolean(pipeline?.jobId),
+  });
+
+  // Resume-on-refresh: if a validation job was mid-flight when the page unloaded, pick the
+  // pipeline UI back up from its job id instead of silently losing the user's place.
+  useEffect(() => {
+    const stored = readStoredValidationJob();
+    if (!stored?.jobId) return;
+    setPipeline({
+      fileName: stored.fileName || "Invoice",
+      extraction: { status: "SUCCESS", durationMs: stored.extractionDurationMs ?? null, errorMessage: null },
+      jobId: stored.jobId,
+      validation: { status: "RUNNING", stages: {}, isValid: undefined, requiresManualReview: undefined, issues: [], pollUnavailable: false },
+      result: { invoiceId: stored.invoiceId ?? null, inboundDocumentId: stored.inboundDocumentId ?? null },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Merge real polling status into the pipeline view, exactly as the backend reports it.
+  useEffect(() => {
+    if (!pipeline?.jobId) return;
+
+    if (validationQuery.data) {
+      const data = validationQuery.data;
+      setPipeline((prev) =>
+        prev
+          ? {
+              ...prev,
+              validation: {
+                status: data.status,
+                stages: data.stages || {},
+                isValid: data.is_valid,
+                requiresManualReview: data.requires_manual_review,
+                issues: data.issues || [],
+                pollUnavailable: false,
+              },
+            }
+          : prev,
+      );
+
+      if (isValidationTerminal(data.status)) {
+        clearStoredValidationJob();
+        invalidateInvoices(queryClient, pipeline.result?.invoiceId);
+      }
+      return;
+    }
+
+    if (validationQuery.isError) {
+      if (validationQuery.error?.status === 404) {
+        setPipeline((prev) =>
+          prev
+            ? {
+                ...prev,
+                validation: {
+                  ...(prev.validation || { stages: {}, issues: [] }),
+                  status: "FAILED",
+                  errorMessage: "This validation job could not be found. It may have expired.",
+                  pollUnavailable: false,
+                },
+              }
+            : prev,
+        );
+        clearStoredValidationJob();
+      } else {
+        setPipeline((prev) =>
+          prev && prev.validation ? { ...prev, validation: { ...prev.validation, pollUnavailable: true } } : prev,
+        );
+      }
+    }
+  }, [validationQuery.data, validationQuery.isError, validationQuery.error, pipeline?.jobId, pipeline?.result?.invoiceId, queryClient]);
 
   const handleFileSelected = (file) => {
     if (!file) return;
@@ -83,9 +190,11 @@ export default function InvoiceUploadPage() {
     handleFileSelected(e.dataTransfer.files?.[0]);
   };
 
-  const handleCancel = () => {
+  const handleReset = () => {
     setSelectedFile(null);
     setValidationError("");
+    setPipeline(null);
+    clearStoredValidationJob();
   };
 
   const handleUpload = async () => {
@@ -93,84 +202,137 @@ export default function InvoiceUploadPage() {
       setValidationError("Please select a file to upload.");
       return;
     }
+    if (isPipelineActive(pipeline)) return; // guard against duplicate submission
+
+    const fileName = selectedFile.name;
+    setPipeline({
+      fileName,
+      extraction: { status: "RUNNING", durationMs: null, errorMessage: null },
+      jobId: null,
+      validation: null,
+      result: null,
+    });
+
+    const startedAt = performance.now();
+    let extracted;
+    try {
+      extracted = await extractFields.mutateAsync(selectedFile);
+    } catch (error) {
+      const message = getApiErrorMessage(error, "Unable to extract invoice data.");
+      setPipeline((prev) => (prev ? { ...prev, extraction: { status: "FAILED", durationMs: null, errorMessage: message } } : prev));
+      toast.error(message);
+      return;
+    }
+
+    const extractionDurationMs = performance.now() - startedAt;
+    const result = { invoiceId: extracted?.invoice_id ?? null, inboundDocumentId: extracted?.inbound_document_id ?? null };
+
+    setPipeline((prev) =>
+      prev ? { ...prev, extraction: { status: "SUCCESS", durationMs: extractionDurationMs, errorMessage: null }, result } : prev,
+    );
 
     try {
-      setProcessingStep("uploading");
+      const queued = await validateFields.mutateAsync(extracted);
+      const jobId = queued?.job_id;
+      if (!jobId) throw new Error("Validation did not return a job id.");
 
-      const result = await uploadInvoice.mutateAsync(selectedFile);
+      setPipeline((prev) =>
+        prev
+          ? {
+              ...prev,
+              jobId,
+              validation: {
+                status: queued.status || "QUEUED",
+                stages: {},
+                isValid: undefined,
+                requiresManualReview: undefined,
+                issues: [],
+                pollUnavailable: false,
+              },
+            }
+          : prev,
+      );
 
-      const invoiceNumber = result?.extracted_invoice?.invoice_number || "Invoice";
-      const status = result?.invoice_status;
-
-      if (status === "OCR_FAILED") {
-        toast.error(`${invoiceNumber} — OCR extraction failed.`);
-      } else if (status === "OCR_REVIEW_PENDING") {
-        toast.info(`${invoiceNumber} requires OCR review.`);
-      } else {
-        toast.success(`${invoiceNumber} processed successfully.`);
-      }
-
-      if (result?.invoice_id) {
-        // Confirm the invoice record is actually retrievable (and warm the detail page's
-        // cache) before navigating, instead of trusting the upload response alone.
-        setProcessingStep("confirming");
-        try {
-          await queryClient.fetchQuery({
-            queryKey: INVOICE_DETAIL_KEY(result.invoice_id),
-            queryFn: () => invoiceService.getInvoice(result.invoice_id),
-          });
-          navigate(AP_ROUTES.INVOICE_DETAIL(result.invoice_id));
-        } catch {
-          toast.info("Invoice uploaded — it will appear in Invoice Management once processing finishes.");
-          navigate(AP_ROUTES.INVOICE_LIST);
-        }
-      } else if (result?.inbound_document_id) {
-        // No invoice record yet (still OCR-only) — send the user to the OCR Review queue
-        // rather than a detail route that doesn't accept an inbound document id.
-        navigate(AP_ROUTES.INVOICE_OCR_REVIEW);
-      } else {
-        navigate(AP_ROUTES.INVOICE_LIST);
-      }
+      writeStoredValidationJob({
+        jobId,
+        fileName,
+        extractionDurationMs,
+        invoiceId: result.invoiceId,
+        inboundDocumentId: result.inboundDocumentId,
+      });
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Invoice processing failed. Please try again."));
-    } finally {
-      setProcessingStep(null);
+      const message = getApiErrorMessage(error, "Unable to start invoice validation.");
+      setPipeline((prev) =>
+        prev
+          ? {
+              ...prev,
+              validation: {
+                status: "FAILED",
+                stages: {},
+                isValid: undefined,
+                requiresManualReview: undefined,
+                issues: [],
+                pollUnavailable: false,
+                errorMessage: message,
+              },
+            }
+          : prev,
+      );
+      toast.error(message);
     }
   };
+
+  const handleViewResult = () => {
+    const { invoiceId, inboundDocumentId } = pipeline?.result || {};
+    if (invoiceId) {
+      navigate(AP_ROUTES.INVOICE_DETAIL(invoiceId));
+    } else if (inboundDocumentId) {
+      navigate(AP_ROUTES.INVOICE_OCR_REVIEW);
+    } else {
+      navigate(AP_ROUTES.INVOICE_LIST);
+    }
+  };
+
+  const validationDone = pipeline?.validation && isValidationTerminal(pipeline.validation.status);
+  const extractionFailed = pipeline?.extraction.status === "FAILED";
 
   return (
     <div className="p-6">
       <PageHeader title="Upload Invoice" subtitle="Upload a vendor invoice document for OCR processing" />
 
-      <PageCard className="mx-auto max-w-2xl">
-        <PageCardContent>
-          {processingStep ? (
-            <div className="py-6">
-              <p className="mb-4 text-center text-sm font-medium text-gray-700">Processing {selectedFile?.name}</p>
-              <ul className="mx-auto max-w-xs space-y-3">
-                {PROCESSING_STEPS.map((step, index) => {
-                  const currentIndex = PROCESSING_STEPS.findIndex((s) => s.key === processingStep);
-                  const isDone = index < currentIndex;
-                  const isCurrent = index === currentIndex;
-                  return (
-                    <li key={step.key} className="flex items-center gap-3">
-                      {isDone ? (
-                        <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
-                      ) : isCurrent ? (
-                        <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[#0A0082]" />
-                      ) : (
-                        <span className="h-5 w-5 shrink-0 rounded-full border-2 border-gray-200" />
-                      )}
-                      <span className={`text-sm ${isCurrent ? "font-medium text-gray-900" : isDone ? "text-gray-500" : "text-gray-400"}`}>
-                        {step.label}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ) : (
-            <>
+      <div className="mx-auto max-w-2xl">
+        {pipeline ? (
+          <>
+            <InvoiceProcessingPipeline fileName={pipeline.fileName} extraction={pipeline.extraction} validation={pipeline.validation} />
+
+            {(extractionFailed || validationDone) && (
+              <div className="mt-4 flex justify-end gap-2">
+                {extractionFailed && (
+                  <>
+                    <Button variant="outline" onClick={handleReset}>
+                      Choose a Different File
+                    </Button>
+                    <Button variant="primary" onClick={handleUpload}>
+                      Try Again
+                    </Button>
+                  </>
+                )}
+                {validationDone && (
+                  <>
+                    <Button variant="outline" onClick={handleReset}>
+                      Upload Another Invoice
+                    </Button>
+                    <Button variant="primary" onClick={handleViewResult}>
+                      View Invoice
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <PageCard>
+            <PageCardContent>
               <div
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -210,7 +372,7 @@ export default function InvoiceUploadPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={handleCancel}
+                    onClick={handleReset}
                     className="shrink-0 text-gray-400 hover:text-gray-600"
                     aria-label="Remove selected file"
                   >
@@ -220,21 +382,17 @@ export default function InvoiceUploadPage() {
               )}
 
               <div className="mt-6 flex justify-end gap-2">
-                <Button variant="outline" onClick={handleCancel} disabled={!selectedFile}>
+                <Button variant="outline" onClick={handleReset} disabled={!selectedFile}>
                   Cancel
                 </Button>
-                <Button
-                  variant="primary"
-                  onClick={handleUpload}
-                  disabled={!selectedFile || Boolean(validationError)}
-                >
+                <Button variant="primary" onClick={handleUpload} disabled={!selectedFile || Boolean(validationError)}>
                   Upload Invoice
                 </Button>
               </div>
-            </>
-          )}
-        </PageCardContent>
-      </PageCard>
+            </PageCardContent>
+          </PageCard>
+        )}
+      </div>
     </div>
   );
 }
