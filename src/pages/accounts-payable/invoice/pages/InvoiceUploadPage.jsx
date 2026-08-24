@@ -1,13 +1,16 @@
 // src/pages/accounts-payable/invoice/pages/InvoiceUploadPage.jsx
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { UploadCloud, FileText, X } from "lucide-react";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
-import { useExtractInvoiceFieldsMutation, useValidateInvoiceFieldsMutation, invalidateInvoices } from "../hooks/useInvoiceMutations";
+import {
+  useExtractInvoiceFieldsMutation,
+  useValidateInvoiceFieldsMutation,
+  useCreateInvoiceMutation,
+} from "../hooks/useInvoiceMutations";
 import { useInvoiceValidationProgress, isValidationTerminal } from "../hooks/useInvoiceValidationProgress";
 import InvoiceProcessingPipeline from "../components/InvoiceProcessingPipeline";
 import { AP_ROUTES } from "../../constants/routes";
@@ -80,7 +83,6 @@ function isPipelineActive(pipeline) {
 /** Route: /accounts-payable/invoices/upload */
 export default function InvoiceUploadPage() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const inputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [validationError, setValidationError] = useState("");
@@ -89,6 +91,7 @@ export default function InvoiceUploadPage() {
 
   const extractFields = useExtractInvoiceFieldsMutation();
   const validateFields = useValidateInvoiceFieldsMutation();
+  const createInvoice = useCreateInvoiceMutation();
   const validationQuery = useInvoiceValidationProgress(pipeline?.jobId ?? null, {
     enabled: Boolean(pipeline?.jobId),
   });
@@ -103,7 +106,9 @@ export default function InvoiceUploadPage() {
       extraction: { status: "SUCCESS", durationMs: stored.extractionDurationMs ?? null, errorMessage: null },
       jobId: stored.jobId,
       validation: { status: "RUNNING", stages: {}, isValid: undefined, requiresManualReview: undefined, issues: [], pollUnavailable: false },
-      result: { invoiceId: stored.invoiceId ?? null, inboundDocumentId: stored.inboundDocumentId ?? null },
+      // The extracted payload itself is never persisted to sessionStorage, so a resumed session
+      // can't call Save Invoice until the user re-uploads — see the disabled-Save fallback below.
+      extractionResult: null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -132,7 +137,6 @@ export default function InvoiceUploadPage() {
 
       if (isValidationTerminal(data.status)) {
         clearStoredValidationJob();
-        invalidateInvoices(queryClient, pipeline.result?.invoiceId);
       }
       return;
     }
@@ -159,7 +163,7 @@ export default function InvoiceUploadPage() {
         );
       }
     }
-  }, [validationQuery.data, validationQuery.isError, validationQuery.error, pipeline?.jobId, pipeline?.result?.invoiceId, queryClient]);
+  }, [validationQuery.data, validationQuery.isError, validationQuery.error, pipeline?.jobId]);
 
   const handleFileSelected = (file) => {
     if (!file) return;
@@ -210,7 +214,7 @@ export default function InvoiceUploadPage() {
       extraction: { status: "RUNNING", durationMs: null, errorMessage: null },
       jobId: null,
       validation: null,
-      result: null,
+      extractionResult: null,
     });
 
     const startedAt = performance.now();
@@ -225,10 +229,15 @@ export default function InvoiceUploadPage() {
     }
 
     const extractionDurationMs = performance.now() - startedAt;
-    const result = { invoiceId: extracted?.invoice_id ?? null, inboundDocumentId: extracted?.inbound_document_id ?? null };
 
     setPipeline((prev) =>
-      prev ? { ...prev, extraction: { status: "SUCCESS", durationMs: extractionDurationMs, errorMessage: null }, result } : prev,
+      prev
+        ? {
+            ...prev,
+            extraction: { status: "SUCCESS", durationMs: extractionDurationMs, errorMessage: null },
+            extractionResult: extracted,
+          }
+        : prev,
     );
 
     try {
@@ -253,13 +262,7 @@ export default function InvoiceUploadPage() {
           : prev,
       );
 
-      writeStoredValidationJob({
-        jobId,
-        fileName,
-        extractionDurationMs,
-        invoiceId: result.invoiceId,
-        inboundDocumentId: result.inboundDocumentId,
-      });
+      writeStoredValidationJob({ jobId, fileName, extractionDurationMs });
     } catch (error) {
       const message = getApiErrorMessage(error, "Unable to start invoice validation.");
       setPipeline((prev) =>
@@ -282,14 +285,18 @@ export default function InvoiceUploadPage() {
     }
   };
 
-  const handleViewResult = () => {
-    const { invoiceId, inboundDocumentId } = pipeline?.result || {};
-    if (invoiceId) {
-      navigate(AP_ROUTES.INVOICE_DETAIL(invoiceId));
-    } else if (inboundDocumentId) {
-      navigate(AP_ROUTES.INVOICE_OCR_REVIEW);
-    } else {
+  const handleSaveInvoice = async () => {
+    if (!pipeline?.extractionResult) {
+      toast.error("The extracted invoice data is no longer available. Please upload the file again.");
+      return;
+    }
+
+    try {
+      const created = await createInvoice.mutateAsync(pipeline.extractionResult);
+      toast.success(created?.invoice_number ? `Invoice ${created.invoice_number} saved successfully.` : "Invoice saved successfully.");
       navigate(AP_ROUTES.INVOICE_LIST);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Unable to save the invoice. Please try again."));
     }
   };
 
@@ -319,11 +326,18 @@ export default function InvoiceUploadPage() {
                 )}
                 {validationDone && (
                   <>
-                    <Button variant="outline" onClick={handleReset}>
+                    <Button variant="outline" onClick={handleReset} disabled={createInvoice.isPending}>
                       Upload Another Invoice
                     </Button>
-                    <Button variant="primary" onClick={handleViewResult}>
-                      View Invoice
+                    <Button
+                      variant="primary"
+                      onClick={handleSaveInvoice}
+                      disabled={!pipeline.extractionResult}
+                      loading={createInvoice.isPending}
+                      loadingText="Saving..."
+                      title={!pipeline.extractionResult ? "Extracted data isn't available after a refresh — please upload the file again." : undefined}
+                    >
+                      Save Invoice
                     </Button>
                   </>
                 )}

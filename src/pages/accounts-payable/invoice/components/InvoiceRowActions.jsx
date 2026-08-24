@@ -1,12 +1,30 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
+import { Eye } from "lucide-react";
 import { OCR_REVIEW_QUEUE_STATUSES, INVOICE_STATUS, INVOICE_STATUS_ID } from "../../constants/invoiceStatus";
 import { AP_ROUTES } from "../../constants/routes";
 import { useApPermissions } from "../../hooks/useApPermissions";
 import { useUpdateInvoiceStatusMutation } from "../hooks/useInvoiceMutations";
+import { invoiceService } from "../services/invoiceService";
 import { getApiErrorMessage } from "../../utils/apiError";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
+
+/** Opens the invoice's source document (PDF/image) in a new tab via a presigned blob URL. */
+async function handleViewDocument(inboundDocumentId) {
+  if (!inboundDocumentId) {
+    toast.info("Source document is not available for this invoice.");
+    return;
+  }
+  try {
+    const { blob, contentType } = await invoiceService.viewInvoice(inboundDocumentId);
+    const url = URL.createObjectURL(new Blob([blob], { type: contentType || "application/pdf" }));
+    window.open(url, "_blank", "noopener,noreferrer");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (error) {
+    toast.error(getApiErrorMessage(error, "Could not load the source document."));
+  }
+}
 
 /**
  * Row actions depend on the invoice's current lifecycle status. OCR correction happens in the
@@ -78,7 +96,16 @@ export default function InvoiceRowActions({ invoice }) {
         isLoading={updateStatus.isPending}
         onConfirm={handleMoveToApproval}
         onCancel={() => setShowMoveToApprovalConfirm(false)}
-      />
+      >
+        <button
+          type="button"
+          onClick={() => handleViewDocument(invoice.inboundDocumentId)}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-[#0A0082] hover:underline"
+        >
+          <Eye className="h-4 w-4" />
+          Preview source document
+        </button>
+      </ConfirmationModal>
     </>
   );
 }
