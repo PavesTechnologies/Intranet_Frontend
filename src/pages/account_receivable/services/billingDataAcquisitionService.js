@@ -772,7 +772,9 @@ export function normalizeAcquisitionStatus(rawStatus) {
   const s = String(rawStatus).trim().toUpperCase().replace(/\s+/g, "_");
   if (["NOT_ACQUIRED", "NOTACQUIRED", "NOT_ACQUIRED_YET"].includes(s)) return "NOT_ACQUIRED";
   if (["VALIDATING", "ACQUIRING", "IN_PROGRESS"].includes(s)) return "VALIDATING";
-  if (["READY", "SUCCESS", "ACQUIRED"].includes(s)) return "READY";
+  if (["READY_TO_TAX", "READY_FOR_TAX", "READY", "SUCCESS", "ACQUIRED"].includes(s)) return "READY_TO_TAX";
+  if (["IN_TAX"].includes(s)) return "IN_TAX";
+  if (["TAX_COMPLETED"].includes(s)) return "TAX_COMPLETED";
   if (["PARTIALLY_READY", "PARTIALLYREADY", "PARTIAL"].includes(s)) return "PARTIALLY_READY";
   if (["PENDING_APPROVAL", "PENDINGAPPROVAL", "NEEDS_APPROVAL", "AWAITING_APPROVAL"].includes(s)) return "PENDING_APPROVAL";
   if (["NO_BILLABLE_DATA", "NO_DATA", "NO_TIMESHEETS", "NO_ACTIVITY"].includes(s)) return "NO_BILLABLE_DATA";
@@ -798,7 +800,7 @@ export function getAcquisitionKpis(configs = []) {
       notAcquiredCount++;
     } else if (st === "PARTIALLY_READY" || st === "PENDING_APPROVAL") {
       needsApprovalCount++;
-    } else if (st === "READY") {
+    } else if (st === "READY_TO_TAX" || st === "IN_TAX" || st === "TAX_COMPLETED") {
       readyCount++;
     }
   });

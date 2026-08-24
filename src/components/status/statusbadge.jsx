@@ -9,15 +9,27 @@ const StatusBadge = ({ label, size = "md" }) => {
   let textColor = "text-gray-700";
 
   // Account Receivable Billing Statuses
-  if (normalized === "not acquired") {
+  let displayLabel = label;
+  const rawUpper = (label || "").toString().trim().toUpperCase();
+
+  if (rawUpper === "READY_TO_TAX" || rawUpper === "READY_FOR_TAX" || rawUpper === "READY" || normalized === "ready" || normalized === "ready to tax" || normalized === "ready for tax") {
+    displayLabel = "Ready for Tax";
+    bgColor = "bg-emerald-100 border border-emerald-300";
+    textColor = "text-emerald-800 font-bold";
+  } else if (rawUpper === "IN_TAX" || normalized === "in tax") {
+    displayLabel = "Tax Calculation in Progress";
+    bgColor = "bg-amber-100 border border-amber-300";
+    textColor = "text-amber-800 font-bold";
+  } else if (rawUpper === "TAX_COMPLETED" || normalized === "tax completed") {
+    displayLabel = "Tax Completed";
+    bgColor = "bg-blue-100 border border-blue-300";
+    textColor = "text-blue-800 font-bold";
+  } else if (normalized === "not acquired") {
     bgColor = "bg-slate-100 border border-slate-300";
     textColor = "text-slate-700 font-medium";
   } else if (normalized === "validating") {
     bgColor = "bg-indigo-50 border border-indigo-200";
     textColor = "text-indigo-700 font-medium";
-  } else if (normalized === "ready") {
-    bgColor = "bg-emerald-100 border border-emerald-300";
-    textColor = "text-emerald-800 font-bold";
   } else if (normalized === "partially ready" || normalized === "needs approval") {
     bgColor = "bg-amber-100 border border-amber-300";
     textColor = "text-amber-800 font-bold";
@@ -154,7 +166,7 @@ const StatusBadge = ({ label, size = "md" }) => {
         sizeStyles[size]
       )}
     >
-      {label}
+      {displayLabel}
     </span>
   );
 };

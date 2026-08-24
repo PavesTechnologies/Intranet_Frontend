@@ -4,6 +4,7 @@ import { Check, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
+import FormTextArea from "../../../../components/forms/FormTextArea";
 import Button from "../../../../components/Button/Button";
 import ARTable from "../common/ARTable";
 import Modal from "../../../../components/Modal/modal";
@@ -15,11 +16,10 @@ import RadioCardGroup from "../common/RadioCardGroup";
 import ToggleSwitch from "../common/ToggleSwitch";
 import {
   RECURRING_BILLING_MODE_OPTIONS,
-  INVOICE_SCHEDULE_TYPE_OPTIONS,
-  RECOGNITION_TRIGGER_OPTIONS,
   MILESTONE_STATUS_OPTIONS,
   CURRENCY_OPTIONS,
 } from "../../data/wizardOptions";
+import { formatCurrency } from "../../utils/format";
 import {
   getActiveBillingTypes,
   getActiveBillingFrequencies,
@@ -27,6 +27,11 @@ import {
   saveTmRateCard,
   deleteTmRateCard,
   getApiErrorMessage,
+  getFixedPriceByBillingConfiguration,
+  createFixedPriceConfiguration,
+  updateFixedPriceConfiguration,
+  deleteFixedPriceConfiguration,
+  toApiContractValueSource,
 } from "../../services/billingConfigurationService";
 
 let milestoneSeq = 0;
@@ -57,6 +62,16 @@ const BILLING_FREQUENCY_ORDER = [
   "QUARTERLY",
   "ANNUALLY",
 ];
+// Fixed Price is the only billing type that can be settled as a single lump sum,
+// so One-Time is offered there and nowhere else.
+const FIXED_PRICE_FREQUENCY_ORDER = [
+  "ONE_TIME",
+  "WEEKLY",
+  "BI_WEEKLY",
+  "MONTHLY",
+  "QUARTERLY",
+  "ANNUALLY",
+];
 const BILLING_TYPE_ORDER = [
   "TIME_MATERIAL",
   "MILESTONE",
@@ -80,14 +95,25 @@ function getBillingFrequencyOptions(billingType, frequencies = []) {
     (option) => option.value !== "HALF_YEARLY",
   );
 
-  const scoped =
-    billingType === "RECURRING"
-      ? withoutHalfYearly.filter((option) =>
+  if (billingType === "RECURRING") {
+    return sortByOrder(
+      withoutHalfYearly.filter((option) =>
         ["MONTHLY", "QUARTERLY", "ANNUALLY"].includes(option.value),
-      )
-      : withoutHalfYearly;
+      ),
+      BILLING_FREQUENCY_ORDER,
+    );
+  }
 
-  return sortByOrder(scoped, BILLING_FREQUENCY_ORDER);
+  if (billingType === "FIXED_PRICE") {
+    return sortByOrder(withoutHalfYearly, FIXED_PRICE_FREQUENCY_ORDER);
+  }
+
+  // One-Time only makes sense against a single lump-sum contract value, so every
+  // other billing type (T&M, Milestone) never offers it, even if master data does.
+  return sortByOrder(
+    withoutHalfYearly.filter((option) => option.value !== "ONE_TIME"),
+    BILLING_FREQUENCY_ORDER,
+  );
 }
 
 const RATE_PERIOD_OPTIONS = [
@@ -702,67 +728,400 @@ function TimeAndMaterialForm({
   );
 }
 
-function FixedPriceForm({ value = {}, onChange, currency }) {
+function ContractValueSourceBadge({ source }) {
+  if (source === "MANUAL") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
+        Manually adjusted
+      </span>
+    );
+  }
+  if (source === "PMS") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
+        Imported from PMS Project Budget
+      </span>
+    );
+  }
+  return null;
+}
+
+// Fixed Price billing must be driven by the actual client-agreed commercial value,
+// which can legitimately differ from the PMS Project Budget in either direction —
+// so Contract Value only seeds from the budget once and is freely editable after.
+function FixedPriceForm({
+  value = {},
+  onChange,
+  currency,
+  projectBudget,
+  billingFrequency,
+  billingFrequencyLabel,
+  billingConfigurationId,
+}) {
   const update = (patch) => onChange({ ...value, ...patch });
+  const [loadingConfig, setLoadingConfig] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const fetchedRef = useRef(false);
+
+  // [6] billingConfigurationId received by FixedPriceForm.
+  useEffect(() => {
+    console.log("[FixedPriceForm] billingConfigurationId prop:", billingConfigurationId);
+  }, [billingConfigurationId]);
+
+  useEffect(() => {
+    if (value.totalContractValue || value.contractValueSource) return;
+    if (projectBudget === "" || projectBudget === null || projectBudget === undefined) return;
+    update({ totalContractValue: projectBudget, contractValueSource: "PMS" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectBudget]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const load = async () => {
+      if (!billingConfigurationId) return;
+      if (fetchedRef.current) return;
+      fetchedRef.current = true;
+
+      setLoadingConfig(true);
+      try {
+        const record = await getFixedPriceByBillingConfiguration(billingConfigurationId);
+        if (!mounted || !record) return;
+        update({
+          fixedPriceConfigurationId: record.fixedPriceConfigurationId || record.id || null,
+          totalContractValue: record.totalContractValue ?? value.totalContractValue ?? "",
+          contractValueSource: value.contractValueSource || "MANUAL",
+          retentionPercent: record.retentionPercent ?? "",
+          advanceReceived: record.advanceReceived ?? "",
+          effectiveFrom: record.effectiveFrom || "",
+          effectiveTo: record.effectiveTo || "",
+          remarks: record.remarks || "",
+          retentionAmount: record.retentionAmount ?? "",
+          billableAmount: record.billableAmount ?? "",
+          remainingAmount: record.remainingAmount ?? "",
+        });
+      } catch (error) {
+        showStatusToast(
+          getApiErrorMessage(error, "Unable to load fixed price configuration."),
+          "error",
+        );
+      } finally {
+        if (mounted) setLoadingConfig(false);
+      }
+    };
+
+    load();
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [billingConfigurationId]);
+
+  const contractValue = Number(value.totalContractValue) || 0;
+  const retentionPercentNum = Number(value.retentionPercent);
+  const hasRetention =
+    value.retentionPercent !== "" &&
+    value.retentionPercent !== null &&
+    value.retentionPercent !== undefined &&
+    !Number.isNaN(retentionPercentNum) &&
+    retentionPercentNum > 0;
+  const retentionAmount = hasRetention ? contractValue * (retentionPercentNum / 100) : 0;
+  const billableAmount = contractValue - retentionAmount;
+
+  const advanceReceivedNum = Number(value.advanceReceived);
+  const hasAdvance =
+    value.advanceReceived !== "" &&
+    value.advanceReceived !== null &&
+    value.advanceReceived !== undefined &&
+    !Number.isNaN(advanceReceivedNum) &&
+    advanceReceivedNum > 0;
+  const remainingReceivable = billableAmount - (hasAdvance ? advanceReceivedNum : 0);
+
+  const retentionError =
+    value.retentionPercent !== "" && value.retentionPercent !== null && value.retentionPercent !== undefined
+      ? Number.isNaN(retentionPercentNum) || retentionPercentNum < 0 || retentionPercentNum > 100
+        ? "Retention must be between 0% and 100%."
+        : ""
+      : "";
+  const advanceError =
+    value.advanceReceived !== "" && value.advanceReceived !== null && value.advanceReceived !== undefined
+      ? Number.isNaN(advanceReceivedNum) || advanceReceivedNum < 0
+        ? "Advance Received cannot be negative."
+        : advanceReceivedNum > billableAmount
+        ? "Advance Received cannot exceed the Billable Amount."
+        : ""
+      : "";
+
+  const isOneTime = billingFrequency === "ONE_TIME";
+
+  // The backend requires a different field depending on contractValueSource: PMS
+  // Budget sends the project budget as pmsProjectBudget (from the Billing
+  // Configuration state, never blank/null) AND still needs contractValue populated
+  // with that same budget — the backend's retention/billable/remaining calculations
+  // read contractValue regardless of source, so it can never be left null there.
+  // Manual sends only the user-entered amount as contractValue (not
+  // "totalContractValue" — that's only the wizard's internal form field name).
+  const buildFixedPricePayload = () => {
+    const apiContractValueSource = toApiContractValueSource(value.contractValueSource);
+    const sharedFields = {
+      contractValueSource: apiContractValueSource,
+      retentionPercent:
+        value.retentionPercent === "" || value.retentionPercent === null || value.retentionPercent === undefined
+          ? null
+          : Number(value.retentionPercent),
+      advanceReceived:
+        value.advanceReceived === "" || value.advanceReceived === null || value.advanceReceived === undefined
+          ? null
+          : Number(value.advanceReceived),
+      effectiveFrom: value.effectiveFrom || "",
+      effectiveTo: value.effectiveTo || "",
+      remarks: value.remarks || "",
+    };
+
+    if (apiContractValueSource === "PMS_BUDGET") {
+      const pmsProjectBudget = Number(projectBudget);
+      return { ...sharedFields, pmsProjectBudget, contractValue: pmsProjectBudget };
+    }
+
+    return { ...sharedFields, contractValue: Number(value.totalContractValue) };
+  };
+
+  const saveFixedPriceConfig = async () => {
+    if (!value.totalContractValue) {
+      showStatusToast("Contract Value is required before saving.", "error");
+      return;
+    }
+    if (retentionError || advanceError) {
+      showStatusToast("Please fix the highlighted errors before saving.", "error");
+      return;
+    }
+
+    const apiContractValueSource = toApiContractValueSource(value.contractValueSource);
+    const pmsProjectBudgetIsBlank =
+      projectBudget === "" || projectBudget === null || projectBudget === undefined || Number.isNaN(Number(projectBudget));
+    if (apiContractValueSource === "PMS_BUDGET" && pmsProjectBudgetIsBlank) {
+      showStatusToast("Project budget is required before saving a PMS Budget contract value.", "error");
+      return;
+    }
+
+    // This button only ever reads billingConfigurationId — it never creates the
+    // parent draft itself. The draft is created once, up front, when the wizard is
+    // first entered (see ensureBillingConfigurationId in NewConfigurationWizard), so
+    // by the time the user reaches this step the id is already in state.
+    if (!billingConfigurationId) {
+      showStatusToast(
+        "Unable to save fixed price configuration: billing configuration id is missing. Please reload and try again.",
+        "error",
+      );
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = buildFixedPricePayload();
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.log("[FixedPriceForm] Fixed Price API payload:", payload);
+      }
+      const saved = value.fixedPriceConfigurationId
+        ? await updateFixedPriceConfiguration(value.fixedPriceConfigurationId, payload)
+        : await createFixedPriceConfiguration(billingConfigurationId, payload);
+
+      update({
+        fixedPriceConfigurationId:
+          saved?.fixedPriceConfigurationId || saved?.id || value.fixedPriceConfigurationId || null,
+        retentionAmount: saved?.retentionAmount ?? value.retentionAmount ?? "",
+        billableAmount: saved?.billableAmount ?? value.billableAmount ?? "",
+        remainingAmount: saved?.remainingAmount ?? value.remainingAmount ?? "",
+      });
+      showStatusToast("Fixed price configuration saved", "success");
+    } catch (error) {
+      showStatusToast(
+        getApiErrorMessage(error, "Unable to save fixed price configuration."),
+        "error",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeFixedPriceConfig = async () => {
+    if (!value.fixedPriceConfigurationId) {
+      update({
+        totalContractValue: "",
+        contractValueSource: "",
+        retentionPercent: "",
+        advanceReceived: "",
+        effectiveFrom: "",
+        effectiveTo: "",
+        remarks: "",
+      });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Remove this fixed price configuration? This cannot be undone.",
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      await deleteFixedPriceConfiguration(value.fixedPriceConfigurationId);
+      update({
+        fixedPriceConfigurationId: null,
+        totalContractValue: "",
+        contractValueSource: "",
+        retentionPercent: "",
+        advanceReceived: "",
+        effectiveFrom: "",
+        effectiveTo: "",
+        remarks: "",
+        retentionAmount: "",
+        billableAmount: "",
+        remainingAmount: "",
+      });
+      showStatusToast("Fixed price configuration removed", "success");
+    } catch (error) {
+      showStatusToast(
+        getApiErrorMessage(error, "Unable to remove fixed price configuration."),
+        "error",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
       <h2 className={Fonts.heading4}>Fixed Price Billing Configuration</h2>
 
-      <SectionCard title="Contract Value">
-        <FormInput
-          label="Total Contract Value"
-          name="totalContractValue"
-          type="number"
-          value={value.totalContractValue || ""}
-          onChange={(event) =>
-            update({ totalContractValue: event.target.value })
-          }
-          placeholder="e.g. 8500000"
-        />
-        <ReadOnlyField label="Currency" value={currency} />
-        <FormInput
-          label="Advance Received"
-          name="advanceReceived"
-          type="number"
-          value={value.advanceReceived || ""}
-          onChange={(event) => update({ advanceReceived: event.target.value })}
-          placeholder="e.g. 500000"
-        />
-        <FormInput
-          label="Retention %"
-          name="retentionPercent"
-          type="number"
-          value={value.retentionPercent || ""}
-          onChange={(event) => update({ retentionPercent: event.target.value })}
-          placeholder="e.g. 5"
-        />
-      </SectionCard>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="md:col-span-2">
+            <FormInput
+              label={
+                <span className="flex flex-wrap items-center gap-2">
+                  Contract Value <span className="text-red-500">*</span>
+                  <ContractValueSourceBadge source={value.contractValueSource} />
+                </span>
+              }
+              name="totalContractValue"
+              type="number"
+              value={value.totalContractValue || ""}
+              onChange={(event) =>
+                update({ totalContractValue: event.target.value, contractValueSource: "MANUAL" })
+              }
+              placeholder={`e.g. 120000 (${currency})`}
+            />
+          </div>
+          <FormInput
+            label="Retention % (optional)"
+            name="retentionPercent"
+            type="number"
+            min="0"
+            max="100"
+            value={value.retentionPercent || ""}
+            onChange={(event) => update({ retentionPercent: event.target.value })}
+            placeholder="e.g. 10"
+            error={retentionError}
+          />
+          <FormInput
+            label="Advance Received"
+            name="advanceReceived"
+            type="number"
+            min="0"
+            value={value.advanceReceived || ""}
+            onChange={(event) => update({ advanceReceived: event.target.value })}
+            placeholder="e.g. 20000"
+            error={advanceError}
+          />
+          <FormDatePicker
+            label="Effective From"
+            name="fixedPriceEffectiveFrom"
+            value={value.effectiveFrom || ""}
+            onChange={(event) => update({ effectiveFrom: event.target.value })}
+          />
+          <FormDatePicker
+            label="Effective To"
+            name="fixedPriceEffectiveTo"
+            value={value.effectiveTo || ""}
+            onChange={(event) => update({ effectiveTo: event.target.value })}
+          />
+          <div className="md:col-span-3">
+            <FormTextArea
+              label="Remarks"
+              name="fixedPriceRemarks"
+              value={value.remarks || ""}
+              onChange={(event) => update({ remarks: event.target.value })}
+              placeholder="Any additional notes about this fixed price arrangement"
+              rows={3}
+            />
+          </div>
+        </div>
 
-      <div>
-        <h3 className="mb-3 text-sm font-semibold text-slate-900">
-          Invoice Schedule
-        </h3>
-        <RadioCardGroup
-          name="invoiceScheduleType"
-          options={INVOICE_SCHEDULE_TYPE_OPTIONS}
-          value={value.invoiceScheduleType || ""}
-          onChange={(next) => update({ invoiceScheduleType: next })}
-          columns={3}
-        />
-      </div>
+        <div className="rounded-lg border border-slate-100 bg-slate-50/70 px-4 py-3">
+          <div className="flex items-center justify-between py-1 text-sm">
+            <span className="text-slate-500">Contract Value</span>
+            <span className="font-semibold text-slate-900">{formatCurrency(contractValue, currency)}</span>
+          </div>
+          {hasRetention && (
+            <div className="flex items-center justify-between py-1 text-sm">
+              <span className="text-slate-500">Retention ({retentionPercentNum}%)</span>
+              <span className="font-semibold text-slate-900">-{formatCurrency(retentionAmount, currency)}</span>
+            </div>
+          )}
+          <div className="mt-1 flex items-center justify-between border-t border-slate-200 pt-2 text-sm">
+            <span className="font-semibold text-slate-700">Billable Amount</span>
+            <span className="font-bold text-[#0A0082]">{formatCurrency(billableAmount, currency)}</span>
+          </div>
+          {hasAdvance && (
+            <div className="flex items-center justify-between py-1 text-sm">
+              <span className="text-slate-500">Advance Received</span>
+              <span className="font-semibold text-slate-900">-{formatCurrency(advanceReceivedNum, currency)}</span>
+            </div>
+          )}
+          <div className="mt-1 flex items-center justify-between border-t border-slate-200 pt-2 text-sm">
+            <span className="font-semibold text-slate-700">Remaining Receivable</span>
+            <span className="font-bold text-[#0A0082]">{formatCurrency(remainingReceivable, currency)}</span>
+          </div>
+        </div>
 
-      <div>
-        <h3 className="mb-3 text-sm font-semibold text-slate-900">
-          Recognition
-        </h3>
-        <RadioCardGroup
-          name="recognitionTrigger"
-          options={RECOGNITION_TRIGGER_OPTIONS}
-          value={value.recognitionTrigger || ""}
-          onChange={(next) => update({ recognitionTrigger: next })}
-          columns={2}
-        />
+        <p className="text-xs text-slate-500">
+          {isOneTime
+            ? "One-Time billing: the Remaining Receivable will be raised as a single billing event."
+            : `Remaining Receivable will be scheduled across ${
+                billingFrequencyLabel && billingFrequencyLabel !== "—" ? billingFrequencyLabel : "the selected"
+              } billing cycles based on the project duration.`}
+        </p>
+
+        {loadingConfig ? (
+          <p className="text-sm text-slate-500">Loading saved fixed price configuration…</p>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="small"
+              onClick={saveFixedPriceConfig}
+              loading={saving}
+              loadingText="Saving..."
+            >
+              <Check className="h-4 w-4" />
+              {value.fixedPriceConfigurationId ? "Update Fixed Price Details" : "Save Fixed Price Details"}
+            </Button>
+            {value.fixedPriceConfigurationId && (
+              <Button
+                variant="ghost"
+                size="small"
+                onClick={removeFixedPriceConfig}
+                loading={deleting}
+                loadingText="Removing..."
+              >
+                <Trash2 className="h-4 w-4 text-red-500" /> Remove
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1164,6 +1523,19 @@ export default function BillingConfigurationStep({
     const nextBillingMode =
       nextPricingModels.length > 0 ? nextPricingModels[0].value : "";
 
+    // Switching away from Fixed Price after it was already saved would otherwise leave
+    // an orphaned fixed price record under this billing configuration.
+    const staleFixedPriceId = value.fixedPrice?.fixedPriceConfigurationId;
+    if (
+      billingType === "FIXED_PRICE" &&
+      normalizedBillingType !== "FIXED_PRICE" &&
+      staleFixedPriceId
+    ) {
+      deleteFixedPriceConfiguration(staleFixedPriceId).catch((error) => {
+        console.warn("Unable to remove previous fixed price configuration", error);
+      });
+    }
+
     update({
       billingType: normalizedBillingType,
       billingTypeId: selectedOption.billingTypeId,
@@ -1344,6 +1716,10 @@ export default function BillingConfigurationStep({
                 value={value.fixedPrice}
                 onChange={(next) => updateSection("fixedPrice", next)}
                 currency={currency}
+                projectBudget={projectInfo.projectBudget}
+                billingFrequency={billingFrequency}
+                billingFrequencyLabel={frequencyLabel(billingFrequency)}
+                billingConfigurationId={value.billingConfigurationId || value.id}
               />
             )}
 

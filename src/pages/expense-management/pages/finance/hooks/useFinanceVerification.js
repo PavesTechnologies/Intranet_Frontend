@@ -53,7 +53,9 @@ export const useVerifyLineItem = () => {
   return useMutation({
     mutationFn: ({ reportId, lineItemId }) =>
       financeVerificationApi.verifyLineItem(reportId, lineItemId).then(unwrap),
-    onSuccess: (_data, { reportId }) => invalidateFinanceCaches(qc, reportId),
+    // Refresh on failure too - a rejected verify (e.g. eligibility changed since this queue was
+    // last fetched) means the row shown was already stale, so re-fetch clears it immediately.
+    onSettled: (_data, _err, { reportId }) => invalidateFinanceCaches(qc, reportId),
   });
 };
 
@@ -62,6 +64,6 @@ export const useQueryLineItem = () => {
   return useMutation({
     mutationFn: ({ reportId, lineItemId, reason }) =>
       financeVerificationApi.queryLineItem(reportId, lineItemId, reason).then(unwrap),
-    onSuccess: (_data, { reportId }) => invalidateFinanceCaches(qc, reportId),
+    onSettled: (_data, _err, { reportId }) => invalidateFinanceCaches(qc, reportId),
   });
 };
