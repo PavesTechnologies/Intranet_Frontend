@@ -57,6 +57,7 @@ const DEFAULT_CAMPAIGN_FORM = {
   hiring_manager_id: "",
   recruiter_id: "",
   prompt_template_id: "",
+  ai_evaluate_prompt_id: "",
 };
 
 const STATUS_BADGE = {
@@ -69,6 +70,13 @@ const STATUS_BADGE = {
 // Title-case a status enum for display, e.g. "ACTIVE" -> "Active"
 const statusLabel = (s) =>
   s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "—";
+
+// extracted_json's certification/skill entries are sometimes plain strings and
+// sometimes objects (e.g. { name, importance }) depending on the parser
+// version — pull out a renderable label either way instead of passing the
+// raw value (possibly an object) straight into JSX.
+const entryLabel = (entry) =>
+  typeof entry === "string" ? entry : entry?.name || entry?.skill_name || entry?.skill || "";
 
 // Reduce a pipeline-summary payload into the three headline counts the card shows.
 const deriveCampaignStats = (summary) => {
@@ -797,6 +805,10 @@ export default function JdDetails() {
       toast.error("Please select a Resume Parsing Prompt.");
       return;
     }
+    if (!String(campaignForm.ai_evaluate_prompt_id || "").trim()) {
+      toast.error("Please select an AI Evaluation Prompt.");
+      return;
+    }
     if (campaignForm.max_candidates !== "" && campaignForm.max_candidates !== null && Number(campaignForm.max_candidates) <= 0) {
       toast.error("Max candidates must be greater than 0.");
       return;
@@ -821,6 +833,7 @@ export default function JdDetails() {
       hiring_manager_id: campaignForm.hiring_manager_id.trim(),
       recruiter_id: campaignForm.recruiter_id.trim(),
       prompt_template_id: String(campaignForm.prompt_template_id || "").trim(),
+      ai_evaluate_prompt_id: String(campaignForm.ai_evaluate_prompt_id || "").trim(),
     };
 
     setIsSubmittingCampaign(true);
@@ -1119,7 +1132,7 @@ export default function JdDetails() {
                         <div className="flex flex-wrap gap-1.5">
                           {currentJd.extracted_json.certifications.map((cert, index) => (
                             <span key={index} className="text-[10px] bg-slate-100 border border-slate-200 px-2 py-0.5 rounded font-bold text-slate-700">
-                              {cert}
+                              {entryLabel(cert)}
                             </span>
                           ))}
                         </div>
@@ -1135,7 +1148,7 @@ export default function JdDetails() {
                           <div className="flex flex-wrap gap-1.5">
                             {currentJd.extracted_json.required_skills.map((skill, index) => (
                               <span key={index} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded font-bold">
-                                {skill}
+                                {entryLabel(skill)}
                               </span>
                             ))}
                           </div>
@@ -1149,7 +1162,7 @@ export default function JdDetails() {
                           <div className="flex flex-wrap gap-1.5">
                             {currentJd.extracted_json.preferred_skills.map((skill, index) => (
                               <span key={index} className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded font-bold">
-                                {skill}
+                                {entryLabel(skill)}
                               </span>
                             ))}
                           </div>

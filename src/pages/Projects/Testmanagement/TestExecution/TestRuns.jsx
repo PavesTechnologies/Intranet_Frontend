@@ -71,7 +71,7 @@ export default function TestRunAccordion({ run, projectId, refreshRuns, onDelete
       const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/test-execution/test-runs/${run.id}/cases`,
       );
-      console.log("🔍 Test cases loaded:", res.data);
+      // console.log("🔍 Test cases loaded:", res.data);
       setTestCases(res.data || []);
     } catch (err) {
       console.error("Error loading test cases:", err);

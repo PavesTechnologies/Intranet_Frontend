@@ -132,46 +132,25 @@ export default function LeaveDashboard({ employeeId, refreshKey, year }) {
             CARD_ACCENTS[leave.leaveType.leaveName] ?? "border-l-violet-400";
 
           return (
-            <div
+            <LeaveUsageChart
               key={leave.balanceId}
-              className={`
-                bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 ${accentClass}
-                hover:shadow-md hover:-translate-y-0.5 transition-all duration-200
-                p-5 flex flex-col gap-4
-              `}
+              leave={leave}
+              displayName={displayName}
+              year={year}
+              accentClass={accentClass}
               style={{ animationDelay: `${i * 80}ms` }}
-            >
-              {/* Card header */}
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-sm leading-tight">
-                    {displayName}
-                  </h3>
-                  <p className="text-[11px] text-gray-400 mt-0.5">
-                    {year} Balance
-                  </p>
-                </div>
-                <button
-                  onClick={() =>
-                    navigate(
-                      `/leave-details/${employeeId}/${leave.leaveType.leaveName}`,
-                      {
-                        state: {
-                          leaveTypeName: displayName,
-                          allLeaveTypes: allLeaveTypesForNav,
-                        },
-                      },
-                    )
-                  }
-                  className="text-[11px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors whitespace-nowrap ml-2"
-                >
-                  Details →
-                </button>
-              </div>
-
-              {/* Chart */}
-              <LeaveUsageChart leave={leave} />
-            </div>
+              onViewDetails={() =>
+                navigate(
+                  `/leave-details/${employeeId}/${leave.leaveType.leaveName}`,
+                  {
+                    state: {
+                      leaveTypeName: displayName,
+                      allLeaveTypes: allLeaveTypesForNav,
+                    },
+                  },
+                )
+              }
+            />
           );
         })}
       </div>

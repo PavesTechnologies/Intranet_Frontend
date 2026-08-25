@@ -68,6 +68,17 @@ export function mapCandidateScoreDetail(raw) {
     notice: textOrDash(data.notice_period),
     salary: textOrDash(data.expected_salary),
     stage: textOrDash(data.pipeline_stage),
+    decisionType: data.decision_type ?? null,
+    decisionSource: data.decision_source ?? null,
+    decisionReason: data.decision_reason ?? null,
+    decisionAt: data.decision_at ?? null,
+    // The override panel needs the raw values, not "-", to decide
+    // between offering "apply override" and "clear override".
+    pipelineStage: data.pipeline_stage ?? null,
+    // The scorecard export route is campaign-scoped.
+    campaignId: data.campaign_id ?? null,
+    hrOverride: data.hr_override ?? false,
+    overrideReason: data.override_reason || null,
     deterministic: numberOr(data.deterministic_score, 0),
     semantic: numberOr(data.semantic_score, 0),
     ats: numberOr(data.ai_ats_score, 0),

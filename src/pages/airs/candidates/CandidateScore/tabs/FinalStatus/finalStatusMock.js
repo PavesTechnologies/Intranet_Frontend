@@ -60,10 +60,10 @@ export function getFinalStatusMock(candidate) {
       : candidate.stage === "Selected"
       ? "Candidate has already been selected in the pipeline — proceed with offer formalities."
       : finalRecommendation === "SHORTLISTED"
-      ? "Recommended for the next hiring round based on composite score and pipeline stage."
+      ? "Recommended for the next hiring round based on overall score and pipeline stage."
       : finalRecommendation === "MANUAL_REVIEW"
-      ? "Composite score is borderline — recommend a manual recruiter review before proceeding."
-      : "Composite score falls below the shortlisting bar — recommend rejection unless overridden by a recruiter.";
+      ? "Overall score is borderline — recommend a manual recruiter review before proceeding."
+      : "Overall score falls below the shortlisting bar — recommend rejection unless overridden by a recruiter.";
 
   return {
     compositeScore: candidate.composite,
@@ -74,7 +74,7 @@ export function getFinalStatusMock(candidate) {
     deterministicResult: { score: candidate.scoreBreakdown.score, status: candidate.scoreBreakdown.status },
     semanticResult: { score: candidate.semantic, status: candidate.semantic >= 65 ? "PASSED" : "FAILED" },
     aiResult: { score: candidate.ats, status: candidate.ats >= 60 ? "PASSED" : "FAILED" },
-    compositeFormula: "Composite = (Deterministic × 30%) + (Semantic × 40%) + (AI ATS × 30%)",
+    compositeFormula: "Overall = (Requirements × 30%) + (Relevance × 40%) + (AI Review × 30%)",
     finalRecommendation,
     hiringRecommendation,
   };

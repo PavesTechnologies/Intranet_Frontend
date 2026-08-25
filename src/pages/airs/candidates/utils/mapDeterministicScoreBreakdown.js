@@ -1,5 +1,5 @@
 // Adapts the raw GET /airs/campaign-candidates/{campaign_candidate_id}/deterministic
-// response into the shape the Deterministic Score tab renders. Field names are
+// response into the shape the Requirements Score tab renders. Field names are
 // kept exactly as returned by the backend — only grouped/defaulted so the UI
 // never has to null-check nested paths.
 import { arr } from "./candidateDataUtils";

@@ -152,7 +152,7 @@ export default function EditSkillModal({ employeeId, skillData, onClose, onSaveS
     // ✅ Hydrate Logic (Refined)
     if (!tree.length || !skillData) return;
 
-    console.log("🔥 Hydrating with skillData:", skillData);
+    // console.log("🔥 Hydrating with skillData:", skillData);
     setIsHydrating(true);
 
     let catId = String(skillData.categoryId || skillData.skill?.category?.id || "");
@@ -250,12 +250,12 @@ export default function EditSkillModal({ employeeId, skillData, onClose, onSaveS
           };
         });
 
-        console.log("✅ Hydration results:", {
-          categoryId: catId,
-          skillId: finalSkillId,
-          skillProficiencyId: finalPId,
-          subSkillsCount: mappedSubSkills.length
-        });
+        // console.log("✅ Hydration results:", {
+          // categoryId: catId,
+          // skillId: finalSkillId,
+          // skillProficiencyId: finalPId,
+          // subSkillsCount: mappedSubSkills.length
+        // });
 
         setFormState({
           categoryId: catId,
@@ -264,8 +264,8 @@ export default function EditSkillModal({ employeeId, skillData, onClose, onSaveS
           otherSkillName: !finalSkillId ? (skillData.skillName || "") : "",
           subSkills: mappedSubSkills
         });
-        console.log("✅ AvailableSubSkills (Hydration):", availableSubSkills);
-        console.log("✅ FormSubSkills (Hydration):", mappedSubSkills);
+        // console.log("✅ AvailableSubSkills (Hydration):", availableSubSkills);
+        // console.log("✅ FormSubSkills (Hydration):", mappedSubSkills);
       } catch (err) {
         console.error("Hydration failed:", err);
       } finally {
@@ -388,12 +388,12 @@ export default function EditSkillModal({ employeeId, skillData, onClose, onSaveS
         return;
       }
 
-      console.log("🔍 [EditSkillModal] Pre-update:", {
-        resourceSkillId,
-        skillId: payload.skillId,
-        resourceId: Number(employeeId),
-        payload,
-      });
+      // console.log("🔍 [EditSkillModal] Pre-update:", {
+        // resourceSkillId,
+        // skillId: payload.skillId,
+        // resourceId: Number(employeeId),
+        // payload,
+      // });
 
       await skillService.updateSkill(resourceSkillId, payload);
       showStatusToast("Skill mastery updated successfully", "success");

@@ -22,7 +22,7 @@ const CreateEscalationModal = ({ open, onClose }) => {
   };
 
   const handleSave = () => {
-    console.log("Escalation Contact Saved:", formData);
+    // console.log("Escalation Contact Saved:", formData);
     onClose();
   };
 
@@ -137,7 +137,5 @@ const CreateEscalationModal = ({ open, onClose }) => {
     </Modal>
   );
 };
-
-export default CreateEscalationModal;
 
 export default CreateEscalationModal;

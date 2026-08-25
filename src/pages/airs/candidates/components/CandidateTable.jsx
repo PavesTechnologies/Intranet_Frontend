@@ -1,18 +1,57 @@
 import React, { useState } from "react";
 import { toast } from "react-toastify";
-import { Star, StarOff, Eye, Archive, Trash2 } from "lucide-react";
+import { Star, StarOff, Eye, Archive, Trash2, MessageSquare } from "lucide-react";
 import GenericTable from "../../../../components/Table/table";
 import Button from "../../../../components/Button/Button";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import ScoreRing from "./ScoreRing";
-import { renderStageBadge, renderRiskBadge } from "../utils/candidateUtils.jsx";
+import {
+  renderStageBadge,
+  renderRiskBadge,
+  renderAiRecommendationBadge,
+  renderDecisionBadge,
+  renderFlags,
+} from "../utils/candidateUtils.jsx";
+import { DASH } from "../utils/candidateDataUtils";
 import { deleteCandidate } from "../../service/resumeIntake";
 import { extractErrorMessage } from "../../resume-intake/intake/utils/intakeUtils.jsx";
 import { useAuth } from "../../../../contexts/AuthContext";
 
-export default function CandidateTable({ candidates, onView, onToggleStar, onDeleted }) {
+// The mapper hands scores over as numbers OR the DASH string when the backend
+// had no value, so this must not assume a number: Number("-") is NaN and
+// NaN.toFixed(1) renders "NaN". multiplier converts 0–1 scales (semantic) to
+// the 0–100 the column displays.
+const renderScore = (value, multiplier = 1) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return <span className="text-slate-300">{DASH}</span>;
+  return <span className="font-semibold text-slate-900">{(n * multiplier).toFixed(1)}</span>;
+};
+
+/**
+ * Shared candidate table (M10). The selection, note-badge and extra-action
+ * Props below are additions and are all opt-in — every existing caller
+ * that omits them renders exactly as before.
+ */
+export default function CandidateTable({
+  candidates,
+  onView,
+  onToggleStar,
+  onDeleted,
+  // Bulk selection
+  selectable = false,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
+  // Note count badges, keyed by campaign_candidate_id
+  noteCounts,
+  // Per-row actions, rendered after the built-in ones
+  renderExtraActions,
+}) {
   const { hasRole } = useAuth();
   const canDeleteCandidates = hasRole(["HR_ADMIN"]);
+  const selected = selectedIds || new Set();
+  const allOnPageSelected =
+    candidates.length > 0 && candidates.every((c) => selected.has(c.id));
 
   const [candidateToDelete, setCandidateToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -41,20 +80,59 @@ export default function CandidateTable({ candidates, onView, onToggleStar, onDel
     );
   }
 
-  const headers = ["Candidate", "Deterministic", "Semantic", "ATS", "Composite", "Exp.", "Location", "Stage", "Risk", "Actions"];
+  const headers = ["Candidate", "Requirements", "Relevance", "ATS", "Overall", "AI Rec.", "Exp.", "Location", "Stage", "Risk", "Actions"];
+  const columns = ["name", "deterministic", "semantic", "ats", "composite", "aiRecommendation", "experience", "location", "stage", "risk", "actions"];
 
-  const columns = ["name", "deterministic", "semantic", "ats", "composite", "experience", "location", "stage", "risk", "actions"];
+  if (selectable) {
+    headers.unshift(
+      <input
+        type="checkbox"
+        checked={allOnPageSelected}
+        onChange={() => onToggleSelectAll?.(candidates, !allOnPageSelected)}
+        className="accent-indigo-600 cursor-pointer"
+        title="Select all on this page"
+      />
+    );
+    columns.unshift("select");
+  }
+
   const rows = candidates.map((c) => ({
     id: c.id,
     rowClass: "hover:bg-slate-50/50 transition cursor-pointer",
     onRowClick: () => onView(c),
+    // stopPropagation throughout: the row itself opens the scorecard, so a
+    // click on the checkbox must not navigate away from the selection.
+    select: selectable ? (
+      <input
+        type="checkbox"
+        checked={selected.has(c.id)}
+        onChange={() => onToggleSelect?.(c.id)}
+        onClick={(e) => e.stopPropagation()}
+        className="accent-indigo-600 cursor-pointer"
+      />
+    ) : null,
     name: (
       <div className="w-full flex items-center gap-2.5 text-left">
+        <span className="w-6 text-center text-[11px] font-bold text-slate-400 shrink-0" title={c.rankingStatus ? `Ranking: ${c.rankingStatus}` : undefined}>
+          {c.rank != null ? `#${c.rank}` : "—"}
+        </span>
         <div className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 bg-gradient-to-br from-blue-600 to-indigo-600">
           {c.initials}
         </div>
         <div className="min-w-0">
-          <div className="font-semibold text-slate-900 truncate">{c.name}</div>
+          <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5">
+            <span className="truncate">{c.name}</span>
+            {/* Only shown when there is something to see */}
+            {noteCounts?.[c.id] > 0 && (
+              <span
+                title={`${noteCounts[c.id]} recruiter note(s)`}
+                className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700"
+              >
+                <MessageSquare className="h-2.5 w-2.5" />
+                {noteCounts[c.id]}
+              </span>
+            )}
+          </div>
           <div className="text-[11px] text-slate-400 truncate">{c.role}</div>
         </div>
         <button
@@ -68,13 +146,16 @@ export default function CandidateTable({ candidates, onView, onToggleStar, onDel
         </button>
       </div>
     ),
-    deterministic: <span className="font-semibold text-slate-900">{Number(c.deterministic).toFixed(1)}</span>,
-    ats: <span className="font-semibold text-slate-900">{Number(c.ats).toFixed(1)}</span>,
-    semantic: <span className="font-semibold text-slate-900">{Number(c.semantic).toFixed(1)}</span>,
+    deterministic: renderScore(c.deterministic),
+    ats: renderScore(c.ats),
+    semantic: renderScore(c.semantic, 100),
     composite: <ScoreRing value={c.composite} size={32} color="#16A34A" />,
+    aiRecommendation: renderAiRecommendationBadge(c.aiRecommendation),
     experience: `${Number(c.experience).toFixed(1)} yrs`,
     location: c.location,
     stage: renderStageBadge(c.stage),
+    // keyed `risk` to match the Risk column; c.rank is the ranking position and
+    // is already shown beside the candidate's name
     risk: renderRiskBadge(c.risk),
     actions: (
       <div className="flex items-center gap-1">
@@ -90,7 +171,7 @@ export default function CandidateTable({ candidates, onView, onToggleStar, onDel
         >
           <Eye className="h-4 w-4" />
         </Button>
-        {/* {canDeleteCandidates && (
+        {canDeleteCandidates && (
           <Button
             variant="ghost"
             size="icon"
@@ -103,14 +184,17 @@ export default function CandidateTable({ candidates, onView, onToggleStar, onDel
           >
             <Trash2 className="h-4 w-4" />
           </Button>
-        )} */}
+        )}
+        {renderExtraActions?.(c)}
       </div>
     ),
   }));
 
   return (
     <>
-      <GenericTable headers={headers} columns={columns} rows={rows} />
+      <div className="overflow-x-auto">
+        <GenericTable headers={headers} columns={columns} rows={rows} />
+      </div>
 
       <ConfirmationModal
         isOpen={!!candidateToDelete}

@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, LogOut, User, Menu, X, Eye, EyeOff, KeyRound, ChevronDown, } from "lucide-react";
+import { Bell, LogOut, User, Menu, X, Eye, EyeOff, KeyRound, ChevronDown, Building2, Landmark, Check } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
+import { FINANCE_ALL_ROLES } from "../../config/sidebarConfig";
+import { APPLICATIONS, isFinanceEnabled } from "../../utils/applicationRoutes";
 
 import Modal from "../Modal/modal";
 import api from "../../api/axiosInstance";
@@ -11,13 +13,18 @@ import { showStatusToast } from "../toastfy/toast";
 const EMPTY_PW_FORM = { newPassword: "", confirmPassword: "" };
 const EMPTY_SHOW_PW = { current: false, new: false, confirm: false };
 
-const Header = ({ onToggleSidebar, isSidebarOpen }) => {
+const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, hasRole } = useAuth();
 
   const [employeeProfile, setEmployeeProfile] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  const [appSwitcherOpen, setAppSwitcherOpen] = useState(false);
+  const appSwitcherRef = useRef(null);
+  const financeEnabled = isFinanceEnabled();
+  const canAccessFinance = financeEnabled && hasRole(FINANCE_ALL_ROLES);
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [pwForm, setPwForm] = useState(EMPTY_PW_FORM);
@@ -47,13 +54,13 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const employees = Array.isArray(res.data) ? res.data : res.data.data || [];
-        console.log("Logged in employee_id:", user?.employee_id);
-        console.log("API Response:", res.data);
-        console.log("Employees Array:", employees);
+        // console.log("Logged in employee_id:", user?.employee_id);
+        // console.log("API Response:", res.data);
+        // console.log("Employees Array:", employees);
         const matched = employees.find(
           (emp) => String(emp.employee_id) === String(user?.employee_id)
         );
-        console.log("Matched Employee:", matched);
+        // console.log("Matched Employee:", matched);
         setEmployeeProfile(matched);
       } catch (err) {
         console.error("Failed to fetch employee profile", err);
@@ -62,26 +69,36 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
     if (user?.employee_id) fetchEmployeeProfile();
   }, [user]);
 
-  /* ── Close dropdown on outside click ── */
+  /* ── Close dropdowns on outside click ── */
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
+      }
+      if (appSwitcherRef.current && !appSwitcherRef.current.contains(e.target)) {
+        setAppSwitcherOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  /* ── Application Switcher: URL is the source of truth, this just navigates ── */
+  const handleSelectApplication = (application) => {
+    setAppSwitcherOpen(false);
+    if (application === activeApplication) return;
+    navigate(application === APPLICATIONS.FINANCE ? "/finance/dashboard" : "/dashboard");
+  };
+
   /* ── Dropdown actions ── */
   const handleViewProfile = () => {
-    console.log("USER:", user);
-    console.log("EMPLOYEE PROFILE:", employeeProfile);
+    // console.log("USER:", user);
+    // console.log("EMPLOYEE PROFILE:", employeeProfile);
 
     setDropdownOpen(false);
 
     if (!employeeProfile?.employee_uuid) {
-      console.log("No employee UUID found");
+      // console.log("No employee UUID found");
       return;
     }
 
@@ -179,12 +196,74 @@ const Header = ({ onToggleSidebar, isSidebarOpen }) => {
             </div>
           </div>
 
-          {/* ── Right: notifications + profile ── */}
+          {/* ── Right: application switcher + notifications + profile ── */}
           <div className="flex items-center space-x-4">
             {/* <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
               <Bell className="h-5 w-5" />
               <span className="absolute top-1 right-1 h-2 w-2 bg-[#ff3d72] rounded-full" />
             </button> */}
+
+            {/* Application Switcher — fully hidden when FINANCE_TOGGLE is off (public/config.js) */}
+            {financeEnabled && (
+            <div className="relative" ref={appSwitcherRef}>
+              <button
+                onClick={() => setAppSwitcherOpen((prev) => !prev)}
+                className="flex items-center gap-2 cursor-pointer rounded-lg px-2 py-1.5 hover:bg-gray-100 transition-colors"
+              >
+                {activeApplication === APPLICATIONS.FINANCE ? (
+                  <Landmark className="h-4 w-4 text-[#263383] flex-shrink-0" />
+                ) : (
+                  <Building2 className="h-4 w-4 text-[#263383] flex-shrink-0" />
+                )}
+                <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
+                  {activeApplication === APPLICATIONS.FINANCE ? "Finance Management" : "Paves Intranet"}
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${appSwitcherOpen ? "rotate-180" : ""
+                    }`}
+                />
+              </button>
+
+              <AnimatePresence>
+                {appSwitcherOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-gray-200 overflow-hidden z-50"
+                    style={{ boxShadow: "0 8px 24px rgba(8,21,52,0.12)" }}
+                  >
+                    <div className="py-1">
+                      <button
+                        onClick={() => handleSelectApplication(APPLICATIONS.INTRANET)}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-[#f4f6fc] hover:text-[#263383] transition-colors"
+                      >
+                        <Building2 className="h-4 w-4 flex-shrink-0" />
+                        <span className="flex-1 text-left">Paves Intranet</span>
+                        {activeApplication === APPLICATIONS.INTRANET && (
+                          <Check className="h-4 w-4 flex-shrink-0 text-[#263383]" />
+                        )}
+                      </button>
+
+                      {canAccessFinance && (
+                        <button
+                          onClick={() => handleSelectApplication(APPLICATIONS.FINANCE)}
+                          className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-[#f4f6fc] hover:text-[#263383] transition-colors"
+                        >
+                          <Landmark className="h-4 w-4 flex-shrink-0" />
+                          <span className="flex-1 text-left">Finance Management</span>
+                          {activeApplication === APPLICATIONS.FINANCE && (
+                            <Check className="h-4 w-4 flex-shrink-0 text-[#263383]" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            )}
 
             {/* Profile dropdown */}
             <div className="relative pl-4 border-l border-gray-200" ref={dropdownRef}>

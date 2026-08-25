@@ -119,6 +119,30 @@ export const getPipelineSummary = async (campaignId) => {
     }
 };
 
+// Interview calendar — no pagination on this endpoint; the caller is
+// expected to bound result size via start_date/end_date (the calendar's
+// own visible range), not fetch everything and filter client-side.
+export const getCampaignInterviews = async (campaignId, filters = {}) => {
+    try {
+        const params = {};
+        if (filters.startDate) params.start_date = filters.startDate;
+        if (filters.endDate) params.end_date = filters.endDate;
+        if (filters.status?.length) params.status = filters.status;
+        if (filters.interviewerEmail) params.interviewer_email = filters.interviewerEmail;
+
+        const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/interviews`, {
+            params,
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching campaign interviews:", error);
+        throw error;
+    }
+};
+
 export const getCampaignTimeline = async (campaignId, { limit = 20, offset = 0, event_type } = {}) => {
     try {
         const params = { limit, offset };
@@ -158,9 +182,45 @@ export const getCampaignCandidates = async (campaignId) => {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
         });
+        // TEMP DEBUG - remove once candidates render correctly
+        console.log("[getCampaignCandidates] response:", response);
+        console.log("[getCampaignCandidates] response.data:", response.data);
+        console.log("[getCampaignCandidates] response.data.items:", response.data?.items);
         return response.data;
     } catch (error) {
         console.error("Error fetching campaign candidates:", error);
+        throw error;
+    }
+};
+
+// Pipeline Board — GET /campaign-candidates/campaign/{campaign_id}/board
+export const getCampaignBoard = async (campaignId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/campaign-candidates/campaign/${campaignId}/board`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching campaign board:", error);
+        throw error;
+    }
+};
+
+// Pipeline Board drag-and-drop — POST /campaign-candidates/{campaign_candidate_id}/stage.
+// Resume selection/transition validation stays entirely server-side
+// (PipelineTransitionService) — this only ever sends the target stage.
+export const moveCampaignCandidateStage = async (campaignCandidateId, toStage, reason) => {
+    try {
+        const response = await api.post(
+            `${BASE_URL}/campaign-candidates/${campaignCandidateId}/stage`,
+            { to_stage: toStage, reason: reason || undefined },
+            { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        );
+        return response.data;
+    } catch (error) {
+        console.error("Error moving campaign candidate stage:", error);
         throw error;
     }
 };
@@ -494,6 +554,21 @@ export const getRejectionAnalytics = async (campaignId) => {
         console.error("Error fetching rejection analytics:", error);
         throw error;
     }
+};
+
+// HR override report. campaign_alerts carries the per-campaign
+// override_rate and the server-computed override_alert flag that the dashboard
+// warning (T03) renders. HR_ADMIN only.
+export const getOverrideReport = async ({ campaignId, dateFrom, dateTo } = {}) => {
+    const params = {};
+    if (campaignId) params.campaign_id = campaignId;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    const response = await api.get(`${BASE_URL}/campaign-candidates/override-report`, {
+        params,
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+    });
+    return response.data?.data || null;
 };
 
 

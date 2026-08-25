@@ -273,7 +273,7 @@ const handleSprintStatus = async (sprintId, action) => {
   // Move Task
   // =======================================
   const handleDropTask = async (taskId, sprintId) => {
-    console.log("handleDropTask called with:", sprintId);
+    // console.log("handleDropTask called with:", sprintId);
     try {
       setTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, sprintId } : t)),

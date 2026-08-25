@@ -1,9 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Archive, ArrowRight } from "lucide-react";
+import { toast } from "react-toastify";
+import { Archive, ArrowRight, RotateCcw } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
-import { renderParseStatusBadge, renderSourceBadge, formatResumeDate } from "../utils/resumeIntakeUtils.jsx";
+import { useAuth } from "../../../../contexts/AuthContext";
+import { getResumeById, retryResume, replayResumeDlqEntry } from "../../service/resumeIntake";
+import { renderParseStatusBadge, renderSourceBadge, renderPipelineStageBadge, formatResumeDate } from "../utils/resumeIntakeUtils.jsx";
 import LoadingSpinner from "../../../../components/LoadingSpinner.jsx";
 
 // Progress indicators mapping to statuses
@@ -20,8 +23,42 @@ const progressColor = (status) => {
   return "bg-blue-600";
 };
 
-export default function ResumeUploadHistoryList({ files, isLoading }) {
+export default function ResumeUploadHistoryList({ files, isLoading, onRetried }) {
   const navigate = useNavigate();
+
+  // HR_ADMIN can't access the Resume Intake page at all — RECRUITER is the
+  // role that actually works this screen, so the retry action is gated to
+  // RECRUITER here (verify with backend that RECRUITER is authorized to call
+  // /resumes/{id}/retry and /resumes/dead-letter-queue/{id}/replay).
+  const { hasRole } = useAuth();
+  const isRecruiter = hasRole(["RECRUITER"]);
+
+  // Resume id currently being retried, for the per-row loading state.
+  const [retryingId, setRetryingId] = useState(null);
+
+  // A FAILED resume may or may not have already been moved to the dead-letter
+  // queue by the backend's own retry/classification logic — look up its
+  // failure detail first, then route to whichever endpoint actually applies
+  // (DLQ replay vs. a plain retry), so this one button works for both cases.
+  const handleRetry = async (f) => {
+    const resumeId = f.id || f.resume_id;
+    if (!resumeId) return;
+    setRetryingId(resumeId);
+    try {
+      const detailRes = await getResumeById(resumeId);
+      const failure = detailRes?.data?.failure;
+      const res =
+        failure?.moved_to_dlq && failure?.dlq_id
+          ? await replayResumeDlqEntry(failure.dlq_id)
+          : await retryResume(resumeId);
+      toast.success(res?.message || "Retry queued for this resume.");
+      onRetried?.();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to retry this resume.");
+    } finally {
+      setRetryingId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -46,6 +83,7 @@ export default function ResumeUploadHistoryList({ files, isLoading }) {
     "Format & Date",
     "Parsing Progress",
     "Status",
+    "Pipeline Stage",
     "Actions"
   ];
 
@@ -55,6 +93,7 @@ export default function ResumeUploadHistoryList({ files, isLoading }) {
     "fileDetails",
     "progress",
     "status",
+    "pipelineStage",
     "actions"
   ];
 
@@ -67,6 +106,7 @@ export default function ResumeUploadHistoryList({ files, isLoading }) {
       .toUpperCase();
 
     const isFinished = f.parse_status === "PARSED" || f.parse_status === "FAILED";
+    const resumeRowId = f.id || f.resume_id;
 
     return {
       candidate: (
@@ -111,6 +151,7 @@ export default function ResumeUploadHistoryList({ files, isLoading }) {
         </div>
       ),
       status: renderParseStatusBadge(f.parse_status),
+      pipelineStage: renderPipelineStageBadge(f),
       actions: (
         <div className="flex items-center gap-1 justify-center">
           {isFinished && (
@@ -120,11 +161,26 @@ export default function ResumeUploadHistoryList({ files, isLoading }) {
               title="View candidate resume"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/airs/pipeline/candidates/${f.candidate_id}`, { state: { resume: f } });
+                navigate(`/airs/pipeline/candidates/${f.campaign_candidate_id}`, { state: { resume: f } });
               }}
               className="h-8 w-8 !text-blue-600 hover:!text-blue-700 hover:bg-blue-50"
             >
               <ArrowRight className="h-4 w-4" />
+            </Button>
+          )}
+          {isRecruiter && f.parse_status === "FAILED" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Retry parsing"
+              disabled={retryingId === resumeRowId}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRetry(f);
+              }}
+              className="h-8 w-8 !text-amber-600 hover:!text-amber-700 hover:bg-amber-50"
+            >
+              <RotateCcw className={`h-4 w-4 ${retryingId === resumeRowId ? "animate-spin" : ""}`} />
             </Button>
           )}
         </div>

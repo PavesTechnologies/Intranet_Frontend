@@ -376,7 +376,7 @@ export default function ViewEmpDetails() {
       setDeleteOfferModal(false);
       setTimeout(() => navigate("/employee-onboarding"), 800);
     } catch (e) {
-      console.log("DELETE ERROR:", e);
+      // console.log("DELETE ERROR:", e);
       setDeleteOfferModal(false);
       showStatusToast(e?.response?.data?.detail || "Failed to delete offer");
     } finally {

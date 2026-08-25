@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
-import { UploadCloud, FileText, X, CheckCircle2 } from "lucide-react";
+import { UploadCloud, FileText, X, CheckCircle2, AlertTriangle, ArrowRight } from "lucide-react";
 import { toast } from "react-toastify";
 import Button from "../../../../../components/Button/Button";
 import { Input } from "../../../../../components/ui/input";
+import Modal from "../../../../../components/ui/Modal";
+import PipelineCandidateScorecardPage from "../../../pipeline/PipelineCandidateScorecardPage";
 import { activeCampaigns, resumeUpload } from "../../../service/resumeIntake";
 // import CountriesList from "../../../../../components/CountriesList";
 import FilterListbox from "../../../../../components/filter/FilterListbox";
@@ -29,6 +31,15 @@ function isAcceptedFile(file) {
   return ACCEPTED_FILE_TYPES.some((ext) => name.endsWith(ext));
 }
 
+// "use_existing" -> "Use Existing" — available_resolutions are backend enum
+// values, not display copy.
+function formatResolutionLabel(resolution) {
+  return resolution
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export default function UploadStep({ onSubmit, bare = false }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [file, setFile] = useState(null);
@@ -41,6 +52,18 @@ export default function UploadStep({ onSubmit, bare = false }) {
   const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef(null);
+
+  // Set when the upload is rejected because this candidate already exists in
+  // the campaign ({ candidateId, message } or null) — surfaces a "View
+  // Candidate" action instead of just a dead-end error toast.
+  const [duplicateCandidate, setDuplicateCandidate] = useState(null);
+  const [isScorecardOpen, setIsScorecardOpen] = useState(false);
+
+  // Set when the upload is rejected because an identical resume file already
+  // exists ({ message, candidateName, campaignNames, availableResolutions }
+  // or null) — surfaces the backend's available_resolutions as buttons
+  // instead of a dead-end error toast.
+  const [duplicateResume, setDuplicateResume] = useState(null);
 
   const isFormValid = Boolean(
     form.campaignId &&
@@ -98,31 +121,72 @@ export default function UploadStep({ onSubmit, bare = false }) {
     return Object.keys(next).length === 0;
   };
 
+  const buildFormData = () => {
+    const formData = new FormData();
+    formData.append("campaign_id", form.campaignId);
+    formData.append("candidate_full_name", form.candidateName.trim());
+    formData.append("candidate_email", form.candidateEmail.trim());
+    if (form.candidatePhone.trim()) {
+      formData.append("candidate_phone", form.candidatePhone.trim());
+    }
+    formData.append("jurisdiction", form.jurisdiction);
+    formData.append("consent_confirmed", consent);
+    formData.append("file", file);
+    return formData;
+  };
+
+  const submitUpload = async (formData) => {
+    const res = await resumeUpload(formData);
+    toast.success(res?.message || "Resume uploaded successfully and queued for processing.");
+    setDuplicateCandidate(null);
+    setDuplicateResume(null);
+    onSubmit({
+      uploadResponse: res?.data,
+      candidateName: form.candidateName.trim(),
+      candidateEmail: form.candidateEmail.trim(),
+      fileFormat: file.name.toLowerCase().endsWith(".docx") ? "DOCX" : "PDF",
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
 
+    setDuplicateCandidate(null);
+    setDuplicateResume(null);
     setIsSubmitting(true);
     try {
-      const formData = new FormData();
-      formData.append("campaign_id", form.campaignId);
-      formData.append("candidate_full_name", form.candidateName.trim());
-      formData.append("candidate_email", form.candidateEmail.trim());
-      if (form.candidatePhone.trim()) {
-        formData.append("candidate_phone", form.candidatePhone.trim());
+      await submitUpload(buildFormData());
+    } catch (err) {
+      const responseBody = err?.response?.data;
+      const conflictData = responseBody?.data;
+      if (conflictData?.candidate_exists && conflictData?.candidate_id) {
+        setDuplicateCandidate({
+          candidateId: conflictData.candidate_id,
+          campaignCandidateId: conflictData.campaign_candidate_id ?? conflictData.campaignCandidateId,
+          message: responseBody?.message || "Candidate already exists in this campaign.",
+        });
+      } else if (conflictData?.duplicate_resume_id && Array.isArray(conflictData?.available_resolutions)) {
+        setDuplicateResume({
+          message: responseBody?.message || "An identical resume file already exists in the system.",
+          candidateName: conflictData.candidate_name,
+          campaignNames: conflictData.campaign_names || [],
+          availableResolutions: conflictData.available_resolutions,
+        });
+      } else {
+        toast.error(responseBody?.message || "Failed to upload resume. Please try again.");
       }
-      formData.append("jurisdiction", form.jurisdiction);
-      formData.append("consent_confirmed", consent);
-      formData.append("file", file);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-      const res = await resumeUpload(formData);
-      toast.success(res?.message || "Resume uploaded successfully and queued for processing.");
-      onSubmit({
-        uploadResponse: res?.data,
-        candidateName: form.candidateName.trim(),
-        candidateEmail: form.candidateEmail.trim(),
-        fileFormat: file.name.toLowerCase().endsWith(".docx") ? "DOCX" : "PDF",
-      });
+  const handleResolveDuplicateResume = async (resolution) => {
+    setIsSubmitting(true);
+    try {
+      const formData = buildFormData();
+      formData.append("resolution", resolution);
+      await submitUpload(formData);
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to upload resume. Please try again.");
     } finally {
@@ -131,6 +195,7 @@ export default function UploadStep({ onSubmit, bare = false }) {
   };
 
   return (
+    <>
     <form onSubmit={handleSubmit} className={bare ? "" : "max-w-3xl"}>
       <div className={bare ? "" : "rounded-xl border border-slate-200 bg-white shadow-sm"}>
         {!bare && (
@@ -271,6 +336,57 @@ export default function UploadStep({ onSubmit, bare = false }) {
             </label>
             {errors.consent && <p className="text-[11.5px] text-rose-600 mt-1 ml-6.5">{errors.consent}</p>}
           </div>
+
+          {duplicateCandidate && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                <p className="text-[12.5px] text-amber-800">{duplicateCandidate.message}</p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="small"
+                onClick={() => setIsScorecardOpen(true)}
+                className="!text-blue-600 hover:!text-blue-700 hover:bg-blue-50 text-xs shrink-0"
+              >
+                View Candidate <ArrowRight size={14} className="ml-1" />
+              </Button>
+            </div>
+          )}
+
+          {duplicateResume && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                <div className="text-[12.5px] text-amber-800">
+                  <p>{duplicateResume.message}</p>
+                  {duplicateResume.candidateName && (
+                    <p className="mt-1 text-amber-700">
+                      Matches <span className="font-semibold">{duplicateResume.candidateName}</span>
+                      {duplicateResume.campaignNames.length > 0 && (
+                        <> in {duplicateResume.campaignNames.join(", ")}</>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                {duplicateResume.availableResolutions.map((resolution) => (
+                  <Button
+                    key={resolution}
+                    type="button"
+                    variant={resolution === "upload_anyway" ? "secondary" : "primary"}
+                    size="small"
+                    disabled={isSubmitting}
+                    onClick={() => handleResolveDuplicateResume(resolution)}
+                  >
+                    {formatResolutionLabel(resolution)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className={bare ? "flex justify-end gap-2 pt-5 mt-1 border-t border-slate-100" : "px-6 py-4 border-t border-slate-100 flex justify-end gap-2"}>
@@ -278,7 +394,7 @@ export default function UploadStep({ onSubmit, bare = false }) {
             type="submit"
             variant="primary"
             size="medium"
-            disabled={!isFormValid}
+            disabled={!isFormValid || !!duplicateResume}
             loading={isSubmitting}
             loadingText="Submitting..."
           >
@@ -287,5 +403,26 @@ export default function UploadStep({ onSubmit, bare = false }) {
         </div>
       </div>
     </form>
+
+    <Modal
+      isOpen={isScorecardOpen}
+      onClose={() => setIsScorecardOpen(false)}
+      title="Candidate Scorecard"
+      width="1100px"
+    >
+      {duplicateCandidate && (
+        <PipelineCandidateScorecardPage
+          candidateId={duplicateCandidate.candidateId}
+          resumeRow={{
+            candidate_full_name: form.candidateName.trim(),
+            candidate_email: form.candidateEmail.trim(),
+            campaign_candidate_id: duplicateCandidate.campaignCandidateId,
+          }}
+          onBack={() => setIsScorecardOpen(false)}
+          variant="modal"
+        />
+      )}
+    </Modal>
+    </>
   );
 }

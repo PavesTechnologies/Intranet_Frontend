@@ -83,7 +83,7 @@ const TimesheetHistory = () => {
         );
         setProjectInfo(response.data);
       } catch (error) {
-        console.log("project info fetch error :", error);
+        // console.log("project info fetch error :", error);
         showStatusToast(
           error.response?.data || "Failed fetching projects info",
           "error",

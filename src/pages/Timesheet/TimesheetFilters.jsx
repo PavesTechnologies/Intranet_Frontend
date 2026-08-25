@@ -142,6 +142,7 @@ const TimesheetFilters = ({
         <FilterListbox
           options={[
             { value: "All Status", label: "All Status" },
+            { value: "Draft", label: "Draft" },
             { value: "Submitted", label: "Submitted" },
             { value: "Approved", label: "Approved" },
             { value: "Rejected", label: "Rejected" },

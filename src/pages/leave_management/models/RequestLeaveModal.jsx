@@ -364,7 +364,7 @@ export default function RequestLeaveModal({
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
       .then((response) => {
-        console.log(response.data.data);
+        // console.log(response.data.data);
         setBalances(response.data.data);
         setLoadingBalances(false);
       })
@@ -474,7 +474,7 @@ export default function RequestLeaveModal({
         "Failed to submit leave request: " +
           (err.response?.data?.message || err.message),
       );
-      toast.error("Failed to submit leave request: ");
+      toast.error("Failed to submit leave request: " + (err.response?.data?.message || err.message));
     } finally {
       setSubmitting(false);
     }

@@ -71,6 +71,10 @@ const Modal = ({
   footerClassName = "",
   backdropClassName = "",
   panelClassName = "",
+  // Inline styles for the panel. Use when the width must be content-driven
+  // (e.g. `width: fit-content`), which a class cannot express reliably against
+  // the panel's own `w-full`.
+  panelStyle,
   titleClassName = "",
   subtitleClassName = "",
   overlayColor = "bg-black/60",
@@ -107,6 +111,7 @@ const Modal = ({
       />
 
       <div
+        style={panelStyle}
         className={`
           relative flex w-full flex-col rounded-xl border border-gray-200 bg-white shadow-2xl
           ${maxHeight}

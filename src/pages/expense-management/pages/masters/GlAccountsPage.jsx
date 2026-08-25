@@ -106,26 +106,27 @@ export default function GlAccountsPage() {
 
       const res = await glAccountService.getAll(params);
 
-      if (res.data && typeof res.data === "object" && !Array.isArray(res.data)) {
-        // Server-side paginated structure
-        const items = res.data.glAccounts || res.data.content || res.data.data || [];
-        const total = res.data.total !== undefined ? res.data.total : (res.data.totalElements || items.length || 0);
-        setGlAccounts(items);
-        setTotalItems(total);
-        setIsServerPaginated(true);
-      } else if (Array.isArray(res.data)) {
-        // Fallback for flat array response
-        setAllGlAccounts(res.data);
-        setIsServerPaginated(false);
-      } else {
-        setGlAccounts([]);
-        setTotalItems(0);
+      let items = [];
+      if (res.data) {
+        if (Array.isArray(res.data)) {
+          items = res.data;
+        } else if (res.data.data && Array.isArray(res.data.data)) {
+          items = res.data.data;
+        } else {
+          items = res.data.glAccounts || res.data.content || [];
+        }
       }
+
+      setAllGlAccounts(items);
+      setIsServerPaginated(false);
+      setGlAccounts([]);
+      setTotalItems(0);
     } catch (err) {
       console.error("Failed to fetch GL Accounts:", err);
       const errMsg = err.response?.data?.message || err.response?.data?.detail || "Failed to fetch GL Accounts.";
       showStatusToast(errMsg, "error");
       setGlAccounts([]);
+      setAllGlAccounts([]);
       setTotalItems(0);
     } finally {
       setLoading(false);
@@ -136,32 +137,92 @@ export default function GlAccountsPage() {
     fetchGlAccounts();
   }, [fetchGlAccounts]);
 
-  // Compute local search & pagination if API returned flat array
+  // Compute local search, sorting & pagination if API returned flat array
+  const filteredAccounts = React.useMemo(() => {
+    return allGlAccounts.filter((acc) => {
+      const id = (acc.glAccountId || "").toLowerCase();
+      const code = (acc.glAccountCode || "").toLowerCase();
+      const name = (acc.glAccountName || "").toLowerCase();
+      const type = (acc.accountType || "").toLowerCase();
+      const desc = (acc.description || "").toLowerCase();
+      const q = searchTerm.toLowerCase();
+      return (
+        id.includes(q) ||
+        code.includes(q) ||
+        name.includes(q) ||
+        type.includes(q) ||
+        desc.includes(q)
+      );
+    });
+  }, [allGlAccounts, searchTerm]);
+
+  const sortedAccounts = React.useMemo(() => {
+    return [...filteredAccounts].sort((a, b) => {
+      const q = searchTerm.toLowerCase();
+      if (q) {
+        const codeA = (a.glAccountCode || "").toLowerCase();
+        const codeB = (b.glAccountCode || "").toLowerCase();
+        const idA = (a.glAccountId || "").toLowerCase();
+        const idB = (b.glAccountId || "").toLowerCase();
+
+        // Exact match on code
+        const exactCodeA = codeA === q ? 1 : 0;
+        const exactCodeB = codeB === q ? 1 : 0;
+        if (exactCodeA !== exactCodeB) return exactCodeB - exactCodeA;
+
+        // Exact match on ID
+        const exactIdA = idA === q ? 1 : 0;
+        const exactIdB = idB === q ? 1 : 0;
+        if (exactIdA !== exactIdB) return exactIdB - exactIdA;
+
+        // Prefix match on code
+        const prefixCodeA = codeA.startsWith(q) ? 1 : 0;
+        const prefixCodeB = codeB.startsWith(q) ? 1 : 0;
+        if (prefixCodeA !== prefixCodeB) return prefixCodeB - prefixCodeA;
+
+        // Prefix match on ID
+        const prefixIdA = idA.startsWith(q) ? 1 : 0;
+        const prefixIdB = idB.startsWith(q) ? 1 : 0;
+        if (prefixIdA !== prefixIdB) return prefixIdB - prefixIdA;
+
+        // Substring match on code index
+        const indexCodeA = codeA.indexOf(q);
+        const indexCodeB = codeB.indexOf(q);
+        if (indexCodeA !== indexCodeB) {
+          if (indexCodeA === -1) return 1;
+          if (indexCodeB === -1) return -1;
+          return indexCodeA - indexCodeB;
+        }
+
+        // Substring match on ID index
+        const indexIdA = idA.indexOf(q);
+        const indexIdB = idB.indexOf(q);
+        if (indexIdA !== indexIdB) {
+          if (indexIdA === -1) return 1;
+          if (indexIdB === -1) return -1;
+          return indexIdA - indexIdB;
+        }
+      }
+
+      // Default alphabetical sort by glAccountCode, then glAccountId
+      const codeCompare = (a.glAccountCode || "").localeCompare(b.glAccountCode || "", undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+      if (codeCompare !== 0) return codeCompare;
+
+      return (a.glAccountId || "").localeCompare(b.glAccountId || "");
+    });
+  }, [filteredAccounts, searchTerm]);
+
   const displayedAccounts = isServerPaginated
     ? glAccounts
     : (() => {
-        const filtered = allGlAccounts.filter((acc) => {
-          const code = (acc.glAccountCode || "").toLowerCase();
-          const name = (acc.glAccountName || "").toLowerCase();
-          const type = (acc.accountType || "").toLowerCase();
-          const desc = (acc.description || "").toLowerCase();
-          const q = searchTerm.toLowerCase();
-          return code.includes(q) || name.includes(q) || type.includes(q) || desc.includes(q);
-        });
         const start = (currentPage - 1) * ITEMS_PER_PAGE;
-        return filtered.slice(start, start + ITEMS_PER_PAGE);
+        return sortedAccounts.slice(start, start + ITEMS_PER_PAGE);
       })();
 
-  const totalCount = isServerPaginated
-    ? totalItems
-    : allGlAccounts.filter((acc) => {
-        const code = (acc.glAccountCode || "").toLowerCase();
-        const name = (acc.glAccountName || "").toLowerCase();
-        const type = (acc.accountType || "").toLowerCase();
-        const desc = (acc.description || "").toLowerCase();
-        const q = searchTerm.toLowerCase();
-        return code.includes(q) || name.includes(q) || type.includes(q) || desc.includes(q);
-      }).length;
+  const totalCount = isServerPaginated ? totalItems : filteredAccounts.length;
 
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
