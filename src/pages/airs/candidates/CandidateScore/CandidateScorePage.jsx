@@ -23,8 +23,8 @@ const TABS = [
   { id: "deterministic", label: "Deterministic Score", Component: DeterministicScoreTab },
   { id: "semantic", label: "Semantic Score", Component: SemanticScoreTab },
   { id: "ai", label: "AI Evaluation Score", Component: AiEvaluationTab },
-  { id: "interview", label: "Interview", Component: InterviewTab },
   { id: "finalStatus", label: "Final Status", Component: FinalStatusTab },
+  { id: "interview", label: "Interview", Component: InterviewTab }, 
 ];
 
 export default function CandidateScorePage() {

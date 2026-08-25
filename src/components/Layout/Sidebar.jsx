@@ -479,7 +479,7 @@ const Sidebar = ({ isCollapsed }) => {
             </li>
           }
 
-          {/* AI Screening (AIRS) Menu
+          {/* AI Screening (AIRS) Menu */}
           {airsRBACAccess && (
             <li
               ref={airsRef}
@@ -533,7 +533,7 @@ const Sidebar = ({ isCollapsed }) => {
                 </ul>
               )}
             </li>
-          )} */}
+          )}
 
           {/* Employee Onboarding (Non-General, Non-DM) */}
           {

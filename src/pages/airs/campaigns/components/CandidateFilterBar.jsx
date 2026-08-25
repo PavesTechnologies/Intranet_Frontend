@@ -142,14 +142,11 @@ export default function CandidateFilterBar({
     }
   };
 
-  // S03-T03 — canonical IDs, never display names, so the link survives a
-  // skill being renamed in the ontology.
+  // S03-T03 — CampaignDetails/CandidatesTab keep the address bar in sync with
+  // every active filter (tab, stage, skills, score range, resume filters,
+  // page), so the current URL already *is* the shareable link.
   const handleShare = async () => {
-    const params = new URLSearchParams();
-    params.set("tab", "candidates");
-    if (stageFilter) params.set("stage", stageFilter);
-    skills.forEach((s) => params.append("skill_ids", s.canonical_skill_id));
-    const url = `${window.location.origin}/airs/campaigns/${campaignId}?${params.toString()}`;
+    const url = window.location.href;
     try {
       await navigator.clipboard.writeText(url);
       toast.success("Filter link copied to clipboard.", { autoClose: 3000 });

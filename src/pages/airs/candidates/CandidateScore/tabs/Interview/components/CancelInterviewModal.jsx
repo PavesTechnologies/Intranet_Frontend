@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/Button/Button";
+import { formatDateLabel } from "../interviewMock";
 
-export default function CancelInterviewModal({ onClose, onConfirm }) {
+export default function CancelInterviewModal({ candidateName, round, isSubmitting, onClose, onConfirm }) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
 
@@ -15,10 +16,11 @@ export default function CancelInterviewModal({ onClose, onConfirm }) {
   };
 
   return (
-    <Modal isOpen onClose={onClose} title="Cancel Interview" width="440px">
+    <Modal isOpen onClose={onClose} title="Cancel Interview?" width="440px">
       <div className="space-y-4">
         <p className="text-[12.5px] text-slate-600">
-          This will mark the interview as cancelled. This is a preview only — it does not affect any backend record.
+          Are you sure you want to cancel the interview with <span className="font-semibold text-slate-900">{candidateName}</span> scheduled
+          for {formatDateLabel(round.date)}?
         </p>
 
         <div>
@@ -41,11 +43,11 @@ export default function CancelInterviewModal({ onClose, onConfirm }) {
         </div>
 
         <div className="flex items-center justify-end gap-2 pt-2">
-          <Button variant="outline" size="small" onClick={onClose}>
-            Back
+          <Button variant="outline" size="small" onClick={onClose} disabled={isSubmitting}>
+            Keep Interview
           </Button>
-          <Button variant="danger" size="small" onClick={handleConfirm}>
-            Confirm Cancel
+          <Button variant="danger" size="small" onClick={handleConfirm} loading={isSubmitting} loadingText="Cancelling...">
+            Cancel Interview
           </Button>
         </div>
       </div>

@@ -1,190 +1,280 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { toast } from "react-toastify";
-import { CalendarClock } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { CalendarClock, CalendarPlus } from "lucide-react";
 import Button from "@/components/Button/Button";
-import { useAuth } from "@/contexts/AuthContext";
-import { textOrDash } from "../../../utils/candidateDataUtils";
-import { getInterviewScheduleMock, getInterviewHistoryMock, INTERVIEW_MODE_LABEL } from "./interviewMock";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import ErrorState from "@/pages/airs/skill-ontology/components/ErrorState";
+import useInterviewQuery from "./hooks/useInterviewQuery";
+import { useScheduleInterview, useRescheduleInterview, useCancelInterview, useCompleteInterview } from "./hooks/useInterviewMutations";
 import InterviewScheduleModal from "./components/InterviewScheduleModal";
 import CancelInterviewModal from "./components/CancelInterviewModal";
-import InterviewHistoryTimeline from "./components/InterviewHistoryTimeline";
+import EditInterviewersModal from "./components/EditInterviewersModal";
+import InterviewStatusBadge from "./components/InterviewStatusBadge";
+import InterviewRoundCard from "./components/InterviewRoundCard";
 
-// Interview tab (Epic 4 preview) — mock data only, no backend calls.
-// interview_schedules/interview_schedule_history don't exist yet; this tab
-// previews the UI so E04's backend has a known target once it's built.
-// Every action here mutates local component state only (never a module-
-// level mock singleton), so one candidate's preview edits can never leak
-// into another candidate's view, and reschedules always append to history
-// rather than overwrite it — mirroring the append-only design (Option B)
-// the real interview_schedule_history table will enforce.
-const STATUS_TONE = {
-  NOT_SCHEDULED: "bg-slate-100 text-slate-600 border-slate-200",
-  SCHEDULED: "bg-blue-50 text-blue-700 border-blue-100",
-  COMPLETED: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  CANCELLED: "bg-rose-100 text-rose-800 border-rose-200",
-  NO_SHOW: "bg-amber-50 text-amber-700 border-amber-100",
-};
-
-const STATUS_LABEL = {
-  NOT_SCHEDULED: "Not Scheduled",
-  SCHEDULED: "Scheduled",
-  COMPLETED: "Completed",
-  CANCELLED: "Cancelled",
-  NO_SHOW: "No Show",
-};
-
-function renderInterviewStatusBadge(status) {
-  const tone = STATUS_TONE[status] || STATUS_TONE.NOT_SCHEDULED;
-  return <Badge className={`${tone} font-bold px-3 py-1 text-xs`}>{STATUS_LABEL[status] || status}</Badge>;
+// Interview tab (Epic 4) — a candidate can have several interview rounds,
+// freely (HM decides count/order). `interviews` is the full ordered list
+// from the real query (item 0 = round 1); every mutation invalidates that
+// same query instead of merging its own response into local state, so the
+// tab always reflects the server's authoritative rounds after any action.
+//
+// Scheduling is round-aware server-side now: POSTing again while the
+// latest round is SCHEDULED/RESCHEDULED atomically completes that round
+// and starts a new one — "Schedule Next Round" is the exact same call as
+// the first "Schedule Interview", just a different button/label depending
+// on the latest round's status.
+function getScheduleErrorMessage(error, isNextRound, fallback) {
+  if (error?.response?.status === 409) {
+    return (
+      error.response?.data?.message ||
+      (isNextRound
+        ? "Couldn't start the next round — it may already have been started elsewhere. Refreshed to the latest state."
+        : "This candidate isn't ready for interview scheduling yet.")
+    );
+  }
+  return error?.response?.data?.message || fallback;
 }
 
-function DetailTile({ label, value }) {
-  return (
-    <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-center">
-      <div className="text-[10.5px] text-slate-400">{label}</div>
-      <div className="text-[13px] font-bold text-slate-900 mt-1">{value}</div>
-    </div>
-  );
+function getErrorMessage(error, fallback) {
+  if (error?.response?.status === 409) {
+    return error.response?.data?.message || "This round's status changed elsewhere — refreshed to the latest.";
+  }
+  return error?.response?.data?.message || fallback;
 }
 
 export default function InterviewTab({ candidate }) {
-  const { user } = useAuth();
-  const actingUserName = user?.name || user?.email || "You";
-
-  const [schedule, setSchedule] = useState(() => getInterviewScheduleMock(candidate));
-  const [history, setHistory] = useState(() => getInterviewHistoryMock(candidate));
+  const { interviews, isLoading, error, refetch } = useInterviewQuery(candidate?.id);
   const [modalMode, setModalMode] = useState(null); // null | "schedule" | "reschedule"
-  const [cancelOpen, setCancelOpen] = useState(false);
+  const [activeRound, setActiveRound] = useState(null); // round being rescheduled
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [completingRoundId, setCompletingRoundId] = useState(null);
+  const [editInterviewersTarget, setEditInterviewersTarget] = useState(null);
 
-  // Re-seed the preview when navigating from one candidate to another — this
-  // component instance can be reused across route param changes, and each
-  // candidate must get its own fresh mock rather than inheriting a sibling's.
-  useEffect(() => {
-    setSchedule(getInterviewScheduleMock(candidate));
-    setHistory(getInterviewHistoryMock(candidate));
-  }, [candidate?.id]);
+  const scheduleMutation = useScheduleInterview(candidate?.id);
+  const rescheduleMutation = useRescheduleInterview(candidate?.id);
+  const cancelMutation = useCancelInterview(candidate?.id);
+  const completeMutation = useCompleteInterview(candidate?.id);
 
-  const applyScheduleFields = (values) => ({
-    campaign_candidate_id: candidate?.id ?? null,
-    status: "SCHEDULED",
-    scheduled_at: values.scheduledAt.toISOString(),
-    duration_minutes: values.durationMinutes,
-    interviewer_names: [values.interviewer],
-    mode: values.mode,
-    meeting_link: values.mode === "ONSITE" ? null : values.meetingLink,
-    location: values.mode === "ONSITE" ? values.location : null,
-    notes: schedule.notes || "",
-  });
+  const latestRound = interviews.length ? interviews[interviews.length - 1] : null;
+  const isFirstRound = (latestRound?.status || "PENDING") === "PENDING";
+  // A real PENDING placeholder round (nothing scheduled yet) has no details
+  // worth showing — same treatment as no rounds at all. Round numbers come
+  // from each item's original position, not the filtered list's index, so
+  // they stay stable even if a PENDING row ever shows up somewhere unusual.
+  const displayRounds = interviews
+    .map((round, idx) => ({ round, roundNumber: idx + 1 }))
+    .filter((item) => item.round.status !== "PENDING");
+
+  const openSchedule = () => {
+    setActiveRound(null);
+    setModalMode("schedule");
+  };
+
+  const openReschedule = (round) => {
+    setActiveRound(round);
+    setModalMode("reschedule");
+  };
 
   const handleScheduleSubmit = (values) => {
-    setSchedule(applyScheduleFields(values));
-    setModalMode(null);
-    toast.success("Interview scheduled — preview only, not saved to a backend record yet.");
+    const isNextRound = !isFirstRound;
+    scheduleMutation.mutate(values, {
+      onSuccess: () => {
+        setModalMode(null);
+        toast.success(
+          isNextRound
+            ? "Next round scheduled — the previous round is now marked complete."
+            : "Interview scheduled successfully. A calendar invitation will be sent to the selected interviewers once calendar integration is enabled."
+        );
+      },
+      onError: (err) => {
+        toast.error(getScheduleErrorMessage(err, isNextRound, "Couldn't schedule the interview. Please try again."));
+        // Unlike reschedule/cancel (which target one specific round and
+        // still make sense to retry with the same input), a schedule error
+        // means the whole premise of "is there a next round to start" may
+        // have changed under this tab — closing forces a look at the
+        // refetched, authoritative list instead of retrying blind against
+        // a wizard whose captured isNextRound is now stale.
+        setModalMode(null);
+        setActiveRound(null);
+        if (err?.response?.status === 409) refetch();
+      },
+    });
   };
 
   const handleRescheduleSubmit = (values) => {
-    setHistory((prev) => [
-      ...prev,
+    rescheduleMutation.mutate(
+      { interviewId: activeRound.id, payload: values },
       {
-        id: `${candidate?.id ?? "mock"}-hist-${prev.length + 1}`,
-        old_scheduled_at: schedule.scheduled_at,
-        new_scheduled_at: values.scheduledAt.toISOString(),
-        rescheduled_by: actingUserName,
-        reason: values.reason,
-        changed_at: new Date().toISOString(),
-      },
-    ]);
-    setSchedule(applyScheduleFields(values));
-    setModalMode(null);
-    toast.success("Interview rescheduled — preview only, not saved to a backend record yet.");
+        onSuccess: () => {
+          setModalMode(null);
+          setActiveRound(null);
+          toast.success("Interview rescheduled successfully.");
+        },
+        onError: (err) => {
+          toast.error(getErrorMessage(err, "Couldn't reschedule the interview. Please try again."));
+          if (err?.response?.status === 409) refetch();
+        },
+      }
+    );
   };
 
   const handleCancelConfirm = (reason) => {
-    setSchedule((prev) => ({ ...prev, status: "CANCELLED", notes: reason }));
-    setCancelOpen(false);
-    toast.success("Interview cancelled — preview only, not saved to a backend record yet.");
+    cancelMutation.mutate(
+      { interviewId: cancelTarget.id, reason },
+      {
+        onSuccess: () => {
+          setCancelTarget(null);
+          toast.success("Interview cancelled.");
+        },
+        onError: (err) => {
+          toast.error(getErrorMessage(err, "Couldn't cancel the interview. Please try again."));
+          if (err?.response?.status === 409) refetch();
+        },
+      }
+    );
   };
+
+  const handleComplete = (round) => {
+    setCompletingRoundId(round.id);
+    completeMutation.mutate(round.id, {
+      onSuccess: ({ feedbackQueuedCount }) => {
+        setCompletingRoundId(null);
+        toast.success(
+          feedbackQueuedCount > 0
+            ? `Marked as completed — feedback requested from ${feedbackQueuedCount} interviewer${feedbackQueuedCount > 1 ? "s" : ""}.`
+            : "Marked as completed."
+        );
+      },
+      onError: (err) => {
+        setCompletingRoundId(null);
+        toast.error(getErrorMessage(err, "Couldn't mark this interview as completed. Please try again."));
+        if (err?.response?.status === 409) refetch();
+      },
+    });
+  };
+
+  // Reuses the reschedule endpoint with the round's own date/time/platform/
+  // etc. unchanged — the backend detects nothing schedule-related changed
+  // and skips appending a history entry, so this stays a plain reschedule
+  // call from the frontend's side.
+  const handleEditInterviewersSubmit = ({ interviewers, reason }) => {
+    const round = editInterviewersTarget;
+    rescheduleMutation.mutate(
+      {
+        interviewId: round.id,
+        payload: {
+          interviewers,
+          date: round.date,
+          startTime: round.start_time,
+          endTime: round.end_time,
+          durationMinutes: round.duration_minutes,
+          platform: round.platform,
+          location: round.location,
+          notes: round.notes,
+          reason,
+        },
+      },
+      {
+        onSuccess: () => {
+          setEditInterviewersTarget(null);
+          toast.success("Interviewers updated.");
+        },
+        onError: (err) => {
+          toast.error(getErrorMessage(err, "Couldn't update the interviewer list. Please try again."));
+          if (err?.response?.status === 409) refetch();
+        },
+      }
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="py-12 flex items-center justify-center">
+        <LoadingSpinner text="Loading interviews..." />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        title="Couldn't load interview details"
+        message="We couldn't load this candidate's interview rounds. Please try again."
+        onRetry={refetch}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">
-      <div className="bg-white border border-slate-200 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <span className="flex items-center gap-1.5 text-[12.5px] font-bold text-slate-900">
-            <CalendarClock size={14} className="text-blue-500" /> Interview
-          </span>
-          {renderInterviewStatusBadge(schedule.status)}
-        </div>
-
-        {schedule.status !== "NOT_SCHEDULED" && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <DetailTile label="Date & Time" value={new Date(schedule.scheduled_at).toLocaleString()} />
-            <DetailTile label="Duration" value={schedule.duration_minutes ? `${schedule.duration_minutes} min` : "-"} />
-            <DetailTile
-              label="Interviewer(s)"
-              value={schedule.interviewer_names?.length ? schedule.interviewer_names.join(", ") : "-"}
-            />
-            <DetailTile label="Mode" value={schedule.mode ? INTERVIEW_MODE_LABEL[schedule.mode] : "-"} />
-          </div>
-        )}
-
-        {schedule.status !== "NOT_SCHEDULED" && (schedule.meeting_link || schedule.location) && (
-          <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 mb-4 text-[12px]">
-            {schedule.mode === "ONSITE" ? (
-              <>
-                <span className="text-slate-400">Location: </span>
-                <span className="font-medium text-slate-900">{textOrDash(schedule.location)}</span>
-              </>
-            ) : (
-              <>
-                <span className="text-slate-400">Meeting link: </span>
-                <a
-                  href={schedule.meeting_link}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium text-blue-600 hover:underline break-all"
-                >
-                  {schedule.meeting_link}
-                </a>
-              </>
-            )}
-          </div>
-        )}
-
-        <div className="flex items-center gap-2">
-          {schedule.status === "NOT_SCHEDULED" && (
-            <Button size="small" onClick={() => setModalMode("schedule")}>
-              Schedule Interview
-            </Button>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <span className="flex items-center gap-1.5 text-[12.5px] font-bold text-slate-900">
+          <CalendarClock size={14} className="text-blue-500" /> Interview
+          {displayRounds.length > 0 && (
+            <span className="text-slate-400 font-normal">
+              ({displayRounds.length} round{displayRounds.length > 1 ? "s" : ""})
+            </span>
           )}
-          {schedule.status === "SCHEDULED" && (
-            <>
-              <Button size="small" variant="outline" onClick={() => setModalMode("reschedule")}>
-                Reschedule
-              </Button>
-              <Button size="small" variant="danger" onClick={() => setCancelOpen(true)}>
-                Cancel
-              </Button>
-            </>
-          )}
-        </div>
+        </span>
+        <Button size="small" onClick={openSchedule}>
+          <CalendarPlus size={14} /> {isFirstRound ? "Schedule Interview" : "Schedule Next Round"}
+        </Button>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-5">
-        <span className="text-[12.5px] font-bold text-slate-900 block mb-4">Reschedule History</span>
-        <InterviewHistoryTimeline history={history} />
-      </div>
+      {displayRounds.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between">
+          <span className="text-[12.5px] text-slate-500">No interview scheduled yet.</span>
+          <InterviewStatusBadge status="PENDING" />
+        </div>
+      ) : (
+        displayRounds.map(({ round, roundNumber }, idx) => (
+          <InterviewRoundCard
+            key={round.id}
+            round={round}
+            roundNumber={roundNumber}
+            // Most recent round open by default, earlier ones collapsed —
+            // each card's expand state is otherwise independent after that.
+            defaultExpanded={idx === displayRounds.length - 1}
+            onReschedule={openReschedule}
+            onCancel={setCancelTarget}
+            onComplete={handleComplete}
+            isCompleting={completeMutation.isPending && completingRoundId === round.id}
+            onEditInterviewers={setEditInterviewersTarget}
+          />
+        ))
+      )}
 
       {modalMode && (
         <InterviewScheduleModal
           mode={modalMode}
-          schedule={schedule}
-          onClose={() => setModalMode(null)}
+          round={modalMode === "reschedule" ? activeRound : null}
+          isSubmitting={modalMode === "reschedule" ? rescheduleMutation.isPending : scheduleMutation.isPending}
+          onClose={() => {
+            setModalMode(null);
+            setActiveRound(null);
+          }}
           onSubmit={modalMode === "reschedule" ? handleRescheduleSubmit : handleScheduleSubmit}
         />
       )}
 
-      {cancelOpen && <CancelInterviewModal onClose={() => setCancelOpen(false)} onConfirm={handleCancelConfirm} />}
+      {cancelTarget && (
+        <CancelInterviewModal
+          candidateName={candidate?.name}
+          round={cancelTarget}
+          isSubmitting={cancelMutation.isPending}
+          onClose={() => setCancelTarget(null)}
+          onConfirm={handleCancelConfirm}
+        />
+      )}
+
+      {editInterviewersTarget && (
+        <EditInterviewersModal
+          round={editInterviewersTarget}
+          isSubmitting={rescheduleMutation.isPending}
+          onClose={() => setEditInterviewersTarget(null)}
+          onSubmit={handleEditInterviewersSubmit}
+        />
+      )}
     </div>
   );
 }
