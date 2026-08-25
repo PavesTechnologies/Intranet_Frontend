@@ -175,6 +175,7 @@ const RoleOffSidePanel = ({
   onRmReject,
   onApprove,
   onReject,
+  onCancel,
 }) => {
   const [form, setForm] = useState(baseForm);
   const [error, setError] = useState("");
@@ -359,6 +360,10 @@ const RoleOffSidePanel = ({
           reviewConfirmed: form.reviewConfirmed,
         });
         // console.log("SUBMIT RESPONSE:", response);
+        if (response?.handledByModal) {
+          onClose?.();
+          return;
+        }
         if (response?.requiresConfirmation && !form.reviewConfirmed) {
           setReviewState(response);
           setForm((prev) => ({

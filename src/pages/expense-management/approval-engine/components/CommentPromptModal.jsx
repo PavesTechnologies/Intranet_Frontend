@@ -14,11 +14,12 @@ export default function CommentPromptModal({
   contextLabel,
   confirmLabel = "Confirm",
   confirmVariant = "primary",
+  initialValue = "",
   onConfirm,
   onCancel,
   isLoading,
 }) {
-  const [comment, setComment] = useState("");
+  const [comment, setComment] = useState(initialValue);
 
   if (!isOpen) return null;
 

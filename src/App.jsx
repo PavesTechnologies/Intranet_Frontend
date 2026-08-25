@@ -42,8 +42,11 @@ import InvoiceDetailPage from "./pages/accounts-payable/invoice/pages/InvoiceDet
 import PaymentReadyPage from "./pages/accounts-payable/payment/pages/PaymentReadyPage.jsx";
 import PaymentHistoryPage from "./pages/accounts-payable/payment/pages/PaymentHistoryPage.jsx";
 import PaymentMarkAsPaidPage from "./pages/accounts-payable/payment/pages/PaymentMarkAsPaidPage.jsx";
+import PaymentQueuePage from "./pages/accounts-payable/payment/pages/PaymentQueuePage.jsx";
+import PaymentDetailsPage from "./pages/accounts-payable/payment/pages/PaymentDetailsPage.jsx";
 import APReportsPage from "./pages/accounts-payable/reports/pages/APReportsPage.jsx";
 import APSettingsPage from "./pages/accounts-payable/settings/pages/APSettingsPage.jsx";
+import SystemConfigurationPage from "./pages/accounts-payable/system-configuration/pages/SystemConfigurationPage.jsx";
 
 
 // Resource Management
@@ -195,8 +198,7 @@ import XmsOcrProcessingPage from "./pages/expense-management/pages/receipts/OcrP
 import XmsRequestAdvancePage from "./pages/expense-management/pages/cash-advance/RequestAdvancePage.jsx";
 import XmsMyAdvancesPage from "./pages/expense-management/pages/cash-advance/MyAdvancesPage.jsx";
 import XmsSettlementPage from "./pages/expense-management/pages/cash-advance/SettlementPage.jsx";
-import XmsPendingApprovalsPage from "./pages/expense-management/approval-engine/pages/PendingApprovalsPage.jsx";
-import XmsApprovalHistoryPage from "./pages/expense-management/approval-engine/pages/ApprovalHistoryPage.jsx";
+import XmsApprovalsPage from "./pages/expense-management/approval-engine/pages/ApprovalsPage.jsx";
 import XmsApprovalFlowsPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowsPage.jsx";
 import XmsApprovalFlowBuilderPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowBuilderPage.jsx";
 import XmsCatchAllFlowPage from "./pages/expense-management/approval-engine/pages/CatchAllFlowPage.jsx";
@@ -205,6 +207,7 @@ import XmsDelegationsPage from "./pages/expense-management/approval-engine/pages
 import XmsVerificationPage from "./pages/expense-management/pages/finance/VerificationPage.jsx";
 import XmsReimbursementsPage from "./pages/expense-management/pages/finance/ReimbursementsPage.jsx";
 import XmsPaymentStatusPage from "./pages/expense-management/pages/finance/PaymentStatusPage.jsx";
+import XmsApPaymentQueuePage from "./pages/expense-management/pages/ap-payments/ApPaymentQueuePage.jsx";
 import XmsBillableExpensesPage from "./pages/expense-management/pages/client-billing/BillableExpensesPage.jsx";
 import XmsInvoiceHandoffPage from "./pages/expense-management/pages/client-billing/InvoiceHandoffPage.jsx";
 import XmsInvoiceStatusPage from "./pages/expense-management/pages/client-billing/InvoiceStatusPage.jsx";
@@ -282,6 +285,10 @@ import AccountReceivableDashboard from "./pages/account_receivable/pages/Dashboa
 import Overview from "./pages/account_receivable/pages/Overview.jsx";
 import BillingConfigurations from "./pages/account_receivable/pages/BillingConfigurations.jsx";
 import NewConfigurationWizard from "./pages/account_receivable/pages/NewConfigurationWizard.jsx";
+import BillingDataAcquisition from "./pages/account_receivable/pages/BillingDataAcquisition.jsx";
+import AcquisitionDetail from "./pages/account_receivable/pages/AcquisitionDetail.jsx";
+import TaxConfiguration from "./pages/account_receivable/pages/TaxConfiguration.jsx";
+import TaxCalculationPage from "./pages/account_receivable/pages/TaxCalculation.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -368,12 +375,12 @@ const ProjectManager = () => {
 const RoleOffEntry = () => {
   const { user } = useAuth();
 
-  if (user?.roles?.includes("Delivery_Manager")) {
-    return <Navigate to="/resource-management/roleoff/dm" replace />;
-  }
-
   if (user?.roles?.includes("Resource_Manager")) {
     return <Navigate to="/resource-management/roleoff/rm" replace />;
+  }
+
+  if (user?.roles?.includes("Delivery_Manager")) {
+    return <Navigate to="/resource-management/roleoff/dm" replace />;
   }
 
   return <Navigate to="/resource-management/roleoff/pm" replace />;
@@ -524,6 +531,22 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path={AP_ROUTES.PAYMENT_QUEUE}
+            element={
+              <ProtectedRoute allowedRoles={["AP_Executive", "Admin", "Super_Admin"]}>
+                <PaymentQueuePage />
+              </ProtectedRoute>
+            }
+          />
+          {/* <Route
+            path={AP_ROUTES.PAYMENT_QUEUE_DETAIL()}
+            element={
+              <ProtectedRoute allowedRoles={["AP_Executive", "Admin", "Super_Admin"]}>
+                <PaymentDetailsPage />
+              </ProtectedRoute>
+            }
+          /> */}
+          <Route
             path={AP_ROUTES.PAYMENT_READY}
             element={
               <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
@@ -560,6 +583,14 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
                 <APSettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.SYSTEM_CONFIG}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <SystemConfigurationPage />
               </ProtectedRoute>
             }
           />
@@ -619,8 +650,31 @@ const AppRoutes = () => {
               path="project-billing-setup/configurations/:configId"
               element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><NewConfigurationWizard /></ProtectedRoute>}
             />
+            <Route
+              path="billing-data-acquisition"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingDataAcquisition /></ProtectedRoute>}
+            />
+            <Route
+              path="billing-data-acquisition/workspace"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingDataAcquisition /></ProtectedRoute>}
+            />
+            <Route
+              path="billing-data-acquisition/:projectId"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><AcquisitionDetail /></ProtectedRoute>}
+            />
+            <Route
+              path="tax-configuration"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxConfiguration /></ProtectedRoute>}
+            />
+            <Route
+              path="tax-calculation"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxCalculationPage /></ProtectedRoute>}
+            />
+            <Route
+              path="tax-calculation/:snapshotId"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxCalculationPage /></ProtectedRoute>}
+            />
             {/* Configuration history removed — not supported by backend */}
-            {/* Removed unsupported billing data & tool management pages — not backed by BillingConfigurationController */}
           </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />
           <Route path="/profile" element={<Profile />} />
@@ -1435,9 +1489,10 @@ const AppRoutes = () => {
           {/* No role gate (§1.5): any employee can be a resolved approver (NAMED_USER/DEPARTMENT_OWNER/
               COST_CENTER_OWNER), not just "Manager" - the backend itself has no role restriction on
               these endpoints either, "My Approvals" is presence-based, not role-based. */}
-          <Route path="/expense-management/approvals/pending" element={<ProtectedRoute><XmsPendingApprovalsPage /></ProtectedRoute>} />
-          <Route path="/expense-management/approvals/approved" element={<ProtectedRoute><XmsApprovalHistoryPage outcome="APPROVED" title="Approved" breadcrumbLabel="Approved" /></ProtectedRoute>} />
-          <Route path="/expense-management/approvals/rejected" element={<ProtectedRoute><XmsApprovalHistoryPage outcome="REJECTED" title="Rejected" breadcrumbLabel="Rejected" /></ProtectedRoute>} />
+          <Route path="/expense-management/approvals/pending" element={<Navigate to="/expense-management/approvals" replace />} />
+          <Route path="/expense-management/approvals/approved" element={<Navigate to="/expense-management/approvals" replace />} />
+          <Route path="/expense-management/approvals/rejected" element={<Navigate to="/expense-management/approvals" replace />} />
+          <Route path="/expense-management/approvals" element={<ProtectedRoute><XmsApprovalsPage /></ProtectedRoute>} />
 
           {/* Approval Rules (Admin config) - ADMIN-only, matching the Masters section's own role gate. */}
           <Route path="/expense-management/approval-rules/flows" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsApprovalFlowsPage /></ProtectedRoute>} />
@@ -1447,13 +1502,14 @@ const AppRoutes = () => {
           <Route path="/expense-management/approval-rules/department-approvers" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsDepartmentApproversPage /></ProtectedRoute>} />
           <Route path="/expense-management/approval-rules/delegations" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsDelegationsPage /></ProtectedRoute>} />
 
-          <Route path="/expense-management/finance/verification" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsVerificationPage /></ProtectedRoute>} />
-          <Route path="/expense-management/finance/reimbursements" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsReimbursementsPage /></ProtectedRoute>} />
-          <Route path="/expense-management/finance/payment-status" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsPaymentStatusPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/verification" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsVerificationPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/reimbursements" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsReimbursementsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/payment-status" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsPaymentStatusPage /></ProtectedRoute>} />
+          <Route path="/expense-management/ap-payments/queue" element={<ProtectedRoute allowedRoles={["AP_Executive"]}><XmsApPaymentQueuePage /></ProtectedRoute>} />
 
-          <Route path="/expense-management/client-billing/billable-expenses" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsBillableExpensesPage /></ProtectedRoute>} />
-          <Route path="/expense-management/client-billing/invoice-handoff" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsInvoiceHandoffPage /></ProtectedRoute>} />
-          <Route path="/expense-management/client-billing/invoice-status" element={<ProtectedRoute allowedRoles={["Finance"]}><XmsInvoiceStatusPage /></ProtectedRoute>} />
+          <Route path="/expense-management/client-billing/billable-expenses" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsBillableExpensesPage /></ProtectedRoute>} />
+          <Route path="/expense-management/client-billing/invoice-handoff" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsInvoiceHandoffPage /></ProtectedRoute>} />
+          <Route path="/expense-management/client-billing/invoice-status" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsInvoiceStatusPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/masters/expense-categories" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsExpenseCategoriesPage /></ProtectedRoute>} />
           <Route path="/expense-management/masters/gl-accounts" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsGlAccountsPage /></ProtectedRoute>} />

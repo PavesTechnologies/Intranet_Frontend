@@ -97,6 +97,14 @@ const accountReceivableSubmenu = [
       },
     ],
   },
+  {
+    label: "Tax Configuration",
+    to: "/account-receivable/tax-configuration",
+  },
+  {
+    label: "Tax Calculation",
+    to: "/account-receivable/tax-calculation",
+  },
 ];
 
 const airsSubmenu = [
@@ -180,7 +188,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   // Whole-module gate: unlike EO/XMS (which have no top-level gate because at least one of
   // their items has no allowedRoles), AP must stay fully invisible outside AP_ALL_ROLES —
   // same requirement as Account Receivable's isSuperAdmin gate below.
-  const isApUser = hasRole(AP_ALL_ROLES);
+  const isApUser = hasRole(["AP_Executive", "Admin", "Super_Admin"]);
   const isRM = hasRole(["RESOURCE_MANAGER"]);
   const isPM = hasRole(["PROJECT_MANAGER"]);
   const isDM = hasRole(["DELIVERY_MANAGER"]);

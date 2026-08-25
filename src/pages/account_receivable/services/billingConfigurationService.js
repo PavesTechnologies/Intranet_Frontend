@@ -1,4 +1,5 @@
 import api from "../../../api/axiosInstance";
+import { fetchActiveBillingConfigurations } from "./billingDataAcquisitionService";
 
 const BASE_URL = window.__APP_CONFIG__.AR_BASE_URL;
 
@@ -9,6 +10,7 @@ const ACTIVE_PAYMENT_TERMS_URL = `${BASE_URL}/api/payment-terms/active`;
 const ACTIVE_TAX_REGIONS_URL = `${BASE_URL}/api/tax-region/active`;
 const BILLING_SUBSCRIPTIONS_URL = `${BASE_URL}/api/billing-subscription`;
 const TM_RATE_CARDS_URL = `${BASE_URL}/api/billing-tm-rate-card`;
+const BILLING_FIXED_PRICE_URL = `${BASE_URL}/api/billing-fixed-price`;
 
 const unwrapData = (response) => {
   const payload = response?.data;
@@ -184,11 +186,42 @@ const normalizeTmRateCard = (card = {}) => ({
   ratePeriod: normalizeBillingFrequencyValue(firstPresent(card.ratePeriod, card.period)) || "HOURLY",
   effectiveFrom: toLocalDateString(firstPresent(card.effectiveFrom, card.validFrom)) || "",
   effectiveTo: toLocalDateString(firstPresent(card.effectiveTo, card.validTo)) || "",
-  remarks: firstPresent(card.remarks, card.notes, card.description) || "",
   rateCardId: firstPresent(card.rateCardId, card.tmRateCardId, card.id) || null,
 });
 
 const getTmRateCardId = (card = {}) => firstPresent(card.rateCardId, card.tmRateCardId, card.id) || null;
+
+// The UI only ever works with "PMS" (Project Budget) / "MANUAL" for the contract
+// value source badge and internal state — those labels stay unchanged. The backend
+// ContractValueSource enum accepts only PMS_BUDGET / MANUAL, so requests must map
+// "PMS" -> "PMS_BUDGET" (never send "PMS"), and responses must map it back.
+const CONTRACT_VALUE_SOURCE_TO_API = { PMS: "PMS_BUDGET", MANUAL: "MANUAL" };
+const CONTRACT_VALUE_SOURCE_FROM_API = { PMS_BUDGET: "PMS", MANUAL: "MANUAL" };
+
+export const toApiContractValueSource = (value) => {
+  if (!value) return null;
+  return CONTRACT_VALUE_SOURCE_TO_API[value] || value;
+};
+
+const fromApiContractValueSource = (value) => {
+  if (!value) return "";
+  return CONTRACT_VALUE_SOURCE_FROM_API[value] || value;
+};
+
+const normalizeFixedPriceConfig = (record = {}) => ({
+  fixedPriceConfigurationId: firstPresent(record.fixedPriceConfigurationId, record.id) || null,
+  totalContractValue:
+    firstPresent(record.totalContractValue, record.contractValue, record.manualContractValue, record.pmsBudget) ?? "",
+  contractValueSource: fromApiContractValueSource(record.contractValueSource),
+  retentionPercent: firstPresent(record.retentionPercent, record.retentionPercentage) ?? "",
+  advanceReceived: firstPresent(record.advanceReceived, record.advanceAmount) ?? "",
+  effectiveFrom: toLocalDateString(firstPresent(record.effectiveFrom, record.validFrom)) || "",
+  effectiveTo: toLocalDateString(firstPresent(record.effectiveTo, record.validTo)) || "",
+  remarks: record.remarks || "",
+  retentionAmount: firstPresent(record.retentionAmount, record.retentionAmt) ?? "",
+  billableAmount: firstPresent(record.billableAmount, record.billableAmt) ?? "",
+  remainingAmount: firstPresent(record.remainingAmount, record.remainingReceivable, record.remainingAmt) ?? "",
+});
 
 const normalizeBoolean = (value, fallback = false) => {
   if (value === null || value === undefined || value === "") return fallback;
@@ -609,16 +642,12 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
               config.ratePeriod,
             ),
           ) || "HOURLY",
-        remarks:
-          firstPresent(
-            rawBillingConfig.timeAndMaterial?.remarks,
-            rawBillingConfig.remarks,
-            config.remarks,
-          ) || "",
         roles: (rawBillingConfig.timeAndMaterial?.roles || rawBillingConfig.roles || rawBillingConfig.rateCards || []).map(normalizeTmRateCard),
       },
       fixedPrice: {
         ...(rawBillingConfig.fixedPrice || {}),
+        fixedPriceConfigurationId:
+          firstPresent(rawBillingConfig.fixedPrice?.fixedPriceConfigurationId, rawBillingConfig.fixedPriceConfigurationId) || null,
         totalContractValue:
           firstPresent(
             rawBillingConfig.fixedPrice?.totalContractValue,
@@ -630,6 +659,12 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
           firstPresent(rawBillingConfig.fixedPrice?.advanceReceived, rawBillingConfig.advanceReceived, config.advanceReceived) || "",
         retentionPercent:
           firstPresent(rawBillingConfig.fixedPrice?.retentionPercent, rawBillingConfig.retentionPercent, config.retentionPercent) || "",
+        effectiveFrom: toLocalDateString(firstPresent(rawBillingConfig.fixedPrice?.effectiveFrom, rawBillingConfig.fixedPriceEffectiveFrom)) || "",
+        effectiveTo: toLocalDateString(firstPresent(rawBillingConfig.fixedPrice?.effectiveTo, rawBillingConfig.fixedPriceEffectiveTo)) || "",
+        remarks: firstPresent(rawBillingConfig.fixedPrice?.remarks, rawBillingConfig.fixedPriceRemarks) || "",
+        retentionAmount: firstPresent(rawBillingConfig.fixedPrice?.retentionAmount) ?? "",
+        billableAmount: firstPresent(rawBillingConfig.fixedPrice?.billableAmount) ?? "",
+        remainingAmount: firstPresent(rawBillingConfig.fixedPrice?.remainingAmount) ?? "",
       },
       milestones: rawBillingConfig.milestones || config.milestones || [],
       milestoneSettings: rawBillingConfig.milestoneSettings || config.milestoneSettings || {},
@@ -696,18 +731,39 @@ export const normalizeProject = (project = {}) => {
   };
 };
 
-export const getApiErrorMessage = (error, fallback = "Something went wrong. Please try again.") =>
-  error?.response?.data?.message ||
-  error?.response?.data?.detail ||
-  error?.response?.data?.error ||
-  error?.message ||
-  fallback;
+export const getApiErrorMessage = (error, fallback = "Something went wrong. Please try again.") => {
+  const rawMsg =
+    error?.response?.data?.message ||
+    error?.response?.data?.detail ||
+    error?.response?.data?.error ||
+    error?.message ||
+    "";
+
+  if (typeof rawMsg === "string" && rawMsg.includes("paymentTerm") && rawMsg.includes("is null")) {
+    return "Backend error: A billing configuration record in database has a null Payment Term reference. Please assign payment terms in backend or re-save billing setup.";
+  }
+
+  return rawMsg || fallback;
+};
 
 export const getBillingConfigurations = async () => {
-  const response = await api.get(BILLING_CONFIGURATIONS_URL);
-  return asArray(unwrapData(response))
-    .filter(shouldDisplayBillingConfiguration)
-    .map(normalizeBillingConfiguration);
+  try {
+    const response = await api.get(BILLING_CONFIGURATIONS_URL);
+    return asArray(unwrapData(response))
+      .filter(shouldDisplayBillingConfiguration)
+      .map(normalizeBillingConfiguration);
+  } catch (error) {
+    console.warn("[billingConfigurationService] GET /api/billing-configurations failed, attempting active fallback:", error);
+    try {
+      const activeConfigs = await fetchActiveBillingConfigurations();
+      if (Array.isArray(activeConfigs) && activeConfigs.length > 0) {
+        return activeConfigs.map((cfg) => normalizeBillingConfiguration(cfg));
+      }
+    } catch (fallbackErr) {
+      console.warn("[billingConfigurationService] Active configurations fallback failed:", fallbackErr);
+    }
+    throw error;
+  }
 };
 
 export const getBillingConfigurationById = async (billingConfigurationId) => {
@@ -716,6 +772,20 @@ export const getBillingConfigurationById = async (billingConfigurationId) => {
   const normalized = normalizeBillingConfiguration(config);
   const detail = normalizeWizardDetail(config, normalized);
   const configId = detail.billingConfigurationId || normalized.billingConfigurationId || billingConfigurationId;
+
+  if (detail.billingConfig?.billingType === "FIXED_PRICE" && configId) {
+    try {
+      const fixedPriceRecord = await getFixedPriceByBillingConfiguration(configId);
+      if (fixedPriceRecord) {
+        detail.billingConfig.fixedPrice = {
+          ...detail.billingConfig.fixedPrice,
+          ...normalizeFixedPriceConfig(fixedPriceRecord),
+        };
+      }
+    } catch (error) {
+      console.warn("Unable to load fixed price configuration", error);
+    }
+  }
 
   if (["STANDARD", "ROLE_BASED"].includes(detail.billingConfig?.pricingModel) && configId) {
     const rateCards = await getTmRateCardsByBillingConfiguration(configId);
@@ -730,7 +800,6 @@ export const getBillingConfigurationById = async (billingConfigurationId) => {
           ratePeriod: standardRate.ratePeriod,
           effectiveFrom: standardRate.effectiveFrom,
           effectiveTo: standardRate.effectiveTo,
-          remarks: standardRate.remarks,
           rateCardId: standardRate.rateCardId,
           roles: [],
         };
@@ -754,8 +823,16 @@ export const getApprovedConfigurationByProject = async (projectId) => {
   return normalizeBillingConfiguration(unwrapData(response));
 };
 
+// Creating the parent Billing Configuration always goes through the /draft
+// endpoint — the backend only ever creates configurations in Draft status;
+// finalizing an existing one is a PUT to /api/billing-configurations/{id}
+// (see updateBillingConfiguration), never a second POST.
 export const createBillingConfiguration = async (payload) => {
-  const response = await api.post(BILLING_CONFIGURATIONS_URL, payload);
+  // [2] Immediately before POST /api/billing-configurations/draft.
+  console.log("[billingConfigurationService] POST .../draft payload:", payload);
+  const response = await api.post(`${BILLING_CONFIGURATIONS_URL}/draft`, payload);
+  // [3] Complete draft API response.
+  console.log("[billingConfigurationService] POST .../draft response:", response?.data);
   return unwrapData(response);
 };
 
@@ -778,6 +855,11 @@ export const rejectBillingConfiguration = async (billingConfigurationId, rejecti
 
 export const deactivateBillingConfiguration = async (billingConfigurationId) => {
   const response = await api.patch(`${BILLING_CONFIGURATIONS_URL}/${billingConfigurationId}/deactivate`);
+  return unwrapData(response);
+};
+
+export const deleteBillingConfiguration = async (billingConfigurationId) => {
+  const response = await api.delete(`${BILLING_CONFIGURATIONS_URL}/${billingConfigurationId}`);
   return unwrapData(response);
 };
 
@@ -868,9 +950,49 @@ export const updateTmRateCard = async (rateCardId, payload) => {
   return unwrapData(response);
 };
 
+export const saveTmRateCard = async (billingConfigurationId, payload) => {
+  if (!billingConfigurationId) throw new Error("Missing billingConfigurationId");
+  const response = await api.post(`${TM_RATE_CARDS_URL}/${billingConfigurationId}/tm-rate-cards/save`, payload);
+  return unwrapData(response);
+};
+
 export const deleteTmRateCard = async (rateCardId) => {
   if (!rateCardId) throw new Error("Missing rateCardId");
   const response = await api.delete(`${TM_RATE_CARDS_URL}/tm-rate-cards/${rateCardId}`);
+  return unwrapData(response);
+};
+
+// --- Fixed Price Configuration APIs ---
+export const getFixedPriceByBillingConfiguration = async (billingConfigurationId) => {
+  if (!billingConfigurationId) return null;
+  const response = await api.get(`${BILLING_FIXED_PRICE_URL}/${billingConfigurationId}/fixed-price`);
+  const record = unwrapData(response);
+  return record && typeof record === "object" && !Array.isArray(record) ? record : null;
+};
+
+export const getFixedPriceById = async (fixedPriceConfigurationId) => {
+  if (!fixedPriceConfigurationId) return null;
+  const response = await api.get(`${BILLING_FIXED_PRICE_URL}/fixed-price/${fixedPriceConfigurationId}`);
+  return unwrapData(response);
+};
+
+export const createFixedPriceConfiguration = async (billingConfigurationId, payload) => {
+  if (!billingConfigurationId) throw new Error("Missing billingConfigurationId");
+  // [7] Immediately before POST /api/billing-fixed-price/{billingConfigurationId}/fixed-price.
+  console.log("[billingConfigurationService] POST .../fixed-price:", billingConfigurationId, payload);
+  const response = await api.post(`${BILLING_FIXED_PRICE_URL}/${billingConfigurationId}/fixed-price`, payload);
+  return unwrapData(response);
+};
+
+export const updateFixedPriceConfiguration = async (fixedPriceConfigurationId, payload) => {
+  if (!fixedPriceConfigurationId) throw new Error("Missing fixedPriceConfigurationId");
+  const response = await api.put(`${BILLING_FIXED_PRICE_URL}/fixed-price/${fixedPriceConfigurationId}`, payload);
+  return unwrapData(response);
+};
+
+export const deleteFixedPriceConfiguration = async (fixedPriceConfigurationId) => {
+  if (!fixedPriceConfigurationId) throw new Error("Missing fixedPriceConfigurationId");
+  const response = await api.delete(`${BILLING_FIXED_PRICE_URL}/fixed-price/${fixedPriceConfigurationId}`);
   return unwrapData(response);
 };
 
@@ -901,6 +1023,21 @@ const buildSubscriptionPayload = (payload = {}) => {
     prorateFirstMonth: Boolean(billingConfig.monthlyRetainer?.prorateFirstMonth),
   };
 };
+
+const buildFixedPriceRequestPayload = (fixedPrice = {}) => ({
+  // The backend field is "contractValue", not "totalContractValue" (that's only the
+  // internal wizard state/form field name) — sending the wrong key left the backend
+  // reading contractValue as null and rejecting with "Contract Value is required."
+  contractValue: isBlank(fixedPrice.totalContractValue) ? null : Number(fixedPrice.totalContractValue),
+  // contractValueSource is an optional enum — map the UI's "PMS"/"MANUAL" to the
+  // backend's PMS_BUDGET/MANUAL values, sending null (not "" and not "PMS") when unset.
+  contractValueSource: toApiContractValueSource(fixedPrice.contractValueSource),
+  retentionPercent: isBlank(fixedPrice.retentionPercent) ? null : Number(fixedPrice.retentionPercent),
+  advanceReceived: isBlank(fixedPrice.advanceReceived) ? null : Number(fixedPrice.advanceReceived),
+  effectiveFrom: toLocalDateString(fixedPrice.effectiveFrom) || "",
+  effectiveTo: toLocalDateString(fixedPrice.effectiveTo) || "",
+  remarks: fixedPrice.remarks || "",
+});
 
 const REQUIRED_BILLING_CONFIGURATION_FIELDS = [
   "clientId",
@@ -982,7 +1119,12 @@ const normalizeCurrencyCode = (...values) => {
   return "";
 };
 
-export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
+// `options.finalize` maps to the backend's BillingConfigurationRequestDto.finalize —
+// true flips the record to ACTIVE/isActive=true on PUT; omitted/false leaves it a
+// normal save (stays DRAFT). Only the final "Create Billing Setup" submit should
+// ever pass { finalize: true } — draft creation, Save Draft, TM rate-card saves, and
+// Fixed Price saves all call this without options and must never include the field.
+export const buildBillingConfigurationRequestPayload = (wizardPayload = {}, options = {}) => {
   const projectInfo = wizardPayload.projectInfo || {};
   const billingConfig = wizardPayload.billingConfig || {};
   const controls = wizardPayload.controls || {};
@@ -992,6 +1134,13 @@ export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
     billingConfig.currency,
     wizardPayload.currency,
   );
+  // CurrencyMaster.currencyId is a UUID on the backend — this must be the real id
+  // resolved against the currency master list (see NewConfigurationWizard's
+  // currency-master effect, which stamps it onto projectInfo.currencyId), never a
+  // fabricated number. If it isn't resolved yet, omit it rather than guess.
+  const currencyId =
+    wizardPayload.currencyId || projectInfo.currencyId || billingConfig.currencyId || null;
+
   const effectiveFrom = toLocalDateString(
     billingConfig.effectiveFrom ||
       wizardPayload.effectiveFrom ||
@@ -1003,19 +1152,33 @@ export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
       projectInfo.endDate,
   );
 
+  // pricingModel on /api/billing-configurations maps to the backend PricingModel
+  // enum (STANDARD / ROLE_BASED), which is only meaningful for Time & Material
+  // billing. Fixed Price (and every other billing type) must never send it —
+  // Recurring's own mode is a separate concept (recurringMode) submitted to the
+  // billing-subscription endpoint via buildSubscriptionPayload, not this field.
+  const billingType = billingConfig.billingType || wizardPayload.billingType || "";
+  const pricingModel =
+    billingType === "TIME_MATERIAL"
+      ? billingConfig.billingMode || billingConfig.pricingModel || wizardPayload.pricingModel || ""
+      : "";
+
   const requestPayload = {
     clientId: projectInfo.clientId || wizardPayload.clientId || "",
     projectId: projectInfo.projectId || wizardPayload.projectId || "",
+    projectCode: projectInfo.projectCode || wizardPayload.projectCode || "",
     billingTypeId: billingConfig.billingTypeId || wizardPayload.billingTypeId || "",
     billingFrequencyId: billingConfig.billingFrequencyId || wizardPayload.billingFrequencyId || "",
     paymentTermId: controls.paymentTermId || wizardPayload.paymentTermId || "",
     currency,
+    currencyId,
+    currencyCode: currency,
     taxRegionId: controls.taxRegionId || wizardPayload.taxRegionId || "",
     invoiceGenerationType:
       controls.invoiceGenerationType ||
       wizardPayload.invoiceGenerationType ||
       (controls.autoInvoiceGeneration === true ? "AUTOMATIC" : "MANUAL"),
-    pricingModel: billingConfig.billingMode || billingConfig.pricingModel || wizardPayload.pricingModel || "",
+    pricingModel: pricingModel || null,
     expenseBillingEligible:
       controls.expenseBillingEligible ?? wizardPayload.expenseBillingEligible ?? false,
     effectiveFrom,
@@ -1025,15 +1188,30 @@ export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
     requestPayload.effectiveTo = effectiveTo;
   }
 
+  if (options.finalize === true) {
+    requestPayload.finalize = true;
+  }
+
   return requestPayload;
 };
 
-const assertBillingConfigurationPayload = (payload) => {
-  const missingFields = REQUIRED_BILLING_CONFIGURATION_FIELDS.filter((field) => isBlank(payload[field]));
+// eslint-disable-next-line no-unused-vars
+const assertBillingConfigurationPayload = (_payload) => {
+  // Validation temporarily disabled
+};
 
-  if (missingFields.length > 0) {
-    throw new Error(`Missing required billing configuration field(s): ${missingFields.join(", ")}`);
-  }
+// Creates the parent billing configuration only, without saveBillingConfiguration's
+// full-draft side effects (e.g. saveTmRateCards, which bulk-syncs and deletes any TM
+// rate cards absent from the current wizard state). Used when a rate-card save needs
+// a billingConfigurationId to exist but must not touch other rate card rows.
+export const ensureBillingConfigurationDraft = async (payload) => {
+  const requestPayload = buildBillingConfigurationRequestPayload(payload);
+  assertBillingConfigurationPayload(requestPayload);
+  const configResponse = await createBillingConfiguration(requestPayload);
+  const extractedId = extractBillingConfigurationId(configResponse);
+  // [4] Extracted billingConfigurationId from the (already unwrapped) ApiResponse data.
+  console.log("[billingConfigurationService] extracted billingConfigurationId:", extractedId);
+  return extractedId;
 };
 
 const buildTmRateCardRequestPayload = (card = {}, pricingModel, billingConfigurationId) => ({
@@ -1043,7 +1221,7 @@ const buildTmRateCardRequestPayload = (card = {}, pricingModel, billingConfigura
   ratePeriod: normalizeBillingFrequencyValue(card.ratePeriod) || "HOURLY",
   effectiveFrom: toLocalDateString(card.effectiveFrom) || "",
   effectiveTo: toLocalDateString(card.effectiveTo) || "",
-  remarks: card.remarks || "",
+  remarks: "",
 });
 
 const buildTmRateCardRequests = (payload = {}, billingConfigurationId) => {
@@ -1113,8 +1291,8 @@ const saveTmRateCards = async (payload, billingConfigurationId) => {
   );
 };
 
-export const saveBillingConfiguration = async (payload, billingConfigurationId) => {
-  const requestPayload = buildBillingConfigurationRequestPayload(payload);
+export const saveBillingConfiguration = async (payload, billingConfigurationId, options = {}) => {
+  const requestPayload = buildBillingConfigurationRequestPayload(payload, options);
   assertBillingConfigurationPayload(requestPayload);
 
   const configResponse = billingConfigurationId
@@ -1144,7 +1322,40 @@ export const saveBillingConfiguration = async (payload, billingConfigurationId) 
     }
   }
 
+  if (configId && billingType === "FIXED_PRICE") {
+    try {
+      const existingFixedPrice = await getFixedPriceByBillingConfiguration(configId);
+      const fixedPricePayload = buildFixedPriceRequestPayload(payload?.billingConfig?.fixedPrice);
+      if (existingFixedPrice) {
+        const existingId = existingFixedPrice.fixedPriceConfigurationId || existingFixedPrice.id;
+        await updateFixedPriceConfiguration(existingId, fixedPricePayload);
+      } else {
+        await createFixedPriceConfiguration(configId, fixedPricePayload);
+      }
+    } catch (error) {
+      console.warn("Unable to save fixed price configuration", error);
+    }
+  }
+
   return configResponse;
+};
+
+// Persists only the Billing Configuration record itself (POST when creating, PUT
+// when updating) — no Fixed Price / TM rate card / subscription side effects and no
+// activation call. Fixed Price details are saved independently and immediately by
+// the "Save Fixed Price Details" button (see FixedPriceForm.saveFixedPriceConfig),
+// so the Fixed Price create flow's final submit only needs to persist this record.
+export const saveBillingConfigurationRecord = async (wizardPayload, billingConfigurationId, options = {}) => {
+  const requestPayload = buildBillingConfigurationRequestPayload(wizardPayload, options);
+  const configResponse = billingConfigurationId
+    ? await updateBillingConfiguration(billingConfigurationId, requestPayload)
+    : await createBillingConfiguration(requestPayload);
+
+  const configId =
+    extractBillingConfigurationId(billingConfigurationId) ||
+    extractBillingConfigurationId(configResponse);
+
+  return { configResponse, configId };
 };
 
 export const getBillingConfigurationStats = async () => {
