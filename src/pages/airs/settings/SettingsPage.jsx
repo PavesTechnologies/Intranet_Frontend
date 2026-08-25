@@ -1,13 +1,42 @@
-import React from "react";
+import React, { useEffect } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "react-toastify";
 import { Settings as SettingsIcon } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import useAirsSettings from "./hooks/useAirsSettings";
 import SettingsSystemInfo from "./components/SettingsSystemInfo";
 import SettingsWeightConfig from "./components/SettingsWeightConfig";
 import SettingsToggles from "./components/SettingsToggles";
+import SettingsIntegrations from "./components/SettingsIntegrations";
+
+const PROVIDER_LABEL = { microsoft: "Microsoft Calendar", google: "Google Calendar" };
 
 export default function SettingsPage() {
   const { settings, setField, isDirty, save, reset } = useAirsSettings();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // The OAuth callback redirects back here as
+  // ?connected=microsoft&status=success|error — surface that once, then
+  // strip the params so a page refresh doesn't re-show the toast.
+  useEffect(() => {
+    const connected = searchParams.get("connected");
+    const status = searchParams.get("status");
+    if (!connected) return;
+
+    const label = PROVIDER_LABEL[connected] || connected;
+    if (status === "success") {
+      toast.success(`${label} connected successfully.`);
+    } else if (status === "error") {
+      toast.error(`Couldn't connect ${label}. Please try again.`);
+    }
+
+    navigate(location.pathname, { replace: true });
+    // Deliberately mount-only — this reads whatever the URL was redirected
+    // in with, not anything that should re-run as the user navigates the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
@@ -38,6 +67,10 @@ export default function SettingsPage() {
       <div className="grid md:grid-cols-2 gap-5">
         <SettingsWeightConfig />
         <SettingsToggles settings={settings} onChange={setField} />
+      </div>
+
+      <div className="mt-5">
+        <SettingsIntegrations />
       </div>
     </div>
   );

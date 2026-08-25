@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../../../expense-management-service/expense-management-service"
+		},
+		{
+			"path": "../.."
+		}
+	],
+	"settings": {
+		"java.configuration.updateBuildConfiguration": "automatic",
+		"java.debug.settings.onBuildFailureProceed": true
+	}
+}

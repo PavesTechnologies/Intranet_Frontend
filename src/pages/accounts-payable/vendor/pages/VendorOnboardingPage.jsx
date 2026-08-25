@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
 import FormInput from "../../../../components/forms/FormInput";
+import FormSelect from "../../../../components/forms/FormSelect";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 import { getApiErrorMessage } from "../../utils/apiError";
@@ -18,7 +19,17 @@ import { AP_ROUTES } from "../../constants/routes";
 import vendorAddressService from "../services/vendorAddressService";
 import vendorTaxService from "../services/vendorTaxService";
 import VendorForm, { DEFAULT_VENDOR_FORM } from "../components/VendorForm";
+import CountrySpecificVendorFields from "../components/CountrySpecificVendorFields";
 import { useCreateVendor } from "../hooks/useVendorMutations";
+import {
+  COUNTRY_KIND,
+  getCountryKind,
+  getCountryLabel,
+  findCurrencyIdByKind,
+  BRAZIL_MOCK_DATA,
+  EMPTY_COUNTRY_FIELDS_BY_KIND,
+  validateCountryFields,
+} from "../config/vendorCountryConfig";
 
 const REQUIRED_FIELDS = ["vendor_name", "country_id"];
 
@@ -59,7 +70,7 @@ const GstSummaryRow = ({ label, value }) => (
 /** Route: /accounts-payable/vendors/onboard */
 export default function VendorOnboardingPage() {
   const navigate = useNavigate();
-  const { countryOptions } = useApLookups();
+  const { countryOptions, currencyOptions } = useApLookups();
   const [formData, setFormData] = useState(DEFAULT_VENDOR_FORM);
   const [errors, setErrors] = useState({});
 
@@ -70,12 +81,101 @@ export default function VendorOnboardingPage() {
   const [gstMapped, setGstMapped] = useState(null); // { vendorFields, addressFields }
   const [isRegistering, setIsRegistering] = useState(false);
 
+  // Country-specific (non-India) vendor fields — Brazil/US/UK/Other, config-driven.
+  // Kept separate from `formData` since none of these map to a backend column yet.
+  const [countryFields, setCountryFields] = useState({});
+  const [countryFieldErrors, setCountryFieldErrors] = useState({});
+  const [cpfCnpjStatus, setCpfCnpjStatus] = useState("idle"); // idle | verifying | verified | error
+  const [cpfCnpjError, setCpfCnpjError] = useState("");
+
   const createMutation = useCreateVendor();
+
+  const countryKind = getCountryKind(countryOptions, formData.country_id);
+  const countryLabel = getCountryLabel(countryOptions, formData.country_id);
+  const isIndiaOrUnselected = countryKind === null || countryKind === COUNTRY_KIND.INDIA;
+
+  // Default the Country dropdown to India once the (async) lookup has loaded,
+  // same India lookup already used at GST-submit time — no country picked yet
+  // is a transient state, not a fourth "kind".
+  useEffect(() => {
+    if (!formData.country_id && countryOptions.length > 0) {
+      const indiaId = findIndiaCountryId(countryOptions);
+      if (indiaId) {
+        setFormData((prev) => (prev.country_id ? prev : { ...prev, country_id: indiaId }));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countryOptions.length]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "country_id") {
+      const nextKind = getCountryKind(countryOptions, value);
+      const currencyId = findCurrencyIdByKind(currencyOptions, nextKind);
+
+      setFormData((prev) => ({
+        ...prev,
+        country_id: value,
+        ...(currencyId !== undefined ? { currency_id: currencyId } : {}),
+      }));
+
+      // Changing country must clear the previous country's mock/registration state —
+      // country-specific values must never leak between countries.
+      setCountryFields(EMPTY_COUNTRY_FIELDS_BY_KIND[nextKind] || {});
+      setCountryFieldErrors({});
+      setCpfCnpjStatus("idle");
+      setCpfCnpjError("");
+
+      if (nextKind !== COUNTRY_KIND.INDIA && nextKind !== null) {
+        setHasRegistrationNumber("no");
+        setGstin("");
+        setGstStatus("idle");
+        setGstError("");
+        setGstMapped(null);
+      }
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+
     setErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const handleCountryFieldChange = (e) => {
+    const { name, value } = e.target;
+    setCountryFields((prev) => ({ ...prev, [name]: value }));
+    setCountryFieldErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const handleVerifyCpfCnpj = () => {
+    if (!countryFields.cpf_cnpj?.trim()) {
+      toast.warning("Enter a CPF or CNPJ to verify.");
+      return;
+    }
+
+    setCpfCnpjStatus("verifying");
+    setCpfCnpjError("");
+
+    // Mock verification only — there is no backend service for Brazilian tax IDs yet.
+    setTimeout(() => {
+      setCountryFields((prev) => ({
+        ...prev,
+        postal_code: BRAZIL_MOCK_DATA.postal_code,
+        number: BRAZIL_MOCK_DATA.number,
+        street: BRAZIL_MOCK_DATA.street,
+        complement: BRAZIL_MOCK_DATA.complement,
+        neighborhood: BRAZIL_MOCK_DATA.neighborhood,
+        city: BRAZIL_MOCK_DATA.city,
+        state: BRAZIL_MOCK_DATA.state,
+      }));
+      setFormData((prev) => ({
+        ...prev,
+        vendor_name: prev.vendor_name?.trim() ? prev.vendor_name : BRAZIL_MOCK_DATA.name,
+      }));
+      setCountryFieldErrors({});
+      setCpfCnpjStatus("verified");
+      toast.success("CPF/CNPJ verified (mock). Vendor address auto-filled.");
+    }, 300);
   };
 
   const handleHasRegistrationNumberChange = (value) => {
@@ -136,9 +236,13 @@ export default function VendorOnboardingPage() {
     e.preventDefault();
     const nextErrors = validateForm(formData);
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
 
-    if (isGstGateBlocking) {
+    const nextCountryFieldErrors = validateCountryFields(countryKind, countryFields);
+    setCountryFieldErrors(nextCountryFieldErrors);
+
+    if (Object.keys(nextErrors).length > 0 || Object.keys(nextCountryFieldErrors).length > 0) return;
+
+    if (isIndiaOrUnselected && isGstGateBlocking) {
       toast.warning("Please verify the GSTIN before registering.");
       return;
     }
@@ -193,6 +297,20 @@ export default function VendorOnboardingPage() {
       <PageHeader title="Register Vendor" subtitle="Add a new vendor master record for Accounts Payable." />
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        <PageCard>
+          <PageCardContent>
+            <FormSelect
+              label="Country *"
+              name="country_id"
+              options={countryOptions}
+              value={formData.country_id}
+              onChange={handleChange}
+              className="max-w-sm"
+            />
+          </PageCardContent>
+        </PageCard>
+
+        {isIndiaOrUnselected && (
         <PageCard>
           <PageCardContent className="space-y-4">
             <h2 className={Fonts.subheading}>GST Registration</h2>
@@ -264,6 +382,60 @@ export default function VendorOnboardingPage() {
             )}
           </PageCardContent>
         </PageCard>
+        )}
+
+        {countryKind === COUNTRY_KIND.BRAZIL && (
+          <PageCard>
+            <PageCardContent className="space-y-4">
+              <h2 className={Fonts.subheading}>Brazil Vendor Registration</h2>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FormInput
+                  label="CPF or CNPJ"
+                  name="cpf_cnpj"
+                  value={countryFields.cpf_cnpj || ""}
+                  onChange={handleCountryFieldChange}
+                  error={countryFieldErrors.cpf_cnpj}
+                  requiredMark
+                />
+                <div className="flex items-end gap-2">
+                  <FormInput
+                    label="Contact Now"
+                    name="contact"
+                    value={countryFields.contact || ""}
+                    onChange={handleCountryFieldChange}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleVerifyCpfCnpj}
+                    loading={cpfCnpjStatus === "verifying"}
+                    loadingText="Verifying..."
+                  >
+                    Verify CPF/CNPJ
+                  </Button>
+                </div>
+              </div>
+
+              {cpfCnpjStatus === "error" && <p className="text-xs text-red-500">{cpfCnpjError}</p>}
+
+              {cpfCnpjStatus === "verified" && (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                    Verification Details (mock)
+                  </p>
+                  <GstSummaryRow label="Logradouro" value={`${countryFields.street}, ${countryFields.number}`} />
+                  <GstSummaryRow label="Bairro" value={countryFields.neighborhood} />
+                  <GstSummaryRow label="City / UF" value={`${countryFields.city} / ${countryFields.state}`} />
+                  <p className="mt-2 text-xs text-emerald-700">
+                    Vendor Name and the address fields below were auto-filled from this mock verification.
+                  </p>
+                </div>
+              )}
+            </PageCardContent>
+          </PageCard>
+        )}
 
         <PageCard>
           <PageCardContent className="space-y-4">
@@ -274,7 +446,19 @@ export default function VendorOnboardingPage() {
               onChange={handleChange}
               mode="create"
               disabledFields={isGstGateBlocking ? ["vendor_name", "pan_number"] : []}
+              hideCountryField
             />
+
+            {countryKind && countryKind !== COUNTRY_KIND.INDIA && (
+              <CountrySpecificVendorFields
+                kind={countryKind}
+                countryLabel={countryLabel}
+                values={countryFields}
+                errors={countryFieldErrors}
+                onChange={handleCountryFieldChange}
+              />
+            )}
+
             <p className="text-xs text-gray-400">
               Addresses, bank accounts, and tax registrations can be added once the vendor is saved.
             </p>

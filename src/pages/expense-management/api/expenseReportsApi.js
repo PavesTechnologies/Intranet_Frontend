@@ -110,6 +110,25 @@ export const receiptService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
+  // Uploads straight to the report (no line item yet) - the entry point for the "Automatic (AI
+  // Scan)" add-line-item flow, as opposed to `upload()` above which attaches to an existing line item.
+  uploadForOcr: (reportId, formData, onUploadProgress) =>
+    api.post(`/xms/employee/expense-reports/${reportId}/receipts`, formData, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+      onUploadProgress,
+    }),
+  getOcrResult: (receiptId) =>
+    api.get(`/xms/employee/receipts/${receiptId}/ocr`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+  // The one place a line item is actually created/linked from a scanned receipt.
+  confirmOcr: (receiptId, payload) =>
+    api.post(`/xms/employee/receipts/${receiptId}/confirm`, payload, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
 };
 
 const normalizeList = (data, key) => {

@@ -112,6 +112,20 @@ export const MILESTONE_STATUS_OPTIONS = [
   { value: "COMPLETED", label: "Completed" },
 ];
 
+// Used only for Standalone (non-PMS) projects, where no currency master-data API
+// exists yet. Enterprise projects always source currency from the synced PMS project.
+export const CURRENCY_OPTIONS = [
+  { value: "", label: "Select currency" },
+  { value: "USD", label: "USD — US Dollar" },
+  { value: "INR", label: "INR — Indian Rupee" },
+  { value: "GBP", label: "GBP — British Pound" },
+  { value: "EUR", label: "EUR — Euro" },
+  { value: "AUD", label: "AUD — Australian Dollar" },
+  { value: "CAD", label: "CAD — Canadian Dollar" },
+  { value: "SGD", label: "SGD — Singapore Dollar" },
+  { value: "AED", label: "AED — UAE Dirham" },
+];
+
 export const RATE_CARD_OPTIONS = [
   { value: "", label: "Select rate card" },
   { value: "STANDARD", label: "Standard Rate Card" },

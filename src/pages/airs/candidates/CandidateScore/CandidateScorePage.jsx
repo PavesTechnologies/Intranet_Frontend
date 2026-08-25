@@ -19,6 +19,7 @@ const ResumeTab = lazy(() => import("./tabs/Resume/ResumeTab"));
 const DeterministicScoreTab = lazy(() => import("./tabs/Deterministic/DeterministicScoreTab"));
 const SemanticScoreTab = lazy(() => import("./tabs/Semantic/SemanticScoreTab"));
 const AiEvaluationTab = lazy(() => import("./tabs/AiEvaluation/AiEvaluationTab"));
+const InterviewTab = lazy(() => import("./tabs/Interview/InterviewTab"));
 const FinalStatusTab = lazy(() => import("./tabs/FinalStatus/FinalStatusTab"));
 
 const TABS = [
@@ -28,6 +29,7 @@ const TABS = [
   { id: "semantic", label: SCORE_LABELS.semantic, Component: SemanticScoreTab },
   { id: "ai", label: SCORE_LABELS.ai, Component: AiEvaluationTab },
   { id: "finalStatus", label: "Final Status", Component: FinalStatusTab },
+  { id: "interview", label: "Interview", Component: InterviewTab }, 
 ];
 
 export default function CandidateScorePage() {

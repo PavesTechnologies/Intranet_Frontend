@@ -87,8 +87,20 @@ export default function ApprovalLevelTimeline({ reportId, reportStatus }) {
     let subtitle = null;
     if (latest) {
       const actor = resolveEmployeeName(directory, latest.actedBy);
+      const cleanActor = actor?.trim();
+      const hasActor = cleanActor && !/^[-—–_]+$/.test(cleanActor);
+      const formattedDate = latest.actionedAt ? formatDateTime(latest.actionedAt) : null;
       const countNote = levelReviews.length > 1 ? ` (${levelReviews.length} item${levelReviews.length > 1 ? "s" : ""})` : "";
-      subtitle = `${actor} · ${formatDateTime(latest.actionedAt)}${countNote}`;
+
+      if (hasActor && formattedDate) {
+        subtitle = `${cleanActor} · ${formattedDate}${countNote}`;
+      } else if (hasActor) {
+        subtitle = `${cleanActor}${countNote}`;
+      } else if (formattedDate) {
+        subtitle = `${formattedDate}${countNote}`;
+      } else {
+        subtitle = countNote || null;
+      }
     } else if (state === "current") {
       subtitle = "Awaiting decision";
     } else if (state === "upcoming" || state === "skipped") {
