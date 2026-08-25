@@ -11,9 +11,8 @@ import { KPICard } from "../../../components/kpi/KPI";
 import useDashboardSection from "./hooks/useDashboardSection";
 import CampaignTable from "./components/CampaignTable";
 import NavBadges from "./components/NavBadges";
-import CompareCampaigns from "./components/CompareCampaigns";
-import CrossCampaignSearch from "./components/CrossCampaignSearch";
 import OverrideRateAlerts from "./components/OverrideRateAlerts";
+import PlatformHealthStrip from "./components/PlatformHealthStrip";
 import {
   EmptyState, SectionError, SkeletonTiles,
 } from "./components/DashboardStates";
@@ -23,25 +22,36 @@ import {
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleString() : null);
 
-const BREAKER_TONE = {
-  CLOSED: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  HALF_OPEN: "bg-amber-50 text-amber-700 border-amber-200",
-  OPEN: "bg-rose-50 text-rose-700 border-rose-200",
-};
-
 // Global KPICard supplies the tile itself; this only adds the click-through
-// that S01-T02/T03 require (every metric must navigate, never be a dead number).
-function MetricTile({ label, value, to, icon: Icon, color }) {
+// (every metric must navigate, never be a dead number).
+//
+// `muted` drops a zero to grey: on an attention row, "0 AI failures" is good
+// news and should not compete for the eye with a real count.
+function MetricTile({ label, value, to, icon: Icon, color, muted = false }) {
+  const isZero = value === 0 || value === null || value === undefined;
   const card = (
     <KPICard
       label={label}
       value={value ?? "—"}
       icon={Icon ? <Icon className="h-5 w-5" /> : null}
-      color={color}
+      color={muted && isZero ? "bg-slate-50 text-slate-400" : color}
       className="h-full hover:border-indigo-300 hover:shadow-md transition"
     />
   );
   return to ? <Link to={to} className="block h-full">{card}</Link> : card;
+}
+
+// A labelled band of tiles. Naming the groups is what turns an awkward 4+3
+// wrap into two rows that each mean something.
+function MetricGroup({ title, children, cols = "md:grid-cols-4" }) {
+  return (
+    <div>
+      <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+        {title}
+      </h2>
+      <div className={`grid grid-cols-2 ${cols} gap-4`}>{children}</div>
+    </div>
+  );
 }
 
 export default function AirsDashboardPage() {
@@ -50,14 +60,14 @@ export default function AirsDashboardPage() {
   const isRecruiter = hasRole(["RECRUITER"]);
 
   // Two independent sections: a summary failure must not hide the campaigns,
-  // and vice versa (S05-T03).
+  // And vice versa.
   const summaryFetcher = useCallback(
     () => (isHRAdmin ? getHrAdminSummary() : getRecruiterSummary()),
     [isHRAdmin],
   );
   const summary = useDashboardSection(summaryFetcher, [isHRAdmin]);
 
-  // S02-T03: search is debounced so typing doesn't fire a request per keystroke;
+  // Search is debounced so typing doesn't fire a request per keystroke;
   // status applies immediately since it's a discrete choice.
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -91,20 +101,36 @@ export default function AirsDashboardPage() {
 
   return (
     <div className="bg-[#F8FAFC] text-slate-900 font-sans min-h-screen p-6 space-y-6">
-      {/* S01-T01 — identity header. Name and role come from the UMS-issued JWT;
+      {/* Identity header. Name and role come from the UMS-issued JWT;
           no lookup or decryption is involved. */}
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        <h1 className="text-xl font-bold text-slate-900">
-          Welcome back, {user?.name || "there"}
-        </h1>
-        <p className="text-xs text-slate-500 mt-1">
-          {isHRAdmin ? "HR Admin" : "Recruiter"}
-          {lastLogin && <> · Last sign-in {lastLogin}</>}
-        </p>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-slate-900">
+              Welcome back, {user?.name || "there"}
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              {isHRAdmin ? "HR Admin" : "Recruiter"}
+              {lastLogin && <> · Last sign-in {lastLogin}</>}
+            </p>
+          </div>
+          {/* Service health lives in the header rather than its own card: when
+              everything is fine it is one line, not a full row of green pills. */}
+          {isHRAdmin && s && (
+            <div className="shrink-0">
+              <PlatformHealthStrip breakers={s.platform_health} />
+            </div>
+          )}
+        </div>
         <div className="mt-3">
           <NavBadges />
         </div>
       </div>
+
+      {/* Warnings sit directly under the header — they were previously below
+          the campaign table, i.e. below the fold on most screens, which is the
+          one place an alert must never be. */}
+      {isHRAdmin && <OverrideRateAlerts />}
 
       {/* ── Activity summary ───────────────────────────────── */}
       {summary.loading && <SkeletonTiles count={isHRAdmin ? 7 : 5} />}
@@ -118,61 +144,48 @@ export default function AirsDashboardPage() {
 
       {!summary.loading && !summary.error && s && isHRAdmin && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <MetricGroup title="Hiring activity">
             <MetricTile label="Active Campaigns" value={s.active_campaigns}
-              to="/airs/campaigns" icon={Briefcase} />
+              to="/airs/campaigns?status=ACTIVE" icon={Briefcase} />
             <MetricTile label="Submitted (7 days)" value={s.candidates_last_7_days}
               to="/airs/campaigns" icon={FileUp} />
             <MetricTile label="Shortlisted" value={s.shortlisted_candidates}
               to="/airs/campaigns" icon={CheckCircle2} color="bg-sky-50 text-sky-600" />
             <MetricTile label="Awaiting HM Review" value={s.hm_review_pending}
               to="/airs/campaigns" icon={Users} color="bg-teal-50 text-teal-600" />
-            <MetricTile label="Campaigns With Stalls" value={s.campaigns_with_stall_warnings}
-              to="/airs/campaigns" icon={Hourglass} color="bg-amber-50 text-amber-600" />
-            <MetricTile label="AI Failures" value={s.ai_evaluation_failures}
-              to="/airs/campaigns" icon={AlertOctagon} color="bg-rose-50 text-rose-600" />
-            <MetricTile label="Pending Unknown Skills" value={s.pending_unknown_skills}
-              to="/airs/skill-ontology" icon={Activity} color="bg-indigo-50 text-indigo-600" />
-          </div>
+          </MetricGroup>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-            <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-900 mb-3">
-              Platform Health
-            </h2>
-            {s.platform_health?.length ? (
-              <div className="flex flex-wrap gap-2">
-                {s.platform_health.map((b) => (
-                  <span key={b.service_name}
-                    className={`text-[11px] font-bold px-3 py-1.5 rounded-full border ${BREAKER_TONE[b.state] || "bg-slate-50 text-slate-600 border-slate-200"}`}
-                    title={b.state === "OPEN"
-                      ? `Open since ${fmtDate(b.opened_at)} · retry after ${fmtDate(b.retry_after)}`
-                      : `${b.failure_count} recorded failure(s)`}>
-                    {b.service_name}: {b.state}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="text-[11px] text-slate-400">
-                No breaker state recorded yet for the monitored services.
-              </p>
-            )}
-          </div>
+          {/* Separated because these are the numbers you act on, not the ones
+              you report. A zero here is good news and is greyed accordingly. */}
+          <MetricGroup title="Needs attention" cols="md:grid-cols-3">
+            <MetricTile label="Campaigns With Stalls" value={s.campaigns_with_stall_warnings}
+              to="/airs/campaigns" icon={Hourglass} color="bg-amber-50 text-amber-600" muted />
+            <MetricTile label="AI Failures" value={s.ai_evaluation_failures}
+              to="/airs/campaigns" icon={AlertOctagon} color="bg-rose-50 text-rose-600" muted />
+            <MetricTile label="Skills To Review" value={s.pending_unknown_skills}
+              to="/airs/skill-ontology" icon={Activity} color="bg-indigo-50 text-indigo-600" muted />
+          </MetricGroup>
         </>
       )}
 
       {!summary.loading && !summary.error && s && !isHRAdmin && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          <MetricTile label="Campaigns I Upload To" value={s.campaigns_uploaded_to}
-            to="/airs/campaigns" icon={Briefcase} />
-          <MetricTile label="Campaigns I Created" value={s.campaigns_created}
-            to="/airs/campaigns" icon={Briefcase} />
-          <MetricTile label="Resumes (7 days)" value={s.resumes_last_7_days}
-            to="/airs/resume-intake" icon={FileUp} />
-          <MetricTile label="Shortlisted From My Uploads" value={s.shortlisted_from_my_uploads}
-            to="/airs/campaigns" icon={CheckCircle2} color="bg-emerald-50 text-emerald-600" />
-          <MetricTile label="Uploads Needing Attention" value={s.failed_bulk_jobs}
-            to="/airs/resume-intake" icon={AlertTriangle} color="bg-rose-50 text-rose-600" />
-        </div>
+        <>
+          <MetricGroup title="My activity" cols="md:grid-cols-3">
+            <MetricTile label="Campaigns I Upload To" value={s.campaigns_uploaded_to}
+              to="/airs/campaigns" icon={Briefcase} />
+            <MetricTile label="Campaigns I Created" value={s.campaigns_created}
+              to="/airs/campaigns" icon={Briefcase} />
+            <MetricTile label="Resumes (7 days)" value={s.resumes_last_7_days}
+              to="/airs/resume-intake" icon={FileUp} />
+          </MetricGroup>
+
+          <MetricGroup title="Outcomes" cols="md:grid-cols-2">
+            <MetricTile label="Shortlisted From My Uploads" value={s.shortlisted_from_my_uploads}
+              to="/airs/campaigns" icon={CheckCircle2} color="bg-emerald-50 text-emerald-600" />
+            <MetricTile label="Uploads Needing Attention" value={s.failed_bulk_jobs}
+              to="/airs/resume-intake" icon={AlertTriangle} color="bg-rose-50 text-rose-600" muted />
+          </MetricGroup>
+        </>
       )}
 
       {/* ── Campaign cards ─────────────────────────────────── */}
@@ -187,7 +200,7 @@ export default function AirsDashboardPage() {
             )}
           </h2>
 
-          {/* S02-T03 — search matches campaign name or JD title */}
+          {/* Search matches campaign name or JD title */}
           <div className="flex items-center gap-2 flex-1 justify-end min-w-0">
             <div className="relative w-full max-w-[280px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -223,7 +236,7 @@ export default function AirsDashboardPage() {
           <SectionError message="Campaign data could not be loaded." onRetry={campaigns.retry} />
         )}
 
-        {/* S05-T01 — a filtered-to-empty result is a different situation from
+        {/* A filtered-to-empty result is a different situation from
             having no campaigns at all, and needs a way back rather than
             onboarding advice. */}
         {!campaigns.loading && !campaigns.error && cards.length === 0 && (
@@ -264,17 +277,6 @@ export default function AirsDashboardPage() {
         )}
       </div>
 
-      {/* M11-E04-S04-T03 — renders only when a campaign is actually flagged */}
-      {isHRAdmin && <OverrideRateAlerts />}
-
-      {/* S04-T03 — HR_ADMIN only, and pointless with fewer than two campaigns */}
-      {isHRAdmin && !campaigns.loading && !campaigns.error && cards.length >= 2 && (
-        <CompareCampaigns campaigns={cards} />
-      )}
-
-      {/* M11-E03-S04 — reach is scoped server-side, so both roles can search.
-          Adding to a campaign is HR_ADMIN-only, matching M13's endpoint. */}
-      <CrossCampaignSearch canAdd={isHRAdmin} />
     </div>
   );
 }

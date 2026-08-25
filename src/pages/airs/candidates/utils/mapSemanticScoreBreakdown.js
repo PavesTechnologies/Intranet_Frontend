@@ -1,5 +1,5 @@
 // Adapts the raw GET /airs/campaign-candidates/{campaign_candidate_id}/semantic
-// response into the shape the Semantic Score tab renders. Field names are kept
+// response into the shape the Relevance Score tab renders. Field names are kept
 // exactly as returned by the backend — only grouped/defaulted so the UI never
 // has to null-check nested paths.
 import { arr } from "./candidateDataUtils";

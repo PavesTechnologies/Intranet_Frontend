@@ -9,7 +9,7 @@ import useResumeVersions from "../../hooks/useResumeVersions";
 // campaign a candidate has been part of directly, so this is built from the
 // real GET /resumes/candidate/{candidate_id}/versions response instead:
 // every version's `campaigns[]` (campaign_name + pipeline_stage) flattened
-// into one table. No composite score/AI recommendation/outcome columns —
+// into one table. No overall score/AI recommendation/outcome columns —
 // that data isn't part of this response.
 export default function CampaignHistoryTab({ candidateId }) {
   const { versions, loading, error, refetch } = useResumeVersions(candidateId);

@@ -1,21 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import { Bookmark, Check, Link2, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { Check, Link2, Search, SlidersHorizontal, X } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import {
-  createSavedView, deleteSavedView, getCampaignUploaders, getSavedViews,
-  getSkillSuggestions, markSavedViewApplied,
+  getCampaignUploaders, getSkillSuggestions,
 } from "../../dashboard/services/dashboardService";
 
 /**
- * M11-E03 filter bar for a campaign's candidate list:
- *   S01-T01/T02 — skill autocomplete + multi-skill AND search
- *   S03-T01/T02 — save / apply / delete named views
- *   S03-T03     — copy a shareable URL of the current filters
+ * Filter bar for a campaign's candidate list:
+ * skill autocomplete + multi-skill AND search, resume-derived filters, and a
+ * shareable URL of the current filter state.
  *
- * Filter state lives in the URL (see CampaignDetails), so a shared link and a
- * saved view describe the same thing and E02's scorecard can read the active
- * filters without coupling to this component.
+ * Filter state lives in the URL (see CampaignDetails), so a shared link fully
+ * describes a filtered view and the scorecard can read the active filters
+ * without coupling to this component.
  */
 const DEGREE_LEVELS = ["PHD", "MASTER", "BACHELOR", "DIPLOMA"];
 
@@ -31,9 +29,6 @@ export default function CandidateFilterBar({
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
-  const [views, setViews] = useState([]);
-  const [savingView, setSavingView] = useState(false);
-  const [showManage, setShowManage] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [uploaders, setUploaders] = useState([]);
   const boxRef = useRef(null);
@@ -71,7 +66,6 @@ export default function CandidateFilterBar({
 
   useEffect(() => {
     (async () => {
-      try { setViews(await getSavedViews(campaignId)); } catch { /* non-fatal */ }
     })();
   }, [campaignId]);
 
@@ -102,45 +96,8 @@ export default function CandidateFilterBar({
     stage: stageFilter || null,
   });
 
-  const handleSaveView = async () => {
-    const name = window.prompt("Name this view (e.g. High scorers for technical review)");
-    if (!name?.trim()) return;
-    setSavingView(true);
-    try {
-      const created = await createSavedView(campaignId, {
-        name: name.trim(),
-        filters: currentFilters(),
-      });
-      setViews((prev) => [...prev, created]);
-      toast.success(`View "${created.name}" saved.`);
-    } catch (err) {
-      // surfaces the server's limit/duplicate message rather than a generic one
-      toast.error(err?.response?.data?.message || "Failed to save view.");
-    } finally {
-      setSavingView(false);
-    }
-  };
 
-  const applyView = async (view) => {
-    const ids = view.filters?.skill_ids || [];
-    const names = view.filters?.skill_names || [];
-    onSkillsChange(ids.map((id, i) => ({
-      canonical_skill_id: id,
-      canonical_name: names[i] || "Skill",
-    })), view.filters?.stage ?? "");
-    try { await markSavedViewApplied(view.id); } catch { /* non-fatal */ }
-    toast.info(`Applied "${view.name}".`);
-  };
 
-  const removeView = async (view) => {
-    try {
-      await deleteSavedView(view.id);
-      setViews((prev) => prev.filter((v) => v.id !== view.id));
-      toast.success(`Deleted "${view.name}".`);
-    } catch {
-      toast.error("Failed to delete view.");
-    }
-  };
 
   // S03-T03 — CampaignDetails/CandidatesTab keep the address bar in sync with
   // every active filter (tab, stage, skills, score range, resume filters,
@@ -192,33 +149,7 @@ export default function CandidateFilterBar({
           )}
         </div>
 
-        {/* saved views */}
-        {views.length > 0 && (
-          <select
-            onChange={(e) => {
-              const v = views.find((x) => x.id === e.target.value);
-              if (v) applyView(v);
-              e.target.value = "";
-            }}
-            defaultValue=""
-            className="px-2 py-2 border border-slate-200 rounded-lg text-xs bg-white max-w-[180px]"
-          >
-            <option value="" disabled>Saved views…</option>
-            {views.map((v) => (
-              <option key={v.id} value={v.id}>{v.name}</option>
-            ))}
-          </select>
-        )}
 
-        <Button variant="outline" size="small" onClick={handleSaveView}
-          loading={savingView} loadingText="Saving...">
-          <Bookmark className="h-3.5 w-3.5" /> Save View
-        </Button>
-        {views.length > 0 && (
-          <Button variant="outline" size="small" onClick={() => setShowManage((v) => !v)}>
-            Manage
-          </Button>
-        )}
         <Button variant="outline" size="small" onClick={() => setShowMore((v) => !v)}>
           <SlidersHorizontal className="h-3.5 w-3.5" /> More filters
         </Button>
@@ -255,7 +186,7 @@ export default function CandidateFilterBar({
         </div>
       )}
 
-      {/* M11-E03-S02-T02/T03 — resume-derived filters */}
+      {/* Resume-derived filters */}
       {showMore && (
         <div className="border-t border-slate-100 pt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
@@ -345,25 +276,6 @@ export default function CandidateFilterBar({
         </div>
       )}
 
-      {showManage && (
-        <div className="border-t border-slate-100 pt-2 space-y-1">
-          {views.map((v) => (
-            <div key={v.id} className="flex items-center justify-between text-[11px] px-1">
-              <span className="truncate">
-                <b>{v.name}</b>
-                <span className="text-slate-400">
-                  {" "}· saved {new Date(v.created_at).toLocaleDateString()}
-                  {v.last_applied_at && ` · last used ${new Date(v.last_applied_at).toLocaleDateString()}`}
-                </span>
-              </span>
-              <button type="button" onClick={() => removeView(v)}
-                className="text-rose-500 hover:text-rose-700 shrink-0" aria-label={`Delete ${v.name}`}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
