@@ -20,10 +20,23 @@ export default function SettingsPage() {
   // The OAuth callback redirects back here as
   // ?connected=microsoft&status=success|error — surface that once, then
   // strip the params so a page refresh doesn't re-show the toast.
+  //
+  // The Schedule Interview modal's inline "Connect" button opens this same
+  // flow in a popup (window.open) instead of navigating the main tab, so it
+  // lands here too. `window.opener` is only set on a window opened via
+  // script, so it's a reliable signal we're that popup rather than a normal
+  // visit to this page — in that case there's no one to show the toast to
+  // (the popup is about to disappear), the modal's own polling of /status
+  // is what notices the connection, so just close.
   useEffect(() => {
     const connected = searchParams.get("connected");
     const status = searchParams.get("status");
     if (!connected) return;
+
+    if (window.opener) {
+      window.close();
+      return;
+    }
 
     const label = PROVIDER_LABEL[connected] || connected;
     if (status === "success") {
