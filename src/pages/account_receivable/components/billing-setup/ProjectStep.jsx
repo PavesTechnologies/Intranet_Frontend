@@ -29,7 +29,7 @@ export default function ProjectStep({ value = {}, onChange }) {
   const [loadingClients, setLoadingClients] = useState(true);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [clientQuery, setClientQuery] = useState("");
-  const [activeProjectCodes, setActiveProjectCodes] = useState(new Set());
+  const [configuredProjectKeys, setConfiguredProjectKeys] = useState(new Set());
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -80,11 +80,13 @@ export default function ProjectStep({ value = {}, onChange }) {
       });
   }, [value.clientId]);
 
-  // Projects that already have an Active billing configuration for this client
-  // are hidden from the picker so a client can't accidentally get two active setups.
+  // Any project that already has a Billing Configuration for this client — Draft
+  // or Active — is not eligible for a new setup, so it's hidden from the picker.
+  // (Rejected/deactivated configs never reach the UI at all; see
+  // shouldDisplayBillingConfiguration in billingConfigurationService.)
   useEffect(() => {
     if (!value.clientId || !value.clientName) {
-      setActiveProjectCodes(new Set());
+      setConfiguredProjectKeys(new Set());
       return;
     }
 
@@ -92,16 +94,21 @@ export default function ProjectStep({ value = {}, onChange }) {
     fetchBillingConfigurations()
       .then((configs) => {
         if (cancelled) return;
-        const codes = new Set(
+        const belongsToClient = (config) =>
+          (value.clientId && config.clientId && String(config.clientId) === String(value.clientId)) ||
+          config.client === value.clientName;
+
+        const keys = new Set(
           (Array.isArray(configs) ? configs : [])
-            .filter((config) => config.status === "Active" && config.client === value.clientName)
-            .map((config) => config.projectCode)
+            .filter(belongsToClient)
+            .flatMap((config) => [config.projectId, config.projectCode])
             .filter(Boolean)
+            .map(String)
         );
-        setActiveProjectCodes(codes);
+        setConfiguredProjectKeys(keys);
       })
       .catch(() => {
-        if (!cancelled) setActiveProjectCodes(new Set());
+        if (!cancelled) setConfiguredProjectKeys(new Set());
       });
 
     return () => {
@@ -114,16 +121,18 @@ export default function ProjectStep({ value = {}, onChange }) {
 
   // clientOptions are loaded from backend via `getBillingConfigurationClients`
 
-  // Projects filtered by selected client, excluding ones already Active for this
-  // client — except the project currently selected, so editing an existing setup
-  // doesn't hide its own project from the dropdown.
+  // Projects filtered by selected client, excluding ones that already have a
+  // Billing Configuration (Draft or Active) — except the project currently
+  // selected, so editing an existing Draft setup doesn't hide its own project.
   const availableProjects = useMemo(() => {
     return projects.filter((project) => {
       const projectId = String(project.projectId || project.id || "");
       if (value.projectId && projectId === String(value.projectId)) return true;
-      return !activeProjectCodes.has(project.projectCode);
+      if (projectId && configuredProjectKeys.has(projectId)) return false;
+      if (project.projectCode && configuredProjectKeys.has(String(project.projectCode))) return false;
+      return true;
     });
-  }, [projects, activeProjectCodes, value.projectId]);
+  }, [projects, configuredProjectKeys, value.projectId]);
 
   const projectOptions = useMemo(() => {
     if (!value.clientId) return [];
