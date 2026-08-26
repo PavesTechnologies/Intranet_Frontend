@@ -2059,13 +2059,13 @@ const RoleOffWorkspace = ({ mode: requestedMode, embedded = false, projectId: pr
             metrics={pmKpis}
             action={(
               <div className="ml-4 shrink-0">
-                <button
+                {/* <button
                   onClick={() => navigate("/resource-management/roleoff/report")}
                   className="inline-flex items-center gap-2 rounded-md bg-[#081534] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#10214f]"
                 >
                   <ClipboardCheckIcon className="h-4 w-4" />
                    Roll-Off Report
-                </button>
+                </button> */}
               </div>
             )}
           />

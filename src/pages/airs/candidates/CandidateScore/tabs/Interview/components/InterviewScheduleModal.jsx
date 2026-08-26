@@ -1,9 +1,11 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { AlertTriangle, Check, Plus, X } from "lucide-react";
+import { toast } from "react-toastify";
+import { AlertTriangle, Check, CheckCircle2, Plus, X } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/Button/Button";
+import { getMicrosoftStatus, connectMicrosoft, getGoogleStatus, connectGoogle } from "@/pages/airs/settings/services/oauthService";
 import {
   INTERVIEW_TYPE_LABEL,
   PLATFORM_OPTIONS,
@@ -12,6 +14,16 @@ import {
   formatDateLabel,
   formatTimeLabel,
 } from "../interviewMock";
+
+// Platform values that need a calendar connection to auto-generate a real
+// meeting link — keyed the same way SettingsIntegrations.jsx keys its own
+// provider list, so status/connect responses mean the same thing in both
+// places.
+const CALENDAR_PROVIDERS = {
+  TEAMS: { key: "microsoft", label: "Microsoft Calendar", getStatus: getMicrosoftStatus, connect: connectMicrosoft },
+  MEET: { key: "google", label: "Google Calendar", getStatus: getGoogleStatus, connect: connectGoogle },
+};
+const POLL_INTERVAL_MS = 2500;
 
 const STEPS = [
   { id: 1, label: "Details" },
@@ -115,6 +127,78 @@ export default function InterviewScheduleModal({ mode, round, isSubmitting, onCl
   const [notes, setNotes] = useState(round?.notes || "");
   const [reason, setReason] = useState("");
   const [errors, setErrors] = useState({});
+
+  // Inline calendar connect (Platform step) — null = status not loaded yet,
+  // so the Connect button only appears once we're sure the provider is
+  // actually disconnected, never flashes on for an instant while loading.
+  const [connectionStatus, setConnectionStatus] = useState({ microsoft: null, google: null });
+  const [connectingProvider, setConnectingProvider] = useState(null); // "microsoft" | "google" | null
+  const pollRef = useRef(null);
+
+  useEffect(() => {
+    Object.values(CALENDAR_PROVIDERS).forEach(async (provider) => {
+      try {
+        const connected = await provider.getStatus();
+        setConnectionStatus((s) => ({ ...s, [provider.key]: connected }));
+      } catch {
+        setConnectionStatus((s) => ({ ...s, [provider.key]: false }));
+      }
+    });
+  }, []);
+
+  // Stop polling if the wizard is closed/unmounted mid-connect — otherwise
+  // the interval keeps hitting /status after there's no one left to update.
+  useEffect(() => () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+  }, []);
+
+  // Opens the OAuth consent screen in a popup instead of navigating this
+  // tab away (which would discard everything typed into steps 1-2). The
+  // popup runs the exact same flow as the Settings page; since /status
+  // can't push a notification back to us, we poll it every few seconds
+  // while the popup is open and again once it's closed, to catch a
+  // connection that finished right as the user closed the window.
+  const handleConnectCalendar = async (provider) => {
+    setConnectingProvider(provider.key);
+    try {
+      const authUrl = await provider.connect();
+      if (!authUrl) throw new Error("No auth URL returned");
+
+      const popup = window.open(authUrl, "calendar-connect", "width=500,height=650");
+      if (!popup) {
+        toast.error(`Couldn't open the ${provider.label} connect window. Please allow popups and try again.`);
+        setConnectingProvider(null);
+        return;
+      }
+
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(async () => {
+        const wasClosed = popup.closed;
+        try {
+          const connected = await provider.getStatus();
+          if (connected) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+            setConnectionStatus((s) => ({ ...s, [provider.key]: true }));
+            setConnectingProvider(null);
+            if (!wasClosed) popup.close();
+            return;
+          }
+        } catch {
+          // Transient — keep polling until the popup closes rather than
+          // giving up on one failed status check.
+        }
+        if (wasClosed) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setConnectingProvider(null);
+        }
+      }, POLL_INTERVAL_MS);
+    } catch {
+      toast.error(`Couldn't start the ${provider.label} connection. Please try again.`);
+      setConnectingProvider(null);
+    }
+  };
 
   const dateKey = dateToKey(date);
   const availabilitySlots = useMemo(
@@ -430,11 +514,60 @@ export default function InterviewScheduleModal({ mode, round, isSubmitting, onCl
                 })}
               </div>
               {errors.platform && <p className="text-[11px] text-rose-600 mt-1">{errors.platform}</p>}
-              {platform && (
+
+              {/* ONSITE/PHONE have no connection concept, so they always get
+                  the plain static note. TEAMS/MEET replace it with a message
+                  driven by the *viewer's own* connection status below —
+                  previously this note showed unconditionally even for an
+                  already-connected user, wrongly implying nothing was set up. */}
+              {platform && !CALENDAR_PROVIDERS[platform] && (
                 <p className="text-[11.5px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-2.5 mt-2">
                   {PLATFORM_OPTIONS.find((p) => p.value === platform)?.note}
                 </p>
               )}
+
+              {CALENDAR_PROVIDERS[platform] && (() => {
+                const provider = CALENDAR_PROVIDERS[platform];
+                const status = connectionStatus[provider.key];
+                const meetingLabel = platform === "TEAMS" ? "Microsoft Teams" : "Google Meet";
+
+                if (status === true) {
+                  return (
+                    <p className="flex items-start gap-1.5 text-[11.5px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 mt-2">
+                      <CheckCircle2 size={14} className="shrink-0 mt-0.5" />
+                      A {meetingLabel} link will be created automatically when you schedule this interview.
+                    </p>
+                  );
+                }
+
+                if (status === false) {
+                  return (
+                    <div className="mt-2 space-y-2">
+                      <p className="text-[11.5px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-2.5">
+                        Connect your {provider.label} to auto-generate a {meetingLabel} link for this interview.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="small"
+                        onClick={() => handleConnectCalendar(provider)}
+                        loading={connectingProvider === provider.key}
+                        loadingText="Waiting for connection..."
+                      >
+                        Connect {provider.label}
+                      </Button>
+                    </div>
+                  );
+                }
+
+                // Status hasn't resolved yet — fall back to the neutral
+                // generic note rather than guessing connected/not-connected.
+                return (
+                  <p className="text-[11.5px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-2.5 mt-2">
+                    {PLATFORM_OPTIONS.find((p) => p.value === platform)?.note}
+                  </p>
+                );
+              })()}
             </div>
 
             {platform === "ONSITE" && (
