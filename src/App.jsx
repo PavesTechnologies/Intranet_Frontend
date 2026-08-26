@@ -1190,19 +1190,35 @@ const AppRoutes = () => {
 
           <Route
             path="/resource-management/projects"
-            element={<RMSProjectList />}
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
+                <RMSProjectList />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/resource-management/projects/:projectId"
-            element={<RMSProjectDetails />}
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
+                <RMSProjectDetails />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/resource-management/workforce-availability"
-            element={<WorkforceAvailability />}
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
+                <WorkforceAvailability />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/resource-management/workforce-availability/resource/:resourceId"
-            element={<ResourceIntelligenceCenter />}
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
+                <ResourceIntelligenceCenter />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/resource-management/demand"

@@ -440,7 +440,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
     }, 200);
   };
 
-  const resourceManagementItems = isAdmin
+  const resourceManagementItems = isAdmin || isRM
     ? resourceManagementSubmenu
     : isDM
       ? deliveryManagerResourceManagementSubmenu
