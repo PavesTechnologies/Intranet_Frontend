@@ -876,6 +876,7 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
       <CandidateTable
         candidates={pageItems}
         onView={(c) => navigate(`/airs/candidates/${c.id}`)}
+        showViewButton={false}
         onToggleStar={toggleStar}
         selectable={canAct}
         selectedIds={selectedIds}
