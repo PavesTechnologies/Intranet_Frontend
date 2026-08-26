@@ -7,7 +7,7 @@ import {
   ExternalLink, ListChecks,
   RotateCcw, Inbox, AlertOctagon, Hourglass, PieChart,
   Send, Flag, SkipForward, Lightbulb, FileUp,
-  ArrowRightLeft, Ban, CalendarClock, Mail, Download
+  ArrowRightLeft, Ban, Mail, Download
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
@@ -41,7 +41,6 @@ import {
   getStageTiming, filterCandidatesBySkills, filterCandidates,
 } from "../dashboard/services/dashboardService";
 import CandidateFilterBar from "./components/CandidateFilterBar";
-import InterviewCalendarTab from "./components/InterviewCalendarTab";
 import { bulkSendRejectionEmail } from "../candidates/services/candidateScoreService";
 
 // Colour per pipeline stage (used for the funnel bars)
@@ -151,7 +150,6 @@ export default function CampaignDetails() {
     { id: "candidates", label: "Candidates", icon: ListChecks, show: true },
     { id: "pipeline", label: "Pipeline", icon: Users, show: canSeePipeline },
     { id: "processing", label: "Processing", icon: Inbox, show: canSeePipeline },
-    { id: "interview-calendar", label: "Interview Calendar", icon: CalendarClock, show: canSeePipeline },
     { id: "uploads", label: "Uploads", icon: FileUp, show: canSeePipeline },
     { id: "stalled", label: "Stalled", icon: Hourglass, show: canManageCampaigns },
     { id: "rejections", label: "Rejections", icon: PieChart, show: canSeePipeline },
@@ -265,7 +263,6 @@ export default function CampaignDetails() {
       )}
       {activeTab === "processing" && (<ProcessingTab campaignId={id} canManageCampaigns={canManageCampaigns} />
       )}
-      {activeTab === "interview-calendar" && <InterviewCalendarTab campaignId={id} />}
       {activeTab === "uploads" && <UploadsTab campaignId={id} />}
       {activeTab === "stalled" && canManageCampaigns && <StalledTab campaignId={id} />}
       {activeTab === "rejections" && (<RejectionsTab
@@ -878,7 +875,8 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
 
       <CandidateTable
         candidates={pageItems}
-        onView={(c) => navigate(`/airs/pipeline/candidates/${c.id}`, { state: { resume: c } })}
+        onView={(c) => navigate(`/airs/candidates/${c.id}`)}
+        showViewButton={false}
         onToggleStar={toggleStar}
         selectable={canAct}
         selectedIds={selectedIds}
