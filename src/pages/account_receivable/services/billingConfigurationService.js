@@ -1,13 +1,12 @@
 import api from "../../../api/axiosInstance";
 import { fetchActiveBillingConfigurations } from "./billingDataAcquisitionService";
+import { getActiveBillingFrequencies, normalizeBillingFrequency } from "./billingFrequencyService";
+import { getActivePaymentTerms, normalizePaymentTerm } from "./paymentTermsService";
+import { getActiveTaxRegions, normalizeTaxRegion } from "./taxRegionService";
 
 const BASE_URL = window.__APP_CONFIG__.AR_BASE_URL;
 
 const BILLING_CONFIGURATIONS_URL = `${BASE_URL}/api/billing-configurations`;
-const ACTIVE_BILLING_TYPES_URL = `${BASE_URL}/api/billing-types/active`;
-const ACTIVE_BILLING_FREQUENCIES_URL = `${BASE_URL}/api/billing-frequency/active`;
-const ACTIVE_PAYMENT_TERMS_URL = `${BASE_URL}/api/payment-terms/active`;
-const ACTIVE_TAX_REGIONS_URL = `${BASE_URL}/api/tax-region/active`;
 const BILLING_RECURRING_URL = `${BASE_URL}/api/billing-recurring`;
 const TM_RATE_CARDS_URL = `${BASE_URL}/api/billing-tm-rate-card`;
 const BILLING_FIXED_PRICE_URL = `${BASE_URL}/api/billing-fixed-price`;
@@ -347,45 +346,9 @@ export const normalizeBillingFrequencyValue = (value) => {
   return String(value).trim().toUpperCase().replace(/[-\s]+/g, "_");
 };
 
-export const normalizeBillingType = (billingType = {}) => {
-  const id = billingType.billingTypeId || billingType.id || billingType.typeId || billingType.value || "";
-  const rawValue =
-  billingType.billingTypeCode ||
-  billingType.code ||
-  billingType.value ||
-  billingType.typeCode ||
-  billingType.type ||
-  billingType.billingTypeValue ||
-  billingType.billingTypeName ||
-  billingType.name ||
-  billingType.label ||
-  "";
-  const value = normalizeBillingTypeValue(rawValue);
-  const name =
-    {
-      TIME_MATERIAL: "Timesheet Based",
-      FIXED_PRICE: "Fixed Price",
-      MILESTONE: "Milestone Based",
-      RECURRING: "Recurring",
-    }[value] ||
-    billingType.billingTypeName ||
-    billingType.name ||
-    billingType.label ||
-    billingType.displayName ||
-    (value ? labelize(value) : "");
-  const description = billingType.description || billingType.details || billingType.summary || "";
-
-  return {
-    ...billingType,
-    id,
-    billingTypeId: id,
-    billingTypeName: name,
-    value,
-    billingTypeValue: value,
-    label: name,
-    description,
-  };
-};
+// Billing Type list/active normalization and fetching now live in
+// billingTypeService.js (single source of truth for the real
+// BillingTypeResponseDto shape) — re-exported below for existing consumers.
 
 // Billing Frequency is dynamic (durationValue + durationUnit is the source of
 // truth, never a hardcoded MONTHLY/QUARTERLY/ANNUALLY check) — this only ever
@@ -415,55 +378,13 @@ export const formatBillingFrequencyLabel = ({ durationValue, durationUnit, billi
   return `Every ${count} ${labelize(unit)}`;
 };
 
-export const normalizeBillingFrequency = (billingFrequency = {}) => {
-  const id = billingFrequency.billingFrequencyId || billingFrequency.id || billingFrequency.value || "";
-  const name = String(
-    billingFrequency.billingFrequencyName || billingFrequency.name || billingFrequency.label || "",
-  ).trim();
-  const value = normalizeBillingFrequencyValue(name);
-  const durationValue = firstPresent(billingFrequency.durationValue, billingFrequency.duration_value) ?? null;
-  const durationUnit = billingFrequency.durationUnit || billingFrequency.duration_unit || "";
-  const displayLabel = name || formatBillingFrequencyLabel({ durationValue, durationUnit });
-
-  return {
-    ...billingFrequency,
-    id,
-    billingFrequencyId: id,
-    value,
-    label: displayLabel,
-    durationValue,
-    durationUnit,
-  };
-};
-
-export const normalizePaymentTerm = (term = {}) => {
-  const id = term.paymentTermId || term.id || term.payment_term_id || term.termId || "";
-  const name = String(term.paymentTermName || term.name || term.term_name || term.termName || term.label || "").trim();
-  const value = normalizeBillingFrequencyValue(name);
-
-  return {
-    ...term,
-    id,
-    paymentTermId: id,
-    paymentTermName: name,
-    value,
-    label: name,
-  };
-};
-
-export const normalizeTaxRegion = (region = {}) => {
-  const id = region.taxRegionId || region.tax_region_id || region.id || region.value || "";
-  const name = String(region.taxRegionName || region.tax_region_name || region.name || region.label || "").trim();
-
-  return {
-    ...region,
-    id,
-    taxRegionId: id,
-    taxRegionName: name,
-    value: id,
-    label: name,
-  };
-};
+// Billing Frequency / Payment Term / Tax Region list & active-list
+// normalization and fetching now live in their own dedicated services
+// (billingFrequencyService.js, paymentTermsService.js, taxRegionService.js —
+// single source of truth for each real DTO shape), imported above and
+// re-exported below for existing consumers (BillingControlsStep.jsx,
+// BillingConfigurationStep.jsx, normalizeControls/normalizeWizardDetail
+// in this file).
 
 const normalizeControls = (controls = {}) => {
   const paymentTerm = controls.paymentTerm && typeof controls.paymentTerm === "object" ? controls.paymentTerm : null;
@@ -573,16 +494,25 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
     config.billingFrequencyId,
     getObjectValue(billingFrequencyObject, ["billingFrequencyId", "id"]),
   );
-  const billingFrequencyValue = normalizeBillingFrequencyValue(
-    firstPresent(
-      rawBillingConfig.billingFrequencyCode,
-      config.billingFrequencyCode,
-      rawBillingConfig.billingFrequencyValue,
-      getObjectValue(billingFrequencyObject, ["billingFrequencyName", "name", "label", "code", "value"]),
-      typeof rawBillingConfig.billingFrequency === "string" ? rawBillingConfig.billingFrequency : "",
-      typeof config.billingFrequency === "string" ? config.billingFrequency : "",
-    ),
-  );
+  // billingFrequency has no separate code of its own here — the frequency
+  // picker's onChange (BillingConfigurationStep.jsx) sets it to the exact
+  // same billingFrequencyId UUID it stores (normalizeBillingFrequency's
+  // `value: id`), not a MONTHLY/QUARTERLY-style code. The backend's flat
+  // config response only carries billingFrequencyId/billingFrequencyName, so
+  // none of the code-ish candidates below are ever actually present on a
+  // loaded draft — falling back to billingFrequencyId keeps this field in
+  // sync with what the button selection and schedule lookup already use.
+  const billingFrequencyValue =
+    normalizeBillingFrequencyValue(
+      firstPresent(
+        rawBillingConfig.billingFrequencyCode,
+        config.billingFrequencyCode,
+        rawBillingConfig.billingFrequencyValue,
+        getObjectValue(billingFrequencyObject, ["billingFrequencyName", "name", "label", "code", "value"]),
+        typeof rawBillingConfig.billingFrequency === "string" ? rawBillingConfig.billingFrequency : "",
+        typeof config.billingFrequency === "string" ? config.billingFrequency : "",
+      ),
+    ) || billingFrequencyId || "";
   const billingFrequencyName =
     firstPresent(
       config.billingFrequencyName,
@@ -952,27 +882,10 @@ export const getBillingConfigurationClients = async () => {
   return asArray(unwrapData(response)).map(normalizeClient);
 };
 
-export const getActiveBillingTypes = async () => {
-  const response = await api.get(ACTIVE_BILLING_TYPES_URL);
-  return asArray(unwrapData(response))
-    .map(normalizeBillingType)
-    .filter((type) => ["TIME_MATERIAL", "FIXED_PRICE", "MILESTONE", "RECURRING"].includes(type.value));
-};
-
-export const getActiveBillingFrequencies = async () => {
-  const response = await api.get(ACTIVE_BILLING_FREQUENCIES_URL);
-  return asArray(unwrapData(response)).map(normalizeBillingFrequency);
-};
-
-export const getActivePaymentTerms = async () => {
-  const response = await api.get(ACTIVE_PAYMENT_TERMS_URL);
-  return asArray(unwrapData(response)).map(normalizePaymentTerm).filter((term) => term.paymentTermId);
-};
-
-export const getActiveTaxRegions = async () => {
-  const response = await api.get(ACTIVE_TAX_REGIONS_URL);
-  return asArray(unwrapData(response)).map(normalizeTaxRegion).filter((region) => region.taxRegionId);
-};
+export { getActiveBillingTypes, normalizeBillingType } from "./billingTypeService";
+export { getActiveBillingFrequencies, normalizeBillingFrequency };
+export { getActivePaymentTerms, normalizePaymentTerm };
+export { getActiveTaxRegions, normalizeTaxRegion };
 
 // A billing configuration only gets a recurring configuration record once one
 // has been saved — selecting Recurring on a brand-new (or not-yet-saved)
@@ -1000,11 +913,23 @@ export const getBillingRecurringById = async (recurringConfigurationId) => {
   }
 };
 
+// GET .../billing-configuration/{billingConfigurationId} returns a list
+// ("success": true, "data": [...]) even though only one recurring record is
+// ever expected per billing configuration — same shape as
+// getFixedPriceByBillingConfiguration above. Assuming a single-object
+// response here silently discarded every array reply as an empty-looking
+// record (normalizeRecurringConfig read undefined off the array itself),
+// which is why Continue Draft never prefilled contract value/source or dates.
 export const getBillingRecurringByBillingConfigurationId = async (billingConfigurationId) => {
   if (!billingConfigurationId) return null;
   try {
     const response = await api.get(`${BILLING_RECURRING_URL}/billing-configuration/${billingConfigurationId}`);
-    return unwrapData(response);
+    const payload = unwrapData(response);
+    const records = asArray(payload);
+
+    if (records.length > 0) return records[0];
+
+    return payload && typeof payload === "object" && !Array.isArray(payload) ? payload : null;
   } catch (error) {
     if (isRecurringNotFoundError(error)) return null;
     throw error;
@@ -1275,6 +1200,17 @@ const toLocalDateString = (value) => {
     const month = String(value.getMonth() + 1).padStart(2, "0");
     const day = String(value.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
+  }
+
+  // Jackson serializes java.time.LocalDate/LocalDateTime as a plain
+  // [year, month, day, ...] array rather than an ISO string unless
+  // WRITE_DATES_AS_TIMESTAMPS is disabled — seen live on effectiveFrom/
+  // effectiveTo and recurringStartDate/recurringEndDate. Java's month here
+  // is already 1-indexed, so it's used as-is (unlike JS Date.getMonth()).
+  if (Array.isArray(value)) {
+    const [year, month, day] = value;
+    if (!year || !month || !day) return "";
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   }
 
   const rawValue = String(value).trim();

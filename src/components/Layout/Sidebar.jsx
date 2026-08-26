@@ -98,16 +98,12 @@ const accountReceivableSubmenu = [
     ],
   },
   {
-    label: "Tax Configuration",
-    to: "/account-receivable/tax-configuration",
-  },
-  {
     label: "Tax Calculation",
     to: "/account-receivable/tax-calculation",
   },
   {
     label: "Configurations",
-    to: "/account-receivable/configurations",
+    to: "/account-receivable/master-data",
   },
 ];
 

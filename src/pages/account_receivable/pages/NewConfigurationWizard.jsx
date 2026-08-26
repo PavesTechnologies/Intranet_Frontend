@@ -141,7 +141,12 @@ function getMissingFields(step, data) {
       const project = data.projectInfo || {};
       if (!(project.projectBudgetCurrency || project.currency)) missing.push("Billing Currency (select a project with a currency)");
       if (!config.billingType) missing.push("Billing Type");
-      if (!config.billingFrequency) missing.push("Billing Frequency");
+      // billingFrequencyId is the value the frequency PillSelectGroup actually
+      // selects on (BillingConfigurationStep.jsx) and what RecurringBillingForm
+      // resolves its schedule/label from — validating against it here keeps
+      // Next in sync with what's visibly selected instead of the separate
+      // billingFrequency field, which a loaded draft doesn't always populate.
+      if (!config.billingFrequencyId) missing.push("Billing Frequency");
 
       if (config.billingType === "TIME_MATERIAL") {
         if (!config.billingMode) missing.push("Pricing Model");

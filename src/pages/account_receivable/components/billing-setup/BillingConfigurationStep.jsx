@@ -1929,51 +1929,53 @@ function RecurringBillingForm({
           </p>
         ) : (
           <div className="max-h-96 w-full overflow-y-auto overflow-x-auto rounded-lg border border-slate-100">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <table className="w-full table-fixed divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Period</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">From</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">To</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Amount</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Type</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Status</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Invoiced</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Invoice Date</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Remarks</th>
+                  <th className="w-1/6 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Period</th>
+                  <th className="w-1/6 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">From</th>
+                  <th className="w-1/6 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">To</th>
+                  <th className="w-1/6 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Amount</th>
+                  <th className="w-1/6 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Partial Period</th>
+                  <th className="w-1/6 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Invoiced</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {schedule.map((period, index) => (
                   <tr key={period.periodNumber ?? index}>
-                    <td className="px-4 py-2 text-slate-700">
+                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
                       Period {period.periodNumber ?? index + 1}
-                      {period.isPartialPeriod && (
-                        <span className="ml-1.5 text-xs font-medium text-amber-600">(partial)</span>
-                      )}
                     </td>
-                    <td className="px-4 py-2 text-slate-700">{formatDisplayDate(period.periodStartDate)}</td>
-                    <td className="px-4 py-2 text-slate-700">{formatDisplayDate(period.periodEndDate)}</td>
-                    <td className="px-4 py-2 font-medium text-slate-900">
+                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                      {formatDisplayDate(period.periodStartDate)}
+                    </td>
+                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                      {formatDisplayDate(period.periodEndDate)}
+                    </td>
+                    <td className="px-3 py-2.5 text-center align-middle font-medium text-slate-900">
                       {period.billingAmount || period.billingAmount === 0
                         ? formatCurrency(period.billingAmount, currency)
                         : "—"}
                     </td>
-                    <td className="px-4 py-2 text-slate-700">{period.scheduleType || "—"}</td>
-                    <td className="px-4 py-2">
-                      {period.periodStatus ? <StatusBadge label={period.periodStatus} size="sm" /> : "—"}
+                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                      {period.isPartialPeriod ? "Yes" : "No"}
                     </td>
-                    <td className="px-4 py-2">
+                    <td className="px-3 py-2.5 text-center align-middle">
                       <StatusBadge label={period.isInvoiced ? "Invoiced" : "Pending"} size="sm" />
                     </td>
-                    <td className="px-4 py-2 text-slate-700">{formatDisplayDate(period.invoiceDate)}</td>
-                    <td className="px-4 py-2 text-slate-700">{period.remarks || "—"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+
+        <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+          <span className="text-sm font-semibold text-slate-900">Total Contract Value</span>
+          <span className="text-sm font-semibold text-slate-900">
+            {value.contractValue || value.contractValue === 0 ? formatCurrency(value.contractValue, currency) : "—"}
+          </span>
+        </div>
       </div>
 
       <ConfirmationModal

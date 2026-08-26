@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import { 
   Plus, 
   Pencil, 
@@ -28,37 +29,18 @@ import { showStatusToast } from "../../../components/toastfy/toast";
 
 const LOCAL_STORAGE_PREFIX = "ar_configurations_";
 
+// Tax Region, Payment Terms, Billing Frequency, and Billing Type are now
+// fully API-driven, dedicated pages under the Master Data Hub
+// (see src/pages/account_receivable/pages/master-data/). Proportion Rule and
+// Currency have no backend yet, so this page remains their local, mock/
+// localStorage-backed tool until real endpoints exist for them — per
+// instruction, no mock data or invented endpoints are added for them here.
 const MASTERS = [
-  { id: "tax_region", label: "Tax Region Master" },
   { id: "proportion_rule", label: "Proportion Rule" },
-  { id: "payment_terms", label: "Payment Terms Master" },
   { id: "currency", label: "Currency Master" },
-  { id: "billing_type", label: "Billing Type Master" },
-  { id: "billing_frequency", label: "Billing Frequency Master" },
 ];
 
 const MASTER_SCHEMAS = {
-  tax_region: {
-    title: "Tax Region Master",
-    fields: [
-      { name: "taxRegionCode", label: "Tax Region Code", type: "text", required: true },
-      { name: "taxRegionName", label: "Tax Region Name", type: "text", required: true },
-      { name: "countryRegion", label: "Country/Region", type: "text", required: true },
-      { name: "taxType", label: "Tax Type", type: "text", required: true },
-      { name: "status", label: "Status", type: "select", options: ["ACTIVE", "INACTIVE"], required: true },
-      { name: "effectiveFrom", label: "Effective From", type: "date", required: true },
-      { name: "effectiveTo", label: "Effective To", type: "date", required: false },
-    ],
-    defaultData: {
-      taxRegionCode: "",
-      taxRegionName: "",
-      countryRegion: "",
-      taxType: "GST",
-      status: "ACTIVE",
-      effectiveFrom: "",
-      effectiveTo: "",
-    }
-  },
   proportion_rule: {
     title: "Proportion Rule",
     fields: [
@@ -80,23 +62,6 @@ const MASTER_SCHEMAS = {
       effectiveTo: "",
     }
   },
-  payment_terms: {
-    title: "Payment Terms Master",
-    fields: [
-      { name: "paymentTermsCode", label: "Payment Terms Code", type: "text", required: true },
-      { name: "paymentTermsName", label: "Payment Terms Name", type: "text", required: true },
-      { name: "description", label: "Description", type: "textarea", required: false },
-      { name: "dueDays", label: "Due Days", type: "number", required: true },
-      { name: "status", label: "Status", type: "select", options: ["ACTIVE", "INACTIVE"], required: true },
-    ],
-    defaultData: {
-      paymentTermsCode: "",
-      paymentTermsName: "",
-      description: "",
-      dueDays: "",
-      status: "ACTIVE",
-    }
-  },
   currency: {
     title: "Currency Master",
     fields: [
@@ -113,74 +78,10 @@ const MASTER_SCHEMAS = {
       decimalPrecision: "2",
       status: "ACTIVE",
     }
-  },
-  billing_type: {
-    title: "Billing Type Master",
-    fields: [
-      { name: "billingTypeCode", label: "Billing Type Code", type: "text", required: true },
-      { name: "billingTypeName", label: "Billing Type Name", type: "text", required: true },
-      { name: "description", label: "Description", type: "textarea", required: false },
-      { name: "status", label: "Status", type: "select", options: ["ACTIVE", "INACTIVE"], required: true },
-    ],
-    defaultData: {
-      billingTypeCode: "",
-      billingTypeName: "",
-      description: "",
-      status: "ACTIVE",
-    }
-  },
-  billing_frequency: {
-    title: "Billing Frequency Master",
-    fields: [
-      { name: "billingFrequencyCode", label: "Billing Frequency Code", type: "text", required: true },
-      { name: "billingFrequencyName", label: "Billing Frequency Name", type: "text", required: true },
-      { name: "description", label: "Description", type: "textarea", required: false },
-      { name: "frequency", label: "Frequency", type: "text", required: true },
-      { name: "status", label: "Status", type: "select", options: ["ACTIVE", "INACTIVE"], required: true },
-    ],
-    defaultData: {
-      billingFrequencyCode: "",
-      billingFrequencyName: "",
-      description: "",
-      frequency: "",
-      status: "ACTIVE",
-    }
   }
 };
 
 const SEED_DATA = {
-  tax_region: [
-    {
-      id: "tr-1",
-      taxRegionCode: "TR001",
-      taxRegionName: "Karnataka",
-      countryRegion: "India",
-      taxType: "GST",
-      status: "ACTIVE",
-      effectiveFrom: "2026-04-01",
-      effectiveTo: "",
-    },
-    {
-      id: "tr-2",
-      taxRegionCode: "TR002",
-      taxRegionName: "Maharashtra",
-      countryRegion: "India",
-      taxType: "GST",
-      status: "ACTIVE",
-      effectiveFrom: "2026-04-01",
-      effectiveTo: "",
-    },
-    {
-      id: "tr-3",
-      taxRegionCode: "TR003",
-      taxRegionName: "California",
-      countryRegion: "USA",
-      taxType: "Sales Tax",
-      status: "ACTIVE",
-      effectiveFrom: "2026-01-01",
-      effectiveTo: "",
-    }
-  ],
   proportion_rule: [
     {
       id: "pr-1",
@@ -201,32 +102,6 @@ const SEED_DATA = {
       status: "ACTIVE",
       effectiveFrom: "2026-04-01",
       effectiveTo: "",
-    }
-  ],
-  payment_terms: [
-    {
-      id: "pt-1",
-      paymentTermsCode: "PT001",
-      paymentTermsName: "Net 30",
-      description: "Payment due within 30 days of invoice date",
-      dueDays: 30,
-      status: "ACTIVE",
-    },
-    {
-      id: "pt-2",
-      paymentTermsCode: "PT002",
-      paymentTermsName: "Net 15",
-      description: "Payment due within 15 days of invoice date",
-      dueDays: 15,
-      status: "ACTIVE",
-    },
-    {
-      id: "pt-3",
-      paymentTermsCode: "PT003",
-      paymentTermsName: "Immediate",
-      description: "Payment due immediately upon receipt of invoice",
-      dueDays: 0,
-      status: "ACTIVE",
     }
   ],
   currency: [
@@ -254,67 +129,14 @@ const SEED_DATA = {
       decimalPrecision: 2,
       status: "ACTIVE",
     }
-  ],
-  billing_type: [
-    {
-      id: "bt-1",
-      billingTypeCode: "TIME_MATERIAL",
-      billingTypeName: "Timesheet Based",
-      description: "Billed based on hours worked and hourly rates",
-      status: "ACTIVE",
-    },
-    {
-      id: "bt-2",
-      billingTypeCode: "FIXED_PRICE",
-      billingTypeName: "Fixed Price",
-      description: "Billed as a fixed total project price",
-      status: "ACTIVE",
-    },
-    {
-      id: "bt-3",
-      billingTypeCode: "MILESTONE",
-      billingTypeName: "Milestone Based",
-      description: "Billed upon completion of specified project milestones",
-      status: "ACTIVE",
-    },
-    {
-      id: "bt-4",
-      billingTypeCode: "RECURRING",
-      billingTypeName: "Recurring",
-      description: "Billed regularly based on subscription terms",
-      status: "ACTIVE",
-    }
-  ],
-  billing_frequency: [
-    {
-      id: "bf-1",
-      billingFrequencyCode: "MONTHLY",
-      billingFrequencyName: "Monthly",
-      description: "Billed once every calendar month",
-      frequency: "Monthly",
-      status: "ACTIVE",
-    },
-    {
-      id: "bf-2",
-      billingFrequencyCode: "QUARTERLY",
-      billingFrequencyName: "Quarterly",
-      description: "Billed once every calendar quarter",
-      frequency: "Quarterly",
-      status: "ACTIVE",
-    },
-    {
-      id: "bf-3",
-      billingFrequencyCode: "WEEKLY",
-      billingFrequencyName: "Weekly",
-      description: "Billed once every calendar week",
-      frequency: "Weekly",
-      status: "ACTIVE",
-    }
   ]
 };
 
 export default function Configurations() {
-  const [selectedMaster, setSelectedMaster] = useState("tax_region");
+  const location = useLocation();
+  const [selectedMaster, setSelectedMaster] = useState(
+    () => location.state?.master || "proportion_rule"
+  );
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -361,7 +183,7 @@ export default function Configurations() {
       }
     } catch (e) {
       console.error("Failed to load local storage data", e);
-      showStatusToast("Failed to load master data.", "error");
+      showStatusToast("Failed to load configurations.", "error");
     } finally {
       setLoading(false);
     }
@@ -398,7 +220,7 @@ export default function Configurations() {
       // Text Search
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
-        return activeSchema.fields.some((field) => {
+        return (activeSchema?.fields || []).some((field) => {
           const value = item[field.name];
           if (value === undefined || value === null) return false;
           return String(value).toLowerCase().includes(query);
@@ -503,7 +325,7 @@ export default function Configurations() {
   // Form Validation
   const validateForm = () => {
     const errors = {};
-    activeSchema.fields.forEach((field) => {
+    (activeSchema?.fields || []).forEach((field) => {
       const val = formData[field.name];
       if (field.required && (val === undefined || val === null || String(val).trim() === "")) {
         errors[field.name] = `${field.label} is required`;
@@ -546,7 +368,7 @@ export default function Configurations() {
   // Headers and columns configuration
   const tableHeaders = useMemo(() => {
     return [
-      ...activeSchema.fields.map((f) => (
+      ...(activeSchema?.fields || []).map((f) => (
         <button
           key={f.name}
           onClick={() => handleSort(f.name)}
@@ -561,7 +383,7 @@ export default function Configurations() {
   }, [activeSchema, sortField, sortDirection]);
 
   const tableColumns = useMemo(() => {
-    return [...activeSchema.fields.map((f) => f.name), "actions"];
+    return [...(activeSchema?.fields || []).map((f) => f.name), "actions"];
   }, [activeSchema]);
 
   // Formats date or default placeholder
@@ -587,7 +409,7 @@ export default function Configurations() {
         id: item.id,
       };
 
-      activeSchema.fields.forEach((f) => {
+      (activeSchema?.fields || []).forEach((f) => {
         const val = item[f.name];
         if (f.name === "status") {
           rowObj[f.name] = <StatusBadge label={val} size="sm" />;
@@ -634,7 +456,7 @@ export default function Configurations() {
       {/* Page Header */}
       <PageHeader
         title="Configurations"
-        subtitle="Manage master settings, regions, proportion rules, and payment terms"
+        subtitle="Local configuration for masters pending backend integration (Proportion Rules, Currency)"
         actions={
           <div className="flex items-center gap-3">
             <Button
