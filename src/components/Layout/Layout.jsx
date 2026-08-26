@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import ErrorBoundary from "../ErrorBoundary";
 import { getApplicationFromPath, isCanonicalPageShellRoute } from "../../utils/applicationRoutes";
 
 const Layout = () => {
@@ -56,7 +57,9 @@ const Layout = () => {
           activeApplication={activeApplication}
         />
         <main className={`flex-1 overflow-y-auto bg-gray-50 rounded-tl-xl shadow-inner ${isCanonicalShell ? "" : isXms ? "p-3" : "p-4"}`}>
-          <Outlet />
+          <ErrorBoundary locationKey={location.pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>
