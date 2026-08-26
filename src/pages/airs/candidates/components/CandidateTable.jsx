@@ -46,6 +46,11 @@ export default function CandidateTable({
   noteCounts,
   // Per-row actions, rendered after the built-in ones
   renderExtraActions,
+  // The row itself already navigates to onView on click — some callers
+  // (CampaignDetails' Candidates tab) find the Eye button redundant next
+  // to that; others (CandidateRankingPage) still want it, so this defaults
+  // to keeping existing behavior everywhere.
+  showViewButton = true,
 }) {
   const { hasRole } = useAuth();
   const canDeleteCandidates = hasRole(["HR_ADMIN"]);
@@ -159,18 +164,20 @@ export default function CandidateTable({
     risk: renderRiskBadge(c.risk),
     actions: (
       <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={(e) => {
-            e.stopPropagation();
-            onView(c);
-          }}
-          title="View candidate"
-          className="h-8 w-8 !text-blue-500 hover:!text-blue-600"
-        >
-          <Eye className="h-4 w-4" />
-        </Button>
+        {showViewButton && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              onView(c);
+            }}
+            title="View candidate"
+            className="h-8 w-8 !text-blue-500 hover:!text-blue-600"
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+        )}
         {canDeleteCandidates && (
           <Button
             variant="ghost"
