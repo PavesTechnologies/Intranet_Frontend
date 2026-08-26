@@ -289,6 +289,7 @@ import BillingDataAcquisition from "./pages/account_receivable/pages/BillingData
 import AcquisitionDetail from "./pages/account_receivable/pages/AcquisitionDetail.jsx";
 import TaxConfiguration from "./pages/account_receivable/pages/TaxConfiguration.jsx";
 import TaxCalculationPage from "./pages/account_receivable/pages/TaxCalculation.jsx";
+import Configurations from "./pages/account_receivable/pages/Configurations.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -673,6 +674,14 @@ const AppRoutes = () => {
             <Route
               path="tax-calculation/:snapshotId"
               element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxCalculationPage /></ProtectedRoute>}
+            />
+            <Route
+              path="configurations"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><Configurations /></ProtectedRoute>}
+            />
+            <Route
+              path="configuration"
+              element={<Navigate to="configurations" replace />}
             />
             {/* Configuration history removed — not supported by backend */}
           </Route>

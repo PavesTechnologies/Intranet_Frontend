@@ -105,6 +105,10 @@ const accountReceivableSubmenu = [
     label: "Tax Calculation",
     to: "/account-receivable/tax-calculation",
   },
+  {
+    label: "Configurations",
+    to: "/account-receivable/configurations",
+  },
 ];
 
 const airsSubmenu = [
