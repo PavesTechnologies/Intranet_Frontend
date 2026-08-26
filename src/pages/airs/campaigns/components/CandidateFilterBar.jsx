@@ -1,19 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
-import { toast } from "react-toastify";
-import { Check, Link2, Search, SlidersHorizontal, X } from "lucide-react";
+import { Check, Search, SlidersHorizontal, X } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import {
   getCampaignUploaders, getSkillSuggestions,
 } from "../../dashboard/services/dashboardService";
 
 /**
- * Filter bar for a campaign's candidate list:
- * skill autocomplete + multi-skill AND search, resume-derived filters, and a
- * shareable URL of the current filter state.
+ * Filter bar for a campaign's candidate list: skill autocomplete +
+ * multi-skill AND search, plus the resume-derived filters.
  *
- * Filter state lives in the URL (see CampaignDetails), so a shared link fully
- * describes a filtered view and the scorecard can read the active filters
- * without coupling to this component.
+ * Filter state lives in the URL (see CampaignDetails), so the scorecard can
+ * read the active filters without coupling to this component.
  */
 const DEGREE_LEVELS = ["PHD", "MASTER", "BACHELOR", "DIPLOMA"];
 
@@ -21,7 +18,6 @@ export default function CandidateFilterBar({
   campaignId,
   skills,            // [{canonical_skill_id, canonical_name}]
   onSkillsChange,
-  stageFilter,
   resultCount,
   resumeFilters = {},
   onResumeFiltersChange,
@@ -63,11 +59,6 @@ export default function CandidateFilterBar({
     }, 300);
     return () => clearTimeout(t);
   }, [query, campaignId]);
-
-  useEffect(() => {
-    (async () => {
-    })();
-  }, [campaignId]);
 
   // click-away closes the suggestion list
   useEffect(() => {
@@ -149,12 +140,8 @@ export default function CandidateFilterBar({
           )}
         </div>
 
-
         <Button variant="outline" size="small" onClick={() => setShowMore((v) => !v)}>
           <SlidersHorizontal className="h-3.5 w-3.5" /> More filters
-        </Button>
-        <Button variant="outline" size="small" onClick={handleShare}>
-          <Link2 className="h-3.5 w-3.5" /> Share
         </Button>
 
         {resultCount != null && (
