@@ -46,6 +46,20 @@ export function useValidateInvoiceFieldsMutation() {
 }
 
 /**
+ * Stage 3 of the upload pipeline: persists the invoice once the user confirms the processing
+ * result ("Save Invoice"). The invoice isn't created until this succeeds — extract-fields and
+ * validate-fields never persist anything on their own.
+ * @param {Object} extractionResult - the same raw extract-fields response sent to validate-fields
+ */
+export function useCreateInvoiceMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (extractionResult) => invoiceService.createInvoice(extractionResult),
+    onSuccess: (data) => invalidateInvoices(queryClient, data?.invoice_id),
+  });
+}
+
+/**
  * Direct status transition via PUT /apm/invoice/status-update/{invoice_id}?status_id={status_id}.
  * Used by the Invoice Management row action that moves an invoice from OCR Review Pending to
  * Pending Approval without going through the OCR Review Queue's field-correction flow.

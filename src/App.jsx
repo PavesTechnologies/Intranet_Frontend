@@ -141,6 +141,7 @@ import IntakeFlowPage from "./pages/airs/resume-intake/intake/IntakeFlowPage.jsx
 import ReviewPage from "./pages/airs/resume-intake/intake/ReviewPage.jsx";
 import CandidateRankingPage from "./pages/airs/candidates/CandidateRankingPage.jsx";
 import CandidateScorePage from "./pages/airs/candidates/CandidateScore/CandidateScorePage.jsx";
+import InterviewQueuePage from "./pages/airs/interview-queue/InterviewQueuePage.jsx";
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
 import PipelineCandidateScorecardPage from "./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
@@ -254,6 +255,7 @@ import Profile from "./pages/UserManagement/user/Profile";
 import EditProfile from "./pages/UserManagement/user/EditProfile";
 
 import Register from "./pages/UserManagement/auth/Register";
+import InterviewFeedbackFormPage from "./pages/public/InterviewFeedbackFormPage.jsx";
 
 
 // ✅ Leave Management
@@ -287,6 +289,7 @@ import BillingDataAcquisition from "./pages/account_receivable/pages/BillingData
 import AcquisitionDetail from "./pages/account_receivable/pages/AcquisitionDetail.jsx";
 import TaxConfiguration from "./pages/account_receivable/pages/TaxConfiguration.jsx";
 import TaxCalculationPage from "./pages/account_receivable/pages/TaxCalculation.jsx";
+import Configurations from "./pages/account_receivable/pages/Configurations.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -419,6 +422,9 @@ const AppRoutes = () => {
         {/* Public Route */}
         <Route path="/" element={<LoginPage />} />
         <Route path="/register" element={<Register />} />
+        {/* Fully public, unauthenticated — no session, no app shell. See
+            src/pages/public/InterviewFeedbackFormPage.jsx. */}
+        <Route path="/interview-feedback/:token" element={<InterviewFeedbackFormPage />} />
 
         {/* Unauthorized should be here */}
         <Route path="/unauthorized" element={<Unauthorized />} />
@@ -668,6 +674,14 @@ const AppRoutes = () => {
             <Route
               path="tax-calculation/:snapshotId"
               element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxCalculationPage /></ProtectedRoute>}
+            />
+            <Route
+              path="configurations"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><Configurations /></ProtectedRoute>}
+            />
+            <Route
+              path="configuration"
+              element={<Navigate to="configurations" replace />}
             />
             {/* Configuration history removed — not supported by backend */}
           </Route>
@@ -1184,19 +1198,35 @@ const AppRoutes = () => {
 
           <Route
             path="/resource-management/projects"
-            element={<RMSProjectList />}
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
+                <RMSProjectList />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/resource-management/projects/:projectId"
-            element={<RMSProjectDetails />}
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
+                <RMSProjectDetails />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/resource-management/workforce-availability"
-            element={<WorkforceAvailability />}
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
+                <WorkforceAvailability />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/resource-management/workforce-availability/resource/:resourceId"
-            element={<ResourceIntelligenceCenter />}
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
+                <ResourceIntelligenceCenter />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/resource-management/demand"
@@ -1347,6 +1377,14 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path="/airs/interview-queue"
+            element={
+              <ProtectedRoute allowedRoles={["HIRING_MANAGER", "HR_ADMIN"]}>
+                <InterviewQueuePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/airs/pipeline"
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
@@ -1389,7 +1427,7 @@ const AppRoutes = () => {
           <Route
             path="/airs/settings"
             element={
-              <ProtectedRoute roles={["General"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
                 <SettingsPage />
               </ProtectedRoute>
             }

@@ -105,6 +105,10 @@ const accountReceivableSubmenu = [
     label: "Tax Calculation",
     to: "/account-receivable/tax-calculation",
   },
+  {
+    label: "Configurations",
+    to: "/account-receivable/configurations",
+  },
 ];
 
 const airsSubmenu = [
@@ -429,7 +433,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
     }, 200);
   };
 
-  const resourceManagementItems = isAdmin
+  const resourceManagementItems = isAdmin || isRM
     ? resourceManagementSubmenu
     : isDM
       ? deliveryManagerResourceManagementSubmenu

@@ -14,6 +14,7 @@ const ResumeTab = lazy(() => import("../candidates/CandidateScore/tabs/Resume/Re
 const DeterministicScoreTab = lazy(() => import("../candidates/CandidateScore/tabs/Deterministic/DeterministicScoreTab"));
 const SemanticScoreTab = lazy(() => import("../candidates/CandidateScore/tabs/Semantic/SemanticScoreTab"));
 const AiEvaluationTab = lazy(() => import("../candidates/CandidateScore/tabs/AiEvaluation/AiEvaluationTab"));
+const InterviewTab = lazy(() => import("../candidates/CandidateScore/tabs/Interview/InterviewTab"));
 const FinalStatusTab = lazy(() => import("../candidates/CandidateScore/tabs/FinalStatus/FinalStatusTab"));
 
 const TABS = [
@@ -23,6 +24,7 @@ const TABS = [
   { id: "semantic", label: SCORE_LABELS.semantic, Component: SemanticScoreTab },
   { id: "ai", label: SCORE_LABELS.ai, Component: AiEvaluationTab },
   { id: "finalStatus", label: "Final Status", Component: FinalStatusTab },
+  { id: "interview", label: "Interview", Component: InterviewTab },
 ];
 
 // Pipeline Board's candidate detail page — reuses the same Candidate
