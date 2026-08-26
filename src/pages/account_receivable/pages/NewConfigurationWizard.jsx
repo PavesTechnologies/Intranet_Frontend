@@ -69,21 +69,20 @@ const INITIAL_WIZARD_DATA = {
     },
     milestones: [],
     milestoneSettings: { billOnlyCompletedMilestones: false, allowPartialMilestoneBilling: false },
-    monthlyRetainer: {
-      amount: "",
-      billingStartDate: "",
-      autoInvoiceGeneration: false,
-      billingDayOfMonth: "",
-      prorateFirstMonth: false,
-    },
-    subscription: {
-      plan: "",
-      amount: "",
-      billingCycle: "",
-      startDate: "",
-      endDate: "",
-      autoRenewal: false,
-      gracePeriodDays: "",
+    // Recurring billing (BillingRecurringConfiguration, via
+    // /api/billing-recurring) — Billing Frequency itself (chosen above via
+    // billingFrequency/billingFrequencyId) determines the recurring period;
+    // there is no separate Pricing Model. The normal Recurring flow has no
+    // subscription/renewal concept — it's fully described by contract
+    // value/source and effective dates.
+    recurring: {
+      recurringConfigurationId: null,
+      contractValueSource: "",
+      contractValue: "",
+      pmsProjectBudget: "",
+      recurringStartDate: "",
+      recurringEndDate: "",
+      remarks: "",
     },
   },
   controls: {
@@ -157,16 +156,40 @@ function getMissingFields(step, data) {
           }
         }
       } else if (config.billingType === "RECURRING") {
-        if (!config.billingMode) missing.push("Pricing Model");
-        else if (config.billingMode === "MONTHLY_RETAINER") {
-          if (!config.monthlyRetainer?.amount) missing.push("Retainer Amount");
-          if (!config.monthlyRetainer?.billingStartDate) missing.push("Billing Start Date");
-        } else if (config.billingMode === "SUBSCRIPTION") {
-          if (!config.subscription?.plan) missing.push("Subscription Plan");
-          if (!config.subscription?.amount) missing.push("Subscription Amount");
-          if (!config.subscription?.billingCycle) missing.push("Billing Cycle");
-          if (!config.subscription?.startDate) missing.push("Subscription Start Date");
-          if (!config.subscription?.endDate) missing.push("Subscription End Date");
+        const recurring = config.recurring || {};
+        const projectStartDate = project.startDate;
+        const projectEndDate = project.endDate;
+
+        if (!recurring.contractValueSource) missing.push("Contract Value Source");
+        const contractValue = Number(recurring.contractValue);
+        if (recurring.contractValue === "" || recurring.contractValue === null || recurring.contractValue === undefined) {
+          missing.push("Contract Value");
+        } else if (Number.isNaN(contractValue) || contractValue <= 0) {
+          missing.push("Contract Value must be greater than 0");
+        }
+
+        if (!recurring.recurringStartDate) missing.push("Billing Start Date");
+        if (!recurring.recurringEndDate) missing.push("Billing End Date");
+        if (
+          recurring.recurringStartDate &&
+          projectStartDate &&
+          recurring.recurringStartDate < projectStartDate
+        ) {
+          missing.push("Billing Start Date must be on or after the Project Start Date");
+        }
+        if (
+          recurring.recurringEndDate &&
+          projectEndDate &&
+          recurring.recurringEndDate > projectEndDate
+        ) {
+          missing.push("Billing End Date must be on or before the Project End Date");
+        }
+        if (
+          recurring.recurringStartDate &&
+          recurring.recurringEndDate &&
+          recurring.recurringEndDate < recurring.recurringStartDate
+        ) {
+          missing.push("Billing End Date must be on or after the Billing Start Date");
         }
       } else if (config.billingType === "FIXED_PRICE") {
         const fixedPrice = config.fixedPrice || {};
@@ -535,6 +558,7 @@ export default function NewConfigurationWizard() {
     try {
       await persistDraft();
       showStatusToast("Draft saved successfully.", "success");
+      navigate(CONFIGURATIONS_PATH);
     } catch (error) {
       showStatusToast(getApiErrorMessage(error, "Failed to save draft."), "error");
     } finally {
