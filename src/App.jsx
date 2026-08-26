@@ -142,6 +142,7 @@ import ReviewPage from "./pages/airs/resume-intake/intake/ReviewPage.jsx";
 import CandidateRankingPage from "./pages/airs/candidates/CandidateRankingPage.jsx";
 import CandidateScorePage from "./pages/airs/candidates/CandidateScore/CandidateScorePage.jsx";
 import InterviewQueuePage from "./pages/airs/interview-queue/InterviewQueuePage.jsx";
+import InterviewCalendarPage from "./pages/airs/interview-calendar/InterviewCalendarPage.jsx";
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
 import PipelineCandidateScorecardPage from "./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
@@ -1308,6 +1309,18 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <CampaignDetails />
+              </ProtectedRoute>
+            }
+          />
+          {/* Was a tab inside CampaignDetails.jsx — moved to its own page with
+              a campaign selector. Same roles that could see that tab
+              (canSeePipeline = HR_ADMIN/RECRUITER); HIRING_MANAGER is
+              deliberately excluded, matching the tab's old visibility. */}
+          <Route
+            path="/airs/interview-calendar"
+            element={
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER"]}>
+                <InterviewCalendarPage />
               </ProtectedRoute>
             }
           />
