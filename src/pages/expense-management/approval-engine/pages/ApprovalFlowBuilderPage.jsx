@@ -13,7 +13,7 @@ import { parseCriteriaPattern, serializeCriteriaGroups } from "../utils/criteria
 import { describeCriteriaGroups } from "../constants/approvalLabels";
 
 const emptyGroup = () => ({ id: crypto.randomUUID(), criteria: [{ id: crypto.randomUUID(), field: "AMOUNT", operator: "GREATER_THAN", value: "" }] });
-const emptyLevel = () => ({ id: crypto.randomUUID(), levelName: "", quorum: "SEQUENTIAL", approvers: [{ id: crypto.randomUUID(), sourceType: "REPORTING_MANAGER", sourceReference: "" }] });
+const emptyLevel = () => ({ id: crypto.randomUUID(), levelName: "", quorum: "SEQUENTIAL", levelType: "APPROVAL", approvers: [{ id: crypto.randomUUID(), sourceType: "REPORTING_MANAGER", sourceReference: "" }] });
 
 const toLocalLevels = (levels) =>
   (levels || []).map((l) => ({
@@ -21,6 +21,7 @@ const toLocalLevels = (levels) =>
     levelId: l.levelId,
     levelName: l.levelName || "",
     quorum: l.quorum,
+    levelType: l.levelType || "APPROVAL",
     approvers: (l.approvers || []).map((a) => ({ id: crypto.randomUUID(), entryId: a.entryId, sourceType: a.sourceType, sourceReference: a.sourceReference || "" })),
   }));
 
@@ -74,6 +75,7 @@ export default function ApprovalFlowBuilderPage() {
       levelOrder: levelIdx + 1,
       levelName: l.levelName?.trim() || null,
       quorum: l.quorum,
+      levelType: l.levelType || "APPROVAL",
       approvers: l.approvers.map((a, approverIdx) => ({
         entryOrder: approverIdx + 1,
         sourceType: a.sourceType,

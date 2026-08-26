@@ -81,6 +81,28 @@ export default function CandidateFilterBar({
   const removeSkill = (id) =>
     onSkillsChange(skills.filter((s) => s.canonical_skill_id !== id));
 
+  const currentFilters = () => ({
+    skill_ids: skills.map((s) => s.canonical_skill_id),
+    skill_names: skills.map((s) => s.canonical_name),
+    stage: stageFilter || null,
+  });
+
+
+
+
+  // S03-T03 — CampaignDetails/CandidatesTab keep the address bar in sync with
+  // every active filter (tab, stage, skills, score range, resume filters,
+  // page), so the current URL already *is* the shareable link.
+  const handleShare = async () => {
+    const url = window.location.href;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Filter link copied to clipboard.", { autoClose: 3000 });
+    } catch {
+      toast.info(url);
+    }
+  };
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm space-y-2">
       <div className="flex flex-wrap items-center gap-2">

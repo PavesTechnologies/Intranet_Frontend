@@ -8,8 +8,12 @@ import { INVOICE_SUMMARY_KEY } from "./useInvoiceSummary";
  * resolves once its matching *active* queries have actually refetched, not just when they're
  * marked stale. Awaiting it there keeps the mutation pending until the invoice list/detail have
  * genuinely reloaded, instead of letting the UI (e.g. closing a confirm dialog) move on first.
+ *
+ * Exported for InvoiceUploadPage, which invalidates once the extract-fields/validate-fields
+ * pipeline reaches a terminal state — not automatically here, since neither mutation alone
+ * reflects the invoice's final persisted state.
  */
-function invalidateInvoices(queryClient, invoiceId) {
+export function invalidateInvoices(queryClient, invoiceId) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: ["accountsPayable", "invoices"] }),
     queryClient.invalidateQueries({ queryKey: INVOICE_SUMMARY_KEY }),
@@ -18,18 +22,40 @@ function invalidateInvoices(queryClient, invoiceId) {
 }
 
 /**
- * The only invoice mutation with a real, direct backend endpoint outside the OCR review,
- * matching and approval flows (see useReviewQueue.js, useInvoiceMatching.js,
- * useInvoiceApprovals.js for those). Everything previously stubbed here (OCR corrections,
- * resubmit, validate, reject-validation) has either moved to a real endpoint or been retired as
- * backend-dependent — see the AP Integration Ledger.
+ * Stage 1 of the upload pipeline: the real OCR/field extraction request (~30s, no backend
+ * progress tracking). See InvoiceUploadPage for orchestration with useValidateInvoiceFieldsMutation
+ * and useInvoiceValidationProgress.
  * @param {File} file
  */
-export function useUploadInvoiceMutation() {
+export function useExtractInvoiceFieldsMutation() {
+  return useMutation({
+    mutationFn: (file) => invoiceService.extractInvoiceFields(file),
+  });
+}
+
+/**
+ * Stage 2 of the upload pipeline: queues background field validation for the invoice just
+ * extracted by useExtractInvoiceFieldsMutation. Resolves immediately with { job_id, status:
+ * "QUEUED" } — actual per-stage progress comes from useInvoiceValidationProgress.
+ * @param {Object} extractionResult - raw extract-fields response
+ */
+export function useValidateInvoiceFieldsMutation() {
+  return useMutation({
+    mutationFn: (extractionResult) => invoiceService.validateInvoiceFields(extractionResult),
+  });
+}
+
+/**
+ * Stage 3 of the upload pipeline: persists the invoice once the user confirms the processing
+ * result ("Save Invoice"). The invoice isn't created until this succeeds — extract-fields and
+ * validate-fields never persist anything on their own.
+ * @param {Object} extractionResult - the same raw extract-fields response sent to validate-fields
+ */
+export function useCreateInvoiceMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (file) => invoiceService.uploadInvoice(file),
-    onSuccess: () => invalidateInvoices(queryClient),
+    mutationFn: (extractionResult) => invoiceService.createInvoice(extractionResult),
+    onSuccess: (data) => invalidateInvoices(queryClient, data?.invoice_id),
   });
 }
 

@@ -93,7 +93,10 @@ export const useReviewLineItem = () => {
   return useMutation({
     mutationFn: ({ reportId, lineItemId, decision, comment }) =>
       approvalWorkflowApi.reviewLineItem(reportId, lineItemId, decision, comment).then(unwrap),
-    onSuccess: (_data, { reportId }) => invalidateApprovalCaches(qc, reportId),
+    // Refresh on failure too, not just success: a rejection here (e.g. the level has already moved
+    // on to Finance Verification since this queue was last fetched) means the row shown was already
+    // stale - re-fetching immediately clears it instead of leaving it sitting there to be retried.
+    onSettled: (_data, _err, { reportId }) => invalidateApprovalCaches(qc, reportId),
   });
 };
 
@@ -101,7 +104,7 @@ export const useRejectReport = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ reportId, comment }) => approvalWorkflowApi.rejectReport(reportId, comment).then(unwrap),
-    onSuccess: (_data, { reportId }) => invalidateApprovalCaches(qc, reportId),
+    onSettled: (_data, _err, { reportId }) => invalidateApprovalCaches(qc, reportId),
   });
 };
 
@@ -109,6 +112,6 @@ export const useBulkApprove = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (reportId) => approvalWorkflowApi.bulkApprove(reportId).then(unwrap),
-    onSuccess: (_data, reportId) => invalidateApprovalCaches(qc, reportId),
+    onSettled: (_data, _err, reportId) => invalidateApprovalCaches(qc, reportId),
   });
 };

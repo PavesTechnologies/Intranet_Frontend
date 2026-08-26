@@ -153,20 +153,74 @@ export const invoiceService = {
 },
 
   /**
-   * Uploads a new invoice document for OCR/validation processing.
+   * Runs OCR/field extraction on a newly uploaded invoice document. This is the real extraction
+   * operation (~30s) — there is no Redis progress tracking for it, so callers can only observe
+   * its request lifecycle (pending → resolved/rejected), not sub-stage progress.
    * @param {File} file
-   * @returns {Promise<Object>} raw process-invoice response (invoice_id / inbound_document_id /
+   * @returns {Promise<Object>} raw extract-fields response (invoice_id / inbound_document_id /
    *   invoice_status / extracted_invoice) — consumed directly by InvoiceUploadPage, not mapped
    *   through mapInvoiceRecord since it isn't an InvoiceDetailsResponse.
    */
-  async uploadInvoice(file) {
+  async extractInvoiceFields(file) {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const response = await api.post(`${AP_BASE_URL}/invoice/process-invoice`, formData);
+      const response = await api.post(`${AP_BASE_URL}/invoice-extract/extract-fields`, formData);
       return response.data;
     } catch (error) {
-      console.error("Error in invoiceService.uploadInvoice:", error);
+      console.error("Error in invoiceService.extractInvoiceFields:", error);
+      throw withNormalizedStatus(error);
+    }
+  },
+
+  /**
+   * Queues the background validation pipeline for a just-extracted invoice. Returns immediately
+   * with { job_id, status: "QUEUED" } — the per-stage validation (extraction/vendor/buyer/gst)
+   * runs asynchronously on the backend and must be polled via getInvoiceValidationStatus.
+   * @param {Object} extractionResult - the raw extract-fields response, forwarded as-is
+   * @returns {Promise<{job_id: string, status: string}>}
+   */
+  async validateInvoiceFields(extractionResult) {
+    try {
+      const response = await api.post(`${AP_BASE_URL}/invoice-extract/validate-fields`, extractionResult);
+      return response.data;
+    } catch (error) {
+      console.error("Error in invoiceService.validateInvoiceFields:", error);
+      throw withNormalizedStatus(error);
+    }
+  },
+
+  /**
+   * Polls the Redis-backed status of a queued validation job.
+   * @param {string} jobId
+   * @returns {Promise<Object>} { job_id, status, current_stage, stages, is_valid,
+   *   requires_manual_review, issues }
+   */
+  async getInvoiceValidationStatus(jobId) {
+    try {
+      const response = await api.get(
+        `${AP_BASE_URL}/invoice-extract/validate-fields/${encodeURIComponent(jobId)}/status`,
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error in invoiceService.getInvoiceValidationStatus:", error);
+      throw withNormalizedStatus(error);
+    }
+  },
+
+  /**
+   * Persists the invoice once extraction/validation have finished — the invoice does not exist
+   * until this call succeeds. Takes the same payload that was sent to validateInvoiceFields.
+   * @param {Object} extractionResult - the raw extract-fields response, forwarded as-is
+   * @returns {Promise<Object>} { invoice_id, invoice_number, vendor_id, inbound_document_id,
+   *   invoice_attachment_id, status_code, line_count, skipped_line_count, warnings }
+   */
+  async createInvoice(extractionResult) {
+    try {
+      const response = await api.post(`${AP_BASE_URL}/invoice-extract/create-invoice`, extractionResult);
+      return response.data;
+    } catch (error) {
+      console.error("Error in invoiceService.createInvoice:", error);
       throw withNormalizedStatus(error);
     }
   },

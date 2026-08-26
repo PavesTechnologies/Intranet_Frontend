@@ -97,6 +97,14 @@ const accountReceivableSubmenu = [
       },
     ],
   },
+  {
+    label: "Tax Calculation",
+    to: "/account-receivable/tax-calculation",
+  },
+  {
+    label: "Configurations",
+    to: "/account-receivable/master-data",
+  },
 ];
 
 const airsSubmenu = [
@@ -112,17 +120,28 @@ const airsSubmenu = [
   { label: "Settings", to: "/airs/settings" },
 ];
 
+// Interview Calendar (/airs/interview-calendar) is HR_ADMIN/RECRUITER only
+// — same roles the tab it replaced was gated to — so like Prompt Templates
+// below, it's added directly to those two submenus rather than to the
+// shared airsSubmenu, which would leak it into the HIRING_MANAGER/HR
+// fallback menu further down.
+const interviewCalendarItem = { label: "Interview Calendar", to: "/airs/interview-calendar" };
+
 // HR_ADMIN gets a trimmed-down AIRS menu — only these items, plus
 // Prompt Templates below (HR_ADMIN-only, not part of the general airsSubmenu).
 const hrAdminAirsSubmenu = [
   ...airsSubmenu.filter((item) => ["Dashboard", "JD Management", "Skill Ontology", "Campaigns", "Pipeline", "Talent Pool"].includes(item.label)),
+  interviewCalendarItem,
   { label: "Prompt Templates", to: "/airs/prompt-templates" },
 ];
 
 // RECRUITER gets a trimmed-down AIRS menu — only these items.
-const recruiterAirsSubmenu = airsSubmenu.filter((item) =>
-  ["Dashboard", "Campaigns", "Resume Intake", "Pipeline", "Talent Pool"].includes(item.label),
-);
+const recruiterAirsSubmenu = [
+  ...airsSubmenu.filter((item) =>
+    ["Dashboard", "Campaigns", "Resume Intake", "Pipeline", "Talent Pool"].includes(item.label),
+  ),
+  interviewCalendarItem,
+];
 
 
 const deliveryManagerResourceManagementSubmenu =
@@ -421,7 +440,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
     }, 200);
   };
 
-  const resourceManagementItems = isAdmin
+  const resourceManagementItems = isAdmin || isRM
     ? resourceManagementSubmenu
     : isDM
       ? deliveryManagerResourceManagementSubmenu

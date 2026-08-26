@@ -1,5 +1,5 @@
 import React, { useState, lazy, Suspense } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import useCandidateDetail from "../hooks/useCandidateDetail";
 import CandidateHeader from "./components/CandidateHeader";
@@ -19,6 +19,7 @@ const ResumeTab = lazy(() => import("./tabs/Resume/ResumeTab"));
 const DeterministicScoreTab = lazy(() => import("./tabs/Deterministic/DeterministicScoreTab"));
 const SemanticScoreTab = lazy(() => import("./tabs/Semantic/SemanticScoreTab"));
 const AiEvaluationTab = lazy(() => import("./tabs/AiEvaluation/AiEvaluationTab"));
+const InterviewTab = lazy(() => import("./tabs/Interview/InterviewTab"));
 const FinalStatusTab = lazy(() => import("./tabs/FinalStatus/FinalStatusTab"));
 
 const TABS = [
@@ -28,13 +29,22 @@ const TABS = [
   { id: "semantic", label: SCORE_LABELS.semantic, Component: SemanticScoreTab },
   { id: "ai", label: SCORE_LABELS.ai, Component: AiEvaluationTab },
   { id: "finalStatus", label: "Final Status", Component: FinalStatusTab },
+  { id: "interview", label: "Interview", Component: InterviewTab }, 
 ];
 
 export default function CandidateScorePage() {
   const { candidateId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { candidate, loading, error, refetch } = useCandidateDetail(candidateId);
-  const [activeTab, setActiveTab] = useState(TABS[0].id);
+  // Lets a caller (e.g. the Interview Calendar's event chips) deep-link
+  // straight into a specific tab via ?tab=interview instead of always
+  // landing on the default Summary tab. Read once on mount — this page
+  // doesn't keep the URL in sync as the user switches tabs afterwards.
+  const [activeTab, setActiveTab] = useState(() => {
+    const requested = searchParams.get("tab");
+    return TABS.some((t) => t.id === requested) ? requested : TABS[0].id;
+  });
   const [exporting, setExporting] = useState(false);
   const { user, hasRole } = useAuth();
   const isHrAdmin = hasRole(["HR_ADMIN"]);

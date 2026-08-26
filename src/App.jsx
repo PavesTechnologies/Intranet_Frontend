@@ -141,6 +141,8 @@ import IntakeFlowPage from "./pages/airs/resume-intake/intake/IntakeFlowPage.jsx
 import ReviewPage from "./pages/airs/resume-intake/intake/ReviewPage.jsx";
 import CandidateRankingPage from "./pages/airs/candidates/CandidateRankingPage.jsx";
 import CandidateScorePage from "./pages/airs/candidates/CandidateScore/CandidateScorePage.jsx";
+import InterviewQueuePage from "./pages/airs/interview-queue/InterviewQueuePage.jsx";
+import InterviewCalendarPage from "./pages/airs/interview-calendar/InterviewCalendarPage.jsx";
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
 import PipelineCandidateScorecardPage from "./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
@@ -197,8 +199,6 @@ import XmsOcrProcessingPage from "./pages/expense-management/pages/receipts/OcrP
 import XmsRequestAdvancePage from "./pages/expense-management/pages/cash-advance/RequestAdvancePage.jsx";
 import XmsMyAdvancesPage from "./pages/expense-management/pages/cash-advance/MyAdvancesPage.jsx";
 import XmsSettlementPage from "./pages/expense-management/pages/cash-advance/SettlementPage.jsx";
-import XmsPendingApprovalsPage from "./pages/expense-management/approval-engine/pages/PendingApprovalsPage.jsx";
-import XmsApprovalHistoryPage from "./pages/expense-management/approval-engine/pages/ApprovalHistoryPage.jsx";
 import XmsApprovalsPage from "./pages/expense-management/approval-engine/pages/ApprovalsPage.jsx";
 import XmsApprovalFlowsPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowsPage.jsx";
 import XmsApprovalFlowBuilderPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowBuilderPage.jsx";
@@ -208,6 +208,7 @@ import XmsDelegationsPage from "./pages/expense-management/approval-engine/pages
 import XmsVerificationPage from "./pages/expense-management/pages/finance/VerificationPage.jsx";
 import XmsReimbursementsPage from "./pages/expense-management/pages/finance/ReimbursementsPage.jsx";
 import XmsPaymentStatusPage from "./pages/expense-management/pages/finance/PaymentStatusPage.jsx";
+import XmsApPaymentQueuePage from "./pages/expense-management/pages/ap-payments/ApPaymentQueuePage.jsx";
 import XmsBillableExpensesPage from "./pages/expense-management/pages/client-billing/BillableExpensesPage.jsx";
 import XmsInvoiceHandoffPage from "./pages/expense-management/pages/client-billing/InvoiceHandoffPage.jsx";
 import XmsInvoiceStatusPage from "./pages/expense-management/pages/client-billing/InvoiceStatusPage.jsx";
@@ -255,6 +256,7 @@ import Profile from "./pages/UserManagement/user/Profile";
 import EditProfile from "./pages/UserManagement/user/EditProfile";
 
 import Register from "./pages/UserManagement/auth/Register";
+import InterviewFeedbackFormPage from "./pages/public/InterviewFeedbackFormPage.jsx";
 
 
 // ✅ Leave Management
@@ -286,6 +288,14 @@ import BillingConfigurations from "./pages/account_receivable/pages/BillingConfi
 import NewConfigurationWizard from "./pages/account_receivable/pages/NewConfigurationWizard.jsx";
 import BillingDataAcquisition from "./pages/account_receivable/pages/BillingDataAcquisition.jsx";
 import AcquisitionDetail from "./pages/account_receivable/pages/AcquisitionDetail.jsx";
+import TaxCalculationPage from "./pages/account_receivable/pages/TaxCalculation.jsx";
+import Configurations from "./pages/account_receivable/pages/Configurations.jsx";
+import MasterDataOverview from "./pages/account_receivable/pages/master-data/MasterDataOverview.jsx";
+import BillingTypeMasterPage from "./pages/account_receivable/pages/master-data/BillingTypeMasterPage.jsx";
+import BillingFrequencyMasterPage from "./pages/account_receivable/pages/master-data/BillingFrequencyMasterPage.jsx";
+import PaymentTermsMasterPage from "./pages/account_receivable/pages/master-data/PaymentTermsMasterPage.jsx";
+import TaxConfigurationMasterPage from "./pages/account_receivable/pages/master-data/TaxConfigurationMasterPage.jsx";
+import TaxConfigurationRegionDetailPage from "./pages/account_receivable/pages/master-data/TaxConfigurationRegionDetailPage.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -418,6 +428,9 @@ const AppRoutes = () => {
         {/* Public Route */}
         <Route path="/" element={<LoginPage />} />
         <Route path="/register" element={<Register />} />
+        {/* Fully public, unauthenticated — no session, no app shell. See
+            src/pages/public/InterviewFeedbackFormPage.jsx. */}
+        <Route path="/interview-feedback/:token" element={<InterviewFeedbackFormPage />} />
 
         {/* Unauthorized should be here */}
         <Route path="/unauthorized" element={<Unauthorized />} />
@@ -532,14 +545,14 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
-          <Route
+          {/* <Route
             path={AP_ROUTES.PAYMENT_QUEUE_DETAIL()}
             element={
               <ProtectedRoute allowedRoles={["AP_Executive", "Admin", "Super_Admin"]}>
                 <PaymentDetailsPage />
               </ProtectedRoute>
             }
-          />
+          /> */}
           <Route
             path={AP_ROUTES.PAYMENT_READY}
             element={
@@ -656,7 +669,55 @@ const AppRoutes = () => {
               path="billing-data-acquisition/:projectId"
               element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><AcquisitionDetail /></ProtectedRoute>}
             />
+            <Route
+              path="tax-configuration"
+              element={<Navigate to="/account-receivable/master-data/tax-configuration" replace />}
+            />
+            <Route
+              path="tax-calculation"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxCalculationPage /></ProtectedRoute>}
+            />
+            <Route
+              path="tax-calculation/:snapshotId"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxCalculationPage /></ProtectedRoute>}
+            />
+            <Route
+              path="configurations"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><Configurations /></ProtectedRoute>}
+            />
+            <Route
+              path="configuration"
+              element={<Navigate to="configurations" replace />}
+            />
             {/* Configuration history removed — not supported by backend */}
+            <Route
+              path="master-data"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><MasterDataOverview /></ProtectedRoute>}
+            />
+            <Route
+              path="master-data/billing-types"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingTypeMasterPage /></ProtectedRoute>}
+            />
+            <Route
+              path="master-data/billing-frequency"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingFrequencyMasterPage /></ProtectedRoute>}
+            />
+            <Route
+              path="master-data/payment-terms"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><PaymentTermsMasterPage /></ProtectedRoute>}
+            />
+            <Route
+              path="master-data/tax-regions"
+              element={<Navigate to="/account-receivable/master-data/tax-configuration" replace />}
+            />
+            <Route
+              path="master-data/tax-configuration"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxConfigurationMasterPage /></ProtectedRoute>}
+            />
+            <Route
+              path="master-data/tax-configuration/:taxRegionId"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxConfigurationRegionDetailPage /></ProtectedRoute>}
+            />
           </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />
           <Route path="/profile" element={<Profile />} />
@@ -1171,19 +1232,35 @@ const AppRoutes = () => {
 
           <Route
             path="/resource-management/projects"
-            element={<RMSProjectList />}
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
+                <RMSProjectList />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/resource-management/projects/:projectId"
-            element={<RMSProjectDetails />}
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
+                <RMSProjectDetails />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/resource-management/workforce-availability"
-            element={<WorkforceAvailability />}
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
+                <WorkforceAvailability />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/resource-management/workforce-availability/resource/:resourceId"
-            element={<ResourceIntelligenceCenter />}
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Resource_Manager"]}>
+                <ResourceIntelligenceCenter />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/resource-management/demand"
@@ -1293,6 +1370,18 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+          {/* Was a tab inside CampaignDetails.jsx — moved to its own page with
+              a campaign selector. Same roles that could see that tab
+              (canSeePipeline = HR_ADMIN/RECRUITER); HIRING_MANAGER is
+              deliberately excluded, matching the tab's old visibility. */}
+          <Route
+            path="/airs/interview-calendar"
+            element={
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER"]}>
+                <InterviewCalendarPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/airs/resume-intake"
             element={
@@ -1330,6 +1419,14 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute roles={["General"]}>
                 <CandidateScorePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/airs/interview-queue"
+            element={
+              <ProtectedRoute allowedRoles={["HIRING_MANAGER", "HR_ADMIN"]}>
+                <InterviewQueuePage />
               </ProtectedRoute>
             }
           />
@@ -1376,7 +1473,7 @@ const AppRoutes = () => {
           <Route
             path="/airs/settings"
             element={
-              <ProtectedRoute roles={["General"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
                 <SettingsPage />
               </ProtectedRoute>
             }
@@ -1479,6 +1576,7 @@ const AppRoutes = () => {
           <Route path="/expense-management/finance/verification" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsVerificationPage /></ProtectedRoute>} />
           <Route path="/expense-management/finance/reimbursements" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsReimbursementsPage /></ProtectedRoute>} />
           <Route path="/expense-management/finance/payment-status" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsPaymentStatusPage /></ProtectedRoute>} />
+          <Route path="/expense-management/ap-payments/queue" element={<ProtectedRoute allowedRoles={["AP_Executive"]}><XmsApPaymentQueuePage /></ProtectedRoute>} />
 
           <Route path="/expense-management/client-billing/billable-expenses" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsBillableExpensesPage /></ProtectedRoute>} />
           <Route path="/expense-management/client-billing/invoice-handoff" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsInvoiceHandoffPage /></ProtectedRoute>} />

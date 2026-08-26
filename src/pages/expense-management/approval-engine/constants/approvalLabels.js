@@ -27,12 +27,18 @@ export const SOURCE_TYPE_LABELS = {
   REPORTING_MANAGER: "Reporting Manager",
   DEPARTMENT_OWNER: "Department Owner",
   COST_CENTER_OWNER: "Cost Center Owner",
+  FINANCE_OWNER: "Finance Owner (by Cost Center)",
 };
 
 export const QUORUM_LABELS = {
   SEQUENTIAL: "Sequential",
   ANY_OF: "Any Of",
   ALL_OF: "All Of",
+};
+
+export const LEVEL_TYPE_LABELS = {
+  APPROVAL: "Approval",
+  FINANCE_VERIFICATION: "Finance Verification",
 };
 
 export const formatMoney = (amount, currencyCode) =>
@@ -52,6 +58,19 @@ export const formatDateTime = (value) => {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleString("en-IN", { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+};
+
+/**
+ * Rewrites the one backend guard message that's genuinely confusing out of context: it fires when
+ * an action is attempted on a report whose active level has moved on (e.g. into Finance
+ * Verification) since the caller's queue was last fetched - a stale-row race, not a real mistake by
+ * the approver. Every other backend error message is shown as-is (already written for end users).
+ */
+export const friendlyApprovalError = (rawMessage, fallback = "Action failed") => {
+  if (rawMessage && rawMessage.includes("use the Finance Verification API")) {
+    return "This report has already moved on to Finance Verification since your queue last refreshed - it's been removed from your list, no action needed.";
+  }
+  return rawMessage || fallback;
 };
 
 const describeCriterion = (c) => `${FIELD_LABELS[c.field] || c.field} ${OPERATOR_LABELS[c.operator] || c.operator} ${c.value}`;

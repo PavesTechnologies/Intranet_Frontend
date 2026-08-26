@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
@@ -7,7 +7,7 @@ import {
   ExternalLink, ListChecks,
   RotateCcw, Inbox, AlertOctagon, Hourglass, PieChart,
   Send, Flag, SkipForward, Lightbulb, FileUp,
-  ArrowRightLeft, Ban, Download
+  ArrowRightLeft, Ban, Mail, Download
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
@@ -40,6 +40,7 @@ import {
   getStageTiming, filterCandidatesBySkills, filterCandidates,
 } from "../dashboard/services/dashboardService";
 import CandidateFilterBar from "./components/CandidateFilterBar";
+import { bulkSendRejectionEmail } from "../candidates/services/candidateScoreService";
 
 // Colour per pipeline stage (used for the funnel bars)
 const STAGE_COLORS = {
@@ -58,13 +59,17 @@ const fmtDate = (d) => (d ? new Date(d).toLocaleString() : "—");
 export default function CampaignDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { canManageCampaigns, canViewPipeline, canViewTimeline } = useCampaignPermissions();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { canManageCampaigns, canViewPipeline, canViewTimeline, isHiringManager, isHRAdmin } = useCampaignPermissions();
+  const canReviewInterviews = isHiringManager || isHRAdmin;
 
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
-  // ?tab=&stage= let the dashboard quick links land directly
-  // on a stage-filtered candidate list, and make that view bookmarkable.
+  // ?tab=&stage= let the dashboard quick links (M11-E01-S03-T01) land directly
+  // on a stage-filtered candidate list, and make that view bookmarkable. Kept
+  // in sync (below) as the user switches tabs/stages so that navigating away
+  // to a candidate's scorecard and hitting "back" returns to this same URL —
+  // otherwise the browser-history entry never reflected the tab you were on.
   const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") || "details");
   const [editOpen, setEditOpen] = useState(false);
   // lifecycle actions — only one of these is ever open at a time
@@ -73,6 +78,17 @@ export default function CampaignDetails() {
   const [candidateStageFilter, setCandidateStageFilter] = useState(
     () => (searchParams.get("stage") || "").toUpperCase(),
   );
+
+  useEffect(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", activeTab);
+      if (candidateStageFilter) next.set("stage", candidateStageFilter);
+      else next.delete("stage");
+      return next;
+    }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, candidateStageFilter]);
 
   // Refreshing must not go through `loading`: that flag drives a full-page
   // spinner which unmounts the whole tree, including any open modal, so a
@@ -235,7 +251,9 @@ export default function CampaignDetails() {
           campaignId={id}
           isActive={isActive}
           canViewTiming={canViewTimeline}
+          canReviewInterviews={canReviewInterviews}
           onViewCandidates={() => navigate(`/airs/candidates?campaign=${id}`)}
+          onReviewInterviews={() => navigate(`/airs/interview-queue?campaign=${id}`)}
           onStageClick={(stage) => {
             setCandidateStageFilter(stage);
             setActiveTab("candidates");
@@ -473,29 +491,88 @@ function DetailsTab({ info, jd, scoring, limits, hm }) {
   );
 }
 
+// Reconstructs the CandidatesTab filter state from the URL — mirrors
+// serializeCandidateFilters below. Kept outside the component so it's usable
+// as a useState initializer (only ever runs once, on mount).
+function parseCandidateFilters(searchParams) {
+  const ids = searchParams.getAll("skill_ids");
+  const names = searchParams.getAll("skill_names");
+  const degrees = searchParams.get("degrees");
+  return {
+    skills: ids.map((id, i) => ({ canonical_skill_id: id, canonical_name: names[i] || "Skill" })),
+    resumeFilters: {
+      experience_min: searchParams.get("exp_min") || undefined,
+      experience_max: searchParams.get("exp_max") || undefined,
+      include_unknown_experience: searchParams.get("include_unknown") === "0" ? false : undefined,
+      degree_levels: degrees ? degrees.split(",").filter(Boolean) : undefined,
+      uploaded_by: searchParams.get("uploaded_by") || undefined,
+      upload_type: searchParams.get("upload_type") || undefined,
+      uploaded_from: searchParams.get("uploaded_from") || undefined,
+      uploaded_to: searchParams.get("uploaded_to") || undefined,
+    },
+    scoreFilters: {
+      min: searchParams.get("score_min") || "",
+      max: searchParams.get("score_max") || "",
+      recommendation: searchParams.get("score_rec") || "",
+    },
+    page: Number(searchParams.get("page")) || 1,
+  };
+}
+
+// Mirrors the candidate filters into the URL so that browsing back from a
+// candidate's scorecard (a separate route) returns to this exact view instead
+// of a blank Candidates tab — the browser-history entry for this page only
+// reflects whatever the URL was at the time of navigating away.
+function serializeCandidateFilters(prev, { skills, resumeFilters, scoreFilters, page }) {
+  const next = new URLSearchParams(prev);
+  ["skill_ids", "skill_names", "exp_min", "exp_max", "include_unknown", "degrees",
+    "uploaded_by", "upload_type", "uploaded_from", "uploaded_to",
+    "score_min", "score_max", "score_rec", "page"].forEach((k) => next.delete(k));
+  skills.forEach((s) => {
+    next.append("skill_ids", s.canonical_skill_id);
+    next.append("skill_names", s.canonical_name);
+  });
+  if (resumeFilters.experience_min) next.set("exp_min", resumeFilters.experience_min);
+  if (resumeFilters.experience_max) next.set("exp_max", resumeFilters.experience_max);
+  if (resumeFilters.include_unknown_experience === false) next.set("include_unknown", "0");
+  if (resumeFilters.degree_levels?.length) next.set("degrees", resumeFilters.degree_levels.join(","));
+  if (resumeFilters.uploaded_by) next.set("uploaded_by", resumeFilters.uploaded_by);
+  if (resumeFilters.upload_type) next.set("upload_type", resumeFilters.upload_type);
+  if (resumeFilters.uploaded_from) next.set("uploaded_from", resumeFilters.uploaded_from);
+  if (resumeFilters.uploaded_to) next.set("uploaded_to", resumeFilters.uploaded_to);
+  if (scoreFilters.min !== "") next.set("score_min", scoreFilters.min);
+  if (scoreFilters.max !== "") next.set("score_max", scoreFilters.max);
+  if (scoreFilters.recommendation) next.set("score_rec", scoreFilters.recommendation);
+  if (page > 1) next.set("page", String(page));
+  return next;
+}
+
 /* ---------------- Candidates Tab ---------------- */
 function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialFilters = useMemo(() => parseCandidateFilters(searchParams), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [candidates, setCandidates] = useState(null);
   const [loading, setLoading] = useState(true);
   const [starredIds, setStarredIds] = useState(() => new Set());
-  const [currentPage, setCurrentPage] = useState(1);
-  // Selected skills, AND-combined server-side. null means "no
+  const [currentPage, setCurrentPage] = useState(initialFilters.page);
+  // M11-E03-S01 — selected skills, AND-combined server-side. null means "no
   // skill filter"; an empty array would mean "matched nothing".
-  const [skills, setSkills] = useState([]);
+  const [skills, setSkills] = useState(initialFilters.skills);
   const [skillMatchIds, setSkillMatchIds] = useState(null);
   // Experience / education / upload-source live in the resume,
   // so they resolve server-side to a set of ids, same as the skill filter.
-  const [resumeFilters, setResumeFilters] = useState({});
+  const [resumeFilters, setResumeFilters] = useState(initialFilters.resumeFilters);
   const [resumeMatchIds, setResumeMatchIds] = useState(null);
   // Score range and AI recommendation are already supported by the
   // list endpoint; these narrow the rows we fetched, AND-combined with the rest.
-  const [scoreFilters, setScoreFilters] = useState({ min: "", max: "", recommendation: "" });
+  const [scoreFilters, setScoreFilters] = useState(initialFilters.scoreFilters);
   // E04 — selection for bulk moves, note badges, and the one shared action modal
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [noteCounts, setNoteCounts] = useState({});
   const [action, setAction] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [sendingBulkRejectionEmail, setSendingBulkRejectionEmail] = useState(false);
   const { hasRole } = useAuth();
   const canAct = hasRole(["HR_ADMIN", "RECRUITER"]);
 
@@ -515,9 +592,21 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
     return () => { cancelled = true; };
   }, [campaignId, resumeFilters]);
 
+  // Skip the very first run — on mount, currentPage may have been restored
+  // from the URL (see initialFilters.page) and must not be reset to 1.
+  const skipNextPageReset = useRef(true);
   useEffect(() => {
+    if (skipNextPageReset.current) { skipNextPageReset.current = false; return; }
     setCurrentPage(1);
   }, [campaignId, stageFilter, skills]);
+
+  useEffect(() => {
+    setSearchParams(
+      (prev) => serializeCandidateFilters(prev, { skills, resumeFilters, scoreFilters, page: currentPage }),
+      { replace: true },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skills, resumeFilters, scoreFilters, currentPage]);
 
   // The AND logic lives in SQL (GROUP BY ... HAVING COUNT DISTINCT), so this
   // asks the server which candidates qualify and intersects locally.
@@ -627,6 +716,38 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
     });
   };
 
+  // Bulk "Send Rejection Email" — only worth showing once the selection
+  // includes at least one REJECTED candidate; the backend still validates
+  // per-id, so a mixed selection is fine, this just avoids showing the
+  // button for a selection that's guaranteed to skip every row.
+  const selectedRejectedCount = allCandidates.filter(
+    (c) => selectedIds.has(c.id) && (c.stage || "").toUpperCase() === "REJECTED"
+  ).length;
+
+  const handleBulkSendRejectionEmail = async () => {
+    const ids = [...selectedIds];
+    setSendingBulkRejectionEmail(true);
+    try {
+      const res = await bulkSendRejectionEmail(ids);
+      const queuedCount = res?.queued?.length ?? 0;
+      const failed = res?.failed || [];
+      if (queuedCount > 0) {
+        toast.success(`Rejection email sent to ${queuedCount} candidate${queuedCount === 1 ? "" : "s"}.`);
+      }
+      if (failed.length > 0) {
+        const nameFor = (id) => allCandidates.find((c) => c.id === id)?.name || id;
+        const preview = failed.slice(0, 5).map((f) => `${nameFor(f.campaign_candidate_id)} (${f.reason})`).join(", ");
+        const extra = failed.length > 5 ? `, +${failed.length - 5} more` : "";
+        toast.error(`${failed.length} skipped: ${preview}${extra}`);
+      }
+      setSelectedIds(new Set());
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Could not send rejection emails.");
+    } finally {
+      setSendingBulkRejectionEmail(false);
+    }
+  };
+
   return (<div className="space-y-4">
       <div className="flex justify-between items-end flex-wrap gap-2">
         <div>
@@ -704,6 +825,17 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
               {["SCREENING", "SHORTLISTED", "HM_REVIEW", "INTERVIEW", "SELECTED", "HOLD", "REJECTED"]
                 .map((s) => <option key={s} value={s}>{stageLabel(s)}</option>)}
             </select>
+            {selectedRejectedCount > 0 && (
+              <Button
+                variant="outline"
+                size="small"
+                onClick={handleBulkSendRejectionEmail}
+                loading={sendingBulkRejectionEmail}
+                loadingText="Sending..."
+              >
+                <Mail size={13} /> Send Rejection Email ({selectedRejectedCount})
+              </Button>
+            )}
             <button type="button" onClick={() => setSelectedIds(new Set())}
               className="text-[11px] text-indigo-700 font-semibold hover:underline">
               Clear
@@ -714,7 +846,8 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
 
       <CandidateTable
         candidates={pageItems}
-        onView={(c) => navigate(`/airs/pipeline/candidates/${c.id}`, { state: { resume: c } })}
+        onView={(c) => navigate(`/airs/candidates/${c.id}`)}
+        showViewButton={false}
         onToggleStar={toggleStar}
         selectable={canAct}
         selectedIds={selectedIds}
@@ -736,12 +869,16 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
               className="h-8 w-8 inline-flex items-center justify-center text-slate-400 hover:text-indigo-600">
               <ArrowRightLeft className="h-4 w-4" />
             </button>
-            {(c.stage || "").toUpperCase() !== "REJECTED" && (
+            {/* Fixed h-8 w-8 slot kept even when reject isn't applicable, so
+                rows without it don't shift the icons out of column alignment. */}
+            {(c.stage || "").toUpperCase() !== "REJECTED" ? (
               <button type="button" title="Reject with a reason"
                 onClick={(e) => { e.stopPropagation(); setAction({ kind: "reject", candidate: c }); }}
                 className="h-8 w-8 inline-flex items-center justify-center text-slate-400 hover:text-red-600">
                 <Ban className="h-4 w-4" />
               </button>
+            ) : (
+              <span className="h-8 w-8 inline-block" aria-hidden="true" />
             )}
           </>
         ) : undefined}
@@ -771,7 +908,7 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
 }
 
 /* ---------------- Pipeline Tab ---------------- */
-function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick, canViewTiming }) {
+function PipelineTab({ campaignId, isActive, onViewCandidates, onReviewInterviews, onStageClick, canViewTiming, canReviewInterviews }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   // HR_ADMIN-only overlay, fetched lazily on first toggle so
@@ -833,6 +970,11 @@ function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick, can
           {canViewTiming && (
             <Button size="small" variant={showTiming ? "secondary" : "outline"} onClick={toggleTiming}>
               <Clock className="h-3.5 w-3.5" /> {showTiming ? "Hide" : "Show"} Timing
+            </Button>
+          )}
+          {canReviewInterviews && (
+            <Button size="small" variant="outline" onClick={onReviewInterviews}>
+              Review Interviews <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           )}
           <Button size="small" variant="primary" onClick={onViewCandidates}>
@@ -1301,10 +1443,13 @@ function StalledTab({ campaignId }) {
             return (<div key={item.campaign_candidate_id} className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
                 <div className="flex flex-wrap justify-between items-center gap-2">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[11px] font-mono text-slate-500 truncate" title={item.campaign_candidate_id}>
-                        {String(item.campaign_candidate_id).slice(0, 8)}…
-                      </span>
+                    <div className="text-[13px] font-bold text-slate-900 truncate">
+                      {/* candidate_name isn't confirmed to exist on this endpoint's response yet —
+                          falls back to a short id-based placeholder rather than blank/undefined
+                          until that's confirmed either way. */}
+                      {item.candidate_name || `Candidate ${String(item.campaign_candidate_id).slice(0, 8)}…`}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap mt-1">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-indigo-50 text-indigo-700">
                         {item.pipeline_stage.replace(/_/g, " ")}
                       </span>
@@ -1315,6 +1460,10 @@ function StalledTab({ campaignId }) {
                     <p className="text-[10px] text-slate-400 mt-1">
                       Stalled {item.days_stalled} day(s) · last update {fmtDate(item.last_updated_at)}
                       {item.last_action_by && <> · last action by {item.last_action_by}</>}
+                      {" · "}
+                      <span className="font-mono" title={item.campaign_candidate_id}>
+                        {String(item.campaign_candidate_id).slice(0, 8)}…
+                      </span>
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 flex-wrap">

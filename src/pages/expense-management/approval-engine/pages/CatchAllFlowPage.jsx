@@ -8,7 +8,7 @@ import { useCatchAllFlow, useSaveCatchAllFlow } from "../hooks/useApprovalFlows"
 import LevelsBuilder from "../components/LevelsBuilder";
 import FlowPreview from "../components/FlowPreview";
 
-const emptyLevel = () => ({ id: crypto.randomUUID(), levelName: "", quorum: "SEQUENTIAL", approvers: [{ id: crypto.randomUUID(), sourceType: "REPORTING_MANAGER", sourceReference: "" }] });
+const emptyLevel = () => ({ id: crypto.randomUUID(), levelName: "", quorum: "SEQUENTIAL", levelType: "APPROVAL", approvers: [{ id: crypto.randomUUID(), sourceType: "REPORTING_MANAGER", sourceReference: "" }] });
 
 const toLocalLevels = (levels) =>
   (levels || []).map((l) => ({
@@ -16,6 +16,7 @@ const toLocalLevels = (levels) =>
     levelId: l.levelId,
     levelName: l.levelName || "",
     quorum: l.quorum,
+    levelType: l.levelType || "APPROVAL",
     approvers: (l.approvers || []).map((a) => ({ id: crypto.randomUUID(), entryId: a.entryId, sourceType: a.sourceType, sourceReference: a.sourceReference || "" })),
   }));
 
@@ -50,6 +51,7 @@ export default function CatchAllFlowPage() {
         levelOrder: levelIdx + 1,
         levelName: l.levelName?.trim() || null,
         quorum: l.quorum,
+        levelType: l.levelType || "APPROVAL",
         approvers: l.approvers.map((a, approverIdx) => ({
           entryOrder: approverIdx + 1,
           sourceType: a.sourceType,

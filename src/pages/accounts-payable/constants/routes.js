@@ -26,6 +26,10 @@ export const AP_ROUTES = {
   PAYMENT_MARK_PAID: (invoiceId = ":invoiceId") =>
     `${BASE}/payments/mark-paid/${invoiceId}`,
 
+  PAYMENT_QUEUE: `${BASE}/payment-queue`,
+  PAYMENT_QUEUE_DETAIL: (reportId = ":reportId") =>
+    `${BASE}/payment-queue/${reportId}`,
+
   REPORTS: `${BASE}/reports`,
   SETTINGS: `${BASE}/settings`,
   SYSTEM_CONFIG: `${BASE}/system-configuration`,
