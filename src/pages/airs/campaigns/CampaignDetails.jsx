@@ -10,7 +10,6 @@ import {
   ArrowRightLeft, Ban, Mail, Download
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
-import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
@@ -166,24 +165,8 @@ export default function CampaignDetails() {
   }[status] || "bg-slate-50 text-slate-600 border-slate-200";
 
   return (<div className="bg-[#F8FAFC] text-slate-900 font-sans min-h-screen p-6">
-      {/* Trail back to the dashboard. Campaign name is
-          truncated to 40 chars per spec; the current page is not a link. */}
-      <div className="mb-4">
-        <Breadcrumb
-          items={[
-            { label: "Dashboard", to: "/airs/dashboard" },
-            { label: "Campaigns", to: "/airs/campaigns" },
-            {
-              label: (info.name || "").length > 40
-                ? `${info.name.slice(0, 40)}…`
-                : (info.name || "Campaign"),
-            },
-          ]}
-        />
-      </div>
-
       {/* Header */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm mb-6 flex flex-col md:flex-row justify-between gap-4">
+      <div className="mb-6 flex flex-col md:flex-row justify-between gap-4">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
@@ -319,22 +302,6 @@ function Row({ label, value, className = "" }) {
   );
 }
 
-// Summary strip cell — cells sit flush against each other (divide-x, no
-// gutters) so the strip reads as one continuous band.
-function GlanceCell({ label, children }) {
-  return (<div className="px-5 py-4 flex-1 min-w-0">
-      <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400 mb-1.5">{label}</p>
-      {children}
-    </div>
-  );
-}
-
-const STATUS_PILL = {
-  ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  PAUSED: "bg-amber-50 text-amber-700 border-amber-200",
-  CLOSED: "bg-slate-100 text-slate-600 border-slate-300",
-};
-
 // Same palette the rejection-analytics chart uses, so a layer reads as the
 // same colour everywhere in the module.
 const SCORING_LAYERS = [
@@ -344,8 +311,6 @@ const SCORING_LAYERS = [
 ];
 
 function DetailsTab({ info, jd, scoring, limits, hm }) {
-  const status = (info.status || "").toUpperCase();
-
   // max_candidates is the number of openings, filled by SELECTED candidates —
   // intake is deliberately uncapped, so the gauge must not measure total
   // candidates against it.
@@ -364,53 +329,65 @@ function DetailsTab({ info, jd, scoring, limits, hm }) {
     ? SCORING_LAYERS.reduce((sum, l) => sum + Number(scoring[l.key] || 0), 0)
     : 0;
 
-  return (<div className="space-y-5">
-      {/* At-a-glance strip — the four numbers worth knowing before reading
-          anything else. Flush cells, full width, no empty slots. */}
+  return (<div className="space-y-6">
+      {/* At-a-glance strip — the numbers worth knowing before reading
+          anything else. Flush cells, full width, no empty slots. Status is
+          skipped here since it's already shown next to the campaign name. */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-        <GlanceCell label="Status">
-          <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${STATUS_PILL[status] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
-            {status || "—"}
-          </span>
-        </GlanceCell>
-
-        <GlanceCell label="Positions Filled">
+        <div className="px-5 py-4 flex-1 min-w-0">
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="h-7 w-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <Target className="h-3.5 w-3.5" />
+            </span>
+            <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400">Positions Filled</p>
+          </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-lg font-black text-slate-900 tabular-nums leading-none">{selected}</span>
             <span className="text-[11px] font-bold text-slate-400">
               {max == null ? "of unlimited openings" : `of ${max} opening${max === 1 ? "" : "s"}`}
             </span>
           </div>
-          {capPct != null && (<div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+          {capPct != null && (<div className="mt-2.5 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
               <div className={`h-1.5 rounded-full ${capTone} transition-all duration-500`} style={{ width: `${capPct}%` }} />
             </div>
           )}
           <p className="text-[10px] text-slate-400 mt-1.5">
             {totalCandidates} candidate{totalCandidates === 1 ? "" : "s"} in pipeline
           </p>
-        </GlanceCell>
+        </div>
 
-        <GlanceCell label="Deadline">
-          <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+        <div className="px-5 py-4 flex-1 min-w-0">
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="h-7 w-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+              <Clock className="h-3.5 w-3.5" />
+            </span>
+            <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400">Deadline</p>
+          </div>
+          <p className="text-xs font-bold text-slate-800">
             {limits.deadline ? fmtDate(limits.deadline) : "None set"}
           </p>
-        </GlanceCell>
+        </div>
 
-        <GlanceCell label="Job Description">
+        <div className="px-5 py-4 flex-1 min-w-0">
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="h-7 w-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <FileText className="h-3.5 w-3.5" />
+            </span>
+            <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400">Job Description</p>
+          </div>
           {jd.jd_id ? (<Link
               to={`/airs/jds/${jd.jd_id}`}
-              className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+              className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 min-w-0"
             >
               <span className="truncate">{jd.jd_title}</span>
               <ExternalLink className="h-3 w-3 shrink-0" />
             </Link>
           ) : (<p className="text-xs font-bold text-slate-800 truncate">{jd.jd_title ?? "—"}</p>
           )}
-          <p className="text-[10px] text-slate-400 mt-0.5">
+          <p className="text-[10px] text-slate-400 mt-1">
             v{jd.version_number ?? "—"} · {jd.jurisdiction ?? "—"} · {jd.mandatory_skill_count ?? 0} mandatory skills
           </p>
-        </GlanceCell>
+        </div>
       </div>
 
       {/* Two equal-height cards. Scoring is null for HIRING_MANAGER, in which

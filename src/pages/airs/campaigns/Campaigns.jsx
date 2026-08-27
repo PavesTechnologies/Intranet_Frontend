@@ -401,15 +401,15 @@ export default function Campaigns() {
       </div>
 
       {/* Toolbar: search + status filter */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center mb-6">
-        <div className="relative flex-1 max-w-[360px]">
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-end mb-6">
+        <div className="relative flex-1 max-w-[560px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             type="text"
             placeholder="Search by name, JD, or hiring manager..."
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white shadow-sm"
+            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white shadow-sm"
           />
         </div>
         <div className="w-44">
@@ -473,7 +473,7 @@ export default function Campaigns() {
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_BADGE[status] || "bg-slate-50 text-slate-600"}`}>
                           {statusLabel(status)}
                         </span>
-                        {/* Edit shortcut — HR_ADMIN only, closed campaigns are read-only */}
+                        {/* Edit shortcut — HR_ADMIN only, closed campaigns are read-only
                         {canManageCampaigns && status !== "CLOSED" && (<button
                             onClick={(e) => handleEditClick(e, c)}
                             disabled={editLoadingId === c.id}
@@ -484,7 +484,7 @@ export default function Campaigns() {
                             ) : (<EditIcon className="h-3.5 w-3.5" />
                             )}
                           </button>
-                        )}
+                        )} */}
                       </div>
                     </div>
                     <p className="text-xs text-slate-500 font-medium mt-1">
