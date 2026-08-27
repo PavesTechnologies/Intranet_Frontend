@@ -422,9 +422,10 @@ export const getProcessingStatus = async (campaignId) => {
     }
 };
 
-export const getDeadLetterQueue = async (campaignId) => {
+export const getDeadLetterQueue = async (campaignId, params) => {
     try {
         const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/dead-letter-queue`, {
+            params,
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
         });
         return response.data;
