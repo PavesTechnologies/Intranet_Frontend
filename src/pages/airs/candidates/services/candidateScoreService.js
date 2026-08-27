@@ -103,6 +103,29 @@ export const sendRejectionEmail = async (campaignCandidateId) => {
   }
 };
 
+// Candidate Scorecard — Final Status tab —
+// POST /airs/campaign-candidates/{campaign_candidate_id}/send-selection-email
+// Only valid when pipeline_stage === "SELECTED" (backend-enforced); no
+// dedup lock (allow_resend=True server-side), so this is safe to call more
+// than once for the same candidate — same convention as sendRejectionEmail.
+export const sendSelectionEmail = async (campaignCandidateId) => {
+  try {
+    const response = await api.post(
+      `${BASE_URL}/campaign-candidates/${campaignCandidateId}/send-selection-email`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error sending selection email:", error);
+    throw error;
+  }
+};
+
 // Candidate list / Candidates tab — bulk version of the above.
 // POST /airs/campaign-candidates/bulk-send-rejection-email
 // Per-candidate validation (must be REJECTED) — a mixed batch returns

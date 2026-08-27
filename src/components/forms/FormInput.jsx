@@ -15,6 +15,7 @@ const FormInput = ({
   inputClassName = "",
   labelClassName = "",
   requiredMark = false,
+  onWheel,
   ...rest
 }) => (
   <div className={`space-y-1 ${className}`.trim()}>
@@ -38,6 +39,15 @@ const FormInput = ({
         error ? "border-red-300 focus:border-red-500 focus:ring-red-500/20" : "border-gray-300"
       } ${inputClassName}`.trim()}
       aria-invalid={Boolean(error)}
+      // Number inputs otherwise change value on scroll while focused (including
+      // flipping the sign on a negative value) — blur on wheel so scrolling the
+      // page never mutates the field.
+      onWheel={(event) => {
+        if (type === "number") {
+          event.target.blur();
+        }
+        onWheel?.(event);
+      }}
       {...rest}
     />
     {error ? <p className="text-xs text-red-500">{error}</p> : null}

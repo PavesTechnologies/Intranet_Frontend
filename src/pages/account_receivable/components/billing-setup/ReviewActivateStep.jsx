@@ -11,10 +11,6 @@ const RATE_PREVIEW_COUNT = 4;
 const RATE_PERIOD_SUFFIX = { HOURLY: "/ hr", DAILY: "/ day", WEEKLY: "/ wk" };
 const RATE_PERIOD_LABEL = { HOURLY: "Hourly", DAILY: "Daily", WEEKLY: "Weekly" };
 
-function formatBoolean(flag) {
-  return flag ? "Enabled" : "Disabled";
-}
-
 function formatDisplayDate(isoValue) {
   if (!isoValue || !/^\d{4}-\d{2}-\d{2}$/.test(isoValue)) return isoValue;
   const date = new Date(`${isoValue}T00:00:00`);
@@ -59,13 +55,10 @@ function getCommercialEffectiveDates(billingConfig) {
       to: billingConfig.timeAndMaterial?.effectiveTo || null,
     };
   }
-  if (billingType === "RECURRING" && billingMode === "MONTHLY_RETAINER") {
-    return { from: billingConfig.monthlyRetainer?.billingStartDate || null, to: null };
-  }
-  if (billingType === "RECURRING" && billingMode === "SUBSCRIPTION") {
+  if (billingType === "RECURRING") {
     return {
-      from: billingConfig.subscription?.startDate || null,
-      to: billingConfig.subscription?.endDate || null,
+      from: billingConfig.recurring?.recurringStartDate || null,
+      to: billingConfig.recurring?.recurringEndDate || null,
     };
   }
   return { from: null, to: null };
@@ -311,7 +304,7 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
             <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
               {billingTypeLabel}
             </span>
-            {pricingModel && ["TIME_MATERIAL", "RECURRING"].includes(billingConfig.billingType) && (
+            {pricingModel && billingConfig.billingType === "TIME_MATERIAL" && (
               <span className="text-xs font-medium text-slate-400">
                 {BILLING_MODE_LABELS[pricingModel] || pricingModel}
               </span>
@@ -337,31 +330,37 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
 
           {billingConfig.billingType === "FIXED_PRICE" && (() => {
             const fixedPrice = billingConfig.fixedPrice || {};
-            const contractValue = Number(fixedPrice.totalContractValue) || 0;
+            // Prefer the backend-calculated amounts (retentionAmount, billableAmount,
+            // remainingAmount) returned by the Fixed Price API over recomputing them
+            // client-side — the API is the source of truth for these derived values.
+            const hasContractValue =
+              fixedPrice.totalContractValue !== "" &&
+              fixedPrice.totalContractValue !== null &&
+              fixedPrice.totalContractValue !== undefined;
             const retentionPercent = Number(fixedPrice.retentionPercent) || 0;
             const hasRetention = Boolean(fixedPrice.retentionPercent) && retentionPercent > 0;
-            const retentionAmount = hasRetention ? contractValue * (retentionPercent / 100) : 0;
-            const billableAmount = contractValue - retentionAmount;
-            const advanceReceived = Number(fixedPrice.advanceReceived) || 0;
-            const hasAdvance = Boolean(fixedPrice.advanceReceived) && advanceReceived > 0;
-            const remainingReceivable = billableAmount - (hasAdvance ? advanceReceived : 0);
+            const hasAdvance = Boolean(fixedPrice.advanceReceived) && Number(fixedPrice.advanceReceived) > 0;
             const isOneTime = billingConfig.billingFrequency === "ONE_TIME";
+            const isPmsSourced = fixedPrice.contractValueSource === "PMS";
 
             return (
               <PricingTable
                 rows={[
-                  { label: "Contract Value", value: formatMoney(fixedPrice.totalContractValue, currency) },
+                  { label: "Contract Value", value: hasContractValue ? formatMoney(fixedPrice.totalContractValue, currency) : "—" },
+                  ...(isPmsSourced && fixedPrice.pmsProjectBudget !== "" && fixedPrice.pmsProjectBudget !== null && fixedPrice.pmsProjectBudget !== undefined
+                    ? [{ label: "PMS Project Budget", value: formatMoney(fixedPrice.pmsProjectBudget, currency) }]
+                    : []),
                   { label: "Retention %", value: hasRetention ? `${retentionPercent}%` : "—" },
                   {
                     label: "Retention Amount",
-                    value: hasRetention ? `-${formatMoney(retentionAmount, currency)}` : formatMoney(0, currency),
+                    value: hasRetention ? `-${formatMoney(fixedPrice.retentionAmount, currency)}` : formatMoney(0, currency),
                   },
-                  { label: "Billable Amount", value: formatMoney(billableAmount, currency) },
+                  { label: "Billable Amount", value: formatMoney(fixedPrice.billableAmount, currency) },
                   {
                     label: "Advance Received",
-                    value: hasAdvance ? `-${formatMoney(advanceReceived, currency)}` : formatMoney(0, currency),
+                    value: hasAdvance ? `-${formatMoney(fixedPrice.advanceReceived, currency)}` : formatMoney(0, currency),
                   },
-                  { label: "Remaining Receivable", value: formatMoney(remainingReceivable, currency) },
+                  { label: "Remaining Receivable", value: formatMoney(fixedPrice.remainingAmount, currency) },
                   {
                     label: "Billing Frequency / Billing Event",
                     value: `${billingFrequencyLabel} — ${isOneTime ? "Single (One-Time)" : "Scheduled per billing frequency"}`,
@@ -386,27 +385,32 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
             <PricingTable rows={[{ label: "Milestones", value: `${(billingConfig.milestones || []).length} defined` }]} />
           )}
 
-          {billingConfig.billingType === "RECURRING" && billingConfig.billingMode === "MONTHLY_RETAINER" && (
-            <PricingTable
-              rows={[
-                { label: "Monthly Retainer Amount", value: formatMoney(billingConfig.monthlyRetainer?.amount, currency) },
-                {
-                  label: "Auto Invoice Generation",
-                  value: formatBoolean(billingConfig.monthlyRetainer?.autoInvoiceGeneration),
-                },
-              ]}
-            />
-          )}
+          {billingConfig.billingType === "RECURRING" && (() => {
+            const recurring = billingConfig.recurring || {};
+            const isPmsSourced = recurring.contractValueSource === "PMS_BUDGET";
 
-          {billingConfig.billingType === "RECURRING" && billingConfig.billingMode === "SUBSCRIPTION" && (
-            <PricingTable
-              rows={[
-                { label: "Subscription Amount", value: formatMoney(billingConfig.subscription?.amount, currency) },
-                { label: "Billing Cycle", value: billingConfig.subscription?.billingCycle },
-                { label: "Auto Renewal", value: formatBoolean(billingConfig.subscription?.autoRenewal) },
-              ]}
-            />
-          )}
+            return (
+              <PricingTable
+                rows={[
+                  {
+                    label: "Contract Value",
+                    value: `${formatMoney(recurring.contractValue, currency) || "—"}${isPmsSourced ? " (from Project Budget)" : ""}`,
+                  },
+                  { label: "Billing Frequency", value: billingFrequencyLabel },
+                  {
+                    label: "Billing Period",
+                    value:
+                      recurring.recurringStartDate || recurring.recurringEndDate
+                        ? `${formatDisplayDate(recurring.recurringStartDate) || "—"} - ${
+                            formatDisplayDate(recurring.recurringEndDate) || "Ongoing"
+                          }`
+                        : null,
+                  },
+                  ...(recurring.remarks ? [{ label: "Remarks", value: recurring.remarks }] : []),
+                ]}
+              />
+            );
+          })()}
         </div>
       </SectionShell>
 

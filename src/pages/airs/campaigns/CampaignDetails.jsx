@@ -7,7 +7,7 @@ import {
   ExternalLink, ListChecks,
   RotateCcw, Inbox, AlertOctagon, Hourglass, PieChart,
   Send, Flag, SkipForward, Lightbulb, FileUp,
-  ArrowRightLeft, Ban, CalendarClock, Mail, Download
+  ArrowRightLeft, Ban, Mail, Download
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
@@ -22,7 +22,6 @@ import EditCampaignModal from "./components/EditCampaignModal";
 import ReopenCampaignModal from "./components/ReopenCampaignModal";
 import CandidateActionModals from "./components/CandidateActionModals";
 import CampaignExportPanel from "./components/CampaignExportPanel";
-import { exportBatchScorecards } from "./services/exportService";
 import { getNoteCounts } from "./services/candidateActionsService";
 import { useAuth } from "../../../contexts/AuthContext";
 import { REJECTION_LAYER_LABELS } from "../constants/scoreLabels";
@@ -41,7 +40,6 @@ import {
   getStageTiming, filterCandidatesBySkills, filterCandidates,
 } from "../dashboard/services/dashboardService";
 import CandidateFilterBar from "./components/CandidateFilterBar";
-import InterviewCalendarTab from "./components/InterviewCalendarTab";
 import { bulkSendRejectionEmail } from "../candidates/services/candidateScoreService";
 
 // Colour per pipeline stage (used for the funnel bars)
@@ -151,7 +149,6 @@ export default function CampaignDetails() {
     { id: "candidates", label: "Candidates", icon: ListChecks, show: true },
     { id: "pipeline", label: "Pipeline", icon: Users, show: canSeePipeline },
     { id: "processing", label: "Processing", icon: Inbox, show: canSeePipeline },
-    { id: "interview-calendar", label: "Interview Calendar", icon: CalendarClock, show: canSeePipeline },
     { id: "uploads", label: "Uploads", icon: FileUp, show: canSeePipeline },
     { id: "stalled", label: "Stalled", icon: Hourglass, show: canManageCampaigns },
     { id: "rejections", label: "Rejections", icon: PieChart, show: canSeePipeline },
@@ -265,7 +262,6 @@ export default function CampaignDetails() {
       )}
       {activeTab === "processing" && (<ProcessingTab campaignId={id} canManageCampaigns={canManageCampaigns} />
       )}
-      {activeTab === "interview-calendar" && <InterviewCalendarTab campaignId={id} />}
       {activeTab === "uploads" && <UploadsTab campaignId={id} />}
       {activeTab === "stalled" && canManageCampaigns && <StalledTab campaignId={id} />}
       {activeTab === "rejections" && (<RejectionsTab
@@ -579,7 +575,6 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const [sendingBulkRejectionEmail, setSendingBulkRejectionEmail] = useState(false);
   const { hasRole } = useAuth();
   const canAct = hasRole(["HR_ADMIN", "RECRUITER"]);
-  const isHRAdminUser = hasRole(["HR_ADMIN"]);
 
   useEffect(() => {
     let cancelled = false;
@@ -769,18 +764,14 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
         )}
       </div>
 
-      {/* Skill search, saved views and share link */}
+      {/* Skill search + resume-derived filters */}
       <CandidateFilterBar
         campaignId={campaignId}
         skills={skills}
-        stageFilter={stageFilter}
         resultCount={list.length}
         resumeFilters={resumeFilters}
         onResumeFiltersChange={setResumeFilters}
-        onSkillsChange={(next, nextStage) => {
-          setSkills(next);
-          if (nextStage !== undefined && onStageFilterChange) onStageFilterChange(nextStage);
-        }}
+        onSkillsChange={setSkills}
       />
 
       {/* Score range + AI recommendation, AND-combined with
@@ -845,29 +836,6 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
                 <Mail size={13} /> Send Rejection Email ({selectedRejectedCount})
               </Button>
             )}
-            {/* Batch scorecards, HR_ADMIN only and only
-                meaningful for 2+ candidates (the API enforces both). */}
-            {isHRAdminUser && selectedIds.size >= 2 && (
-              <select
-                className="px-2 py-1.5 border border-indigo-200 rounded-lg text-xs bg-white"
-                value=""
-                onChange={async (e) => {
-                  const fmt = e.target.value;
-                  if (!fmt) return;
-                  e.target.value = "";
-                  try {
-                    await exportBatchScorecards(campaignId, [...selectedIds], fmt);
-                    toast.success("Scorecards downloaded.");
-                  } catch (err) {
-                    toast.error(err?.response?.data?.message || "Batch export failed.");
-                  }
-                }}
-              >
-                <option value="">Export scorecards…</option>
-                <option value="PDF">Single PDF</option>
-                <option value="ZIP">ZIP of PDFs</option>
-              </select>
-            )}
             <button type="button" onClick={() => setSelectedIds(new Set())}
               className="text-[11px] text-indigo-700 font-semibold hover:underline">
               Clear
@@ -878,7 +846,8 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
 
       <CandidateTable
         candidates={pageItems}
-        onView={(c) => navigate(`/airs/pipeline/candidates/${c.id}`, { state: { resume: c } })}
+        onView={(c) => navigate(`/airs/candidates/${c.id}`)}
+        showViewButton={false}
         onToggleStar={toggleStar}
         selectable={canAct}
         selectedIds={selectedIds}

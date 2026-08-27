@@ -10,7 +10,7 @@ import useCompositeScore from "../../../hooks/useCompositeScore";
 import { renderStageBadge, renderDecisionBadge } from "../../../utils/candidateUtils.jsx";
 import { DECISION_SOURCE_LABEL } from "../../../constants/candidateConstants";
 import { numberOr, formatDateTime } from "../../../utils/candidateDataUtils";
-import { sendRejectionEmail } from "../../../services/candidateScoreService";
+import { sendRejectionEmail, sendSelectionEmail } from "../../../services/candidateScoreService";
 
 // Tone for the hero card/ring — keyed off whichever outcome is most
 // authoritative: the recorded decision (can reflect an HR override), falling
@@ -77,6 +77,7 @@ function MetaTile({ icon: Icon, label, value }) {
 export default function FinalStatusTab({ candidate }) {
   const { breakdown, loading, error, refetch } = useCompositeScore(candidate?.id);
   const [sendingRejectionEmail, setSendingRejectionEmail] = useState(false);
+  const [sendingSelectionEmail, setSendingSelectionEmail] = useState(false);
 
   const stage = candidate?.stage;
   const hasStage = stage && stage !== "-";
@@ -87,6 +88,7 @@ export default function FinalStatusTab({ candidate }) {
   // itself validates — not decisionType/outcomeKey, which can diverge
   // (e.g. an HR override) from the actual stage this endpoint checks.
   const isRejected = stage === "REJECTED";
+  const isSelected = stage === "SELECTED";
 
   const handleSendRejectionEmail = async () => {
     setSendingRejectionEmail(true);
@@ -97,6 +99,18 @@ export default function FinalStatusTab({ candidate }) {
       toast.error(err?.response?.data?.message || "Couldn't send the rejection email. Please try again.");
     } finally {
       setSendingRejectionEmail(false);
+    }
+  };
+
+  const handleSendSelectionEmail = async () => {
+    setSendingSelectionEmail(true);
+    try {
+      await sendSelectionEmail(candidate.id);
+      toast.success("Selection email sent.");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Couldn't send the selection email. Please try again.");
+    } finally {
+      setSendingSelectionEmail(false);
     }
   };
   // Prefer the freshly computed composite score; fall back to whatever
@@ -146,6 +160,19 @@ export default function FinalStatusTab({ candidate }) {
                 className="shrink-0"
               >
                 <Mail size={13} /> Send Rejection Email
+              </Button>
+            )}
+
+            {isSelected && (
+              <Button
+                variant="outline"
+                size="small"
+                onClick={handleSendSelectionEmail}
+                loading={sendingSelectionEmail}
+                loadingText="Sending..."
+                className="shrink-0"
+              >
+                <Mail size={13} /> Send Selection Email
               </Button>
             )}
           </div>

@@ -29,20 +29,6 @@ export const BILLING_TYPE_LABELS = BILLING_TYPES.reduce((acc, type) => {
   return acc;
 }, {});
 
-// Recurring billing is further split by billing mode — shown only when billingType is RECURRING.
-export const RECURRING_BILLING_MODE_OPTIONS = [
-  {
-    value: "MONTHLY_RETAINER",
-    label: "Monthly Retainer",
-    description: "Bill a fixed recurring amount every billing period.",
-  },
-  {
-    value: "SUBSCRIPTION",
-    label: "Subscription",
-    description: "Bill a recurring subscription fee for ongoing services.",
-  },
-];
-
 // Covers every billingMode code that can appear across all billing types (used for
 // read-only display in the Existing Enterprise Project flow, where billingMode is
 // synchronized master data rather than something the user picks from the list above).
@@ -110,6 +96,42 @@ export const RECOGNITION_TRIGGER_OPTIONS = [
 export const MILESTONE_STATUS_OPTIONS = [
   { value: "PENDING", label: "Pending" },
   { value: "COMPLETED", label: "Completed" },
+];
+
+// --- Recurring billing (BillingRecurringConfiguration, via /api/billing-recurring) ---
+// These mirror the backend enums verbatim — never rename/duplicate these values.
+
+// Shared duration-unit enum (backend: RenewalDurationUnit) — used both for the
+// primary billing frequency's durationUnit and for a custom renewal duration.
+export const DURATION_UNIT_OPTIONS = [
+  { value: "DAYS", label: "Day(s)" },
+  { value: "MONTHS", label: "Month(s)" },
+  { value: "YEARS", label: "Year(s)" },
+];
+
+// Backend: ContractValueSource — also reused by Fixed Price (see
+// billingConfigurationService's CONTRACT_VALUE_SOURCE_TO_API/FROM_API map).
+export const CONTRACT_VALUE_SOURCE_OPTIONS = [
+  { value: "PMS_BUDGET", label: "Use Project Budget" },
+  { value: "MANUAL", label: "Manual" },
+];
+
+// Backend: RenewalType
+export const RENEWAL_TYPE_OPTIONS = [
+  { value: "MANUAL", label: "Manual" },
+  { value: "AUTO", label: "Automatic" },
+];
+
+// Backend: RenewalDurationType
+export const RENEWAL_DURATION_TYPE_OPTIONS = [
+  { value: "SAME_DURATION", label: "Same as Primary Duration" },
+  { value: "CUSTOM", label: "Custom Duration" },
+];
+
+// Backend: RenewalPricingType
+export const RENEWAL_PRICING_TYPE_OPTIONS = [
+  { value: "SAME_PRICE", label: "Same as Current Price" },
+  { value: "REVISED_PRICE", label: "Revised Price" },
 ];
 
 // Used only for Standalone (non-PMS) projects, where no currency master-data API

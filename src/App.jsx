@@ -142,6 +142,7 @@ import ReviewPage from "./pages/airs/resume-intake/intake/ReviewPage.jsx";
 import CandidateRankingPage from "./pages/airs/candidates/CandidateRankingPage.jsx";
 import CandidateScorePage from "./pages/airs/candidates/CandidateScore/CandidateScorePage.jsx";
 import InterviewQueuePage from "./pages/airs/interview-queue/InterviewQueuePage.jsx";
+import InterviewCalendarPage from "./pages/airs/interview-calendar/InterviewCalendarPage.jsx";
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
 import PipelineCandidateScorecardPage from "./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
@@ -288,8 +289,14 @@ import BillingConfigurations from "./pages/account_receivable/pages/BillingConfi
 import NewConfigurationWizard from "./pages/account_receivable/pages/NewConfigurationWizard.jsx";
 import BillingDataAcquisition from "./pages/account_receivable/pages/BillingDataAcquisition.jsx";
 import AcquisitionDetail from "./pages/account_receivable/pages/AcquisitionDetail.jsx";
-import TaxConfiguration from "./pages/account_receivable/pages/TaxConfiguration.jsx";
 import TaxCalculationPage from "./pages/account_receivable/pages/TaxCalculation.jsx";
+import Configurations from "./pages/account_receivable/pages/Configurations.jsx";
+import MasterDataOverview from "./pages/account_receivable/pages/master-data/MasterDataOverview.jsx";
+import BillingTypeMasterPage from "./pages/account_receivable/pages/master-data/BillingTypeMasterPage.jsx";
+import BillingFrequencyMasterPage from "./pages/account_receivable/pages/master-data/BillingFrequencyMasterPage.jsx";
+import PaymentTermsMasterPage from "./pages/account_receivable/pages/master-data/PaymentTermsMasterPage.jsx";
+import TaxConfigurationMasterPage from "./pages/account_receivable/pages/master-data/TaxConfigurationMasterPage.jsx";
+import TaxConfigurationRegionDetailPage from "./pages/account_receivable/pages/master-data/TaxConfigurationRegionDetailPage.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -665,7 +672,7 @@ const AppRoutes = () => {
             />
             <Route
               path="tax-configuration"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxConfiguration /></ProtectedRoute>}
+              element={<Navigate to="/account-receivable/master-data/tax-configuration" replace />}
             />
             <Route
               path="tax-calculation"
@@ -675,7 +682,43 @@ const AppRoutes = () => {
               path="tax-calculation/:snapshotId"
               element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxCalculationPage /></ProtectedRoute>}
             />
+            <Route
+              path="configurations"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><Configurations /></ProtectedRoute>}
+            />
+            <Route
+              path="configuration"
+              element={<Navigate to="configurations" replace />}
+            />
             {/* Configuration history removed — not supported by backend */}
+            <Route
+              path="master-data"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><MasterDataOverview /></ProtectedRoute>}
+            />
+            <Route
+              path="master-data/billing-types"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingTypeMasterPage /></ProtectedRoute>}
+            />
+            <Route
+              path="master-data/billing-frequency"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingFrequencyMasterPage /></ProtectedRoute>}
+            />
+            <Route
+              path="master-data/payment-terms"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><PaymentTermsMasterPage /></ProtectedRoute>}
+            />
+            <Route
+              path="master-data/tax-regions"
+              element={<Navigate to="/account-receivable/master-data/tax-configuration" replace />}
+            />
+            <Route
+              path="master-data/tax-configuration"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxConfigurationMasterPage /></ProtectedRoute>}
+            />
+            <Route
+              path="master-data/tax-configuration/:taxRegionId"
+              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxConfigurationRegionDetailPage /></ProtectedRoute>}
+            />
           </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />
           <Route path="/profile" element={<Profile />} />
@@ -1329,6 +1372,18 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <CampaignDetails />
+              </ProtectedRoute>
+            }
+          />
+          {/* Was a tab inside CampaignDetails.jsx — moved to its own page with
+              a campaign selector. Same roles that could see that tab
+              (canSeePipeline = HR_ADMIN/RECRUITER); HIRING_MANAGER is
+              deliberately excluded, matching the tab's old visibility. */}
+          <Route
+            path="/airs/interview-calendar"
+            element={
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER"]}>
+                <InterviewCalendarPage />
               </ProtectedRoute>
             }
           />
