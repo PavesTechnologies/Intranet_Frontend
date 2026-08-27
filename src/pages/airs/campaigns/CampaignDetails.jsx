@@ -10,7 +10,6 @@ import {
   ArrowRightLeft, Ban, Mail, Download
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
-import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
@@ -167,24 +166,8 @@ export default function CampaignDetails() {
   }[status] || "bg-slate-50 text-slate-600 border-slate-200";
 
   return (<div className="bg-[#F8FAFC] text-slate-900 font-sans min-h-screen p-6">
-      {/* Trail back to the dashboard. Campaign name is
-          truncated to 40 chars per spec; the current page is not a link. */}
-      <div className="mb-4">
-        <Breadcrumb
-          items={[
-            { label: "Dashboard", to: "/airs/dashboard" },
-            { label: "Campaigns", to: "/airs/campaigns" },
-            {
-              label: (info.name || "").length > 40
-                ? `${info.name.slice(0, 40)}…`
-                : (info.name || "Campaign"),
-            },
-          ]}
-        />
-      </div>
-
       {/* Header */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm mb-6 flex flex-col md:flex-row justify-between gap-4">
+      <div className="mb-6 flex flex-col md:flex-row justify-between gap-4">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
@@ -320,22 +303,6 @@ function Row({ label, value, className = "" }) {
   );
 }
 
-// Summary strip cell — cells sit flush against each other (divide-x, no
-// gutters) so the strip reads as one continuous band.
-function GlanceCell({ label, children }) {
-  return (<div className="px-5 py-4 flex-1 min-w-0">
-      <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400 mb-1.5">{label}</p>
-      {children}
-    </div>
-  );
-}
-
-const STATUS_PILL = {
-  ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  PAUSED: "bg-amber-50 text-amber-700 border-amber-200",
-  CLOSED: "bg-slate-100 text-slate-600 border-slate-300",
-};
-
 // Same palette the rejection-analytics chart uses, so a layer reads as the
 // same colour everywhere in the module.
 const SCORING_LAYERS = [
@@ -345,8 +312,6 @@ const SCORING_LAYERS = [
 ];
 
 function DetailsTab({ info, jd, scoring, limits, hm }) {
-  const status = (info.status || "").toUpperCase();
-
   // max_candidates is the number of openings, filled by SELECTED candidates —
   // intake is deliberately uncapped, so the gauge must not measure total
   // candidates against it.
@@ -365,53 +330,65 @@ function DetailsTab({ info, jd, scoring, limits, hm }) {
     ? SCORING_LAYERS.reduce((sum, l) => sum + Number(scoring[l.key] || 0), 0)
     : 0;
 
-  return (<div className="space-y-5">
-      {/* At-a-glance strip — the four numbers worth knowing before reading
-          anything else. Flush cells, full width, no empty slots. */}
+  return (<div className="space-y-6">
+      {/* At-a-glance strip — the numbers worth knowing before reading
+          anything else. Flush cells, full width, no empty slots. Status is
+          skipped here since it's already shown next to the campaign name. */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-        <GlanceCell label="Status">
-          <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${STATUS_PILL[status] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
-            {status || "—"}
-          </span>
-        </GlanceCell>
-
-        <GlanceCell label="Positions Filled">
+        <div className="px-5 py-4 flex-1 min-w-0">
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="h-7 w-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <Target className="h-3.5 w-3.5" />
+            </span>
+            <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400">Positions Filled</p>
+          </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-lg font-black text-slate-900 tabular-nums leading-none">{selected}</span>
             <span className="text-[11px] font-bold text-slate-400">
               {max == null ? "of unlimited openings" : `of ${max} opening${max === 1 ? "" : "s"}`}
             </span>
           </div>
-          {capPct != null && (<div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+          {capPct != null && (<div className="mt-2.5 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
               <div className={`h-1.5 rounded-full ${capTone} transition-all duration-500`} style={{ width: `${capPct}%` }} />
             </div>
           )}
           <p className="text-[10px] text-slate-400 mt-1.5">
             {totalCandidates} candidate{totalCandidates === 1 ? "" : "s"} in pipeline
           </p>
-        </GlanceCell>
+        </div>
 
-        <GlanceCell label="Deadline">
-          <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+        <div className="px-5 py-4 flex-1 min-w-0">
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="h-7 w-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+              <Clock className="h-3.5 w-3.5" />
+            </span>
+            <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400">Deadline</p>
+          </div>
+          <p className="text-xs font-bold text-slate-800">
             {limits.deadline ? fmtDate(limits.deadline) : "None set"}
           </p>
-        </GlanceCell>
+        </div>
 
-        <GlanceCell label="Job Description">
+        <div className="px-5 py-4 flex-1 min-w-0">
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="h-7 w-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <FileText className="h-3.5 w-3.5" />
+            </span>
+            <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400">Job Description</p>
+          </div>
           {jd.jd_id ? (<Link
               to={`/airs/jds/${jd.jd_id}`}
-              className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+              className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 min-w-0"
             >
               <span className="truncate">{jd.jd_title}</span>
               <ExternalLink className="h-3 w-3 shrink-0" />
             </Link>
           ) : (<p className="text-xs font-bold text-slate-800 truncate">{jd.jd_title ?? "—"}</p>
           )}
-          <p className="text-[10px] text-slate-400 mt-0.5">
+          <p className="text-[10px] text-slate-400 mt-1">
             v{jd.version_number ?? "—"} · {jd.jurisdiction ?? "—"} · {jd.mandatory_skill_count ?? 0} mandatory skills
           </p>
-        </GlanceCell>
+        </div>
       </div>
 
       {/* Two equal-height cards. Scoring is null for HIRING_MANAGER, in which
@@ -556,7 +533,6 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const initialFilters = useMemo(() => parseCandidateFilters(searchParams), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [candidates, setCandidates] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [starredIds, setStarredIds] = useState(() => new Set());
   const [currentPage, setCurrentPage] = useState(initialFilters.page);
   // M11-E03-S01 — selected skills, AND-combined server-side. null means "no
   // skill filter"; an empty array would mean "matched nothing".
@@ -670,11 +646,8 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   }
 
   // same row shape the standalone candidates screen renders, so CandidateTable
-  // and the star/pagination helpers work unchanged here
-  const allCandidates = mapCampaignCandidateList(candidates || []).map((c) => ({
-    ...c,
-    starred: starredIds.has(c.id),
-  }));
+  // and the pagination helpers work unchanged here
+  const allCandidates = mapCampaignCandidateList(candidates || []);
   // All active filters are AND-combined: stage from the
   // funnel/dropdown, skills from the server-side AND search.
   const byId = new Map((candidates || []).map((r) => [r.campaign_candidate_id ?? r.id, r]));
@@ -709,15 +682,6 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
 
   const { pageItems, totalPages, currentPage: safePage } = paginate(list, currentPage, CANDIDATE_PAGE_SIZE);
 
-  const toggleStar = (candidateId) => {
-    setStarredIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(candidateId)) next.delete(candidateId);
-      else next.add(candidateId);
-      return next;
-    });
-  };
-
   // Bulk "Send Rejection Email" — only worth showing once the selection
   // includes at least one REJECTED candidate; the backend still validates
   // per-id, so a mixed selection is fine, this just avoids showing the
@@ -751,22 +715,8 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   };
 
   return (<div className="space-y-4">
-      <div className="flex justify-between items-end flex-wrap gap-2">
-        <div>
-          <h3 className="text-sm font-bold text-slate-900">Candidates</h3>
-          <p className="text-[11px] text-slate-500">
-            {stageFilter
-              ? `${list.length} of ${allCandidates.length} candidate${allCandidates.length === 1 ? "" : "s"} — filtered to ${stageLabel(stageFilter)}`
-              : `${list.length} candidate${list.length === 1 ? "" : "s"} sourced for this campaign`}
-          </p>
-        </div>
-        {onStageFilterChange && allCandidates.length > 0 && (<div className="w-44">
-            <FilterListbox options={stageOptions} value={stageFilter} onChange={onStageFilterChange} />
-          </div>
-        )}
-      </div>
-
-      {/* Skill search + resume-derived filters */}
+      {/* Skill search, status/score filters + resume-derived filters —
+          all in one row beside "More filters" so the row stays compact. */}
       <CandidateFilterBar
         campaignId={campaignId}
         skills={skills}
@@ -774,36 +724,12 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
         resumeFilters={resumeFilters}
         onResumeFiltersChange={setResumeFilters}
         onSkillsChange={setSkills}
+        scoreFilters={scoreFilters}
+        onScoreFiltersChange={setScoreFilters}
+        stageOptions={onStageFilterChange && allCandidates.length > 0 ? stageOptions : null}
+        stageFilter={stageFilter}
+        onStageFilterChange={onStageFilterChange}
       />
-
-      {/* Score range + AI recommendation, AND-combined with
-          the stage, skill and resume filters above. */}
-      <div className="flex flex-wrap items-center gap-2 bg-white border border-slate-200 rounded-xl p-3">
-        <span className="text-[10px] uppercase font-bold text-slate-400">Overall score</span>
-        <input type="number" min="0" max="100" placeholder="Min" value={scoreFilters.min}
-          onChange={(e) => setScoreFilters({ ...scoreFilters, min: e.target.value })}
-          className="w-20 px-2 py-1.5 border border-slate-200 rounded-lg text-xs" />
-        <span className="text-slate-300">–</span>
-        <input type="number" min="0" max="100" placeholder="Max" value={scoreFilters.max}
-          onChange={(e) => setScoreFilters({ ...scoreFilters, max: e.target.value })}
-          className="w-20 px-2 py-1.5 border border-slate-200 rounded-lg text-xs" />
-        <span className="text-[10px] uppercase font-bold text-slate-400 ml-2">AI says</span>
-        <select value={scoreFilters.recommendation}
-          onChange={(e) => setScoreFilters({ ...scoreFilters, recommendation: e.target.value })}
-          className="px-2 py-1.5 border border-slate-200 rounded-lg text-xs">
-          <option value="">Any</option>
-          <option value="SHORTLIST">Shortlist</option>
-          <option value="HOLD">Hold</option>
-          <option value="REJECT">Reject</option>
-        </select>
-        {(scoreFilters.min || scoreFilters.max || scoreFilters.recommendation) && (
-          <button type="button"
-            onClick={() => setScoreFilters({ min: "", max: "", recommendation: "" })}
-            className="text-[11px] text-indigo-600 font-semibold hover:underline ml-auto">
-            Clear
-          </button>
-        )}
-      </div>
 
       {/* The bulk bar only exists while something is selected */}
       {canAct && selectedIds.size > 0 && (
@@ -850,7 +776,6 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
         candidates={pageItems}
         onView={(c) => navigate(`/airs/candidates/${c.id}`)}
         showViewButton={false}
-        onToggleStar={toggleStar}
         selectable={canAct}
         selectedIds={selectedIds}
         noteCounts={noteCounts}
@@ -871,16 +796,12 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
               className="h-8 w-8 inline-flex items-center justify-center text-slate-400 hover:text-indigo-600">
               <ArrowRightLeft className="h-4 w-4" />
             </button>
-            {/* Fixed h-8 w-8 slot kept even when reject isn't applicable, so
-                rows without it don't shift the icons out of column alignment. */}
-            {(c.stage || "").toUpperCase() !== "REJECTED" ? (
+            {(c.stage || "").toUpperCase() !== "REJECTED" && (
               <button type="button" title="Reject with a reason"
                 onClick={(e) => { e.stopPropagation(); setAction({ kind: "reject", candidate: c }); }}
                 className="h-8 w-8 inline-flex items-center justify-center text-slate-400 hover:text-red-600">
                 <Ban className="h-4 w-4" />
               </button>
-            ) : (
-              <span className="h-8 w-8 inline-block" aria-hidden="true" />
             )}
           </>
         ) : undefined}
