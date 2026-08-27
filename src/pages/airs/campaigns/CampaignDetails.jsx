@@ -21,7 +21,6 @@ import EditCampaignModal from "./components/EditCampaignModal";
 import ReopenCampaignModal from "./components/ReopenCampaignModal";
 import CandidateActionModals from "./components/CandidateActionModals";
 import CampaignExportPanel from "./components/CampaignExportPanel";
-import { exportBatchScorecards } from "./services/exportService";
 import { getNoteCounts } from "./services/candidateActionsService";
 import { useAuth } from "../../../contexts/AuthContext";
 import { REJECTION_LAYER_LABELS } from "../constants/scoreLabels";
@@ -553,7 +552,6 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const [sendingBulkRejectionEmail, setSendingBulkRejectionEmail] = useState(false);
   const { hasRole } = useAuth();
   const canAct = hasRole(["HR_ADMIN", "RECRUITER"]);
-  const isHRAdminUser = hasRole(["HR_ADMIN"]);
 
   useEffect(() => {
     let cancelled = false;
@@ -743,18 +741,14 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
         )}
       </div>
 
-      {/* Skill search, saved views and share link */}
+      {/* Skill search + resume-derived filters */}
       <CandidateFilterBar
         campaignId={campaignId}
         skills={skills}
-        stageFilter={stageFilter}
         resultCount={list.length}
         resumeFilters={resumeFilters}
         onResumeFiltersChange={setResumeFilters}
-        onSkillsChange={(next, nextStage) => {
-          setSkills(next);
-          if (nextStage !== undefined && onStageFilterChange) onStageFilterChange(nextStage);
-        }}
+        onSkillsChange={setSkills}
       />
 
       {/* Score range + AI recommendation, AND-combined with
@@ -819,29 +813,6 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
                 <Mail size={13} /> Send Rejection Email ({selectedRejectedCount})
               </Button>
             )}
-            {/* Batch scorecards, HR_ADMIN only and only
-                meaningful for 2+ candidates (the API enforces both). */}
-            {isHRAdminUser && selectedIds.size >= 2 && (
-              <select
-                className="px-2 py-1.5 border border-indigo-200 rounded-lg text-xs bg-white"
-                value=""
-                onChange={async (e) => {
-                  const fmt = e.target.value;
-                  if (!fmt) return;
-                  e.target.value = "";
-                  try {
-                    await exportBatchScorecards(campaignId, [...selectedIds], fmt);
-                    toast.success("Scorecards downloaded.");
-                  } catch (err) {
-                    toast.error(err?.response?.data?.message || "Batch export failed.");
-                  }
-                }}
-              >
-                <option value="">Export scorecards…</option>
-                <option value="PDF">Single PDF</option>
-                <option value="ZIP">ZIP of PDFs</option>
-              </select>
-            )}
             <button type="button" onClick={() => setSelectedIds(new Set())}
               className="text-[11px] text-indigo-700 font-semibold hover:underline">
               Clear
@@ -853,6 +824,7 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
       <CandidateTable
         candidates={pageItems}
         onView={(c) => navigate(`/airs/candidates/${c.id}`)}
+        showViewButton={false}
         onToggleStar={toggleStar}
         selectable={canAct}
         selectedIds={selectedIds}

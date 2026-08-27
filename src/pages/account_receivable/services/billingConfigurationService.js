@@ -1,14 +1,13 @@
 import api from "../../../api/axiosInstance";
 import { fetchActiveBillingConfigurations } from "./billingDataAcquisitionService";
+import { getActiveBillingFrequencies, normalizeBillingFrequency } from "./billingFrequencyService";
+import { getActivePaymentTerms, normalizePaymentTerm } from "./paymentTermsService";
+import { getActiveTaxRegions, normalizeTaxRegion } from "./taxRegionService";
 
 const BASE_URL = window.__APP_CONFIG__.AR_BASE_URL;
 
 const BILLING_CONFIGURATIONS_URL = `${BASE_URL}/api/billing-configurations`;
-const ACTIVE_BILLING_TYPES_URL = `${BASE_URL}/api/billing-types/active`;
-const ACTIVE_BILLING_FREQUENCIES_URL = `${BASE_URL}/api/billing-frequency/active`;
-const ACTIVE_PAYMENT_TERMS_URL = `${BASE_URL}/api/payment-terms/active`;
-const ACTIVE_TAX_REGIONS_URL = `${BASE_URL}/api/tax-region/active`;
-const BILLING_SUBSCRIPTIONS_URL = `${BASE_URL}/api/billing-subscription`;
+const BILLING_RECURRING_URL = `${BASE_URL}/api/billing-recurring`;
 const TM_RATE_CARDS_URL = `${BASE_URL}/api/billing-tm-rate-card`;
 const BILLING_FIXED_PRICE_URL = `${BASE_URL}/api/billing-fixed-price`;
 
@@ -213,6 +212,7 @@ const normalizeFixedPriceConfig = (record = {}) => ({
   totalContractValue:
     firstPresent(record.totalContractValue, record.contractValue, record.manualContractValue, record.pmsBudget) ?? "",
   contractValueSource: fromApiContractValueSource(record.contractValueSource),
+  pmsProjectBudget: firstPresent(record.pmsProjectBudget, record.pmsBudget) ?? "",
   retentionPercent: firstPresent(record.retentionPercent, record.retentionPercentage) ?? "",
   advanceReceived: firstPresent(record.advanceReceived, record.advanceAmount) ?? "",
   effectiveFrom: toLocalDateString(firstPresent(record.effectiveFrom, record.validFrom)) || "",
@@ -295,6 +295,13 @@ export const normalizeBillingConfiguration = (config = {}) => {
     billingConfigurationId: getConfigId(config),
     projectCode: config.projectCode || projectInfo.projectCode || projectInfo.code || "",
     projectName: config.projectName || projectInfo.projectName || projectInfo.name || "",
+    projectId: config.projectId || projectInfo.projectId || projectInfo.id || "",
+    clientId:
+      config.clientId ||
+      projectInfo.clientId ||
+      projectInfo.client?.clientId ||
+      projectInfo.client?.id ||
+      "",
     client:
       config.client ||
       config.clientName ||
@@ -339,90 +346,45 @@ export const normalizeBillingFrequencyValue = (value) => {
   return String(value).trim().toUpperCase().replace(/[-\s]+/g, "_");
 };
 
-export const normalizeBillingType = (billingType = {}) => {
-  const id = billingType.billingTypeId || billingType.id || billingType.typeId || billingType.value || "";
-  const rawValue =
-  billingType.billingTypeCode ||
-  billingType.code ||
-  billingType.value ||
-  billingType.typeCode ||
-  billingType.type ||
-  billingType.billingTypeValue ||
-  billingType.billingTypeName ||
-  billingType.name ||
-  billingType.label ||
-  "";
-  const value = normalizeBillingTypeValue(rawValue);
-  const name =
-    {
-      TIME_MATERIAL: "Timesheet Based",
-      FIXED_PRICE: "Fixed Price",
-      MILESTONE: "Milestone Based",
-      RECURRING: "Recurring",
-    }[value] ||
-    billingType.billingTypeName ||
-    billingType.name ||
-    billingType.label ||
-    billingType.displayName ||
-    (value ? labelize(value) : "");
-  const description = billingType.description || billingType.details || billingType.summary || "";
+// Billing Type list/active normalization and fetching now live in
+// billingTypeService.js (single source of truth for the real
+// BillingTypeResponseDto shape) — re-exported below for existing consumers.
 
-  return {
-    ...billingType,
-    id,
-    billingTypeId: id,
-    billingTypeName: name,
-    value,
-    billingTypeValue: value,
-    label: name,
-    description,
-  };
+// Billing Frequency is dynamic (durationValue + durationUnit is the source of
+// truth, never a hardcoded MONTHLY/QUARTERLY/ANNUALLY check) — this only ever
+// generates a *fallback* label. Whenever the backend already supplies a
+// billingFrequencyName ("Monthly", "Quarterly", ...), that name wins.
+const MONTH_FREQUENCY_LABELS = { 1: "Monthly", 3: "Quarterly", 6: "Half-Yearly", 12: "Annual" };
+
+export const formatBillingFrequencyLabel = ({ durationValue, durationUnit, billingFrequencyName } = {}) => {
+  if (billingFrequencyName) return billingFrequencyName;
+
+  const count = Number(durationValue);
+  const unit = String(durationUnit || "").trim().toUpperCase();
+  if (!count || count <= 0 || !unit) return "";
+
+  if (unit === "MONTHS") {
+    if (MONTH_FREQUENCY_LABELS[count]) return MONTH_FREQUENCY_LABELS[count];
+    if (count % 6 === 0) {
+      const years = count / 12;
+      return `Every ${years} Year${years === 1 ? "" : "s"}`;
+    }
+    return `Every ${count} Month${count === 1 ? "" : "s"}`;
+  }
+
+  if (unit === "YEARS") return count === 1 ? "Annual" : `Every ${count} Years`;
+  if (unit === "DAYS") return `Every ${count} Day${count === 1 ? "" : "s"}`;
+
+  return `Every ${count} ${labelize(unit)}`;
 };
 
-export const normalizeBillingFrequency = (billingFrequency = {}) => {
-  const id = billingFrequency.billingFrequencyId || billingFrequency.id || billingFrequency.value || "";
-  const name = String(
-    billingFrequency.billingFrequencyName || billingFrequency.name || billingFrequency.label || "",
-  ).trim();
-  const value = normalizeBillingFrequencyValue(name);
-
-  return {
-    ...billingFrequency,
-    id,
-    billingFrequencyId: id,
-    value,
-    label: name,
-  };
-};
-
-export const normalizePaymentTerm = (term = {}) => {
-  const id = term.paymentTermId || term.id || term.payment_term_id || term.termId || "";
-  const name = String(term.paymentTermName || term.name || term.term_name || term.termName || term.label || "").trim();
-  const value = normalizeBillingFrequencyValue(name);
-
-  return {
-    ...term,
-    id,
-    paymentTermId: id,
-    paymentTermName: name,
-    value,
-    label: name,
-  };
-};
-
-export const normalizeTaxRegion = (region = {}) => {
-  const id = region.taxRegionId || region.tax_region_id || region.id || region.value || "";
-  const name = String(region.taxRegionName || region.tax_region_name || region.name || region.label || "").trim();
-
-  return {
-    ...region,
-    id,
-    taxRegionId: id,
-    taxRegionName: name,
-    value: id,
-    label: name,
-  };
-};
+// Billing Frequency / Payment Term / Tax Region list & active-list
+// normalization and fetching now live in their own dedicated services
+// (billingFrequencyService.js, paymentTermsService.js, taxRegionService.js —
+// single source of truth for each real DTO shape), imported above and
+// re-exported below for existing consumers (BillingControlsStep.jsx,
+// BillingConfigurationStep.jsx, normalizeControls/normalizeWizardDetail
+// in this file).
 
 const normalizeControls = (controls = {}) => {
   const paymentTerm = controls.paymentTerm && typeof controls.paymentTerm === "object" ? controls.paymentTerm : null;
@@ -532,16 +494,25 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
     config.billingFrequencyId,
     getObjectValue(billingFrequencyObject, ["billingFrequencyId", "id"]),
   );
-  const billingFrequencyValue = normalizeBillingFrequencyValue(
-    firstPresent(
-      rawBillingConfig.billingFrequencyCode,
-      config.billingFrequencyCode,
-      rawBillingConfig.billingFrequencyValue,
-      getObjectValue(billingFrequencyObject, ["billingFrequencyName", "name", "label", "code", "value"]),
-      typeof rawBillingConfig.billingFrequency === "string" ? rawBillingConfig.billingFrequency : "",
-      typeof config.billingFrequency === "string" ? config.billingFrequency : "",
-    ),
-  );
+  // billingFrequency has no separate code of its own here — the frequency
+  // picker's onChange (BillingConfigurationStep.jsx) sets it to the exact
+  // same billingFrequencyId UUID it stores (normalizeBillingFrequency's
+  // `value: id`), not a MONTHLY/QUARTERLY-style code. The backend's flat
+  // config response only carries billingFrequencyId/billingFrequencyName, so
+  // none of the code-ish candidates below are ever actually present on a
+  // loaded draft — falling back to billingFrequencyId keeps this field in
+  // sync with what the button selection and schedule lookup already use.
+  const billingFrequencyValue =
+    normalizeBillingFrequencyValue(
+      firstPresent(
+        rawBillingConfig.billingFrequencyCode,
+        config.billingFrequencyCode,
+        rawBillingConfig.billingFrequencyValue,
+        getObjectValue(billingFrequencyObject, ["billingFrequencyName", "name", "label", "code", "value"]),
+        typeof rawBillingConfig.billingFrequency === "string" ? rawBillingConfig.billingFrequency : "",
+        typeof config.billingFrequency === "string" ? config.billingFrequency : "",
+      ),
+    ) || billingFrequencyId || "";
   const billingFrequencyName =
     firstPresent(
       config.billingFrequencyName,
@@ -662,6 +633,7 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
         effectiveFrom: toLocalDateString(firstPresent(rawBillingConfig.fixedPrice?.effectiveFrom, rawBillingConfig.fixedPriceEffectiveFrom)) || "",
         effectiveTo: toLocalDateString(firstPresent(rawBillingConfig.fixedPrice?.effectiveTo, rawBillingConfig.fixedPriceEffectiveTo)) || "",
         remarks: firstPresent(rawBillingConfig.fixedPrice?.remarks, rawBillingConfig.fixedPriceRemarks) || "",
+        pmsProjectBudget: firstPresent(rawBillingConfig.fixedPrice?.pmsProjectBudget) ?? "",
         retentionAmount: firstPresent(rawBillingConfig.fixedPrice?.retentionAmount) ?? "",
         billableAmount: firstPresent(rawBillingConfig.fixedPrice?.billableAmount) ?? "",
         remainingAmount: firstPresent(rawBillingConfig.fixedPrice?.remainingAmount) ?? "",
@@ -669,7 +641,7 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
       milestones: rawBillingConfig.milestones || config.milestones || [],
       milestoneSettings: rawBillingConfig.milestoneSettings || config.milestoneSettings || {},
       monthlyRetainer: rawBillingConfig.monthlyRetainer || {},
-      subscription: rawBillingConfig.subscription || {},
+      recurring: rawBillingConfig.recurring || {},
     },
     controls: normalizeControls({
       ...rawControls,
@@ -726,8 +698,14 @@ export const normalizeProject = (project = {}) => {
     projectDuration,
     projectBudget,
     projectBudgetCurrency,
-    startDate: project.startDate || project.projectStartDate || parsedDuration.startDate || "",
-    endDate: project.endDate || project.projectEndDate || parsedDuration.endDate || "",
+    // Normalized to a plain yyyy-mm-dd (never a raw datetime/timestamp string) —
+    // every date-range check downstream (Recurring's Billing Start/End Date
+    // validation, Fixed Price's Effective From/To) does lexical string
+    // comparison against these, so a stray time component here would make an
+    // exact boundary date (e.g. the project's own start date) look "outside
+    // the project duration" even though it isn't.
+    startDate: toLocalDateString(project.startDate || project.projectStartDate || parsedDuration.startDate) || "",
+    endDate: toLocalDateString(project.endDate || project.projectEndDate || parsedDuration.endDate) || "",
   };
 };
 
@@ -787,6 +765,20 @@ export const getBillingConfigurationById = async (billingConfigurationId) => {
     }
   }
 
+  if (detail.billingConfig?.billingType === "RECURRING" && configId) {
+    try {
+      const recurringRecord = await getBillingRecurringByBillingConfigurationId(configId);
+      if (recurringRecord) {
+        detail.billingConfig.recurring = {
+          ...detail.billingConfig.recurring,
+          ...normalizeRecurringConfig(recurringRecord),
+        };
+      }
+    } catch (error) {
+      console.warn("Unable to load recurring billing configuration", error);
+    }
+  }
+
   if (["STANDARD", "ROLE_BASED"].includes(detail.billingConfig?.pricingModel) && configId) {
     const rateCards = await getTmRateCardsByBillingConfiguration(configId);
     const normalizedRateCards = rateCards.map(normalizeTmRateCard);
@@ -824,9 +816,12 @@ export const getApprovedConfigurationByProject = async (projectId) => {
 };
 
 // Creating the parent Billing Configuration always goes through the /draft
-// endpoint — the backend only ever creates configurations in Draft status;
-// finalizing an existing one is a PUT to /api/billing-configurations/{id}
-// (see updateBillingConfiguration), never a second POST.
+// endpoint — the backend only ever creates configurations in Draft status.
+// Updating an existing one splits by intent: a non-finalizing Save Draft is a
+// PUT to /api/billing-configurations/{id}/draft (see
+// updateBillingConfigurationDraft), while finalizing is a PUT to
+// /api/billing-configurations/{id} (see updateBillingConfiguration) — never a
+// second POST.
 export const createBillingConfiguration = async (payload) => {
   // [2] Immediately before POST /api/billing-configurations/draft.
   console.log("[billingConfigurationService] POST .../draft payload:", payload);
@@ -838,6 +833,15 @@ export const createBillingConfiguration = async (payload) => {
 
 export const updateBillingConfiguration = async (billingConfigurationId, payload) => {
   const response = await api.put(`${BILLING_CONFIGURATIONS_URL}/${billingConfigurationId}`, payload);
+  return unwrapData(response);
+};
+
+// Used to persist a Save Draft (non-finalizing) update on an existing billing
+// configuration — finalizing an existing one still goes through
+// updateBillingConfiguration's plain PUT (see saveBillingConfiguration/
+// saveBillingConfigurationRecord).
+export const updateBillingConfigurationDraft = async (billingConfigurationId, payload) => {
+  const response = await api.put(`${BILLING_CONFIGURATIONS_URL}/${billingConfigurationId}/draft`, payload);
   return unwrapData(response);
 };
 
@@ -878,47 +882,141 @@ export const getBillingConfigurationClients = async () => {
   return asArray(unwrapData(response)).map(normalizeClient);
 };
 
-export const getActiveBillingTypes = async () => {
-  const response = await api.get(ACTIVE_BILLING_TYPES_URL);
-  return asArray(unwrapData(response))
-    .map(normalizeBillingType)
-    .filter((type) => ["TIME_MATERIAL", "FIXED_PRICE", "MILESTONE", "RECURRING"].includes(type.value));
+export { getActiveBillingTypes, normalizeBillingType } from "./billingTypeService";
+export { getActiveBillingFrequencies, normalizeBillingFrequency };
+export { getActivePaymentTerms, normalizePaymentTerm };
+export { getActiveTaxRegions, normalizeTaxRegion };
+
+// A billing configuration only gets a recurring configuration record once one
+// has been saved — selecting Recurring on a brand-new (or not-yet-saved)
+// configuration means the backend has nothing to return yet, and answers with
+// a 404 / "Recurring Configuration not found" rather than an empty body. That
+// is an expected "nothing saved yet" signal, not a real failure, so callers
+// must treat it as such (return null/[] silently) instead of surfacing it as
+// an error toast and blocking the UI.
+const isRecurringNotFoundError = (error) => {
+  if (error?.response?.status === 404) return true;
+  const message = String(
+    error?.response?.data?.message || error?.response?.data?.detail || error?.response?.data?.error || "",
+  );
+  return /not found/i.test(message);
 };
 
-export const getActiveBillingFrequencies = async () => {
-  const response = await api.get(ACTIVE_BILLING_FREQUENCIES_URL);
-  return asArray(unwrapData(response)).map(normalizeBillingFrequency);
+export const getBillingRecurringById = async (recurringConfigurationId) => {
+  if (!recurringConfigurationId) return null;
+  try {
+    const response = await api.get(`${BILLING_RECURRING_URL}/${recurringConfigurationId}`);
+    return unwrapData(response);
+  } catch (error) {
+    if (isRecurringNotFoundError(error)) return null;
+    throw error;
+  }
 };
 
-export const getActivePaymentTerms = async () => {
-  const response = await api.get(ACTIVE_PAYMENT_TERMS_URL);
-  return asArray(unwrapData(response)).map(normalizePaymentTerm).filter((term) => term.paymentTermId);
+// GET .../billing-configuration/{billingConfigurationId} returns a list
+// ("success": true, "data": [...]) even though only one recurring record is
+// ever expected per billing configuration — same shape as
+// getFixedPriceByBillingConfiguration above. Assuming a single-object
+// response here silently discarded every array reply as an empty-looking
+// record (normalizeRecurringConfig read undefined off the array itself),
+// which is why Continue Draft never prefilled contract value/source or dates.
+export const getBillingRecurringByBillingConfigurationId = async (billingConfigurationId) => {
+  if (!billingConfigurationId) return null;
+  try {
+    const response = await api.get(`${BILLING_RECURRING_URL}/billing-configuration/${billingConfigurationId}`);
+    const payload = unwrapData(response);
+    const records = asArray(payload);
+
+    if (records.length > 0) return records[0];
+
+    return payload && typeof payload === "object" && !Array.isArray(payload) ? payload : null;
+  } catch (error) {
+    if (isRecurringNotFoundError(error)) return null;
+    throw error;
+  }
 };
 
-export const getActiveTaxRegions = async () => {
-  const response = await api.get(ACTIVE_TAX_REGIONS_URL);
-  return asArray(unwrapData(response)).map(normalizeTaxRegion).filter((region) => region.taxRegionId);
-};
-
-export const getBillingSubscriptionById = async (subscriptionConfigurationId) => {
-  const response = await api.get(`${BILLING_SUBSCRIPTIONS_URL}/${subscriptionConfigurationId}`);
+export const createBillingRecurring = async (billingConfigurationId, payload) => {
+  const response = await api.post(`${BILLING_RECURRING_URL}/${billingConfigurationId}`, payload);
   return unwrapData(response);
 };
 
-export const getBillingSubscriptionByBillingConfigurationId = async (billingConfigurationId) => {
-  const response = await api.get(`${BILLING_SUBSCRIPTIONS_URL}/billing-configuration/${billingConfigurationId}`);
+export const updateBillingRecurring = async (recurringConfigurationId, payload) => {
+  const response = await api.put(`${BILLING_RECURRING_URL}/${recurringConfigurationId}`, payload);
   return unwrapData(response);
 };
 
-export const createBillingSubscription = async (billingConfigurationId, payload) => {
-  const response = await api.post(`${BILLING_SUBSCRIPTIONS_URL}/${billingConfigurationId}`, payload);
+export const deleteBillingRecurring = async (recurringConfigurationId) => {
+  if (!recurringConfigurationId) throw new Error("Missing recurringConfigurationId");
+  const response = await api.delete(`${BILLING_RECURRING_URL}/${recurringConfigurationId}`);
   return unwrapData(response);
 };
 
-export const updateBillingSubscription = async (subscriptionConfigurationId, payload) => {
-  const response = await api.put(`${BILLING_SUBSCRIPTIONS_URL}/${subscriptionConfigurationId}`, payload);
-  return unwrapData(response);
+// The backend-generated BillingSchedule is the sole source of truth for
+// recurring billing periods and amounts — the frontend never computes these
+// itself (see normalizeBillingSchedulePeriod below).
+export const getBillingRecurringSchedule = async (recurringConfigurationId) => {
+  if (!recurringConfigurationId) return [];
+  try {
+    const response = await api.get(`${BILLING_RECURRING_URL}/${recurringConfigurationId}/schedule`);
+    return asArray(unwrapData(response)).map(normalizeBillingSchedulePeriod);
+  } catch (error) {
+    if (isRecurringNotFoundError(error)) return [];
+    throw error;
+  }
 };
+
+export const getBillingRecurringScheduleByBillingConfigurationId = async (billingConfigurationId) => {
+  if (!billingConfigurationId) return [];
+  try {
+    const response = await api.get(
+      `${BILLING_RECURRING_URL}/billing-configuration/${billingConfigurationId}/schedule`,
+    );
+    return asArray(unwrapData(response)).map(normalizeBillingSchedulePeriod);
+  } catch (error) {
+    if (isRecurringNotFoundError(error)) return [];
+    throw error;
+  }
+};
+
+// Maps a BillingSchedule API record onto the shape the "Billing Schedule
+// (Preview)" table renders — a straight relabeling, nothing computed.
+export const normalizeBillingSchedulePeriod = (record = {}) => ({
+  periodNumber: firstPresent(record.periodNumber, record.index) ?? "",
+  periodStartDate: toLocalDateString(firstPresent(record.periodStartDate, record.startDate)) || "",
+  periodEndDate: toLocalDateString(firstPresent(record.periodEndDate, record.endDate)) || "",
+  billingAmount: firstPresent(record.billingAmount, record.amount) ?? "",
+  scheduleType: record.scheduleType || "",
+  isPartialPeriod: Boolean(firstPresent(record.isPartialPeriod, record.partialPeriod, false)),
+  periodStatus: record.periodStatus || "",
+  isInvoiced: Boolean(firstPresent(record.isInvoiced, record.invoiced, false)),
+  invoiceDate: toLocalDateString(record.invoiceDate) || "",
+  remarks: record.remarks || "",
+});
+
+// Maps a BillingRecurringConfiguration API record (GET /api/billing-recurring/...)
+// onto the wizard's internal Recurring Billing form-state shape (mirrors
+// normalizeFixedPriceConfig above). The normal Recurring flow has no
+// subscription/renewal concept — only the contract value, billing frequency,
+// and effective dates that describe the recurring schedule — so those fields
+// are never read into wizard state here.
+//
+// Field names mirror the backend's RecurringBillingRequestDto exactly
+// (recurringConfigurationId/recurringStartDate/recurringEndDate) — the legacy
+// subscriptionConfigurationId/subscriptionStartDate/subscriptionEndDate names
+// are kept only as a fallback in case a record hasn't been migrated yet.
+export const normalizeRecurringConfig = (record = {}) => ({
+  recurringConfigurationId:
+    firstPresent(record.recurringConfigurationId, record.subscriptionConfigurationId, record.id) || null,
+  contractValueSource: record.contractValueSource || "",
+  contractValue: firstPresent(record.contractValue, record.pmsProjectBudget) ?? "",
+  pmsProjectBudget: firstPresent(record.pmsProjectBudget) ?? "",
+  recurringStartDate:
+    toLocalDateString(firstPresent(record.recurringStartDate, record.subscriptionStartDate, record.startDate)) || "",
+  recurringEndDate:
+    toLocalDateString(firstPresent(record.recurringEndDate, record.subscriptionEndDate, record.endDate)) || "",
+  remarks: record.remarks || "",
+});
 
 export const getBillingConfigurationProjectsByClient = async (clientId) => {
   const response = await api.get(`${BILLING_CONFIGURATIONS_URL}/projects/${clientId}`);
@@ -963,11 +1061,24 @@ export const deleteTmRateCard = async (rateCardId) => {
 };
 
 // --- Fixed Price Configuration APIs ---
+// GET .../{billingConfigurationId}/fixed-price returns a list ("Fixed Price
+// configurations fetched successfully.", data: [...]) even though only one
+// active record is ever expected per billing configuration — a single-object
+// response was assumed here, so every array reply was discarded as null. That
+// silently hid the existing fixedPriceConfigurationId from callers (the wizard's
+// edit-draft load and the Fixed Price form's own fetch), which made Save fall
+// back to creating a duplicate record and made View Details show nothing.
 export const getFixedPriceByBillingConfiguration = async (billingConfigurationId) => {
   if (!billingConfigurationId) return null;
   const response = await api.get(`${BILLING_FIXED_PRICE_URL}/${billingConfigurationId}/fixed-price`);
-  const record = unwrapData(response);
-  return record && typeof record === "object" && !Array.isArray(record) ? record : null;
+  const payload = unwrapData(response);
+  const records = asArray(payload);
+
+  if (records.length > 0) {
+    return records.find((record) => record?.isActive !== false) || records[0];
+  }
+
+  return payload && typeof payload === "object" && !Array.isArray(payload) ? payload : null;
 };
 
 export const getFixedPriceById = async (fixedPriceConfigurationId) => {
@@ -996,31 +1107,42 @@ export const deleteFixedPriceConfiguration = async (fixedPriceConfigurationId) =
   return unwrapData(response);
 };
 
-const buildSubscriptionPayload = (payload = {}) => {
-  const billingConfig = payload?.billingConfig || {};
-  const recurringMode = billingConfig.billingMode || "MONTHLY_RETAINER";
-
-  if (recurringMode === "SUBSCRIPTION") {
-    return {
-      recurringMode: "SUBSCRIPTION",
-      plan: billingConfig.subscription?.plan || "",
-      amount: billingConfig.subscription?.amount || "",
-      billingCycle: billingConfig.subscription?.billingCycle || billingConfig.billingFrequency || "",
-      startDate: billingConfig.subscription?.startDate || "",
-      endDate: billingConfig.subscription?.endDate || "",
-      autoRenewal: Boolean(billingConfig.subscription?.autoRenewal),
-      gracePeriodDays: billingConfig.subscription?.gracePeriodDays || "",
-    };
-  }
+// Builds the POST/PUT /api/billing-recurring request body — field names match
+// the backend's RecurringBillingRequestDto exactly (recurringName/
+// recurringStartDate/recurringEndDate, not the legacy subscription* names).
+//
+// billingFrequencyId is a required field on RecurringBillingRequestDto itself
+// (backend: "Billing Frequency is required for recurring billing.") — the
+// caller must pass the UUID of the Billing Frequency Master record the user
+// selected (Monthly/Quarterly/Half-Yearly/Annual/custom), never a hardcoded
+// value. It is also separately required on the parent BillingConfiguration
+// record (see REQUIRED_BILLING_CONFIGURATION_FIELDS), but that does not make
+// it optional here — both records need it.
+//
+// The normal Recurring Billing flow has no subscription/renewal concept — it
+// is fully described by contract value/source, billing frequency, and
+// effective dates, so recurringName and every renewal field are sent as null
+// (optional/unset) rather than a value nothing in the UI ever collects.
+export const buildRecurringRequestPayload = (recurring = {}, billingFrequencyId) => {
+  const isPmsBudgetSource = recurring.contractValueSource === "PMS_BUDGET";
 
   return {
-    recurringMode: "MONTHLY_RETAINER",
-    amount: billingConfig.monthlyRetainer?.amount || "",
-    billingStartDate: billingConfig.monthlyRetainer?.billingStartDate || "",
-    billingFrequency: billingConfig.billingFrequency || "",
-    billingDayOfMonth: billingConfig.monthlyRetainer?.billingDayOfMonth || "",
-    autoInvoiceGeneration: Boolean(billingConfig.monthlyRetainer?.autoInvoiceGeneration),
-    prorateFirstMonth: Boolean(billingConfig.monthlyRetainer?.prorateFirstMonth),
+    contractValueSource: recurring.contractValueSource || null,
+    contractValue: isBlank(recurring.contractValue) ? null : Number(recurring.contractValue),
+    pmsProjectBudget: isPmsBudgetSource && !isBlank(recurring.pmsProjectBudget) ? Number(recurring.pmsProjectBudget) : null,
+    billingFrequencyId: billingFrequencyId || null,
+    recurringName: null,
+    recurringStartDate: toLocalDateString(recurring.recurringStartDate) || "",
+    recurringEndDate: toLocalDateString(recurring.recurringEndDate) || "",
+    renewalType: null,
+    renewalDurationType: null,
+    renewalDurationValue: null,
+    renewalDurationUnit: null,
+    renewalPricingType: null,
+    renewalContractValue: null,
+    renewalBillingFrequencyId: null,
+    renewalEffectiveFrom: null,
+    remarks: recurring.remarks || "",
   };
 };
 
@@ -1078,6 +1200,17 @@ const toLocalDateString = (value) => {
     const month = String(value.getMonth() + 1).padStart(2, "0");
     const day = String(value.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
+  }
+
+  // Jackson serializes java.time.LocalDate/LocalDateTime as a plain
+  // [year, month, day, ...] array rather than an ISO string unless
+  // WRITE_DATES_AS_TIMESTAMPS is disabled — seen live on effectiveFrom/
+  // effectiveTo and recurringStartDate/recurringEndDate. Java's month here
+  // is already 1-indexed, so it's used as-is (unlike JS Date.getMonth()).
+  if (Array.isArray(value)) {
+    const [year, month, day] = value;
+    if (!year || !month || !day) return "";
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   }
 
   const rawValue = String(value).trim();
@@ -1156,7 +1289,7 @@ export const buildBillingConfigurationRequestPayload = (wizardPayload = {}, opti
   // enum (STANDARD / ROLE_BASED), which is only meaningful for Time & Material
   // billing. Fixed Price (and every other billing type) must never send it —
   // Recurring's own mode is a separate concept (recurringMode) submitted to the
-  // billing-subscription endpoint via buildSubscriptionPayload, not this field.
+  // billing-recurring endpoint via buildRecurringRequestPayload, not this field.
   const billingType = billingConfig.billingType || wizardPayload.billingType || "";
   const pricingModel =
     billingType === "TIME_MATERIAL"
@@ -1296,7 +1429,9 @@ export const saveBillingConfiguration = async (payload, billingConfigurationId, 
   assertBillingConfigurationPayload(requestPayload);
 
   const configResponse = billingConfigurationId
-    ? await updateBillingConfiguration(billingConfigurationId, requestPayload)
+    ? options.finalize === true
+      ? await updateBillingConfiguration(billingConfigurationId, requestPayload)
+      : await updateBillingConfigurationDraft(billingConfigurationId, requestPayload)
     : await createBillingConfiguration(requestPayload);
 
   const configId =
@@ -1310,15 +1445,21 @@ export const saveBillingConfiguration = async (payload, billingConfigurationId, 
 
   if (configId && billingType === "RECURRING") {
     try {
-      const existingSubscription = await getBillingSubscriptionByBillingConfigurationId(configId);
-      const subscriptionPayload = buildSubscriptionPayload(payload);
-      if (existingSubscription) {
-        await updateBillingSubscription(existingSubscription.subscriptionConfigurationId || existingSubscription.id, subscriptionPayload);
+      const existingRecurring = await getBillingRecurringByBillingConfigurationId(configId);
+      const recurringPayload = buildRecurringRequestPayload(
+        payload?.billingConfig?.recurring,
+        payload?.billingConfig?.billingFrequencyId,
+      );
+      if (existingRecurring) {
+        await updateBillingRecurring(
+          existingRecurring.recurringConfigurationId || existingRecurring.subscriptionConfigurationId || existingRecurring.id,
+          recurringPayload,
+        );
       } else {
-        await createBillingSubscription(configId, subscriptionPayload);
+        await createBillingRecurring(configId, recurringPayload);
       }
     } catch (error) {
-      console.warn("Unable to save recurring subscription configuration", error);
+      console.warn("Unable to save recurring billing configuration", error);
     }
   }
 
@@ -1348,7 +1489,9 @@ export const saveBillingConfiguration = async (payload, billingConfigurationId, 
 export const saveBillingConfigurationRecord = async (wizardPayload, billingConfigurationId, options = {}) => {
   const requestPayload = buildBillingConfigurationRequestPayload(wizardPayload, options);
   const configResponse = billingConfigurationId
-    ? await updateBillingConfiguration(billingConfigurationId, requestPayload)
+    ? options.finalize === true
+      ? await updateBillingConfiguration(billingConfigurationId, requestPayload)
+      : await updateBillingConfigurationDraft(billingConfigurationId, requestPayload)
     : await createBillingConfiguration(requestPayload);
 
   const configId =

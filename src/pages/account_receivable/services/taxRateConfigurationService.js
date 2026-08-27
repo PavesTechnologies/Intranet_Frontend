@@ -3,7 +3,6 @@ import api from "../../../api/axiosInstance";
 const BASE_URL = window.__APP_CONFIG__.AR_BASE_URL;
 
 const TAX_RATE_CONFIGURATIONS_URL = `${BASE_URL}/api/v1/tax-rate-configurations`;
-const ACTIVE_TAX_REGIONS_URL = `${BASE_URL}/api/tax-region/active`;
 
 const unwrapData = (response) => {
   const payload = response?.data;
@@ -61,27 +60,9 @@ export const getApiErrorMessage = (error, fallback = "Something went wrong. Plea
   return rawMsg || error?.message || fallback;
 };
 
-export const normalizeTaxRegion = (region = {}) => {
-  const id = region.taxRegionId || region.tax_region_id || region.id || region.value || "";
-  const name = String(
-    region.taxRegionName || region.tax_region_name || region.name || region.label || ""
-  ).trim();
-  const code = String(
-    region.taxRegionCode || region.tax_region_code || region.code || region.regionCode || ""
-  ).trim();
-
-  const label = code && code !== name ? `${name} (${code})` : name || id;
-
-  return {
-    ...region,
-    id,
-    taxRegionId: id,
-    taxRegionName: name,
-    taxRegionCode: code,
-    value: id,
-    label,
-  };
-};
+// Tax Region normalization/fetching now lives in taxRegionService.js
+// (single source of truth for the real TaxRegionResponseDto shape) —
+// re-exported below.
 
 export const normalizeTaxRateConfiguration = (item = {}) => {
   if (!item || typeof item !== "object") return {};
@@ -159,11 +140,7 @@ export const normalizeTaxRateConfiguration = (item = {}) => {
   };
 };
 
-// GET active tax regions
-export const getActiveTaxRegions = async () => {
-  const response = await api.get(ACTIVE_TAX_REGIONS_URL);
-  return asArray(unwrapData(response)).map(normalizeTaxRegion).filter((region) => region.taxRegionId);
-};
+export { getActiveTaxRegions, normalizeTaxRegion } from "./taxRegionService";
 
 // GET tax-rate-configurations
 export const getTaxRateConfigurations = async () => {
