@@ -531,7 +531,6 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const initialFilters = useMemo(() => parseCandidateFilters(searchParams), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [candidates, setCandidates] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [starredIds, setStarredIds] = useState(() => new Set());
   const [currentPage, setCurrentPage] = useState(initialFilters.page);
   // M11-E03-S01 — selected skills, AND-combined server-side. null means "no
   // skill filter"; an empty array would mean "matched nothing".
@@ -645,11 +644,8 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   }
 
   // same row shape the standalone candidates screen renders, so CandidateTable
-  // and the star/pagination helpers work unchanged here
-  const allCandidates = mapCampaignCandidateList(candidates || []).map((c) => ({
-    ...c,
-    starred: starredIds.has(c.id),
-  }));
+  // and the pagination helpers work unchanged here
+  const allCandidates = mapCampaignCandidateList(candidates || []);
   // All active filters are AND-combined: stage from the
   // funnel/dropdown, skills from the server-side AND search.
   const byId = new Map((candidates || []).map((r) => [r.campaign_candidate_id ?? r.id, r]));
@@ -684,15 +680,6 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
 
   const { pageItems, totalPages, currentPage: safePage } = paginate(list, currentPage, CANDIDATE_PAGE_SIZE);
 
-  const toggleStar = (candidateId) => {
-    setStarredIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(candidateId)) next.delete(candidateId);
-      else next.add(candidateId);
-      return next;
-    });
-  };
-
   // Bulk "Send Rejection Email" — only worth showing once the selection
   // includes at least one REJECTED candidate; the backend still validates
   // per-id, so a mixed selection is fine, this just avoids showing the
@@ -726,22 +713,8 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   };
 
   return (<div className="space-y-4">
-      <div className="flex justify-between items-end flex-wrap gap-2">
-        <div>
-          <h3 className="text-sm font-bold text-slate-900">Candidates</h3>
-          <p className="text-[11px] text-slate-500">
-            {stageFilter
-              ? `${list.length} of ${allCandidates.length} candidate${allCandidates.length === 1 ? "" : "s"} — filtered to ${stageLabel(stageFilter)}`
-              : `${list.length} candidate${list.length === 1 ? "" : "s"} sourced for this campaign`}
-          </p>
-        </div>
-        {onStageFilterChange && allCandidates.length > 0 && (<div className="w-44">
-            <FilterListbox options={stageOptions} value={stageFilter} onChange={onStageFilterChange} />
-          </div>
-        )}
-      </div>
-
-      {/* Skill search + resume-derived filters */}
+      {/* Skill search, status/score filters + resume-derived filters —
+          all in one row beside "More filters" so the row stays compact. */}
       <CandidateFilterBar
         campaignId={campaignId}
         skills={skills}
@@ -749,36 +722,12 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
         resumeFilters={resumeFilters}
         onResumeFiltersChange={setResumeFilters}
         onSkillsChange={setSkills}
+        scoreFilters={scoreFilters}
+        onScoreFiltersChange={setScoreFilters}
+        stageOptions={onStageFilterChange && allCandidates.length > 0 ? stageOptions : null}
+        stageFilter={stageFilter}
+        onStageFilterChange={onStageFilterChange}
       />
-
-      {/* Score range + AI recommendation, AND-combined with
-          the stage, skill and resume filters above. */}
-      <div className="flex flex-wrap items-center gap-2 bg-white border border-slate-200 rounded-xl p-3">
-        <span className="text-[10px] uppercase font-bold text-slate-400">Overall score</span>
-        <input type="number" min="0" max="100" placeholder="Min" value={scoreFilters.min}
-          onChange={(e) => setScoreFilters({ ...scoreFilters, min: e.target.value })}
-          className="w-20 px-2 py-1.5 border border-slate-200 rounded-lg text-xs" />
-        <span className="text-slate-300">–</span>
-        <input type="number" min="0" max="100" placeholder="Max" value={scoreFilters.max}
-          onChange={(e) => setScoreFilters({ ...scoreFilters, max: e.target.value })}
-          className="w-20 px-2 py-1.5 border border-slate-200 rounded-lg text-xs" />
-        <span className="text-[10px] uppercase font-bold text-slate-400 ml-2">AI says</span>
-        <select value={scoreFilters.recommendation}
-          onChange={(e) => setScoreFilters({ ...scoreFilters, recommendation: e.target.value })}
-          className="px-2 py-1.5 border border-slate-200 rounded-lg text-xs">
-          <option value="">Any</option>
-          <option value="SHORTLIST">Shortlist</option>
-          <option value="HOLD">Hold</option>
-          <option value="REJECT">Reject</option>
-        </select>
-        {(scoreFilters.min || scoreFilters.max || scoreFilters.recommendation) && (
-          <button type="button"
-            onClick={() => setScoreFilters({ min: "", max: "", recommendation: "" })}
-            className="text-[11px] text-indigo-600 font-semibold hover:underline ml-auto">
-            Clear
-          </button>
-        )}
-      </div>
 
       {/* The bulk bar only exists while something is selected */}
       {canAct && selectedIds.size > 0 && (
@@ -825,7 +774,6 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
         candidates={pageItems}
         onView={(c) => navigate(`/airs/candidates/${c.id}`)}
         showViewButton={false}
-        onToggleStar={toggleStar}
         selectable={canAct}
         selectedIds={selectedIds}
         noteCounts={noteCounts}
@@ -846,16 +794,12 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
               className="h-8 w-8 inline-flex items-center justify-center text-slate-400 hover:text-indigo-600">
               <ArrowRightLeft className="h-4 w-4" />
             </button>
-            {/* Fixed h-8 w-8 slot kept even when reject isn't applicable, so
-                rows without it don't shift the icons out of column alignment. */}
-            {(c.stage || "").toUpperCase() !== "REJECTED" ? (
+            {(c.stage || "").toUpperCase() !== "REJECTED" && (
               <button type="button" title="Reject with a reason"
                 onClick={(e) => { e.stopPropagation(); setAction({ kind: "reject", candidate: c }); }}
                 className="h-8 w-8 inline-flex items-center justify-center text-slate-400 hover:text-red-600">
                 <Ban className="h-4 w-4" />
               </button>
-            ) : (
-              <span className="h-8 w-8 inline-block" aria-hidden="true" />
             )}
           </>
         ) : undefined}
