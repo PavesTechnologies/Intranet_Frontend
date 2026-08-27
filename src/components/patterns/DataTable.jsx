@@ -61,6 +61,10 @@ export default function DataTable({
   selectedRowKeys,
   onSelectedRowKeysChange,
 }) {
+  // `rows = []` above only covers an omitted/undefined prop; a caller that
+  // explicitly passes null/undefined (e.g. before its first fetch resolves)
+  // must still get a header-visible empty state, not a crash on rows.length.
+  rows = Array.isArray(rows) ? rows : [];
   // Sticky-column offset measurement. Hooks must run unconditionally (before
   // the loading/empty early returns below), so this always executes; the
   // effect itself is a no-op whenever there's no table to measure.
@@ -101,14 +105,6 @@ export default function DataTable({
     return (
       <div className={classNames(SHELL_CLASSNAME, className)}>
         <TableSkeleton rows={5} columns={columns.length || 4} />
-      </div>
-    );
-  }
-
-  if (!rows.length) {
-    return (
-      <div className={classNames(SHELL_CLASSNAME, className)}>
-        <EmptyState title={emptyTitle} description={emptyDescription} />
       </div>
     );
   }
@@ -200,54 +196,64 @@ export default function DataTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, rowIndex) => {
-              const key = keyOf(row, rowIndex);
-              const isSelected = selectable && selectedKeys.has(key);
-              return (
-                <tr
-                  key={key}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  className={classNames(
-                    "group border-b border-gray-100 text-sm text-gray-700 last:border-b-0 transition-colors",
-                    rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50",
-                    "hover:bg-indigo-50",
-                    onRowClick && "cursor-pointer"
-                  )}
-                >
-                  {selectable && (
-                    <td
-                      className={classNames(
-                        "w-10 px-4 py-3 text-center",
-                        hasStickyCols && stickyBodyCellProps(SELECT_COL_KEY, "left", rowIndex).className
-                      )}
-                      style={hasStickyCols ? stickyBodyCellProps(SELECT_COL_KEY, "left", rowIndex).style : undefined}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={(e) => toggleRow(key, e.target.checked)}
-                        aria-label="Select row"
-                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </td>
-                  )}
-                  {columns.map((col) => {
-                    const sticky = col.sticky === "left" || col.sticky === "right" ? col.sticky : null;
-                    const stickyProps = sticky ? stickyBodyCellProps(col.key, sticky, rowIndex) : null;
-                    return (
+            {!rows.length ? (
+              <tr>
+                <td colSpan={columns.length + (selectable ? 1 : 0)} className="px-4 py-8">
+                  <div className="flex w-full items-center justify-center">
+                    <EmptyState title={emptyTitle} description={emptyDescription} />
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              rows.map((row, rowIndex) => {
+                const key = keyOf(row, rowIndex);
+                const isSelected = selectable && selectedKeys.has(key);
+                return (
+                  <tr
+                    key={key}
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    className={classNames(
+                      "group border-b border-gray-100 text-sm text-gray-700 last:border-b-0 transition-colors",
+                      rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50",
+                      "hover:bg-indigo-50",
+                      onRowClick && "cursor-pointer"
+                    )}
+                  >
+                    {selectable && (
                       <td
-                        key={col.key}
-                        style={stickyProps?.style}
-                        className={classNames("px-4 py-3", stickyProps?.className, col.className)}
+                        className={classNames(
+                          "w-10 px-4 py-3 text-center",
+                          hasStickyCols && stickyBodyCellProps(SELECT_COL_KEY, "left", rowIndex).className
+                        )}
+                        style={hasStickyCols ? stickyBodyCellProps(SELECT_COL_KEY, "left", rowIndex).style : undefined}
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        {col.render ? col.render(row, rowIndex) : row[col.key]}
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => toggleRow(key, e.target.checked)}
+                          aria-label="Select row"
+                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                        />
                       </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
+                    )}
+                    {columns.map((col) => {
+                      const sticky = col.sticky === "left" || col.sticky === "right" ? col.sticky : null;
+                      const stickyProps = sticky ? stickyBodyCellProps(col.key, sticky, rowIndex) : null;
+                      return (
+                        <td
+                          key={col.key}
+                          style={stickyProps?.style}
+                          className={classNames("px-4 py-2", stickyProps?.className, col.className)}
+                        >
+                          {col.render ? col.render(row, rowIndex) : row[col.key]}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>

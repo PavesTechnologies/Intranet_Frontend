@@ -8114,3 +8114,523 @@ Confirmed untouched — no file containing `DatePicker`/`DateRangePicker`/`react
 ### 16. Confirmation no other modules were modified
 
 Confirmed — `git status --short` shows changes only in `src/utils/applicationRoutes.js`, `src/components/Layout/Layout.jsx`, `src/App.jsx` (route wiring only, for the 2 named Leave Management routes), `src/pages/leave_management/HRManageTools.jsx`, plus this documentation update. No Timesheet/User Management/AIRS/Project Management/Resource Management/Employee Onboarding/Expense Management/Accounts Payable/Accounts Receivable source file was touched.
+
+## P2.26 — EmptyState Visual Standardization
+
+*(The request that prompted this task referred to it as "P2.25"; that number was already used earlier in this document for "PendingLeaveRequests EmptyState Horizontal Layout," so this section is filed as P2.26 to avoid a numbering collision — no content change to the earlier P2.25 section.)*
+
+### 1. Branch verified
+
+`intra-ui/unify` — re-read all files fresh; did not rely on any prior report.
+
+### 2. Canonical EmptyState file
+
+`src/components/patterns/EmptyState.jsx`.
+
+### 3. Previous EmptyState behavior
+
+Always rendered an icon/image: a `h-24 w-24` gray circle containing either a caller-supplied `icon` element or the default `lucide-react` `Inbox` icon, above an optional `Fonts.subheading`-styled title and a `text-sm text-gray-500` description.
+
+### 4. New standard EmptyState behavior
+
+Default (`variant="standard"`, the new default — no prop needed): renders **no icon, no circle, no illustration at all** — just the `title`/`description` text, centered horizontally and vertically within its own container, using `text-sm font-semibold italic text-gray-500`. `action` behavior (rendered below the text) is unchanged. An opt-in `variant="illustrated"` reproduces the exact previous icon-circle-plus-subheading rendering byte-for-byte, for the one file that still needs it.
+
+### 5. Exact typography used
+
+`text-sm font-semibold italic text-gray-500` — the 3 required properties (`text-sm`, `font-semibold`, `italic`) plus `text-gray-500`, reused from the component's own pre-existing description color (not a new/arbitrary color) to keep the message legibly muted rather than stark black. No existing `Fonts.jsx` token combines `text-sm`+`font-semibold`+`italic`, and this exact combination isn't otherwise reused elsewhere in the app, so a new shared token was **not** added — the two classes live as a local `STANDARD_TEXT_CLASSES` constant inside `EmptyState.jsx` itself, with a code comment explaining why. Global font-family (Inter, inherited automatically per P2.23's tracing) was not touched.
+
+### 6. Whether icon/image was removed
+
+Yes, for the new default (`standard`) variant — completely, not just visually hidden (the icon markup isn't rendered into the DOM at all in that branch).
+
+### 7. All Leave Management EmptyState consumers audited
+
+Repo-wide grep for `<EmptyState` and `patterns/EmptyState` imports, cross-checked against the actual current source of every match (not assumed from prior work):
+
+| File | Current usage | Disposition |
+|---|---|---|
+| `models/PendingLeaveRequests.jsx` | Does not use the canonical `EmptyState` component at all — fully custom inline markup (horizontal layout, `NoPendingLeaves` image, `Fonts.subheading` title) | **Exception — confirmed untouched** (no edit needed; it was never wired to the canonical component) |
+| `models/ApprovalDashboard.jsx` | `<EmptyState icon={...} title="No Pending Approvals." />` | **Exception — explicitly opted into `variant="illustrated"`** to preserve its exact current appearance |
+| `charts/LeaveDetailsPage.jsx` | `<EmptyState icon={<img src={beachDay} .../>} description={...} />` | **Migrated** — `icon` prop and now-unused `beachDay` import removed; renders via the new default `standard` variant |
+| `models/PendingApprovalsQueueView.jsx` | `<EmptyState icon={<img src={clearingDesk} className="h-40 w-40" />} title="No Pending Approvals." />` | **Migrated** — `icon` prop and now-unused `clearingDesk` import removed. (This file was *not* in the task's 2-item exception list, so its previously-deliberate oversized icon was intentionally converted, per this task's explicit scope.) |
+| `models/ProjectMembersOnLeave.jsx` | `<EmptyState title="No active projects for this employee." />` — no icon prop | **Already standard** — no change needed, automatically benefits from the new default |
+| `models/CompOffBalanceRequests.jsx` | Passes `emptyTitle` to `DataTable`, which internally renders `<EmptyState title={...} />` — no direct import | **Now standard automatically**, via `DataTable`'s own (unmodified) internal call |
+| `components/patterns/DataTable.jsx` | Internal empty-row branch: `<EmptyState title={emptyTitle} description={emptyDescription} />` — no icon prop, never did | **Unmodified**, automatically renders standard for every `DataTable` consumer app-wide |
+
+### 8. Complete migrated-file list
+
+`src/components/patterns/EmptyState.jsx` (canonical component), `src/pages/leave_management/charts/LeaveDetailsPage.jsx`, `src/pages/leave_management/models/PendingApprovalsQueueView.jsx`.
+
+### 9. Complete excluded/specialized list with reasons
+
+- `src/pages/leave_management/models/PendingLeaveRequests.jsx` — explicit task exception; also structurally never used the canonical component, so there was nothing to migrate or preserve via a prop.
+- `src/pages/leave_management/models/ApprovalDashboard.jsx` — explicit task exception; preserved via the new `variant="illustrated"` opt-in, including its pre-existing `h-45 w-45` (a non-standard Tailwind value with no matching utility class, rendering the icon at its intrinsic size) — left exactly as-is per "must remain visually and behaviorally exactly as they are today."
+
+### 10. Confirmation PendingLeaveRequests is unchanged
+
+Confirmed — the file was not edited; it never depended on the canonical `EmptyState` component.
+
+### 11. Confirmation ApprovalDashboard is unchanged (visually)
+
+Confirmed — its only edit was adding `variant="illustrated"`, which routes it through the branch that reproduces its previous rendering exactly (same icon-circle markup, same `Fonts.subheading` title styling, same spacing). No visual difference.
+
+### 12. Confirmation CompOffBalanceRequests now follows the standard
+
+Confirmed — it never imported `EmptyState` directly; its empty state comes from `DataTable`'s internal call, which has no `icon` prop and therefore now renders through the new default `standard` (text-only) branch automatically.
+
+### 13. New canonical capability added
+
+One: the `variant` prop (`"standard"` default / `"illustrated"` opt-in) on `EmptyState.jsx`. No new component was created; no speculative props were added — `icon`/`title`/`description`/`action`/`className` are all unchanged and still work exactly as before within whichever variant is selected.
+
+### 14. Confirmation no business/API logic changed
+
+Confirmed — every edit was either inside `EmptyState.jsx`'s own presentation logic, or a `variant`/`icon`-prop change plus an unused-import removal in the 3 consumer files. No state, effect, API call, WebSocket, RBAC, validation, or navigation logic was touched in any file.
+
+### 15. Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### 16. Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues; no unused-import warnings (the now-dead `beachDay`/`clearingDesk` imports were found and removed).
+
+### 17. git diff --check result
+
+✅ Clean (only a pre-existing LF/CRLF informational notice on `EmptyState.jsx`).
+
+### 18. Confirmation DatePicker/DateRangePicker were untouched
+
+Confirmed — no file containing `DatePicker`/`DateRangePicker`/`react-datepicker` code was opened or edited.
+
+### 19. Confirmation no unrelated module was modified
+
+Confirmed — no `Modal`, `PageContainer`, `PageHeader`, `Tabs`, `Button`, `DataTable`, `StatusBadge`, or `BackButton` source file was edited (`DataTable.jsx` was read to confirm its internal `EmptyState` call has no `icon` prop, but not modified). **Disclosed side-effect, not a file edit:** `EmptyState.jsx` is a genuinely shared/canonical component with ~13 other consumers outside Leave Management (`airs`, `expense-management`, `employee-onboarding`, `RiskManagement`), all confirmed via repo-wide grep to pass no `icon` prop — none of their files were opened or edited, but their empty states will now also render the new text-only default the next time those screens are viewed, since they were all relying on the old default `Inbox`-icon fallback. This is an inherent, expected consequence of changing the shared canonical component's default rendering (exactly what "canonical" implies) — flagged here for visibility, not treated as an unauthorized module change.
+
+### 20. Confirmation no commit/push was performed
+
+Confirmed — all changes remain in the working tree for local review.
+
+## P2.26a — EmptyState Plain Text Presentation
+
+### Starting point (re-read fresh)
+
+The P2.26 `standard` variant already had zero `bg-*`/`border`/`rounded-*`/`shadow-*` classes — but its wrapper used `flex flex-col items-center justify-center gap-1 py-6 text-center` directly around the `<p>` text elements, with a `py-6` vertical padding and `gap-1` spacing that read as leftover "container" styling rather than a pure centering wrapper.
+
+### Change made
+
+Restructured the `standard` branch to the minimal two-level centering pattern requested — an outer `flex w-full items-center justify-center` row that only centers, and an inner plain `text-center` block that only holds the text/action content:
+
+```jsx
+return (
+  <div className={`flex w-full items-center justify-center ${className}`.trim()}>
+    <div className="text-center">
+      {title ? <p className={STANDARD_TEXT_CLASSES}>{title}</p> : null}
+      {description ? <p className={STANDARD_TEXT_CLASSES}>{description}</p> : null}
+      {action ? <div className="mt-3">{action}</div> : null}
+    </div>
+  </div>
+);
+```
+
+`py-6` and `gap-1` were dropped — the component no longer imposes any spacing/sizing of its own beyond centering; it occupies exactly the space its parent gives it. `STANDARD_TEXT_CLASSES` (`text-sm font-semibold italic text-gray-500`) is unchanged. Neither the inner nor outer `div` carries `bg-*`/`border`/`outline`/`rounded-*`/`shadow-*` — confirmed by re-reading the final file.
+
+### Illustrated variant
+
+Untouched — confirmed via diff review: lines 25-37 (the `variant === "illustrated"` branch) are byte-for-byte identical to before this task.
+
+### Consumer verification
+
+- **`DataTable.jsx`'s internal `EmptyState` call** — not modified; automatically renders through the updated `standard` branch (no `icon`/`variant` prop, same as before).
+- **`CompOffBalanceRequests.jsx`** — unaffected directly (no direct `EmptyState` import); its empty state, reached via `DataTable`, now shows the plainer text-only presentation.
+- **`LeaveDetailsPage.jsx`, `PendingApprovalsQueueView.jsx`** — both already use the default `standard` variant (from P2.26); not touched in this task, both automatically pick up the plainer presentation.
+- **`ApprovalDashboard.jsx`** — not modified in this task; its `variant="illustrated"` opt-in (added in P2.26) continues to route it through the completely untouched illustrated branch. Visually identical to before.
+- **`PendingLeaveRequests.jsx`** — not modified; still doesn't use the canonical `EmptyState` component at all.
+
+### Note on DataTable's own card shell (explicitly out of scope)
+
+`DataTable.jsx`'s empty-row branch wraps `EmptyState` in its own `SHELL_CLASSNAME` (`w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm`) — this is `DataTable`'s own table-shell styling, not `EmptyState`'s, and `DataTable.jsx` was explicitly listed as "do not modify" for this task. If a bordered/shadowed card is still visible around a `DataTable`-hosted empty state (e.g. `CompOffBalanceRequests`), that's this pre-existing `DataTable` shell, not `EmptyState` — flagged here for clarity, not altered.
+
+### Files modified
+
+`src/components/patterns/EmptyState.jsx`, `docs/ui/phase-2-leave-management.md`.
+
+### Business/API logic verification
+
+Confirmed unchanged — the only edit was the `standard` branch's JSX structure inside `EmptyState.jsx`. No consumer file was touched in this task.
+
+### Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### git diff --check
+
+✅ Clean (only pre-existing LF/CRLF informational notices).
+
+### Unused-import verification
+
+No imports were added or removed in this task — `EmptyState.jsx`'s import list (`React`, `Inbox`, `Fonts`) is unchanged and all three remain used (the illustrated branch still uses `Inbox`/`Fonts`).
+
+### DatePicker/DateRangePicker confirmation
+
+Confirmed untouched — no file containing `DatePicker`/`DateRangePicker`/`react-datepicker` code was opened or edited.
+
+### Confirmation no commit/push was performed
+
+Confirmed — all changes remain in the working tree for local review.
+
+## P2.26b — Remove EmptyState Background Completely
+
+Re-read `EmptyState.jsx` fresh and grepped the entire file for `bg-`, `border-`, `outline-`, `shadow-`, `rounded-`. The only match in the whole file is `rounded-full bg-gray-100` on the icon circle inside the untouched `variant === "illustrated"` branch — the `standard` branch (the default) has **zero** matches for any of those five patterns. It already renders as a fully transparent, undecorated wrapper (`flex w-full items-center justify-center` → `text-center` → `<p className="text-sm font-semibold italic text-gray-500">`), inheriting whatever background belongs to its parent, exactly as required.
+
+**Conclusion: P2.26a already satisfied every P2.26b requirement — no source code change was made in this task.** Making an edit here would have meant either introducing a no-op change or restructuring working code purely for its own sake, which this project's standing conventions treat as unnecessary churn.
+
+Verified against the task's own checklist:
+1. No `bg-*`/`border-*`/`outline-*`/`shadow-*`/`rounded-*` on the standard variant — confirmed via grep (only hit is in the illustrated branch).
+2. No icon/image in the standard variant — confirmed (the `Icon`/`Inbox` logic only exists inside the `if (variant === "illustrated")` block).
+3. Text is `text-sm font-semibold italic text-gray-500` (the `STANDARD_TEXT_CLASSES` constant) — unchanged.
+4. Content is centered via `flex w-full items-center justify-center` + `text-center` — unchanged.
+5. Illustrated variant unchanged — confirmed, no edit touched lines 25-37.
+6. `ApprovalDashboard.jsx` unchanged — not opened in this task.
+7. `PendingLeaveRequests.jsx` unchanged — not opened in this task.
+8. `DataTable.jsx` unchanged — not opened in this task.
+9. No unrelated file was modified — `git status --short` before and after this task shows the identical set of files from P2.26/P2.26a, with no new entries.
+
+### Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### git diff --check
+
+✅ Clean (only pre-existing LF/CRLF informational notices).
+
+### Unused-import verification
+
+N/A — no file was edited in this task.
+
+### DatePicker/DateRangePicker confirmation
+
+Confirmed untouched — not opened.
+
+### Confirmation no commit/push was performed
+
+Confirmed — the working tree is unchanged from before this task; nothing to commit from P2.26b specifically.
+
+## P2.27 — Migrate HandleLeaveRequestAndApprovals to Canonical DataTable
+
+### Target file
+
+`src/pages/leave_management/models/HandleLeaveRequestAndApprovals.jsx` — the manager's leave-request approval table (rendered inside `AdminPanel.jsx`), migrated from a hand-rolled `<table>` to canonical `src/components/patterns/DataTable.jsx`.
+
+### Raw table before migration
+
+A manually-built `<table>` with: a conditional selection-summary `<tr>` spanning all columns (shown only when `selectedRequests.length > 0`, containing "N selected" + batch Approve/Reject/Clear buttons); a gradient header row with 12 `<th>`s (2 left-sticky via hardcoded `left-1`/`left-[4.5%]` offsets, 1 right-sticky via `right-0`); a `<tbody>` with 3 hand-coded conditional branches (loading spinner row, "no data" row, "no search match" row) before the real `.map()` over `paginatedRequests`.
+
+### Two genuine audit findings that shaped the migration approach
+
+1. **Cross-page select-all.** `selectableRequests` (and therefore the header checkbox's checked/indeterminate state and `handleSelectAll`) is computed from the full, unpaginated `adminLeaveRequests` array — not just the current page. `DataTable`'s built-in `selectable` prop only ever toggles the rows passed to it (current page), per its own doc comment. Using it here would have silently narrowed "select all" to the visible page only — a real behavior change. **Resolution:** selection was implemented as a manual column (`col.header`/`col.render`) instead of DataTable's `selectable` API, reusing the existing `selectedRequests`/`selectedResourceId` state and `handleSelectAll`/`handleSelectRequest` handlers completely unchanged.
+2. **Shared loading flag (the CompOffBalanceRequests pattern, confirmed present here too).** `loading` is set to `true` at the start of `fetchData`, `handleAcceptAll`, `handleRejectAll`, `handleDecision`, and `handleLeaveUpdate` alike — i.e. every approve/reject/edit action, not just the initial fetch. Wiring this directly to `DataTable`'s `loading` prop would blank the entire table (headers included) on every single approve/reject click. **Resolution:** `DataTable`'s `loading` prop is set to `loading && adminLeaveRequests.length === 0` — true only for the genuine first load (no data fetched yet). During any action, `adminLeaveRequests` already holds data, so the table keeps rendering its existing rows while the acting row's own button shows its existing `disabled={loading}` state (unchanged) — exactly the distinction section 4 of this task asked for, applied consistently with how P2.10's original CompOffBalanceRequests fix worked.
+
+### Column mapping (all 12 original columns preserved)
+
+| Original `<th>` | New `DataTable` column | Notes |
+|---|---|---|
+| Checkbox (header + per-row) | `key: "select"`, `sticky: "left"` | Manual header/render (see finding 1 above); same per-row disabled condition (`approved`/`rejected`/`cancelled`) |
+| Employee | `key: "employee"`, `sticky: "left"` | Same `Button variant="link"` opening the leave-balance `Modal`, same handler |
+| From | `key: "from"` | Same date formatting + session-suffix logic, unchanged |
+| To | `key: "to"` | Same date formatting + session-suffix logic, unchanged |
+| Days | `key: "days"` | Unchanged |
+| Requested On | `key: "requestedOn"` | Same date formatting, unchanged |
+| Leave Type | `key: "leaveType"` | Unchanged (`request.leaveName`) |
+| Reason | `key: "reason"` | Same `LeaveReasonCell` (View More/Less) component, unchanged |
+| Status | `key: "status"` | Same canonical `StatusBadge`, unchanged |
+| Last Action By | `key: "lastActionBy"` | Same approver name + manager-comment sub-line, unchanged |
+| Documents | `key: "documents"` | Same conditional "View Documents" link, unchanged |
+| Actions | `key: "actions"`, `sticky: "right"` | Same Approve/Reject/Edit (pending) and Cancel (approved) `Button`s, same `onClick`s building the same `confirmation`/`editingRequest` state, same `disabled={loading}` |
+
+Sticky-column visuals (indigo header, zebra body, edge shadow) are now driven entirely by `DataTable`'s own dynamically-measured sticky offsets instead of the original's hardcoded `left-1`/`left-[4.5%]`/`right-0` percentages — a presentational improvement inherent to adopting the canonical sticky system (documented in `DataTable.jsx` itself as "P1.5 — DataTable Sticky Columns Enhancement"), not a functional change.
+
+### Row-key mapping
+
+`getRowKey={(request) => request.leaveId}` — matches the original `key={request.leaveId}` on each `<tr>` exactly.
+
+### Empty-state behavior
+
+The original had two distinct empty messages ("No leaves to be displayed." when `adminLeaveRequests` itself is empty, vs. `` `No leaves found matching ${searchTerm}.` `` when only the client-side search filter yields nothing). Both are preserved via a computed `emptyTableMessage`, passed as `DataTable`'s `emptyTitle`. `DataTable` shows this through its own canonical `EmptyState` (the standard, text-only variant established in P2.26/P2.26a/P2.26b) whenever `rows.length === 0`.
+
+### Selection-summary bar
+
+The batch "N selected / Approve / Reject / Clear Selection" bar was previously a `<tr>` inside the raw table's `<thead>` (spanning all columns via `colSpan`). Since `DataTable` has no header-banner slot, it's now rendered as a sibling `<div>` immediately above `<DataTable>`, shown under the identical `selectedRequests.length > 0` condition, with the exact same buttons, handlers, and classes (`bg-indigo-100 text-indigo-700`, `w-1/2` on large screens, etc.) — a structural placement change necessitated by `DataTable`'s API, not a behavior change.
+
+### Double-shell avoidance
+
+The original wrapped the search/filter bar AND the raw table together inside one `<div className="bg-white rounded-lg shadow-sm">`. `DataTable` already provides its own bordered/rounded/shadowed shell (`SHELL_CLASSNAME`), so nesting it inside that same outer card would have reproduced the double-card problem previously identified in `EditHolidaysPage.jsx`. The outer card now wraps only the filter bar; `DataTable` renders as an independent sibling below it with its own shell.
+
+### Files modified
+
+`src/pages/leave_management/models/HandleLeaveRequestAndApprovals.jsx`, `docs/ui/phase-2-leave-management.md`. (`src/components/patterns/DataTable.jsx` and `src/components/patterns/EmptyState.jsx` show as modified in `git status`, but both changes predate this task — see note below.)
+
+### Note on pre-existing uncommitted changes found in DataTable.jsx/EmptyState.jsx
+
+Before this task began, `DataTable.jsx` already had one uncommitted change in the working tree (its empty-row wrapper had `SHELL_CLASSNAME` removed, leaving just `className`) and `EmptyState.jsx` reflected the P2.26/P2.26a/P2.26b work from earlier in this session. Neither was touched in this task — confirmed via `git diff` showing zero new hunks in either file beyond what already existed before this task's first edit.
+
+### Unused import found and removed
+
+`LoadingSpinner` was imported solely for the old loading-row markup (`<LoadingSpinner text="Loading..." />` inside the removed `<tbody>` branch). Since `DataTable`'s own `TableSkeleton` now owns that state, the import became unused and was removed.
+
+### Note on a pre-existing dead variable (not touched)
+
+The original per-row `.map()` computed `const typeObj = allLeaveTypes.find(...) || request.leaveType;` but never used `typeObj` anywhere in the rendered output — it was already dead code before this migration. It was not carried into the new column `render` functions (carrying over an unused variable would serve no purpose and could trigger a lint warning). `allLeaveTypes` state and its `setAllLeaveTypes(...)` call inside `fetchData` (part of the existing, untouched API-fetch logic) are left completely as-is — removing the state itself was out of scope since it would mean touching `fetchData`'s business logic.
+
+### Verification — three states
+
+1. **Requests exist:** all 12 columns render with the same data/formatting/actions as before; approve/reject/edit continue to open the same `confirmation`/`editingRequest`-driven `Modal`s with the same handlers.
+2. **No requests:** `DataTable` shows its canonical `EmptyState` with the correct one of the two original messages, computed the same way as before.
+3. **Action in progress:** confirmed via the `loading && adminLeaveRequests.length === 0` gate — during approve/reject/edit, `adminLeaveRequests` already has data, so `DataTable` does not fall back to `TableSkeleton`; the table stays visible with the acting row's own button already `disabled` (unchanged from before).
+
+### Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### git diff --check
+
+✅ Clean (only pre-existing LF/CRLF informational notices).
+
+### DatePicker/DateRangePicker confirmation
+
+Confirmed untouched — this file does not import either, and neither was opened.
+
+### Confirmation no commit/push was performed
+
+Confirmed — all changes remain in the working tree for local review.
+
+## P2.28 — HandleLeaveRequestAndApprovals Table Body Label/Value Layout
+
+### Target file / DataTable file
+
+`src/pages/leave_management/models/HandleLeaveRequestAndApprovals.jsx` (built on `src/components/patterns/DataTable.jsx`, unchanged from P2.27).
+
+### Previous table layout
+
+Post-P2.27: 12 `DataTable` columns rendered horizontally — one `<th>` header per field, one `<td>` per field per row (the conventional header-row-then-value-rows table layout).
+
+### New label/value row layout
+
+The `select` column is unchanged. The remaining 11 fields (employee, from, to, days, requestedOn, leaveType, reason, status, lastActionBy, documents, actions) are now rendered by a single consolidated `details` column whose `render` returns a CSS grid — `grid-cols-1 sm:grid-cols-[140px_1fr]` — stacking each field as a label (left) next to its value (right) within the row, instead of one table column per field. Below the `sm` breakpoint the grid collapses to a single column (label sits above its value) to avoid horizontal cramping on small screens. The table now effectively has 2 `DataTable` columns (`select`, `details`); the `details` column's `header` is an empty string, so no duplicate/second copy of the field names appears in the traditional header row — the field names live only once each, inside the row itself.
+
+### Complete 12-field mapping
+
+| Field | Where it lives now | Value markup |
+|---|---|---|
+| select | Own `DataTable` column, unchanged from P2.27 | Same checkbox, same `handleSelectAll`/`handleSelectRequest` |
+| employee | Label/value row 1 inside `details` | Same `Button variant="link"` opening the leave-balance `Modal` |
+| from | Row 2 | Same date formatting + session suffix |
+| to | Row 3 | Same date formatting + session suffix |
+| days | Row 4 | Same `request.daysRequested` |
+| requestedOn | Row 5 | Same date formatting |
+| leaveType | Row 6 | Same `request.leaveName` |
+| reason | Row 7 | Same `LeaveReasonCell` (View More/Less) |
+| status | Row 8 | Same canonical `StatusBadge` |
+| lastActionBy | Row 9 | Same approver name + manager-comment sub-line |
+| documents | Row 10 | Same conditional "View Documents" link |
+| actions | Row 11 | Same Approve/Reject/Edit (pending) / Cancel (approved) `Button`s, same handlers, same `disabled={loading}` |
+
+Every value's inner JSX/formatting/handler is the exact same code that lived in its own P2.27 column — only its position (inside a shared grid instead of its own `<td>`) changed.
+
+### Whether DataTable required a capability change
+
+**No.** `DataTable.jsx` was not modified (confirmed via `git diff` — it shows only the one pre-existing, pre-this-session hunk unrelated to this task). The label/value layout is achieved entirely through `DataTable`'s existing, already-documented capability that a column's `render` function "may return any node" — consolidating 11 columns into 1 column whose `render` returns a multi-field grid is a normal use of that existing API, not a new one.
+
+### Why no new capability was generic (n/a — none was added)
+
+Not applicable, since no `DataTable` capability was added. Had one been needed, the task's own instruction (generic, opt-in, no page-named props) would have applied — noted here for completeness since the report template asks for it.
+
+### Confirmation existing DataTable consumers are unaffected
+
+Confirmed — `DataTable.jsx` itself has zero new changes from this task, so every other consumer (`CompOffBalanceRequests.jsx`, `PendingLeaveRequestsTable.jsx`, `CompOffRequestsTable.jsx`, etc.) is provably unaffected; this is a page-level column-shape choice, entirely local to `HandleLeaveRequestAndApprovals.jsx`.
+
+### Selection behavior verification
+
+Unchanged — the `select` column's header (select-all) and per-row checkboxes still call the exact same `handleSelectAll`/`handleSelectRequest` handlers against the same `selectedRequests`/`selectedResourceId` state (still cross-page, per P2.27's own finding). The selection-summary bar above `DataTable` is untouched, still shown under the same `selectedRequests.length > 0` condition with the same Approve/Reject/Clear buttons.
+
+### Approve/reject behavior verification
+
+Unchanged — the Actions row inside `details` calls the same `setConfirmation({...})`/`setEditingRequest(request)` calls as before, which drive the same, untouched `confirmation`/`editingRequest`-based `Modal`s and `handleDecision`/`handleLeaveUpdate` handlers.
+
+### Loading behavior verification
+
+Unchanged from P2.27 — `DataTable`'s `loading` prop is still `loading && adminLeaveRequests.length === 0` (genuine first-load only); approve/reject/edit still leave the table's existing rows visible instead of falling back to `TableSkeleton`.
+
+### EmptyState verification
+
+Unchanged — `emptyTitle`/`emptyDescription` computation and `DataTable`'s internal canonical `EmptyState` call are untouched; still text-only per P2.26/P2.26a/P2.26b.
+
+### Responsive-layout verification
+
+The `grid-cols-1 sm:grid-cols-[140px_1fr]` layout stacks label above value on narrow viewports (no fixed width forced below `sm`) and aligns them side-by-side at `sm:` and above with a fixed 140px label column and a fluid `1fr` value column. Long values (`reason` via `LeaveReasonCell`'s existing `whitespace-pre-wrap`, `employeeFullName`, `leaveName`) wrap naturally within the `1fr` column rather than forcing horizontal overflow — no `whitespace-nowrap` was added to any value that could realistically grow long. The Actions button row uses `flex-wrap` so it can't force horizontal overflow either.
+
+### Business/API verification
+
+Confirmed unchanged — a targeted diff search for `fetchData`, `handleAcceptAll`, `handleRejectAll`, `handleDecision`, `handleLeaveUpdate`, and any `api.post/put/get`/`toast.` calls found zero modifications to any of them; the only matches were pre-existing (P2.27) comment removals next to two `onClick` handlers whose target functions are unchanged.
+
+### Files modified
+
+`src/pages/leave_management/models/HandleLeaveRequestAndApprovals.jsx`, `docs/ui/phase-2-leave-management.md`. (`DataTable.jsx`/`EmptyState.jsx` continue to show their pre-existing, pre-this-session diffs only — not touched in P2.28.)
+
+### Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### git diff --check
+
+✅ Clean (only pre-existing LF/CRLF informational notices).
+
+### DatePicker/DateRangePicker confirmation
+
+Confirmed untouched — this file does not import either, and neither was opened.
+
+### Confirmation no unrelated modules were modified
+
+Confirmed — only the target file and this documentation file were edited.
+
+### Confirmation no commit/push was performed
+
+Confirmed — all changes remain in the working tree for local review.
+
+## P2.29a — Standardize Empty Table State Presentation
+
+**Verification-only task. No source code was modified.** Every requirement was already satisfied by prior work (P2.26/P2.26a/P2.26b's `EmptyState` standardization, a pre-existing shell-removal already present in `DataTable.jsx`'s empty branch, and P2.27/P2.28's `DataTable` integration in `HandleLeaveRequestAndApprovals.jsx`) — re-verified fresh against current source rather than assumed.
+
+### 1. Branch
+
+`intra-ui/unify`
+
+### 2. Canonical EmptyState implementation
+
+`src/components/patterns/EmptyState.jsx`, re-read fresh (unchanged since the P2.26b session read). Standard (default) branch:
+
+```jsx
+<div className={`flex w-full items-center justify-center ${className}`.trim()}>
+  <div className="text-center">
+    {title ? <p className={STANDARD_TEXT_CLASSES}>{title}</p> : null}
+    {description ? <p className={STANDARD_TEXT_CLASSES}>{description}</p> : null}
+    {action ? <div className="mt-3">{action}</div> : null}
+  </div>
+</div>
+```
+with `STANDARD_TEXT_CLASSES = "text-sm font-semibold italic text-gray-500"`. No icon, no image, no `bg-*`/`border-*`/`outline-*`/`shadow-*`/`rounded-*` anywhere in this branch — confirmed by re-reading the whole file. The `illustrated` variant (used only by `ApprovalDashboard.jsx`) is untouched.
+
+### 3. Canonical DataTable implementation
+
+`src/components/patterns/DataTable.jsx`, re-read fresh. Its empty-row branch:
+
+```jsx
+if (!rows.length) {
+  return (
+    <div className={classNames(className)}>
+      <EmptyState title={emptyTitle} description={emptyDescription} />
+    </div>
+  );
+}
+```
+This already omits `SHELL_CLASSNAME` (the bordered/rounded/shadowed card used for the *non-empty* table state) — a change already present in the working tree before this task started (not made by this task; confirmed via `git diff` showing the identical single hunk from prior sessions, zero new hunks). This satisfies section 8's explicit instruction ("do not modify DataTable's outer shell just to remove its styling — only EmptyState itself should be plain") with no further action needed: the shell was already absent from the empty path specifically, while the *non-empty* table state still gets its shell normally (unaffected).
+
+### 4. Empty-state typography
+
+`text-sm font-semibold italic text-gray-500` — confirmed present and unchanged.
+
+### 5. Empty-state layout
+
+Centered horizontally (`items-center justify-center` on a `w-full` flex row) and vertically within whatever height its container provides (the same centering flexbox, no arbitrary fixed height added anywhere — confirmed no `h-64`/`h-72`/`h-80` or similar exists in either file).
+
+### 6. Tables audited
+
+All 16 live table implementations found under `src/pages/leave_management/**`:
+
+**Canonical `DataTable` consumers (10):** `HandleLeaveRequestAndApprovals.jsx`, `EmployeeLeaveBalances.jsx`, `ManageActiveLeaveBlocks.jsx`, `ApprovalRulesPage.jsx`, `EditHolidaysPage.jsx`, `CompOffBalanceRequests.jsx`, `LeaveHistory.jsx`, `RevokeLeaveRequests.jsx`, `CompOffRequestsTable.jsx`, `PendingLeaveRequestsTable.jsx`.
+
+**Raw `<table>` implementations (5, all previously assessed and deliberately excluded from `DataTable` migration in P2.22d for light-header/contrast or page-consistent-palette reasons):** `HRManageTools.jsx`, `EnterpriseConfigManager.jsx`, `EditBlockLeaveModal.jsx`, `ruleBook/RuleBookPage.jsx`, `models/ApprovalQueue.jsx`. `LeaveHistory.jsx`'s own `<table>`-pattern grep hit is inside its confirmed-dead ~1400-line commented legacy block (per P2.23), not live code — its live table is the `DataTable` usage counted above.
+
+### 7. Tables using standard EmptyState
+
+All 10 `DataTable` consumers automatically render through the canonical (now plain/text-only) `EmptyState` when their `rows` array is empty — 7 pass an explicit `emptyTitle` (preserving their exact existing message, see section 13), 3 (`RevokeLeaveRequests.jsx`, `CompOffRequestsTable.jsx`, `PendingLeaveRequestsTable.jsx`) don't pass one at all and fall back to `DataTable`'s own existing default (`"No data"`) — this is pre-existing behavior, not new text invented by this task.
+
+### 8. Tables intentionally excluded
+
+The 5 raw-`<table>` files above — none use canonical `EmptyState` today (their light/page-specific header styling was the reason they weren't migrated to `DataTable` in P2.22d, and that reasoning is unrelated to and unaffected by this empty-state-only task). Not forced into `DataTable` here, per this task's own section 5 instruction.
+
+### 9. ApprovalDashboard verification
+
+Confirmed unchanged — `models/ApprovalDashboard.jsx` still passes `variant="illustrated"` to its `EmptyState` call (verified via fresh grep), so its icon/circle/spacing/appearance are completely untouched.
+
+### 10. PendingLeaveRequests verification
+
+Confirmed unchanged — `models/PendingLeaveRequests.jsx` still doesn't import or use the canonical `EmptyState` component at all; its custom horizontal image+text empty layout (verified via fresh grep for `NoPendingLeaves`) is exactly as before.
+
+### 11. CompOffBalanceRequests verification
+
+Confirmed compliant with zero code changes needed — its `<DataTable emptyTitle="No pending Comp-Off requests for your team." .../>` call (unchanged) automatically renders the plain, centered, `text-sm font-semibold italic text-gray-500` message with no icon/background/border, since it never passes an `icon` prop and `DataTable`'s empty branch has no shell.
+
+### 12. HandleLeaveRequestAndApprovals verification
+
+Confirmed compliant with zero code changes needed — `emptyTitle={emptyTableMessage}` (the P2.27/P2.28 computed value preserving both original messages, "No leaves to be displayed." / `` `No leaves found matching ${searchTerm}.` ``) is unchanged, and its normal (non-empty) state — the P2.28 label/value row layout — is completely separate code, untouched, still shown whenever `paginatedRequests.length > 0`.
+
+### 13. Existing empty messages preserved
+
+| File | Message | Changed? |
+|---|---|---|
+| `ApprovalRulesPage.jsx` | "No approval rules found" | No |
+| `CompOffBalanceRequests.jsx` | "No pending Comp-Off requests for your team." | No |
+| `EditHolidaysPage.jsx` | "No holidays found" | No |
+| `EmployeeLeaveBalances.jsx` | "No leave balances found." | No |
+| `HandleLeaveRequestAndApprovals.jsx` | "No leaves to be displayed." / dynamic "No leaves found matching {searchTerm}." | No |
+| `LeaveHistory.jsx` | "No leave history found" | No |
+| `ManageActiveLeaveBlocks.jsx` | "No active blocks" | No |
+| `RevokeLeaveRequests.jsx`, `CompOffRequestsTable.jsx`, `PendingLeaveRequestsTable.jsx` | `DataTable`'s existing default "No data" | No |
+
+### 14. Business/API verification
+
+Confirmed unchanged — no source file was edited in this task, so by definition no state/API/filter/pagination/loading/WebSocket/RBAC/validation logic was touched.
+
+### 15. Files modified
+
+None (source). Only `docs/ui/phase-2-leave-management.md` was written.
+
+### 16. Build result
+
+✅ `npm run build` succeeds — only pre-existing, unrelated chunk-size warnings.
+
+### 17. Lint result
+
+✅ `npm run lint` — same pre-existing baseline (2 `react-hooks/exhaustive-deps` errors in `src/pages/airs/**`, 1 unrelated warning in `account_receivable/services/billingConfigurationService.js`). Zero new issues.
+
+### 18. git diff --check
+
+✅ Clean (only pre-existing LF/CRLF informational notices).
+
+### 19. DatePicker/DateRangePicker confirmation
+
+Confirmed untouched — not opened.
+
+### 20. Confirmation no unrelated modules were modified
+
+Confirmed — `git status --short` before and after this task shows the identical file set from P2.26–P2.28, plus only this documentation addition.
+
+### 21. Confirmation no commit/push was performed
+
+Confirmed — all changes remain in the working tree for local review.

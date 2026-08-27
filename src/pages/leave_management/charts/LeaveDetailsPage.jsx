@@ -3,7 +3,6 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import api from "../../../api/axiosInstance";
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import beachDay from "../../../components/icons/beach-day_cnsv.svg";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import StatusBadge from "../../../components/patterns/StatusBadge";
 import EmptyState from "../../../components/patterns/EmptyState";
@@ -239,7 +238,6 @@ export default function LeaveDetailsPage() {
             ) : (
               // Display this message if there are no leave requests at all
               <EmptyState
-                icon={<img src={beachDay} alt="" className="h-6 w-6" />}
                 description={`No requests found for ${displayName} in ${new Date().getFullYear()}.`}
               />
             )}

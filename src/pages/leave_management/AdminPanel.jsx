@@ -199,10 +199,10 @@ const AdminPanel = ({ employeeId }) => {
 
   return (
     <div className="space-y-6 py-4">
-      <PageHeader
+      {/* <PageHeader
         title="Leave Management"
         subtitle="Handle leave requests and approvals"
-      />
+      /> */}
       {/* <Button
         onClick={() => navigate(`/block-leave-dates/${employeeId}`)}
         variant="secondary"

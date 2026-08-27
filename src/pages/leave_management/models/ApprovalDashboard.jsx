@@ -158,6 +158,7 @@ const ApprovalDashboard = () => {
         </div>
       ) : requests.length === 0 ? (
         <EmptyState
+          variant="illustrated"
           icon={<img src={clearingDesk} alt="" className="h-45 w-45" />}
           title="No Pending Approvals."
         />

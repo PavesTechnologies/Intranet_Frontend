@@ -4,7 +4,6 @@ import { toast } from "react-toastify";
 import ApprovalQueue from "./ApprovalQueue";
 import { ChevronRight } from "lucide-react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import clearingDesk from "../../../components/icons/clearing-desk_emmv.svg";
 import StatusBadge from "../../../components/patterns/StatusBadge";
 import EmptyState from "../../../components/patterns/EmptyState";
 import PageHeader from "../../../components/ui/PageHeader";
@@ -54,7 +53,6 @@ const PendingApprovalsQueueView = () => {
         </div>
       ) : requests.length === 0 ? (
         <EmptyState
-          icon={<img src={clearingDesk} alt="" className="h-40 w-40" />}
           title="No Pending Approvals."
         />
       ) : (
