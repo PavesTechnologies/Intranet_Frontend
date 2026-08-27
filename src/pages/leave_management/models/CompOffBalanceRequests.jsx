@@ -103,12 +103,7 @@ const CompOffBalanceRequests = ({ managerId }) => {
     );
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500 mb-6">
-            <h3 className="text-lg font-semibold text-blue-900 mb-2">
-                Comp-Off Balance Requests
-            </h3>
-            <div className="border-b-2 border-blue-500 w-16 mb-4"></div>
-
+        <>
             <DataTable
                 loading={loading}
                 emptyTitle="No pending Comp-Off requests for your team."
@@ -174,7 +169,7 @@ const CompOffBalanceRequests = ({ managerId }) => {
                     <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
                 </div>
             )} */}
-        </div>
+        </>
     );
 };
 

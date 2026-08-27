@@ -85,6 +85,13 @@ export default function CancellationModal({
           value={selectedReason}
           onChange={(e) => setSelectedReason(e.target.value)}
           placeholder="Choose a reason"
+          // The default absolutely-positioned menu is a child of Modal's
+          // `overflow-y-auto` body, so it gets clipped at the body's bottom
+          // edge and renders behind the modal footer's buttons. `anchorOptions`
+          // renders the menu anchored/portaled instead, avoiding that clip —
+          // the same fix already used for FormSelect-in-Modal elsewhere (see
+          // WeeklyEntryModal.jsx).
+          anchorOptions
         />
 
         {/* Custom Reason Textarea */}

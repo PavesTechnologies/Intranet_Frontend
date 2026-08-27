@@ -7,6 +7,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import Button from "../../components/Button/Button";
 import PageHeader from "../../components/ui/PageHeader";
 import RevokeLeaveRequests from "./models/RevokeLeaveRequests";
+import { Fonts } from "../../components/Fonts/Fonts";
 import { toast } from "react-toastify";
 import { se } from "date-fns/locale";
 import { useWebSocket } from "./websockets/WebSocketProvider.jsx";
@@ -266,15 +267,21 @@ const AdminPanel = ({ employeeId }) => {
       {/* Comp-Off Balance Requests Section */}
       {permissions.includes("VIEW_COMPOFF_BY_EMPLOYEE") &&
         leaveTypes.some((lt) => lt.leaveTypeId === "L-COMPOFF") && (
-          <CompOffBalanceRequests managerId={employeeId} />
+          <section className="space-y-3">
+            <h2 className={Fonts.subheading}>Comp-Off Balance Requests</h2>
+            <CompOffBalanceRequests managerId={employeeId} />
+          </section>
         )}
       {/* <CompOffBalanceRequests managerId={employeeId} /> */}
 
       {revokeRequests.length > 0 && (
-        <RevokeLeaveRequests
-          revokeRequests={revokeRequests}
-          onActionSuccess={fetchRevokeRequests}
-        />
+        <section className="space-y-3">
+          <h2 className={Fonts.subheading}>Revoke Leave Requests</h2>
+          <RevokeLeaveRequests
+            revokeRequests={revokeRequests}
+            onActionSuccess={fetchRevokeRequests}
+          />
+        </section>
       )}
 
       {/* Search and Filter Section */}

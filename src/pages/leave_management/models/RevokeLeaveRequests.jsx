@@ -100,86 +100,80 @@ const RevokeLeaveRequests = ({ revokeRequests, onActionSuccess }) => {
   // revokeRequests.length > 0 and would miss the very first request.
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500 mb-6">
-      <h3 className="text-lg font-semibold text-blue-900 mb-2">
-        Revoke Leave Requests
-      </h3>
-      <div className="border-b-2 border-blue-500 w-16 mb-4"></div>
-      <DataTable
-          loading={loading}
-          getRowKey={(req) => req.revokeId}
-          rows={revokeRequests}
-          columns={[
-            { key: "leaveName", header: "Leave Type", className: "text-center" },
-            { key: "employeeName", header: "Employee", className: "text-center" },
-            {
-              key: "startDate",
-              header: "Start Date",
-              className: "text-center",
-              render: (req) =>
-                new Date(req.startDate).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                }),
-            },
-            {
-              key: "endDate",
-              header: "End Date",
-              className: "text-center",
-              render: (req) =>
-                new Date(req.endDate).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                }),
-            },
-            {
-              key: "days",
-              header: "Duration",
-              className: "text-center",
-              render: (req) =>
-                req.days <= 1 ? `${req.days} Day` : `${req.days} Days`,
-            },
-            { key: "reason", header: "Reason", className: "text-center" },
-            {
-              key: "actions",
-              header: "Action",
-              className: "text-center",
-              render: (req) => (
-                <div className="flex justify-center gap-2">
-                  <Button
-                    onClick={() =>
-                      handleApprove(req.revokeId, req.employeeId, req.year)
-                    }
-                    variant="primary"
-                    size="icon"
-                    aria-label="Approve"
-                    className="p-1 pr-2 text-green-600 hover:text-green-800 transition-colors"
-                    title="Approve"
-                    disabled={loading}
-                  >
-                    <Check className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    onClick={() =>
-                      handleReject(req.revokeId, req.employeeId, req.year)
-                    }
-                    variant="danger"
-                    size="icon"
-                    aria-label="Reject"
-                    className="p-1 pl-4 text-red-600 hover:text-red-800 transition-colors"
-                    title="Reject"
-                    disabled={loading}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              ),
-            },
-          ]}
-        />
-    </div>
+    <DataTable
+      loading={loading}
+      getRowKey={(req) => req.revokeId}
+      rows={revokeRequests}
+      columns={[
+        { key: "leaveName", header: "Leave Type", className: "text-center" },
+        { key: "employeeName", header: "Employee", className: "text-center" },
+        {
+          key: "startDate",
+          header: "Start Date",
+          className: "text-center",
+          render: (req) =>
+            new Date(req.startDate).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            }),
+        },
+        {
+          key: "endDate",
+          header: "End Date",
+          className: "text-center",
+          render: (req) =>
+            new Date(req.endDate).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            }),
+        },
+        {
+          key: "days",
+          header: "Duration",
+          className: "text-center",
+          render: (req) =>
+            req.days <= 1 ? `${req.days} Day` : `${req.days} Days`,
+        },
+        { key: "reason", header: "Reason", className: "text-center" },
+        {
+          key: "actions",
+          header: "Action",
+          className: "text-center",
+          render: (req) => (
+            <div className="flex justify-center gap-2">
+              <Button
+                onClick={() =>
+                  handleApprove(req.revokeId, req.employeeId, req.year)
+                }
+                variant="primary"
+                size="icon"
+                aria-label="Approve"
+                className="p-1 pr-2 text-green-600 hover:text-green-800 transition-colors"
+                title="Approve"
+                disabled={loading}
+              >
+                <Check className="w-4 h-4" />
+              </Button>
+              <Button
+                onClick={() =>
+                  handleReject(req.revokeId, req.employeeId, req.year)
+                }
+                variant="danger"
+                size="icon"
+                aria-label="Reject"
+                className="p-1 pl-4 text-red-600 hover:text-red-800 transition-colors"
+                title="Reject"
+                disabled={loading}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ),
+        },
+      ]}
+    />
   );
 };
 

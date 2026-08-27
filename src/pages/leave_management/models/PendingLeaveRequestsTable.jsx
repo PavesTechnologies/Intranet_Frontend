@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "react-toastify";
 import api from "../../../api/axiosInstance";
 import { PencilIcon, X } from "lucide-react";
@@ -7,8 +8,58 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationModal from "./ConfirmationModal";
 import Button from "../../../components/Button/Button";
 import DataTable from "../../../components/patterns/DataTable";
-const token = localStorage.getItem("token");
 const BASE_URL = window.__APP_CONFIG__.BASE_URL;
+
+// Visible cell is a single-line CSS ellipsis (`truncate`) — the table Reason
+// value must stay single-line so it can't force other columns' headers to
+// wrap. The complete reason is still available via the tooltip, which
+// reuses BirthdayAnniversaryPanel's visual design (bg-gray-900/90
+// text-white text-[10px] px-2.5 py-1.5 rounded-lg shadow-xl + pointer
+// triangle), adapted two ways: (1) the tooltip itself still wraps across
+// multiple lines (unlike Birthday's `whitespace-nowrap`, since names are
+// short but reasons aren't), and (2) it's shown/positioned via hover state
+// + a `document.body` portal instead of Birthday's pure `group-hover` CSS.
+// Birthday's trigger sits in plain page flow, so a same-flow `absolute`
+// tooltip never affects any ancestor's size. This trigger sits inside
+// DataTable's `overflow-x-auto` wrapper, where a same-flow `absolute`
+// tooltip would still be included in that ancestor's scrollable-overflow
+// box and could visually "resize" the table / introduce scrollbars — the
+// portal avoids that entirely.
+function ReasonCell({ reason }) {
+  const [show, setShow] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const triggerRef = useRef(null);
+
+  const handleMouseEnter = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPosition({ top: rect.top - 8, left: rect.left + rect.width / 2 });
+    }
+    setShow(true);
+  };
+
+  return (
+    <div
+      ref={triggerRef}
+      className="relative block w-full min-w-0"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setShow(false)}
+    >
+      <div className="truncate text-left">{reason}</div>
+      {show &&
+        createPortal(
+          <div
+            className="fixed z-20 max-w-xs -translate-x-1/2 -translate-y-full whitespace-normal break-words rounded-lg bg-gray-900/90 px-2.5 py-1.5 text-[10px] text-white shadow-xl pointer-events-none"
+            style={{ top: position.top, left: position.left }}
+          >
+            {reason}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-gray-900/90" />
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
 
 /**
  * This is now a "presentational" component. It receives data and functions as props.
@@ -100,17 +151,27 @@ const PendingLeaveRequestsTable = ({
       .replace(/(^\w{1})|(\s+\w{1})/g, (letter) => letter.toUpperCase()); // Capitalizes each word
   };
 
+  // Column `w-[n%]` widths sum to 100% (required by the `table-fixed`
+  // layout below). Reason is the only column that ever gives up width —
+  // startDate/endDate/days/actions get whatever they need to never clip a
+  // value or a button (dates render as e.g. "Aug 27, 2026" plus an
+  // optional " (session)" suffix, so they carry no truncation classes at
+  // all), Leave Type gets enough to fit typical names (e.g. "Casual Leave")
+  // in full, and Reason absorbs whatever's left, truncating to one line
+  // with the complete value still available via its own tooltip.
   const columns = [
     {
       key: "leaveType",
       header: "Leave Type",
-      className: "text-center",
+      className: "w-[15%] truncate overflow-hidden whitespace-nowrap text-center",
       render: (leave) => getLabelFromName(leave.leaveName),
     },
     {
       key: "startDate",
       header: "Start Date",
-      className: "text-center",
+      // Renders as e.g. "Aug 27, 2026" plus an optional " (session)" suffix
+      // — never truncate/clip this; the column is sized to always fit it.
+      className: "w-[17%] whitespace-nowrap text-center",
       render: (leave) => (
         <>
           {new Date(leave.startDate).toLocaleDateString("en-US", {
@@ -131,7 +192,8 @@ const PendingLeaveRequestsTable = ({
     {
       key: "endDate",
       header: "End Date",
-      className: "text-center",
+      // Same rationale as startDate above — must stay fully visible.
+      className: "w-[17%] whitespace-nowrap text-center",
       render: (leave) => (
         <>
           {new Date(leave.endDate).toLocaleDateString("en-US", {
@@ -150,19 +212,20 @@ const PendingLeaveRequestsTable = ({
     {
       key: "days",
       header: "Days",
-      className: "text-center",
+      className: "w-[10%] whitespace-nowrap text-center",
       render: (leave) => leave.daysRequested,
     },
     {
       key: "reason",
       header: "Reason",
-      className: "text-center",
-      render: (leave) => leave.reason || "-",
+      className: "w-[25%] whitespace-nowrap text-center",
+      render: (leave) =>
+        leave.reason ? <ReasonCell reason={leave.reason} /> : "-",
     },
     {
       key: "actions",
       header: "Actions",
-      className: "text-center",
+      className: "w-[16%] whitespace-nowrap text-center",
       render: (leave) => (
         <div className="flex items-center space-x-1 justify-center">
           <Button
@@ -193,6 +256,16 @@ const PendingLeaveRequestsTable = ({
           columns={columns}
           rows={pendingLeaves}
           getRowKey={(leave) => leave.leaveId}
+          // Auto table layout sizes every column to its unwrapped content
+          // (every header/cell here is `whitespace-nowrap`), so the sum of
+          // those natural widths can exceed the section's available width
+          // and force DataTable's own `overflow-x-auto` to kick in. Fixed
+          // layout instead divides the table strictly by each column's own
+          // width class below, so the table always equals its container's
+          // width (100%) and never grows past it — no DataTable.jsx change
+          // needed, since this only targets this table's own descendant
+          // `<table>` element.
+          className="[&_table]:table-fixed"
         />
       </div>
 

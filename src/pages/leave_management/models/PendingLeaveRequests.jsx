@@ -96,13 +96,15 @@ const PendingLeaveRequests = ({ refresh, year, onLeaveCancel }) => {
       ) : error ? (
         <p className="text-red-500">{error}</p>
       ) : pendingLeaves.length === 0 ? (
-        <div className="flex flex-row items-center justify-center gap-4 py-6 text-left">
-          <div className="flex items-center justify-center">
-            <img src={NoPendingLeaves} alt="" className="h-24 w-24 object-contain" />
-          </div>
-          <div>
-            <p className={Fonts.subheading}>Cheers! No pending leave requests.</p>
-            <p className="max-w-sm text-sm text-gray-500">Request leave on the above!</p>
+        <div className="bg-white shadow rounded-lg p-6">
+          <div className="flex flex-row items-center justify-center gap-4 text-left">
+            <div className="flex items-center justify-center">
+              <img src={NoPendingLeaves} alt="" className="h-24 w-24 object-contain" />
+            </div>
+            <div>
+              <p className={Fonts.subheading}>Cheers! No pending leave requests.</p>
+              <p className="max-w-sm text-sm text-gray-500">Request leave on the above!</p>
+            </div>
           </div>
         </div>
       ) : (
