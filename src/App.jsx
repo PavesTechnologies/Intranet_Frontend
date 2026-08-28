@@ -1320,13 +1320,10 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />          {/* AI Screening (AIRS) Routes */}
-          {/* HIRING_MANAGER is deliberately excluded: every /airs/dashboard/*
-              endpoint is restricted to HR_ADMIN and/or RECRUITER, so a hiring
-              manager would load the page and get a 403 in every section. */}
           <Route
             path="/airs/dashboard"
             element={
-              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <RecruiterDashboardPage />
               </ProtectedRoute>
             }
