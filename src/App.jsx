@@ -127,6 +127,7 @@ import DegreeMasterManagement from "./pages/employee-onboarding/hr-configuration
 import AdminApprovalDashboard from "./pages/employee-onboarding/admin/AdminApprovalDashboard.jsx"; import AdminOfferView from "./pages/employee-onboarding/admin/AdminOfferView.jsx";
 
 // AI Screening (AIRS)
+import RecruiterDashboardPage from "./pages/airs/dashboard/RecruiterDashboardPage.jsx";
 import JdLibrary from "./pages/airs/pages/JdLibrary.jsx";
 import JdCreate from "./pages/airs/pages/JdCreate.jsx";
 import JdDetails from "./pages/airs/pages/JdDetails.jsx";
@@ -144,6 +145,7 @@ import CandidateScorePage from "./pages/airs/candidates/CandidateScore/Candidate
 import InterviewQueuePage from "./pages/airs/interview-queue/InterviewQueuePage.jsx";
 import InterviewCalendarPage from "./pages/airs/interview-calendar/InterviewCalendarPage.jsx";
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
+import GlobalCandidatesPage from "./pages/airs/global-candidates/GlobalCandidatesPage.jsx";
 import PipelineCandidateScorecardPage from "./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
 import TalentPoolCandidateProfilePage from "./pages/airs/talent-pool/profile/TalentPoolCandidateProfilePage.jsx";
@@ -1330,6 +1332,14 @@ const AppRoutes = () => {
             }
           />          {/* AI Screening (AIRS) Routes */}
           <Route
+            path="/airs/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
+                <RecruiterDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/airs/jds"
             element={
               <ProtectedRoute roles={["General"]}>
@@ -1453,6 +1463,18 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <PipelineCandidateScorecardPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* Global Candidate Directory (GET /candidates) — distinct from
+              /airs/candidates below, which is the campaign-scoped
+              Candidates & Ranking page. HR_ADMIN only, matching the
+              backend's require_roles(UserRole.HR_ADMIN) on this endpoint. */}
+          <Route
+            path="/airs/global-candidates"
+            element={
+              <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
+                <GlobalCandidatesPage />
               </ProtectedRoute>
             }
           />

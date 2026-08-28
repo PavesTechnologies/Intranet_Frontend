@@ -146,13 +146,24 @@ const interviewCalendarItem = { label: "Interview Calendar", to: "/airs/intervie
 
 // HR_ADMIN gets a trimmed-down AIRS menu — only these items, plus
 // Prompt Templates below (HR_ADMIN-only, not part of the general airsSubmenu).
+// "Candidates" here is deliberately its own entry (not filtered in from
+// airsSubmenu above) — it points at the HR_ADMIN-only Global Candidate
+// Directory (/airs/global-candidates, GET /candidates), NOT the
+// campaign-scoped Candidates & Ranking page airsSubmenu's own "Candidates"
+// entry points to.
 const hrAdminAirsSubmenu = [
+  ...airsSubmenu.filter((item) => ["Dashboard", "JD Management", "Campaigns", "Pipeline"].includes(item.label)),
+  { label: "Candidates", to: "/airs/global-candidates" },
+  ...airsSubmenu.filter((item) => ["Talent Pool", "Skill Ontology"].includes(item.label)),
   ...airsSubmenu.filter((item) => ["Dashboard", "JD Management", "Skill Ontology", "Campaigns", "Pipeline", "Talent Pool"].includes(item.label)),
   interviewCalendarItem,
   { label: "Prompt Templates", to: "/airs/prompt-templates" },
 ];
 
 // RECRUITER gets a trimmed-down AIRS menu — only these items.
+const recruiterAirsSubmenu = airsSubmenu.filter((item) =>
+  ["Dashboard", "Campaigns", "Resume Intake", "Pipeline", "Talent Pool"].includes(item.label),
+);
 const recruiterAirsSubmenu = [
   ...airsSubmenu.filter((item) =>
     ["Dashboard", "Campaigns", "Resume Intake", "Pipeline", "Talent Pool"].includes(item.label),
