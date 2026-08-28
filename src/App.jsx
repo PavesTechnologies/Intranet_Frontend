@@ -134,6 +134,7 @@ import ReviewPage from "./pages/airs/resume-intake/intake/ReviewPage.jsx";
 import CandidateRankingPage from "./pages/airs/candidates/CandidateRankingPage.jsx";
 import CandidateScorePage from "./pages/airs/candidates/CandidateScore/CandidateScorePage.jsx";
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
+import GlobalCandidatesPage from "./pages/airs/global-candidates/GlobalCandidatesPage.jsx";
 import PipelineCandidateScorecardPage from "./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
 import TalentPoolCandidateProfilePage from "./pages/airs/talent-pool/profile/TalentPoolCandidateProfilePage.jsx";
@@ -1284,6 +1285,18 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <PipelineCandidateScorecardPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* Global Candidate Directory (GET /candidates) — distinct from
+              /airs/candidates below, which is the campaign-scoped
+              Candidates & Ranking page. HR_ADMIN only, matching the
+              backend's require_roles(UserRole.HR_ADMIN) on this endpoint. */}
+          <Route
+            path="/airs/global-candidates"
+            element={
+              <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
+                <GlobalCandidatesPage />
               </ProtectedRoute>
             }
           />

@@ -112,8 +112,15 @@ const airsSubmenu = [
 
 // HR_ADMIN gets a trimmed-down AIRS menu — only these items, plus
 // Prompt Templates below (HR_ADMIN-only, not part of the general airsSubmenu).
+// "Candidates" here is deliberately its own entry (not filtered in from
+// airsSubmenu above) — it points at the HR_ADMIN-only Global Candidate
+// Directory (/airs/global-candidates, GET /candidates), NOT the
+// campaign-scoped Candidates & Ranking page airsSubmenu's own "Candidates"
+// entry points to.
 const hrAdminAirsSubmenu = [
-  ...airsSubmenu.filter((item) => ["JD Management", "Skill Ontology", "Campaigns", "Pipeline", "Talent Pool"].includes(item.label)),
+  ...airsSubmenu.filter((item) => ["JD Management", "Campaigns", "Pipeline"].includes(item.label)),
+  { label: "Candidates", to: "/airs/global-candidates" },
+  ...airsSubmenu.filter((item) => ["Talent Pool", "Skill Ontology"].includes(item.label)),
   { label: "Prompt Templates", to: "/airs/prompt-templates" },
 ];
 
