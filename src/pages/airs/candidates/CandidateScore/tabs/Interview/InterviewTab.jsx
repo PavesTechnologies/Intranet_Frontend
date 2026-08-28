@@ -4,6 +4,7 @@ import { CalendarClock, CalendarPlus } from "lucide-react";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorState from "@/pages/airs/skill-ontology/components/ErrorState";
+import { useAuth } from "../../../../../../contexts/AuthContext";
 import useInterviewQuery from "./hooks/useInterviewQuery";
 import { useScheduleInterview, useRescheduleInterview, useCancelInterview, useCompleteInterview } from "./hooks/useInterviewMutations";
 import InterviewScheduleModal from "./components/InterviewScheduleModal";
@@ -43,6 +44,11 @@ function getErrorMessage(error, fallback) {
 }
 
 export default function InterviewTab({ candidate }) {
+  const { hasRole } = useAuth();
+  // HIRING_MANAGER gets a read-only view of this tab — no scheduling,
+  // rescheduling, cancelling, completing, editing interviewers, or
+  // requesting feedback.
+  const isHiringManager = hasRole(["HIRING_MANAGER"]);
   const { interviews, isLoading, error, refetch } = useInterviewQuery(candidate?.id);
   const [modalMode, setModalMode] = useState(null); // null | "schedule" | "reschedule"
   const [activeRound, setActiveRound] = useState(null); // round being rescheduled
@@ -223,7 +229,7 @@ export default function InterviewTab({ candidate }) {
             </span>
           )}
         </span>
-        {!isRejected && (
+        {!isRejected && !isHiringManager && (
           <Button
             size="small"
             onClick={openSchedule}
@@ -254,6 +260,7 @@ export default function InterviewTab({ candidate }) {
             onComplete={handleComplete}
             isCompleting={completeMutation.isPending && completingRoundId === round.id}
             onEditInterviewers={setEditInterviewersTarget}
+            readOnly={isHiringManager}
           />
         ))
       )}

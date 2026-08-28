@@ -95,6 +95,7 @@ export default function JdDetails() {
   const { jds, campaigns, updateJd, restoreJdVersion, addCampaign } = useAirsStore();
   const { hasRole } = useAuth();
   const isHRAdmin = hasRole(["HR_ADMIN"]);
+  const isRecruiter = hasRole(["RECRUITER"]);
   const canViewPipeline = hasRole(["HR_ADMIN", "RECRUITER"]);
 
   const jd = jds.find((j) => j.id === id);
@@ -465,30 +466,35 @@ export default function JdDetails() {
     });
   }, [paginatedSkills, skillsCurrentPage, jdSkillsData]);
 
+  // Selecting/resolving unknown skills is an HR_ADMIN-only action — the
+  // select and action columns only exist for that role; RECRUITER and
+  // HIRING_MANAGER get a plain read-only table.
   const jdUnknownSkillsHeaders = [
-    <div key="select" className="w-full flex justify-center select-none">
-      <input
-        type="checkbox"
-        checked={allUnknownSkillsSelected}
-        onChange={toggleSelectAllUnknownSkills}
-        className="h-3.5 w-3.5 cursor-pointer accent-indigo-600"
-      />
-    </div>,
+    isHRAdmin && (
+      <div key="select" className="w-full flex justify-center select-none">
+        <input
+          type="checkbox"
+          checked={allUnknownSkillsSelected}
+          onChange={toggleSelectAllUnknownSkills}
+          className="h-3.5 w-3.5 cursor-pointer accent-indigo-600"
+        />
+      </div>
+    ),
     <div key="rawSkill" className="w-full flex justify-start select-none">Raw Skill</div>,
     <div key="mandatory" className="w-full flex justify-center select-none">Mandatory</div>,
     <div key="status" className="w-full flex justify-center select-none">Status</div>,
     <div key="createdAt" className="w-full flex justify-center select-none">Created Date</div>,
-    <div key="action" className="w-full flex justify-center select-none">Action</div>
-  ];
+    isHRAdmin && <div key="action" className="w-full flex justify-center select-none">Action</div>,
+  ].filter(Boolean);
 
   const jdUnknownSkillsColumns = [
-    "select",
+    isHRAdmin && "select",
     "raw_text",
     "mandatory",
     "status",
     "created_at",
-    "action"
-  ];
+    isHRAdmin && "action",
+  ].filter(Boolean);
 
   const jdUnknownSkillsRows = useMemo(() => {
     return paginatedUnknownSkills.map((sk) => {
@@ -1001,9 +1007,10 @@ export default function JdDetails() {
           { id: "extracted_json", label: "Extracted JSON" },
           { id: "jd_skills", label: "JD Skill" },
           { id: "jd_unknown_skills", label: "JD Unknown Skills" },
-          { id: "campaigns", label: "Campaigns" },
+          // RECRUITER doesn't get the Campaigns tab here.
+          { id: "campaigns", label: "Campaigns", show: !isRecruiter },
           { id: "versions", label: "Version History" },
-        ].map((t) => (
+        ].filter((t) => t.show !== false).map((t) => (
           <button
             key={t.id}
             onClick={() => {
@@ -1300,7 +1307,7 @@ export default function JdDetails() {
       )}
 
       {/* --- CAMPAIGNS TAB --- */}
-      {activeTab === "campaigns" && (
+      {activeTab === "campaigns" && !isRecruiter && (
         <div className="space-y-6">
           {/* Header row */}
           <div className="flex justify-between items-center bg-slate-50/50 p-5 rounded-xl border border-slate-200">
@@ -1327,25 +1334,26 @@ export default function JdDetails() {
               </div>
             </div>
 
-            {/* Right section: Action Buttons */}
-            <div className="flex-1 flex items-center justify-end gap-3">
-              <Button
-                size="small"
-                variant="primary"
-                disabled={!isJdCampaignEligible}
-                title={!isJdCampaignEligible
-                  ?"Campaigns require a verified,active JD - resolve unknown skills first."
-                  :undefined}
-                onClick={() => {
-                  setCampaignForm(DEFAULT_CAMPAIGN_FORM);
-                  setLinkCampaignModalOpen(true);
-                }}
-                className="flex items-center gap-1.5 font-bold shadow-sm"
-              >
-                <Plus className="h-3.5 w-3.5" /> New campaign
-              </Button>
-              
-            </div>
+            {/* Right section: Action Buttons — campaign creation is HR_ADMIN only */}
+            {isHRAdmin && (
+              <div className="flex-1 flex items-center justify-end gap-3">
+                <Button
+                  size="small"
+                  variant="primary"
+                  disabled={!isJdCampaignEligible}
+                  title={!isJdCampaignEligible
+                    ?"Campaigns require a verified,active JD - resolve unknown skills first."
+                    :undefined}
+                  onClick={() => {
+                    setCampaignForm(DEFAULT_CAMPAIGN_FORM);
+                    setLinkCampaignModalOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 font-bold shadow-sm"
+                >
+                  <Plus className="h-3.5 w-3.5" /> New campaign
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Campaign Cards Grid */}
@@ -1513,12 +1521,14 @@ export default function JdDetails() {
                           >
                             <Eye className="h-3 w-3" /> Compare diff
                           </button>
-                          <button
-                            onClick={() => setRestoreConfirmVersion(hist.version)}
-                            className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-amber-50 hover:text-amber-700 rounded text-[10px] font-bold transition"
-                          >
-                            <RefreshCw className="h-3 w-3" /> Restore state
-                          </button>
+                          {isHRAdmin && (
+                            <button
+                              onClick={() => setRestoreConfirmVersion(hist.version)}
+                              className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-amber-50 hover:text-amber-700 rounded text-[10px] font-bold transition"
+                            >
+                              <RefreshCw className="h-3 w-3" /> Restore state
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

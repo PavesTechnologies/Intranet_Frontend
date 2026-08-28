@@ -115,7 +115,6 @@ const airsSubmenu = [
   { label: "Pipeline", to: "/airs/pipeline" },
   { label: "Skill Ontology", to: "/airs/skill-ontology" },
   { label: "Talent Pool", to: "/airs/talent-pool" },
-  { label: "Analytics", to: "/airs/analytics" },
   { label: "Settings", to: "/airs/settings" },
 ];
 
@@ -139,6 +138,12 @@ const recruiterAirsSubmenu = [
   ...airsSubmenu.filter((item) =>
     ["Dashboard", "Campaigns", "Resume Intake", "Pipeline", "Talent Pool"].includes(item.label),
   ),
+  interviewCalendarItem,
+];
+
+// HIRING_MANAGER gets a trimmed-down AIRS menu — only these items.
+const hiringManagerAirsSubmenu = [
+  ...airsSubmenu.filter((item) => ["Campaigns", "Pipeline"].includes(item.label)),
   interviewCalendarItem,
 ];
 
@@ -209,14 +214,17 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   const airsRBACAccess = hasRole(["HIRING_MANAGER", "HR", "HR_ADMIN", "RECRUITER"]);
   const isHrAdmin = hasRole(["HR_ADMIN"]);
   const isRecruiter = hasRole(["RECRUITER"]);
-  // Everyone else (HIRING_MANAGER, HR) falls through to the full menu, which
-  // must not offer Dashboard — /airs/dashboard is HR_ADMIN/RECRUITER only, so
-  // the link would lead straight to the unauthorized page.
+  const isHiringManager = hasRole(["HIRING_MANAGER"]);
+  // Everyone else (plain HR) falls through to the full menu, which must not
+  // offer Dashboard — /airs/dashboard is HR_ADMIN/RECRUITER only, so the
+  // link would lead straight to the unauthorized page.
   const filteredAirsSubmenu = isHrAdmin
     ? hrAdminAirsSubmenu
     : isRecruiter
       ? recruiterAirsSubmenu
-      : airsSubmenu.filter((item) => item.label !== "Dashboard");
+      : isHiringManager
+        ? hiringManagerAirsSubmenu
+        : airsSubmenu.filter((item) => item.label !== "Dashboard");
 
   // State for User Management Hover
   const [userHovered, setUserHovered] = useState(false);

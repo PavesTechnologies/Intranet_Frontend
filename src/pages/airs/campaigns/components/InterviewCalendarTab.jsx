@@ -513,7 +513,9 @@ export default function InterviewCalendarTab({ campaignId }) {
   // design), so clicking through goes straight to the candidate's own
   // Interview tab via CandidateScorePage's ?tab= deep-link, rather than
   // landing on its default Summary tab and requiring one more click.
-  const goToCandidate = (entry) => navigate(`/airs/candidates/${entry.campaign_candidate_id}?tab=interview`);
+  const goToCandidate = (entry) => navigate(`/airs/candidates/${entry.campaign_candidate_id}?tab=interview`, {
+    state: { candidate: entry, campaignId },
+  });
 
   const gridMinWidth = TIME_COL_PX + 7 * DAY_COL_MIN_PX;
 

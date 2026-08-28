@@ -115,7 +115,7 @@ export default function PipelineBoardPage() {
                 // campaign_candidate_id (card.id) — not the pipeline-only
                 // scorecard, which only has resume-parsed data and no real
                 // scores.
-                onCardClick={(card) => navigate(`/airs/candidates/${card.id}`)}
+                onCardClick={(card) => navigate(`/airs/candidates/${card.id}`, { state: { candidate: card, campaignId } })}
               />
             ))}
           </div>

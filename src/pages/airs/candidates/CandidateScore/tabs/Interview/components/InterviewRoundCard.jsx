@@ -63,6 +63,7 @@ export default function InterviewRoundCard({
   onComplete,
   isCompleting,
   onEditInterviewers,
+  readOnly = false,
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
@@ -184,7 +185,7 @@ export default function InterviewRoundCard({
             </div>
           )}
 
-          {canReschedule && (
+          {!readOnly && canReschedule && (
             <div className="flex items-center gap-2 pt-2 border-t border-slate-100 flex-wrap">
               {canCancel && round.meeting_link && (
                 <Button variant="outline" size="small" onClick={handleCopyLink}>
@@ -212,7 +213,7 @@ export default function InterviewRoundCard({
             </div>
           )}
 
-          <InterviewRoundFeedback round={round} feedback={feedback} isLoading={feedbackLoading} />
+          <InterviewRoundFeedback round={round} feedback={feedback} isLoading={feedbackLoading} readOnly={readOnly} />
         </div>
       )}
     </div>

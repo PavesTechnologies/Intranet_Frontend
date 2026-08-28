@@ -146,7 +146,6 @@ import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
 import PipelineCandidateScorecardPage from "./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
 import TalentPoolCandidateProfilePage from "./pages/airs/talent-pool/profile/TalentPoolCandidateProfilePage.jsx";
-import AnalyticsPage from "./pages/airs/analytics/AnalyticsPage.jsx";
 import SettingsPage from "./pages/airs/settings/SettingsPage.jsx";
 import SkillOntologyPage from "./pages/airs/skill-ontology/SkillOntologyPage.jsx";
 import SkillDetailPage from "./pages/airs/skill-ontology/SkillDetailPage.jsx";
@@ -1370,13 +1369,14 @@ const AppRoutes = () => {
             }
           />
           {/* Was a tab inside CampaignDetails.jsx — moved to its own page with
-              a campaign selector. Same roles that could see that tab
-              (canSeePipeline = HR_ADMIN/RECRUITER); HIRING_MANAGER is
-              deliberately excluded, matching the tab's old visibility. */}
+              a campaign selector. Now also in HIRING_MANAGER's sidebar menu,
+              so it's allowed here too — the backend campaign list/interviews
+              calls are already scoped to whichever campaigns each role can
+              see. */}
           <Route
             path="/airs/interview-calendar"
             element={
-              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <InterviewCalendarPage />
               </ProtectedRoute>
             }
@@ -1450,14 +1450,6 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute roles={["General"]}>
                 <TalentPoolCandidateProfilePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/airs/analytics"
-            element={
-              <ProtectedRoute roles={["General"]}>
-                <AnalyticsPage />
               </ProtectedRoute>
             }
           />

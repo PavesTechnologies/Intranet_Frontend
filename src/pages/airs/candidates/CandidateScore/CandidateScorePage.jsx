@@ -1,9 +1,7 @@
-import React, { useState, lazy, Suspense } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import React, { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { useParams, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import useCandidateDetail from "../hooks/useCandidateDetail";
-import useParsedResume from "../hooks/useParsedResume";
-import { mergeResumeFields } from "../utils/mapParsedResumeFields";
+import useParsedResumeCandidate from "../hooks/useParsedResumeCandidate";
 import CandidateHeader from "./components/CandidateHeader";
 import CandidateTabs from "./components/CandidateTabs";
 import ErrorState from "../../skill-ontology/components/ErrorState";
@@ -31,19 +29,55 @@ const TABS = [
   { id: "semantic", label: SCORE_LABELS.semantic, Component: SemanticScoreTab },
   { id: "ai", label: SCORE_LABELS.ai, Component: AiEvaluationTab },
   { id: "finalStatus", label: "Overall Score", Component: FinalStatusTab },
-  { id: "interview", label: "Interview", Component: InterviewTab }, 
+  { id: "interview", label: "Interview", Component: InterviewTab },
 ];
 
+// Candidate Scorecard — sourced entirely from GET /resumes/candidate/
+// {campaign_candidate_id}/parsed-json (see useParsedResumeCandidate), the
+// same endpoint the Pipeline Board and Resume Upload History scorecards use.
+// There's no separate GET /campaign-candidates/{id} detail call any more —
+// that response now carries identity/contact/pipeline-stage/override/score
+// fields directly. `fallback` is only whatever the caller already had on
+// hand (a Candidates-tab row, a Pipeline card, an interview entry) passed
+// via navigate(..., { state }), used to fill in anything a given response
+// still leaves out and to paint instantly while the fetch is in flight.
 export default function CandidateScorePage() {
   const { candidateId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { candidate, loading, error, refetch } = useCandidateDetail(candidateId);
-  // Backs the Summary/Resume tabs — fetched independently of the main
-  // candidate record so a slow/failed resume parse never blocks the rest
-  // of the scorecard from rendering.
-  const { fields: resumeFields, status: resumeStatus, loading: resumeLoading } = useParsedResume(candidate?.id);
-  const candidateWithResume = candidate ? mergeResumeFields(candidate, resumeFields) : candidate;
+
+  const navCandidate = location.state?.candidate;
+  const fallback = useMemo(() => ({
+    name: navCandidate?.name ?? navCandidate?.candidate_name,
+    email: navCandidate?.email,
+    phone: navCandidate?.phone,
+    location: navCandidate?.location,
+    role: navCandidate?.role ?? navCandidate?.current_designation,
+    createdAt: navCandidate?.createdAt ?? navCandidate?.created_at,
+    status: navCandidate?.status,
+    campaignCandidateId: navCandidate?.id ?? navCandidate?.campaign_candidate_id ?? candidateId,
+    campaignId: navCandidate?.campaignId ?? location.state?.campaignId,
+    stage: navCandidate?.stage ?? navCandidate?.pipeline_stage,
+    hrOverride: navCandidate?.hrOverride ?? navCandidate?.hr_override,
+    overrideReason: navCandidate?.overrideReason ?? navCandidate?.override_reason,
+    decisionType: navCandidate?.decisionType ?? navCandidate?.decision_type,
+    decisionSource: navCandidate?.decisionSource ?? navCandidate?.decision_source,
+    decisionReason: navCandidate?.decisionReason ?? navCandidate?.decision_reason,
+    decisionAt: navCandidate?.decisionAt ?? navCandidate?.decision_at,
+    notice: navCandidate?.notice,
+    salary: navCandidate?.salary,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [navCandidate, candidateId, location.state?.campaignId]);
+
+  const { candidate: fetchedCandidate, loading, error, status, refetch } = useParsedResumeCandidate(candidateId, fallback);
+  // Applying/clearing an HR override has no detail re-fetch to lean on —
+  // the endpoint returns the resume parse, not a live candidate record —
+  // so the known outcome is patched in directly instead.
+  const [overridePatch, setOverridePatch] = useState(null);
+  useEffect(() => { setOverridePatch(null); }, [candidateId]);
+  const candidate = fetchedCandidate && overridePatch ? { ...fetchedCandidate, ...overridePatch } : fetchedCandidate;
+
   // Lets a caller (e.g. the Interview Calendar's event chips) deep-link
   // straight into a specific tab via ?tab=interview instead of always
   // landing on the default Summary tab. Read once on mount — this page
@@ -65,16 +99,17 @@ export default function CandidateScorePage() {
   }
 
   if (error || !candidate) {
+    const messageByStatus = {
+      not_found: "No resume is linked to this candidate yet.",
+      pending: "This candidate's resume is still being parsed. Check back shortly.",
+      error: "We couldn't load this candidate. Please try again.",
+    };
     return (
       <div className="p-8 bg-[#F8FAFC] min-h-screen">
         <ErrorState
           title="Candidate not found"
-          message={
-            error
-              ? "We couldn't load this candidate. Please try again."
-              : "We couldn't find this candidate. They may have been removed."
-          }
-          onRetry={() => navigate("/airs/campaigns")}
+          message={messageByStatus[status] || "We couldn't find this candidate. They may have been removed."}
+          onRetry={status === "pending" ? refetch : () => navigate("/airs/campaigns")}
         />
       </div>
     );
@@ -119,25 +154,23 @@ export default function CandidateScorePage() {
 
         <div className="p-5">
           <Suspense fallback={null}>
-            <ActiveTabComponent
-              candidate={candidateWithResume}
-              resumeStatus={resumeStatus}
-              resumeLoading={resumeLoading}
-            />
+            <ActiveTabComponent candidate={candidate} onExpired={refetch} />
           </Suspense>
         </div>
       </div>
 
       {/* Actions on the candidate, alongside the read-only scorecard */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-        <CandidateOverridePanel candidate={candidate} onChanged={refetch} />
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <CandidateNotesPanel
-            campaignCandidateId={candidate.id}
-            currentUserId={user?.user_id || user?.id}
-          />
+      {candidate.campaignId && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+          <CandidateOverridePanel candidate={candidate} onChanged={setOverridePatch} />
+          <div className="bg-white border border-slate-200 rounded-xl p-4">
+            <CandidateNotesPanel
+              campaignCandidateId={candidate.id}
+              currentUserId={user?.user_id || user?.id}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

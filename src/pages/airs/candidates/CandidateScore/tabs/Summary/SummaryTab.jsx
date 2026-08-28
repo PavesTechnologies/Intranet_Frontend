@@ -1,9 +1,16 @@
 import React from "react";
-import { Sparkles, Tags, BadgeCheck } from "lucide-react";
+import { Sparkles, Tags, BadgeCheck, FileText, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getSummaryMock } from "./summaryMock";
 
 const NOT_MENTIONED = "Not mentioned";
+
+const RECOMMENDATION_TONE = {
+  SHORTLIST: "bg-emerald-100 text-emerald-700",
+  SELECT: "bg-emerald-100 text-emerald-700",
+  HOLD: "bg-amber-100 text-amber-700",
+  REJECT: "bg-rose-100 text-rose-700",
+};
 
 // textOrDash (candidateDataUtils) already turns missing values into "-"
 // before they reach this component, so we treat "-" the same as empty here.
@@ -87,12 +94,70 @@ export default function SummaryTab({ candidate }) {
         </div>
       )}
 
+      {!isMissing(summary.resumeSummary) && (
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <div className="flex items-center gap-1.5 text-[12px] font-bold mb-1.5 text-slate-900">
+            <FileText size={13} className="text-slate-400" /> Resume summary
+          </div>
+          <p className="text-[12.5px] leading-relaxed text-slate-700">{summary.resumeSummary}</p>
+        </div>
+      )}
+
       {summary.aiCandidateSummary && (
         <div className="p-4 rounded-xl bg-purple-50">
-          <div className="flex items-center gap-1.5 text-[12px] font-bold mb-1.5 text-purple-700">
-            <Sparkles size={13} /> AI candidate summary
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-1.5 text-[12px] font-bold text-purple-700">
+              <Sparkles size={13} /> AI candidate summary
+            </div>
+            {summary.aiCandidateSummary.recommendation && (
+              <Badge
+                className={`font-bold px-2 py-0.5 text-[10px] border-0 ${
+                  RECOMMENDATION_TONE[summary.aiCandidateSummary.recommendation] || "bg-slate-200 text-slate-700"
+                }`}
+              >
+                {summary.aiCandidateSummary.recommendation}
+              </Badge>
+            )}
           </div>
-          <p className="text-[12.5px] leading-relaxed text-slate-900">{summary.aiCandidateSummary}</p>
+
+          {summary.aiCandidateSummary.text && (
+            <p className="text-[12.5px] leading-relaxed text-slate-900 mb-2">{summary.aiCandidateSummary.text}</p>
+          )}
+
+          {(summary.aiCandidateSummary.strengths.length > 0 || summary.aiCandidateSummary.weaknesses.length > 0) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+              {summary.aiCandidateSummary.strengths.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 mb-1">
+                    <ThumbsUp size={11} /> Strengths
+                  </div>
+                  <ul className="space-y-1">
+                    {summary.aiCandidateSummary.strengths.map((s, i) => (
+                      <li key={i} className="text-[12px] text-slate-800 flex gap-1.5">
+                        <span className="mt-[6px] w-1 h-1 rounded-full bg-emerald-500 shrink-0" />
+                        <span>{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {summary.aiCandidateSummary.weaknesses.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 mb-1">
+                    <ThumbsDown size={11} /> Weaknesses
+                  </div>
+                  <ul className="space-y-1">
+                    {summary.aiCandidateSummary.weaknesses.map((w, i) => (
+                      <li key={i} className="text-[12px] text-slate-800 flex gap-1.5">
+                        <span className="mt-[6px] w-1 h-1 rounded-full bg-amber-500 shrink-0" />
+                        <span>{w}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

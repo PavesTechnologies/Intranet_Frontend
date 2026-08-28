@@ -1,10 +1,17 @@
-import React, { useMemo, useState, lazy, Suspense } from "react";
+import React, { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import CandidateHeader from "../candidates/CandidateScore/components/CandidateHeader";
 import CandidateTabs from "../candidates/CandidateScore/components/CandidateTabs";
 import ErrorState from "../skill-ontology/components/ErrorState";
-import useParsedResumeCandidate from "./hooks/useParsedResumeCandidate";
+import useParsedResumeCandidate from "../candidates/hooks/useParsedResumeCandidate";
+import CandidateOverridePanel from "../campaigns/components/CandidateOverridePanel";
+import CandidateNotesPanel from "../campaigns/components/CandidateNotesPanel";
+import { exportScorecard } from "../campaigns/services/exportService";
+import Button from "../../../components/Button/Button";
+import { Download } from "lucide-react";
+import { toast } from "react-toastify";
+import { useAuth } from "../../../contexts/AuthContext";
 import { SCORE_LABELS } from "../constants/scoreLabels";
 // import { MOCK_CANDIDATES } from "../candidates/mock/candidateMockData";
 // import { mapMockCandidateForScorecard } from "./utils/mapMockCandidateForScorecard";
@@ -72,6 +79,7 @@ export default function PipelineCandidateScorecardPage({
       // through here so the Deterministic/Semantic/AI Evaluation tabs can call
       // /campaign-candidates/{campaign_candidate_id}/... with the right id.
       campaignCandidateId,
+      campaignId: resumeRow?.campaign_id ?? resumeRow?.campaignId,
       // pipeline_stage/decision_* are only present once the resume's candidate
       // is linked to a campaign — same fields Resume Upload History already
       // renders via renderPipelineStageBadge.
@@ -83,6 +91,8 @@ export default function PipelineCandidateScorecardPage({
     }),
     [
       campaignCandidateId,
+      resumeRow?.campaign_id,
+      resumeRow?.campaignId,
       resumeRow?.candidate_email,
       resumeRow?.email,
       resumeRow?.candidate_full_name,
@@ -101,9 +111,17 @@ export default function PipelineCandidateScorecardPage({
       resumeRow?.decisionAt,
     ]
   );
-  const { candidate, loading, error, refetch } = useParsedResumeCandidate(candidateId, fallback);
+  const { candidate: fetchedCandidate, loading, error, status, refetch } = useParsedResumeCandidate(candidateId, fallback);
+  // Applying/clearing an HR override has no detail re-fetch to lean on here
+  // either — same optimistic-patch approach as CandidateScorePage.
+  const [overridePatch, setOverridePatch] = useState(null);
+  useEffect(() => { setOverridePatch(null); }, [candidateId]);
+  const candidate = fetchedCandidate && overridePatch ? { ...fetchedCandidate, ...overridePatch } : fetchedCandidate;
   const [activeTab, setActiveTab] = useState(TABS[0].id);
   const isModal = variant === "modal";
+  const { user, hasRole } = useAuth();
+  const isHrAdmin = hasRole(["HR_ADMIN"]);
+  const [exporting, setExporting] = useState(false);
 
   // Prefer real browser "back" so this returns to wherever the user actually
   // came from — a specific Resume Intake tab (history/processing/bulk-batches),
@@ -130,16 +148,17 @@ export default function PipelineCandidateScorecardPage({
   }
 
   if (error || !candidate) {
+    const messageByStatus = {
+      not_found: "No resume is linked to this candidate yet.",
+      pending: "This candidate's resume is still being parsed. Check back shortly.",
+      error: "We couldn't load this candidate. Please try again.",
+    };
     return (
       <div className={isModal ? undefined : "p-8 bg-[#F8FAFC] min-h-screen"}>
         <ErrorState
           title="Candidate not found"
-          message={
-            error
-              ? "We couldn't load this candidate. Please try again."
-              : "We couldn't find this candidate. They may have been removed."
-          }
-          onRetry={handleBack}
+          message={messageByStatus[status] || "We couldn't find this candidate. They may have been removed."}
+          onRetry={status === "pending" ? refetch : handleBack}
         />
       </div>
     );
@@ -149,7 +168,33 @@ export default function PipelineCandidateScorecardPage({
 
   return (
     <div className={isModal ? "text-slate-900 font-sans" : "p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans"}>
-      <CandidateHeader candidate={candidate} onBack={handleBack} />
+      <CandidateHeader
+        candidate={candidate}
+        onBack={handleBack}
+        actions={
+          !isModal && isHrAdmin && candidate.campaignId && (
+            <Button
+              variant="outline"
+              size="small"
+              loading={exporting}
+              loadingText="Generating..."
+              onClick={async () => {
+                setExporting(true);
+                try {
+                  await exportScorecard(candidate.campaignId, candidate.id);
+                  toast.success("Scorecard downloaded.");
+                } catch (err) {
+                  toast.error(err?.response?.data?.message || "Could not export the scorecard.");
+                } finally {
+                  setExporting(false);
+                }
+              }}
+            >
+              <Download className="h-3.5 w-3.5 mr-1" /> Export scorecard
+            </Button>
+          )
+        }
+      />
 
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
         <CandidateTabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
@@ -160,6 +205,22 @@ export default function PipelineCandidateScorecardPage({
           </Suspense>
         </div>
       </div>
+
+      {/* Actions on the candidate, alongside the read-only scorecard — only
+          meaningful once this record is linked to a campaign (campaignId set
+          by the parsed-json response). Skipped in the modal popup variant to
+          keep it compact. */}
+      {!isModal && candidate.campaignId && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+          <CandidateOverridePanel candidate={candidate} onChanged={setOverridePatch} />
+          <div className="bg-white border border-slate-200 rounded-xl p-4">
+            <CandidateNotesPanel
+              campaignCandidateId={candidate.id}
+              currentUserId={user?.user_id || user?.id}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
