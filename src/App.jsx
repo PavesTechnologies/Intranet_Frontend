@@ -120,6 +120,7 @@ import DegreeMasterManagement from "./pages/employee-onboarding/hr-configuration
 import AdminApprovalDashboard from "./pages/employee-onboarding/admin/AdminApprovalDashboard.jsx"; import AdminOfferView from "./pages/employee-onboarding/admin/AdminOfferView.jsx";
 
 // AI Screening (AIRS)
+import RecruiterDashboardPage from "./pages/airs/dashboard/RecruiterDashboardPage.jsx";
 import JdLibrary from "./pages/airs/pages/JdLibrary.jsx";
 import JdCreate from "./pages/airs/pages/JdCreate.jsx";
 import JdDetails from "./pages/airs/pages/JdDetails.jsx";
@@ -1187,6 +1188,14 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />          {/* AI Screening (AIRS) Routes */}
+          <Route
+            path="/airs/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
+                <RecruiterDashboardPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/airs/jds"
             element={

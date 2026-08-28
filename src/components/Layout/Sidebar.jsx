@@ -99,6 +99,7 @@ const accountReceivableSubmenu = [
 ];
 
 const airsSubmenu = [
+  { label: "Dashboard", to: "/airs/dashboard" },
   { label: "JD Management", to: "/airs/jds" },
   { label: "Campaigns", to: "/airs/campaigns" },
   { label: "Resume Intake", to: "/airs/resume-intake" },
@@ -118,7 +119,7 @@ const airsSubmenu = [
 // campaign-scoped Candidates & Ranking page airsSubmenu's own "Candidates"
 // entry points to.
 const hrAdminAirsSubmenu = [
-  ...airsSubmenu.filter((item) => ["JD Management", "Campaigns", "Pipeline"].includes(item.label)),
+  ...airsSubmenu.filter((item) => ["Dashboard", "JD Management", "Campaigns", "Pipeline"].includes(item.label)),
   { label: "Candidates", to: "/airs/global-candidates" },
   ...airsSubmenu.filter((item) => ["Talent Pool", "Skill Ontology"].includes(item.label)),
   { label: "Prompt Templates", to: "/airs/prompt-templates" },
@@ -126,7 +127,7 @@ const hrAdminAirsSubmenu = [
 
 // RECRUITER gets a trimmed-down AIRS menu — only these items.
 const recruiterAirsSubmenu = airsSubmenu.filter((item) =>
-  ["Campaigns", "Resume Intake", "Pipeline", "Talent Pool"].includes(item.label),
+  ["Dashboard", "Campaigns", "Resume Intake", "Pipeline", "Talent Pool"].includes(item.label),
 );
 
 
