@@ -22,18 +22,17 @@ export const INVOICE_ACTIONS = {
 /**
  * The invoice status each action transitions *to* on success — drives optimistic UI updates.
  *
- * High OCR confidence or a clean validation pass never resolves to APPROVED/READY_FOR_PAYMENT
- * directly — VALIDATE only ever lands an invoice in PENDING_APPROVAL. Reaching APPROVED requires
- * the separate, human APPROVE_INVOICE action (see InvoiceApprovalPanel) regardless of how
- * confident OCR/validation was.
+ * Only actions with a real backend endpoint and a confirmed resulting status are listed.
+ * RESUBMIT_OCR, VALIDATE and REJECT_VALIDATION are deliberately absent: they have no
+ * corresponding backend endpoint at all (see the AP Integration Ledger) — inventing a target
+ * status for them would fabricate a transition the backend doesn't perform. SAVE_OCR_CORRECTIONS
+ * only reaches PENDING_APPROVAL for Path A items (invoice already exists) — see
+ * useSaveOcrReviewMutation.
  */
 export const INVOICE_ACTION_RESULT_STATUS = {
-  [INVOICE_ACTIONS.UPLOAD]: INVOICE_STATUS.OCR_PROCESSING,
-  [INVOICE_ACTIONS.SAVE_OCR_CORRECTIONS]: INVOICE_STATUS.VALIDATION_PENDING,
-  [INVOICE_ACTIONS.RESUBMIT_OCR]: INVOICE_STATUS.OCR_PROCESSING,
-  [INVOICE_ACTIONS.VALIDATE]: INVOICE_STATUS.PENDING_APPROVAL,
-  [INVOICE_ACTIONS.REJECT_VALIDATION]: INVOICE_STATUS.VALIDATION_FAILED,
-  [INVOICE_ACTIONS.APPROVE_INVOICE]: INVOICE_STATUS.READY_FOR_PAYMENT,
+  [INVOICE_ACTIONS.UPLOAD]: INVOICE_STATUS.OCR_REVIEW_PENDING,
+  [INVOICE_ACTIONS.SAVE_OCR_CORRECTIONS]: INVOICE_STATUS.PENDING_APPROVAL,
+  [INVOICE_ACTIONS.APPROVE_INVOICE]: INVOICE_STATUS.APPROVED,
   [INVOICE_ACTIONS.REJECT_INVOICE]: INVOICE_STATUS.REJECTED,
   [INVOICE_ACTIONS.MARK_PAID]: INVOICE_STATUS.PAID,
 };

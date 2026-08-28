@@ -9,6 +9,8 @@ import { getWeightPresets, createWeightPreset, updateWeightPreset, deleteWeightP
 
 const unwrap = (res) => (res && res.data !== undefined ? res.data : res);
 
+const LABEL_CLASS = "text-[10px] uppercase font-bold text-slate-400 block mb-1.5";
+
 // Fixed sentinel ids the backend hardcodes for its 4 built-in system presets
 // (Technical/Managerial/Balanced/Entry Level) — never rows in the DB, and
 // the backend rejects update/delete on these with a 403. Detecting them
@@ -131,21 +133,21 @@ export default function WeightPresetsModal({ isOpen, onClose }) {
 
   const isForm = editingId !== null;
 
-  return (<Modal isOpen={isOpen} onClose={onClose} title="Scoring Weight Presets" width="560px" height="85vh">
+  return (<Modal isOpen={isOpen} onClose={onClose} title="Default Scoring Weight Presets" width="640px" height="90vh">
       {loading ? (<div className="py-8 flex justify-center"><LoadingSpinner text="Loading presets..." /></div>
       ) : isForm ? (<div className="space-y-4">
-          <FormInput label="Preset Name" name="name" value={form.name} onChange={change} maxLength={100} requiredMark />
-          <FormInput label="Description" name="description" value={form.description} onChange={change} maxLength={255} />
+          <FormInput label="Preset Name" name="name" value={form.name} onChange={change} maxLength={100} requiredMark labelClassName={LABEL_CLASS} />
+          <FormInput label="Description" name="description" value={form.description} onChange={change} maxLength={255} labelClassName={LABEL_CLASS} />
 
           <div className="grid grid-cols-3 gap-4">
-            <FormInput label="Deterministic Wt" name="weight_deterministic" type="number" value={form.weight_deterministic} onChange={change} />
-            <FormInput label="Semantic Wt" name="weight_semantic" type="number" value={form.weight_semantic} onChange={change} />
-            <FormInput label="AI Wt" name="weight_ai" type="number" value={form.weight_ai} onChange={change} />
+            <FormInput label="Requirements Wt" name="weight_deterministic" type="number" value={form.weight_deterministic} onChange={change} labelClassName={LABEL_CLASS} />
+            <FormInput label="Relevance Wt" name="weight_semantic" type="number" value={form.weight_semantic} onChange={change} labelClassName={LABEL_CLASS} />
+            <FormInput label="AI Review Wt" name="weight_ai" type="number" value={form.weight_ai} onChange={change} labelClassName={LABEL_CLASS} />
           </div>
           <div className="grid grid-cols-3 gap-4">
-            <FormInput label="Deterministic Threshold" name="deterministic_threshold" type="number" value={form.deterministic_threshold} onChange={change} />
-            <FormInput label="Semantic Threshold" name="semantic_threshold" type="number" step="0.01" min="0" max="1" value={form.semantic_threshold} onChange={change} />
-            <FormInput label="AI Threshold" name="ai_threshold" type="number" value={form.ai_threshold} onChange={change} />
+            <FormInput label="Requirements Threshold" name="deterministic_threshold" type="number" value={form.deterministic_threshold} onChange={change} labelClassName={LABEL_CLASS} />
+            <FormInput label="Relevance Threshold" name="semantic_threshold" type="number" step="0.01" min="0" max="1" value={form.semantic_threshold} onChange={change} labelClassName={LABEL_CLASS} />
+            <FormInput label="AI Threshold" name="ai_threshold" type="number" value={form.ai_threshold} onChange={change} labelClassName={LABEL_CLASS} />
           </div>
 
           <div className="flex justify-end gap-3 mt-6 border-t pt-4">
@@ -159,9 +161,9 @@ export default function WeightPresetsModal({ isOpen, onClose }) {
         </div>
       ) : (<div className="space-y-4">
           <div className="flex justify-end">
-            <Button variant="primary" size="small" onClick={startCreate}>
+            {/* <Button variant="primary" size="small" onClick={startCreate}>
               <Plus className="h-4 w-4" /> New Preset
-            </Button>
+            </Button> */}
           </div>
 
           <div className="space-y-2">

@@ -175,6 +175,7 @@ const RoleOffSidePanel = ({
   onRmReject,
   onApprove,
   onReject,
+  onCancel,
 }) => {
   const [form, setForm] = useState(baseForm);
   const [error, setError] = useState("");
@@ -296,8 +297,8 @@ const RoleOffSidePanel = ({
 
   const showRmApproveAction = isRM && (!isBulkRecord || isRmBulkApproveFlow);
   const showRmRejectAction = isRM && (!isBulkRecord || isRmBulkRejectFlow);
-  const showDmApproveAction = isDM && isDmActionableStatus(record.status) && (!isBulkRecord || isDmBulkApproveFlow);
-  const showDmRejectAction = isDM && isDmActionableStatus(record.status) && (!isBulkRecord || isDmBulkRejectFlow);
+  const showDmApproveAction = isDM && (isBulkRecord ? isDmBulkApproveFlow : isDmActionableStatus(record.status));
+  const showDmRejectAction = isDM && (isBulkRecord ? isDmBulkRejectFlow : isDmActionableStatus(record.status));
   const acknowledgementOptions = normalizeAcknowledgementOptions(record);
   const showAcknowledgementType = !isBulkRecord && (isDM || record.acknowledgementType || acknowledgementOptions.length > 0);
   const requiresAcknowledgementType =
@@ -359,6 +360,10 @@ const RoleOffSidePanel = ({
           reviewConfirmed: form.reviewConfirmed,
         });
         // console.log("SUBMIT RESPONSE:", response);
+        if (response?.handledByModal) {
+          onClose?.();
+          return;
+        }
         if (response?.requiresConfirmation && !form.reviewConfirmed) {
           setReviewState(response);
           setForm((prev) => ({
@@ -1105,8 +1110,8 @@ const RoleOffSidePanel = ({
                 {showRmApproveAction ? (
                   <Button
                     onClick={handleRmApproveClick}
-                    disabled={isSubmitting || !isPendingStatus(record.status)}
-                    className={`h-10 bg-[#081534] text-sm hover:bg-[#10214f] disabled:opacity-50 disabled:cursor-not-allowed ${isSubmitting || !isPendingStatus(record.status) ? "opacity-50 cursor-not-allowed" : ""}`}
+                    disabled={isSubmitting || (!isBulkRecord && !isPendingStatus(record.status))}
+                    className={`h-10 bg-[#081534] text-sm hover:bg-[#10214f] disabled:opacity-50 disabled:cursor-not-allowed ${isSubmitting || (!isBulkRecord && !isPendingStatus(record.status)) ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     {submittingAction === "approve" ? <SpinnerIcon className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Approve
@@ -1116,8 +1121,8 @@ const RoleOffSidePanel = ({
                   <Button
                     variant="outline"
                     onClick={handleRmRejectClick}
-                    disabled={isSubmitting || !isPendingStatus(record.status)}
-                    className={`h-10 border-rose-300 bg-white text-sm text-rose-700 hover:bg-rose-50 hover:text-rose-800 disabled:opacity-50 disabled:cursor-not-allowed ${isSubmitting || !isPendingStatus(record.status) ? "opacity-50 cursor-not-allowed" : ""}`}
+                    disabled={isSubmitting || (!isBulkRecord && !isPendingStatus(record.status))}
+                    className={`h-10 border-rose-300 bg-white text-sm text-rose-700 hover:bg-rose-50 hover:text-rose-800 disabled:opacity-50 disabled:cursor-not-allowed ${isSubmitting || (!isBulkRecord && !isPendingStatus(record.status)) ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     {submittingAction === "reject" ? <SpinnerIcon className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Reject

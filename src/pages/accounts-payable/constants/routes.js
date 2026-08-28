@@ -17,11 +17,20 @@ export const AP_ROUTES = {
   INVOICE_DETAIL: (invoiceId = ":invoiceId") =>
     `${BASE}/invoices/${invoiceId}`,
 
+  PAYMENT_QUEUE: `${BASE}/payment-queue`,
+  PAYMENT_QUEUE_DETAIL: (reportId = ":reportId") =>
+    `${BASE}/payment-queue/${reportId}`,
+
   PAYMENT_READY: `${BASE}/payments/ready`,
   PAYMENT_HISTORY: `${BASE}/payments/history`,
   PAYMENT_MARK_PAID: (invoiceId = ":invoiceId") =>
     `${BASE}/payments/mark-paid/${invoiceId}`,
 
+  PAYMENT_QUEUE: `${BASE}/payment-queue`,
+  PAYMENT_QUEUE_DETAIL: (reportId = ":reportId") =>
+    `${BASE}/payment-queue/${reportId}`,
+
   REPORTS: `${BASE}/reports`,
   SETTINGS: `${BASE}/settings`,
+  SYSTEM_CONFIG: `${BASE}/system-configuration`,
 };

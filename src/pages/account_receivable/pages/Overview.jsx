@@ -4,23 +4,22 @@ import {
   FolderKanban,
   FileText,
   Cable,
-  PenLine,
   CheckCircle2,
   Eye,
   Pencil,
   ArrowRightCircle,
   Ban,
   XCircle,
+  Trash2,
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
-import FilterCard from "../../../components/ui/FilterCard";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import { KPICard } from "../../../components/kpi/KPI";
 import Button from "../../../components/Button/Button";
 import SearchInput from "../../../components/filter/Searchbar";
 import FormSelect from "../../../components/forms/FormSelect";
-import GenericTable from "../../../components/Table/table";
+import ARTable from "../components/common/ARTable";
 import Pagination from "../../../components/Pagination/pagination";
 import StatusBadge from "../../../components/status/statusbadge";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
@@ -34,27 +33,27 @@ import {
   deactivateBillingConfiguration,
   approveBillingConfiguration,
   rejectBillingConfiguration,
+  deleteBillingConfiguration,
   getApiErrorMessage,
   getBillingConfigurationStats,
-  getBillingConfigurationActivity,
 } from "../services/billingConfigService";
 
-const INITIAL_FILTERS = { search: "", status: "", source: "" };
+const INITIAL_FILTERS = { search: "", status: "" };
 const PAGE_SIZE = 6;
 
 const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Source", "Status", "Actions"];
 const TABLE_COLUMNS = ["client", "project", "billingType", "source", "status", "actions"];
 
 const SOURCE_BADGE_CLASSES = {
-  Enterprise: "bg-indigo-100 text-indigo-700",
-  Standalone: "bg-slate-100 text-slate-700",
+  Enterprise: "bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200",
+  Standalone: "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200",
 };
 
 function SourceBadge({ source }) {
   return (
     <span
-      className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-        SOURCE_BADGE_CLASSES[source] || "bg-slate-100 text-slate-700"
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+        SOURCE_BADGE_CLASSES[source] || "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200"
       }`}
     >
       {source}
@@ -65,9 +64,8 @@ function SourceBadge({ source }) {
 export default function Overview() {
   const navigate = useNavigate();
 
-  // Overview Stats & Recent Activity State
+  // Overview Stats State
   const [stats, setStats] = useState(null);
-  const [activity, setActivity] = useState([]);
   const [loadingStats, setLoadingStats] = useState(true);
 
   // Billing Configurations State
@@ -82,6 +80,8 @@ export default function Overview() {
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectLoading, setRejectLoading] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   // load configurations helper available to handlers
   const loadConfigurations = async () => {
     setLoadingStats(true);
@@ -90,15 +90,12 @@ export default function Overview() {
       const configsResult = await fetchBillingConfigurations();
       setConfigs(configsResult);
 
-      // derive stats and activity from configurations
+      // derive stats from configurations
       const statsResult = await getBillingConfigurationStats();
-      const activityResult = await getBillingConfigurationActivity();
       setStats(statsResult);
-      setActivity(activityResult);
     } catch (error) {
       showStatusToast(getApiErrorMessage(error, "Failed to load billing configuration overview."), "error");
       setStats(null);
-      setActivity([]);
     } finally {
       setLoadingStats(false);
       setLoadingConfigs(false);
@@ -125,19 +122,19 @@ export default function Overview() {
     setCurrentPage(1);
   };
 
-  const filterOptions = useMemo(() => {
-    const uniqueOptions = (field, defaultLabel) => [
-      { value: "", label: defaultLabel },
-      ...Array.from(new Set(configs.map((config) => config[field]).filter(Boolean)))
-        .sort((a, b) => String(a).localeCompare(String(b)))
-        .map((value) => ({ value, label: value })),
-    ];
-
-    return {
-      status: uniqueOptions("status", "All Statuses"),
-      source: uniqueOptions("source", "All Sources"),
-    };
-  }, [configs]);
+  // Only Draft and Active configurations are ever returned by the API, so the
+  // status filter is a fixed list rather than derived from the current page of
+  // data (which could omit a status even though records with it exist).
+  const filterOptions = useMemo(
+    () => ({
+      status: [
+        { value: "", label: "All Statuses" },
+        { value: "Draft", label: "Draft" },
+        { value: "Active", label: "Active" },
+      ],
+    }),
+    []
+  );
 
   const filteredConfigs = useMemo(() => {
     const search = filters.search.trim().toLowerCase();
@@ -149,9 +146,8 @@ export default function Overview() {
         String(config.projectCode || "").toLowerCase().includes(search) ||
         String(config.client || "").toLowerCase().includes(search);
       const matchesStatus = !filters.status || String(config.status) === String(filters.status);
-      const matchesSource = !filters.source || String(config.source) === String(filters.source);
 
-      return matchesSearch && matchesStatus && matchesSource;
+      return matchesSearch && matchesStatus;
     });
   }, [configs, filters]);
 
@@ -229,7 +225,27 @@ export default function Overview() {
     setRejectionReason("");
   };
 
-  const canApproveOrReject = (status) => !["Active", "Inactive", "Rejected"].includes(status);
+  const handleConfirmDelete = async () => {
+    setDeleteLoading(true);
+    try {
+      await deleteBillingConfiguration(deleteTarget.id);
+      await loadConfigurations();
+      showStatusToast("Draft billing configuration deleted.", "success");
+      setDeleteTarget(null);
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Failed to delete draft billing configuration."), "error");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const closeDeleteModal = () => {
+    if (!deleteLoading) {
+      setDeleteTarget(null);
+    }
+  };
+
+  const canApproveOrReject = (status) => !["Active", "Inactive", "Rejected", "Draft"].includes(status);
 
   const closeDeactivateModal = () => {
     if (!deactivateLoading) {
@@ -286,6 +302,13 @@ export default function Overview() {
                 danger: true,
                 onClick: () => setDeactivateTarget(config),
               },
+              {
+                label: "Delete",
+                icon: <Trash2 className="h-4 w-4" />,
+                hidden: config.status !== "Draft",
+                danger: true,
+                onClick: () => setDeleteTarget(config),
+              },
             ]}
           />
         ),
@@ -323,13 +346,6 @@ export default function Overview() {
       icon: Cable,
       color: "bg-indigo-600 text-white",
     },
-    {
-      key: "manual",
-      label: "Standalone Projects",
-      value: stats?.manual ?? "—",
-      icon: PenLine,
-      color: "bg-orange-500 text-white",
-    },
   ];
 
   return (
@@ -349,7 +365,7 @@ export default function Overview() {
       />
 
       {/* 2. KPIs Row */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {kpiCards.map((kpi) => (
           <KPICard
             key={kpi.key}
@@ -362,41 +378,31 @@ export default function Overview() {
         ))}
       </div>
 
-      {/* 3. Filters Box */}
-      <FilterCard title="Filters" description="Search and narrow down billing configurations.">
-        <div className="w-full sm:w-64">
-          <SearchInput
-            value={filters.search}
-            onChange={handleFilterChange}
-            onSearch={handleSearch}
-            placeholder="Search by project, code or client..."
-          />
-        </div>
-        <div className="w-full sm:w-64">
-          <FormSelect
-            name="status"
-            value={filters.status}
-            onChange={handleFilterChange}
-            options={filterOptions.status}
-          />
-        </div>
-        <div className="w-full sm:w-64">
-          <FormSelect
-            name="source"
-            value={filters.source}
-            onChange={handleFilterChange}
-            options={filterOptions.source}
-          />
-        </div>
-      </FilterCard>
-
-      {/* 4. Billing Configurations Table */}
+      {/* 3. Billing Configurations */}
       <PageCard>
-        <PageCardContent className="p-4 sm:p-5">
+        <PageCardContent className="p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="w-full sm:flex-[3] sm:min-w-[320px]">
+              <SearchInput
+                value={filters.search}
+                onChange={handleFilterChange}
+                onSearch={handleSearch}
+                placeholder="Search by project, code or client..."
+              />
+            </div>
+            <div className="w-full sm:flex-1 sm:min-w-[160px]">
+              <FormSelect
+                name="status"
+                value={filters.status}
+                onChange={handleFilterChange}
+                options={filterOptions.status}
+              />
+            </div>
+          </div>
 
           {!loadingConfigs && filteredConfigs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100">
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
                 <FileText className="h-6 w-6 text-slate-400" />
               </div>
               <h3 className="mb-1 text-sm font-semibold text-slate-900">No Billing Configurations Found</h3>
@@ -406,14 +412,12 @@ export default function Overview() {
             </div>
           ) : (
             <>
-              <div className="w-full overflow-x-auto">
-                <GenericTable
-                  headers={TABLE_HEADERS}
-                  columns={TABLE_COLUMNS}
-                  rows={tableRows}
-                  loading={loadingConfigs}
-                />
-              </div>
+              <ARTable
+                headers={TABLE_HEADERS}
+                columns={TABLE_COLUMNS}
+                rows={tableRows}
+                loading={loadingConfigs}
+              />
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
@@ -421,35 +425,6 @@ export default function Overview() {
                 onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
               />
             </>
-          )}
-        </PageCardContent>
-      </PageCard>
-
-      {/* 5. Recent Activity (Bottom) */}
-      <PageCard>
-        <PageCardContent className="p-4 sm:p-5">
-          <h2 className="mb-3 text-base font-semibold text-slate-900">Recent Activity</h2>
-
-          {loadingStats ? (
-            <div className="py-6 text-center text-sm text-slate-500">Loading recent activity…</div>
-          ) : activity.length === 0 ? (
-            <div className="py-6 text-center text-sm text-slate-500">No recent activity yet.</div>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {activity.map((item, index) => (
-                <li
-                  key={`${item.configId}-${index}`}
-                  className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
-                >
-                  <div>
-                    <span className="text-slate-600">{item.action}</span>
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    {item.user} · {item.time}
-                  </div>
-                </li>
-              ))}
-            </ul>
           )}
         </PageCardContent>
       </PageCard>
@@ -468,6 +443,22 @@ export default function Overview() {
         isLoading={deactivateLoading}
         onCancel={closeDeactivateModal}
         onConfirm={handleConfirmDeactivate}
+      />
+
+      {/* Delete Draft Modal */}
+      <ConfirmationModal
+        isOpen={Boolean(deleteTarget)}
+        title="Delete Draft Billing Configuration"
+        message={
+          deleteTarget
+            ? `Are you sure you want to permanently delete the draft billing setup for ${deleteTarget.projectName}? This action cannot be undone.`
+            : ""
+        }
+        confirmText="Delete"
+        variant="danger"
+        isLoading={deleteLoading}
+        onCancel={closeDeleteModal}
+        onConfirm={handleConfirmDelete}
       />
 
       <ConfirmationModal

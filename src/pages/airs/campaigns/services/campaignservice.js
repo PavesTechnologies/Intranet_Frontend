@@ -119,6 +119,30 @@ export const getPipelineSummary = async (campaignId) => {
     }
 };
 
+// Interview calendar — no pagination on this endpoint; the caller is
+// expected to bound result size via start_date/end_date (the calendar's
+// own visible range), not fetch everything and filter client-side.
+export const getCampaignInterviews = async (campaignId, filters = {}) => {
+    try {
+        const params = {};
+        if (filters.startDate) params.start_date = filters.startDate;
+        if (filters.endDate) params.end_date = filters.endDate;
+        if (filters.status?.length) params.status = filters.status;
+        if (filters.interviewerEmail) params.interviewer_email = filters.interviewerEmail;
+
+        const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/interviews`, {
+            params,
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching campaign interviews:", error);
+        throw error;
+    }
+};
+
 export const getCampaignTimeline = async (campaignId, { limit = 20, offset = 0, event_type } = {}) => {
     try {
         const params = { limit, offset };
@@ -398,9 +422,10 @@ export const getProcessingStatus = async (campaignId) => {
     }
 };
 
-export const getDeadLetterQueue = async (campaignId) => {
+export const getDeadLetterQueue = async (campaignId, params) => {
     try {
         const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/dead-letter-queue`, {
+            params,
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
         });
         return response.data;
@@ -530,6 +555,21 @@ export const getRejectionAnalytics = async (campaignId) => {
         console.error("Error fetching rejection analytics:", error);
         throw error;
     }
+};
+
+// HR override report. campaign_alerts carries the per-campaign
+// override_rate and the server-computed override_alert flag that the dashboard
+// warning (T03) renders. HR_ADMIN only.
+export const getOverrideReport = async ({ campaignId, dateFrom, dateTo } = {}) => {
+    const params = {};
+    if (campaignId) params.campaign_id = campaignId;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    const response = await api.get(`${BASE_URL}/campaign-candidates/override-report`, {
+        params,
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+    });
+    return response.data?.data || null;
 };
 
 

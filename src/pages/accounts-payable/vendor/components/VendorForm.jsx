@@ -1,6 +1,7 @@
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import useApLookups from "../../hooks/useApLookups";
+import { COUNTRY_KIND, getCountryKind } from "../config/vendorCountryConfig";
 
 export const DEFAULT_VENDOR_FORM = {
   vendor_name: "",
@@ -20,9 +21,21 @@ export const DEFAULT_VENDOR_FORM = {
  * `mode="edit"` also surfaces the status dropdown (backed by the
  * /system/status?module_name=VENDOR lookup).
  */
-const VendorForm = ({ formData, errors = {}, onChange, mode = "create", disabledFields = [] }) => {
+const VendorForm = ({
+  formData,
+  errors = {},
+  onChange,
+  mode = "create",
+  disabledFields = [],
+  hideCountryField = false,
+}) => {
   const { countryOptions, currencyOptions, paymentTermOptions, vendorStatusOptions } = useApLookups();
   const isDisabled = (name) => disabledFields.includes(name);
+
+  // PAN is India-specific. Show it for India (and while no country is picked yet,
+  // to keep the pre-selection form identical to the original India-only flow).
+  const countryKind = getCountryKind(countryOptions, formData.country_id);
+  const showPan = countryKind === null || countryKind === COUNTRY_KIND.INDIA;
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -44,13 +57,15 @@ const VendorForm = ({ formData, errors = {}, onChange, mode = "create", disabled
         error={errors.vendor_code}
         placeholder="Optional"
       />
-      <FormSelect
-        label="Country *"
-        name="country_id"
-        options={countryOptions}
-        value={formData.country_id}
-        onChange={onChange}
-      />
+      {!hideCountryField && (
+        <FormSelect
+          label="Country *"
+          name="country_id"
+          options={countryOptions}
+          value={formData.country_id}
+          onChange={onChange}
+        />
+      )}
       <FormSelect
         label="Payment Term"
         name="payment_term_id"
@@ -65,15 +80,17 @@ const VendorForm = ({ formData, errors = {}, onChange, mode = "create", disabled
         value={formData.currency_id}
         onChange={onChange}
       />
-      <FormInput
-        label="PAN Number"
-        name="pan_number"
-        value={formData.pan_number}
-        onChange={onChange}
-        error={errors.pan_number}
-        disabled={isDisabled("pan_number")}
-        placeholder={isDisabled("pan_number") ? "Verify GSTIN to fill this in" : undefined}
-      />
+      {showPan && (
+        <FormInput
+          label="PAN Number"
+          name="pan_number"
+          value={formData.pan_number}
+          onChange={onChange}
+          error={errors.pan_number}
+          disabled={isDisabled("pan_number")}
+          placeholder={isDisabled("pan_number") ? "Verify GSTIN to fill this in" : undefined}
+        />
+      )}
       <FormInput
         label="Phone Number"
         name="phone_number"

@@ -176,11 +176,31 @@ const AssetDetail = () => {
     });
   }, [projectResources, assignments, editingAssignment]);
 
-  const fetchProjectResources = async () => {
+  const fetchProjectResources = async (projectIdOverride, assignmentOverride) => {
+    const projectIdToFetch = projectIdOverride ?? formData.projectId;
+    if (!projectIdToFetch) return;
+
+    const currentAssignment =
+      assignmentOverride !== undefined ? assignmentOverride : editingAssignment;
+
     setProjectResourcesLoading(true);
     try {
-      const res = await projectResourceDetails(formData.projectId);
-      setProjectResources(res?.data || []);
+      const res = await projectResourceDetails(projectIdToFetch);
+      const fetched = res?.data || [];
+
+      // Keep the assignment's current resource visible even if the PMS
+      // resource list no longer/doesn't include it (e.g. edit mode).
+      if (
+        currentAssignment?.resourceName &&
+        !fetched.find((r) => r.resourceName === currentAssignment.resourceName)
+      ) {
+        fetched.push({
+          resourceName: currentAssignment.resourceName,
+          resourceRole: currentAssignment.resourceRole || "",
+        });
+      }
+
+      setProjectResources(fetched);
     } catch (err) {
       console.error("Failed to load project resources", err);
       notify.error(err, "Failed to load project resources");
@@ -491,33 +511,27 @@ const AssetDetail = () => {
   };
 
   const openEditModal = async (a) => {
-    // mark editing target so availableProjectResources allows it
+    // mark editing target so availableProjectResources allows it, and so
+    // fetchProjectResources (triggered below via the projectId effect) knows
+    // to keep this resource visible even if the PMS resource list omits it.
     setEditingAssignment(a);
 
-    // fetch project resources for the assignment's project so the resource list contains the current resource
-    try {
-      if (a.projectId) {
-        setProjectResourcesLoading(true);
-        const res = await projectResourceDetails(a.projectId);
-        const fetched = res?.data || [];
+    // Backend assignment list only returns projectName, not projectId — resolve it
+    // from the already-loaded client projects so the (disabled) Project field can
+    // display the correct value. The projectId effect will fetch the resource
+    // list for this project once formData is updated below.
+    const matchedProject = clientProjects.find((p) => p.projectName === a.projectName);
+    const resolvedProjectId = a.projectId || matchedProject?.pmsProjectId || a.projectName || "";
 
-        // If the resource in the assignment isn't present in fetched list, add it so the listbox can show it
-        if (a.resourceName && !fetched.find((r) => r.resourceName === a.resourceName)) {
-          fetched.push({ resourceName: a.resourceName, resourceRole: a.resourceRole || "" });
-        }
-
-        setProjectResources(fetched);
-      }
-    } catch (err) {
-      console.error("Failed to load project resources for edit modal", err);
-    } finally {
-      setProjectResourcesLoading(false);
-    }
+    // Fetch explicitly (rather than relying solely on the projectId effect below)
+    // so switching between two assignments on the same project still refreshes
+    // the resource list with the correct current resource included.
+    fetchProjectResources(resolvedProjectId, a);
 
     // populate form with existing assignment values
     setFormData({
       resourceName: a.resourceName || "",
-      projectId: a.projectId || "",
+      projectId: resolvedProjectId,
       projectName: a.projectName || "",
       assignedDate: a.assignedDate ? new Date(a.assignedDate).toISOString().split("T")[0] : today,
       expectedReturnDate: a.expectedReturnDate || "",
@@ -789,10 +803,18 @@ const AssetDetail = () => {
                   <FilterListbox
                     options={[
                       { value: "", label: "Select Project" },
-                      ...clientProjects.map((p) => ({ value: p.pmsProjectId, label: p.projectName }))
+                      ...clientProjects.map((p) => ({ value: p.pmsProjectId, label: p.projectName })),
+                      // Fallback so the disabled field still shows the correct label when
+                      // editing an assignment whose project isn't in the loaded list.
+                      ...(editingAssignment &&
+                        formData.projectId &&
+                        !clientProjects.some((p) => String(p.pmsProjectId) === String(formData.projectId))
+                        ? [{ value: formData.projectId, label: formData.projectName || String(formData.projectId) }]
+                        : [])
                     ]}
                     value={formData.projectId || ""}
                     buttonClassName={listboxButtonClass(!!errors.projectId)}
+                    disabled={!!editingAssignment}
                     onChange={(val) => {
                       setFormData((prev) => ({
                         ...prev,
@@ -820,10 +842,14 @@ const AssetDetail = () => {
                   <FilterListbox
                     options={[
                       { value: "", label: !formData.projectId ? "Select Resource" : projectResourcesLoading ? "Loading resources..." : availableProjectResources.length === 0 ? "No resources allocated to this project" : "Select Resource" },
-                      ...availableProjectResources.map((res) => ({ value: res.resourceName, label: `${res.resourceName} - ${res.resourceRole}` }))
+                      ...availableProjectResources.map((res) => ({
+                        value: res.resourceName,
+                        label: res.resourceRole ? `${res.resourceName} - ${res.resourceRole}` : res.resourceName,
+                      }))
                     ]}
                     value={formData.resourceName || ""}
                     buttonClassName={listboxButtonClass(!!errors.resourceName)}
+                    disabled={!!editingAssignment}
                     onChange={(val) => {
                       handleFormChange({ target: { name: "resourceName", value: val } });
                       if (errors.resourceName) {
