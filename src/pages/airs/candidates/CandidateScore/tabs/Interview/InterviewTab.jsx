@@ -63,6 +63,7 @@ export default function InterviewTab({ candidate }) {
   // previous round as a side effect from the recruiter's point of view,
   // even though the backend endpoint itself still supports that atomically.
   const canScheduleNext = isFirstRound || latestRound?.status === "COMPLETED";
+  const isRejected = String(candidate?.stage).toUpperCase() === "REJECTED";
   // A real PENDING placeholder round (nothing scheduled yet) has no details
   // worth showing — same treatment as no rounds at all. Round numbers come
   // from each item's original position, not the filtered list's index, so
@@ -222,14 +223,16 @@ export default function InterviewTab({ candidate }) {
             </span>
           )}
         </span>
-        <Button
-          size="small"
-          onClick={openSchedule}
-          disabled={!canScheduleNext}
-          title={canScheduleNext ? undefined : "Mark the current round as completed before scheduling the next one."}
-        >
-          <CalendarPlus size={14} /> {isFirstRound ? "Schedule Interview" : "Schedule Next Round"}
-        </Button>
+        {!isRejected && (
+          <Button
+            size="small"
+            onClick={openSchedule}
+            disabled={!canScheduleNext}
+            title={canScheduleNext ? undefined : "Mark the current round as completed before scheduling the next one."}
+          >
+            <CalendarPlus size={14} /> {isFirstRound ? "Schedule Interview" : "Schedule Next Round"}
+          </Button>
+        )}
       </div>
 
       {displayRounds.length === 0 ? (

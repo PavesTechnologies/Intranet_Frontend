@@ -18,5 +18,10 @@ export function getSummaryMock(candidate) {
     appliedOn: candidate.createdAt,
     status: candidate.status,
     aiCandidateSummary: candidate.aiCandidateSummary,
+    // Resume-parsed data (merged onto candidate by CandidateScorePage's
+    // mergeResumeFields) — surfaced here too so Summary gives a quick
+    // overview without needing the full Resume tab.
+    skills: Array.isArray(candidate.skills) ? candidate.skills : [],
+    certifications: Array.isArray(candidate.certifications) ? candidate.certifications : [],
   };
 }

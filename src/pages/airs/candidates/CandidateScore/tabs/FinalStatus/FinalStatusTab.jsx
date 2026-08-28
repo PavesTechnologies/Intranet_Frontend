@@ -133,7 +133,7 @@ export default function FinalStatusTab({ candidate }) {
               <ScoreRing value={compositeScore} size={74} color={tone.ring} />
               <div>
                 <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-slate-900 mb-1.5">
-                  <Award size={15} className="text-amber-500" /> Final Status
+                  <Award size={15} className="text-amber-500" /> Overall Score
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   {hasStage && renderStageBadge(stage)}

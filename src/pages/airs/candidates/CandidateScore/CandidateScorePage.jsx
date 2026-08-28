@@ -2,6 +2,8 @@ import React, { useState, lazy, Suspense } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import useCandidateDetail from "../hooks/useCandidateDetail";
+import useParsedResume from "../hooks/useParsedResume";
+import { mergeResumeFields } from "../utils/mapParsedResumeFields";
 import CandidateHeader from "./components/CandidateHeader";
 import CandidateTabs from "./components/CandidateTabs";
 import ErrorState from "../../skill-ontology/components/ErrorState";
@@ -28,7 +30,7 @@ const TABS = [
   { id: "deterministic", label: SCORE_LABELS.deterministic, Component: DeterministicScoreTab },
   { id: "semantic", label: SCORE_LABELS.semantic, Component: SemanticScoreTab },
   { id: "ai", label: SCORE_LABELS.ai, Component: AiEvaluationTab },
-  { id: "finalStatus", label: "Final Status", Component: FinalStatusTab },
+  { id: "finalStatus", label: "Overall Score", Component: FinalStatusTab },
   { id: "interview", label: "Interview", Component: InterviewTab }, 
 ];
 
@@ -37,6 +39,11 @@ export default function CandidateScorePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { candidate, loading, error, refetch } = useCandidateDetail(candidateId);
+  // Backs the Summary/Resume tabs — fetched independently of the main
+  // candidate record so a slow/failed resume parse never blocks the rest
+  // of the scorecard from rendering.
+  const { fields: resumeFields, status: resumeStatus, loading: resumeLoading } = useParsedResume(candidate?.id);
+  const candidateWithResume = candidate ? mergeResumeFields(candidate, resumeFields) : candidate;
   // Lets a caller (e.g. the Interview Calendar's event chips) deep-link
   // straight into a specific tab via ?tab=interview instead of always
   // landing on the default Summary tab. Read once on mount — this page
@@ -67,7 +74,7 @@ export default function CandidateScorePage() {
               ? "We couldn't load this candidate. Please try again."
               : "We couldn't find this candidate. They may have been removed."
           }
-          onRetry={() => navigate("/airs/candidates")}
+          onRetry={() => navigate("/airs/campaigns")}
         />
       </div>
     );
@@ -77,41 +84,46 @@ export default function CandidateScorePage() {
 
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <CandidateHeader candidate={candidate} onBack={() => navigate(-1)} />
-        </div>
-        {/* HR_ADMIN only; needs the campaign the scorecard
-            belongs to, since the export route is campaign-scoped. */}
-        {isHrAdmin && candidate.campaignId && (
-          <Button
-            variant="outline"
-            size="small"
-            loading={exporting}
-            loadingText="Generating..."
-            onClick={async () => {
-              setExporting(true);
-              try {
-                await exportScorecard(candidate.campaignId, candidate.id);
-                toast.success("Scorecard downloaded.");
-              } catch (err) {
-                toast.error(err?.response?.data?.message || "Could not export the scorecard.");
-              } finally {
-                setExporting(false);
-              }
-            }}
-          >
-            <Download className="h-3.5 w-3.5 mr-1" /> Export scorecard
-          </Button>
-        )}
-      </div>
+      <CandidateHeader
+        candidate={candidate}
+        onBack={() => navigate(-1)}
+        actions={
+          // HR_ADMIN only; needs the campaign the scorecard belongs to,
+          // since the export route is campaign-scoped.
+          isHrAdmin && candidate.campaignId && (
+            <Button
+              variant="outline"
+              size="small"
+              loading={exporting}
+              loadingText="Generating..."
+              onClick={async () => {
+                setExporting(true);
+                try {
+                  await exportScorecard(candidate.campaignId, candidate.id);
+                  toast.success("Scorecard downloaded.");
+                } catch (err) {
+                  toast.error(err?.response?.data?.message || "Could not export the scorecard.");
+                } finally {
+                  setExporting(false);
+                }
+              }}
+            >
+              <Download className="h-3.5 w-3.5 mr-1" /> Export scorecard
+            </Button>
+          )
+        }
+      />
 
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
         <CandidateTabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
 
         <div className="p-5">
           <Suspense fallback={null}>
-            <ActiveTabComponent candidate={candidate} />
+            <ActiveTabComponent
+              candidate={candidateWithResume}
+              resumeStatus={resumeStatus}
+              resumeLoading={resumeLoading}
+            />
           </Suspense>
         </div>
       </div>

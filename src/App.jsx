@@ -139,7 +139,6 @@ import AirsPlaceholder from "./pages/airs/pages/AirsPlaceholder.jsx";
 import ResumeIntakePage from "./pages/airs/resume-intake/ResumeIntakePage.jsx";
 import IntakeFlowPage from "./pages/airs/resume-intake/intake/IntakeFlowPage.jsx";
 import ReviewPage from "./pages/airs/resume-intake/intake/ReviewPage.jsx";
-import CandidateRankingPage from "./pages/airs/candidates/CandidateRankingPage.jsx";
 import CandidateScorePage from "./pages/airs/candidates/CandidateScore/CandidateScorePage.jsx";
 import InterviewQueuePage from "./pages/airs/interview-queue/InterviewQueuePage.jsx";
 import InterviewCalendarPage from "./pages/airs/interview-calendar/InterviewCalendarPage.jsx";
@@ -1403,14 +1402,6 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute roles={["General"]}>
                 <ReviewPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/airs/candidates"
-            element={
-              <ProtectedRoute roles={["General"]}>
-                <CandidateRankingPage />
               </ProtectedRoute>
             }
           />

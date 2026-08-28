@@ -45,10 +45,8 @@ export default function CandidateTable({
   noteCounts,
   // Per-row actions, rendered after the built-in ones
   renderExtraActions,
-  // The row itself already navigates to onView on click — some callers
-  // (CampaignDetails' Candidates tab) find the Eye button redundant next
-  // to that; others (CandidateRankingPage) still want it, so this defaults
-  // to keeping existing behavior everywhere.
+  // The row itself already navigates to onView on click, so CampaignDetails'
+  // Candidates tab (the only caller) hides the redundant Eye button.
   showViewButton = true,
 }) {
   const { hasRole } = useAuth();
@@ -162,7 +160,7 @@ export default function CandidateTable({
     // is already shown beside the candidate's name
     risk: renderRiskBadge(c.risk),
     actions: (
-      <div className="w-full flex items-center justify-end gap-1">
+      <div className="w-full flex items-center justify-center gap-1">
         {showViewButton && (
           <Button
             variant="ghost"

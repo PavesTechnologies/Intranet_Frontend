@@ -17,6 +17,25 @@ export const getCampaignCandidateDetail = async (campaignCandidateId) => {
   }
 };
 
+// Candidate Scorecard — Summary/Resume tabs —
+// GET /airs/resumes/candidate/{campaign_candidate_id}/parsed-json
+// 404 when no resume is linked yet, 409 when one exists but hasn't finished
+// parsing — both are expected, non-exceptional states the caller branches
+// on (see useParsedResume), not just error noise.
+export const getParsedResume = async (campaignCandidateId) => {
+  try {
+    const response = await api.get(`${BASE_URL}/resumes/candidate/${campaignCandidateId}/parsed-json`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching parsed resume:", error);
+    throw error;
+  }
+};
+
 // Candidate Scorecard — Deterministic tab —
 // GET /airs/campaign-candidates/{campaign_candidate_id}/deterministic
 export const getDeterministicScoreBreakdown = async (campaignCandidateId) => {
