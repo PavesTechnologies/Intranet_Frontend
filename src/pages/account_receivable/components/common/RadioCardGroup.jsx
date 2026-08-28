@@ -26,17 +26,15 @@ export default function RadioCardGroup({
             aria-checked={isSelected}
             disabled={disabled}
             onClick={() => onChange?.(option.value)}
-            className={`rounded-xl border p-4 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-[#0A0082]/30 ${
-              isSelected
+            className={`rounded-xl border p-4 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-[#0A0082]/30 ${isSelected
                 ? "border-[#0A0082] bg-[#0A0082]/5 ring-1 ring-[#0A0082]"
                 : "border-slate-200 bg-white hover:border-slate-300"
-            } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+              } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
           >
             <div className="flex items-start gap-3">
               <span
-                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
-                  isSelected ? "border-[#0A0082]" : "border-slate-300"
-                }`}
+                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${isSelected ? "border-[#0A0082]" : "border-slate-300"
+                  }`}
               >
                 {isSelected ? <span className="h-2 w-2 rounded-full bg-[#0A0082]" /> : null}
               </span>

@@ -37,7 +37,7 @@ export default function useBulkImport() {
   };
 
   // Selecting a new file always re-validates before Import can be enabled —
-  // never imports immediately (S07/T01).
+  // never imports immediately.
   const selectFile = (nextFile) => {
     setFile(nextFile);
     if (nextFile) validate(nextFile);

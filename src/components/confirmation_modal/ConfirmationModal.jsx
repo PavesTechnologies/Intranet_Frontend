@@ -6,6 +6,7 @@ const ConfirmationModal = ({
   isOpen,
   title = "Confirm Action",
   message = "Are you sure?",
+  children,
   onConfirm,
   onCancel,
   isLoading = false,
@@ -23,6 +24,8 @@ const ConfirmationModal = ({
         <p className="mt-2 mb-5 text-sm text-gray-600 leading-relaxed">
           {message}
         </p>
+
+        {children && <div className="mb-5">{children}</div>}
 
         <div className="flex justify-end gap-2">
           <Button

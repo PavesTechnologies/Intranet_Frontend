@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import { ShieldCheck, Calculator, SlidersHorizontal } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorState from "@/pages/airs/skill-ontology/components/ErrorState";
+import AccordionSection from "../../components/AccordionSection";
 import useDeterministicScore from "../../../hooks/useDeterministicScore";
 import SummaryCard from "./components/SummaryCard";
 import SkillsTabNav from "./components/SkillsTabNav";
@@ -12,7 +14,7 @@ import ValidationSection from "./components/ValidationSection";
 import ScoreCalculation from "./components/ScoreCalculation";
 import ConfigurationCard from "./components/ConfigurationCard";
 
-// Deterministic Score tab — GET /airs/campaign-candidates/{campaign_candidate_id}/deterministic.
+// Requirements Score tab — GET /airs/campaign-candidates/{campaign_candidate_id}/deterministic.
 export default function DeterministicScoreTab({ candidate }) {
   const { breakdown, loading, error, refetch } = useDeterministicScore(candidate?.id);
   const [skillsTab, setSkillsTab] = useState("mandatory");
@@ -20,7 +22,7 @@ export default function DeterministicScoreTab({ candidate }) {
   if (loading) {
     return (
       <div className="py-12 flex items-center justify-center">
-        <LoadingSpinner text="Loading deterministic score..." />
+        <LoadingSpinner text="Loading requirements score..." />
       </div>
     );
   }
@@ -28,22 +30,22 @@ export default function DeterministicScoreTab({ candidate }) {
   if (error) {
     return (
       <ErrorState
-        title="Couldn't load deterministic score"
-        message="We couldn't load this candidate's deterministic score breakdown. Please try again."
+        title="Couldn't load requirements score"
+        message="We couldn't load this candidate's requirements score breakdown. Please try again."
         onRetry={refetch}
       />
     );
   }
 
   if (!breakdown) {
-    return <ErrorState title="No data available" message="No deterministic score breakdown found for this candidate." />;
+    return <ErrorState title="No data available" message="No requirements score breakdown found for this candidate." />;
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <SummaryCard summary={breakdown.summary} />
 
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-4">
         <SkillsTabNav
           activeTab={skillsTab}
           onChange={setSkillsTab}
@@ -78,14 +80,22 @@ export default function DeterministicScoreTab({ candidate }) {
         </div>
       </div>
 
-      <ValidationSection
-        experienceValidation={breakdown.experienceValidation}
-        educationValidation={breakdown.educationValidation}
-      />
+      <div className="bg-white border border-slate-200 rounded-xl px-4">
+        <AccordionSection icon={ShieldCheck} title="Validation">
+          <ValidationSection
+            experienceValidation={breakdown.experienceValidation}
+            educationValidation={breakdown.educationValidation}
+          />
+        </AccordionSection>
 
-      <ScoreCalculation scoreCalculation={breakdown.scoreCalculation} configuration={breakdown.configuration} />
+        <AccordionSection icon={Calculator} title="Score Calculation">
+          <ScoreCalculation scoreCalculation={breakdown.scoreCalculation} configuration={breakdown.configuration} />
+        </AccordionSection>
 
-      <ConfigurationCard configuration={breakdown.configuration} />
+        <AccordionSection icon={SlidersHorizontal} title="Configuration" defaultOpen={false}>
+          <ConfigurationCard configuration={breakdown.configuration} />
+        </AccordionSection>
+      </div>
     </div>
   );
 }

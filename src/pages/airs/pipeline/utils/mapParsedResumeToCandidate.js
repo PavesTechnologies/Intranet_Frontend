@@ -146,9 +146,12 @@ export function mapParsedResumeToCandidate(raw, fallback = {}) {
       endDate: w.end_date ?? null,
       isCurrent: !!w.is_current,
       duration: textOrDash(w.duration_text),
+      // Raw resume text often already carries its own bullet glyph
+      // (•, -, *, ‣, …) per line — strip it so the UI's own bullet marker
+      // doesn't double up with the source text's.
       highlights: (w.description ?? "")
         .split("\n")
-        .map((line) => line.trim())
+        .map((line) => line.trim().replace(/^[•●○◦▪▫‣∙*\-–—]\s*/, ""))
         .filter(Boolean),
     })),
     educationExtracted: arr(parsed.education).map((e) => ({

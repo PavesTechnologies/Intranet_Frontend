@@ -7,7 +7,7 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Button from "../../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import InvoiceAmountSummary from "../components/InvoiceAmountSummary";
-import InvoiceLineTable from "../components/InvoiceLineTable";
+import InvoiceMatchingCard from "../components/InvoiceMatchingCard";
 import InvoiceAttachmentList from "../components/InvoiceAttachmentList";
 import InvoiceIssueList from "../components/InvoiceIssueList";
 import InvoiceOcrReviewPanel from "../components/InvoiceOcrReviewPanel";
@@ -15,18 +15,16 @@ import InvoiceValidationPanel from "../components/InvoiceValidationPanel";
 import InvoiceApprovalPanel from "../components/InvoiceApprovalPanel";
 import InvoiceAuditHistory from "../components/InvoiceAuditHistory";
 import { useInvoiceDetail } from "../hooks/useInvoiceDetail";
-import { OCR_REVIEW_QUEUE_STATUSES, VALIDATION_QUEUE_STATUSES, INVOICE_STATUS } from "../../constants/invoiceStatus";
 import { AP_ROUTES } from "../../constants/routes";
-import { formatCurrency, formatDate } from "../../utils/formatters";
+import { formatDate } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
 
 /**
- * Single detail route for the whole invoice lifecycle (per the original AP architecture
- * decision) — the page renders an OCR Review / Validation / Approval workspace panel depending
- * on the invoice's current status, instead of separate near-duplicate detail pages each
- * re-implementing Header/Vendor/Amount Summary/Lines/Issues. The OCR and Validation panels are
- * always rendered (read-only outside their active stage) so extraction/validation results stay
- * visible per the detail-page spec; only the Approval panel's actions are stage-gated.
+ * Single detail route for the whole invoice lifecycle. OCR/Validation render as fixed
+ * informational cards (their real corrective actions live elsewhere — the OCR Review Queue, and
+ * nowhere yet for validation, since the backend has no standalone validation stage). Approval and
+ * Matching are real, live data from their own endpoints; only Approval's action buttons are
+ * stage-gated to Pending Approval.
  */
 export default function InvoiceDetailPage() {
   const { invoiceId } = useParams();
@@ -63,10 +61,6 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  const isOcrReview = OCR_REVIEW_QUEUE_STATUSES.includes(invoice.status);
-  const isValidation = VALIDATION_QUEUE_STATUSES.includes(invoice.status);
-  const isApproval = invoice.status === INVOICE_STATUS.PENDING_APPROVAL;
-  const isRejected = invoice.status === INVOICE_STATUS.REJECTED;
   const symbol = invoice.currency?.symbol || "₹";
 
   return (
@@ -96,6 +90,7 @@ export default function InvoiceDetailPage() {
             <Field label="Invoice Type" value={invoice.invoiceType} />
             <Field label="Invoice Date" value={formatDate(invoice.invoiceDate)} />
             <Field label="Due Date" value={formatDate(invoice.dueDate)} />
+            <Field label="Inbound Document ID" value={invoice.inboundDocumentId} />
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Status</p>
               <div className="mt-1">
@@ -109,28 +104,22 @@ export default function InvoiceDetailPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Main column */}
         <div className="space-y-4 lg:col-span-2">
-          <InvoiceOcrReviewPanel invoice={invoice} readOnly={!isOcrReview} />
-          {isApproval && <InvoiceApprovalPanel invoice={invoice} />}
-          <InvoiceValidationPanel invoice={invoice} readOnly={!isValidation} />
-
-          <PageCard>
-            <PageCardContent>
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">Invoice Lines</h3>
-              <InvoiceLineTable lines={invoice.invoiceLines} currencySymbol={symbol} />
-            </PageCardContent>
-          </PageCard>
+          <InvoiceOcrReviewPanel invoice={invoice} />
+          <InvoiceApprovalPanel invoice={invoice} />
+          <InvoiceValidationPanel />
+          <InvoiceMatchingCard invoiceId={invoice.id} currencySymbol={symbol} />
 
           <PageCard>
             <PageCardContent>
               <h3 className="mb-3 text-sm font-semibold text-gray-700">Attachments</h3>
-              <InvoiceAttachmentList attachments={invoice.attachments} />
+              <InvoiceAttachmentList attachments={invoice.attachments} inboundDocumentId={invoice.inboundDocumentId} />
             </PageCardContent>
           </PageCard>
 
           <PageCard>
             <PageCardContent>
               <h3 className="mb-3 text-sm font-semibold text-gray-700">Issues</h3>
-              <InvoiceIssueList invoiceId={invoice.id} issues={invoice.issues} />
+              <InvoiceIssueList issues={invoice.issues} />
             </PageCardContent>
           </PageCard>
 
@@ -156,59 +145,14 @@ export default function InvoiceDetailPage() {
             </PageCardContent>
           </PageCard>
 
-          <PageCard>
-            <PageCardContent>
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">Purchase Information</h3>
-              <dl className="space-y-1 text-sm">
-                <Field label="PO Number" value={invoice.purchaseOrder?.poNumber || "Not applicable"} stacked />
-                <Field label="GRN Number" value={invoice.goodsReceipt?.grnNumber || "Not applicable"} stacked />
-                <Field label="Payment Terms" value={invoice.paymentTerms || "—"} stacked />
-              </dl>
-            </PageCardContent>
-          </PageCard>
-
           <InvoiceAmountSummary invoice={invoice} />
 
           <PageCard>
             <PageCardContent>
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">Approval Information</h3>
-              {invoice.approval?.required ? (
-                <dl className="space-y-1 text-sm">
-                  <Field label="Status" value={invoice.status} stacked />
-                  <Field label={isRejected ? "Rejected By" : "Approved By"} value={invoice.approval.approvedBy || "Pending"} stacked />
-                  <Field label="Approved On" value={formatDate(invoice.approval.approvedAt)} stacked />
-                  {isRejected && (
-                    <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-2">
-                      <p className="text-xs font-medium uppercase tracking-wide text-red-600">Rejection Reason</p>
-                      <p className="mt-0.5 text-sm text-red-700">{invoice.approval.rejectionReason || "—"}</p>
-                    </div>
-                  )}
-                </dl>
-              ) : (
-                <p className="text-sm italic text-gray-500">
-                  No approval step required for this invoice.
-                </p>
-              )}
-            </PageCardContent>
-          </PageCard>
-
-          <PageCard>
-            <PageCardContent>
               <h3 className="mb-3 text-sm font-semibold text-gray-700">Payment Information</h3>
-              {invoice.payments?.length > 0 ? (
-                <ul className="space-y-2 text-sm">
-                  {invoice.payments.map((payment) => (
-                    <li key={payment.id} className="flex items-center justify-between border-b border-gray-100 pb-2 last:border-0 last:pb-0">
-                      <span className="text-gray-600">
-                        {formatDate(payment.paidAt)} · {payment.method}
-                      </span>
-                      <span className="font-medium text-gray-900">{formatCurrency(payment.amount, symbol)}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm italic text-gray-500">Not yet paid.</p>
-              )}
+              <p className="text-sm italic text-gray-500">
+                Payment tracking isn't wired up yet — see the Payments module.
+              </p>
             </PageCardContent>
           </PageCard>
         </div>

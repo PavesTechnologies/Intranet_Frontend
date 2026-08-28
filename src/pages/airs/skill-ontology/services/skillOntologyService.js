@@ -437,7 +437,7 @@ const mapImportResult = (raw) => ({
 });
 
 // S07/T01 — dry-run validation of the uploaded file. Never mutates data;
-// the Import button (S07/T02) only unlocks once this returns isValid:true.
+// the Import button only unlocks once this returns isValid:true.
 export const validateImportFile = async (file) => {
   try {
     const formData = new FormData();
@@ -483,7 +483,7 @@ export const getImportErrorReport = async (importId) => {
   }
 };
 
-// Root skills only (S05/T02) — the tree lazy-loads deeper levels via
+// Root skills only — the tree lazy-loads deeper levels via
 // getSkillChildren below rather than this endpoint ever taking a parent id.
 export const getSkillHierarchy = async () => {
   try {

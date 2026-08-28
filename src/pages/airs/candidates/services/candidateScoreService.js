@@ -80,3 +80,72 @@ export const getCompositeScoreBreakdown = async (campaignCandidateId) => {
     throw error;
   }
 };
+
+// Candidate Scorecard — Final Status tab —
+// POST /airs/campaign-candidates/{campaign_candidate_id}/send-rejection-email
+// Only valid when pipeline_stage === "REJECTED" (backend-enforced); no
+// dedup lock, so this is safe to call more than once for the same candidate.
+export const sendRejectionEmail = async (campaignCandidateId) => {
+  try {
+    const response = await api.post(
+      `${BASE_URL}/campaign-candidates/${campaignCandidateId}/send-rejection-email`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error sending rejection email:", error);
+    throw error;
+  }
+};
+
+// Candidate Scorecard — Final Status tab —
+// POST /airs/campaign-candidates/{campaign_candidate_id}/send-selection-email
+// Only valid when pipeline_stage === "SELECTED" (backend-enforced); no
+// dedup lock (allow_resend=True server-side), so this is safe to call more
+// than once for the same candidate — same convention as sendRejectionEmail.
+export const sendSelectionEmail = async (campaignCandidateId) => {
+  try {
+    const response = await api.post(
+      `${BASE_URL}/campaign-candidates/${campaignCandidateId}/send-selection-email`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error sending selection email:", error);
+    throw error;
+  }
+};
+
+// Candidate list / Candidates tab — bulk version of the above.
+// POST /airs/campaign-candidates/bulk-send-rejection-email
+// Per-candidate validation (must be REJECTED) — a mixed batch returns
+// partial success ({queued, failed}), not all-or-nothing; max 200 ids,
+// an empty list is a clean no-op. Re-sending is allowed, same as the
+// single version.
+export const bulkSendRejectionEmail = async (campaignCandidateIds) => {
+  try {
+    const response = await api.post(
+      `${BASE_URL}/campaign-candidates/bulk-send-rejection-email`,
+      { campaign_candidate_ids: campaignCandidateIds },
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error bulk-sending rejection emails:", error);
+    throw error;
+  }
+};

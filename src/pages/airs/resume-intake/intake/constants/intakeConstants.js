@@ -10,6 +10,10 @@ export const PARSE_STAGE_ORDER = [
   "PERSISTENCE",
 ];
 
+// The actual resume processing pipeline (Resume Intake -> In Processing tab)
+// does not include EMBEDDING_GENERATION — that stage is JD-specific.
+export const RESUME_PROCESSING_STAGES = PARSE_STAGE_ORDER.filter((s) => s !== "EMBEDDING_GENERATION");
+
 export const STAGE_LABELS = {
   TEXT_EXTRACTION: "Extracting text",
   TEXT_CLEANING: "Cleaning text",

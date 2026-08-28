@@ -107,22 +107,26 @@ export default function ResumePreview({ file, onExpired }) {
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col h-full min-h-[600px]">
-      {/* File Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 bg-slate-50">
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col min-h-[460px]">
+      {/* Section Header — matches the other Resume tab section cards */}
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-slate-100 bg-slate-50/70">
         <div className="flex items-center gap-2 min-w-0">
-          <FileText size={16} className={isPdf ? "text-rose-500 shrink-0" : "text-blue-500 shrink-0"} />
-          <span className="text-[12.5px] font-semibold text-slate-900 truncate" title={file.name}>
+          <span className="flex items-center justify-center w-5 h-5 rounded-md bg-slate-100 text-slate-500 shrink-0">
+            <FileText size={12} />
+          </span>
+          <span className="text-[12.5px] font-bold text-slate-900 shrink-0">Resume Preview</span>
+          <span className="text-slate-300 shrink-0">·</span>
+          <span className="text-[11.5px] text-slate-500 truncate" title={file.name}>
             {file.name}
           </span>
         </div>
-        <Button variant="ghost" size="small" onClick={handleDownload}>
+        <Button variant="ghost" size="small" onClick={handleDownload} className="shrink-0">
           <Download className="h-4 w-4 mr-1" /> Download
         </Button>
       </div>
 
       {/* Main Preview Container */}
-      <div className="flex-1 flex min-h-[500px] bg-slate-100 relative">
+      <div className="flex-1 flex min-h-[360px] bg-slate-100 relative">
         {loading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50/80 z-10">
             <Loader2 className="animate-spin text-indigo-600 mb-2" size={28} />
@@ -150,7 +154,7 @@ export default function ResumePreview({ file, onExpired }) {
 
         {/* PDF Layout */}
         {isPdf && !error && (
-          <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto max-h-[550px]">
+          <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto max-h-[500px]">
             <div className="shadow-lg border border-slate-200 bg-white rounded-sm">
               <Document
                 file={file.url}
@@ -160,7 +164,7 @@ export default function ResumePreview({ file, onExpired }) {
               >
                 <Page
                   pageNumber={pageNumber}
-                  width={350}
+                  width={380}
                   renderTextLayer={false}
                   renderAnnotationLayer={false}
                 />
@@ -171,10 +175,10 @@ export default function ResumePreview({ file, onExpired }) {
 
         {/* DOCX Layout */}
         {isDocx && !error && (
-          <div className="flex-1 p-6 overflow-y-auto max-h-[550px] flex justify-center">
+          <div className="flex-1 p-6 overflow-y-auto max-h-[500px] flex justify-center">
             <div
               ref={docxContainerRef}
-              className="bg-white shadow-lg border border-slate-200 p-8 w-full max-w-[500px] h-fit min-h-[400px] docx-preview-container text-slate-800"
+              className="bg-white shadow-lg border border-slate-200 p-8 w-full max-w-[460px] h-fit min-h-[400px] docx-preview-container text-slate-800"
             />
           </div>
         )}

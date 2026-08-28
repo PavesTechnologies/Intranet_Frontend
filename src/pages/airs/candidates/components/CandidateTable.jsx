@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { toast } from "react-toastify";
-import { Star, StarOff, Eye, Archive, Trash2 } from "lucide-react";
+import { Eye, Archive, Trash2, MessageSquare } from "lucide-react";
 import GenericTable from "../../../../components/Table/table";
 import Button from "../../../../components/Button/Button";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
@@ -17,9 +17,45 @@ import { deleteCandidate } from "../../service/resumeIntake";
 import { extractErrorMessage } from "../../resume-intake/intake/utils/intakeUtils.jsx";
 import { useAuth } from "../../../../contexts/AuthContext";
 
-export default function CandidateTable({ candidates, onView, onToggleStar, onDeleted }) {
+// The mapper hands scores over as numbers OR the DASH string when the backend
+// had no value, so this must not assume a number: Number("-") is NaN and
+// NaN.toFixed(1) renders "NaN". multiplier converts 0–1 scales (semantic) to
+// the 0–100 the column displays.
+const renderScore = (value, multiplier = 1) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return <span className="text-slate-300">{DASH}</span>;
+  return <span className="font-semibold text-slate-900">{(n * multiplier).toFixed(1)}</span>;
+};
+
+/**
+ * Shared candidate table (M10). The selection, note-badge and extra-action
+ * Props below are additions and are all opt-in — every existing caller
+ * that omits them renders exactly as before.
+ */
+export default function CandidateTable({
+  candidates,
+  onView,
+  onDeleted,
+  // Bulk selection
+  selectable = false,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
+  // Note count badges, keyed by campaign_candidate_id
+  noteCounts,
+  // Per-row actions, rendered after the built-in ones
+  renderExtraActions,
+  // The row itself already navigates to onView on click — some callers
+  // (CampaignDetails' Candidates tab) find the Eye button redundant next
+  // to that; others (CandidateRankingPage) still want it, so this defaults
+  // to keeping existing behavior everywhere.
+  showViewButton = true,
+}) {
   const { hasRole } = useAuth();
   const canDeleteCandidates = hasRole(["HR_ADMIN"]);
+  const selected = selectedIds || new Set();
+  const allOnPageSelected =
+    candidates.length > 0 && candidates.every((c) => selected.has(c.id));
 
   const [candidateToDelete, setCandidateToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -48,92 +84,100 @@ export default function CandidateTable({ candidates, onView, onToggleStar, onDel
     );
   }
 
-  const headers = [
-    "Candidate",
-    "Deterministic",
-    "Semantic",
-    "ATS",
-    "Composite",
-    "AI Rec.",
-    "Exp.",
-    "Stage",
-    "Rank",
-    "Actions",
-  ];
+  const headers = ["Candidate", "Requirements", "Relevance", "ATS", "Overall", "AI Rec.", "Exp.", "Stage", "Risk", "Actions"];
+  const columns = ["name", "deterministic", "semantic", "ats", "composite", "aiRecommendation", "experience", "stage", "risk", "actions"];
 
-  const columns = [
-    "name",
-    "deterministic",
-    "semantic",
-    "ats",
-    "composite",
-    "aiRecommendation",
-    "experience",
-    "stage",
-    "rank",
-    "actions",
-  ];
-
-  // Deterministic/semantic/ATS are dash-safe placeholders (candidates not yet
-  // scored by that layer) rather than numbers, so render "—" instead of
-  // running them through toFixed and printing "NaN".
-  const renderScore = (value, scale = 1) =>
-    value === DASH ? (
-      <span className="text-slate-400">—</span>
-    ) : (
-      <span className="font-semibold text-slate-900">{(Number(value) * scale).toFixed(1)}</span>
+  if (selectable) {
+    headers.unshift(
+      <input
+        type="checkbox"
+        checked={allOnPageSelected}
+        onChange={() => onToggleSelectAll?.(candidates, !allOnPageSelected)}
+        className="accent-indigo-600 cursor-pointer"
+        title="Select all on this page"
+      />
     );
+    columns.unshift("select");
+  }
 
   const rows = candidates.map((c) => ({
     id: c.id,
     rowClass: "hover:bg-slate-50/50 transition cursor-pointer",
     onRowClick: () => onView(c),
+    // stopPropagation throughout: the row itself opens the scorecard, so a
+    // click on the checkbox must not navigate away from the selection.
+    select: selectable ? (
+      <input
+        type="checkbox"
+        checked={selected.has(c.id)}
+        onChange={() => onToggleSelect?.(c.id)}
+        onClick={(e) => e.stopPropagation()}
+        className="accent-indigo-600 cursor-pointer"
+      />
+    ) : null,
     name: (
       <div className="w-full flex items-center gap-2.5 text-left">
-        <span className="w-6 text-center text-[11px] font-bold text-slate-400 shrink-0" title={c.rankingStatus ? `Ranking: ${c.rankingStatus}` : undefined}>
-          {c.rank != null ? `#${c.rank}` : "—"}
-        </span>
         <div className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 bg-gradient-to-br from-blue-600 to-indigo-600">
           {c.initials}
         </div>
         <div className="min-w-0">
-          <div className="font-semibold text-slate-900 truncate">{c.name}</div>
-          <div className="text-[11px] text-slate-400 truncate">{c.role}</div>
+          <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+            <span className="line-clamp-1">{c.name}</span>
+            {c.rank != null && (
+              <span
+                title={c.rankingStatus ? `Ranking: ${c.rankingStatus}` : undefined}
+                className="shrink-0 inline-flex items-center text-xs font-bold text-indigo-600"
+              >
+                #{c.rank}
+              </span>
+            )}
+            {/* Only shown when there is something to see */}
+            {noteCounts?.[c.id] > 0 && (
+              <span
+                title={`${noteCounts[c.id]} recruiter note(s)`}
+                className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700"
+              >
+                <MessageSquare className="h-2.5 w-2.5" />
+                {noteCounts[c.id]}
+              </span>
+            )}
+          </div>
+          <div className="text-[11px] text-slate-400 line-clamp-1">{c.role}</div>
         </div>
-        <button
-          className="shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleStar(c.id);
-          }}
-        >
-          {c.starred ? <Star size={14} className="fill-amber-500 text-amber-500" /> : <StarOff size={14} className="text-slate-300" />}
-        </button>
       </div>
     ),
     deterministic: renderScore(c.deterministic),
     ats: renderScore(c.ats),
     semantic: renderScore(c.semantic, 100),
-    composite: <ScoreRing value={c.composite} size={32} color="#16A34A" />,
+    composite: <ScoreRing value={c.composite} size={32} color="#16A34A" decimals={0} />,
     aiRecommendation: renderAiRecommendationBadge(c.aiRecommendation),
-    experience: `${Number(c.experience).toFixed(1)} yrs`,
-    location: c.location,
+    experience: (
+      <div className="text-center leading-tight">
+        <div className="font-semibold text-slate-900">{Number(c.experience).toFixed(1)}</div>
+        <div className="text-[9px] uppercase text-slate-400">yrs</div>
+      </div>
+    ),
     stage: renderStageBadge(c.stage),
-    rank: renderRiskBadge(c.rank),
+    // keyed `risk` to match the Risk column; c.rank is the ranking position and
+    // is already shown beside the candidate's name
+    risk: renderRiskBadge(c.risk),
     actions: (
-      <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={(e) => {
-            e.stopPropagation();
-            onView(c);
-          }}
-          title="View candidate"
-          className="h-8 w-8 !text-blue-500 hover:!text-blue-600"
-        >
-          <Eye className="h-4 w-4" />
-        </Button>
+      <div className="w-full flex items-center justify-end gap-1">
+        {showViewButton && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              onView(c);
+            }}
+            title="View candidate"
+            className="h-8 w-8 !text-blue-500 hover:!text-blue-600"
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+        )}
+        {renderExtraActions?.(c)}
         {canDeleteCandidates && (
           <Button
             variant="ghost"

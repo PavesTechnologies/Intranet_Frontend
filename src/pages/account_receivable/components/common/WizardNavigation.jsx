@@ -1,28 +1,26 @@
 import Button from "../../../../components/Button/Button";
+import BackIconButton from "./BackIconButton";
 
 export default function WizardNavigation({
   isFirstStep,
   isLastStep,
   nextDisabled,
+  nextIncomplete = false,
   nextLabel = "Next",
+  finalLabel = "Save Billing Setup",
+  finalLoadingText = "Saving...",
   showSaveDraft = true,
   saving,
   activating,
   onBack,
   onNext,
   onSaveDraft,
-  onCancel,
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <Button variant="outline" onClick={onBack} disabled={isFirstStep} aria-label="Go back one step">
-        Back
-      </Button>
+      <BackIconButton onClick={onBack} disabled={isFirstStep} label="Previous Step" />
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" onClick={onCancel}>
-          Cancel
-        </Button>
         {showSaveDraft && (
           <Button variant="outline" onClick={onSaveDraft} loading={saving} loadingText="Saving...">
             Save Draft
@@ -32,11 +30,12 @@ export default function WizardNavigation({
           variant="primary"
           onClick={onNext}
           disabled={nextDisabled}
+          className={nextIncomplete ? "opacity-50" : ""}
           loading={activating}
-          loadingText="Activating..."
-          aria-label={isLastStep ? "Activate billing setup" : "Continue to next step"}
+          loadingText={isLastStep ? finalLoadingText : "Loading..."}
+          aria-label={isLastStep ? finalLabel : "Continue to next step"}
         >
-          {isLastStep ? "Activate Billing Setup" : nextLabel}
+          {isLastStep ? finalLabel : nextLabel}
         </Button>
       </div>
     </div>

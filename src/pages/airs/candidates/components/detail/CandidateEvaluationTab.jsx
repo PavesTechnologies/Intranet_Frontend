@@ -20,7 +20,7 @@ export default function CandidateEvaluationTab({ candidate, onAddManualSkill }) 
         </div>
         <div className="text-center">
           <ScoreRing value={candidate.composite} size={54} color="#16A34A" />
-          <div className="text-[11px] mt-1.5 text-slate-400">Composite</div>
+          <div className="text-[11px] mt-1.5 text-slate-400">Overall</div>
         </div>
         <div className="text-center">
           <ScoreRing value={candidate.risk} size={54} color={candidate.risk > 60 ? "#DC2626" : "#D97706"} />

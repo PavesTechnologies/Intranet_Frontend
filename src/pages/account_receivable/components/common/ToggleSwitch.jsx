@@ -27,15 +27,14 @@ export default function ToggleSwitch({
         aria-label={label}
         disabled={disabled}
         onClick={() => !disabled && onChange?.(!checked)}
-        className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-[#0A0082]/30 ${
+        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-[#0A0082]/30 ${
           checked ? "border-[#0A0082] bg-[#0A0082]" : "border-slate-300 bg-slate-200"
         } ${disabled ? "pointer-events-none" : ""}`}
       >
         <span
-          className={`absolute top-0.5 h-4.5 w-4.5 rounded-full bg-white shadow transition-transform ${
-            checked ? "translate-x-5" : "translate-x-0.5"
+          className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${
+            checked ? "translate-x-[18px]" : "translate-x-0.5"
           }`}
-          style={{ height: "1.125rem", width: "1.125rem" }}
         />
       </button>
     </label>

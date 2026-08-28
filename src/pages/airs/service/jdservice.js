@@ -189,7 +189,7 @@ export const exportJDs = async (params) => {
 
 export const downloadJDById = async (jdId) => {
     try {
-        const response = await api.get(`${BASE_URL}/jd/${jdId}/download`, {
+        const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}/download`, {
             responseType: "blob",
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
