@@ -43,7 +43,7 @@ export const BILLING_MODE_LABELS = {
 
 export const BILLING_FREQUENCIES = [
   { value: "WEEKLY", label: "Weekly" },
-  { value: "BIWEEKLY", label: "Biweekly" },
+  { value: "BI_WEEKLY", label: "Bi-Weekly" },
   { value: "MONTHLY", label: "Monthly" },
   { value: "QUARTERLY", label: "Quarterly" },
   { value: "HALF_YEARLY", label: "Half-Yearly" },
