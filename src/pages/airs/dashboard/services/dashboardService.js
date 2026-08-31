@@ -3,12 +3,12 @@ import api from "../../../../api/axiosInstance";
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
 
 const authHeaders = () => ({
-    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
 });
 
 export const getDashboardStats = async () => {
     try {
-        const response = await api.get(`${BASE_URL}/dashboard/stats`, authHeaders());
+        const response = await api.get(`${BASE_URL}/dashboard/stats`, { headers: authHeaders() });
         return response.data;
     } catch (error) {
         console.error("Error fetching dashboard stats:", error);
@@ -20,7 +20,7 @@ export const getHiringFunnel = async (days = 30) => {
     try {
         const response = await api.get(`${BASE_URL}/dashboard/hiring-funnel`, {
             params: { days },
-            ...authHeaders(),
+            headers: authHeaders(),
         });
         return response.data;
     } catch (error) {
@@ -33,7 +33,7 @@ export const getTopCandidates = async (limit = 5) => {
     try {
         const response = await api.get(`${BASE_URL}/dashboard/top-candidates`, {
             params: { limit },
-            ...authHeaders(),
+            headers: authHeaders(),
         });
         return response.data;
     } catch (error) {
@@ -46,16 +46,14 @@ export const getDashboardNotifications = async (limit = 10) => {
     try {
         const response = await api.get(`${BASE_URL}/dashboard/notifications`, {
             params: { limit },
-            ...authHeaders(),
+            headers: authHeaders(),
         });
         return response.data;
     } catch (error) {
         console.error("Error fetching dashboard notifications:", error);
         throw error;
     }
-  Authorization: `Bearer ${localStorage.getItem("token")}`,
-});
-
+};
 export const getHrAdminSummary = async () => {
   const response = await api.get(`${BASE_URL}/dashboard/hr-admin/summary`, {
     headers: authHeaders(),

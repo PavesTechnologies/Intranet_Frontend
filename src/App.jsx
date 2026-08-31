@@ -132,7 +132,6 @@ import JdLibrary from "./pages/airs/pages/JdLibrary.jsx";
 import JdCreate from "./pages/airs/pages/JdCreate.jsx";
 import JdDetails from "./pages/airs/pages/JdDetails.jsx";
 import Campaigns from "./pages/airs/campaigns/Campaigns.jsx";
-import AirsDashboardPage from "./pages/airs/dashboard/AirsDashboardPage.jsx";
 import CampaignDetails from "./pages/airs/campaigns/CampaignDetails.jsx";
 
 import AirsPlaceholder from "./pages/airs/pages/AirsPlaceholder.jsx";
@@ -1360,17 +1359,6 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute roles={["General"]}>
                 <JdDetails />
-              </ProtectedRoute>
-            }
-          />
-          {/* HIRING_MANAGER is deliberately excluded: every /airs/dashboard/*
-              endpoint is restricted to HR_ADMIN and/or RECRUITER, so a hiring
-              manager would load the page and get a 403 in every section. */}
-          <Route
-            path="/airs/dashboard"
-            element={
-              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER"]}>
-                <AirsDashboardPage />
               </ProtectedRoute>
             }
           />
