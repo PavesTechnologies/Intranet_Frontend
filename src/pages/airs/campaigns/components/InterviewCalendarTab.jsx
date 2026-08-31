@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -26,6 +26,19 @@ const STATUS_ACCENT = {
   RESCHEDULED: { border: "border-l-violet-500", dot: "bg-violet-500" },
   COMPLETED: { border: "border-l-emerald-500", dot: "bg-emerald-500" },
   CANCELLED: { border: "border-l-rose-500", dot: "bg-rose-500" },
+};
+
+// Week/Day blocks get their own full-border-plus-tint style (same color
+// families as STATUS_ACCENT/STATUS_TONE, so the legend still means the same
+// thing everywhere) — Month's cells are too small for anything beyond a
+// left-border strip, but timeGrid gives each event real width and height to
+// read as a proper colored block, closer to a personal-calendar look.
+const STATUS_BLOCK_STYLE = {
+  PENDING: "bg-amber-50 border-amber-400 text-amber-800",
+  SCHEDULED: "bg-blue-50 border-blue-400 text-blue-800",
+  RESCHEDULED: "bg-violet-50 border-violet-400 text-violet-800",
+  COMPLETED: "bg-emerald-50 border-emerald-400 text-emerald-800",
+  CANCELLED: "bg-rose-50 border-rose-400 text-rose-800",
 };
 
 const unwrap = (res) => (res && res.data !== undefined ? res.data : res);
@@ -56,7 +69,46 @@ function buildTooltip(entry) {
   ].join("\n");
 }
 
-function EventChip({ entry }) {
+// Week/Day (timeGrid) events get a full-bordered, tinted block — each event
+// already has real width/height on those views, proportional to its
+// duration, so it reads like a personal-calendar entry rather than a
+// cramped list row.
+//
+// Top-aligned, not centered: a short (e.g. 15-30 min) interview gets very
+// little height here, and centering 2-3 stacked lines inside a box shorter
+// than their combined height clips the *top* line along with the bottom —
+// candidate name included — leaving nothing readable. Top-aligning means
+// the box always clips from the bottom down, so the name (line 1, the one
+// thing that must stay legible) survives even when there's no room for
+// anything else.
+function TimeGridEventChip({ entry }) {
+  const style = STATUS_BLOCK_STYLE[entry.status] || STATUS_BLOCK_STYLE.PENDING;
+  const interviewerCount = entry.interviewers?.length || 0;
+
+  return (
+    <div
+      title={buildTooltip(entry)}
+      className={`w-full h-full border-2 rounded-lg px-1.5 py-0.5 flex flex-col justify-start overflow-hidden cursor-pointer hover:shadow-md transition-shadow ${style}`}
+    >
+      <div className="flex items-center gap-1 w-full">
+        <span className="text-[11.5px] font-bold leading-tight truncate flex-1 min-w-0">{entry.candidate_name}</span>
+        {interviewerCount > 1 && (
+          <span className="shrink-0 flex items-center gap-0.5 text-[9.5px] font-bold opacity-70">
+            <Users size={9} /> {interviewerCount}
+          </span>
+        )}
+      </div>
+      <span className="text-[10px] font-medium leading-tight truncate w-full opacity-80">
+        Round {entry.round_number}
+        {entry.interview_type ? ` · ${entry.interview_type}` : ""}
+      </span>
+    </div>
+  );
+}
+
+function EventChip({ entry, viewType }) {
+  if (viewType && viewType !== "dayGridMonth") return <TimeGridEventChip entry={entry} />;
+
   const accent = STATUS_ACCENT[entry.status] || STATUS_ACCENT.PENDING;
   const time = formatChipTime(entry.start_at);
   const interviewerCount = entry.interviewers?.length || 0;
@@ -161,8 +213,9 @@ function EmptyState() {
 // Campaign-wide interview calendar — every candidate's rounds in one
 // campaign, not one candidate's. No pagination on the backend endpoint;
 // the calendar's own visible range (start_date/end_date) is what bounds
-// the result size, so every range change re-fetches rather than filtering
-// an unbounded client-side list.
+// the result size, so only a range change re-fetches. Status/interviewer
+// filters narrow that same fetched set client-side (see filteredEntries)
+// instead of each triggering their own re-fetch.
 export default function InterviewCalendarTab({ campaignId }) {
   const navigate = useNavigate();
   const calendarRef = useRef(null);
@@ -176,8 +229,16 @@ export default function InterviewCalendarTab({ campaignId }) {
   const [interviewerEmailInput, setInterviewerEmailInput] = useState(""); // draft, bound to the input
   const [appliedInterviewerEmail, setAppliedInterviewerEmail] = useState(""); // last value actually sent to the backend
 
+  // Only the date range is ever sent to the backend — per this endpoint's
+  // own contract there's no pagination, the whole visible range comes back
+  // in one shot, so status/interviewer-email narrow that same in-memory
+  // set (see filteredEntries below) rather than triggering a re-fetch.
+  // Fetching pre-filtered by status would also break widening a filter
+  // back out later (e.g. re-checking CANCELLED after unchecking it) since
+  // whatever was excluded from a filtered fetch was never in `entries` to
+  // begin with — always fetching the full range sidesteps that entirely.
   const fetchEntries = useCallback(
-    async (nextRange, filters) => {
+    async (nextRange) => {
       if (!nextRange) return;
       setLoading(true);
       setError(null);
@@ -185,8 +246,6 @@ export default function InterviewCalendarTab({ campaignId }) {
         const res = await getCampaignInterviews(campaignId, {
           startDate: nextRange.startDate,
           endDate: nextRange.endDate,
-          status: filters.status,
-          interviewerEmail: filters.interviewerEmail || undefined,
         });
         const items = unwrap(res);
         setEntries(Array.isArray(items) ? items : []);
@@ -208,45 +267,54 @@ export default function InterviewCalendarTab({ campaignId }) {
     setRange(nextRange);
     setCalendarTitle(arg.view.title);
     setCurrentView(arg.view.type);
-    fetchEntries(nextRange, { status: statusFilter, interviewerEmail: appliedInterviewerEmail });
+    fetchEntries(nextRange);
   };
+
+  // Switching campaigns (InterviewCalendarPage's own selector, a level up)
+  // changes this prop without changing the calendar's visible date range,
+  // so FullCalendar never calls datesSet for it — nothing else here reacts
+  // to campaignId on its own. Guarded on `range` so this is a no-op on the
+  // very first render (before datesSet has fired even once); every change
+  // after that re-fetches whatever range is already on screen, for the
+  // newly selected campaign.
+  useEffect(() => {
+    if (range) fetchEntries(range);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaignId]);
 
   const changeView = (viewName) => calendarApi()?.changeView(viewName);
 
-  // Status pills re-fetch immediately on click — matching how filters
-  // already behave elsewhere in this app (PromptTemplateFilters,
-  // CandidateFilters: no separate "Apply" step for a toggle/select).
-  // Free text is the one exception (see applyInterviewerEmail) — an
-  // explicit trigger makes sense there since every keystroke isn't a
-  // real filter change yet.
+  // Purely local state changes now — no re-fetch, see fetchEntries above.
   const toggleStatus = (status) => {
-    setStatusFilter((prev) => {
-      const next = prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status];
-      if (range) fetchEntries(range, { status: next, interviewerEmail: appliedInterviewerEmail });
-      return next;
-    });
+    setStatusFilter((prev) => (prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]));
   };
 
-  const applyInterviewerEmail = () => {
-    const trimmed = interviewerEmailInput.trim();
-    setAppliedInterviewerEmail(trimmed);
-    if (range) fetchEntries(range, { status: statusFilter, interviewerEmail: trimmed });
-  };
+  const applyInterviewerEmail = () => setAppliedInterviewerEmail(interviewerEmailInput.trim());
 
   const clearAllFilters = () => {
     setStatusFilter([]);
     setInterviewerEmailInput("");
     setAppliedInterviewerEmail("");
-    if (range) fetchEntries(range, { status: [], interviewerEmail: "" });
   };
 
   const activeFilterCount = statusFilter.length + (appliedInterviewerEmail ? 1 : 0);
 
+  // Status + interviewer-email filters, applied client-side to whatever
+  // the current date range already fetched.
+  const filteredEntries = useMemo(() => {
+    const email = appliedInterviewerEmail.toLowerCase();
+    return entries.filter((e) => {
+      if (statusFilter.length && !statusFilter.includes(e.status)) return false;
+      if (email && !(e.interviewers || []).some((i) => (i.email || "").toLowerCase().includes(email))) return false;
+      return true;
+    });
+  }, [entries, statusFilter, appliedInterviewerEmail]);
+
   // PENDING rounds have no start_at/end_at — they can't be placed on a
   // date grid, so they're listed separately below instead of silently
   // dropped.
-  const scheduledEntries = useMemo(() => entries.filter((e) => e.start_at && e.end_at), [entries]);
-  const pendingEntries = useMemo(() => entries.filter((e) => !e.start_at || !e.end_at), [entries]);
+  const scheduledEntries = useMemo(() => filteredEntries.filter((e) => e.start_at && e.end_at), [filteredEntries]);
+  const pendingEntries = useMemo(() => filteredEntries.filter((e) => !e.start_at || !e.end_at), [filteredEntries]);
 
   const events = useMemo(
     () => scheduledEntries.map((e) => ({ id: e.id, start: e.start_at, end: e.end_at, extendedProps: { entry: e } })),
@@ -254,13 +322,11 @@ export default function InterviewCalendarTab({ campaignId }) {
   );
 
   // This is a summary view only (no notes/meeting_link/history here by
-  // design), so clicking through goes to the full per-candidate Interview
-  // tab. That page doesn't currently support deep-linking to a specific
-  // tab or round (confirmed — CandidateScorePage/PipelineCandidateScorecardPage
-  // both hold activeTab in plain useState, not the URL), so this lands on
-  // the candidate's default tab; reaching Interview specifically still
-  // takes one manual click today.
-  const goToCandidate = (entry) => navigate(`/airs/candidates/${entry.campaign_candidate_id}`);
+  // design), so clicking through goes straight to the candidate's own
+  // Interview tab via CandidateScorePage's ?tab= deep-link, rather than
+  // landing on its default Summary tab and requiring one more click.
+  // (There's still no deep-link to a specific *round* within that tab.)
+  const goToCandidate = (entry) => navigate(`/airs/candidates/${entry.campaign_candidate_id}?tab=interview`);
 
   const calendarApi = () => calendarRef.current?.getApi();
 
@@ -330,7 +396,6 @@ export default function InterviewCalendarTab({ campaignId }) {
                   onClick={() => {
                     setInterviewerEmailInput("");
                     setAppliedInterviewerEmail("");
-                    if (range) fetchEntries(range, { status: statusFilter, interviewerEmail: "" });
                   }}
                   className="hover:text-slate-950"
                   aria-label="Remove interviewer email filter"
@@ -382,7 +447,7 @@ export default function InterviewCalendarTab({ campaignId }) {
                 slotMaxTime="21:00:00"
                 events={events}
                 datesSet={handleDatesSet}
-                eventContent={(arg) => <EventChip entry={arg.event.extendedProps.entry} />}
+                eventContent={(arg) => <EventChip entry={arg.event.extendedProps.entry} viewType={arg.view.type} />}
                 eventClick={(arg) => goToCandidate(arg.event.extendedProps.entry)}
                 // Without this, a 15-interview day would stack all 15 chips
                 // in one cell, growing it far taller than its neighbors in
@@ -396,7 +461,7 @@ export default function InterviewCalendarTab({ campaignId }) {
                 dayMaxEvents={true}
                 moreLinkClassNames="!text-[11px] !font-semibold !text-blue-600 hover:!underline"
               />
-              {!loading && entries.length === 0 && <EmptyState />}
+              {!loading && filteredEntries.length === 0 && <EmptyState />}
             </>
           )}
         </div>

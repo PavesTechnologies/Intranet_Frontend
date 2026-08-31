@@ -57,6 +57,12 @@ export default function InterviewTab({ candidate }) {
 
   const latestRound = interviews.length ? interviews[interviews.length - 1] : null;
   const isFirstRound = (latestRound?.status || "PENDING") === "PENDING";
+  // Explicit gate, per product decision: scheduling the next round requires
+  // the latest one to already be COMPLETED (via its own "Mark as Completed"
+  // action on the round card) — scheduling no longer auto-completes the
+  // previous round as a side effect from the recruiter's point of view,
+  // even though the backend endpoint itself still supports that atomically.
+  const canScheduleNext = isFirstRound || latestRound?.status === "COMPLETED";
   // A real PENDING placeholder round (nothing scheduled yet) has no details
   // worth showing — same treatment as no rounds at all. Round numbers come
   // from each item's original position, not the filtered list's index, so
@@ -216,7 +222,12 @@ export default function InterviewTab({ candidate }) {
             </span>
           )}
         </span>
-        <Button size="small" onClick={openSchedule}>
+        <Button
+          size="small"
+          onClick={openSchedule}
+          disabled={!canScheduleNext}
+          title={canScheduleNext ? undefined : "Mark the current round as completed before scheduling the next one."}
+        >
           <CalendarPlus size={14} /> {isFirstRound ? "Schedule Interview" : "Schedule Next Round"}
         </Button>
       </div>

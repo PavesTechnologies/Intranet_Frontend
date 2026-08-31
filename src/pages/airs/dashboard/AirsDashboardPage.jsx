@@ -1,61 +1,52 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import {
-  Activity, AlertOctagon, AlertTriangle, Briefcase, CheckCircle2,
-  FileUp, Hourglass, Search, Users,
+  Activity, AlertTriangle, Briefcase, CheckCircle2,
+  FileUp, Search, Users,
 } from "lucide-react";
 import { useAuth } from "../../../contexts/AuthContext";
 import Button from "../../../components/Button/Button";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import { KPICard } from "../../../components/kpi/KPI";
+import Pagination from "../../../components/Pagination/pagination";
 import useDashboardSection from "./hooks/useDashboardSection";
 import CampaignTable from "./components/CampaignTable";
 import NavBadges from "./components/NavBadges";
 import OverrideRateAlerts from "./components/OverrideRateAlerts";
 import PlatformHealthStrip from "./components/PlatformHealthStrip";
 import {
-  EmptyState, SectionError, SkeletonTiles,
+  EmptyState, SectionError,
 } from "./components/DashboardStates";
 import {
   getDashboardCampaigns, getHrAdminSummary, getRecruiterSummary,
 } from "./services/dashboardService";
 
-const fmtDate = (d) => (d ? new Date(d).toLocaleString() : null);
-
-// Global KPICard supplies the tile itself; this only adds the click-through
-// (every metric must navigate, never be a dead number).
-//
 // `muted` drops a zero to grey: on an attention row, "0 AI failures" is good
 // news and should not compete for the eye with a real count.
-function MetricTile({ label, value, to, icon: Icon, color, muted = false }) {
+function MetricTile({ label, value, icon: Icon, color, muted = false }) {
   const isZero = value === 0 || value === null || value === undefined;
-  const card = (
+  return (
     <KPICard
       label={label}
       value={value ?? "—"}
       icon={Icon ? <Icon className="h-5 w-5" /> : null}
       color={muted && isZero ? "bg-slate-50 text-slate-400" : color}
-      className="h-full hover:border-indigo-300 hover:shadow-md transition"
+      className="h-full"
     />
   );
-  return to ? <Link to={to} className="block h-full">{card}</Link> : card;
 }
 
-// A labelled band of tiles. Naming the groups is what turns an awkward 4+3
-// wrap into two rows that each mean something.
-function MetricGroup({ title, children, cols = "md:grid-cols-4" }) {
+// All KPIs in a single responsive row rather than grouped bands.
+function MetricRow({ children, cols }) {
   return (
-    <div>
-      <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">
-        {title}
-      </h2>
-      <div className={`grid grid-cols-2 ${cols} gap-4`}>{children}</div>
+    <div className={`grid grid-cols-2 sm:grid-cols-3 ${cols} gap-4`}>
+      {children}
     </div>
   );
 }
 
 export default function AirsDashboardPage() {
-  const { user, hasRole } = useAuth();
+  const { hasRole } = useAuth();
   const isHRAdmin = hasRole(["HR_ADMIN"]);
   const isRecruiter = hasRole(["RECRUITER"]);
 
@@ -72,11 +63,16 @@ export default function AirsDashboardPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("All");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 5;
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(t);
   }, [search]);
+
+  // A new search/status result set invalidates whatever page we were on.
+  useEffect(() => { setPage(1); }, [debouncedSearch, status]);
 
   const campaignsFetcher = useCallback(
     () => getDashboardCampaigns({
@@ -95,36 +91,23 @@ export default function AirsDashboardPage() {
   if (!isHRAdmin && !isRecruiter) return <Navigate to="/airs/campaigns" replace />;
 
   const s = summary.data;
-  const lastLogin = fmtDate(s?.last_login_at);
   const cards = campaigns.data || [];
   const hasFilters = Boolean(debouncedSearch) || status !== "All";
+  const totalPages = Math.max(1, Math.ceil(cards.length / PAGE_SIZE));
+  const pagedCards = cards.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="bg-[#F8FAFC] text-slate-900 font-sans min-h-screen p-6 space-y-6">
-      {/* Identity header. Name and role come from the UMS-issued JWT;
-          no lookup or decryption is involved. */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold text-slate-900">
-              Welcome back, {user?.name || "there"}
-            </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              {isHRAdmin ? "HR Admin" : "Recruiter"}
-              {lastLogin && <> · Last sign-in {lastLogin}</>}
-            </p>
+      {/* Nav + service health, without the welcome banner. Health lives here
+          rather than its own card: when everything is fine it is one line,
+          not a full row of green pills. */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <NavBadges />
+        {isHRAdmin && s && (
+          <div className="shrink-0">
+            <PlatformHealthStrip breakers={s.platform_health} />
           </div>
-          {/* Service health lives in the header rather than its own card: when
-              everything is fine it is one line, not a full row of green pills. */}
-          {isHRAdmin && s && (
-            <div className="shrink-0">
-              <PlatformHealthStrip breakers={s.platform_health} />
-            </div>
-          )}
-        </div>
-        <div className="mt-3">
-          <NavBadges />
-        </div>
+        )}
       </div>
 
       {/* Warnings sit directly under the header — they were previously below
@@ -133,59 +116,40 @@ export default function AirsDashboardPage() {
       {isHRAdmin && <OverrideRateAlerts />}
 
       {/* ── Activity summary ───────────────────────────────── */}
-      {summary.loading && <SkeletonTiles count={isHRAdmin ? 7 : 5} />}
-
-      {!summary.loading && summary.error && (
+      {/* Tiles render immediately with empty values and fill in once the
+          summary resolves — no loading state, no layout jump. */}
+      {summary.error && (
         <SectionError
           message="Your activity summary could not be loaded."
           onRetry={summary.retry}
         />
       )}
 
-      {!summary.loading && !summary.error && s && isHRAdmin && (
-        <>
-          <MetricGroup title="Hiring activity">
-            <MetricTile label="Active Campaigns" value={s.active_campaigns}
-              to="/airs/campaigns?status=ACTIVE" icon={Briefcase} />
-            <MetricTile label="Submitted (7 days)" value={s.candidates_last_7_days}
-              to="/airs/campaigns" icon={FileUp} />
-            <MetricTile label="Shortlisted" value={s.shortlisted_candidates}
-              to="/airs/campaigns" icon={CheckCircle2} color="bg-sky-50 text-sky-600" />
-            <MetricTile label="Awaiting HM Review" value={s.hm_review_pending}
-              to="/airs/campaigns" icon={Users} color="bg-teal-50 text-teal-600" />
-          </MetricGroup>
-
-          {/* Separated because these are the numbers you act on, not the ones
-              you report. A zero here is good news and is greyed accordingly. */}
-          <MetricGroup title="Needs attention" cols="md:grid-cols-3">
-            <MetricTile label="Campaigns With Stalls" value={s.campaigns_with_stall_warnings}
-              to="/airs/campaigns" icon={Hourglass} color="bg-amber-50 text-amber-600" muted />
-            <MetricTile label="AI Failures" value={s.ai_evaluation_failures}
-              to="/airs/campaigns" icon={AlertOctagon} color="bg-rose-50 text-rose-600" muted />
-            <MetricTile label="Skills To Review" value={s.pending_unknown_skills}
-              to="/airs/skill-ontology" icon={Activity} color="bg-indigo-50 text-indigo-600" muted />
-          </MetricGroup>
-        </>
+      {!summary.error && isHRAdmin && (
+        <MetricRow cols="md:grid-cols-5">
+          <MetricTile label="Active Campaigns" value={s?.active_campaigns} icon={Briefcase} />
+          <MetricTile label="New (7d)" value={s?.candidates_last_7_days} icon={FileUp} />
+          <MetricTile label="Shortlisted" value={s?.shortlisted_candidates}
+            icon={CheckCircle2} color="bg-sky-50 text-sky-600" />
+          <MetricTile label="HM Review" value={s?.hm_review_pending}
+            icon={Users} color="bg-teal-50 text-teal-600" />
+          {/* A zero here is good news, so it's greyed rather than competing
+              for attention with the numbers you report. */}
+          <MetricTile label="Skills Review" value={s?.pending_unknown_skills}
+            icon={Activity} color="bg-indigo-50 text-indigo-600" muted />
+        </MetricRow>
       )}
 
-      {!summary.loading && !summary.error && s && !isHRAdmin && (
-        <>
-          <MetricGroup title="My activity" cols="md:grid-cols-3">
-            <MetricTile label="Campaigns I Upload To" value={s.campaigns_uploaded_to}
-              to="/airs/campaigns" icon={Briefcase} />
-            <MetricTile label="Campaigns I Created" value={s.campaigns_created}
-              to="/airs/campaigns" icon={Briefcase} />
-            <MetricTile label="Resumes (7 days)" value={s.resumes_last_7_days}
-              to="/airs/resume-intake" icon={FileUp} />
-          </MetricGroup>
-
-          <MetricGroup title="Outcomes" cols="md:grid-cols-2">
-            <MetricTile label="Shortlisted From My Uploads" value={s.shortlisted_from_my_uploads}
-              to="/airs/campaigns" icon={CheckCircle2} color="bg-emerald-50 text-emerald-600" />
-            <MetricTile label="Uploads Needing Attention" value={s.failed_bulk_jobs}
-              to="/airs/resume-intake" icon={AlertTriangle} color="bg-rose-50 text-rose-600" muted />
-          </MetricGroup>
-        </>
+      {!summary.error && !isHRAdmin && (
+        <MetricRow cols="md:grid-cols-5">
+          <MetricTile label="My Uploads" value={s?.campaigns_uploaded_to} icon={Briefcase} />
+          <MetricTile label="Created" value={s?.campaigns_created} icon={Briefcase} />
+          <MetricTile label="Resumes (7d)" value={s?.resumes_last_7_days} icon={FileUp} />
+          <MetricTile label="Shortlisted" value={s?.shortlisted_from_my_uploads}
+            icon={CheckCircle2} color="bg-emerald-50 text-emerald-600" />
+          <MetricTile label="Needs Attention" value={s?.failed_bulk_jobs}
+            icon={AlertTriangle} color="bg-rose-50 text-rose-600" muted />
+        </MetricRow>
       )}
 
       {/* ── Campaign cards ─────────────────────────────────── */}
@@ -271,9 +235,17 @@ export default function AirsDashboardPage() {
         )}
 
         {!campaigns.loading && !campaigns.error && cards.length > 0 && (
-          <div className="overflow-x-auto">
-            <CampaignTable campaigns={cards} />
-          </div>
+          <>
+            <div className="overflow-x-auto">
+              <CampaignTable campaigns={pagedCards} />
+            </div>
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+              onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+            />
+          </>
         )}
       </div>
 
