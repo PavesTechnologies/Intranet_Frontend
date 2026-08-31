@@ -57,13 +57,15 @@ const TSAdminPanel = () => {
         {showToggle && (
           <div className="flex items-center gap-2">
             <span className="text-lg font-medium text-gray-700">View as:</span>
-            <div className="w-56">
+            {/* Sized to the widest option ("Reporting Manager") rather than to
+                content, so the control does not resize as you switch views. */}
+            <div className="w-48">
               <FormSelect
                 name="adminView"
                 value={activeView}
                 options={viewOptions}
                 onChange={(e) => handleViewChange(e.target.value)}
-                buttonClassName="h-10 flex items-center text-sm"
+                optionRowClassName="min-w-0"
               />
             </div>
           </div>

@@ -53,6 +53,13 @@ const IssueTracker = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [issueToDelete, setIssueToDelete] = useState(null);
 
+  // Multi-select state for bulk delete (keys look like "Epic-12", "Story-5", "Task-9")
+  const [selectedIssues, setSelectedIssues] = useState([]);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const issueKey = (issue) => `${issue.type}-${issue.id}`;
+
   const [filters, setFilters] = useState({
     search: "",
     type: "ALL",
@@ -193,6 +200,16 @@ const IssueTracker = () => {
     }
   }, [projectId]);
 
+  // Drop any selected keys that no longer exist after a refetch/delete
+  useEffect(() => {
+    const validKeys = new Set([
+      ...issues.epicsData.map(issueKey),
+      ...issues.storiesData.map(issueKey),
+      ...issues.tasksData.map(issueKey),
+    ]);
+    setSelectedIssues((prev) => prev.filter((k) => validKeys.has(k)));
+  }, [issues]);
+
   // --- NEW TOAST CONFIRMATION LOGIC ---
   const executeDelete = async (issue) => {
     let endpoint = "";
@@ -214,6 +231,56 @@ const IssueTracker = () => {
   const handleDelete = (issue) => {
     setIssueToDelete(issue);
     setDeleteConfirmOpen(true);
+  };
+
+  const toggleSelectIssue = (issue) => {
+    const key = issueKey(issue);
+    setSelectedIssues((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
+  };
+
+  const clearSelection = () => setSelectedIssues([]);
+
+  const handleBulkDelete = () => setBulkDeleteConfirmOpen(true);
+
+  const executeBulkDelete = async () => {
+    const endpointFor = (issue) => {
+      if (issue.type === "Epic") return `/api/epics/${issue.id}`;
+      if (issue.type === "Story") return `/api/stories/${issue.id}`;
+      return `/api/tasks/${issue.id}`;
+    };
+
+    const targets = [
+      ...issues.epicsData,
+      ...issues.storiesData,
+      ...issues.tasksData,
+    ].filter((issue) => selectedIssues.includes(issueKey(issue)));
+
+    setBulkDeleting(true);
+    const results = await Promise.allSettled(
+      targets.map((issue) =>
+        api.delete(`${window.__APP_CONFIG__.PMS_BASE_URL}${endpointFor(issue)}`, {
+          headers,
+        }),
+      ),
+    );
+    setBulkDeleting(false);
+    setBulkDeleteConfirmOpen(false);
+
+    const failedCount = results.filter((r) => r.status === "rejected").length;
+    const successCount = results.length - failedCount;
+
+    setSelectedIssues([]);
+    fetchIssues();
+
+    if (failedCount === 0) {
+      showStatusToast(`${successCount} issue(s) deleted successfully!`, "success");
+    } else if (successCount === 0) {
+      showStatusToast("Failed to delete selected issues", "error");
+    } else {
+      showStatusToast(`${successCount} deleted, ${failedCount} failed`, "error");
+    }
   };
 
   const handleEdit = (issue) =>
@@ -385,6 +452,69 @@ const IssueTracker = () => {
     return false;
   };
 
+  // Flat list of every issue row currently rendered on screen (respects
+  // filters + expand/collapse state), used to drive the "select all" checkbox.
+  const getVisibleIssues = () => {
+    const visible = [];
+
+    issues.epicsData.filter(epicMatchesHierarchy).forEach((epic) => {
+      visible.push(epic);
+      if (openEpics.includes(epic.id)) {
+        issues.storiesData
+          .filter((s) => s.epicId === epic.id)
+          .filter(storyMatchesHierarchy)
+          .forEach((story) => {
+            visible.push(story);
+            if (openStories.includes(story.id)) {
+              issues.tasksData
+                .filter((t) => t.storyId === story.id)
+                .filter(matchesFilters)
+                .forEach((task) => visible.push(task));
+            }
+          });
+      }
+    });
+
+    issues.storiesData
+      .filter((s) => !s.epicId)
+      .filter(storyMatchesHierarchy)
+      .forEach((story) => {
+        visible.push(story);
+        if (openStories.includes(story.id)) {
+          issues.tasksData
+            .filter((t) => t.storyId === story.id)
+            .filter(matchesFilters)
+            .forEach((task) => visible.push(task));
+        }
+      });
+
+    issues.tasksData
+      .filter((t) => !t.storyId)
+      .filter(matchesFilters)
+      .forEach((task) => visible.push(task));
+
+    return visible;
+  };
+
+  const visibleKeys = getVisibleIssues().map(issueKey);
+  const allVisibleSelected =
+    visibleKeys.length > 0 && visibleKeys.every((k) => selectedIssues.includes(k));
+  const someVisibleSelected =
+    !allVisibleSelected && visibleKeys.some((k) => selectedIssues.includes(k));
+
+  const selectAllRef = useRef(null);
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someVisibleSelected;
+  });
+
+  const toggleSelectAll = () => {
+    setSelectedIssues((prev) =>
+      allVisibleSelected
+        ? prev.filter((k) => !visibleKeys.includes(k))
+        : Array.from(new Set([...prev, ...visibleKeys])),
+    );
+  };
+
   // --- POLISHED TABLE ROW ---
   const TableRow = ({ issue, level }) => {
     const isEpic = issue.type === "Epic";
@@ -397,6 +527,15 @@ const IssueTracker = () => {
         className={`${rowBg} hover:bg-indigo-50/60 border-b border-gray-100 cursor-pointer transition-all duration-200 group`}
         onClick={() => handleView(issue)}
       >
+        <td className="py-3 px-4 w-10" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selectedIssues.includes(issueKey(issue))}
+            onChange={() => toggleSelectIssue(issue)}
+            className="h-4 w-4 cursor-pointer accent-indigo-600 rounded"
+          />
+        </td>
+
         <td className="py-3 px-4">
           <div
             className="flex items-center gap-2"
@@ -499,6 +638,16 @@ const IssueTracker = () => {
       <table className="w-full text-left border-collapse">
         <thead className="bg-slate-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
           <tr>
+            <th className="py-4 px-4 w-10">
+              <input
+                ref={selectAllRef}
+                type="checkbox"
+                checked={allVisibleSelected}
+                onChange={toggleSelectAll}
+                className="h-4 w-4 cursor-pointer accent-indigo-600 rounded"
+                title="Select all"
+              />
+            </th>
             <th className="py-4 px-4 w-[35%]">Title</th>
             <th className="px-3 w-24">Type</th>
             <th className="px-3 w-24">Priority</th>
@@ -549,7 +698,7 @@ const IssueTracker = () => {
               <React.Fragment>
                 <tr className="bg-slate-50">
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-4 py-3 border-y border-gray-200"
                   >
                     <div className="flex items-center gap-2 text-sm font-semibold text-gray-500 uppercase tracking-wider">
@@ -587,7 +736,7 @@ const IssueTracker = () => {
               <React.Fragment>
                 <tr className="bg-slate-50">
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-4 py-3 border-y border-gray-200"
                   >
                     <div className="flex items-center gap-2 text-sm font-semibold text-gray-500 uppercase tracking-wider">
@@ -720,6 +869,30 @@ const IssueTracker = () => {
         </div>
       </div>
 
+      {/* BULK SELECTION BAR */}
+      {selectedIssues.length > 0 && (
+        <div className="flex items-center justify-between bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
+          <span className="text-sm font-medium text-indigo-700">
+            {selectedIssues.length} issue{selectedIssues.length > 1 ? "s" : ""} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={clearSelection}
+              className="px-3 py-1.5 text-sm font-medium text-slate-500 hover:text-slate-700 transition-colors"
+            >
+              Clear selection
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              className="flex items-center gap-2 px-4 py-1.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+            >
+              <DeleteIcon size={16} />
+              Delete Selected ({selectedIssues.length})
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* CONTENT */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-32 bg-gray-50/50 rounded-xl border border-gray-100">
@@ -769,6 +942,17 @@ const IssueTracker = () => {
         message={`Are you sure you want to delete this ${issueToDelete?.type?.toLowerCase() || "issue"}? This action cannot be undone.`}
         onConfirm={() => { setDeleteConfirmOpen(false); executeDelete(issueToDelete); setIssueToDelete(null); }}
         onCancel={() => { setDeleteConfirmOpen(false); setIssueToDelete(null); }}
+        confirmText="Delete"
+        variant="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={bulkDeleteConfirmOpen}
+        title={`Delete ${selectedIssues.length} Issue${selectedIssues.length > 1 ? "s" : ""}`}
+        message={`Are you sure you want to delete the ${selectedIssues.length} selected issue${selectedIssues.length > 1 ? "s" : ""}? This action cannot be undone.`}
+        onConfirm={executeBulkDelete}
+        onCancel={() => setBulkDeleteConfirmOpen(false)}
+        isLoading={bulkDeleting}
         confirmText="Delete"
         variant="danger"
       />
