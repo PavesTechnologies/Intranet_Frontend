@@ -1,14 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Check, Search, SlidersHorizontal, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import FilterListbox from "../../../../components/filter/FilterListbox";
-import {
-  getCampaignUploaders, getSkillSuggestions,
-} from "../../dashboard/services/dashboardService";
+import { getCampaignUploaders } from "../../dashboard/services/dashboardService";
 
 /**
- * Filter bar for a campaign's candidate list: skill autocomplete +
- * multi-skill AND search, plus the resume-derived filters.
+ * Filter bar for a campaign's candidate list: candidate-name search, plus
+ * the resume-derived filters.
  *
  * Filter state lives in the URL (see CampaignDetails), so the scorecard can
  * read the active filters without coupling to this component.
@@ -17,8 +15,8 @@ const DEGREE_LEVELS = ["PHD", "MASTER", "BACHELOR", "DIPLOMA"];
 
 export default function CandidateFilterBar({
   campaignId,
-  skills,            // [{canonical_skill_id, canonical_name}]
-  onSkillsChange,
+  nameFilter = "",
+  onNameFilterChange,
   resultCount,
   resumeFilters = {},
   onResumeFiltersChange,
@@ -28,12 +26,15 @@ export default function CandidateFilterBar({
   stageFilter,
   onStageFilterChange,
 }) {
-  const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState([]);
-  const [open, setOpen] = useState(false);
+  // local echo so typing feels instant; the debounced value below is what
+  // actually triggers the server-side candidate_name search + URL sync
+  const [nameQuery, setNameQuery] = useState(nameFilter);
   const [showMore, setShowMore] = useState(false);
   const [uploaders, setUploaders] = useState([]);
-  const boxRef = useRef(null);
+
+  // keep the input in sync if the filter is cleared/changed from outside
+  // (e.g. a "clear all" action, or restoring from browser back/forward)
+  useEffect(() => { setNameQuery(nameFilter); }, [nameFilter]);
 
   // uploader list only matters once the extra filters are opened
   useEffect(() => {
@@ -52,50 +53,13 @@ export default function CandidateFilterBar({
     onResumeFiltersChange?.({ ...resumeFilters, degree_levels: next.length ? next : undefined });
   };
 
-  // debounce — autocomplete fires per keystroke otherwise
+  // debounce — a server request per keystroke otherwise
   useEffect(() => {
-    if (!query.trim()) { setSuggestions([]); return; }
-    const t = setTimeout(async () => {
-      try {
-        setSuggestions(await getSkillSuggestions(campaignId, query.trim()));
-        setOpen(true);
-      } catch {
-        setSuggestions([]);
-      }
-    }, 300);
+    if (nameQuery === nameFilter) return;
+    const t = setTimeout(() => onNameFilterChange?.(nameQuery.trim()), 300);
     return () => clearTimeout(t);
-  }, [query, campaignId]);
-
-  // click-away closes the suggestion list
-  useEffect(() => {
-    const onDocClick = (e) => {
-      if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
-
-  const addSkill = (s) => {
-    if (!skills.some((x) => x.canonical_skill_id === s.canonical_skill_id)) {
-      onSkillsChange([...skills, s]);
-    }
-    setQuery("");
-    setSuggestions([]);
-    setOpen(false);
-  };
-
-  const removeSkill = (id) =>
-    onSkillsChange(skills.filter((s) => s.canonical_skill_id !== id));
-
-  const currentFilters = () => ({
-    skill_ids: skills.map((s) => s.canonical_skill_id),
-    skill_names: skills.map((s) => s.canonical_name),
-    stage: stageFilter || null,
-  });
-
-
-
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nameQuery]);
   // S03-T03 — CampaignDetails/CandidatesTab keep the address bar in sync with
   // every active filter (tab, stage, skills, score range, resume filters,
   // page), so the current URL already *is* the shareable link.
@@ -114,37 +78,24 @@ export default function CandidateFilterBar({
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        {/* skill autocomplete */}
-        <div ref={boxRef} className="relative flex-1 min-w-[140px] max-w-[220px] shrink">
+        {/* candidate-name search */}
+        <div className="relative flex-1 min-w-[140px] max-w-[220px] shrink">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => suggestions.length && setOpen(true)}
-            placeholder="Filter by skill…"
-            className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            value={nameQuery}
+            onChange={(e) => setNameQuery(e.target.value)}
+            placeholder="Filter by candidate name…"
+            className="w-full pl-9 pr-8 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
-          {open && suggestions.length > 0 && (
-            <ul className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-              {suggestions.map((s) => (
-                <li key={s.canonical_skill_id}>
-                  <button
-                    type="button"
-                    onClick={() => addSkill(s)}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 flex justify-between items-center gap-2"
-                  >
-                    <span className="truncate">
-                      {s.canonical_name}
-                      {s.category && <span className="text-slate-400"> · {s.category}</span>}
-                    </span>
-                    <span className="text-[10px] text-slate-400 tabular-nums shrink-0">
-                      {s.candidate_count}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+          {nameQuery && (<button
+              type="button"
+              onClick={() => setNameQuery("")}
+              aria-label="Clear name filter"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           )}
         </div>
 
@@ -198,28 +149,6 @@ export default function CandidateFilterBar({
           </span>
         )}
       </div>
-
-      {/* active skill chips — AND-combined */}
-      {skills.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] uppercase font-bold text-slate-400">Has all of:</span>
-          {skills.map((s) => (
-            <span key={s.canonical_skill_id}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
-              <Check className="h-3 w-3" />
-              {s.canonical_name}
-              <button type="button" onClick={() => removeSkill(s.canonical_skill_id)}
-                className="hover:text-indigo-900" aria-label={`Remove ${s.canonical_name}`}>
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-          <button type="button" onClick={() => onSkillsChange([])}
-            className="text-[10px] font-bold text-slate-400 hover:text-slate-600 underline">
-            clear
-          </button>
-        </div>
-      )}
 
       {/* Resume-derived filters */}
       {showMore && (
