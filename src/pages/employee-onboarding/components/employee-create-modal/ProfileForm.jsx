@@ -33,20 +33,21 @@ export default function ProfileForm({
         name="empFirstName"
         value={form.empFirstName || ""}
         onChange={handleChange}
+        required
       />
       <FormInput
         label="Middle Name"
         name="empMiddleName"
         value={form.empMiddleName || ""}
         onChange={handleChange}
-        
+
       />
       <FormInput
         label="Last Name"
         name="empLastName"
         value={form.empLastName || ""}
         onChange={handleChange}
-        
+        required
       />
       <FormInput
         label="Date of Birth"
@@ -54,6 +55,7 @@ export default function ProfileForm({
         name="empDob"
         value={form.empDob || ""}
         onChange={handleChange}
+        required
       />
       <FormSelect
         label="Gender"
@@ -61,20 +63,21 @@ export default function ProfileForm({
         value={form.gender || ""}
         onChange={handleChange}
         options={["Male", "Female", "Other"]}
+        required
       />
       <FormInput
         label="Contact"
         name="contact"
         value={form.contact || ""}
         onChange={handleChange}
-        
+        required
       />
       <FormInput
         label="Blood Group"
         name="bloodGroup"
         value={form.bloodGroup || ""}
         onChange={handleChange}
-
+        required
       />
       <FormSelect
         label="Marital Status"
@@ -82,6 +85,7 @@ export default function ProfileForm({
         value={form.maritalStatus || ""}
         onChange={handleChange}
         options={["Single", "Married", "Divorced"]}
+        required
       />
     </div>
   );
