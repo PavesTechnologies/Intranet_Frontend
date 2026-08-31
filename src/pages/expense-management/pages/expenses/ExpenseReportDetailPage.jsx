@@ -53,12 +53,12 @@ import FormTextArea from "@/components/forms/FormTextArea";
 import FormDatePicker from "@/components/forms/FormDatePicker";
 import GstCalculationCard from "@/pages/expense-management/components/expense-reports/GstCalculationCard";
 import CurrencyConversionCard from "@/pages/expense-management/components/expense-reports/CurrencyConversionCard";
-import ReceiptDropzone from "@/pages/expense-management/components/expense-reports/ReceiptDropzone";
 import PolicyStatusBadge, {
-  PolicyResultBanner,
   derivePolicyStatus,
 } from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
 import ApprovalStatusPill from "@/pages/expense-management/approval-engine/components/ApprovalStatusPill";
+import ApprovalLevelTimeline from "@/pages/expense-management/approval-engine/components/ApprovalLevelTimeline";
+import FinanceQueryPanel from "@/pages/expense-management/components/expense-reports/FinanceQueryPanel";
 import { useApprovalLiveSync } from "@/pages/expense-management/approval-engine/hooks/useApprovalLiveSync";
 import {
   useApprovalStatus,
@@ -359,13 +359,7 @@ export default function ExpenseReportDetailPage() {
       formData.append("file", file, safeName);
 
       // Upload file to the report's receipt store
-      const uploadRes = await api.post(`/xms/employee/expense-reports/${reportId}/receipts`, formData, {
-        baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const uploadRes = await receiptService.uploadForOcr(reportId, formData);
 
       const receiptId = uploadRes.data?.data?.receiptId || uploadRes.data?.receiptId;
       if (!receiptId) {
@@ -380,12 +374,7 @@ export default function ExpenseReportDetailPage() {
       const interval = setInterval(async () => {
         try {
           pollCount++;
-          const ocrRes = await api.get(`/xms/employee/receipts/${receiptId}/ocr`, {
-            baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          });
+          const ocrRes = await receiptService.getOcrResult(receiptId);
 
           // Checking if response data holds OCR result or status
           const responsePayload = ocrRes.data?.data || ocrRes.data;
@@ -732,6 +721,7 @@ export default function ExpenseReportDetailPage() {
     : ["category", "merchant", "date", "amount", "policy", "gst", "net", "base", "billable"];
 
   const tableRows = filteredLineItems.map((li) => {
+    const showCurrency = li.currencyCode && (li.currencyCode === "EUR" || li.currencyCode !== li.baseCurrencyCode);
     const rowObj = {
       category: <span className="font-medium text-gray-800">{li.categoryName || "—"}</span>,
       merchant: (
@@ -747,8 +737,16 @@ export default function ExpenseReportDetailPage() {
         </span>
       ),
       policy: <PolicyStatusBadge lineStatus={li.lineStatus} policyWarnings={li.policyWarnings} />,
-      gst: <span className="font-mono text-amber-600">{formatAmount(li.taxAmount)}</span>,
-      net: <span className="font-mono font-semibold text-emerald-700">{formatAmount(li.netAmount)}</span>,
+      gst: (
+        <span className="font-mono text-amber-600">
+          {formatAmount(li.taxAmount)} {showCurrency && <span className="text-xs text-gray-400">{li.currencyCode}</span>}
+        </span>
+      ),
+      net: (
+        <span className="font-mono font-semibold text-emerald-700">
+          {formatAmount(li.netAmount)} {showCurrency && <span className="text-xs text-gray-400">{li.currencyCode}</span>}
+        </span>
+      ),
       base: (
         <span className="font-mono text-[#0A0082] font-semibold">
           {formatAmount(li.baseAmount)} <span className="text-xs text-gray-400">{li.baseCurrencyCode}</span>
@@ -857,15 +855,7 @@ export default function ExpenseReportDetailPage() {
 
     try {
       setOcrSubmitting(true);
-      await api.post(`/xms/employee/receipts/${ocrReviewData.ocrReceiptId}/confirm`, {
-        ...payload,
-        lineItemId: null
-      }, {
-        baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        }
-      });
+      await receiptService.confirmOcr(ocrReviewData.ocrReceiptId, { ...payload, lineItemId: null });
 
       showStatusToast("Line item created and receipt confirmed successfully!", "success");
       fetchLineItems();
@@ -989,6 +979,8 @@ export default function ExpenseReportDetailPage() {
               </div>
             )}
 
+            <FinanceQueryPanel reportId={reportId} lineItems={lineItems} />
+
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <DetailField icon={<FileText size={16} />} label="Business Purpose" value={report.businessPurpose || "—"} />
               <DetailField icon={<Briefcase size={16} />} label="Cost Center" value={report.costCenterName || "—"} />
@@ -1042,8 +1034,20 @@ export default function ExpenseReportDetailPage() {
         </div>
 
         {/* Right column */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-4">
           <SummaryPanel report={{ ...report, status: report?.reportStatus }} lineItems={lineItems} />
+
+          {report.reportStatus !== "DRAFT" && (
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-indigo-50 text-[#0A0082]">
+                  <Landmark size={16} />
+                </div>
+                <h2 className="text-base font-bold text-gray-900">Approval Progress</h2>
+              </div>
+              <ApprovalLevelTimeline reportId={reportId} reportStatus={report.reportStatus} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -1305,38 +1309,62 @@ export default function ExpenseReportDetailPage() {
         variant="danger"
       />
 
-      <Modal
-        isOpen={isEditReportOpen}
-        onClose={() => setIsEditReportOpen(false)}
-        title="Edit Expense Report"
-        subtitle="Modify this expense report's properties."
-        size="lg"
-        fullScreenMobile
-        closeOnBackdrop={false}
-        footer={
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={() => setIsEditReportOpen(false)} disabled={savingReport} className="w-full sm:w-auto">
-              Cancel
-            </Button>
-            <Button type="submit" form="detail-report-edit-form" variant="primary" loading={savingReport} loadingText="Saving..." className="w-full sm:w-auto">
-              Save Changes
-            </Button>
-          </div>
-        }
-      >
-        <form id="detail-report-edit-form" onSubmit={handleEditReportSubmit} className="py-2">
-          <ReportFormFields
-            formData={editFormData}
-            formErrors={editFormErrors}
-            onInputChange={handleEditInputChange}
-            onSelectChange={handleEditSelectChange}
-            costCenterOptions={costCenterOptions}
-            currencyOptions={currencyOptions}
-            disabled={savingReport}
-            lookupsLoading={lookupsLoading}
+      {isEditReportOpen && createPortal(
+        <>
+          {/* Backdrop overlay */}
+          <div 
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] animate-in fade-in duration-200"
+            onClick={() => setIsEditReportOpen(false)}
           />
-        </form>
-      </Modal>
+          {/* Drawer Panel */}
+          <div 
+            className="fixed inset-y-0 right-0 z-[10000] w-full max-w-lg bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Edit Expense Report</h2>
+                <p className="text-xs text-gray-500 font-medium mt-0.5">Modify this expense report's properties.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditReportOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable Form Content */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <form id="detail-report-edit-form" onSubmit={handleEditReportSubmit} className="py-2">
+                <ReportFormFields
+                  formData={editFormData}
+                  formErrors={editFormErrors}
+                  onInputChange={handleEditInputChange}
+                  onSelectChange={handleEditSelectChange}
+                  costCenterOptions={costCenterOptions}
+                  currencyOptions={currencyOptions}
+                  disabled={savingReport}
+                  lookupsLoading={lookupsLoading}
+                />
+              </form>
+            </div>
+
+            {/* Footer */}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end px-6 py-4 border-t border-gray-100 bg-gray-50 shrink-0">
+              <Button type="button" variant="outline" onClick={() => setIsEditReportOpen(false)} disabled={savingReport} className="w-full sm:w-auto">
+                Cancel
+              </Button>
+              <Button type="submit" form="detail-report-edit-form" variant="primary" loading={savingReport} loadingText="Saving..." className="w-full sm:w-auto">
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
 
       <ConfirmationModal
         isOpen={isDeleteReportOpen}
@@ -1348,6 +1376,22 @@ export default function ExpenseReportDetailPage() {
         onCancel={() => setIsDeleteReportOpen(false)}
         isLoading={deletingReport}
         variant="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={!!pendingLifecycleAction}
+        title={pendingLifecycleAction === "recall" ? "Recall to Draft" : "Cancel Expense Report"}
+        message={
+          pendingLifecycleAction === "recall"
+            ? "This will withdraw the report from approval and return it to Draft so you can edit it. You'll need to resubmit it afterwards."
+            : "This will permanently cancel this expense report. This action cannot be undone."
+        }
+        confirmText={pendingLifecycleAction === "recall" ? "Recall to Draft" : "Cancel Report"}
+        cancelText="Back"
+        onConfirm={handleLifecycleConfirm}
+        onCancel={() => setPendingLifecycleAction(null)}
+        isLoading={isLifecycleBusy}
+        variant={pendingLifecycleAction === "recall" ? "primary" : "danger"}
       />
 
       {isViewModalOpen && createPortal(
@@ -1986,13 +2030,13 @@ const compactSelectStyles = {
 
 const emptyForm = (defaultCostCenterId) => ({
   categoryId: "",
-  expenseDate: new Date().toISOString().split("T")[0],
+  expenseDate: "",
   merchantName: "",
   description: "",
   amount: "",
   currencyId: "",
   taxAmount: "0",
-  costCenterId: "",
+  costCenterId: defaultCostCenterId || "",
   clientBillable: false,
   projectId: "",
 });
@@ -2391,15 +2435,7 @@ function LineItemDrawer({
         finalizeLineItemSave(updatedItem, "Line item updated successfully!");
       } else if (ocrReceiptId) {
         // OCR Confirm flow
-        res = await api.post(`/xms/employee/receipts/${ocrReceiptId}/confirm`, {
-          ...payload,
-          lineItemId: null
-        }, {
-          baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          }
-        });
+        res = await receiptService.confirmOcr(ocrReceiptId, { ...payload, lineItemId: null });
         const createdItem = res.data?.data || res.data;
         finalizeLineItemSave(createdItem, "Line item created and receipt confirmed successfully!", { closeOnSuccess: true });
       } else {

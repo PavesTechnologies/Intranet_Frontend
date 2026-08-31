@@ -1,6 +1,6 @@
 // src/pages/Projects/manager/BacklogAndSprints.jsx
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../api/axiosInstance";
 import { DndProvider, useDrop } from "react-dnd";
@@ -50,6 +50,37 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   const [deleteSprintConfirmOpen, setDeleteSprintConfirmOpen] = useState(false);
   const [sprintIdToDelete, setSprintIdToDelete] = useState(null);
   const [riskMap, setRiskMap] = useState({});
+
+  // Opening/closing the right side panel (story/task/sprint details) must not
+  // move the user away from where they were scrolled on the backlog list.
+  const scrollContainerRef = useRef(null);
+  const scrollPosRef = useRef({ window: 0, container: 0 });
+
+  useEffect(() => {
+    const captureWindowScroll = () => {
+      scrollPosRef.current.window = window.scrollY;
+    };
+    const captureContainerScroll = () => {
+      if (scrollContainerRef.current) {
+        scrollPosRef.current.container = scrollContainerRef.current.scrollTop;
+      }
+    };
+    window.addEventListener("scroll", captureWindowScroll, { passive: true });
+    const el = scrollContainerRef.current;
+    el?.addEventListener("scroll", captureContainerScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", captureWindowScroll);
+      el?.removeEventListener("scroll", captureContainerScroll);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, scrollPosRef.current.window);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollPosRef.current.container;
+    }
+  }, [rightPanelOpen, selectedStoryId, selectedTaskId, selectedSprintId, panelMode]);
+
   const toggleStoryExpand = (storyId) => {
     setExpandedBacklogStories((prev) =>
       prev.includes(storyId)
@@ -530,7 +561,7 @@ const handleSprintStatus = async (sprintId, action) => {
         </div>
 
         {/* ── Scrollable Content ── */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
+        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
         {/* Sprints */}
         <div className="space-y-4">
           {activeAndPlanningSprints.map((sprint) => {

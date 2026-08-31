@@ -64,9 +64,9 @@ export default function CampaignTable({ campaigns, loading = false }) {
       rowClass: "hover:bg-slate-50/50 transition cursor-pointer",
       onRowClick: () => navigate(`/airs/campaigns/${c.id}`),
       campaign: (
-        <div className="min-w-0 text-left">
-          <div className="font-semibold text-slate-900 truncate">{c.name}</div>
-          <div className="text-[11px] text-slate-400 truncate">
+        <div className="min-w-0 max-w-[160px] text-left">
+          <div className="font-semibold text-slate-900 line-clamp-1" title={c.name}>{c.name}</div>
+          <div className="text-[11px] text-slate-400 line-clamp-1" title={c.jd_title || ""}>
             {c.jd_title || "—"}{c.jd_version != null && ` · v${c.jd_version}`}
           </div>
         </div>

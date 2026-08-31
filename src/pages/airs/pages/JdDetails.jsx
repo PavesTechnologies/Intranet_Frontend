@@ -916,10 +916,10 @@ export default function JdDetails() {
   const isJdReady = skillsList.length > 0 && skillsList.every((s) => s.verified);
 
   return (
-    <div className="bg-[#F8FAFC] text-slate-900 font-sans">
+    <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
 
       {/* Profile Header */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
@@ -928,18 +928,15 @@ export default function JdDetails() {
             <ArrowLeft size={18} />
           </button>
           <div>
-            <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold font-mono">
-              <span>Version {version}</span>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-slate-900">{title}</h1>
+              <span className="text-slate-400 text-xs font-semibold font-mono">Version {version}</span>
               {confidence !== null && (
-                <>
-                  <span>•</span>
-                  <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 uppercase text-[9px] font-bold">
-                    AI confidence {confidence}%
-                  </span>
-                </>
+                <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 uppercase text-[9px] font-bold">
+                  AI confidence {confidence}%
+                </span>
               )}
             </div>
-            <h1 className="text-xl font-bold text-slate-900 mt-1">{title}</h1>
             <p className="text-xs text-slate-500 mt-0.5">Created by {createdBy} on {createdDate}</p>
           </div>
         </div>

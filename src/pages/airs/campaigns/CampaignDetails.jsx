@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
@@ -7,10 +7,9 @@ import {
   ExternalLink, ListChecks,
   RotateCcw, Inbox, AlertOctagon, Hourglass, PieChart,
   Send, Flag, SkipForward, Lightbulb, FileUp,
-  ArrowRightLeft, Ban, Download
+  ArrowRightLeft, Ban, Mail, Download
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
-import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Pagination from "../../../components/Pagination/pagination";
@@ -22,7 +21,6 @@ import EditCampaignModal from "./components/EditCampaignModal";
 import ReopenCampaignModal from "./components/ReopenCampaignModal";
 import CandidateActionModals from "./components/CandidateActionModals";
 import CampaignExportPanel from "./components/CampaignExportPanel";
-import { exportBatchScorecards } from "./services/exportService";
 import { getNoteCounts } from "./services/candidateActionsService";
 import { useAuth } from "../../../contexts/AuthContext";
 import { REJECTION_LAYER_LABELS } from "../constants/scoreLabels";
@@ -41,6 +39,9 @@ import {
   getStageTiming, filterCandidatesBySkills, filterCandidates,
 } from "../dashboard/services/dashboardService";
 import CandidateFilterBar from "./components/CandidateFilterBar";
+import { bulkSendRejectionEmail } from "../candidates/services/candidateScoreService";
+import { getBulkUploadFiles, getBulkUploadFileLog } from "../service/resumeIntake";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../../components/ui/tooltip";
 
 // Colour per pipeline stage (used for the funnel bars)
 const STAGE_COLORS = {
@@ -59,13 +60,17 @@ const fmtDate = (d) => (d ? new Date(d).toLocaleString() : "—");
 export default function CampaignDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { canManageCampaigns, canViewPipeline, canViewTimeline } = useCampaignPermissions();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { canManageCampaigns, canViewPipeline, canViewTimeline, isHiringManager, isHRAdmin } = useCampaignPermissions();
+  const canReviewInterviews = isHiringManager || isHRAdmin;
 
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
-  // ?tab=&stage= let the dashboard quick links land directly
-  // on a stage-filtered candidate list, and make that view bookmarkable.
+  // ?tab=&stage= let the dashboard quick links (M11-E01-S03-T01) land directly
+  // on a stage-filtered candidate list, and make that view bookmarkable. Kept
+  // in sync (below) as the user switches tabs/stages so that navigating away
+  // to a candidate's scorecard and hitting "back" returns to this same URL —
+  // otherwise the browser-history entry never reflected the tab you were on.
   const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") || "details");
   const [editOpen, setEditOpen] = useState(false);
   // lifecycle actions — only one of these is ever open at a time
@@ -74,6 +79,17 @@ export default function CampaignDetails() {
   const [candidateStageFilter, setCandidateStageFilter] = useState(
     () => (searchParams.get("stage") || "").toUpperCase(),
   );
+
+  useEffect(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", activeTab);
+      if (candidateStageFilter) next.set("stage", candidateStageFilter);
+      else next.delete("stage");
+      return next;
+    }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, candidateStageFilter]);
 
   // Refreshing must not go through `loading`: that flag drives a full-page
   // spinner which unmounts the whole tree, including any open modal, so a
@@ -150,24 +166,8 @@ export default function CampaignDetails() {
   }[status] || "bg-slate-50 text-slate-600 border-slate-200";
 
   return (<div className="bg-[#F8FAFC] text-slate-900 font-sans min-h-screen p-6">
-      {/* Trail back to the dashboard. Campaign name is
-          truncated to 40 chars per spec; the current page is not a link. */}
-      <div className="mb-4">
-        <Breadcrumb
-          items={[
-            { label: "Dashboard", to: "/airs/dashboard" },
-            { label: "Campaigns", to: "/airs/campaigns" },
-            {
-              label: (info.name || "").length > 40
-                ? `${info.name.slice(0, 40)}…`
-                : (info.name || "Campaign"),
-            },
-          ]}
-        />
-      </div>
-
       {/* Header */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm mb-6 flex flex-col md:flex-row justify-between gap-4">
+      <div className="mb-6 flex flex-col md:flex-row justify-between gap-4">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
@@ -236,14 +236,16 @@ export default function CampaignDetails() {
           campaignId={id}
           isActive={isActive}
           canViewTiming={canViewTimeline}
+          canReviewInterviews={canReviewInterviews}
           onViewCandidates={() => navigate(`/airs/candidates?campaign=${id}`)}
+          onReviewInterviews={() => navigate(`/airs/interview-queue?campaign=${id}`)}
           onStageClick={(stage) => {
             setCandidateStageFilter(stage);
             setActiveTab("candidates");
           }}
         />
       )}
-      {activeTab === "processing" && (<ProcessingTab campaignId={id} canManageCampaigns={canManageCampaigns} />
+      {activeTab === "processing" && (<ProcessingTab campaignId={id} canManageCampaigns={canManageCampaigns} canReplayDlq={canViewPipeline} />
       )}
       {activeTab === "uploads" && <UploadsTab campaignId={id} />}
       {activeTab === "stalled" && canManageCampaigns && <StalledTab campaignId={id} />}
@@ -301,22 +303,6 @@ function Row({ label, value, className = "" }) {
   );
 }
 
-// Summary strip cell — cells sit flush against each other (divide-x, no
-// gutters) so the strip reads as one continuous band.
-function GlanceCell({ label, children }) {
-  return (<div className="px-5 py-4 flex-1 min-w-0">
-      <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400 mb-1.5">{label}</p>
-      {children}
-    </div>
-  );
-}
-
-const STATUS_PILL = {
-  ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  PAUSED: "bg-amber-50 text-amber-700 border-amber-200",
-  CLOSED: "bg-slate-100 text-slate-600 border-slate-300",
-};
-
 // Same palette the rejection-analytics chart uses, so a layer reads as the
 // same colour everywhere in the module.
 const SCORING_LAYERS = [
@@ -326,8 +312,6 @@ const SCORING_LAYERS = [
 ];
 
 function DetailsTab({ info, jd, scoring, limits, hm }) {
-  const status = (info.status || "").toUpperCase();
-
   // max_candidates is the number of openings, filled by SELECTED candidates —
   // intake is deliberately uncapped, so the gauge must not measure total
   // candidates against it.
@@ -346,53 +330,65 @@ function DetailsTab({ info, jd, scoring, limits, hm }) {
     ? SCORING_LAYERS.reduce((sum, l) => sum + Number(scoring[l.key] || 0), 0)
     : 0;
 
-  return (<div className="space-y-5">
-      {/* At-a-glance strip — the four numbers worth knowing before reading
-          anything else. Flush cells, full width, no empty slots. */}
+  return (<div className="space-y-6">
+      {/* At-a-glance strip — the numbers worth knowing before reading
+          anything else. Flush cells, full width, no empty slots. Status is
+          skipped here since it's already shown next to the campaign name. */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-        <GlanceCell label="Status">
-          <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${STATUS_PILL[status] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
-            {status || "—"}
-          </span>
-        </GlanceCell>
-
-        <GlanceCell label="Positions Filled">
+        <div className="px-5 py-4 flex-1 min-w-0">
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="h-7 w-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <Target className="h-3.5 w-3.5" />
+            </span>
+            <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400">Positions Filled</p>
+          </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-lg font-black text-slate-900 tabular-nums leading-none">{selected}</span>
             <span className="text-[11px] font-bold text-slate-400">
               {max == null ? "of unlimited openings" : `of ${max} opening${max === 1 ? "" : "s"}`}
             </span>
           </div>
-          {capPct != null && (<div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+          {capPct != null && (<div className="mt-2.5 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
               <div className={`h-1.5 rounded-full ${capTone} transition-all duration-500`} style={{ width: `${capPct}%` }} />
             </div>
           )}
           <p className="text-[10px] text-slate-400 mt-1.5">
             {totalCandidates} candidate{totalCandidates === 1 ? "" : "s"} in pipeline
           </p>
-        </GlanceCell>
+        </div>
 
-        <GlanceCell label="Deadline">
-          <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+        <div className="px-5 py-4 flex-1 min-w-0">
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="h-7 w-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+              <Clock className="h-3.5 w-3.5" />
+            </span>
+            <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400">Deadline</p>
+          </div>
+          <p className="text-xs font-bold text-slate-800">
             {limits.deadline ? fmtDate(limits.deadline) : "None set"}
           </p>
-        </GlanceCell>
+        </div>
 
-        <GlanceCell label="Job Description">
+        <div className="px-5 py-4 flex-1 min-w-0">
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="h-7 w-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <FileText className="h-3.5 w-3.5" />
+            </span>
+            <p className="text-[10px] uppercase font-bold tracking-wide text-slate-400">Job Description</p>
+          </div>
           {jd.jd_id ? (<Link
               to={`/airs/jds/${jd.jd_id}`}
-              className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+              className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 min-w-0"
             >
               <span className="truncate">{jd.jd_title}</span>
               <ExternalLink className="h-3 w-3 shrink-0" />
             </Link>
           ) : (<p className="text-xs font-bold text-slate-800 truncate">{jd.jd_title ?? "—"}</p>
           )}
-          <p className="text-[10px] text-slate-400 mt-0.5">
+          <p className="text-[10px] text-slate-400 mt-1">
             v{jd.version_number ?? "—"} · {jd.jurisdiction ?? "—"} · {jd.mandatory_skill_count ?? 0} mandatory skills
           </p>
-        </GlanceCell>
+        </div>
       </div>
 
       {/* Two equal-height cards. Scoring is null for HIRING_MANAGER, in which
@@ -474,32 +470,89 @@ function DetailsTab({ info, jd, scoring, limits, hm }) {
   );
 }
 
+// Reconstructs the CandidatesTab filter state from the URL — mirrors
+// serializeCandidateFilters below. Kept outside the component so it's usable
+// as a useState initializer (only ever runs once, on mount).
+function parseCandidateFilters(searchParams) {
+  const ids = searchParams.getAll("skill_ids");
+  const names = searchParams.getAll("skill_names");
+  const degrees = searchParams.get("degrees");
+  return {
+    skills: ids.map((id, i) => ({ canonical_skill_id: id, canonical_name: names[i] || "Skill" })),
+    resumeFilters: {
+      experience_min: searchParams.get("exp_min") || undefined,
+      experience_max: searchParams.get("exp_max") || undefined,
+      include_unknown_experience: searchParams.get("include_unknown") === "0" ? false : undefined,
+      degree_levels: degrees ? degrees.split(",").filter(Boolean) : undefined,
+      uploaded_by: searchParams.get("uploaded_by") || undefined,
+      upload_type: searchParams.get("upload_type") || undefined,
+      uploaded_from: searchParams.get("uploaded_from") || undefined,
+      uploaded_to: searchParams.get("uploaded_to") || undefined,
+    },
+    scoreFilters: {
+      min: searchParams.get("score_min") || "",
+      max: searchParams.get("score_max") || "",
+      recommendation: searchParams.get("score_rec") || "",
+    },
+    page: Number(searchParams.get("page")) || 1,
+  };
+}
+
+// Mirrors the candidate filters into the URL so that browsing back from a
+// candidate's scorecard (a separate route) returns to this exact view instead
+// of a blank Candidates tab — the browser-history entry for this page only
+// reflects whatever the URL was at the time of navigating away.
+function serializeCandidateFilters(prev, { skills, resumeFilters, scoreFilters, page }) {
+  const next = new URLSearchParams(prev);
+  ["skill_ids", "skill_names", "exp_min", "exp_max", "include_unknown", "degrees",
+    "uploaded_by", "upload_type", "uploaded_from", "uploaded_to",
+    "score_min", "score_max", "score_rec", "page"].forEach((k) => next.delete(k));
+  skills.forEach((s) => {
+    next.append("skill_ids", s.canonical_skill_id);
+    next.append("skill_names", s.canonical_name);
+  });
+  if (resumeFilters.experience_min) next.set("exp_min", resumeFilters.experience_min);
+  if (resumeFilters.experience_max) next.set("exp_max", resumeFilters.experience_max);
+  if (resumeFilters.include_unknown_experience === false) next.set("include_unknown", "0");
+  if (resumeFilters.degree_levels?.length) next.set("degrees", resumeFilters.degree_levels.join(","));
+  if (resumeFilters.uploaded_by) next.set("uploaded_by", resumeFilters.uploaded_by);
+  if (resumeFilters.upload_type) next.set("upload_type", resumeFilters.upload_type);
+  if (resumeFilters.uploaded_from) next.set("uploaded_from", resumeFilters.uploaded_from);
+  if (resumeFilters.uploaded_to) next.set("uploaded_to", resumeFilters.uploaded_to);
+  if (scoreFilters.min !== "") next.set("score_min", scoreFilters.min);
+  if (scoreFilters.max !== "") next.set("score_max", scoreFilters.max);
+  if (scoreFilters.recommendation) next.set("score_rec", scoreFilters.recommendation);
+  if (page > 1) next.set("page", String(page));
+  return next;
+}
+
 /* ---------------- Candidates Tab ---------------- */
 function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialFilters = useMemo(() => parseCandidateFilters(searchParams), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [candidates, setCandidates] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [starredIds, setStarredIds] = useState(() => new Set());
-  const [currentPage, setCurrentPage] = useState(1);
-  // Selected skills, AND-combined server-side. null means "no
+  const [currentPage, setCurrentPage] = useState(initialFilters.page);
+  // M11-E03-S01 — selected skills, AND-combined server-side. null means "no
   // skill filter"; an empty array would mean "matched nothing".
-  const [skills, setSkills] = useState([]);
+  const [skills, setSkills] = useState(initialFilters.skills);
   const [skillMatchIds, setSkillMatchIds] = useState(null);
   // Experience / education / upload-source live in the resume,
   // so they resolve server-side to a set of ids, same as the skill filter.
-  const [resumeFilters, setResumeFilters] = useState({});
+  const [resumeFilters, setResumeFilters] = useState(initialFilters.resumeFilters);
   const [resumeMatchIds, setResumeMatchIds] = useState(null);
   // Score range and AI recommendation are already supported by the
   // list endpoint; these narrow the rows we fetched, AND-combined with the rest.
-  const [scoreFilters, setScoreFilters] = useState({ min: "", max: "", recommendation: "" });
+  const [scoreFilters, setScoreFilters] = useState(initialFilters.scoreFilters);
   // E04 — selection for bulk moves, note badges, and the one shared action modal
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [noteCounts, setNoteCounts] = useState({});
   const [action, setAction] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [sendingBulkRejectionEmail, setSendingBulkRejectionEmail] = useState(false);
   const { hasRole } = useAuth();
   const canAct = hasRole(["HR_ADMIN", "RECRUITER"]);
-  const isHRAdminUser = hasRole(["HR_ADMIN"]);
 
   useEffect(() => {
     let cancelled = false;
@@ -517,9 +570,21 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
     return () => { cancelled = true; };
   }, [campaignId, resumeFilters]);
 
+  // Skip the very first run — on mount, currentPage may have been restored
+  // from the URL (see initialFilters.page) and must not be reset to 1.
+  const skipNextPageReset = useRef(true);
   useEffect(() => {
+    if (skipNextPageReset.current) { skipNextPageReset.current = false; return; }
     setCurrentPage(1);
   }, [campaignId, stageFilter, skills]);
+
+  useEffect(() => {
+    setSearchParams(
+      (prev) => serializeCandidateFilters(prev, { skills, resumeFilters, scoreFilters, page: currentPage }),
+      { replace: true },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skills, resumeFilters, scoreFilters, currentPage]);
 
   // The AND logic lives in SQL (GROUP BY ... HAVING COUNT DISTINCT), so this
   // asks the server which candidates qualify and intersects locally.
@@ -581,11 +646,8 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   }
 
   // same row shape the standalone candidates screen renders, so CandidateTable
-  // and the star/pagination helpers work unchanged here
-  const allCandidates = mapCampaignCandidateList(candidates || []).map((c) => ({
-    ...c,
-    starred: starredIds.has(c.id),
-  }));
+  // and the pagination helpers work unchanged here
+  const allCandidates = mapCampaignCandidateList(candidates || []);
   // All active filters are AND-combined: stage from the
   // funnel/dropdown, skills from the server-side AND search.
   const byId = new Map((candidates || []).map((r) => [r.campaign_candidate_id ?? r.id, r]));
@@ -620,73 +682,54 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
 
   const { pageItems, totalPages, currentPage: safePage } = paginate(list, currentPage, CANDIDATE_PAGE_SIZE);
 
-  const toggleStar = (candidateId) => {
-    setStarredIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(candidateId)) next.delete(candidateId);
-      else next.add(candidateId);
-      return next;
-    });
+  // Bulk "Send Rejection Email" — only worth showing once the selection
+  // includes at least one REJECTED candidate; the backend still validates
+  // per-id, so a mixed selection is fine, this just avoids showing the
+  // button for a selection that's guaranteed to skip every row.
+  const selectedRejectedCount = allCandidates.filter(
+    (c) => selectedIds.has(c.id) && (c.stage || "").toUpperCase() === "REJECTED"
+  ).length;
+
+  const handleBulkSendRejectionEmail = async () => {
+    const ids = [...selectedIds];
+    setSendingBulkRejectionEmail(true);
+    try {
+      const res = await bulkSendRejectionEmail(ids);
+      const queuedCount = res?.queued?.length ?? 0;
+      const failed = res?.failed || [];
+      if (queuedCount > 0) {
+        toast.success(`Rejection email sent to ${queuedCount} candidate${queuedCount === 1 ? "" : "s"}.`);
+      }
+      if (failed.length > 0) {
+        const nameFor = (id) => allCandidates.find((c) => c.id === id)?.name || id;
+        const preview = failed.slice(0, 5).map((f) => `${nameFor(f.campaign_candidate_id)} (${f.reason})`).join(", ");
+        const extra = failed.length > 5 ? `, +${failed.length - 5} more` : "";
+        toast.error(`${failed.length} skipped: ${preview}${extra}`);
+      }
+      setSelectedIds(new Set());
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Could not send rejection emails.");
+    } finally {
+      setSendingBulkRejectionEmail(false);
+    }
   };
 
   return (<div className="space-y-4">
-      <div className="flex justify-between items-end flex-wrap gap-2">
-        <div>
-          <h3 className="text-sm font-bold text-slate-900">Candidates</h3>
-          <p className="text-[11px] text-slate-500">
-            {stageFilter
-              ? `${list.length} of ${allCandidates.length} candidate${allCandidates.length === 1 ? "" : "s"} — filtered to ${stageLabel(stageFilter)}`
-              : `${list.length} candidate${list.length === 1 ? "" : "s"} sourced for this campaign`}
-          </p>
-        </div>
-        {onStageFilterChange && allCandidates.length > 0 && (<div className="w-44">
-            <FilterListbox options={stageOptions} value={stageFilter} onChange={onStageFilterChange} />
-          </div>
-        )}
-      </div>
-
-      {/* Skill search, saved views and share link */}
+      {/* Skill search, status/score filters + resume-derived filters —
+          all in one row beside "More filters" so the row stays compact. */}
       <CandidateFilterBar
         campaignId={campaignId}
         skills={skills}
-        stageFilter={stageFilter}
         resultCount={list.length}
         resumeFilters={resumeFilters}
         onResumeFiltersChange={setResumeFilters}
-        onSkillsChange={(next, nextStage) => {
-          setSkills(next);
-          if (nextStage !== undefined && onStageFilterChange) onStageFilterChange(nextStage);
-        }}
+        onSkillsChange={setSkills}
+        scoreFilters={scoreFilters}
+        onScoreFiltersChange={setScoreFilters}
+        stageOptions={onStageFilterChange && allCandidates.length > 0 ? stageOptions : null}
+        stageFilter={stageFilter}
+        onStageFilterChange={onStageFilterChange}
       />
-
-      {/* Score range + AI recommendation, AND-combined with
-          the stage, skill and resume filters above. */}
-      <div className="flex flex-wrap items-center gap-2 bg-white border border-slate-200 rounded-xl p-3">
-        <span className="text-[10px] uppercase font-bold text-slate-400">Overall score</span>
-        <input type="number" min="0" max="100" placeholder="Min" value={scoreFilters.min}
-          onChange={(e) => setScoreFilters({ ...scoreFilters, min: e.target.value })}
-          className="w-20 px-2 py-1.5 border border-slate-200 rounded-lg text-xs" />
-        <span className="text-slate-300">–</span>
-        <input type="number" min="0" max="100" placeholder="Max" value={scoreFilters.max}
-          onChange={(e) => setScoreFilters({ ...scoreFilters, max: e.target.value })}
-          className="w-20 px-2 py-1.5 border border-slate-200 rounded-lg text-xs" />
-        <span className="text-[10px] uppercase font-bold text-slate-400 ml-2">AI says</span>
-        <select value={scoreFilters.recommendation}
-          onChange={(e) => setScoreFilters({ ...scoreFilters, recommendation: e.target.value })}
-          className="px-2 py-1.5 border border-slate-200 rounded-lg text-xs">
-          <option value="">Any</option>
-          <option value="SHORTLIST">Shortlist</option>
-          <option value="HOLD">Hold</option>
-          <option value="REJECT">Reject</option>
-        </select>
-        {(scoreFilters.min || scoreFilters.max || scoreFilters.recommendation) && (
-          <button type="button"
-            onClick={() => setScoreFilters({ min: "", max: "", recommendation: "" })}
-            className="text-[11px] text-indigo-600 font-semibold hover:underline ml-auto">
-            Clear
-          </button>
-        )}
-      </div>
 
       {/* The bulk bar only exists while something is selected */}
       {canAct && selectedIds.size > 0 && (
@@ -710,28 +753,16 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
               {["SCREENING", "SHORTLISTED", "HM_REVIEW", "INTERVIEW", "SELECTED", "HOLD", "REJECTED"]
                 .map((s) => <option key={s} value={s}>{stageLabel(s)}</option>)}
             </select>
-            {/* Batch scorecards, HR_ADMIN only and only
-                meaningful for 2+ candidates (the API enforces both). */}
-            {isHRAdminUser && selectedIds.size >= 2 && (
-              <select
-                className="px-2 py-1.5 border border-indigo-200 rounded-lg text-xs bg-white"
-                value=""
-                onChange={async (e) => {
-                  const fmt = e.target.value;
-                  if (!fmt) return;
-                  e.target.value = "";
-                  try {
-                    await exportBatchScorecards(campaignId, [...selectedIds], fmt);
-                    toast.success("Scorecards downloaded.");
-                  } catch (err) {
-                    toast.error(err?.response?.data?.message || "Batch export failed.");
-                  }
-                }}
+            {selectedRejectedCount > 0 && (
+              <Button
+                variant="outline"
+                size="small"
+                onClick={handleBulkSendRejectionEmail}
+                loading={sendingBulkRejectionEmail}
+                loadingText="Sending..."
               >
-                <option value="">Export scorecards…</option>
-                <option value="PDF">Single PDF</option>
-                <option value="ZIP">ZIP of PDFs</option>
-              </select>
+                <Mail size={13} /> Send Rejection Email ({selectedRejectedCount})
+              </Button>
             )}
             <button type="button" onClick={() => setSelectedIds(new Set())}
               className="text-[11px] text-indigo-700 font-semibold hover:underline">
@@ -743,8 +774,8 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
 
       <CandidateTable
         candidates={pageItems}
-        onView={(c) => navigate(`/airs/pipeline/candidates/${c.id}`, { state: { resume: c } })}
-        onToggleStar={toggleStar}
+        onView={(c) => navigate(`/airs/candidates/${c.id}`)}
+        showViewButton={false}
         selectable={canAct}
         selectedIds={selectedIds}
         noteCounts={noteCounts}
@@ -800,7 +831,7 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
 }
 
 /* ---------------- Pipeline Tab ---------------- */
-function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick, canViewTiming }) {
+function PipelineTab({ campaignId, isActive, onViewCandidates, onReviewInterviews, onStageClick, canViewTiming, canReviewInterviews }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   // HR_ADMIN-only overlay, fetched lazily on first toggle so
@@ -862,6 +893,11 @@ function PipelineTab({ campaignId, isActive, onViewCandidates, onStageClick, can
           {canViewTiming && (
             <Button size="small" variant={showTiming ? "secondary" : "outline"} onClick={toggleTiming}>
               <Clock className="h-3.5 w-3.5" /> {showTiming ? "Hide" : "Show"} Timing
+            </Button>
+          )}
+          {canReviewInterviews && (
+            <Button size="small" variant="outline" onClick={onReviewInterviews}>
+              Review Interviews <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           )}
           <Button size="small" variant="primary" onClick={onViewCandidates}>
@@ -930,25 +966,40 @@ const BREAKER_TONE = {
 
 const QUEUE_STATUS_COLUMNS = ["QUEUED", "RUNNING", "RETRY", "SUCCESS", "FAILURE", "DEAD"];
 
-function ProcessingTab({ campaignId, canManageCampaigns }) {
+const DLQ_PAGE_SIZE = 50; // matches the backend's default `limit`
+
+function ProcessingTab({ campaignId, canManageCampaigns, canReplayDlq }) {
   const [status, setStatus] = useState(null);          // overall summary (HR_ADMIN + RECRUITER)
   const [queue, setQueue] = useState(null);            // per-task-type breakdown (HR_ADMIN only)
   const [dlq, setDlq] = useState([]);
+  const [dlqTotal, setDlqTotal] = useState(0);
+  const [dlqPage, setDlqPage] = useState(1);            // 1-indexed, mirrors the Pagination component's contract
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
   const [replaying, setReplaying] = useState(false);
 
   const load = useCallback(async () => {
-    const calls = [getProcessingStatus(campaignId), getDeadLetterQueue(campaignId)];
+    const calls = [
+      getProcessingStatus(campaignId),
+      getDeadLetterQueue(campaignId, { limit: DLQ_PAGE_SIZE, offset: (dlqPage - 1) * DLQ_PAGE_SIZE }),
+    ];
     if (canManageCampaigns) calls.push(getProcessingQueue(campaignId));
     const [statusRes, dlqRes, queueRes] = await Promise.allSettled(calls);
     if (statusRes.status === "fulfilled") setStatus(unwrap(statusRes.value));
-    if (dlqRes.status === "fulfilled") setDlq(unwrap(dlqRes.value) || []);
+    if (dlqRes.status === "fulfilled") {
+      const dlqData = unwrap(dlqRes.value);
+      setDlq(dlqData?.entries || []);
+      setDlqTotal(dlqData?.total ?? 0);
+    }
     if (queueRes?.status === "fulfilled") setQueue(unwrap(queueRes.value));
     setLoading(false);
-  }, [campaignId, canManageCampaigns]);
+  }, [campaignId, canManageCampaigns, dlqPage]);
 
   useEffect(() => { load(); }, [load]);
+
+  // paging away from a selection the user made on a different page would
+  // silently try to replay entries no longer shown
+  useEffect(() => { setSelectedIds([]); }, [dlqPage]);
 
   // S03: queue status + estimate refresh every 60 seconds
   useEffect(() => {
@@ -1062,13 +1113,13 @@ function ProcessingTab({ campaignId, canManageCampaigns }) {
         </div>
       )}
 
-      {/* — DLQ with multi-select replay (replay = HR_ADMIN only) */}
+      {/* — DLQ with multi-select replay (replay = HR_ADMIN + RECRUITER, matches backend require_roles) */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-xs font-bold text-rose-600 flex items-center gap-1.5">
-            <AlertOctagon className="h-3.5 w-3.5" /> Dead Letter Queue ({dlq.length})
+            <AlertOctagon className="h-3.5 w-3.5" /> Dead Letter Queue ({dlqTotal})
           </h3>
-          {canManageCampaigns && dlq.length > 0 && (<Button
+          {canReplayDlq && dlq.length > 0 && (<Button
               variant="danger" size="small" onClick={handleReplay}
               loading={replaying} loadingText="Replaying..."
               disabled={selectedIds.length === 0}
@@ -1080,12 +1131,15 @@ function ProcessingTab({ campaignId, canManageCampaigns }) {
         {dlq.length === 0 ? (<p className="text-xs text-slate-400 text-center py-6">No dead-lettered tasks for this campaign.</p>
         ) : (<div className="space-y-2">
             {dlq.map((entry) => {
-              const replayable = canManageCampaigns && entry.replay_supported && !entry.replayed_at;
+              // the backend now only ever returns task types its replay
+              // endpoint can actually re-enqueue — every entry here is
+              // replayable unless it already has been.
+              const replayable = canReplayDlq && !entry.replayed_at;
               return (<label
                   key={entry.id}
                   className={`flex gap-3 p-2.5 rounded-xl border ${replayable ? "cursor-pointer bg-rose-50/50 border-rose-100" : "bg-slate-50 border-slate-100"}`}
                 >
-                  {canManageCampaigns && (<input
+                  {canReplayDlq && (<input
                       type="checkbox" className="mt-1 accent-rose-600"
                       disabled={!replayable}
                       checked={selectedIds.includes(entry.id)}
@@ -1100,14 +1154,21 @@ function ProcessingTab({ campaignId, canManageCampaigns }) {
                         retried {entry.retry_count}x · last {fmtDate(entry.last_attempted_at || entry.moved_to_dlq_at)}
                       </span>
                     </div>
-                    <p className="text-xs text-rose-700 mt-1 truncate">{entry.final_error_message}</p>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="text-xs text-rose-700 mt-1 break-words cursor-pointer underline decoration-dotted decoration-rose-300 underline-offset-2">
+                            {extractErrorMessage(entry.final_error_message)}
+                          </p>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs whitespace-pre-wrap break-words bg-slate-900 text-slate-50 border-slate-800">
+                          {extractErrorMessage(entry.final_error_message)}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     {entry.replayed_at && (<p className="text-[10px] text-emerald-600 mt-0.5">Replayed {fmtDate(entry.replayed_at)}</p>
                     )}
                     {entry.resolution_notes && (<p className="text-[10px] text-slate-500 mt-0.5">{entry.resolution_notes}</p>
-                    )}
-                    {!entry.replay_supported && !entry.replayed_at && (<p className="text-[10px] text-slate-400 mt-0.5">
-                        Replay for this task type is handled from the bulk-upload screen.
-                      </p>
                     )}
                   </div>
                 </label>
@@ -1115,6 +1176,12 @@ function ProcessingTab({ campaignId, canManageCampaigns }) {
             })}
           </div>
         )}
+        <Pagination
+          currentPage={dlqPage}
+          totalPages={Math.max(1, Math.ceil(dlqTotal / DLQ_PAGE_SIZE))}
+          onPrevious={() => setDlqPage((p) => p - 1)}
+          onNext={() => setDlqPage((p) => p + 1)}
+        />
       </div>
     </div>
   );
@@ -1131,12 +1198,56 @@ const UPLOAD_STATUS_BADGE = {
   CANCELLED: "bg-slate-100 text-slate-500",
 };
 
+// File-level status vocabulary (BulkUploadFileStatus) is distinct from the
+// job-level one above — a file's terminal success state is PROCESSED, not
+// COMPLETED, and there's no PARTIAL_FAILURE at the file level.
+const FILE_STATUS_BADGE = {
+  QUEUED: "bg-slate-100 text-slate-600",
+  RUNNING: "bg-blue-50 text-blue-700",
+  PROCESSED: "bg-emerald-50 text-emerald-700",
+  FAILED: "bg-rose-50 text-rose-700",
+  CANCELLED: "bg-slate-100 text-slate-500",
+};
+
+// Upstream failures (Gemini/Google API errors) come through as the raw
+// str() of the exception, e.g. "503 UNAVAILABLE. {'error': {'code': 503,
+// 'message': 'The service is currently unavailable.'}}" — pull out just
+// the human-readable 'message' value; fall back to the raw text untouched
+// if it isn't in that shape.
+function extractErrorMessage(raw) {
+  if (!raw) return raw;
+  const match = raw.match(/['"]message['"]\s*:\s*['"]((?:[^'"\\]|\\.)*)['"]/);
+  return match ? match[1] : raw;
+}
+
 function UploadsTab({ campaignId }) {
-  const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
+  // per-job cache so re-collapsing/re-expanding the same job doesn't refetch: { [jobId]: { loading, rows, error } }
+  const [fileData, setFileData] = useState({});
+
+  const toggleExpand = async (jobId) => {
+    const next = expandedId === jobId ? null : jobId;
+    setExpandedId(next);
+    if (!next || fileData[next]) return;
+
+    setFileData((prev) => ({ ...prev, [next]: { loading: true, rows: [] } }));
+    try {
+      const [filesRes, logRes] = await Promise.allSettled([
+        getBulkUploadFiles(next, { page: 1, size: 100 }),
+        getBulkUploadFileLog(next, { limit: 100, offset: 0 }),
+      ]);
+      const files = filesRes.status === "fulfilled" ? (filesRes.value?.data?.items || filesRes.value?.data || []) : [];
+      const logs = logRes.status === "fulfilled" ? (logRes.value?.data?.entries || logRes.value?.data || []) : [];
+      const logByFilename = new Map(logs.map((l) => [l.filename, l]));
+      const rows = files.map((f) => ({ ...f, reason: logByFilename.get(f.original_filename)?.reason || null }));
+      setFileData((prev) => ({ ...prev, [next]: { loading: false, rows } }));
+    } catch {
+      setFileData((prev) => ({ ...prev, [next]: { loading: false, rows: [], error: true } }));
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -1173,14 +1284,6 @@ function UploadsTab({ campaignId }) {
             {total} upload{total === 1 ? "" : "s"} for this campaign · showing the {Math.min(10, jobs.length)} most recent
           </p>
         </div>
-        {total > 0 && (<button
-            type="button"
-            onClick={() => navigate("/airs/resume-intake")}
-            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center gap-1"
-          >
-            View All Uploads <ExternalLink className="h-3 w-3" />
-          </button>
-        )}
       </div>
 
       {jobs.length === 0 ? (<div className="bg-white border border-slate-200 rounded-xl p-8 shadow-sm text-center">
@@ -1191,13 +1294,15 @@ function UploadsTab({ campaignId }) {
           {jobs.map((job) => {
             const resolved = (job.processed_count || 0) + (job.failed_count || 0) + (job.duplicate_count || 0);
             const pct = job.total_files ? Math.round((resolved / job.total_files) * 100) : 0;
-            const hasError = ["FAILED", "PARTIAL_FAILURE"].includes(job.status);
             const isExpanded = expandedId === job.id;
+            const fileState = fileData[job.id];
             return (<div key={job.id} className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => hasError && setExpandedId(isExpanded ? null : job.id)}
-                  className={`w-full text-left ${hasError ? "cursor-pointer" : "cursor-default"}`}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => toggleExpand(job.id)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") toggleExpand(job.id); }}
+                  className="w-full text-left cursor-pointer"
                 >
                   <div className="flex flex-wrap justify-between items-center gap-2">
                     <div className="flex items-center gap-2 min-w-0">
@@ -1206,8 +1311,7 @@ function UploadsTab({ campaignId }) {
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${UPLOAD_STATUS_BADGE[job.status] || "bg-slate-100 text-slate-600"}`}>
                         {job.status.replace(/_/g, " ")}
                       </span>
-                      {hasError && (<ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                      )}
+                      <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                     </div>
                     <span className="text-[10px] text-slate-400">
                       {fmtDate(job.created_at)} · {job.completed_at ? `completed ${fmtDate(job.completed_at)}` : "In Progress"}
@@ -1235,13 +1339,48 @@ function UploadsTab({ campaignId }) {
                       </div>
                     </div>
                   )}
-                </button>
+                </div>
 
-                {isExpanded && hasError && (<div className="mt-2.5 pt-2.5 border-t border-slate-100">
-                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Error Summary</p>
-                    <p className="text-xs text-rose-700">
-                      {job.error_summary || "No error summary recorded — check the file-level detail on the uploads screen."}
-                    </p>
+                {isExpanded && (<div className="mt-2.5 pt-2.5 border-t border-slate-100 space-y-2.5">
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-slate-400 mb-1.5">Files ({job.total_files})</p>
+                      {fileState?.loading ? (<div className="py-4 flex justify-center"><LoadingSpinner text="Loading files..." /></div>
+                      ) : fileState?.error ? (<p className="text-[11px] text-rose-500">Failed to load file-level detail.</p>
+                      ) : fileState?.rows?.length ? (<div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                          {fileState.rows.map((f) => (<div
+                              key={f.id}
+                              className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-100"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <FileText className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                <span className="text-[11.5px] text-slate-700 truncate">{f.original_filename}</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {f.reason && (<TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="text-[10px] text-rose-600 max-w-[240px] truncate cursor-pointer underline decoration-dotted decoration-rose-300 underline-offset-2">
+                                          {extractErrorMessage(f.reason)}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="max-w-xs whitespace-pre-wrap break-words bg-slate-900 text-slate-50 border-slate-800">
+                                        {extractErrorMessage(f.reason)}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                                {f.retry_count > 0 && (<span className="text-[10px] text-slate-400">retried {f.retry_count}x</span>
+                                )}
+                                <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase ${FILE_STATUS_BADGE[f.status] || "bg-slate-100 text-slate-600"}`}>
+                                  {f.status}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (<p className="text-[11px] text-slate-400">No file-level records found.</p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1330,10 +1469,13 @@ function StalledTab({ campaignId }) {
             return (<div key={item.campaign_candidate_id} className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
                 <div className="flex flex-wrap justify-between items-center gap-2">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[11px] font-mono text-slate-500 truncate" title={item.campaign_candidate_id}>
-                        {String(item.campaign_candidate_id).slice(0, 8)}…
-                      </span>
+                    <div className="text-[13px] font-bold text-slate-900 truncate">
+                      {/* candidate_name isn't confirmed to exist on this endpoint's response yet —
+                          falls back to a short id-based placeholder rather than blank/undefined
+                          until that's confirmed either way. */}
+                      {item.candidate_name || `Candidate ${String(item.campaign_candidate_id).slice(0, 8)}…`}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap mt-1">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-indigo-50 text-indigo-700">
                         {item.pipeline_stage.replace(/_/g, " ")}
                       </span>
@@ -1344,11 +1486,16 @@ function StalledTab({ campaignId }) {
                     <p className="text-[10px] text-slate-400 mt-1">
                       Stalled {item.days_stalled} day(s) · last update {fmtDate(item.last_updated_at)}
                       {item.last_action_by && <> · last action by {item.last_action_by}</>}
+                      {" · "}
+                      <span className="font-mono" title={item.campaign_candidate_id}>
+                        {String(item.campaign_candidate_id).slice(0, 8)}…
+                      </span>
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
                     {item.has_dead_letter_tasks && (<Button variant="outline" size="small" disabled={submitting}
                         onClick={() => runAction(() => reprocessStalledCandidate(campaignId, item.campaign_candidate_id),
+                          console.log(item),
                           "Re-process triggered.",
                         )}>
                         <RotateCcw className="h-3 w-3" /> Re-Process

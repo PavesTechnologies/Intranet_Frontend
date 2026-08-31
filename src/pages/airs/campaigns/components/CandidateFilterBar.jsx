@@ -1,19 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
-import { toast } from "react-toastify";
-import { Check, Link2, Search, SlidersHorizontal, X } from "lucide-react";
+import { Check, Search, SlidersHorizontal, X } from "lucide-react";
 import Button from "../../../../components/Button/Button";
+import FilterListbox from "../../../../components/filter/FilterListbox";
 import {
   getCampaignUploaders, getSkillSuggestions,
 } from "../../dashboard/services/dashboardService";
 
 /**
- * Filter bar for a campaign's candidate list:
- * skill autocomplete + multi-skill AND search, resume-derived filters, and a
- * shareable URL of the current filter state.
+ * Filter bar for a campaign's candidate list: skill autocomplete +
+ * multi-skill AND search, plus the resume-derived filters.
  *
- * Filter state lives in the URL (see CampaignDetails), so a shared link fully
- * describes a filtered view and the scorecard can read the active filters
- * without coupling to this component.
+ * Filter state lives in the URL (see CampaignDetails), so the scorecard can
+ * read the active filters without coupling to this component.
  */
 const DEGREE_LEVELS = ["PHD", "MASTER", "BACHELOR", "DIPLOMA"];
 
@@ -21,10 +19,14 @@ export default function CandidateFilterBar({
   campaignId,
   skills,            // [{canonical_skill_id, canonical_name}]
   onSkillsChange,
-  stageFilter,
   resultCount,
   resumeFilters = {},
   onResumeFiltersChange,
+  scoreFilters,
+  onScoreFiltersChange,
+  stageOptions,
+  stageFilter,
+  onStageFilterChange,
 }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
@@ -64,11 +66,6 @@ export default function CandidateFilterBar({
     return () => clearTimeout(t);
   }, [query, campaignId]);
 
-  useEffect(() => {
-    (async () => {
-    })();
-  }, [campaignId]);
-
   // click-away closes the suggestion list
   useEffect(() => {
     const onDocClick = (e) => {
@@ -99,14 +96,11 @@ export default function CandidateFilterBar({
 
 
 
-  // Canonical IDs, never display names, so the link survives a
-  // skill being renamed in the ontology.
+  // S03-T03 — CampaignDetails/CandidatesTab keep the address bar in sync with
+  // every active filter (tab, stage, skills, score range, resume filters,
+  // page), so the current URL already *is* the shareable link.
   const handleShare = async () => {
-    const params = new URLSearchParams();
-    params.set("tab", "candidates");
-    if (stageFilter) params.set("stage", stageFilter);
-    skills.forEach((s) => params.append("skill_ids", s.canonical_skill_id));
-    const url = `${window.location.origin}/airs/campaigns/${campaignId}?${params.toString()}`;
+    const url = window.location.href;
     try {
       await navigator.clipboard.writeText(url);
       toast.success("Filter link copied to clipboard.", { autoClose: 3000 });
@@ -115,19 +109,21 @@ export default function CandidateFilterBar({
     }
   };
 
+  const fieldClass = "px-2 py-1.5 border border-slate-200 rounded-lg text-xs";
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         {/* skill autocomplete */}
-        <div ref={boxRef} className="relative flex-1 min-w-[220px] max-w-[380px]">
+        <div ref={boxRef} className="relative flex-1 min-w-[140px] max-w-[220px] shrink">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => suggestions.length && setOpen(true)}
-            placeholder="Filter by skill (e.g. Python)…"
-            className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="Filter by skill…"
+            className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           {open && suggestions.length > 0 && (
             <ul className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
@@ -152,16 +148,52 @@ export default function CandidateFilterBar({
           )}
         </div>
 
-
-        <Button variant="outline" size="small" onClick={() => setShowMore((v) => !v)}>
+        <Button variant="outline" size="small" onClick={() => setShowMore((v) => !v)} className="shrink-0 whitespace-nowrap">
           <SlidersHorizontal className="h-3.5 w-3.5" /> More filters
         </Button>
-        <Button variant="outline" size="small" onClick={handleShare}>
-          <Link2 className="h-3.5 w-3.5" /> Share
-        </Button>
+
+        {stageOptions && onStageFilterChange && (
+          <div className="shrink-0 w-32">
+            <FilterListbox
+              options={stageOptions}
+              value={stageFilter}
+              onChange={onStageFilterChange}
+              buttonClassName="w-full cursor-default rounded-lg border border-slate-200 bg-white py-1.5 pl-2 pr-8 text-left text-xs shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+        )}
+
+        {scoreFilters && onScoreFiltersChange && (<>
+          <span className="text-[10px] uppercase font-bold text-slate-400 shrink-0">Score</span>
+          <input type="number" min="0" max="100" placeholder="Min" value={scoreFilters.min}
+            onChange={(e) => onScoreFiltersChange({ ...scoreFilters, min: e.target.value })}
+            className={`w-14 shrink-0 ${fieldClass}`} />
+          <span className="text-slate-300 shrink-0">–</span>
+          <input type="number" min="0" max="100" placeholder="Max" value={scoreFilters.max}
+            onChange={(e) => onScoreFiltersChange({ ...scoreFilters, max: e.target.value })}
+            className={`w-14 shrink-0 ${fieldClass}`} />
+
+          <span className="text-[10px] uppercase font-bold text-slate-400 shrink-0">AI says</span>
+          <select value={scoreFilters.recommendation}
+            onChange={(e) => onScoreFiltersChange({ ...scoreFilters, recommendation: e.target.value })}
+            className={`shrink-0 bg-white ${fieldClass}`}>
+            <option value="">Any</option>
+            <option value="SHORTLIST">Shortlist</option>
+            <option value="HOLD">Hold</option>
+            <option value="REJECT">Reject</option>
+          </select>
+
+          {(scoreFilters.min || scoreFilters.max || scoreFilters.recommendation) && (
+            <button type="button"
+              onClick={() => onScoreFiltersChange({ min: "", max: "", recommendation: "" })}
+              className="text-[11px] text-indigo-600 font-semibold hover:underline shrink-0">
+              Clear
+            </button>
+          )}
+        </>)}
 
         {resultCount != null && (
-          <span className="text-[11px] text-slate-500 ml-auto">
+          <span className="text-[11px] text-slate-500 ml-auto shrink-0 pl-2">
             {resultCount} match{resultCount === 1 ? "" : "es"}
           </span>
         )}
