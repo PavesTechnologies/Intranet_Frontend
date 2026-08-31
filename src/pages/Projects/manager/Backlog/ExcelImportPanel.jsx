@@ -26,6 +26,14 @@ const TEMPLATE_COLUMNS = [
 
 const STATUS_COLUMNS = ["D", "J", "N"]; // Epic Status, Story Status, Task Status
 const TEMPLATE_DATA_ROWS = 200;
+const MAX_LIST_FORMULA_LENGTH = 255; // Excel's hard limit for an inline data-validation list
+
+const EPIC_NAME_NOTE =
+  "Leave this blank on the rows below to keep adding stories under the SAME epic. " +
+  "Only type the epic name again when you're starting a NEW epic — repeating it creates a duplicate epic.";
+const STORY_TITLE_NOTE =
+  "Leave this blank on the rows below to keep adding tasks under the SAME story. " +
+  "Only type the story title again when you're starting a NEW story — repeating it creates a duplicate story.";
 
 const ExcelImportPanel = ({ projectId, projectName, disabled, onImported }) => {
   const fileInputRef = useRef(null);
@@ -59,30 +67,57 @@ const ExcelImportPanel = ({ projectId, projectName, disabled, onImported }) => {
 
       const workbook = new ExcelJS.Workbook();
 
-      const statusSheet = workbook.addWorksheet("StatusOptions");
-      statusSheet.state = "hidden";
-      statusNames.forEach((name, idx) => {
-        statusSheet.getCell(`A${idx + 1}`).value = name;
-      });
-      const statusRange = `StatusOptions!$A$1:$A$${statusNames.length}`;
+      // Single sheet only — status dropdown uses an inline list formula so we
+      // don't need a second (hidden) sheet just to hold the option values.
+      const listFormula = `"${statusNames.join(",")}"`;
+      const statusValidation =
+        listFormula.length <= MAX_LIST_FORMULA_LENGTH
+          ? {
+              type: "list",
+              allowBlank: true,
+              formulae: [listFormula],
+              showErrorMessage: true,
+              errorStyle: "warning",
+              errorTitle: "Invalid status",
+              error: `Value must be one of: ${statusNames.join(", ")}`,
+            }
+          : null;
 
       const sheet = workbook.addWorksheet("Backlog Import");
       sheet.columns = TEMPLATE_COLUMNS;
       sheet.getRow(1).font = { bold: true };
       sheet.views = [{ state: "frozen", ySplit: 1 }];
 
-      for (let row = 2; row <= TEMPLATE_DATA_ROWS + 1; row++) {
-        STATUS_COLUMNS.forEach((col) => {
-          sheet.getCell(`${col}${row}`).dataValidation = {
-            type: "list",
-            allowBlank: true,
-            formulae: [statusRange],
-            showErrorMessage: true,
-            errorStyle: "warning",
-            errorTitle: "Invalid status",
-            error: `Value must be one of: ${statusNames.join(", ")}`,
-          };
-        });
+      sheet.getCell("A1").note = EPIC_NAME_NOTE;
+      sheet.getCell("E1").note = STORY_TITLE_NOTE;
+
+      // ── Example rows: show that Epic Name / Story Title are only filled
+      // in on the FIRST row of that epic/story — the merged, blank cells
+      // below them are how you continue adding stories/tasks to the same
+      // parent without retyping (and without the backend creating duplicates).
+      const s0 = statusNames[0];
+      const s1 = statusNames[Math.min(1, statusNames.length - 1)];
+      const exampleRows = [
+        ["Authentication Module", "Login & signup flows", "HIGH", s0, "Login Page", "Build login UI", "HIGH", 5, "User sees an error on invalid credentials", s0, "Create login form", "HTML/CSS form", "MEDIUM", s0],
+        ["", "", "", "", "", "", "", "", "", "", "Add client-side validation", "Validate email/password fields", "LOW", s0],
+        ["", "", "", "", "Signup Page", "Build signup UI", "MEDIUM", 8, "User receives a confirmation email", s1, "Create signup form", "HTML/CSS form", "MEDIUM", s0],
+        ["", "", "", "", "", "", "", "", "", "", "Send confirmation email", "Trigger email on signup", "LOW", s0],
+      ];
+      sheet.addRows(exampleRows);
+      sheet.getRows(2, exampleRows.length).forEach((row) => {
+        row.font = { italic: true, color: { argb: "FF6B7280" } };
+      });
+      sheet.mergeCells("A2:A5"); // Epic Name spans the whole "Authentication Module" group
+      sheet.mergeCells("E2:E3"); // Story Title spans the "Login Page" task rows
+      sheet.mergeCells("E4:E5"); // Story Title spans the "Signup Page" task rows
+
+      const lastDataRow = TEMPLATE_DATA_ROWS + 1;
+      if (statusValidation) {
+        for (let row = 2; row <= lastDataRow; row++) {
+          STATUS_COLUMNS.forEach((col) => {
+            sheet.getCell(`${col}${row}`).dataValidation = statusValidation;
+          });
+        }
       }
 
       const buffer = await workbook.xlsx.writeBuffer();
