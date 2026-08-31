@@ -6,11 +6,19 @@ import ReportingManagerApprovalPage from '../Reportingmanger/ReportingManagerApp
 import FormSelect from '../../../components/forms/FormSelect';
 import Button from '../../../components/Button/Button';
 import ReviewedTimesheetsModal from '../ManagerApproval/ReviewedTimesheetsModal';
+import useMonthScope from '../components/useMonthScope';
+import MonthScopeSelect from '../components/MonthScopeSelect';
 
 const TSAdminPanel = () => {
   const { user } = useAuth();
   const [activeView, setActiveView] = useState('manager');
   const [showReviewedModal, setShowReviewedModal] = useState(false);
+
+  // The Admin view's month scope lives up here because its control sits in this
+  // toolbar, left of Reviewed Logs. The Manager and Reporting Manager views keep
+  // their own scope, since their controls sit inside their own headers.
+  const adminMonthScope = useMonthScope();
+  const [adminLoading, setAdminLoading] = useState(false);
   const isAdmin = user?.permissions?.includes("TIMESHEET_ADMIN");
   const isReportingManager = user?.permissions?.includes(
     "REVIEW_INTERNAL_TIMESHEET",
@@ -45,6 +53,15 @@ const TSAdminPanel = () => {
       {/* Reviewed Logs sits to the left of "View as"; when the role toggle
           isn't available it falls back to the far right on its own. */}
       <div className="mb-0 flex justify-end items-center gap-4">
+        {activeView === 'admin' && isAdmin && (
+          <MonthScopeSelect
+            options={adminMonthScope.options}
+            value={adminMonthScope.monthKey}
+            onChange={adminMonthScope.setMonthKey}
+            disabled={adminLoading}
+          />
+        )}
+
         <Button
           variant="primary"
           size="medium"
@@ -83,7 +100,12 @@ const TSAdminPanel = () => {
         {activeView === 'reportingManager' && isReportingManager && (
           <ReportingManagerApprovalPage />
         )}
-        {activeView === 'admin' && isAdmin && <AdminApprovalPage />}
+        {activeView === 'admin' && isAdmin && (
+          <AdminApprovalPage
+            monthScope={adminMonthScope}
+            onLoadingChange={setAdminLoading}
+          />
+        )}
       </div>
     </div>
   );
