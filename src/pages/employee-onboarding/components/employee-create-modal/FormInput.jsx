@@ -14,7 +14,7 @@ export default function FormInput({
     <div>
       {label && (
         <label className={Fonts.label}>
-          {label} {required && "*"}
+          {label} {required && <span className="text-red-500">*</span>}
         </label>
       )}
 
