@@ -22,6 +22,10 @@ const FormSelect = ({
   // scrolling container (a wide table, a modal body) where an absolutely
   // positioned panel would otherwise be clipped by the overflow.
   anchorOptions = false,
+  // Sizing for an option row's inner flex. The default floors the panel at
+  // 12rem no matter how narrow the trigger is; pass something narrower (e.g.
+  // "min-w-0") where the panel should hug the button instead of overhanging it.
+  optionRowClassName = "min-w-[12rem] pr-6",
 }) => {
   const selectedOption = options.find((opt) => opt.value === value);
 
@@ -104,7 +108,12 @@ const FormSelect = ({
                   }
                 >
                   {({ selected }) => (
-                    <div className="flex justify-between items-center gap-2 min-w-[12rem] pr-6">
+                    <div
+                      className={classNames(
+                        "flex justify-between items-center gap-2",
+                        optionRowClassName,
+                      )}
+                    >
                       <span>{option.label}</span>
                       {selected && <Check className="w-4 h-4 text-blue-600" />}
                     </div>
