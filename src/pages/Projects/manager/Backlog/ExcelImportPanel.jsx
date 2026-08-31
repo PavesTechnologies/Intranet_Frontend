@@ -37,6 +37,69 @@ const STATUS_COLUMNS = ["D", "J", "N"]; // Epic Status, Story Status, Task Statu
 const TEMPLATE_DATA_ROWS = 200;
 const MAX_LIST_FORMULA_LENGTH = 255; // Excel's hard limit for an inline data-validation list
 
+// Backends spell row/field/message keys differently (and FastAPI-style
+// validation errors use {loc, msg} instead) — normalize whatever comes back
+// into one shape so the result modal can render it consistently.
+const normalizeErrorItem = (e) => {
+  if (typeof e === "string") return { message: e };
+  if (e && typeof e === "object") {
+    const row = e.row ?? e.rowNumber ?? e.row_number ?? e.rowIndex ?? null;
+    const field =
+      e.field ??
+      e.column ??
+      e.fieldName ??
+      (Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : null);
+    const message = e.message ?? e.msg ?? e.error ?? e.detail ?? JSON.stringify(e);
+    return { row, field, message };
+  }
+  return { message: String(e) };
+};
+
+const normalizeErrorList = (raw) => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.map(normalizeErrorItem);
+  return [normalizeErrorItem(raw)];
+};
+
+// Builds a "result" object (same shape the success path uses) out of a
+// failed axios request, so an outright upload failure gets the same
+// well-explained modal treatment as a partial/validation failure instead
+// of a single toast line.
+const extractUploadError = (err) => {
+  const data = err.response?.data;
+  const status = err.response?.status;
+
+  let message;
+  if (typeof data === "string" && data.trim()) {
+    message = data;
+  } else if (typeof data?.message === "string" && data.message) {
+    message = data.message;
+  } else if (typeof data?.error === "string" && data.error) {
+    message = data.error;
+  } else if (typeof data?.detail === "string" && data.detail) {
+    message = data.detail;
+  } else if (!err.response) {
+    message = "Could not reach the server. Check your connection and try again.";
+  } else if (status === 413) {
+    message = "This file is too large to upload.";
+  } else {
+    message = err.message || "Failed to upload Excel file";
+  }
+
+  const rawList =
+    data?.errors ??
+    data?.rowErrors ??
+    data?.violations ??
+    (Array.isArray(data?.detail) ? data.detail : null) ??
+    null;
+
+  return {
+    status: "FAILED",
+    message,
+    errors: normalizeErrorList(rawList),
+  };
+};
+
 const EPIC_NAME_NOTE =
   "Leave this blank on the rows below to keep adding stories under the SAME epic. " +
   "Only type the epic name again when you're starting a NEW epic — repeating it creates a duplicate epic.";
@@ -238,7 +301,7 @@ const ExcelImportPanel = ({ projectId, projectName, disabled, onImported }) => {
         headers,
       });
 
-      const data = res.data;
+      const data = { ...res.data, errors: normalizeErrorList(res.data.errors) };
       setResult(data);
       setResultOpen(true);
 
@@ -254,11 +317,12 @@ const ExcelImportPanel = ({ projectId, projectName, disabled, onImported }) => {
         onImported?.();
       }
     } catch (err) {
-      const message =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
-        "Failed to upload Excel file";
-      showStatusToast(message, "error");
+      // Show the same well-explained result modal for an outright failure
+      // (bad file, validation error, network issue) instead of just a toast.
+      const failureResult = extractUploadError(err);
+      setResult(failureResult);
+      setResultOpen(true);
+      showStatusToast(failureResult.message, "error");
     } finally {
       setUploading(false);
     }
@@ -358,29 +422,54 @@ const ExcelImportPanel = ({ projectId, projectName, disabled, onImported }) => {
               <span className={`text-sm font-semibold ${meta.color}`}>{meta.label}</span>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="rounded-lg border border-gray-200 p-3">
-                <p className="text-lg font-bold text-indigo-900">{result.epicsCreated}</p>
-                <p className="text-xs text-gray-500">Epics Created</p>
+            {result.message && (
+              <p className="text-sm text-gray-600">{result.message}</p>
+            )}
+
+            {"epicsCreated" in result && (
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="rounded-lg border border-gray-200 p-3">
+                  <p className="text-lg font-bold text-indigo-900">{result.epicsCreated}</p>
+                  <p className="text-xs text-gray-500">Epics Created</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 p-3">
+                  <p className="text-lg font-bold text-indigo-900">{result.storiesCreated}</p>
+                  <p className="text-xs text-gray-500">Stories Created</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 p-3">
+                  <p className="text-lg font-bold text-indigo-900">{result.tasksCreated}</p>
+                  <p className="text-xs text-gray-500">Tasks Created</p>
+                </div>
               </div>
-              <div className="rounded-lg border border-gray-200 p-3">
-                <p className="text-lg font-bold text-indigo-900">{result.storiesCreated}</p>
-                <p className="text-xs text-gray-500">Stories Created</p>
-              </div>
-              <div className="rounded-lg border border-gray-200 p-3">
-                <p className="text-lg font-bold text-indigo-900">{result.tasksCreated}</p>
-                <p className="text-xs text-gray-500">Tasks Created</p>
-              </div>
-            </div>
+            )}
 
             {result.errors?.length > 0 && (
               <div>
                 <h3 className="mb-2 text-sm font-semibold text-red-600">
                   Errors ({result.errors.length})
                 </h3>
-                <ul className="max-h-64 space-y-1.5 overflow-y-auto rounded-lg border border-red-100 bg-red-50/50 p-3 text-sm text-red-700">
+                <ul className="max-h-64 space-y-2 overflow-y-auto rounded-lg border border-red-100 bg-red-50/50 p-3 text-sm text-red-700">
                   {result.errors.map((err, idx) => (
-                    <li key={idx} className="list-disc ml-4">{err}</li>
+                    <li key={idx} className="flex items-start gap-2">
+                      <XCircle size={14} className="mt-0.5 flex-shrink-0 text-red-400" />
+                      <span>
+                        {(err.row != null || err.field) && (
+                          <span className="mr-1.5 inline-flex items-center gap-1 align-middle">
+                            {err.row != null && (
+                              <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-semibold text-red-700">
+                                Row {err.row}
+                              </span>
+                            )}
+                            {err.field && (
+                              <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-semibold text-red-700">
+                                {err.field}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        {err.message}
+                      </span>
+                    </li>
                   ))}
                 </ul>
               </div>
