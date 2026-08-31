@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Check, Plus, Pencil, Trash2, Loader2, Landmark } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
@@ -94,15 +94,29 @@ const BILLING_TYPE_ORDER = [
 ];
 
 function sortByOrder(options, order, key = "value") {
+  const getKey = typeof key === "function" ? key : (item) => item[key];
   return [...options].sort((a, b) => {
-    const aIndex = order.indexOf(a[key]);
-    const bIndex = order.indexOf(b[key]);
+    const aIndex = order.indexOf(getKey(a));
+    const bIndex = order.indexOf(getKey(b));
     return (
       (aIndex === -1 ? order.length : aIndex) -
       (bIndex === -1 ? order.length : bIndex)
     );
   });
 }
+
+// Billing Frequency options come back from the master-data API with `value`
+// set to the record's database UUID (see normalizeBillingFrequency), not a
+// semantic code — sorting/filtering against BILLING_FREQUENCY_ORDER (or the
+// "ONE_TIME"/"HALF_YEARLY" literals below) by `.value` would never match
+// anything. Derive a stable code from the display label instead
+// ("Bi-Weekly" -> "BI_WEEKLY") so both the fixed display order and the
+// One-Time/Half-Yearly exclusions actually take effect.
+const frequencyCode = (option) =>
+  String(option?.label || option?.billingFrequencyName || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
 
 function getBillingFrequencyOptions(billingType, frequencies = []) {
   if (billingType === "RECURRING") {
@@ -111,24 +125,26 @@ function getBillingFrequencyOptions(billingType, frequencies = []) {
     // One-Time is excluded, since that's a single lump sum with no recurring
     // schedule and only ever applies to Fixed Price.
     return sortByOrder(
-      frequencies.filter((option) => option.value !== "ONE_TIME"),
+      frequencies.filter((option) => frequencyCode(option) !== "ONE_TIME"),
       BILLING_FREQUENCY_ORDER,
+      frequencyCode,
     );
   }
 
   const withoutHalfYearly = frequencies.filter(
-    (option) => option.value !== "HALF_YEARLY",
+    (option) => frequencyCode(option) !== "HALF_YEARLY",
   );
 
   if (billingType === "FIXED_PRICE") {
-    return sortByOrder(withoutHalfYearly, FIXED_PRICE_FREQUENCY_ORDER);
+    return sortByOrder(withoutHalfYearly, FIXED_PRICE_FREQUENCY_ORDER, frequencyCode);
   }
 
   // One-Time only makes sense against a single lump-sum contract value, so every
   // other billing type (T&M, Milestone) never offers it, even if master data does.
   return sortByOrder(
-    withoutHalfYearly.filter((option) => option.value !== "ONE_TIME"),
+    withoutHalfYearly.filter((option) => frequencyCode(option) !== "ONE_TIME"),
     BILLING_FREQUENCY_ORDER,
+    frequencyCode,
   );
 }
 
@@ -333,13 +349,16 @@ function TimeAndMaterialForm({
     rateCardId: value.rateCardId || null,
     isSaved: Boolean(value.rateCardId),
   };
+  // Effective From/To on Timesheet-based (Time & Material) rates are never
+  // bound to the project's own start/end date — that constraint only applies
+  // to Recurring billing (see RecurringBillingForm). projectStartDate/
+  // projectEndDate are intentionally omitted here so getEffectiveDateErrors
+  // only enforces From <= To, not the project date range.
   const standardDateErrors = isOneTime
     ? { effectiveFrom: "", effectiveTo: "" }
     : getEffectiveDateErrors({
         effectiveFrom: standardRate.effectiveFrom,
         effectiveTo: standardRate.effectiveTo,
-        projectStartDate,
-        projectEndDate,
       });
 
   const [rows, setRows] = useState(() =>
@@ -566,8 +585,6 @@ function TimeAndMaterialForm({
         getEffectiveDateErrors({
           effectiveFrom: row.effectiveFrom,
           effectiveTo: row.effectiveTo,
-          projectStartDate,
-          projectEndDate,
         }),
       )
     ) {
@@ -654,8 +671,6 @@ function TimeAndMaterialForm({
                   onChange={(event) =>
                     update({ effectiveFrom: event.target.value })
                   }
-                  min={projectStartDate || undefined}
-                  max={projectEndDate || undefined}
                   error={standardDateErrors.effectiveFrom}
                 />
                 <FormDatePicker
@@ -663,8 +678,6 @@ function TimeAndMaterialForm({
                   name="effectiveTo"
                   value={standardRate.effectiveTo}
                   onChange={(event) => update({ effectiveTo: event.target.value })}
-                  min={projectStartDate || undefined}
-                  max={projectEndDate || undefined}
                   error={standardDateErrors.effectiveTo}
                 />
               </>
@@ -732,8 +745,6 @@ function TimeAndMaterialForm({
                         : getEffectiveDateErrors({
                             effectiveFrom: item.effectiveFrom,
                             effectiveTo: item.effectiveTo,
-                            projectStartDate,
-                            projectEndDate,
                           });
                       return (
                       <tr
@@ -787,8 +798,6 @@ function TimeAndMaterialForm({
                                     e.target.value,
                                   )
                                 }
-                                min={projectStartDate || undefined}
-                                max={projectEndDate || undefined}
                                 error={roleDateErrors.effectiveFrom}
                               />
                             </td>
@@ -802,8 +811,6 @@ function TimeAndMaterialForm({
                                     e.target.value,
                                   )
                                 }
-                                min={projectStartDate || undefined}
-                                max={projectEndDate || undefined}
                                 error={roleDateErrors.effectiveTo}
                               />
                             </td>
@@ -871,6 +878,43 @@ function ContractValueSourceBadge({ source }) {
     );
   }
   return null;
+}
+
+function EnterpriseBudgetSourceSelector({ value, onChange, projectBudget, currency }) {
+  const isPms = value === "PMS" || value === "PMS_BUDGET";
+
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2">
+      <span className="text-xs font-semibold text-slate-700">Contract Value Source:</span>
+      <div className="flex items-center gap-1 rounded-lg bg-slate-200/60 p-0.5">
+        <button
+          type="button"
+          onClick={() => onChange("PMS")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-all ${
+            isPms
+              ? "bg-white text-[#0A0082] shadow-sm font-semibold"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <Landmark className="h-3.5 w-3.5" />
+          <span>Project Budget {projectBudget ? `(${currency || ""} ${projectBudget})` : ""}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onChange("MANUAL")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-all ${
+            !isPms
+              ? "bg-white text-[#0A0082] shadow-sm font-semibold"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          <span>Manual Input</span>
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // Fixed Price billing must be driven by the actual client-agreed commercial value,
@@ -1169,6 +1213,23 @@ function FixedPriceForm({
       <h2 className={Fonts.heading4}>Fixed Price Billing Configuration</h2>
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+        <EnterpriseBudgetSourceSelector
+          value={value.contractValueSource || (value.totalContractValue === projectBudget ? "PMS" : "MANUAL")}
+          onChange={(nextSource) => {
+            if (nextSource === "PMS") {
+              update({
+                contractValueSource: "PMS",
+                totalContractValue: projectBudget || "",
+                pmsProjectBudget: projectBudget || "",
+              });
+            } else {
+              update({ contractValueSource: "MANUAL" });
+            }
+          }}
+          projectBudget={projectBudget}
+          currency={currency}
+        />
+
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="md:col-span-2">
             <FormInput
@@ -1803,27 +1864,22 @@ function RecurringBillingForm({
       <h2 className={Fonts.heading4}>Recurring Billing Configuration</h2>
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-slate-700">
-            Contract Value Source <span className="text-red-500">*</span>
-          </label>
-          <PillSelectGroup
-            name="contractValueSource"
-            options={CONTRACT_VALUE_SOURCE_OPTIONS}
-            value={contractValueSource}
-            onChange={(next) =>
-              update(
-                next === "PMS_BUDGET"
-                  ? {
-                      contractValueSource: next,
-                      contractValue: hasProjectBudget ? Number(projectBudget) : "",
-                      pmsProjectBudget: hasProjectBudget ? Number(projectBudget) : "",
-                    }
-                  : { contractValueSource: next },
-              )
+        <EnterpriseBudgetSourceSelector
+          value={contractValueSource}
+          onChange={(nextSource) => {
+            if (nextSource === "PMS" || nextSource === "PMS_BUDGET") {
+              update({
+                contractValueSource: "PMS_BUDGET",
+                contractValue: hasProjectBudget ? Number(projectBudget) : "",
+                pmsProjectBudget: hasProjectBudget ? Number(projectBudget) : "",
+              });
+            } else {
+              update({ contractValueSource: "MANUAL" });
             }
-          />
-        </div>
+          }}
+          projectBudget={projectBudget}
+          currency={currency}
+        />
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>

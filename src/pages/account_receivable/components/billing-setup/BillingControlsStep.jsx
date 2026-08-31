@@ -257,15 +257,15 @@ export default function BillingControlsStep({ value = {}, onChange }) {
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start gap-3 min-w-0">
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-500">
-                  <Receipt className="h-4 w-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-slate-800">Expense billing eligible</span>
-                  <span className="block text-xs text-slate-500">Project expenses can be included on generated invoices.</span>
-                </span>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/70 px-3.5 py-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Receipt className="h-4 w-4 shrink-0 text-slate-500" />
+                <div className="min-w-0">
+                  <span className="text-xs font-semibold text-slate-800">Expense Billing Eligible</span>
+                  <span className="ml-2 hidden text-[11px] text-slate-500 sm:inline">
+                    (Include project expenses on invoices)
+                  </span>
+                </div>
               </div>
               <ToggleSwitch
                 checked={Boolean(value.expenseBillingEligible)}

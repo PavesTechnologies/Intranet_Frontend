@@ -80,10 +80,14 @@ export default function ProjectStep({ value = {}, onChange }) {
       });
   }, [value.clientId]);
 
-  // Any project that already has a Billing Configuration for this client — Draft
-  // or Active — is not eligible for a new setup, so it's hidden from the picker.
-  // (Rejected/deactivated configs never reach the UI at all; see
-  // shouldDisplayBillingConfiguration in billingConfigurationService.)
+  // Any project that already has a Billing Configuration for this client in
+  // Draft, Pending Approval, or Approved is not eligible for a new setup, so
+  // it's hidden from the picker. A Rejected configuration does NOT block a
+  // fresh setup — the Maker must be able to pick the same project again and
+  // resubmit — so it's excluded from this "already configured" set. (Note:
+  // getBillingConfigurations returns every configuration regardless of
+  // approvalStatus, so REJECTED ones reach the UI here and must be filtered
+  // out explicitly.)
   useEffect(() => {
     if (!value.clientId || !value.clientName) {
       setConfiguredProjectKeys(new Set());
@@ -101,6 +105,7 @@ export default function ProjectStep({ value = {}, onChange }) {
         const keys = new Set(
           (Array.isArray(configs) ? configs : [])
             .filter(belongsToClient)
+            .filter((config) => config.approvalStatus !== "REJECTED")
             .flatMap((config) => [config.projectId, config.projectCode])
             .filter(Boolean)
             .map(String)

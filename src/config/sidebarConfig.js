@@ -19,6 +19,14 @@ export const ROLES = {
   // Expense Management (XMS) roles
   MANAGER:           "Manager",
   FINANCE:           "Finance",
+  // Accounts Receivable (AR) Maker-Checker roles.
+  // FINANCE_EXECUTIVE mirrors the ad-hoc "Finance_Executive" literal already used
+  // by XMS_FINANCE/XMS_EVERYONE/AP_ROLES.FINANCE_EXECUTIVE below — same real
+  // backend role, now also exposed as a named constant for AR's own use.
+  // FINANCE_MANAGER is AR's Checker role (approve/reject billing configurations);
+  // it does not exist anywhere else in the app.
+  FINANCE_EXECUTIVE: "Finance_Executive",
+  FINANCE_MANAGER:   "Finance_Manager",
 };
 
 const ADMIN_ROLES      = [ROLES.ADMIN, ROLES.SUPER_ADMIN];
@@ -38,14 +46,34 @@ export const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, "Fin
 const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
 
 /**
+ * Accounts Receivable (AR) Maker-Checker role groups.
+ *
+ * AR_MAKER_ROLES   — Finance Executive: create/save-draft/edit-draft/submit
+ *                    the Project Billing Setup wizard. Super Admin keeps this
+ *                    too (existing AR access is unchanged for Super Admin).
+ * AR_CHECKER_ROLES — Finance Manager: review/approve/reject submitted billing
+ *                    configurations (Billing Approvals). Super Admin keeps
+ *                    this too, same reasoning.
+ *
+ * Deliberately two separate exports (not one shared AR_ALL_ROLES) — routes and
+ * sidebar menus for Maker screens must allow only AR_MAKER_ROLES, and Checker
+ * screens only AR_CHECKER_ROLES, so a Finance Executive can never reach
+ * Billing Approvals and a Finance Manager can never reach the create/edit
+ * wizard. See App.jsx route guards and Sidebar.jsx's AR submenu split.
+ */
+export const AR_MAKER_ROLES = [ROLES.SUPER_ADMIN, ROLES.FINANCE_EXECUTIVE];
+export const AR_CHECKER_ROLES = [ROLES.SUPER_ADMIN, ROLES.FINANCE_MANAGER];
+export const AR_ALL_ROLES = [...new Set([...AR_MAKER_ROLES, ...AR_CHECKER_ROLES])];
+
+/**
  * Union of every role that can see at least one Finance Management module
  * (Expense Management, Accounts Payable, Accounts Receivable). Composed from
  * each module's own existing role set — not a new authorization mechanism —
- * so it stays correct as long as XMS_EVERYONE / AP_ALL_ROLES / the AR
- * SUPER_ADMIN gate (see Sidebar.jsx / App.jsx) stay in sync.
+ * so it stays correct as long as XMS_EVERYONE / AP_ALL_ROLES / AR_ALL_ROLES
+ * (see Sidebar.jsx / App.jsx) stay in sync.
  */
 export const FINANCE_ALL_ROLES = [
-  ...new Set([...XMS_EVERYONE, ...AP_ALL_ROLES, ROLES.SUPER_ADMIN]),
+  ...new Set([...XMS_EVERYONE, ...AP_ALL_ROLES, ...AR_ALL_ROLES, ROLES.SUPER_ADMIN]),
 ];
 
 /**
