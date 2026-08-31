@@ -699,6 +699,18 @@ export default function EmployeeProfileView() {
       coreData.resolved_department_name = deptData.department_name || coreData.department_uuid;
       coreData.resolved_designation_name = desigData.designation_name || desigData.name || coreData.designation_uuid;
       setEmployee(coreData);
+      // Header.jsx renders outside this page's component tree (it's part of
+      // the shared Layout), so it can't see this setEmployee update through
+      // props/state — it has its own independently-fetched copy of the name.
+      // This event is the cross-tree signal that tells it to refresh too, so
+      // an edited name updates the top nav immediately instead of only on
+      // next login/reload.
+      console.log("[profile-update-event] dispatching", {
+        employee_id: coreData.employee_id, first_name: coreData.first_name, last_name: coreData.last_name,
+      });
+      window.dispatchEvent(new CustomEvent("employee-profile-updated", {
+        detail: { employee_id: coreData.employee_id, first_name: coreData.first_name, last_name: coreData.last_name },
+      }));
       if (coreData.user_uuid) {
         fetchProfilePhoto(
           coreData.user_uuid
