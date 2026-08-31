@@ -36,7 +36,7 @@ import {
   formatApiError,
 } from "./services/campaignservice";
 import {
-  getStageTiming, filterCandidatesBySkills, filterCandidates,
+  getStageTiming, filterCandidates,
 } from "../dashboard/services/dashboardService";
 import CandidateFilterBar from "./components/CandidateFilterBar";
 import { bulkSendRejectionEmail } from "../candidates/services/candidateScoreService";
@@ -474,11 +474,9 @@ function DetailsTab({ info, jd, scoring, limits, hm }) {
 // serializeCandidateFilters below. Kept outside the component so it's usable
 // as a useState initializer (only ever runs once, on mount).
 function parseCandidateFilters(searchParams) {
-  const ids = searchParams.getAll("skill_ids");
-  const names = searchParams.getAll("skill_names");
   const degrees = searchParams.get("degrees");
   return {
-    skills: ids.map((id, i) => ({ canonical_skill_id: id, canonical_name: names[i] || "Skill" })),
+    nameFilter: searchParams.get("name") || "",
     resumeFilters: {
       experience_min: searchParams.get("exp_min") || undefined,
       experience_max: searchParams.get("exp_max") || undefined,
@@ -502,15 +500,12 @@ function parseCandidateFilters(searchParams) {
 // candidate's scorecard (a separate route) returns to this exact view instead
 // of a blank Candidates tab — the browser-history entry for this page only
 // reflects whatever the URL was at the time of navigating away.
-function serializeCandidateFilters(prev, { skills, resumeFilters, scoreFilters, page }) {
+function serializeCandidateFilters(prev, { nameFilter, resumeFilters, scoreFilters, page }) {
   const next = new URLSearchParams(prev);
-  ["skill_ids", "skill_names", "exp_min", "exp_max", "include_unknown", "degrees",
+  ["name", "exp_min", "exp_max", "include_unknown", "degrees",
     "uploaded_by", "upload_type", "uploaded_from", "uploaded_to",
     "score_min", "score_max", "score_rec", "page"].forEach((k) => next.delete(k));
-  skills.forEach((s) => {
-    next.append("skill_ids", s.canonical_skill_id);
-    next.append("skill_names", s.canonical_name);
-  });
+  if (nameFilter) next.set("name", nameFilter);
   if (resumeFilters.experience_min) next.set("exp_min", resumeFilters.experience_min);
   if (resumeFilters.experience_max) next.set("exp_max", resumeFilters.experience_max);
   if (resumeFilters.include_unknown_experience === false) next.set("include_unknown", "0");
@@ -534,12 +529,11 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const [candidates, setCandidates] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(initialFilters.page);
-  // M11-E03-S01 — selected skills, AND-combined server-side. null means "no
-  // skill filter"; an empty array would mean "matched nothing".
-  const [skills, setSkills] = useState(initialFilters.skills);
-  const [skillMatchIds, setSkillMatchIds] = useState(null);
+  // candidate-name search — resolved server-side via the candidate_name
+  // query param (matches against the candidate's active resume version).
+  const [nameFilter, setNameFilter] = useState(initialFilters.nameFilter);
   // Experience / education / upload-source live in the resume,
-  // so they resolve server-side to a set of ids, same as the skill filter.
+  // so they resolve server-side to a set of matching candidate ids.
   const [resumeFilters, setResumeFilters] = useState(initialFilters.resumeFilters);
   const [resumeMatchIds, setResumeMatchIds] = useState(null);
   // Score range and AI recommendation are already supported by the
@@ -576,44 +570,23 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   useEffect(() => {
     if (skipNextPageReset.current) { skipNextPageReset.current = false; return; }
     setCurrentPage(1);
-  }, [campaignId, stageFilter, skills]);
+  }, [campaignId, stageFilter, nameFilter]);
 
   useEffect(() => {
     setSearchParams(
-      (prev) => serializeCandidateFilters(prev, { skills, resumeFilters, scoreFilters, page: currentPage }),
+      (prev) => serializeCandidateFilters(prev, { nameFilter, resumeFilters, scoreFilters, page: currentPage }),
       { replace: true },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [skills, resumeFilters, scoreFilters, currentPage]);
-
-  // The AND logic lives in SQL (GROUP BY ... HAVING COUNT DISTINCT), so this
-  // asks the server which candidates qualify and intersects locally.
-  useEffect(() => {
-    let cancelled = false;
-    if (skills.length === 0) { setSkillMatchIds(null); return; }
-    (async () => {
-      try {
-        const res = await filterCandidatesBySkills(
-          campaignId,
-          skills.map((s) => s.canonical_skill_id),
-          skills.map((s) => s.canonical_name).join(", "),
-        );
-        if (!cancelled) setSkillMatchIds(new Set(res.campaign_candidate_ids || []));
-      } catch {
-        if (!cancelled) {
-          toast.error("Skill filter failed.");
-          setSkillMatchIds(new Set());
-        }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [campaignId, skills]);
+  }, [nameFilter, resumeFilters, scoreFilters, currentPage]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await getCampaignCandidates(campaignId);
+        const res = await getCampaignCandidates(campaignId, {
+          candidate_name: nameFilter || undefined,
+        });
         if (cancelled) return;
         const data = unwrap(res);
         setCandidates((Array.isArray(data) ? data : data?.items) || []);
@@ -626,7 +599,7 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [campaignId, reloadKey]);
+  }, [campaignId, reloadKey, nameFilter]);
 
   // One request for the whole list, refreshed whenever the roster
   // changes. Failure is silent by design: a missing badge must not break rows.
@@ -648,12 +621,11 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   // same row shape the standalone candidates screen renders, so CandidateTable
   // and the pagination helpers work unchanged here
   const allCandidates = mapCampaignCandidateList(candidates || []);
-  // All active filters are AND-combined: stage from the
-  // funnel/dropdown, skills from the server-side AND search.
+  // All active filters are AND-combined: stage from the funnel/dropdown,
+  // candidate name from the server-side search already applied above.
   const byId = new Map((candidates || []).map((r) => [r.campaign_candidate_id ?? r.id, r]));
   const list = allCandidates.filter((c) => {
     if (stageFilter && (c.stage || "").toUpperCase() !== stageFilter) return false;
-    if (skillMatchIds && !skillMatchIds.has(c.id)) return false;
     if (resumeMatchIds && !resumeMatchIds.has(c.id)) return false;
     // Composite range, read from the RAW row: the table mapper
     // coerces a missing composite_score to 0, which would wrongly match a
@@ -715,15 +687,15 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   };
 
   return (<div className="space-y-4">
-      {/* Skill search, status/score filters + resume-derived filters —
+      {/* Candidate-name search, status/score filters + resume-derived filters —
           all in one row beside "More filters" so the row stays compact. */}
       <CandidateFilterBar
         campaignId={campaignId}
-        skills={skills}
+        nameFilter={nameFilter}
+        onNameFilterChange={setNameFilter}
         resultCount={list.length}
         resumeFilters={resumeFilters}
         onResumeFiltersChange={setResumeFilters}
-        onSkillsChange={setSkills}
         scoreFilters={scoreFilters}
         onScoreFiltersChange={setScoreFilters}
         stageOptions={onStageFilterChange && allCandidates.length > 0 ? stageOptions : null}
