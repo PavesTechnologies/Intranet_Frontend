@@ -26,15 +26,35 @@ import ExcelImportPanel from "./Backlog/ExcelImportPanel";
 import { ca } from "date-fns/locale";
 import { useLocation } from "react-router-dom";
 
+// BacklogAndSprints unmounts whenever the user switches project tabs
+// (Summary/Backlog/Board), so without a cache every return trip re-ran all
+// 6 fetches (stories, tasks, sprints, epics, permissions, risk map) from
+// scratch, flashing an empty backlog before anything appeared. This
+// module-level, per-project cache lets a revisit render the last known
+// snapshot instantly while a silent background refetch keeps it current —
+// stale-while-revalidate, scoped to the browser session.
+const backlogCache = new Map();
+const BACKLOG_CACHE_TTL_MS = 60_000;
+const getCachedBacklogSnapshot = (projectId) => backlogCache.get(projectId) || null;
+const saveBacklogCache = (projectId, partial) => {
+  if (!projectId) return;
+  const prev = backlogCache.get(projectId) || {};
+  backlogCache.set(projectId, { ...prev, ...partial, timestamp: Date.now() });
+};
+
 const BacklogAndSprints = ({ projectId, projectName }) => {
   const navigate = useNavigate();
 
-  const [stories, setStories] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [sprints, setSprints] = useState([]);
-  const [epics, setEpics] = useState([]);
-  const [backlogStories, setBacklogStories] = useState([]);
-  const [backlogTasks, setBacklogTasks] = useState([]);
+  const [stories, setStories] = useState(() => getCachedBacklogSnapshot(projectId)?.stories || []);
+  const [tasks, setTasks] = useState(() => getCachedBacklogSnapshot(projectId)?.tasks || []);
+  const [sprints, setSprints] = useState(() => getCachedBacklogSnapshot(projectId)?.sprints || []);
+  const [epics, setEpics] = useState(() => getCachedBacklogSnapshot(projectId)?.epics || []);
+  const [backlogStories, setBacklogStories] = useState(
+    () => getCachedBacklogSnapshot(projectId)?.stories?.filter((s) => !s.sprintId) || [],
+  );
+  const [backlogTasks, setBacklogTasks] = useState(
+    () => getCachedBacklogSnapshot(projectId)?.tasks?.filter((t) => !t.sprintId) || [],
+  );
   const [showIssueForm, setShowIssueForm] = useState(false);
   const [showSprintModal, setShowSprintModal] = useState(false);
   const [selectedStoryId, setSelectedStoryId] = useState(null);
@@ -46,10 +66,10 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   const [pendingData, setPendingData] = useState(null);
   const [showCompletedSprints, setShowCompletedSprints] = useState(false);
   const [expandedBacklogStories, setExpandedBacklogStories] = useState([]);
-  const [permissions, setPermissions] = useState(null);
+  const [permissions, setPermissions] = useState(() => getCachedBacklogSnapshot(projectId)?.permissions || null);
   const [deleteSprintConfirmOpen, setDeleteSprintConfirmOpen] = useState(false);
   const [sprintIdToDelete, setSprintIdToDelete] = useState(null);
-  const [riskMap, setRiskMap] = useState({});
+  const [riskMap, setRiskMap] = useState(() => getCachedBacklogSnapshot(projectId)?.riskMap || {});
 
   // Opening/closing the right side panel (story/task/sprint details) must not
   // move the user away from where they were scrolled on the backlog list.
@@ -314,7 +334,7 @@ const handleSprintStatus = async (sprintId, action) => {
   // =======================================
   // Fetch Data
   // =======================================
-  const fetchStories = async () => {
+  const fetchStories = async ({ silent = false } = {}) => {
     try {
       const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
@@ -328,12 +348,13 @@ const handleSprintStatus = async (sprintId, action) => {
       const list = Array.isArray(res.data) ? res.data : res.data.content || [];
       setStories(list);
       setBacklogStories(list.filter((s) => !s.sprintId));
+      saveBacklogCache(projectId, { stories: list });
     } catch {
-      showStatusToast("Failed to fetch stories", "error");
+      if (!silent) showStatusToast("Failed to fetch stories", "error");
     }
   };
 
-  const fetchPermissions = async () => {
+  const fetchPermissions = async ({ silent = false } = {}) => {
     try {
       const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/permissions`,
@@ -341,13 +362,14 @@ const handleSprintStatus = async (sprintId, action) => {
       );
 
       setPermissions(res.data);
+      saveBacklogCache(projectId, { permissions: res.data });
     } catch (error) {
       console.error("Failed to fetch permissions", error);
     }
   };
 
 
-  const fetchTasks = async () => {
+  const fetchTasks = async ({ silent = false } = {}) => {
     try {
       const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
@@ -361,12 +383,13 @@ const handleSprintStatus = async (sprintId, action) => {
       const list = Array.isArray(res.data) ? res.data : res.data.content || [];
       setTasks(list);
       setBacklogTasks(list.filter((t) => !t.sprintId));
+      saveBacklogCache(projectId, { tasks: list });
     } catch {
-      showStatusToast("Failed to fetch tasks", "error");
+      if (!silent) showStatusToast("Failed to fetch tasks", "error");
     }
   };
 
-  const fetchEpics = async () => {
+  const fetchEpics = async ({ silent = false } = {}) => {
     try {
       const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
@@ -377,13 +400,15 @@ const handleSprintStatus = async (sprintId, action) => {
         },
       );
 
-      setEpics(Array.isArray(res.data) ? res.data : res.data.content || []);
+      const list = Array.isArray(res.data) ? res.data : res.data.content || [];
+      setEpics(list);
+      saveBacklogCache(projectId, { epics: list });
     } catch {
-      showStatusToast("Failed to fetch epics", "error");
+      if (!silent) showStatusToast("Failed to fetch epics", "error");
     }
   };
 
-  const fetchSprints = async () => {
+  const fetchSprints = async ({ silent = false } = {}) => {
     try {
       const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
@@ -394,9 +419,11 @@ const handleSprintStatus = async (sprintId, action) => {
         },
       );
 
-      setSprints(Array.isArray(res.data) ? res.data : res.data.content || []);
+      const list = Array.isArray(res.data) ? res.data : res.data.content || [];
+      setSprints(list);
+      saveBacklogCache(projectId, { sprints: list });
     } catch {
-      showStatusToast("Failed to fetch sprints", "error");
+      if (!silent) showStatusToast("Failed to fetch sprints", "error");
     }
   };
   // =======================================
@@ -436,7 +463,7 @@ const handleSprintStatus = async (sprintId, action) => {
     setDeleteSprintConfirmOpen(true);
   };
 
-  const fetchRiskMap = async () => {
+  const fetchRiskMap = async ({ silent = false } = {}) => {
     const numId = Number(projectId);
     if (!numId || isNaN(numId)) return;
     try {
@@ -452,18 +479,37 @@ const handleSprintStatus = async (sprintId, action) => {
         if (r.linkedType && r.linkedId) map[`${r.linkedType}-${r.linkedId}`] = r.riskCount ?? 1;
       });
       setRiskMap(map);
+      saveBacklogCache(projectId, { riskMap: map });
     } catch {
       // non-critical
     }
   };
 
   useEffect(() => {
-    fetchStories();
-    fetchTasks();
-    fetchSprints();
-    fetchEpics();
-    fetchPermissions();
-    fetchRiskMap();
+    if (!projectId) return;
+    const cached = getCachedBacklogSnapshot(projectId);
+    const isFresh = cached && Date.now() - cached.timestamp < BACKLOG_CACHE_TTL_MS;
+
+    if (cached) {
+      setStories(cached.stories || []);
+      setBacklogStories((cached.stories || []).filter((s) => !s.sprintId));
+      setTasks(cached.tasks || []);
+      setBacklogTasks((cached.tasks || []).filter((t) => !t.sprintId));
+      setSprints(cached.sprints || []);
+      setEpics(cached.epics || []);
+      setPermissions(cached.permissions || null);
+      setRiskMap(cached.riskMap || {});
+    }
+
+    const opts = { silent: !!cached };
+    if (!isFresh) {
+      fetchStories(opts);
+      fetchTasks(opts);
+      fetchSprints(opts);
+      fetchEpics(opts);
+      fetchPermissions(opts);
+      fetchRiskMap(opts);
+    }
   }, [projectId]);
 
   // =======================================
