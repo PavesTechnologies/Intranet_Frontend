@@ -21,6 +21,9 @@ import EditEpicForm from "../../../../components/Backlog/EditEpicForm";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Button from "../../../../components/Button/Button";
 import RiskBadge from "../RiskBadge";
+import Pagination from "../../../../components/Pagination/pagination";
+
+const EPIC_PAGE_SIZE = 10;
 
 // IssueTracker lives on its own route, separate from the issue detail view
 // (ViewSheet). Clicking a row navigates away and unmounts this component
@@ -86,6 +89,7 @@ const IssueTracker = () => {
     status: "ALL",
     assignee: "ALL",
   });
+  const [epicPage, setEpicPage] = useState(1);
 
   const token = localStorage.getItem("token");
   const headers = {
@@ -496,6 +500,12 @@ const IssueTracker = () => {
     setOpenStories((prev) => [...new Set([...prev, ...storiesToOpen])]);
   }, [filters, issues]);
 
+  // Filtering can shrink the epic list, so keep the current page in range;
+  // reset to page 1 whenever the filters change.
+  useEffect(() => {
+    setEpicPage(1);
+  }, [filters]);
+
   const matchesFilters = (issue) => {
     // Search
     if (filters.search) {
@@ -557,6 +567,16 @@ const IssueTracker = () => {
     (issue.type === "Task" && !issue.storyId);
 
   const visibleEpics = issues.epicsData.filter(epicMatchesHierarchy);
+  const epicTotalPages = Math.max(1, Math.ceil(visibleEpics.length / EPIC_PAGE_SIZE));
+  const pagedEpics = visibleEpics.slice(
+    (epicPage - 1) * EPIC_PAGE_SIZE,
+    epicPage * EPIC_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    setEpicPage((p) => Math.min(p, epicTotalPages));
+  }, [epicTotalPages]);
+
   const visibleOrphanStories = issues.storiesData
     .filter((s) => !s.epicId)
     .filter(storyMatchesHierarchy);
@@ -731,8 +751,7 @@ const IssueTracker = () => {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {issues.epicsData
-            .filter((epic) => epicMatchesHierarchy(epic))
+          {pagedEpics
             .map((epic) => (
               <React.Fragment key={`E-${epic.id}`}>
                 <TableRow issue={epic} level={0} />
@@ -760,6 +779,19 @@ const IssueTracker = () => {
                     ))}
               </React.Fragment>
             ))}
+
+          {epicTotalPages > 1 && (
+            <tr>
+              <td colSpan={8} className="px-4 py-2 border-y border-gray-100">
+                <Pagination
+                  currentPage={epicPage}
+                  totalPages={epicTotalPages}
+                  onPrevious={() => setEpicPage((p) => Math.max(1, p - 1))}
+                  onNext={() => setEpicPage((p) => Math.min(epicTotalPages, p + 1))}
+                />
+              </td>
+            </tr>
+          )}
 
           {/* Orphan Stories */}
           {(() => {

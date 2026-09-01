@@ -134,6 +134,10 @@ const Board = ({ projectId, sprintId, projectName }) => {
   const filterRef = useRef(null);
   const [openColumnMenu, setOpenColumnMenu] = useState(null);
 
+  // per-column "search by name"
+  const [columnSearchOpen, setColumnSearchOpen] = useState(null);
+  const [columnSearchQueries, setColumnSearchQueries] = useState({});
+
   // filters
   const [assigneeQuery, setAssigneeQuery] = useState("");
   const [selectedAssignees, setSelectedAssignees] = useState(new Set());
@@ -282,6 +286,13 @@ const Board = ({ projectId, sprintId, projectName }) => {
     if (filterOpen) document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
   }, [filterOpen]);
+
+  // Close column search box on outside click (keeps the query active)
+  useEffect(() => {
+    const close = () => setColumnSearchOpen(null);
+    if (columnSearchOpen != null) document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [columnSearchOpen]);
 
   // ── Derived data ──────────────────────────────────────────────
   const safeTasks = Array.isArray(tasks) ? tasks : [];
@@ -559,6 +570,22 @@ const Board = ({ projectId, sprintId, projectName }) => {
       next.has(String(sId)) ? next.delete(String(sId)) : next.add(String(sId));
       return next;
     });
+
+  const matchesColumnSearch = useCallback(
+    (task, statusId) => {
+      const q = (columnSearchQueries[statusId] || "").trim().toLowerCase();
+      if (!q) return true;
+      const name = (task.title ?? task.name ?? "").toLowerCase();
+      return name.includes(q);
+    },
+    [columnSearchQueries]
+  );
+  const toggleColumnSearch = (statusId) => {
+    setColumnSearchOpen((prev) => (prev === statusId ? null : statusId));
+  };
+  const setColumnSearchQuery = (statusId, value) => {
+    setColumnSearchQueries((prev) => ({ ...prev, [statusId]: value }));
+  };
 
   const openTaskPanel = (task) => {
     setSelectedTask(task);
@@ -931,7 +958,9 @@ const Board = ({ projectId, sprintId, projectName }) => {
                 className="flex gap-3 items-start min-w-max"
               >
                 {statuses.map((status, idx) => {
-                  const taskItems = filteredTasksByStatusId[String(status.id)] || [];
+                  const taskItems = (filteredTasksByStatusId[String(status.id)] || []).filter((t) =>
+                    matchesColumnSearch(t, status.id)
+                  );
                   const itemsCount = taskItems.length;
                   const showWipWarn = itemsCount > WIP_WARNING_THRESHOLD;
                   const { accent, badge } = getStatusColors(status.name ?? status.statusName, idx);
@@ -995,6 +1024,17 @@ const Board = ({ projectId, sprintId, projectName }) => {
                                 ) : (
                                   <>
                                     <button
+                                      title="Search tasks in this column"
+                                      onClick={(e) => { e.stopPropagation(); toggleColumnSearch(status.id); }}
+                                      className={`p-1 rounded hover:bg-slate-100 transition-colors ${
+                                        columnSearchOpen === status.id || (columnSearchQueries[status.id] || "").trim()
+                                          ? "text-indigo-600 bg-indigo-50"
+                                          : "text-gray-400 hover:text-gray-600"
+                                      }`}
+                                    >
+                                      <SearchIcon className="w-3 h-3" />
+                                    </button>
+                                    <button
                                       title="Rename column"
                                       onClick={(e) => { e.stopPropagation(); startRename(status); }}
                                       className="p-1 rounded hover:bg-slate-100 text-gray-400 hover:text-gray-600 transition-colors"
@@ -1031,6 +1071,31 @@ const Board = ({ projectId, sprintId, projectName }) => {
                                 )}
                               </div>
                             </div>
+
+                            {/* Per-column search by name */}
+                            {columnSearchOpen === status.id && (
+                              <div className="px-3 pb-2" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center gap-1.5 border rounded-md px-2 py-1 bg-slate-50 focus-within:ring-2 focus-within:ring-indigo-300">
+                                  <SearchIcon className="w-3 h-3 text-gray-400 shrink-0" />
+                                  <input
+                                    autoFocus
+                                    value={columnSearchQueries[status.id] || ""}
+                                    onChange={(e) => setColumnSearchQuery(status.id, e.target.value)}
+                                    placeholder="Search by name..."
+                                    className="w-full text-[11px] bg-transparent outline-none"
+                                  />
+                                  {(columnSearchQueries[status.id] || "") && (
+                                    <button
+                                      title="Clear search"
+                                      onClick={() => setColumnSearchQuery(status.id, "")}
+                                      className="text-gray-400 hover:text-gray-600 shrink-0 text-[11px] leading-none"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
 
                           {/* {showWipWarn && (
