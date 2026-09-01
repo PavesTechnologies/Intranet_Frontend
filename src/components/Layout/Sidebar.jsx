@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "../../contexts/AuthContext";
-import { EO_SUBMENU, XMS_SUBMENU, AP_SUBMENU } from "../../config/sidebarConfig";
+import { EO_SUBMENU, XMS_SUBMENU, AP_SUBMENU, AR_MAKER_ROLES, AR_CHECKER_ROLES } from "../../config/sidebarConfig";
 import { filterMenuByRole } from "../../utils/sidebarPermissions";
 import ArModuleIcon from "../icons/ArModuleIcon";
 import ApModuleIcon from "../icons/ApModuleIcon";
@@ -84,6 +84,10 @@ const accountReceivableSubmenu = [
     ],
   },
   {
+    label: "Billing Approvals",
+    to: "/account-receivable/billing-approvals",
+  },
+  {
     label: "Billing Data Acquisition",
     to: "/account-receivable/billing-data-acquisition",
     children: [
@@ -106,6 +110,19 @@ const accountReceivableSubmenu = [
     to: "/account-receivable/master-data",
   },
 ];
+
+// Maker-Checker split of the AR submenu above. Super Admin keeps the full,
+// unchanged accountReceivableSubmenu (existing AR access must not change);
+// Finance Executive (Maker) only gets the create/draft items — no Billing
+// Approvals; Finance Manager (Checker) only gets Billing Approvals — no
+// create/draft/edit/submit items. Derived by filtering the same source array
+// rather than hand-duplicated, so the two variants can never drift from it.
+const accountReceivableMakerSubmenu = accountReceivableSubmenu.filter(
+  (item) => item.label !== "Billing Approvals",
+);
+const accountReceivableCheckerSubmenu = accountReceivableSubmenu.filter(
+  (item) => item.label === "Billing Approvals",
+);
 
 const airsSubmenu = [
   { label: "Dashboard", to: "/airs/dashboard" },
@@ -203,6 +220,18 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   // Role checks
   const isAdmin = hasRole(["ADMIN"]);
   const isSuperAdmin = hasRole(["SUPER_ADMIN"]);
+  const isFinanceExecutive = hasRole(["Finance_Executive", "FINANCE_EXECUTIVE"]);
+  const canSeeArMaker = hasRole(AR_MAKER_ROLES);
+  const canSeeArChecker = hasRole(AR_CHECKER_ROLES) && !isFinanceExecutive;
+  const canSeeAr = canSeeArMaker || canSeeArChecker;
+  // Super Admin (who is not specifically a Finance Executive): full unchanged submenu.
+  // Finance Executive (Maker): create/draft items only — no Billing Approvals.
+  // Finance Manager (Checker): Billing Approvals only.
+  const arSubmenu = (isSuperAdmin && !isFinanceExecutive)
+    ? accountReceivableSubmenu
+    : canSeeArMaker
+      ? accountReceivableMakerSubmenu
+      : accountReceivableCheckerSubmenu;
   // Whole-module gate: unlike EO/XMS (which have no top-level gate because at least one of
   // their items has no allowedRoles), AP must stay fully invisible outside AP_ALL_ROLES —
   // same requirement as Account Receivable's isSuperAdmin gate below.
@@ -949,8 +978,9 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                 </li>
               )}
 
-              {/* Accounts Receivable (Super Admin only) */}
-              {isSuperAdmin && (
+              {/* Accounts Receivable — Super Admin (full), Finance Executive
+                  (Maker items only), Finance Manager (Billing Approvals only) */}
+              {canSeeAr && (
                 <li
                   ref={arRef}
                   className="relative"
@@ -991,7 +1021,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                         scheduleClose();
                       }}
                     >
-                      {accountReceivableSubmenu.map((item) => (
+                      {arSubmenu.map((item) => (
                         <li
                           key={item.label}
                           className="group relative"

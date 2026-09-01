@@ -24,7 +24,7 @@ import Calendar from "./pages/Calendar";
 
 // Finance Management (Application Switcher landing page)
 import FinanceDashboard from "./pages/finance/FinanceDashboard";
-import { FINANCE_ALL_ROLES } from "./config/sidebarConfig";
+import { FINANCE_ALL_ROLES, AR_MAKER_ROLES, AR_CHECKER_ROLES } from "./config/sidebarConfig";
 
 // Accounts Payable
 import { AP_ROUTES } from "./pages/accounts-payable/constants/routes";
@@ -287,6 +287,7 @@ import AccountReceivableDashboard from "./pages/account_receivable/pages/Dashboa
 import Overview from "./pages/account_receivable/pages/Overview.jsx";
 import BillingConfigurations from "./pages/account_receivable/pages/BillingConfigurations.jsx";
 import NewConfigurationWizard from "./pages/account_receivable/pages/NewConfigurationWizard.jsx";
+import BillingApprovals from "./pages/account_receivable/pages/BillingApprovals.jsx";
 import BillingDataAcquisition from "./pages/account_receivable/pages/BillingDataAcquisition.jsx";
 import AcquisitionDetail from "./pages/account_receivable/pages/AcquisitionDetail.jsx";
 import TaxCalculationPage from "./pages/account_receivable/pages/TaxCalculation.jsx";
@@ -630,45 +631,54 @@ const AppRoutes = () => {
             element={<MonthlyTSReport />}
           />
           <Route path="/timesheets/history" element={<TimesheetHistory />} />
-          {/* Account Receivable (Super Admin Only) */}
+          {/* Account Receivable — Maker (Finance Executive + Super Admin) vs
+              Checker (Finance Manager + Super Admin). See AR_MAKER_ROLES /
+              AR_CHECKER_ROLES in config/sidebarConfig.js: Super Admin keeps
+              access to everything below unchanged; Finance Executive only
+              gets the Maker (create/draft/submit) routes; Finance Manager
+              only gets the Checker (billing-approvals) route. */}
           <Route path="/account-receivable/*" element={<AccountReceivableLayout />}>
             <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><AccountReceivableDashboard /></ProtectedRoute>} />
+            <Route path="dashboard" element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><AccountReceivableDashboard /></ProtectedRoute>} />
             <Route
               path="project-billing-setup"
               element={<Navigate to="overview" replace />}
             />
             <Route
               path="project-billing-setup/overview"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><Overview /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><Overview /></ProtectedRoute>}
             />
             <Route
               path="project-billing-setup/configurations"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingConfigurations /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><BillingConfigurations /></ProtectedRoute>}
             />
             <Route
               path="project-billing-setup/workspace"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><NewConfigurationWizard /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><NewConfigurationWizard /></ProtectedRoute>}
             />
             <Route
               path="project-billing-setup/configurations/new"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><NewConfigurationWizard /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><NewConfigurationWizard /></ProtectedRoute>}
             />
             <Route
               path="project-billing-setup/configurations/:configId"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><NewConfigurationWizard /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><NewConfigurationWizard /></ProtectedRoute>}
+            />
+            <Route
+              path="billing-approvals"
+              element={<ProtectedRoute allowedRoles={AR_CHECKER_ROLES}><BillingApprovals /></ProtectedRoute>}
             />
             <Route
               path="billing-data-acquisition"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingDataAcquisition /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><BillingDataAcquisition /></ProtectedRoute>}
             />
             <Route
               path="billing-data-acquisition/workspace"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingDataAcquisition /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><BillingDataAcquisition /></ProtectedRoute>}
             />
             <Route
               path="billing-data-acquisition/:projectId"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><AcquisitionDetail /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><AcquisitionDetail /></ProtectedRoute>}
             />
             <Route
               path="tax-configuration"
@@ -676,15 +686,15 @@ const AppRoutes = () => {
             />
             <Route
               path="tax-calculation"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxCalculationPage /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxCalculationPage /></ProtectedRoute>}
             />
             <Route
               path="tax-calculation/:snapshotId"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxCalculationPage /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxCalculationPage /></ProtectedRoute>}
             />
             <Route
               path="configurations"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><Configurations /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><Configurations /></ProtectedRoute>}
             />
             <Route
               path="configuration"
@@ -693,19 +703,19 @@ const AppRoutes = () => {
             {/* Configuration history removed — not supported by backend */}
             <Route
               path="master-data"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><MasterDataOverview /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><MasterDataOverview /></ProtectedRoute>}
             />
             <Route
               path="master-data/billing-types"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingTypeMasterPage /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><BillingTypeMasterPage /></ProtectedRoute>}
             />
             <Route
               path="master-data/billing-frequency"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><BillingFrequencyMasterPage /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><BillingFrequencyMasterPage /></ProtectedRoute>}
             />
             <Route
               path="master-data/payment-terms"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><PaymentTermsMasterPage /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><PaymentTermsMasterPage /></ProtectedRoute>}
             />
             <Route
               path="master-data/tax-regions"
@@ -713,11 +723,11 @@ const AppRoutes = () => {
             />
             <Route
               path="master-data/tax-configuration"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxConfigurationMasterPage /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxConfigurationMasterPage /></ProtectedRoute>}
             />
             <Route
               path="master-data/tax-configuration/:taxRegionId"
-              element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]}><TaxConfigurationRegionDetailPage /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxConfigurationRegionDetailPage /></ProtectedRoute>}
             />
           </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />

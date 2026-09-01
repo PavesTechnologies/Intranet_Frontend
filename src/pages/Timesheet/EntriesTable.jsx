@@ -446,10 +446,24 @@ const EntriesTable = ({
 
   const showActions = window.location.pathname === "/timesheets";
   
-  const headerCellClass = "px-3 py-2 text-left break-words";
-  const bodyCellClass =
-  "px-3 py-2 text-left align-middle break-words whitespace-normal";
-  const actionCellClass = "px-2 py-2 text-left align-middle";
+  // Per-column classes. The table stays table-auto on purpose: in edit mode the
+  // cells hold inputs (FormTime alone has a 130px min-width), so letting the browser
+  // size columns to their content is what keeps both modes usable. The fix for the
+  // ragged layout is not fixed widths but stopping short values from wrapping.
+  const headerBase =
+    "px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap";
+  const headerCellClass = `${headerBase} text-left`;
+  const headerCenterClass = `${headerBase} text-center`;
+
+  const bodyBase = "px-3 py-2.5 align-middle";
+  // Long free text — allowed to wrap; these columns absorb the spare width.
+  const bodyCellClass = `${bodyBase} text-left break-words whitespace-normal`;
+  // Short values that must never break across lines (this is what made the rows ragged).
+  const bodyNoWrapClass = `${bodyBase} text-left whitespace-nowrap`;
+  // Times: centred and tabular so digits line up column-wise down the table.
+  const bodyTimeClass = `${bodyBase} text-center whitespace-nowrap tabular-nums font-medium text-gray-900`;
+  const bodyCenterClass = `${bodyBase} text-center whitespace-nowrap`;
+  const actionCellClass = `${bodyBase} text-center whitespace-nowrap`;
   const compactSelectProps = {
     className: "min-w-0",
     buttonClassName: "px-3 text-sm",
@@ -467,31 +481,25 @@ const EntriesTable = ({
 
   return (
     <>
-    <div className="w-full pb-1">
-  <table className="w-full table-auto border-collapse rounded">
-      
-           
-      <thead>
-               
-        <tr className="bg-indigo-900 text-white text-sm">
-                   
-          {/* Select-all lives on the day header now — this cell only keeps the
-              column aligned with the per-row checkboxes below. */}
-          {selectionMode && <th className="w-8 px-3 py-2" aria-hidden="true" />}
-                    <th className={headerCellClass}>Project</th>         
-          <th className={headerCellClass}>Task</th>         
-          <th className={headerCellClass}>Start</th>         
-          <th className={headerCellClass}>End</th>         
-          <th className={headerCellClass}>Work Location</th>         
-          <th className={headerCellClass}>Description</th>         
-          <th className={headerCellClass}>Billable</th>         
-          {showActions && (
-            <th className={headerCellClass}>Actions</th>
-          )}
-                 
-        </tr>
-             
-      </thead>
+    {/* Horizontal scroll instead of crushing the columns on a narrow viewport.
+        The selects inside already anchor their panels for exactly this reason. */}
+    <div className="w-full overflow-x-auto pb-1">
+      <table className="w-full min-w-[860px] table-auto border-collapse overflow-hidden rounded-lg border border-gray-200 text-sm">
+        <thead>
+          <tr className="bg-indigo-900 text-white">
+            {/* Select-all lives on the day header now — this cell only keeps the
+                column aligned with the per-row checkboxes below. */}
+            {selectionMode && <th className="w-10 px-3 py-2.5" aria-hidden="true" />}
+            <th className={headerCellClass}>Project</th>
+            <th className={headerCellClass}>Task</th>
+            <th className={headerCenterClass}>Start</th>
+            <th className={headerCenterClass}>End</th>
+            <th className={headerCellClass}>Work Location</th>
+            <th className={headerCellClass}>Description</th>
+            <th className={headerCenterClass}>Billable</th>
+            {showActions && <th className={headerCenterClass}>Actions</th>}
+          </tr>
+        </thead>
            
       {/* ----------------- tbody: mapped rows + add-row (if any) ----------------- */}
            
@@ -500,9 +508,9 @@ const EntriesTable = ({
         {[...entries, ...pendingEntries].map((entry, idx) => (
           <tr
             key={getEntryRowId(entry, idx)}
-            className={`text-sm ${
-              idx % 2 === 0 ? "bg-white" : "bg-gray-50"
-            } hover:bg-blue-50 transition`}
+            className={`border-b border-gray-100 text-sm last:border-b-0 ${
+              idx % 2 === 0 ? "bg-white" : "bg-gray-50/70"
+            } transition-colors hover:bg-blue-50/70`}
           >
 
             {selectionMode && (
@@ -593,31 +601,45 @@ const EntriesTable = ({
                                  
                 </td>
                                
-                <td className={bodyCellClass}>
-                                   
-                  {(
-                    editData.isBillable !== undefined
-                      ? editData.isBillable
-                      : entry.isBillable
-                  )
-                    ? "Yes"
-                    : "No"}
+                <td className={bodyCenterClass}>
+                  {(() => {
+                    const billable =
+                      editData.isBillable !== undefined
+                        ? editData.isBillable
+                        : entry.isBillable;
+                    return (
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          billable
+                            ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200"
+                            : "bg-gray-100 text-gray-500 ring-1 ring-inset ring-gray-200"
+                        }`}
+                      >
+                        {billable ? "Yes" : "No"}
+                      </span>
+                    );
+                  })()}
                 </td>
                                
                 {showActions && (
                   <td className={actionCellClass}>
                                        
-                    <div className="flex gap-2">
-                                           
-                      <button className="text-green-500" onClick={handleSave}>
-                                                <Check />                   
-                         
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        className="rounded-md p-1.5 text-emerald-600 transition-colors hover:bg-emerald-50"
+                        onClick={handleSave}
+                        title="Save changes"
+                      >
+                        <Check className="h-4 w-4" />
                       </button>
-                                           
-                      <button className="text-red-500" onClick={handleCancel}>
-                                                <X />                     
+
+                      <button
+                        className="rounded-md p-1.5 text-red-600 transition-colors hover:bg-red-50"
+                        onClick={handleCancel}
+                        title="Cancel"
+                      >
+                        <X className="h-4 w-4" />
                       </button>
-                                         
                     </div>
                                      
                   </td>
@@ -627,33 +649,59 @@ const EntriesTable = ({
             ) : (
               <>
                                
-                <td className={bodyCellClass}>
-                                   
-                  {entry.projectName ||
-                    projectIdToName[entry.projectId] ||
-                    "N/A"}
-                                 
+                <td className={`${bodyNoWrapClass} font-medium text-gray-900`}>
+                  <span
+                    className="block max-w-[160px] truncate"
+                    title={entry.projectName || projectIdToName[entry.projectId] || "N/A"}
+                  >
+                    {entry.projectName || projectIdToName[entry.projectId] || "N/A"}
+                  </span>
                 </td>
-                               
+
                 <td className={bodyCellClass}>
-                                   
-                  {entry.taskName || taskIdToName[entry.taskId] || "N/A"}       
-                         
+                  {/* max-width sits on the span, not the td: browsers largely ignore
+                      max-width on a cell under table-auto. */}
+                  <span
+                    className="line-clamp-2 max-w-[420px]"
+                    title={entry.taskName || taskIdToName[entry.taskId] || "N/A"}
+                  >
+                    {entry.taskName || taskIdToName[entry.taskId] || "N/A"}
+                  </span>
                 </td>
-                               
-                <td className={bodyCellClass}>{prettyTime(entry.fromTime)}</td>     
-                         
-                <td className={bodyCellClass}>{prettyTime(entry.toTime)}</td>       
-                       
-                <td className={bodyCellClass}>{mapWorkType(entry.workLocation)}</td>
-                               
-                <td
-  className={`${bodyCellClass} max-w-[250px] break-words whitespace-normal`}
->
-  {entry.description}
-</td>
-                 
-                <td className={bodyCellClass}>{entry.isBillable ? "Yes" : "No"}</td>
+
+                <td className={bodyTimeClass}>{prettyTime(entry.fromTime)}</td>
+
+                <td className={bodyTimeClass}>{prettyTime(entry.toTime)}</td>
+
+                <td className={`${bodyNoWrapClass} text-gray-600`}>
+                  {mapWorkType(entry.workLocation)}
+                </td>
+
+                <td className={`${bodyCellClass} text-gray-600`}>
+                  {/* An empty cell read as a rendering fault; a dash reads as "nothing logged". */}
+                  {entry.description?.trim() ? (
+                    <span
+                      className="line-clamp-2 max-w-[280px]"
+                      title={entry.description}
+                    >
+                      {entry.description}
+                    </span>
+                  ) : (
+                    <span className="text-gray-300">&mdash;</span>
+                  )}
+                </td>
+
+                <td className={bodyCenterClass}>
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                      entry.isBillable
+                        ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200"
+                        : "bg-gray-100 text-gray-500 ring-1 ring-inset ring-gray-200"
+                    }`}
+                  >
+                    {entry.isBillable ? "Yes" : "No"}
+                  </span>
+                </td>
                                
                 {showActions && (
                   <td className={actionCellClass}>
@@ -662,27 +710,24 @@ const EntriesTable = ({
                     {(status?.toLowerCase() === "draft" ||
                       status?.toLowerCase() === "submitted" ||
                       status?.toLowerCase() === "rejected") && (
-                      <div className="flex gap-4">
-                                             
+                      <div className="flex items-center justify-center gap-1">
                         <button
-                          className="text-blue-600 hover:text-blue-800 text-sm"
+                          className="rounded-md p-1.5 text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-800"
                           onClick={() => handleEditClick(idx)}
                           title="Edit entry"
                         >
-                                                 
-                          <Pencil className="inline w-4 h-4" />                 
-                             
+                          <Pencil className="h-4 w-4" />
                         </button>
-                                             
+
                         <button
-                          className={`text-red-600 hover:text-red-800 text-sm ${deleteLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                          className={`rounded-md p-1.5 text-red-600 transition-colors hover:bg-red-50 hover:text-red-800 ${
+                            deleteLoading ? "cursor-not-allowed opacity-50" : ""
+                          }`}
                           onClick={() => handleDelete(entry.timesheetEntryId)}
                           title="Delete entry"
                           disabled={deleteLoading}
                         >
-                                                 
-                          <Trash2 className="inline w-4 h-4" />                 
-                             
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     )}
@@ -771,28 +816,41 @@ const EntriesTable = ({
                          
             </td>
                        
-            <td className={bodyCellClass}>
-                            
+            <td className={bodyCenterClass}>
               {addData.projectId &&
-              taskIdToBillablity[addData.taskId] !== undefined
-                ? taskIdToBillablity[addData.taskId]
-                  ? "Yes"
-                  : "No"
-                : "N/A"}
-                         
+              taskIdToBillablity[addData.taskId] !== undefined ? (
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                    taskIdToBillablity[addData.taskId]
+                      ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200"
+                      : "bg-gray-100 text-gray-500 ring-1 ring-inset ring-gray-200"
+                  }`}
+                >
+                  {taskIdToBillablity[addData.taskId] ? "Yes" : "No"}
+                </span>
+              ) : (
+                <span className="text-xs text-gray-400">N/A</span>
+              )}
             </td>
                        
             {showActions && (
             <td className={actionCellClass}>
                             
-              <div className="flex gap-2">
-                               
-                <button className="text-green-500" onClick={handleAddEntry}>
-                                    <Check />               
+              <div className="flex items-center justify-center gap-1">
+                <button
+                  className="rounded-md p-1.5 text-emerald-600 transition-colors hover:bg-emerald-50"
+                  onClick={handleAddEntry}
+                  title="Save entry"
+                >
+                  <Check className="h-4 w-4" />
                 </button>
                                
-                <button className="text-red-500" onClick={handleCancel}>
-                                    <X />               
+                <button
+                  className="rounded-md p-1.5 text-red-600 transition-colors hover:bg-red-50"
+                  onClick={handleCancel}
+                  title="Cancel"
+                >
+                  <X className="h-4 w-4" />
                 </button>
                              
               </div>
