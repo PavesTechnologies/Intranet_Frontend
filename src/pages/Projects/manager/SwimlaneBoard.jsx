@@ -62,6 +62,11 @@ const StatusColHeader = ({
   setOpenColumnMenu,
   handleDeleteClick,
   dragHandleProps,
+  searchOpen,
+  searchQuery,
+  hasSearchQuery,
+  onToggleSearch,
+  onSearchChange,
 }) => {
   const { accent, badge } = getStatusColors(status.name ?? status.statusName, idx);
   return (
@@ -103,6 +108,15 @@ const StatusColHeader = ({
           ) : (
             <>
               <button
+                title="Search tasks in this column"
+                onClick={(e) => { e.stopPropagation(); onToggleSearch(status.id); }}
+                className={`p-1 rounded hover:bg-slate-100 transition-colors ${
+                  searchOpen || hasSearchQuery ? "text-indigo-600 bg-indigo-50" : "text-gray-400 hover:text-gray-600"
+                }`}
+              >
+                <SearchIcon className="w-3 h-3" />
+              </button>
+              <button
                 title="Rename column"
                 onClick={(e) => { e.stopPropagation(); startRename(status); }}
                 className="p-1 rounded hover:bg-slate-100 text-gray-400 hover:text-gray-600 transition-colors"
@@ -139,6 +153,30 @@ const StatusColHeader = ({
           )}
         </div>
       </div>
+      {/* Per-column search by name */}
+      {searchOpen && (
+        <div className="px-3 pb-2" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1.5 border rounded-md px-2 py-1 bg-slate-50 focus-within:ring-2 focus-within:ring-indigo-300">
+            <SearchIcon className="w-3 h-3 text-gray-400 shrink-0" />
+            <input
+              autoFocus
+              value={searchQuery}
+              onChange={(e) => onSearchChange(status.id, e.target.value)}
+              placeholder="Search by name..."
+              className="w-full text-[11px] bg-transparent outline-none"
+            />
+            {searchQuery && (
+              <button
+                title="Clear search"
+                onClick={() => onSearchChange(status.id, "")}
+                className="text-gray-400 hover:text-gray-600 shrink-0 text-[11px] leading-none"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -171,6 +209,10 @@ const SwimlaneBoard = ({
   const [statusToDelete,    setStatusToDelete]    = useState(null);
   const [deleteModalOtherStatuses, setDeleteModalOtherStatuses] = useState([]);
   const [openColumnMenu, setOpenColumnMenu] = useState(null);
+
+  // per-column "search by name" (Kanban swimlane columns)
+  const [columnSearchOpen, setColumnSearchOpen] = useState(null);
+  const [columnSearchQueries, setColumnSearchQueries] = useState({});
 
   // row collapse
   const [collapsedRows, setCollapsedRows] = useState({});
@@ -295,6 +337,13 @@ const SwimlaneBoard = ({
     return () => document.removeEventListener("click", close);
   }, [openColumnMenu]);
 
+  // Close column search box on outside click (keeps the query active)
+  useEffect(() => {
+    const close = () => setColumnSearchOpen(null);
+    if (columnSearchOpen != null) document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [columnSearchOpen]);
+
   // Close filter panel on outside click (standalone only)
   useEffect(() => {
     const handler = (e) => {
@@ -351,6 +400,23 @@ const SwimlaneBoard = ({
     });
     return g;
   }, [safeTasks, storyRows, statuses, applyFilters]);
+
+  const matchesColumnSearch = useCallback(
+    (task, statusId) => {
+      const q = (columnSearchQueries[statusId] || "").trim().toLowerCase();
+      if (!q) return true;
+      const name = (task.title ?? task.name ?? "").toLowerCase();
+      return name.includes(q);
+    },
+    [columnSearchQueries]
+  );
+
+  const toggleColumnSearch = (statusId) => {
+    setColumnSearchOpen((prev) => (prev === statusId ? null : statusId));
+  };
+  const setColumnSearchQuery = (statusId, value) => {
+    setColumnSearchQueries((prev) => ({ ...prev, [statusId]: value }));
+  };
 
   const doneStatusId = useMemo(
     () => (statuses.length ? statuses[statuses.length - 1].id : null),
@@ -705,7 +771,9 @@ const SwimlaneBoard = ({
                     </th>
 
                     {statuses.map((status, idx) => {
-                      const totalInCol = safeTasks.filter((t) => t.statusId === status.id).length;
+                      const totalInCol = safeTasks.filter(
+                        (t) => t.statusId === status.id && matchesColumnSearch(t, status.id)
+                      ).length;
                       return (
                         <Draggable
                           key={String(status.id)}
@@ -734,6 +802,11 @@ const SwimlaneBoard = ({
                                 setOpenColumnMenu={setOpenColumnMenu}
                                 handleDeleteClick={handleDeleteClick}
                                 dragHandleProps={dragProv.dragHandleProps}
+                                searchOpen={columnSearchOpen === status.id}
+                                searchQuery={columnSearchQueries[status.id] || ""}
+                                hasSearchQuery={!!(columnSearchQueries[status.id] || "").trim()}
+                                onToggleSearch={toggleColumnSearch}
+                                onSearchChange={setColumnSearchQuery}
                               />
                             </th>
                           )}
@@ -774,7 +847,9 @@ const SwimlaneBoard = ({
                           <div style={{ borderLeft: `3px solid ${hex}30`, minHeight: 72, marginLeft: 4, height: "100%" }} />
                         </td>
                         {statuses.map((status) => {
-                          const cellTasks = grid[String(story.id)]?.[String(status.id)] ?? [];
+                          const cellTasks = (grid[String(story.id)]?.[String(status.id)] ?? []).filter((t) =>
+                            matchesColumnSearch(t, status.id)
+                          );
                           const wipWarn   = cellTasks.length > WIP_WARNING_THRESHOLD;
                           return (
                             <td key={status.id} className="align-top bg-white border border-slate-100 rounded" style={{ verticalAlign: "top" }}>
@@ -885,7 +960,9 @@ const SwimlaneBoard = ({
                         <div style={{ borderLeft: "3px solid #94a3b830", minHeight: 72, marginLeft: 4, height: "100%" }} />
                       </td>
                       {statuses.map((status) => {
-                        const cellTasks = grid["__unassigned__"]?.[String(status.id)] ?? [];
+                        const cellTasks = (grid["__unassigned__"]?.[String(status.id)] ?? []).filter((t) =>
+                          matchesColumnSearch(t, status.id)
+                        );
                         return (
                           <td key={status.id} className="align-top bg-white border border-slate-100 rounded">
                             <Droppable droppableId={`${status.id}____unassigned__`} type="ITEM">
