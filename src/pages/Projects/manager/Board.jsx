@@ -45,6 +45,21 @@ const headersWithToken = () => {
   };
 };
 
+// Board unmounts whenever the user switches project tabs (Summary/Backlog/
+// Board), so without a cache every return trip re-ran all 3 fetches
+// (statuses, tasks, members) plus the sprint lookup from scratch. This
+// module-level, per-project cache lets a revisit render the last known
+// snapshot instantly while a silent background refetch keeps it current —
+// stale-while-revalidate, scoped to the browser session.
+const boardCache = new Map();
+const BOARD_CACHE_TTL_MS = 60_000;
+const getCachedBoardSnapshot = (projectId) => boardCache.get(projectId) || null;
+const saveBoardCache = (projectId, partial) => {
+  if (!projectId) return;
+  const prev = boardCache.get(projectId) || {};
+  boardCache.set(projectId, { ...prev, ...partial, timestamp: Date.now() });
+};
+
 
 const formatSprintDate = (dateStr) => {
   if (!dateStr) return "";
@@ -87,12 +102,12 @@ const Board = ({ projectId, sprintId, projectName }) => {
   const [viewMode, setViewMode] = useState("board");
 
   // data
-  const [statuses, setStatuses] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [sprintStartDate, setSprintStartDate] = useState(null);
-  const [sprintEndDate, setSprintEndDate] = useState(null);
+  const [statuses, setStatuses] = useState(() => getCachedBoardSnapshot(projectId)?.statuses || []);
+  const [tasks, setTasks] = useState(() => getCachedBoardSnapshot(projectId)?.tasks || []);
+  const [members, setMembers] = useState(() => getCachedBoardSnapshot(projectId)?.members || []);
+  const [loading, setLoading] = useState(() => !getCachedBoardSnapshot(projectId));
+  const [sprintStartDate, setSprintStartDate] = useState(() => getCachedBoardSnapshot(projectId)?.sprintStartDate ?? null);
+  const [sprintEndDate, setSprintEndDate] = useState(() => getCachedBoardSnapshot(projectId)?.sprintEndDate ?? null);
 
   // add column
   const [showAddInput, setShowAddInput] = useState(false);
@@ -127,27 +142,32 @@ const Board = ({ projectId, sprintId, projectName }) => {
   const [selectedSprints, setSelectedSprints] = useState(new Set());
 
   // sprint
-  const [activeSprintId, setActiveSprintId] = useState(null);
-  const [activeSprintName, setActiveSprintName] = useState("");
+  const [activeSprintId, setActiveSprintId] = useState(() => getCachedBoardSnapshot(projectId)?.activeSprintId ?? null);
+  const [activeSprintName, setActiveSprintName] = useState(() => getCachedBoardSnapshot(projectId)?.activeSprintName ?? "");
   const [sprintPopup, setSprintPopup] = useState(null);
   const [isFinishingSprint, setIsFinishingSprint] = useState(false);
   const [highlightPulse, setHighlightPulse] = useState(false);
 
   // ── Data loading ──────────────────────────────────────────────
-  const loadBoard = useCallback(async () => {
-    setLoading(true);
+  const loadBoard = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
       let fetchedSprintId = null;
+      let fetchedSprintName = "";
+      let fetchedStart = null;
+      let fetchedEnd = null;
       try {
         const res = await api.get(
           `${BASE}/api/sprints/active/project/${projectId}`,
           { headers: headersWithToken() }
         );
         fetchedSprintId = res.data[0]?.id;
-        setActiveSprintName(res.data[0]?.name ?? "");
-      
-        setSprintStartDate(res.data[0]?.startedAt ?? res.data[0]?.startDate ?? null);
-        setSprintEndDate(res.data[0]?.endDate ?? null);
+        fetchedSprintName = res.data[0]?.name ?? "";
+        fetchedStart = res.data[0]?.startedAt ?? res.data[0]?.startDate ?? null;
+        fetchedEnd = res.data[0]?.endDate ?? null;
+        setActiveSprintName(fetchedSprintName);
+        setSprintStartDate(fetchedStart);
+        setSprintEndDate(fetchedEnd);
         setActiveSprintId(fetchedSprintId);
       } catch (err) {
         console.error("Sprint fetch:", err?.response?.data || err?.message);
@@ -167,8 +187,10 @@ const Board = ({ projectId, sprintId, projectName }) => {
 
       const [sRes, tRes, mRes] = await Promise.all([statusReq, tasksReq, membersReq]);
 
-      const statusData = Array.isArray(sRes.data) ? sRes.data : sRes.data?.content ?? [];
-      setStatuses(statusData.slice().sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
+      const statusData = (Array.isArray(sRes.data) ? sRes.data : sRes.data?.content ?? [])
+        .slice()
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+      setStatuses(statusData);
 
       let tasksData = [];
       if (Array.isArray(tRes.data)) tasksData = tRes.data;
@@ -176,8 +198,9 @@ const Board = ({ projectId, sprintId, projectName }) => {
       else if (Array.isArray(tRes.data?.tasks)) tasksData = tRes.data.tasks;
       setTasks(tasksData);
 
+      let membersData = [];
       if (Array.isArray(mRes.data) && mRes.data.length > 0) {
-        setMembers(mRes.data.map((m) => ({ id: m.id, name: m.fullName ?? m.name })));
+        membersData = mRes.data.map((m) => ({ id: m.id, name: m.fullName ?? m.name }));
       } else {
         const map = {};
         tasksData.forEach((t) => {
@@ -185,20 +208,50 @@ const Board = ({ projectId, sprintId, projectName }) => {
           const aname = t.assigneeName ?? t.assignee?.name ?? t.assignee?.fullName;
           if (aid != null) map[aid] = aname ?? `User ${aid}`;
         });
-        setMembers(Object.entries(map).map(([id, name]) => ({ id: Number(id), name })));
+        membersData = Object.entries(map).map(([id, name]) => ({ id: Number(id), name }));
       }
+      setMembers(membersData);
+
+      saveBoardCache(projectId, {
+        statuses: statusData,
+        tasks: tasksData,
+        members: membersData,
+        activeSprintId: fetchedSprintId,
+        activeSprintName: fetchedSprintName,
+        sprintStartDate: fetchedStart,
+        sprintEndDate: fetchedEnd,
+      });
     } catch (err) {
       console.error("Load board failed", err);
-      showStatusToast("Failed to load board", "error");
-      setStatuses([]);
-      setTasks([]);
-      setMembers([]);
+      if (!silent) {
+        showStatusToast("Failed to load board", "error");
+        setStatuses([]);
+        setTasks([]);
+        setMembers([]);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [projectId]);
 
-  useEffect(() => { loadBoard(); }, [loadBoard]);
+  useEffect(() => {
+    if (!projectId) return;
+    const cached = getCachedBoardSnapshot(projectId);
+    const isFresh = cached && Date.now() - cached.timestamp < BOARD_CACHE_TTL_MS;
+
+    if (cached) {
+      setStatuses(cached.statuses || []);
+      setTasks(cached.tasks || []);
+      setMembers(cached.members || []);
+      setActiveSprintId(cached.activeSprintId ?? null);
+      setActiveSprintName(cached.activeSprintName ?? "");
+      setSprintStartDate(cached.sprintStartDate ?? null);
+      setSprintEndDate(cached.sprintEndDate ?? null);
+      setLoading(false);
+    }
+
+    if (!isFresh) loadBoard({ silent: !!cached });
+  }, [projectId, loadBoard]);
 
   useEffect(() => {
     if (!activeSprintId) return;
@@ -980,11 +1033,11 @@ const Board = ({ projectId, sprintId, projectName }) => {
                             </div>
                           </div>
 
-                          {showWipWarn && (
+                          {/* {showWipWarn && (
                             <div className="text-[10px] text-yellow-700 bg-yellow-50 px-3 py-1 border-y border-yellow-100">
                               ⚠️ {itemsCount} items — over WIP limit ({WIP_WARNING_THRESHOLD})
                             </div>
-                          )}
+                          )} */}
 
                           {/* ── Scrollable task area: fixed height, ~2 cards visible ── */}
                           <Droppable droppableId={String(status.id)} type="ITEM">
