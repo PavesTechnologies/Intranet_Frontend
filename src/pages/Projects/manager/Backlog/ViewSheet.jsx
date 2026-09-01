@@ -293,6 +293,15 @@ const ViewSheet = () => {
                 label="Sprint"
                 value={relatedNames.sprintName || issue.sprintName || "-"}
               />
+              <Detail label="Estimated Hours">
+                {issue.estimatedHours ? (
+                  <span className="font-semibold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md">
+                    {issue.estimatedHours}
+                  </span>
+                ) : (
+                  "-"
+                )}
+              </Detail>
               <Detail label="Billable">
                 <Badge
                   color={

@@ -1,6 +1,6 @@
 // src/pages/Projects/manager/BacklogAndSprints.jsx
 
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../api/axiosInstance";
 import { DndProvider, useDrop } from "react-dnd";
@@ -23,8 +23,11 @@ import RightSidePanel from "./Sprint/RightSidePanel";
 import SprintDetailsPanel from "./Sprint/SprintDetailsPanel";
 import SprintPendingModal from "./Sprint/SprintPendingModal";
 import ExcelImportPanel from "./Backlog/ExcelImportPanel";
+import Pagination from "../../../components/Pagination/pagination";
 import { ca } from "date-fns/locale";
 import { useLocation } from "react-router-dom";
+
+const BACKLOG_PAGE_SIZE = 10;
 
 // BacklogAndSprints unmounts whenever the user switches project tabs
 // (Summary/Backlog/Board), so without a cache every return trip re-ran all
@@ -66,6 +69,7 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   const [pendingData, setPendingData] = useState(null);
   const [showCompletedSprints, setShowCompletedSprints] = useState(false);
   const [expandedBacklogStories, setExpandedBacklogStories] = useState([]);
+  const [backlogPage, setBacklogPage] = useState(1);
   const [permissions, setPermissions] = useState(() => getCachedBacklogSnapshot(projectId)?.permissions || null);
   const [deleteSprintConfirmOpen, setDeleteSprintConfirmOpen] = useState(false);
   const [sprintIdToDelete, setSprintIdToDelete] = useState(null);
@@ -108,6 +112,23 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
         : [...prev, storyId],
     );
   };
+
+  const backlogTotalPages = Math.max(
+    1,
+    Math.ceil(backlogStories.length / BACKLOG_PAGE_SIZE),
+  );
+  const pagedBacklogStories = useMemo(
+    () =>
+      backlogStories.slice(
+        (backlogPage - 1) * BACKLOG_PAGE_SIZE,
+        backlogPage * BACKLOG_PAGE_SIZE,
+      ),
+    [backlogStories, backlogPage],
+  );
+
+  useEffect(() => {
+    setBacklogPage((p) => Math.min(p, backlogTotalPages));
+  }, [backlogTotalPages]);
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
@@ -593,16 +614,18 @@ const handleSprintStatus = async (sprintId, action) => {
               <Plus size={16} /> Create Issue
             </Button>
 
-            <ExcelImportPanel
-              projectId={projectId}
-              projectName={projectName}
-              disabled={!permissions?.canEdit}
-              onImported={() => {
-                fetchStories();
-                fetchTasks();
-                fetchEpics();
-              }}
-            />
+            {isManager && (
+              <ExcelImportPanel
+                projectId={projectId}
+                projectName={projectName}
+                disabled={!permissions?.canEdit}
+                onImported={() => {
+                  fetchStories();
+                  fetchTasks();
+                  fetchEpics();
+                }}
+              />
+            )}
           </div>
         </div>
 
@@ -759,7 +782,7 @@ const handleSprintStatus = async (sprintId, action) => {
 
           <div className="overflow-y-auto max-h-[calc(100vh-250px)] pr-1 space-y-4">
             {/* 1. STORIES AND THEIR NESTED TASKS */}
-            {backlogStories.map((story) => {
+            {pagedBacklogStories.map((story) => {
               // Find tasks that belong to this story
               const childTasks = backlogTasks.filter(
                 (t) => t.storyId === story.id,
@@ -868,6 +891,15 @@ const handleSprintStatus = async (sprintId, action) => {
               );
             })()}
           </div>
+
+          {backlogTotalPages > 1 && (
+            <Pagination
+              currentPage={backlogPage}
+              totalPages={backlogTotalPages}
+              onPrevious={() => setBacklogPage((p) => Math.max(1, p - 1))}
+              onNext={() => setBacklogPage((p) => Math.min(backlogTotalPages, p + 1))}
+            />
+          )}
         </BacklogDropWrapper>
         </div>{/* end scrollable content */}
       </div>{/* end h-full flex-col */}
