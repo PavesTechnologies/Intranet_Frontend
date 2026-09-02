@@ -25,5 +25,11 @@ export function useApPermissions() {
     canViewInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_INVOICE)),
     canMarkPaid: hasRole(rolesForPermission(AP_PERMISSIONS.MARK_PAID)),
     canViewPayment: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_PAYMENT)),
+    canViewProcurement: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_PROCUREMENT)),
+    canManagePR: hasRole(rolesForPermission(AP_PERMISSIONS.MANAGE_PR)),
+    canApprovePR: hasRole(rolesForPermission(AP_PERMISSIONS.APPROVE_PR)),
+    canManageQuotation: hasRole(rolesForPermission(AP_PERMISSIONS.MANAGE_QUOTATION)),
+    canSelectVendor: hasRole(rolesForPermission(AP_PERMISSIONS.SELECT_VENDOR)),
+    canGeneratePO: hasRole(rolesForPermission(AP_PERMISSIONS.GENERATE_PO)),
   };
 }

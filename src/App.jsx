@@ -47,6 +47,9 @@ import PaymentDetailsPage from "./pages/accounts-payable/payment/pages/PaymentDe
 import APReportsPage from "./pages/accounts-payable/reports/pages/APReportsPage.jsx";
 import APSettingsPage from "./pages/accounts-payable/settings/pages/APSettingsPage.jsx";
 import SystemConfigurationPage from "./pages/accounts-payable/system-configuration/pages/SystemConfigurationPage.jsx";
+import ProcurementPage from "./pages/accounts-payable/procurement/pages/ProcurementPage.jsx";
+import PrDetailPage from "./pages/accounts-payable/procurement/pages/PrDetailPage.jsx";
+import PurchaseOrderDetailPage from "./pages/accounts-payable/procurement/pages/PurchaseOrderDetailPage.jsx";
 
 
 // Resource Management
@@ -600,6 +603,30 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
                 <SystemConfigurationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.PROCUREMENT}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <ProcurementPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.PROCUREMENT_PR_DETAIL()}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <PrDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.PROCUREMENT_PO_DETAIL()}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <PurchaseOrderDetailPage />
               </ProtectedRoute>
             }
           />
