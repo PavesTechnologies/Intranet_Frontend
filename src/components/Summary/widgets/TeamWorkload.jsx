@@ -81,7 +81,7 @@ const TeamWorkload = ({ workItems, users }) => {
                   {user.initials}
                 </Avatar>
                 <Text className="text-sm font-medium">
-                  {user.name || user.email || "Unassigned"}
+                  {user.name || user.email || "Unassigned"} ({user.count})
                 </Text>
               </div>
               <div className="w-3/5">

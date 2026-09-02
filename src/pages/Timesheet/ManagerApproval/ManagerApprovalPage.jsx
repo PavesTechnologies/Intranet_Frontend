@@ -8,6 +8,8 @@ import { getManagerDashboardData } from "../api";
 import { useMemo } from "react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import api from "../../../api/axiosInstance";
+import useMonthScope from "../components/useMonthScope";
+import MonthScopeSelect from "../components/MonthScopeSelect";
 
 const ManagerApprovalPage = () => {
   const [groupedTimesheets, setGroupedTimesheets] = useState([]);
@@ -21,6 +23,17 @@ const ManagerApprovalPage = () => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [userFilter, setUserFilter] = useState("All Users");
 
+  // Month scope — current or previous month. Deliberately NOT cleared by the
+  // Reset button below: it is a scope, not a filter.
+  const {
+    month,
+    year,
+    label: monthLabel,
+    monthKey,
+    setMonthKey,
+    options: monthOptions,
+  } = useMonthScope();
+
   const entriesTableRef = useRef(null);
 
   const handleScroll = () => {
@@ -33,13 +46,15 @@ const ManagerApprovalPage = () => {
     try {
       const response = await api.get(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT}/api/timesheets/manager`,
+        { params: { month, year } },
       );
 
-      const data = response.data;
-      setGroupedTimesheets(data);
-      setFilteredTimesheets(data);
+      setGroupedTimesheets(
+        Array.isArray(response.data) ? response.data : [],
+      );
     } catch (error) {
       console.error("Error fetching timesheets:", error);
+      setGroupedTimesheets([]);
     } finally {
       setLoading(false);
     }
@@ -56,11 +71,14 @@ const ManagerApprovalPage = () => {
     }
   };
 
+  // Re-fetches the queue whenever the month scope changes (and on mount).
   useEffect(() => {
-    const loadInitialData = async () => {
-      await Promise.all([fetchGroupedTimesheets(), fetchDashboardData()]);
-    };
-    loadInitialData();
+    fetchGroupedTimesheets();
+  }, [monthKey]);
+
+  // The dashboard summary is not month-scoped, so it must not re-fire on a month switch.
+  useEffect(() => {
+    fetchDashboardData();
   }, []);
 
   // ✅ Apply filters for deeply nested structureimport { useMemo } from "react";
@@ -161,6 +179,8 @@ const ManagerApprovalPage = () => {
 
   // ✅ Add this function inside ManagerApprovalPage component, before return()
   const handleTableRefresh = async () => {
+    // Month-aware without any argument: fetchGroupedTimesheets is re-created each
+    // render, so it closes over the currently selected month/year.
     fetchGroupedTimesheets(); // refresh approval table
     fetchDashboardData(); // refresh dashboard summary
   };
@@ -175,7 +195,16 @@ const ManagerApprovalPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <TimesheetHeader />
+      <TimesheetHeader
+        rightSlot={
+          <MonthScopeSelect
+            options={monthOptions}
+            value={monthKey}
+            onChange={setMonthKey}
+            disabled={loading}
+          />
+        }
+      />
       <ManagerDashboard
         data={dashboardData}
         loading={loadingDashboard}
@@ -300,6 +329,11 @@ const ManagerApprovalPage = () => {
         statusFilter={statusFilter}
         ref={entriesTableRef}
         onRefresh={handleTableRefresh}
+        emptyMessage={
+          groupedTimesheets.length === 0
+            ? `No timesheets were submitted for ${monthLabel}.`
+            : `Every timesheet for ${monthLabel} has already been approved.`
+        }
       />
     </div>
   );

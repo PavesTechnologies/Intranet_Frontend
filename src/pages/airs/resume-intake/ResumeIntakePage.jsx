@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ClipboardCheck, FileArchive } from "lucide-react";
 import Pagination from "../../../components/Pagination/pagination";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/ui/Modal";
@@ -191,14 +190,8 @@ export default function ResumeIntakePage() {
         </>
       ) : activeListTab === "processing" ? (
         <InProcessingList files={inProcessingFiles} isLoading={inProcessingLoading} onRefresh={refreshInProcessing} />
-      ) : campaignFilter ? (
-        <BulkUploadJobsList jobs={bulkJobs} isLoading={isBulkJobsLoading} onSelectJob={handleOpenJobDetail} />
       ) : (
-        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400">
-          <FileArchive className="h-10 w-10 mx-auto stroke-1 mb-2" />
-          Select a specific campaign above to view its bulk upload batches.
-          <p className="text-[11px] text-slate-400 mt-1">Bulk upload jobs can only be listed one campaign at a time.</p>
-        </div>
+        <BulkUploadJobsList jobs={bulkJobs} isLoading={isBulkJobsLoading} onSelectJob={handleOpenJobDetail} />
       )}
 
       <Modal

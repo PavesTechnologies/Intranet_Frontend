@@ -7,6 +7,9 @@ import Button from "../../../components/Button/Button";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../api/axiosInstance";
+import { toast } from "react-toastify";
+import useMonthScope from "../components/useMonthScope";
+import MonthScopeSelect from "../components/MonthScopeSelect";
 
 const ReportingManagerApprovalPage = () => {
   const navigate = useNavigate();
@@ -19,6 +22,20 @@ const ReportingManagerApprovalPage = () => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [userFilter, setUserFilter] = useState("All Users");
 
+  // `loading` gates the full-page spinner and so is only for the first paint;
+  // `reloading` covers month switches, which must not unmount the dropdown.
+  const [reloading, setReloading] = useState(false);
+
+  // Month scope — current or previous month. Not cleared by the Reset button.
+  const {
+    month,
+    year,
+    label: monthLabel,
+    monthKey,
+    setMonthKey,
+    options: monthOptions,
+  } = useMonthScope();
+
   const entriesTableRef = useRef(null);
 
   const handleScroll = () => {
@@ -27,10 +44,12 @@ const ReportingManagerApprovalPage = () => {
 
   // ✅ Fetch Timesheets
   const fetchGroupedTimesheets = async () => {
+    setReloading(true);
     try {
       const response = await api.get(
         `${window.__APP_CONFIG__.TIMESHEET_API_ENDPOINT
         }/api/timesheets/internal/summary/reportingManager`,
+        { params: { month, year } },
       );
 
       const payload = response.data;
@@ -44,19 +63,18 @@ const ReportingManagerApprovalPage = () => {
         (error?.response?.status
           ? `Failed to fetch timesheets (${error.response.status})`
           : error?.message || "Failed to fetch timesheets");
-      showStatusToast(message, "error");
+      toast.error(message);
       setGroupedTimesheets([]);
     } finally {
       setLoading(false);
+      setReloading(false);
     }
   };
 
+  // Re-fetches whenever the month scope changes (and on mount).
   useEffect(() => {
-    const loadInitialData = async () => {
-      await Promise.all([fetchGroupedTimesheets()]);
-    };
-    loadInitialData();
-  }, []);
+    fetchGroupedTimesheets();
+  }, [monthKey]);
 
   // ✅ Shared predicate: does a user pass the active filters?
   //    `applyUserFilter` is skipped when building the user dropdown, so the
@@ -152,6 +170,8 @@ const ReportingManagerApprovalPage = () => {
   };
 
   const handleTableRefresh = async () => {
+    // Month-aware without any argument: fetchGroupedTimesheets is re-created each
+    // render, so it closes over the currently selected month/year.
     fetchGroupedTimesheets();
   };
 
@@ -165,16 +185,25 @@ const ReportingManagerApprovalPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => navigate(-1)}
-          className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm shrink-0"
-        >
-          <ArrowLeft size={18} />
-        </button>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Reporting Manager Approvals
-        </h1>
+      <div className="flex justify-between items-center gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition shadow-sm shrink-0"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Reporting Manager Approvals
+          </h1>
+        </div>
+
+        <MonthScopeSelect
+          options={monthOptions}
+          value={monthKey}
+          onChange={setMonthKey}
+          disabled={reloading}
+        />
       </div>
 
       {/* ✅ Filter Header */}
@@ -280,11 +309,16 @@ const ReportingManagerApprovalPage = () => {
 
       {/* ✅ Timesheet Table */}
       <ReportingManagerApprovalTable
-        loading={loading}
+        loading={loading || reloading}
         groupedData={filteredTimesheets}
         statusFilter={statusFilter}
         ref={entriesTableRef}
         onRefresh={handleTableRefresh}
+        emptyMessage={
+          groupedTimesheets.length === 0
+            ? `No timesheets were submitted for ${monthLabel}.`
+            : `Every timesheet for ${monthLabel} has already been approved.`
+        }
       />
     </div>
   );

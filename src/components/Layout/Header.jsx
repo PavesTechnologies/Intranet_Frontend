@@ -32,7 +32,15 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
   const [saving, setSaving] = useState(false);
   const [showPw, setShowPw] = useState(EMPTY_SHOW_PW);
 
-  const name = user?.name || user?.email || "User";
+  // user.name comes from the JWT's decoded claims (see AuthContext), which are
+  // baked in at login and don't change until the token is reissued — so a
+  // name edited in the employee profile won't show here until next login.
+  // employeeProfile is fetched live from core-employee-details below, so it
+  // reflects the current name immediately; prefer it whenever it's loaded.
+  const liveName = employeeProfile
+    ? `${employeeProfile.first_name || ""} ${employeeProfile.last_name || ""}`.trim()
+    : "";
+  const name = liveName || user?.name || user?.email || "User";
   const firstName = name.split(" ")[0];
   //  const role = user?.roles?.join(", ") || "User";
 
@@ -68,6 +76,22 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
     };
     if (user?.employee_id) fetchEmployeeProfile();
   }, [user]);
+
+  /* ── Live-update the name after an edit on the profile page ──
+     EmployeeProfileView.jsx dispatches this after every successful save,
+     since it lives in a separate component tree and can't reach Header
+     through props/state. Applies the event's own first/last name directly
+     rather than re-fetching, so the header updates in the same tick as the
+     profile page's banner instead of waiting on a second round trip. */
+  useEffect(() => {
+    const handleProfileUpdated = (e) => {
+      console.log("[profile-update-event] Header received", e.detail, "| current user.employee_id =", user?.employee_id, "| current employeeProfile =", employeeProfile);
+      if (String(e.detail?.employee_id) !== String(user?.employee_id)) return;
+      setEmployeeProfile((prev) => (prev ? { ...prev, ...e.detail } : prev));
+    };
+    window.addEventListener("employee-profile-updated", handleProfileUpdated);
+    return () => window.removeEventListener("employee-profile-updated", handleProfileUpdated);
+  }, [user?.employee_id]);
 
   /* ── Close dropdowns on outside click ── */
   useEffect(() => {

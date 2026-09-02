@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import LargeModal from "./LargeModal";
 import Tabs from "./Tabs";
 import ProfileForm from "./ProfileForm";
@@ -148,6 +148,70 @@ const getEmployeeFormValues = (
   };
 };
 
+// Single source of truth for "required" — matches the `required` markers on
+// ProfileForm/JobForm exactly, and is used to validate both the first save
+// (create) and every later edit, so the two can never silently drift apart
+// the way create/update validation used to (update was missing Gender/Blood
+// Group/Marital Status entirely).
+const REQUIRED_FIELD_LABELS = {
+  empFirstName: "First Name",
+  empLastName: "Last Name",
+  empDob: "Date of Birth",
+  gender: "Gender",
+  contact: "Contact",
+  bloodGroup: "Blood Group",
+  maritalStatus: "Marital Status",
+  departmentUuid: "Department",
+  designationUuid: "Designation",
+  employeeType: "Employee Type",
+  joiningDate: "Date of Join",
+  employmentStatus: "Employment Status",
+};
+
+const getMissingRequiredFields = (form) =>
+  Object.entries(REQUIRED_FIELD_LABELS)
+    .filter(([key]) => !form[key])
+    .map(([, label]) => label);
+
+// Internal form field -> API payload field, for the update (PATCH) request.
+const UPDATE_FIELD_MAP = {
+  empFirstName: "first_name",
+  empMiddleName: "middle_name",
+  empLastName: "last_name",
+  empDob: "date_of_birth",
+  contact: "contact_number",
+  departmentUuid: "department_uuid",
+  designationUuid: "designation_uuid",
+  reportingManagerUuid: "reporting_manager_uuid",
+  employeeType: "employment_type",
+  joiningDate: "joining_date",
+  location: "location",
+  workMode: "work_mode",
+  employmentStatus: "employment_status",
+  bloodGroup: "blood_group",
+  gender: "gender",
+  maritalStatus: "marital_status",
+  totalExperience: "total_experience",
+};
+
+// PATCH body: only the fields that actually changed since the record was
+// loaded for editing. Every field the backend accepts here is already
+// Optional and only applied `if request.X is not None` (see
+// UpdatePermanentEmployeeRequest / PermanentEmployeeDetailsService.update_employee),
+// so omitting an untouched field leaves it alone server-side rather than
+// nulling it out — the classic PUT trap this replaces.
+const buildUpdatePayload = (current, baseline) => {
+  const payload = {};
+  for (const [formKey, apiKey] of Object.entries(UPDATE_FIELD_MAP)) {
+    const isExperience = formKey === "totalExperience";
+    const currentValue = isExperience ? Number(current[formKey]) || 0 : current[formKey] ?? "";
+    const baselineValue = isExperience ? Number(baseline[formKey]) || 0 : baseline[formKey] ?? "";
+    if (currentValue === baselineValue) continue;
+    payload[apiKey] = formKey === "reportingManagerUuid" ? current[formKey] || null : currentValue;
+  }
+  return payload;
+};
+
 export default function EmployeeCreateModal({
   isOpen,
   onClose,
@@ -169,6 +233,10 @@ export default function EmployeeCreateModal({
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
   const [managerOptions, setManagerOptions] = useState([]);
+  // Snapshot of the form right after it's loaded for editing — handleUpdate
+  // diffs against this to send only changed fields via PATCH. A ref (not
+  // state) since it's never itself rendered, just read at save time.
+  const baselineFormRef = useRef({});
 
 
   const isEditMode = !!employeeUuid;
@@ -270,15 +338,18 @@ export default function EmployeeCreateModal({
   useEffect(() => {
     if (!isOpen || !initialEmployee) return;
 
-    setForm((prev) => ({
-      ...prev,
-      ...getEmployeeFormValues(initialEmployee, {
-        matchedUserUuid: initialEmployee.user_uuid || userUuid,
-        firstName,
-        middleName,
-        lastName,
-      }),
-    }));
+    const values = getEmployeeFormValues(initialEmployee, {
+      matchedUserUuid: initialEmployee.user_uuid || userUuid,
+      firstName,
+      middleName,
+      lastName,
+    });
+
+    setForm((prev) => {
+      const merged = { ...prev, ...values };
+      baselineFormRef.current = merged;
+      return merged;
+    });
 
     if (initialEmployee.department_uuid) {
       fetchDesignations(initialEmployee.department_uuid);
@@ -350,17 +421,20 @@ export default function EmployeeCreateModal({
           );
         }
 
-        setForm((prev) => ({
-          ...prev,
-          ...getEmployeeFormValues(data, {
-            matchedUserUuid,
-            offerLetter,
-            personalDetails,
-            firstName,
-            middleName,
-            lastName,
-          }),
-        }));
+        const values = getEmployeeFormValues(data, {
+          matchedUserUuid,
+          offerLetter,
+          personalDetails,
+          firstName,
+          middleName,
+          lastName,
+        });
+
+        setForm((prev) => {
+          const merged = { ...prev, ...values };
+          baselineFormRef.current = merged;
+          return merged;
+        });
 
         fetchDesignations(data.department_uuid);
       } catch (error) {
@@ -382,6 +456,13 @@ export default function EmployeeCreateModal({
 
       if (!resolvedManagerId || resolvedManagerId === prev.reportingManagerUuid) {
         return prev;
+      }
+
+      // This resolves a raw stored value (e.g. a name) to the matching
+      // option's id — not a real user edit, so the baseline gets the same
+      // resolution or the update diff would treat every load as "changed".
+      if (baselineFormRef.current.reportingManagerUuid === prev.reportingManagerUuid) {
+        baselineFormRef.current = { ...baselineFormRef.current, reportingManagerUuid: resolvedManagerId };
       }
 
       return {
@@ -435,23 +516,9 @@ export default function EmployeeCreateModal({
       setLoading(true);
       setError("");
 
-      if (
-        !form.empFirstName ||
-        !form.empLastName ||
-        !form.empDob ||
-        !form.gender ||
-        !form.bloodGroup ||
-        !form.maritalStatus ||
-        !form.contact ||
-        !form.departmentUuid ||
-        !form.designationUuid ||
-        !form.employeeType ||
-        !form.joiningDate ||
-        !form.employmentStatus ||
-        !form.emergencyContactName ||
-        !form.emergencyContactNumber
-      ) {
-        setError("Please fill all required Profile fields.");
+      const missingFields = getMissingRequiredFields(form);
+      if (missingFields.length) {
+        setError(`Please fill all required fields: ${missingFields.join(", ")}`);
         showStatusToast("Please fill all required fields", "info");
         return;
       }
@@ -513,43 +580,23 @@ export default function EmployeeCreateModal({
       setUpdating(true);
       setError("");
 
-      if (
-        !form.empFirstName ||
-        !form.empLastName ||
-        !form.empDob ||
-        !form.contact ||
-        !form.departmentUuid ||
-        !form.designationUuid ||
-        !form.employeeType ||
-        !form.joiningDate ||
-        !form.employmentStatus
-      ) {
-        setError("Please fill all required fields.");
+      const missingFields = getMissingRequiredFields(form);
+      if (missingFields.length) {
+        setError(`Please fill all required fields: ${missingFields.join(", ")}`);
         showStatusToast("Please fill all required fields", "info");
         return;
       }
 
-      await api.put(
+      const payload = buildUpdatePayload(form, baselineFormRef.current);
+      if (Object.keys(payload).length === 0) {
+        showStatusToast("No changes to save", "info");
+        onClose();
+        return;
+      }
+
+      await api.patch(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/permanent-employee/core-employee-details/${employeeUuid}`,
-        {
-          first_name: form.empFirstName,
-          middle_name: form.empMiddleName || "",
-          last_name: form.empLastName,
-          date_of_birth: form.empDob,
-          contact_number: form.contact,
-          department_uuid: form.departmentUuid,
-          designation_uuid: form.designationUuid,
-          reporting_manager_uuid: form.reportingManagerUuid || null,
-          employment_type: form.employeeType,
-          joining_date: form.joiningDate,
-          location: form.location || "",
-          work_mode: form.workMode || "",
-          employment_status: form.employmentStatus,
-          blood_group: form.bloodGroup || "",
-          gender: form.gender || "",
-          marital_status: form.maritalStatus || "",
-          total_experience: Number(form.totalExperience) || 0,
-        },
+        payload,
         {
           headers: {
             "Content-Type": "application/json",
@@ -558,6 +605,7 @@ export default function EmployeeCreateModal({
         },
       );
 
+      baselineFormRef.current = form;
       showStatusToast("Employee updated successfully", "success");
       onClose();
     } catch (err) {

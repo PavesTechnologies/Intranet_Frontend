@@ -17,6 +17,7 @@ export const CreateTaskModal = ({
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [estimatedHours, setEstimatedHours] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const today = new Date().toISOString().split('T')[0];
@@ -27,6 +28,7 @@ export const CreateTaskModal = ({
       setDescription("");
       setStartDate("");
       setDueDate("");
+      setEstimatedHours("");
     }
   }, [open]);
 
@@ -48,6 +50,7 @@ export const CreateTaskModal = ({
           description: description.trim(),
           projectId,
           statusId: defaultStatusId,
+          estimatedHours: Number(estimatedHours) || 0,
         },
         {
           headers: headersWithToken(),
@@ -91,6 +94,18 @@ export const CreateTaskModal = ({
         <FormDatePicker label="Start Date" name="startDate" value={startDate} onChange={setStartDate} min={today} />
 
         <FormDatePicker label="Due Date" name="dueDate" value={dueDate} onChange={setDueDate} min={today} />
+
+        <label className="block mb-3">
+          <div className="text-sm font-medium">Estimated Hours</div>
+          <input
+            type="number"
+            min="0"
+            value={estimatedHours}
+            onChange={(e) => setEstimatedHours(e.target.value)}
+            className="mt-1 block w-full border rounded px-3 py-2"
+            placeholder="Enter estimated hours"
+          />
+        </label>
 
         <div className="flex justify-end gap-2 mt-4">
           <Button type="button" variant="outline" size="small" onClick={onClose}>

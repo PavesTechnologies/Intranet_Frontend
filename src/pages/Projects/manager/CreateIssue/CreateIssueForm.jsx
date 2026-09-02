@@ -210,7 +210,7 @@ const CreateIssueForm = ({
     setFormData((prev) => {
       const updated = { ...prev };
 
-      if (name === "isBillable") {
+      if (name === "Billable") {
         updated[name] = value === "true" || checked === true;
         return updated;
       }
