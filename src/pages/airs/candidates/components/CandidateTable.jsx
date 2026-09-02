@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { toast } from "react-toastify";
-import { Star, StarOff, Eye, Archive, Trash2, MessageSquare } from "lucide-react";
+import { Eye, Archive, Trash2, MessageSquare } from "lucide-react";
 import GenericTable from "../../../../components/Table/table";
 import Button from "../../../../components/Button/Button";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
@@ -35,7 +35,6 @@ const renderScore = (value, multiplier = 1) => {
 export default function CandidateTable({
   candidates,
   onView,
-  onToggleStar,
   onDeleted,
   // Bulk selection
   selectable = false,
@@ -85,8 +84,8 @@ export default function CandidateTable({
     );
   }
 
-  const headers = ["Candidate", "Requirements", "Relevance", "ATS", "Overall", "AI Rec.", "Exp.", "Location", "Stage", "Risk", "Actions"];
-  const columns = ["name", "deterministic", "semantic", "ats", "composite", "aiRecommendation", "experience", "location", "stage", "risk", "actions"];
+  const headers = ["Candidate", "Requirements", "Relevance", "ATS", "Overall", "AI Rec.", "Exp.", "Stage", "Risk", "Actions"];
+  const columns = ["name", "deterministic", "semantic", "ats", "composite", "aiRecommendation", "experience", "stage", "risk", "actions"];
 
   if (selectable) {
     headers.unshift(
@@ -118,15 +117,20 @@ export default function CandidateTable({
     ) : null,
     name: (
       <div className="w-full flex items-center gap-2.5 text-left">
-        <span className="w-6 text-center text-[11px] font-bold text-slate-400 shrink-0" title={c.rankingStatus ? `Ranking: ${c.rankingStatus}` : undefined}>
-          {c.rank != null ? `#${c.rank}` : "—"}
-        </span>
         <div className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 bg-gradient-to-br from-blue-600 to-indigo-600">
           {c.initials}
         </div>
         <div className="min-w-0">
-          <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5">
-            <span className="truncate">{c.name}</span>
+          <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+            <span className="line-clamp-1">{c.name}</span>
+            {c.rank != null && (
+              <span
+                title={c.rankingStatus ? `Ranking: ${c.rankingStatus}` : undefined}
+                className="shrink-0 inline-flex items-center text-xs font-bold text-indigo-600"
+              >
+                #{c.rank}
+              </span>
+            )}
             {/* Only shown when there is something to see */}
             {noteCounts?.[c.id] > 0 && (
               <span
@@ -138,32 +142,27 @@ export default function CandidateTable({
               </span>
             )}
           </div>
-          <div className="text-[11px] text-slate-400 truncate">{c.role}</div>
+          <div className="text-[11px] text-slate-400 line-clamp-1">{c.role}</div>
         </div>
-        <button
-          className="shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleStar(c.id);
-          }}
-        >
-          {c.starred ? <Star size={14} className="fill-amber-500 text-amber-500" /> : <StarOff size={14} className="text-slate-300" />}
-        </button>
       </div>
     ),
     deterministic: renderScore(c.deterministic),
     ats: renderScore(c.ats),
     semantic: renderScore(c.semantic, 100),
-    composite: <ScoreRing value={c.composite} size={32} color="#16A34A" />,
+    composite: <ScoreRing value={c.composite} size={32} color="#16A34A" decimals={0} />,
     aiRecommendation: renderAiRecommendationBadge(c.aiRecommendation),
-    experience: `${Number(c.experience).toFixed(1)} yrs`,
-    location: c.location,
+    experience: (
+      <div className="text-center leading-tight">
+        <div className="font-semibold text-slate-900">{Number(c.experience).toFixed(1)}</div>
+        <div className="text-[9px] uppercase text-slate-400">yrs</div>
+      </div>
+    ),
     stage: renderStageBadge(c.stage),
     // keyed `risk` to match the Risk column; c.rank is the ranking position and
     // is already shown beside the candidate's name
     risk: renderRiskBadge(c.risk),
     actions: (
-      <div className="flex items-center gap-1">
+      <div className="w-full flex items-center justify-end gap-1">
         {showViewButton && (
           <Button
             variant="ghost"
@@ -178,6 +177,7 @@ export default function CandidateTable({
             <Eye className="h-4 w-4" />
           </Button>
         )}
+        {renderExtraActions?.(c)}
         {canDeleteCandidates && (
           <Button
             variant="ghost"
@@ -192,7 +192,6 @@ export default function CandidateTable({
             <Trash2 className="h-4 w-4" />
           </Button>
         )}
-        {renderExtraActions?.(c)}
       </div>
     ),
   }));

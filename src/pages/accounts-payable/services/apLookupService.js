@@ -52,6 +52,24 @@ export const apLookupService = {
     return res.data;
   },
 
+  /** Purchase requisition lifecycle statuses (module_name "PURCHASE_REQUISITION"). */
+  getPrStatuses: async () => {
+    const res = await api.get(`${BASE}/system/status`, {
+      params: { module_name: "PURCHASE_REQUISITION" },
+      headers: authHeaders(),
+    });
+    return res.data;
+  },
+
+  /** Quotation statuses — RECEIVED / SELECTED / REJECTED only (module_name "QUOTATION"). */
+  getQuotationStatuses: async () => {
+    const res = await api.get(`${BASE}/system/status`, {
+      params: { module_name: "QUOTATION" },
+      headers: authHeaders(),
+    });
+    return res.data;
+  },
+
   getGstinDetails: async (gstin) => {
     const res = await api.get(`${BASE}/system/gstin/${encodeURIComponent(gstin)}`, {
       headers: authHeaders(),

@@ -175,9 +175,10 @@ export const updateCampaign = async (campaignId, payload) => {
 };
 
 
-export const getCampaignCandidates = async (campaignId) => {
+export const getCampaignCandidates = async (campaignId, params) => {
     try {
         const response = await api.get(`${BASE_URL}/campaign-candidates/campaign/${campaignId}`, {
+            params,
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
             }
@@ -422,9 +423,10 @@ export const getProcessingStatus = async (campaignId) => {
     }
 };
 
-export const getDeadLetterQueue = async (campaignId) => {
+export const getDeadLetterQueue = async (campaignId, params) => {
     try {
         const response = await api.get(`${BASE_URL}/campaigns/${campaignId}/dead-letter-queue`, {
+            params,
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
         });
         return response.data;

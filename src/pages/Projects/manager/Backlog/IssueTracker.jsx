@@ -21,6 +21,21 @@ import EditEpicForm from "../../../../components/Backlog/EditEpicForm";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Button from "../../../../components/Button/Button";
 import RiskBadge from "../RiskBadge";
+import Pagination from "../../../../components/Pagination/pagination";
+
+const EPIC_PAGE_SIZE = 10;
+
+// IssueTracker lives on its own route, separate from the issue detail view
+// (ViewSheet). Clicking a row navigates away and unmounts this component
+// entirely, so without a cache, every "back" to the board re-ran all 4
+// fetches (epics, stories, tasks, projects, statuses, risk map) from
+// scratch. This module-level, per-project cache lets a revisit render the
+// last known snapshot instantly while a silent background refetch keeps it
+// current — stale-while-revalidate, scoped to the browser session.
+const issueTrackerCache = new Map();
+const ISSUE_TRACKER_CACHE_TTL_MS = 60_000;
+
+const getCachedSnapshot = (projectId) => issueTrackerCache.get(projectId) || null;
 
 const IssueTracker = () => {
   const location = useLocation();
@@ -31,16 +46,23 @@ const IssueTracker = () => {
   const projectId = location.state?.projectId || paramProjectId;
   const projectName = location.state?.projectName || "Unknown Project";
 
-  const [issues, setIssues] = useState({
-    epicsData: [],
-    storiesData: [],
-    tasksData: [],
+  const [issues, setIssues] = useState(() => {
+    const cached = getCachedSnapshot(projectId);
+    return cached
+      ? {
+          epicsData: cached.epicsData || [],
+          storiesData: cached.storiesData || [],
+          tasksData: cached.tasksData || [],
+        }
+      : { epicsData: [], storiesData: [], tasksData: [] };
   });
-  const [riskMap, setRiskMap] = useState({});
-  const [boardStatuses, setBoardStatuses] = useState([]);
+  const [riskMap, setRiskMap] = useState(() => getCachedSnapshot(projectId)?.riskMap || {});
+  const [boardStatuses, setBoardStatuses] = useState(
+    () => getCachedSnapshot(projectId)?.boardStatuses || [],
+  );
 
-  const [loading, setLoading] = useState(true);
-  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(() => !getCachedSnapshot(projectId));
+  const [projects, setProjects] = useState(() => getCachedSnapshot(projectId)?.projects || []);
   const [editModal, setEditModal] = useState({
     visible: false,
     type: null,
@@ -53,6 +75,13 @@ const IssueTracker = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [issueToDelete, setIssueToDelete] = useState(null);
 
+  // Multi-select state for bulk delete (keys look like "Epic-12", "Story-5", "Task-9")
+  const [selectedIssues, setSelectedIssues] = useState([]);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const issueKey = (issue) => `${issue.type}-${issue.id}`;
+
   const [filters, setFilters] = useState({
     search: "",
     type: "ALL",
@@ -60,6 +89,7 @@ const IssueTracker = () => {
     status: "ALL",
     assignee: "ALL",
   });
+  const [epicPage, setEpicPage] = useState(1);
 
   const token = localStorage.getItem("token");
   const headers = {
@@ -67,9 +97,17 @@ const IssueTracker = () => {
     "Content-Type": "application/json",
   };
 
-  const fetchIssues = async () => {
+  const saveToCache = (partial) => {
+    if (!projectId) return;
+    const prev = issueTrackerCache.get(projectId) || {};
+    issueTrackerCache.set(projectId, { ...prev, ...partial, timestamp: Date.now() });
+  };
+
+  // `silent` skips the loading spinner/error toast — used for the
+  // background refresh that follows an instant cached render.
+  const fetchIssues = async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [epicsRes, storiesRes, tasksRes] = await Promise.all([
         api.get(
           `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
@@ -129,41 +167,43 @@ const IssueTracker = () => {
       });
 
       setIssues({ epicsData, storiesData, tasksData });
+      saveToCache({ epicsData, storiesData, tasksData });
     } catch (err) {
-      showStatusToast("Failed to load issues", "error");
+      if (!silent) showStatusToast("Failed to load issues", "error");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
-  const fetchProjects = async () => {
+  const fetchProjects = async ({ silent = false } = {}) => {
     try {
       const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects`,
         { headers },
       );
       setProjects(res.data || []);
+      saveToCache({ projects: res.data || [] });
     } catch (err) {
-      showStatusToast("Failed to load projects", "error");
+      if (!silent) showStatusToast("Failed to load projects", "error");
     }
   };
 
-  const fetchStatuses = async () => {
+  const fetchStatuses = async ({ silent = false } = {}) => {
     try {
       const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/statuses`,
         { headers },
       );
       const data = Array.isArray(res.data) ? res.data : res.data?.content ?? [];
-      setBoardStatuses(
-        data.slice().sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
-      );
+      const sorted = data.slice().sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+      setBoardStatuses(sorted);
+      saveToCache({ boardStatuses: sorted });
     } catch (err) {
-      showStatusToast("Failed to load statuses", "error");
+      if (!silent) showStatusToast("Failed to load statuses", "error");
     }
   };
 
-  const fetchRiskMap = async () => {
+  const fetchRiskMap = async ({ silent = false } = {}) => {
     const numId = Number(projectId);
     if (!numId || isNaN(numId)) return;
     try {
@@ -179,19 +219,51 @@ const IssueTracker = () => {
         if (r.linkedType && r.linkedId) map[`${r.linkedType}-${r.linkedId}`] = r.riskCount ?? 1;
       });
       setRiskMap(map);
+      saveToCache({ riskMap: map });
     } catch {
       // non-critical
     }
   };
 
   useEffect(() => {
-    if (projectId) {
-      fetchIssues();
-      fetchProjects();
-      fetchStatuses();
-      fetchRiskMap();
+    if (!projectId) return;
+
+    const cached = getCachedSnapshot(projectId);
+    const isFresh = cached && Date.now() - cached.timestamp < ISSUE_TRACKER_CACHE_TTL_MS;
+
+    if (cached) {
+      // Already rendered from cache via lazy useState init on first mount;
+      // this covers navigating between two different projectIds without
+      // this component unmounting.
+      setIssues({
+        epicsData: cached.epicsData || [],
+        storiesData: cached.storiesData || [],
+        tasksData: cached.tasksData || [],
+      });
+      setRiskMap(cached.riskMap || {});
+      setBoardStatuses(cached.boardStatuses || []);
+      setProjects(cached.projects || []);
+      setLoading(false);
+    }
+
+    if (!isFresh) {
+      const opts = { silent: !!cached };
+      fetchIssues(opts);
+      fetchProjects(opts);
+      fetchStatuses(opts);
+      fetchRiskMap(opts);
     }
   }, [projectId]);
+
+  // Drop any selected keys that no longer exist after a refetch/delete
+  useEffect(() => {
+    const validKeys = new Set([
+      ...issues.epicsData.map(issueKey),
+      ...issues.storiesData.map(issueKey),
+      ...issues.tasksData.map(issueKey),
+    ]);
+    setSelectedIssues((prev) => prev.filter((k) => validKeys.has(k)));
+  }, [issues]);
 
   // --- NEW TOAST CONFIRMATION LOGIC ---
   const executeDelete = async (issue) => {
@@ -214,6 +286,101 @@ const IssueTracker = () => {
   const handleDelete = (issue) => {
     setIssueToDelete(issue);
     setDeleteConfirmOpen(true);
+  };
+
+  const toggleSelectIssue = (issue) => {
+    const key = issueKey(issue);
+    setSelectedIssues((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
+  };
+
+  const clearSelection = () => setSelectedIssues([]);
+
+  const handleBulkDelete = () => setBulkDeleteConfirmOpen(true);
+
+  // Bulk delete is only offered at the Epic / unassigned Story / unassigned
+  // Task level, so selections split cleanly into (at most) three requests —
+  // one per type — against the dedicated bulk-delete endpoints.
+  const BULK_DELETE_ENDPOINTS = {
+    Epic: "/api/epics/bulk-delete",
+    Story: "/api/stories/bulk-delete",
+    Task: "/api/tasks/bulk-delete",
+  };
+
+  const getSelectedTargets = () =>
+    [...issues.epicsData, ...issues.storiesData, ...issues.tasksData].filter(
+      (issue) => selectedIssues.includes(issueKey(issue)),
+    );
+
+  const getBulkDeleteMessage = () => {
+    const targets = getSelectedTargets();
+    const epicCount = targets.filter((t) => t.type === "Epic").length;
+    const storyCount = targets.filter((t) => t.type === "Story").length;
+    const taskCount = targets.filter((t) => t.type === "Task").length;
+
+    const parts = [];
+    if (epicCount) parts.push(`${epicCount} epic${epicCount > 1 ? "s" : ""}`);
+    if (storyCount) parts.push(`${storyCount} unassigned stor${storyCount > 1 ? "ies" : "y"}`);
+    if (taskCount) parts.push(`${taskCount} unassigned task${taskCount > 1 ? "s" : ""}`);
+
+    const cascadeNote =
+      epicCount > 0
+        ? " Deleting an epic also deletes all of its stories and tasks."
+        : "";
+
+    return `Are you sure you want to delete ${parts.join(", ")}? This action cannot be undone.${cascadeNote}`;
+  };
+
+  const executeBulkDelete = async () => {
+    const idsByType = { Epic: [], Story: [], Task: [] };
+    getSelectedTargets().forEach((issue) => idsByType[issue.type]?.push(issue.id));
+    const typesToDelete = Object.keys(idsByType).filter((t) => idsByType[t].length > 0);
+
+    setBulkDeleting(true);
+    const results = await Promise.allSettled(
+      typesToDelete.map((type) =>
+        api
+          .delete(`${window.__APP_CONFIG__.PMS_BASE_URL}${BULK_DELETE_ENDPOINTS[type]}`, {
+            headers,
+            data: idsByType[type],
+          })
+          .then((res) => res.data),
+      ),
+    );
+    setBulkDeleting(false);
+    setBulkDeleteConfirmOpen(false);
+    setSelectedIssues([]);
+    fetchIssues();
+
+    const messages = [];
+    let anyDeleted = false;
+    let anyProblem = false;
+
+    results.forEach((r, i) => {
+      const type = typesToDelete[i];
+      if (r.status === "fulfilled") {
+        const dto = r.value || {};
+        if ((dto.totalDeleted || 0) > 0) anyDeleted = true;
+        if ((dto.totalNotFound || 0) > 0) anyProblem = true;
+        messages.push(
+          dto.message ||
+            `${dto.totalDeleted || 0} ${type.toLowerCase()}(s) deleted`,
+        );
+      } else {
+        anyProblem = true;
+        messages.push(`Failed to delete selected ${type.toLowerCase()}(s)`);
+      }
+    });
+
+    const combinedMessage = messages.join(" ") || "Nothing was deleted";
+    if (anyDeleted && !anyProblem) {
+      showStatusToast(combinedMessage, "success");
+    } else if (!anyDeleted && anyProblem) {
+      showStatusToast(combinedMessage, "error");
+    } else {
+      showStatusToast(combinedMessage, "warn");
+    }
   };
 
   const handleEdit = (issue) =>
@@ -333,6 +500,12 @@ const IssueTracker = () => {
     setOpenStories((prev) => [...new Set([...prev, ...storiesToOpen])]);
   }, [filters, issues]);
 
+  // Filtering can shrink the epic list, so keep the current page in range;
+  // reset to page 1 whenever the filters change.
+  useEffect(() => {
+    setEpicPage(1);
+  }, [filters]);
+
   const matchesFilters = (issue) => {
     // Search
     if (filters.search) {
@@ -385,6 +558,54 @@ const IssueTracker = () => {
     return false;
   };
 
+  // Bulk select/delete is only offered for Epics (top level) and for
+  // unassigned Stories / unassigned Tasks — nested stories/tasks under an
+  // epic only get the existing single delete action.
+  const isBulkSelectable = (issue) =>
+    issue.type === "Epic" ||
+    (issue.type === "Story" && !issue.epicId) ||
+    (issue.type === "Task" && !issue.storyId);
+
+  const visibleEpics = issues.epicsData.filter(epicMatchesHierarchy);
+  const epicTotalPages = Math.max(1, Math.ceil(visibleEpics.length / EPIC_PAGE_SIZE));
+  const pagedEpics = visibleEpics.slice(
+    (epicPage - 1) * EPIC_PAGE_SIZE,
+    epicPage * EPIC_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    setEpicPage((p) => Math.min(p, epicTotalPages));
+  }, [epicTotalPages]);
+
+  const visibleOrphanStories = issues.storiesData
+    .filter((s) => !s.epicId)
+    .filter(storyMatchesHierarchy);
+  const visibleOrphanTasks = issues.tasksData
+    .filter((t) => !t.storyId)
+    .filter(matchesFilters);
+
+  const useSelectAllGroup = (visibleGroupIssues) => {
+    const keys = visibleGroupIssues.map(issueKey);
+    const allSelected = keys.length > 0 && keys.every((k) => selectedIssues.includes(k));
+    const someSelected = !allSelected && keys.some((k) => selectedIssues.includes(k));
+    const ref = useRef(null);
+    useEffect(() => {
+      if (ref.current) ref.current.indeterminate = someSelected;
+    });
+    const toggle = () => {
+      setSelectedIssues((prev) =>
+        allSelected
+          ? prev.filter((k) => !keys.includes(k))
+          : Array.from(new Set([...prev, ...keys])),
+      );
+    };
+    return { allSelected, ref, toggle };
+  };
+
+  const epicSelectAll = useSelectAllGroup(visibleEpics);
+  const orphanStorySelectAll = useSelectAllGroup(visibleOrphanStories);
+  const orphanTaskSelectAll = useSelectAllGroup(visibleOrphanTasks);
+
   // --- POLISHED TABLE ROW ---
   const TableRow = ({ issue, level }) => {
     const isEpic = issue.type === "Epic";
@@ -397,6 +618,17 @@ const IssueTracker = () => {
         className={`${rowBg} hover:bg-indigo-50/60 border-b border-gray-100 cursor-pointer transition-all duration-200 group`}
         onClick={() => handleView(issue)}
       >
+        <td className="py-3 px-4 w-10" onClick={(e) => e.stopPropagation()}>
+          {isBulkSelectable(issue) && (
+            <input
+              type="checkbox"
+              checked={selectedIssues.includes(issueKey(issue))}
+              onChange={() => toggleSelectIssue(issue)}
+              className="h-4 w-4 cursor-pointer accent-indigo-600 rounded"
+            />
+          )}
+        </td>
+
         <td className="py-3 px-4">
           <div
             className="flex items-center gap-2"
@@ -499,6 +731,16 @@ const IssueTracker = () => {
       <table className="w-full text-left border-collapse">
         <thead className="bg-slate-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
           <tr>
+            <th className="py-4 px-4 w-10">
+              <input
+                ref={epicSelectAll.ref}
+                type="checkbox"
+                checked={epicSelectAll.allSelected}
+                onChange={epicSelectAll.toggle}
+                className="h-4 w-4 cursor-pointer accent-indigo-600 rounded"
+                title="Select all epics"
+              />
+            </th>
             <th className="py-4 px-4 w-[35%]">Title</th>
             <th className="px-3 w-24">Type</th>
             <th className="px-3 w-24">Priority</th>
@@ -509,8 +751,7 @@ const IssueTracker = () => {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {issues.epicsData
-            .filter((epic) => epicMatchesHierarchy(epic))
+          {pagedEpics
             .map((epic) => (
               <React.Fragment key={`E-${epic.id}`}>
                 <TableRow issue={epic} level={0} />
@@ -539,6 +780,19 @@ const IssueTracker = () => {
               </React.Fragment>
             ))}
 
+          {epicTotalPages > 1 && (
+            <tr>
+              <td colSpan={8} className="px-4 py-2 border-y border-gray-100">
+                <Pagination
+                  currentPage={epicPage}
+                  totalPages={epicTotalPages}
+                  onPrevious={() => setEpicPage((p) => Math.max(1, p - 1))}
+                  onNext={() => setEpicPage((p) => Math.min(epicTotalPages, p + 1))}
+                />
+              </td>
+            </tr>
+          )}
+
           {/* Orphan Stories */}
           {(() => {
             const orphanStories = issues.storiesData
@@ -548,6 +802,16 @@ const IssueTracker = () => {
             return (
               <React.Fragment>
                 <tr className="bg-slate-50">
+                  <td className="px-4 py-3 border-y border-gray-200 w-10">
+                    <input
+                      ref={orphanStorySelectAll.ref}
+                      type="checkbox"
+                      checked={orphanStorySelectAll.allSelected}
+                      onChange={orphanStorySelectAll.toggle}
+                      className="h-4 w-4 cursor-pointer accent-indigo-600 rounded"
+                      title="Select all unassigned stories"
+                    />
+                  </td>
                   <td
                     colSpan={7}
                     className="px-4 py-3 border-y border-gray-200"
@@ -586,6 +850,16 @@ const IssueTracker = () => {
             return (
               <React.Fragment>
                 <tr className="bg-slate-50">
+                  <td className="px-4 py-3 border-y border-gray-200 w-10">
+                    <input
+                      ref={orphanTaskSelectAll.ref}
+                      type="checkbox"
+                      checked={orphanTaskSelectAll.allSelected}
+                      onChange={orphanTaskSelectAll.toggle}
+                      className="h-4 w-4 cursor-pointer accent-indigo-600 rounded"
+                      title="Select all unassigned tasks"
+                    />
+                  </td>
                   <td
                     colSpan={7}
                     className="px-4 py-3 border-y border-gray-200"
@@ -720,6 +994,30 @@ const IssueTracker = () => {
         </div>
       </div>
 
+      {/* BULK SELECTION BAR */}
+      {selectedIssues.length > 0 && (
+        <div className="flex items-center justify-between bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
+          <span className="text-sm font-medium text-indigo-700">
+            {selectedIssues.length} issue{selectedIssues.length > 1 ? "s" : ""} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={clearSelection}
+              className="px-3 py-1.5 text-sm font-medium text-slate-500 hover:text-slate-700 transition-colors"
+            >
+              Clear selection
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              className="flex items-center gap-2 px-4 py-1.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+            >
+              <DeleteIcon size={16} />
+              Delete Selected ({selectedIssues.length})
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* CONTENT */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-32 bg-gray-50/50 rounded-xl border border-gray-100">
@@ -769,6 +1067,17 @@ const IssueTracker = () => {
         message={`Are you sure you want to delete this ${issueToDelete?.type?.toLowerCase() || "issue"}? This action cannot be undone.`}
         onConfirm={() => { setDeleteConfirmOpen(false); executeDelete(issueToDelete); setIssueToDelete(null); }}
         onCancel={() => { setDeleteConfirmOpen(false); setIssueToDelete(null); }}
+        confirmText="Delete"
+        variant="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={bulkDeleteConfirmOpen}
+        title={`Delete ${selectedIssues.length} Issue${selectedIssues.length > 1 ? "s" : ""}`}
+        message={getBulkDeleteMessage()}
+        onConfirm={executeBulkDelete}
+        onCancel={() => setBulkDeleteConfirmOpen(false)}
+        isLoading={bulkDeleting}
         confirmText="Delete"
         variant="danger"
       />
