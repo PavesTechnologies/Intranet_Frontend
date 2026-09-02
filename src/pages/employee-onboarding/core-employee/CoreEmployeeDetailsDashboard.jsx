@@ -19,54 +19,56 @@ import { useAuth } from "../../../contexts/AuthContext";
 
 const PAGE_SIZE = 5;
 
-// reporting_manager_uuid actually holds the manager's employee_id — walk that
-// chain up from `targetEmployeeId` to see if `currentEmployeeId` is an
-// ancestor (i.e. the current user manages the target directly or via someone
-// under them). Self and peers/superiors are never their own ancestor, so
-// this alone is enough to keep edit access scoped to the reporting subtree.
-const isDescendantOf = (currentEmployeeId, targetEmployeeId, employeesList) => {
-  if (!currentEmployeeId || !targetEmployeeId) return false;
-  if (String(currentEmployeeId) === String(targetEmployeeId)) return false;
+// reporting_manager_uuid actually holds the manager's employee_id. Edit/Delete
+// are scoped to the current user's reporting subtree: a direct report, or a
+// report of a report at any depth — i.e. anyone whose manager chain, walked
+// upward, passes through the current user. Peers and unrelated branches never
+// appear in that chain, so they're excluded without needing a separate check.
+const isInReportingChainOf = (currentEmployeeId, targetEmployee, employeesList) => {
+  if (!currentEmployeeId || !targetEmployee) return false;
 
   const visited = new Set();
-  let cursor = targetEmployeeId;
+  let cursor = targetEmployee.reporting_manager_uuid;
 
   while (cursor && !visited.has(cursor)) {
+    if (String(cursor) === String(currentEmployeeId)) return true;
     visited.add(cursor);
-    const emp = employeesList.find((e) => String(e.employee_id) === String(cursor));
-    const managerId = emp?.reporting_manager_uuid;
-    if (!managerId) return false;
-    if (String(managerId) === String(currentEmployeeId)) return true;
-    cursor = managerId;
+    const managerEmp = employeesList.find((e) => String(e.employee_id) === String(cursor));
+    cursor = managerEmp?.reporting_manager_uuid;
   }
 
   return false;
 };
 
-function ActionMenu({ onEdit, onDelete, canEdit }) {
+function ActionMenu({ onEdit, onDelete, canManage }) {
   return (
     <div className="flex items-center justify-center gap-2">
       <button
         type="button"
-        onClick={canEdit ? onEdit : undefined}
-        disabled={!canEdit}
+        onClick={canManage ? onEdit : undefined}
+        disabled={!canManage}
         className={`rounded-md p-1.5 transition ${
-          canEdit
+          canManage
             ? "bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800"
             : "bg-gray-50 text-gray-300 cursor-not-allowed"
         }`}
         aria-label="Edit employee"
-        title={canEdit ? "Edit employee" : "You can only edit employees who report to you"}
+        title={canManage ? "Edit employee" : "You can only manage employees in your reporting chain"}
       >
         <EditIcon className="h-4 w-4" />
       </button>
 
       <button
         type="button"
-        onClick={onDelete}
-        className="rounded-md bg-red-50 p-1.5 text-red-700 transition hover:bg-red-100 hover:text-red-800"
+        onClick={canManage ? onDelete : undefined}
+        disabled={!canManage}
+        className={`rounded-md p-1.5 transition ${
+          canManage
+            ? "bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800"
+            : "bg-gray-50 text-gray-300 cursor-not-allowed"
+        }`}
         aria-label="Delete employee"
-        title="Delete employee"
+        title={canManage ? "Delete employee" : "You can only manage employees in your reporting chain"}
       >
         <DeleteIcon className="h-4 w-4" />
       </button>
@@ -77,7 +79,6 @@ function ActionMenu({ onEdit, onDelete, canEdit }) {
 export default function EmployeeOnboardingPage() {
   const { user, hasRole } = useAuth();
   const isAdmin = hasRole(["ADMIN"]);
-  const canSeeActions = hasRole(["ADMIN", "HR", "MANAGER"]);
   const currentEmployeeId = user?.employee_id;
 
   const [employees, setEmployees] = useState([]);
@@ -399,10 +400,22 @@ const confirmDelete = async () => {
   } catch (error) {
     console.error(error);
 
-    showStatusToast(
-      error?.response?.data?.message || "Failed to delete employee",
-      "error"
-    );
+    if (error?.response?.status === 403) {
+      showStatusToast(
+        "You don't have permission to delete this employee.",
+        "error"
+      );
+      setIsDeleteModalOpen(false);
+      setSelectedEmployeeUuid(null);
+      // Permissions may have changed since the row was rendered — resync
+      // so a now-disallowed action doesn't keep looking available.
+      fetchEmployees();
+    } else {
+      showStatusToast(
+        error?.response?.data?.message || "Failed to delete employee",
+        "error"
+      );
+    }
   } finally {
     setIsDeleting(false);
   }
@@ -642,7 +655,7 @@ const downloadExcel = async () => {
     "Designation",
     "Joining Date",
     "Status",
-    ...(canSeeActions ? ["Action"] : []),
+    "Action",
   ];
 
   const columns = [
@@ -654,7 +667,7 @@ const downloadExcel = async () => {
     "designation",
     "doj",
     "status",
-    ...(canSeeActions ? ["action"] : []),
+    "action",
   ];
 
   const totalPages = Math.ceil(filteredEmployees.length / PAGE_SIZE);
@@ -687,22 +700,18 @@ const downloadExcel = async () => {
           "—"
         ),
 
-        ...(canSeeActions
-          ? {
-              action: (
-                <ActionMenu
-                  canEdit={isAdmin || isDescendantOf(currentEmployeeId, emp.employee_id, employees)}
-                  onEdit={() => {
-                    setEditEmployee(emp);
-                    setEditEmployeeUuid(emp.employee_uuid);
-                    setSelectedUserUuid(emp.user_uuid);
-                    setIsCreateOpen(true);
-                  }}
-                  onDelete={() => handleDelete(emp.employee_uuid)}
-                />
-              ),
-            }
-          : {}),
+        action: (
+          <ActionMenu
+            canManage={isAdmin || isInReportingChainOf(currentEmployeeId, emp, employees)}
+            onEdit={() => {
+              setEditEmployee(emp);
+              setEditEmployeeUuid(emp.employee_uuid);
+              setSelectedUserUuid(emp.user_uuid);
+              setIsCreateOpen(true);
+            }}
+            onDelete={() => handleDelete(emp.employee_uuid)}
+          />
+        ),
       }));
   }, [
     employees,
@@ -711,7 +720,6 @@ const downloadExcel = async () => {
     departments,
     designations,
     designationMap,
-    canSeeActions,
     isAdmin,
     currentEmployeeId,
   ]);
