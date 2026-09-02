@@ -15,6 +15,8 @@ export const PAYMENT_TERMS_KEY = ["accountsPayable", "lookups", "paymentTerms"];
 export const VENDOR_STATUSES_KEY = ["accountsPayable", "lookups", "vendorStatuses"];
 export const PO_STATUSES_KEY = ["accountsPayable", "lookups", "poStatuses"];
 export const PAYMENT_STATUSES_KEY = ["accountsPayable", "lookups", "paymentStatuses"];
+export const PR_STATUSES_KEY = ["accountsPayable", "lookups", "prStatuses"];
+export const QUOTATION_STATUSES_KEY = ["accountsPayable", "lookups", "quotationStatuses"];
 
 export const useCountries = () =>
   useQuery({
@@ -56,6 +58,22 @@ export const usePaymentStatuses = () =>
   useQuery({
     queryKey: PAYMENT_STATUSES_KEY,
     queryFn: apLookupService.getPaymentStatuses,
+    ...MASTER_DATA_OPTIONS,
+  });
+
+/** Purchase requisition lifecycle statuses (module_name "PURCHASE_REQUISITION"). */
+export const usePrStatuses = () =>
+  useQuery({
+    queryKey: PR_STATUSES_KEY,
+    queryFn: apLookupService.getPrStatuses,
+    ...MASTER_DATA_OPTIONS,
+  });
+
+/** Quotation statuses — RECEIVED / SELECTED / REJECTED (module_name "QUOTATION"). */
+export const useQuotationStatuses = () =>
+  useQuery({
+    queryKey: QUOTATION_STATUSES_KEY,
+    queryFn: apLookupService.getQuotationStatuses,
     ...MASTER_DATA_OPTIONS,
   });
 
