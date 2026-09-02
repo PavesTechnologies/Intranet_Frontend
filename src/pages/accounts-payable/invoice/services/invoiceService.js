@@ -23,8 +23,7 @@ function matchesSearch(invoice, search) {
   if (!term) return true;
   return (
     invoice.invoiceNumber?.toLowerCase().includes(term) ||
-    invoice.vendor?.name?.toLowerCase().includes(term) ||
-    invoice.purchaseOrder?.poNumber?.toLowerCase().includes(term)
+    invoice.vendor?.name?.toLowerCase().includes(term)
   );
 }
 

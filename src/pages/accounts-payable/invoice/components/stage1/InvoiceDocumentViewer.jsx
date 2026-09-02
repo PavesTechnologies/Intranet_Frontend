@@ -47,8 +47,18 @@ function downloadBlobUrl(url, fileName) {
  * @param {React.Ref} [props.highlightRef] - attached to the first highlight's DOM node, used by
  *   FieldDocumentConnector to anchor the arrow to it
  * @param {string|null} [props.noteMessage] - e.g. "No document location available for this field."
+ * @param {string} [props.title="Original Invoice"] - header label prefix; Stage 2 reuses this
+ *   viewer for the PO document pane with a different label instead of duplicating the component.
  */
-export default function InvoiceDocumentViewer({ fileUrl, originalFilename, page, highlights = [], highlightRef, noteMessage = null }) {
+export default function InvoiceDocumentViewer({
+  fileUrl,
+  originalFilename,
+  page,
+  highlights = [],
+  highlightRef,
+  noteMessage = null,
+  title = "Original Invoice",
+}) {
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [loadError, setLoadError] = useState(null);
@@ -74,7 +84,8 @@ export default function InvoiceDocumentViewer({ fileUrl, originalFilename, page,
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white">
       <div className="border-b border-gray-100 px-4 py-3">
         <h3 className="truncate text-sm font-semibold text-gray-800">
-          Original Invoice{originalFilename ? `: ${originalFilename}` : ""}
+          {title}
+          {originalFilename ? `: ${originalFilename}` : ""}
         </h3>
       </div>
 
