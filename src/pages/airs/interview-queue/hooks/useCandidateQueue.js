@@ -31,7 +31,10 @@ export default function useCandidateQueue(campaignId) {
     setError(null);
     try {
       const response = await getCampaignCandidates(campaignId);
-      const list = response && response.data !== undefined ? response.data : response;
+      // Body is { success, message, data: { items, page, page_size, total } } —
+      // unwrap one level for the envelope, then again for the paginated list.
+      const data = response && response.data !== undefined ? response.data : response;
+      const list = Array.isArray(data) ? data : data?.items || [];
       const mapped = mapCampaignCandidateList(list).filter((c) => QUEUE_STAGES.includes(c.stage));
       setCandidates(mapped);
     } catch (err) {

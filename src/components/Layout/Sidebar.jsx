@@ -169,6 +169,8 @@ const recruiterAirsSubmenu = [
 const hiringManagerAirsSubmenu = [
   ...airsSubmenu.filter((item) => ["Campaigns", "Pipeline"].includes(item.label)),
   interviewCalendarItem,
+  // /airs/interview-queue is HIRING_MANAGER-only (see App.jsx ProtectedRoute).
+  { label: "Candidate Review", to: "/airs/interview-queue" },
 ];
 
 

@@ -1424,7 +1424,7 @@ const AppRoutes = () => {
           <Route
             path="/airs/interview-queue"
             element={
-              <ProtectedRoute allowedRoles={["HIRING_MANAGER", "HR_ADMIN"]}>
+              <ProtectedRoute allowedRoles={["HIRING_MANAGER"]}>
                 <InterviewQueuePage />
               </ProtectedRoute>
             }

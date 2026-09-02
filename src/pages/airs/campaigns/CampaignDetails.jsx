@@ -61,8 +61,8 @@ export default function CampaignDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { canManageCampaigns, canViewPipeline, canViewTimeline, canViewCampaigns, isHiringManager, isHRAdmin, isRecruiter } = useCampaignPermissions();
-  const canReviewInterviews = isHiringManager || isHRAdmin;
+  const { canManageCampaigns, canViewPipeline, canViewTimeline, canViewCampaigns, isHiringManager, isRecruiter } = useCampaignPermissions();
+  const canReviewInterviews = isHiringManager;
 
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -138,17 +138,21 @@ export default function CampaignDetails() {
   const isActive = status === "ACTIVE";
   const canEdit = canManageCampaigns && !isClosed;   // closed = read-only
 
-  // Pipeline/Processing tabs: HR_ADMIN + RECRUITER (matches the backend's
-  // require_roles on pipeline-summary / processing-queue).
+  // Uploads/Rejections tabs: HR_ADMIN + RECRUITER (matches the backend's
+  // require_roles on those endpoints).
   // scoring != null is kept as a data-presence AND — the backend also omits
   // the scoring section for roles it hides it from, so both must agree.
   const canSeePipeline = canViewPipeline && scoring != null;
+  // Pipeline tab (funnel/metrics) additionally opened to HIRING_MANAGER —
+  // scoring is always null for that role (hidden independent of pipeline
+  // access), so it can't be used as a data-presence AND here.
+  const canSeePipelineTab = canViewPipeline && (isHiringManager || scoring != null);
   const canSeeTimeline = canViewTimeline;            // HR_ADMIN only
 
   const tabs = [
     { id: "details", label: "Details", icon: FileText, show: true },
     { id: "candidates", label: "Candidates", icon: ListChecks, show: true },
-    { id: "pipeline", label: "Pipeline", icon: Users, show: canSeePipeline },
+    { id: "pipeline", label: "Pipeline", icon: Users, show: canSeePipelineTab },
     // Open to every AIRS role except HIRING_MANAGER; ProcessingTab itself
     // narrows what a RECRUITER sees down to just the Dead Letter Queue.
     { id: "processing", label: "Processing", icon: Inbox, show: canViewCampaigns && !isHiringManager },

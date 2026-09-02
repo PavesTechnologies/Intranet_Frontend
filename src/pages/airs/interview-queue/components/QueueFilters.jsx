@@ -8,9 +8,23 @@ const STAGE_FILTER_OPTIONS = [
   { label: "Interview", value: "INTERVIEW" },
 ];
 
-export default function QueueFilters({ search, setSearch, stageFilter, setStageFilter }) {
+export default function QueueFilters({
+  search,
+  setSearch,
+  stageFilter,
+  setStageFilter,
+  campaignOptions,
+  campaignId,
+  onCampaignChange,
+}) {
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm mb-6 flex flex-col lg:flex-row gap-4 items-center">
+      {campaignOptions && (
+        <div className="w-full lg:w-64">
+          <FilterListbox options={campaignOptions} value={campaignId || ""} onChange={onCampaignChange} />
+        </div>
+      )}
+
       <div className="relative flex-1 w-full">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
         <input

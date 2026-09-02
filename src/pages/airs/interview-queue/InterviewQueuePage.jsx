@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import ErrorState from "../skill-ontology/components/ErrorState";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import Pagination from "@/components/Pagination/pagination";
 import useCandidateQueue from "./hooks/useCandidateQueue";
@@ -10,6 +11,7 @@ import QueueFilters from "./components/QueueFilters";
 import QueueTable from "./components/QueueTable";
 import RejectAtInterviewModal from "./components/RejectAtInterviewModal";
 import { advanceToInterview, selectCandidate, rejectAtInterview } from "./services/pipelineActionsService";
+import { getCampaignsByHiringManager } from "../campaigns/services/campaignservice";
 
 // HM Review / Interview Queue — scoped to one campaign at a time via
 // ?campaign=, matching CandidateRankingPage's convention. Row actions call
@@ -18,9 +20,50 @@ import { advanceToInterview, selectCandidate, rejectAtInterview } from "./servic
 // stage is set directly rather than re-parsed from the response.
 export default function InterviewQueuePage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const campaignId = searchParams.get("campaign");
   const permissions = useM12Permissions();
+
+  // Campaign filter — lets the hiring manager switch which of their own
+  // active campaigns this queue is scoped to, instead of only landing here
+  // via a specific campaign's "Review Interviews" button. Defaults to the
+  // first active campaign so the page always has one to call the backend
+  // with, even when opened straight from the sidebar with no ?campaign=.
+  const [activeCampaigns, setActiveCampaigns] = useState([]);
+  const [campaignsLoading, setCampaignsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setCampaignsLoading(true);
+      try {
+        const res = await getCampaignsByHiringManager({ show_closed: false });
+        const list = Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res?.data?.items)
+            ? res.data.items
+            : Array.isArray(res)
+              ? res
+              : [];
+        const active = list.filter((c) => (c.status || "").toUpperCase() === "ACTIVE");
+        if (cancelled) return;
+        setActiveCampaigns(active);
+        if (!campaignId && active.length > 0) {
+          setSearchParams({ campaign: String(active[0].id) }, { replace: true });
+        }
+      } catch (err) {
+        if (!cancelled) toast.error("Failed to load your campaigns.");
+      } finally {
+        if (!cancelled) setCampaignsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // Only fetch once on mount — the campaign list itself doesn't depend on
+    // which campaign is currently selected.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const campaignOptions = activeCampaigns.map((c) => ({ label: c.name, value: String(c.id) }));
 
   const {
     candidates,
@@ -42,12 +85,20 @@ export default function InterviewQueuePage() {
   const [rejectTarget, setRejectTarget] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  if (!campaignId && campaignsLoading) {
+    return (
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex justify-center">
+        <LoadingSpinner text="Loading your campaigns..." />
+      </div>
+    );
+  }
+
   if (!campaignId) {
     return (
       <div className="p-8 bg-[#F8FAFC] min-h-screen">
         <ErrorState
-          title="No campaign selected"
-          message='Open a campaign and choose "Review Interviews" to see its interview queue.'
+          title="No active campaign"
+          message="You have no active campaigns to review. Open a campaign and choose &quot;Review Interviews&quot; instead."
           onRetry={() => navigate("/airs/campaigns")}
         />
       </div>
@@ -116,7 +167,15 @@ export default function InterviewQueuePage() {
         </p>
       </div>
 
-      <QueueFilters search={search} setSearch={setSearch} stageFilter={stageFilter} setStageFilter={setStageFilter} />
+      <QueueFilters
+        search={search}
+        setSearch={setSearch}
+        stageFilter={stageFilter}
+        setStageFilter={setStageFilter}
+        campaignOptions={campaignOptions}
+        campaignId={campaignId}
+        onCampaignChange={(value) => setSearchParams({ campaign: value })}
+      />
 
       {error ? (
         <ErrorState
@@ -129,6 +188,7 @@ export default function InterviewQueuePage() {
           candidates={candidates}
           isLoading={loading}
           permissions={permissions}
+          campaignId={campaignId}
           onAdvance={(candidate) => setConfirmAction({ kind: "advance", candidate })}
           onSelect={(candidate) => setConfirmAction({ kind: "select", candidate })}
           onReject={setRejectTarget}
