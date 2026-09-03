@@ -3,14 +3,18 @@ import { AlertTriangle, ChevronDown, ChevronRight, Inbox, Layers, ShieldAlert, X
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import GenericTable from "@/components/Table/table";
-import Pagination from "@/components/Pagination/pagination";
 import { showStatusToast } from "@/components/toastfy/toast";
-import { useMyQueue, useBulkApprove } from "../hooks/useApprovalWorkflow";
+import {
+  useMyQueue,
+  useReviewLineItem,
+  useRejectReport,
+  useBulkApprove,
+} from "../hooks/useApprovalWorkflow";
 import { useApprovalLiveSync } from "../hooks/useApprovalLiveSync";
-import { formatMoney, formatDate, friendlyApprovalError } from "../constants/approvalLabels";
+import { formatMoney } from "../constants/approvalLabels";
 import EmployeeLabel from "../components/EmployeeLabel";
-import ApprovalStatusPill from "../components/ApprovalStatusPill";
+import LineItemReviewPanel from "../components/LineItemReviewPanel";
+import CommentPromptModal from "../components/CommentPromptModal";
 import MyDelegateCard from "../components/MyDelegateCard";
 import ExpenseReviewPanel from "../components/ExpenseReviewPanel";
 import { useQueries } from "@tanstack/react-query";
@@ -27,26 +31,21 @@ const hasPolicyIssue = (lineItems) => (lineItems || []).some((l) => l.policyViol
 
 /**
  * The approver's queue - every report where the caller (or their active delegate) currently has an
- * ACTIVE assignment (GET /xms/approvals/my-queue, server-side paginated). A clean summary table;
- * "Review" is the only per-row action - approve/reject/needs-correction/bulk-approve-this-report all
- * live inside ExpenseReviewPanel so they aren't duplicated here. Row checkboxes are only for
- * selecting several DIFFERENT reports to bulk-approve at once (each still calls the same
- * single-report POST /{reportId}/bulk-approve - there is no multi-report backend endpoint).
- *
- * Approval-only by design: Finance Verification is its own separate page
- * (/expense-management/finance/verification) - a report leaving this queue for
- * PENDING_FINANCE_VERIFICATION is expected to disappear from here and be picked up there, not
- * surface inside this page.
+ * ACTIVE assignment (GET /xms/approvals/my-queue, server-side paginated). Row expansion still
+ * offers the fast quick-approve line panel; "Review" opens the full ExpenseReviewPanel (receipt +
+ * full detail + timeline) for reports that need a closer look.
  */
 export default function PendingApprovalsPage({ searchTerm = "" }) {
   const [page, setPage] = useState(0);
+  const [expandedReportId, setExpandedReportId] = useState(null);
+  const [rejectingReport, setRejectingReport] = useState(null);
   const [reviewingItem, setReviewingItem] = useState(null);
-  const [selectedIds, setSelectedIds] = useState(new Set());
-  const [bulkRunning, setBulkRunning] = useState(false);
 
   useApprovalLiveSync();
 
   const { data, isLoading, isError, refetch } = useMyQueue(page, 20);
+  const reviewLineItem = useReviewLineItem();
+  const rejectReport = useRejectReport();
   const bulkApprove = useBulkApprove();
 
   const items = data?.content || [];
@@ -118,43 +117,38 @@ export default function PendingApprovalsPage({ searchTerm = "" }) {
     );
   };
 
-  const toggleSelectAllEligible = () => {
-    setSelectedIds(allEligibleSelected ? new Set() : new Set(eligibleIds));
+  const handleFlagLine = (reportId, lineItemId, comment) => {
+    reviewLineItem.mutate(
+      { reportId, lineItemId, decision: "NEEDS_CORRECTION", comment },
+      {
+        onSuccess: () => showStatusToast("Line item flagged for correction", "success"),
+        onError: (err) => showStatusToast(err.response?.data?.message || "Failed to flag line item", "error"),
+      },
+    );
   };
 
-  const handleBulkApproveSelected = async () => {
-    const ids = selectedEligibleIds;
-    if (!ids.length || bulkRunning) return;
-    setBulkRunning(true);
-
-    const results = await Promise.allSettled(ids.map((id) => bulkApprove.mutateAsync(id)));
-
-    const failures = [];
-    results.forEach((result, idx) => {
-      if (result.status === "rejected") {
-        const reportNumber = items.find((i) => i.reportId === ids[idx])?.reportNumber || ids[idx];
-        failures.push({ reportNumber, reason: friendlyApprovalError(result.reason?.response?.data?.message, "Approval failed") });
-      }
+  const handleBulkApprove = (reportId) => {
+    bulkApprove.mutate(reportId, {
+      onSuccess: () => showStatusToast("Report bulk-approved", "success"),
+      onError: (err) => showStatusToast(err.response?.data?.message || "Bulk approve failed", "error"),
     });
-    const successCount = ids.length - failures.length;
-
-    if (successCount > 0) {
-      showStatusToast(
-        `Successfully approved: ${successCount}${failures.length ? `  ·  Failed: ${failures.length}` : ""}`,
-        failures.length ? "warning" : "success"
-      );
-    }
-    failures.forEach((f) => showStatusToast(`${f.reportNumber}: ${f.reason}`, "error"));
-
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      ids.forEach((id, idx) => {
-        if (results[idx].status === "fulfilled") next.delete(id);
-      });
-      return next;
-    });
-    setBulkRunning(false);
   };
+
+  const renderActions = (item) => (
+    <div className="inline-flex flex-wrap items-center justify-end gap-2">
+      <Button size="small" variant="outline" disabled={isMutating} onClick={() => setReviewingItem(item)}>
+        Review
+      </Button>
+      {item.eligibleForBulkApprove && (
+        <Button size="small" variant="success" disabled={isMutating} onClick={() => handleBulkApprove(item.reportId)}>
+          Bulk Approve
+        </Button>
+      )}
+      <Button size="small" variant="outline" disabled={isMutating} onClick={() => setRejectingReport(item)}>
+        <XCircle className="h-3.5 w-3.5" /> Reject
+      </Button>
+    </div>
+  );
 
   return (
     <div className="p-4 sm:p-6">
@@ -166,14 +160,7 @@ export default function PendingApprovalsPage({ searchTerm = "" }) {
         ]}
       />
 
-      <div className="mt-3 mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-gray-900">Pending Approvals</h1>
-        {selectedEligibleIds.length > 0 && (
-          <Button size="small" variant="success" loading={bulkRunning} loadingText="Approving..." onClick={handleBulkApproveSelected}>
-            Bulk Approve Selected ({selectedEligibleIds.length})
-          </Button>
-        )}
-      </div>
+      <h1 className="text-xl font-semibold text-gray-900 mt-3 mb-4">Pending Approvals</h1>
 
       <MyDelegateCard />
 
@@ -316,22 +303,47 @@ export default function PendingApprovalsPage({ searchTerm = "" }) {
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">{renderActions(item)}</div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
 
       {data && data.totalPages > 1 && (
-        <div className="mt-4 flex justify-center">
-          <Pagination
-            currentPage={page + 1}
-            totalPages={data.totalPages}
-            onPrevious={() => setPage((p) => p - 1)}
-            onNext={() => setPage((p) => p + 1)}
-          />
+        <div className="flex items-center justify-end gap-3 mt-4 text-sm text-gray-600">
+          <Button size="small" variant="outline" disabled={data.first} onClick={() => setPage((p) => p - 1)}>
+            Previous
+          </Button>
+          <span>
+            Page {data.page + 1} of {data.totalPages}
+          </span>
+          <Button size="small" variant="outline" disabled={data.last} onClick={() => setPage((p) => p + 1)}>
+            Next
+          </Button>
         </div>
       )}
+
+      <CommentPromptModal
+        isOpen={!!rejectingReport}
+        title={`Reject report ${rejectingReport?.reportNumber ?? ""}`}
+        description="This is a terminal decision - the employee cannot resubmit this report. Use Needs Correction on individual lines instead if the report just needs a fix."
+        confirmLabel="Reject Report"
+        confirmVariant="danger"
+        isLoading={rejectReport.isPending}
+        onCancel={() => setRejectingReport(null)}
+        onConfirm={(comment) => {
+          rejectReport.mutate(
+            { reportId: rejectingReport.reportId, comment },
+            {
+              onSuccess: () => {
+                showStatusToast("Report rejected", "success");
+                setRejectingReport(null);
+              },
+              onError: (err) => showStatusToast(err.response?.data?.message || "Failed to reject report", "error"),
+            },
+          );
+        }}
+      />
 
       <ExpenseReviewPanel
         isOpen={!!reviewingItem}
