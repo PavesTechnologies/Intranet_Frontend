@@ -1,5 +1,10 @@
+<<<<<<< HEAD
+import React, { useState, useMemo } from "react";
+import { AlertTriangle, ChevronDown, ChevronRight, Inbox, Layers, ShieldAlert, XCircle } from "lucide-react";
+=======
 import React, { useState } from "react";
 import { AlertTriangle, Inbox } from "lucide-react";
+>>>>>>> 3805354568548e3151912262197c663342409d28
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -13,6 +18,9 @@ import EmployeeLabel from "../components/EmployeeLabel";
 import ApprovalStatusPill from "../components/ApprovalStatusPill";
 import MyDelegateCard from "../components/MyDelegateCard";
 import ExpenseReviewPanel from "../components/ExpenseReviewPanel";
+import { useQueries } from "@tanstack/react-query";
+import { lineItemService } from "@/pages/expense-management/api/expenseReportsApi";
+import { approvalWorkflowApi } from "../api/approvalWorkflowApi";
 
 /**
  * The approver's queue - every report where the caller (or their active delegate) currently has an
@@ -27,7 +35,7 @@ import ExpenseReviewPanel from "../components/ExpenseReviewPanel";
  * PENDING_FINANCE_VERIFICATION is expected to disappear from here and be picked up there, not
  * surface inside this page.
  */
-export default function PendingApprovalsPage() {
+export default function PendingApprovalsPage({ searchTerm = "" }) {
   const [page, setPage] = useState(0);
   const [reviewingItem, setReviewingItem] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -39,9 +47,70 @@ export default function PendingApprovalsPage() {
   const bulkApprove = useBulkApprove();
 
   const items = data?.content || [];
+<<<<<<< HEAD
+
+  const lineItemsQueries = useQueries({
+    queries: items.map((item) => ({
+      queryKey: ["reportLineItems", item.reportId],
+      queryFn: async () => {
+        const res = await lineItemService.getAll(item.reportId);
+        const payload = res.data?.data;
+        return Array.isArray(payload) ? payload : payload?.lineItems || payload?.content || payload?.data || [];
+      },
+      staleTime: 30_000,
+    })),
+  });
+
+  const reviewsQueries = useQueries({
+    queries: items.map((item) => ({
+      queryKey: ["reportReviews", item.reportId],
+      queryFn: async () => {
+        const res = await approvalWorkflowApi.getLineItemReviews(item.reportId);
+        return res.data?.data || [];
+      },
+      staleTime: 15_000,
+    })),
+  });
+
+  const resolvedItems = useMemo(() => {
+    return items.map((item, idx) => {
+      const allLines = lineItemsQueries[idx]?.data || [];
+      const reportReviews = reviewsQueries[idx]?.data || [];
+
+      // A line is pending if it has no review at the current level, or the review status is "PENDING"
+      // or not "APPROVED" / "NEEDS_CORRECTION".
+      const pendingLineItems = allLines.filter((line) => {
+        const lineReviews = reportReviews.filter((r) => r.lineItemId === line.lineItemId);
+        const currentLevelReview = lineReviews.find(
+          (r) => r.levelOrder === item.levelOrder || r.levelOrder === item.currentLevelOrder
+        );
+        if (!currentLevelReview) return true;
+        return (
+          currentLevelReview.status === "PENDING" ||
+          (currentLevelReview.status !== "APPROVED" && currentLevelReview.status !== "NEEDS_CORRECTION")
+        );
+      });
+
+      return {
+        ...item,
+        pendingLineItems,
+      };
+    });
+  }, [items, lineItemsQueries, reviewsQueries]);
+
+  const filteredItems = resolvedItems.filter((item) => {
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    const reportNum = (item.reportNumber || "").toLowerCase();
+    const merchant = merchantSummary(item.pendingLineItems).toLowerCase();
+    return reportNum.includes(q) || merchant.includes(q);
+  });
+  const isMutating = reviewLineItem.isPending || rejectReport.isPending || bulkApprove.isPending;
+=======
   const eligibleIds = items.filter((i) => i.eligibleForBulkApprove).map((i) => i.reportId);
   const selectedEligibleIds = [...selectedIds].filter((id) => eligibleIds.includes(id));
   const allEligibleSelected = eligibleIds.length > 0 && eligibleIds.every((id) => selectedIds.has(id));
+>>>>>>> 3805354568548e3151912262197c663342409d28
 
   const toggleSelect = (reportId) => {
     setSelectedIds((prev) => {
@@ -125,17 +194,101 @@ export default function PendingApprovalsPage() {
         </div>
       )}
 
-      {!isLoading && !isError && items.length === 0 && (
+      {!isLoading && !isError && filteredItems.length === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-16 text-center">
           <Inbox className="h-8 w-8 text-gray-300" />
-          <p className="text-sm font-medium text-gray-600">Nothing waiting on you right now.</p>
-          <p className="text-xs text-gray-400">Reports assigned to you for approval will show up here.</p>
+          <p className="text-sm font-medium text-gray-600">
+            {searchTerm ? "No approvals match the search criteria." : "Nothing waiting on you right now."}
+          </p>
+          {!searchTerm && <p className="text-xs text-gray-400">Reports assigned to you for approval will show up here.</p>}
         </div>
       )}
 
-      {items.length > 0 && (
+      {filteredItems.length > 0 && (
         <>
           {/* Desktop / tablet table */}
+<<<<<<< HEAD
+          <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
+                  <tr>
+                    <th className="w-8 px-2.5 py-2" />
+                    <th className="px-2.5 py-2">Report</th>
+                    <th className="px-2.5 py-2">Employee</th>
+                    <th className="px-2.5 py-2">Merchant / Category</th>
+                    <th className="px-2.5 py-2">Items Pending</th>
+                    <th className="px-2.5 py-2">Level</th>
+                    <th className="px-2.5 py-2">Policy</th>
+                    <th className="px-2.5 py-2">Amount</th>
+                    <th className="px-2.5 py-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredItems.map((item, index) => {
+                    const isExpanded = expandedReportId === item.reportId;
+                    const flagged = hasPolicyIssue(item.pendingLineItems);
+                    return (
+                      <React.Fragment key={item.reportId}>
+                        <tr className={`transition cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`} onClick={() => setExpandedReportId(isExpanded ? null : item.reportId)}>
+                          <td className="px-2.5 py-1.5 text-gray-400">
+                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          </td>
+                          <td className="px-2.5 py-1.5">
+                            <span className="font-mono text-[11px] font-semibold text-gray-700">{item.reportNumber}</span>
+                          </td>
+                          <td className="px-2.5 py-1.5">
+                            <span className="font-medium text-xs text-gray-900">
+                              <EmployeeLabel employeeId={item.employeeId} />
+                            </span>
+                          </td>
+                          <td className="px-2.5 py-1.5 text-gray-600 max-w-[220px] truncate text-xs">{merchantSummary(item.pendingLineItems)}</td>
+                          <td className="px-2.5 py-1.5 text-gray-600 text-xs">{item.pendingLineItems?.length ?? 0}</td>
+                          <td className="px-2.5 py-1.5 text-gray-600 text-xs">
+                            <span className="inline-flex items-center gap-1">
+                              <Layers className="h-3.5 w-3.5" /> Level {item.levelOrder}
+                            </span>
+                          </td>
+                          <td className="px-2.5 py-1.5">
+                            {flagged ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                                <ShieldAlert className="h-3 w-3" /> Warning
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                                Clear
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-2.5 py-1.5 text-gray-900 font-medium whitespace-nowrap text-xs">{formatMoney(item.totalAmount, item.currencyCode)}</td>
+                          <td className="px-2.5 py-1.5 text-right text-xs" onClick={(e) => e.stopPropagation()}>
+                            {renderActions(item)}
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={9} className="bg-gray-50/60 p-0">
+                              {flagged && (
+                                <p className="flex items-center gap-1.5 text-xs text-amber-700 px-4 pt-3">
+                                  <ShieldAlert className="h-3.5 w-3.5" /> Has open policy violations - not eligible for bulk approval.
+                                </p>
+                              )}
+                              <LineItemReviewPanel
+                                reportId={item.reportId}
+                                lineItems={item.pendingLineItems}
+                                isBusy={isMutating}
+                                onApproveLine={(lineItemId) => handleApproveLine(item.reportId, lineItemId)}
+                                onFlagLine={(lineItemId, comment) => handleFlagLine(item.reportId, lineItemId, comment)}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+=======
           <div className="hidden md:block rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="w-full overflow-x-auto rounded-lg">
               <GenericTable
@@ -173,11 +326,26 @@ export default function PendingApprovalsPage() {
                   ),
                 }))}
               />
+>>>>>>> 3805354568548e3151912262197c663342409d28
             </div>
           </div>
 
           {/* Mobile card list */}
           <div className="md:hidden space-y-3">
+<<<<<<< HEAD
+            {filteredItems.map((item) => {
+              const flagged = hasPolicyIssue(item.pendingLineItems);
+              return (
+                <div key={item.reportId} className="rounded-xl border border-gray-200 bg-white p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900">{item.reportNumber}</p>
+                      <p className="text-sm text-gray-500">
+                        <EmployeeLabel employeeId={item.employeeId} />
+                      </p>
+                    </div>
+                    <p className="shrink-0 font-semibold text-gray-900">{formatMoney(item.totalAmount, item.currencyCode)}</p>
+=======
             {items.map((item) => (
               <div key={item.reportId} className="rounded-xl border border-gray-200 bg-white p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -186,6 +354,7 @@ export default function PendingApprovalsPage() {
                     <p className="text-sm text-gray-500">
                       <EmployeeLabel employeeId={item.employeeId} />
                     </p>
+>>>>>>> 3805354568548e3151912262197c663342409d28
                   </div>
                   <p className="shrink-0 font-semibold text-gray-900">{formatMoney(item.totalAmount, item.currencyCode)}</p>
                 </div>

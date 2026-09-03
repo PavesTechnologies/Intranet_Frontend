@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   X,
   Check,
-  HelpCircle,
+  MessageSquareWarning,
   Landmark,
   FileText,
   Wallet,
@@ -327,7 +327,7 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
                 disabled={isMutating || !selectedLine}
                 onClick={() => setQueryingLine(selectedLine)}
               >
-                <HelpCircle className="h-4 w-4" /> Query Line
+                <MessageSquareWarning className="h-4 w-4" /> Request Correction
               </Button>
               <Button
                 variant="success"
@@ -344,10 +344,10 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
 
       <CommentPromptModal
         isOpen={!!queryingLine}
-        title="Raise Finance Query"
-        description="Specify the reason for querying this line item. The employee will see this comment and can fix the line item details."
-        contextLabel={queryingLine ? `Querying: ${queryingLine.merchantName || queryingLine.categoryName || "Line item"} — ${formatMoney(queryingLine.amount, queryingLine.currencyCode)}` : ""}
-        confirmLabel="Raise Query"
+        title="Request correction"
+        description="The employee will see this comment and can fix the line item details, then resubmit the report."
+        contextLabel={queryingLine ? `Correcting: ${queryingLine.merchantName || queryingLine.categoryName || "Line item"} — ${formatMoney(queryingLine.amount, queryingLine.currencyCode)}` : ""}
+        confirmLabel="Request Correction"
         confirmVariant="danger"
         isLoading={queryLineItem.isPending}
         onCancel={() => setQueryingLine(null)}
@@ -356,14 +356,23 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
             { reportId, lineItemId: queryingLine.lineItemId, reason },
             {
               onSuccess: () => {
+<<<<<<< HEAD
+                showStatusToast("Correction requested successfully", "success");
+=======
                 refetchReviewData();
                 showStatusToast("Query raised successfully", "success");
+>>>>>>> 3805354568548e3151912262197c663342409d28
                 setQueryingLine(null);
+                onClose();
               },
+<<<<<<< HEAD
+              onError: (err) => showStatusToast(err.response?.data?.message || "Failed to request correction", "error"),
+=======
               onError: (err) => {
                 refetchReviewData();
                 showStatusToast(err.response?.data?.message || "Failed to raise query", "error");
               },
+>>>>>>> 3805354568548e3151912262197c663342409d28
             }
           );
         }}

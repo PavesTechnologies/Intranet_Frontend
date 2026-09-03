@@ -395,6 +395,12 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
             { reportId, lineItemId: flaggingLine.lineItemId, decision: "NEEDS_CORRECTION", comment },
             {
               onSuccess: () => {
+<<<<<<< HEAD
+                showStatusToast("Line item flagged for correction", "success");
+                onClose();
+              },
+              onError: (err) => showStatusToast(err.response?.data?.message || "Failed to flag line item", "error"),
+=======
                 refetchReviewData();
                 showStatusToast("Line item flagged for correction", "success");
               },
@@ -402,6 +408,7 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
                 refetchReviewData();
                 showStatusToast(friendlyApprovalError(err.response?.data?.message, "Failed to flag line item"), "error");
               },
+>>>>>>> 3805354568548e3151912262197c663342409d28
             },
           );
           setFlaggingLine(null);
