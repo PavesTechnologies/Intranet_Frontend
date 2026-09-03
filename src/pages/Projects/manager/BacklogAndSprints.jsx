@@ -1,6 +1,6 @@
 // src/pages/Projects/manager/BacklogAndSprints.jsx
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../api/axiosInstance";
 import { DndProvider, useDrop } from "react-dnd";
@@ -23,18 +23,41 @@ import RightSidePanel from "./Sprint/RightSidePanel";
 import SprintDetailsPanel from "./Sprint/SprintDetailsPanel";
 import SprintPendingModal from "./Sprint/SprintPendingModal";
 import ExcelImportPanel from "./Backlog/ExcelImportPanel";
+import Pagination from "../../../components/Pagination/pagination";
 import { ca } from "date-fns/locale";
 import { useLocation } from "react-router-dom";
+
+const BACKLOG_PAGE_SIZE = 10;
+
+// BacklogAndSprints unmounts whenever the user switches project tabs
+// (Summary/Backlog/Board), so without a cache every return trip re-ran all
+// 6 fetches (stories, tasks, sprints, epics, permissions, risk map) from
+// scratch, flashing an empty backlog before anything appeared. This
+// module-level, per-project cache lets a revisit render the last known
+// snapshot instantly while a silent background refetch keeps it current —
+// stale-while-revalidate, scoped to the browser session.
+const backlogCache = new Map();
+const BACKLOG_CACHE_TTL_MS = 60_000;
+const getCachedBacklogSnapshot = (projectId) => backlogCache.get(projectId) || null;
+const saveBacklogCache = (projectId, partial) => {
+  if (!projectId) return;
+  const prev = backlogCache.get(projectId) || {};
+  backlogCache.set(projectId, { ...prev, ...partial, timestamp: Date.now() });
+};
 
 const BacklogAndSprints = ({ projectId, projectName }) => {
   const navigate = useNavigate();
 
-  const [stories, setStories] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [sprints, setSprints] = useState([]);
-  const [epics, setEpics] = useState([]);
-  const [backlogStories, setBacklogStories] = useState([]);
-  const [backlogTasks, setBacklogTasks] = useState([]);
+  const [stories, setStories] = useState(() => getCachedBacklogSnapshot(projectId)?.stories || []);
+  const [tasks, setTasks] = useState(() => getCachedBacklogSnapshot(projectId)?.tasks || []);
+  const [sprints, setSprints] = useState(() => getCachedBacklogSnapshot(projectId)?.sprints || []);
+  const [epics, setEpics] = useState(() => getCachedBacklogSnapshot(projectId)?.epics || []);
+  const [backlogStories, setBacklogStories] = useState(
+    () => getCachedBacklogSnapshot(projectId)?.stories?.filter((s) => !s.sprintId) || [],
+  );
+  const [backlogTasks, setBacklogTasks] = useState(
+    () => getCachedBacklogSnapshot(projectId)?.tasks?.filter((t) => !t.sprintId) || [],
+  );
   const [showIssueForm, setShowIssueForm] = useState(false);
   const [showSprintModal, setShowSprintModal] = useState(false);
   const [selectedStoryId, setSelectedStoryId] = useState(null);
@@ -46,10 +69,42 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
   const [pendingData, setPendingData] = useState(null);
   const [showCompletedSprints, setShowCompletedSprints] = useState(false);
   const [expandedBacklogStories, setExpandedBacklogStories] = useState([]);
-  const [permissions, setPermissions] = useState(null);
+  const [backlogPage, setBacklogPage] = useState(1);
+  const [permissions, setPermissions] = useState(() => getCachedBacklogSnapshot(projectId)?.permissions || null);
   const [deleteSprintConfirmOpen, setDeleteSprintConfirmOpen] = useState(false);
   const [sprintIdToDelete, setSprintIdToDelete] = useState(null);
-  const [riskMap, setRiskMap] = useState({});
+  const [riskMap, setRiskMap] = useState(() => getCachedBacklogSnapshot(projectId)?.riskMap || {});
+
+  // Opening/closing the right side panel (story/task/sprint details) must not
+  // move the user away from where they were scrolled on the backlog list.
+  const scrollContainerRef = useRef(null);
+  const scrollPosRef = useRef({ window: 0, container: 0 });
+
+  useEffect(() => {
+    const captureWindowScroll = () => {
+      scrollPosRef.current.window = window.scrollY;
+    };
+    const captureContainerScroll = () => {
+      if (scrollContainerRef.current) {
+        scrollPosRef.current.container = scrollContainerRef.current.scrollTop;
+      }
+    };
+    window.addEventListener("scroll", captureWindowScroll, { passive: true });
+    const el = scrollContainerRef.current;
+    el?.addEventListener("scroll", captureContainerScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", captureWindowScroll);
+      el?.removeEventListener("scroll", captureContainerScroll);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, scrollPosRef.current.window);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollPosRef.current.container;
+    }
+  }, [rightPanelOpen, selectedStoryId, selectedTaskId, selectedSprintId, panelMode]);
+
   const toggleStoryExpand = (storyId) => {
     setExpandedBacklogStories((prev) =>
       prev.includes(storyId)
@@ -57,6 +112,23 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
         : [...prev, storyId],
     );
   };
+
+  const backlogTotalPages = Math.max(
+    1,
+    Math.ceil(backlogStories.length / BACKLOG_PAGE_SIZE),
+  );
+  const pagedBacklogStories = useMemo(
+    () =>
+      backlogStories.slice(
+        (backlogPage - 1) * BACKLOG_PAGE_SIZE,
+        backlogPage * BACKLOG_PAGE_SIZE,
+      ),
+    [backlogStories, backlogPage],
+  );
+
+  useEffect(() => {
+    setBacklogPage((p) => Math.min(p, backlogTotalPages));
+  }, [backlogTotalPages]);
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
@@ -283,7 +355,7 @@ const handleSprintStatus = async (sprintId, action) => {
   // =======================================
   // Fetch Data
   // =======================================
-  const fetchStories = async () => {
+  const fetchStories = async ({ silent = false } = {}) => {
     try {
       const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/stories`,
@@ -297,12 +369,13 @@ const handleSprintStatus = async (sprintId, action) => {
       const list = Array.isArray(res.data) ? res.data : res.data.content || [];
       setStories(list);
       setBacklogStories(list.filter((s) => !s.sprintId));
+      saveBacklogCache(projectId, { stories: list });
     } catch {
-      showStatusToast("Failed to fetch stories", "error");
+      if (!silent) showStatusToast("Failed to fetch stories", "error");
     }
   };
 
-  const fetchPermissions = async () => {
+  const fetchPermissions = async ({ silent = false } = {}) => {
     try {
       const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/permissions`,
@@ -310,13 +383,14 @@ const handleSprintStatus = async (sprintId, action) => {
       );
 
       setPermissions(res.data);
+      saveBacklogCache(projectId, { permissions: res.data });
     } catch (error) {
       console.error("Failed to fetch permissions", error);
     }
   };
 
 
-  const fetchTasks = async () => {
+  const fetchTasks = async ({ silent = false } = {}) => {
     try {
       const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/tasks`,
@@ -330,12 +404,13 @@ const handleSprintStatus = async (sprintId, action) => {
       const list = Array.isArray(res.data) ? res.data : res.data.content || [];
       setTasks(list);
       setBacklogTasks(list.filter((t) => !t.sprintId));
+      saveBacklogCache(projectId, { tasks: list });
     } catch {
-      showStatusToast("Failed to fetch tasks", "error");
+      if (!silent) showStatusToast("Failed to fetch tasks", "error");
     }
   };
 
-  const fetchEpics = async () => {
+  const fetchEpics = async ({ silent = false } = {}) => {
     try {
       const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/epics`,
@@ -346,13 +421,15 @@ const handleSprintStatus = async (sprintId, action) => {
         },
       );
 
-      setEpics(Array.isArray(res.data) ? res.data : res.data.content || []);
+      const list = Array.isArray(res.data) ? res.data : res.data.content || [];
+      setEpics(list);
+      saveBacklogCache(projectId, { epics: list });
     } catch {
-      showStatusToast("Failed to fetch epics", "error");
+      if (!silent) showStatusToast("Failed to fetch epics", "error");
     }
   };
 
-  const fetchSprints = async () => {
+  const fetchSprints = async ({ silent = false } = {}) => {
     try {
       const res = await api.get(
         `${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/${projectId}/sprints`,
@@ -363,9 +440,11 @@ const handleSprintStatus = async (sprintId, action) => {
         },
       );
 
-      setSprints(Array.isArray(res.data) ? res.data : res.data.content || []);
+      const list = Array.isArray(res.data) ? res.data : res.data.content || [];
+      setSprints(list);
+      saveBacklogCache(projectId, { sprints: list });
     } catch {
-      showStatusToast("Failed to fetch sprints", "error");
+      if (!silent) showStatusToast("Failed to fetch sprints", "error");
     }
   };
   // =======================================
@@ -405,7 +484,7 @@ const handleSprintStatus = async (sprintId, action) => {
     setDeleteSprintConfirmOpen(true);
   };
 
-  const fetchRiskMap = async () => {
+  const fetchRiskMap = async ({ silent = false } = {}) => {
     const numId = Number(projectId);
     if (!numId || isNaN(numId)) return;
     try {
@@ -421,18 +500,37 @@ const handleSprintStatus = async (sprintId, action) => {
         if (r.linkedType && r.linkedId) map[`${r.linkedType}-${r.linkedId}`] = r.riskCount ?? 1;
       });
       setRiskMap(map);
+      saveBacklogCache(projectId, { riskMap: map });
     } catch {
       // non-critical
     }
   };
 
   useEffect(() => {
-    fetchStories();
-    fetchTasks();
-    fetchSprints();
-    fetchEpics();
-    fetchPermissions();
-    fetchRiskMap();
+    if (!projectId) return;
+    const cached = getCachedBacklogSnapshot(projectId);
+    const isFresh = cached && Date.now() - cached.timestamp < BACKLOG_CACHE_TTL_MS;
+
+    if (cached) {
+      setStories(cached.stories || []);
+      setBacklogStories((cached.stories || []).filter((s) => !s.sprintId));
+      setTasks(cached.tasks || []);
+      setBacklogTasks((cached.tasks || []).filter((t) => !t.sprintId));
+      setSprints(cached.sprints || []);
+      setEpics(cached.epics || []);
+      setPermissions(cached.permissions || null);
+      setRiskMap(cached.riskMap || {});
+    }
+
+    const opts = { silent: !!cached };
+    if (!isFresh) {
+      fetchStories(opts);
+      fetchTasks(opts);
+      fetchSprints(opts);
+      fetchEpics(opts);
+      fetchPermissions(opts);
+      fetchRiskMap(opts);
+    }
   }, [projectId]);
 
   // =======================================
@@ -516,21 +614,23 @@ const handleSprintStatus = async (sprintId, action) => {
               <Plus size={16} /> Create Issue
             </Button>
 
-            <ExcelImportPanel
-              projectId={projectId}
-              projectName={projectName}
-              disabled={!permissions?.canEdit}
-              onImported={() => {
-                fetchStories();
-                fetchTasks();
-                fetchEpics();
-              }}
-            />
+            {isManager && (
+              <ExcelImportPanel
+                projectId={projectId}
+                projectName={projectName}
+                disabled={!permissions?.canEdit}
+                onImported={() => {
+                  fetchStories();
+                  fetchTasks();
+                  fetchEpics();
+                }}
+              />
+            )}
           </div>
         </div>
 
         {/* ── Scrollable Content ── */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
+        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
         {/* Sprints */}
         <div className="space-y-4">
           {activeAndPlanningSprints.map((sprint) => {
@@ -682,7 +782,7 @@ const handleSprintStatus = async (sprintId, action) => {
 
           <div className="overflow-y-auto max-h-[calc(100vh-250px)] pr-1 space-y-4">
             {/* 1. STORIES AND THEIR NESTED TASKS */}
-            {backlogStories.map((story) => {
+            {pagedBacklogStories.map((story) => {
               // Find tasks that belong to this story
               const childTasks = backlogTasks.filter(
                 (t) => t.storyId === story.id,
@@ -791,6 +891,15 @@ const handleSprintStatus = async (sprintId, action) => {
               );
             })()}
           </div>
+
+          {backlogTotalPages > 1 && (
+            <Pagination
+              currentPage={backlogPage}
+              totalPages={backlogTotalPages}
+              onPrevious={() => setBacklogPage((p) => Math.max(1, p - 1))}
+              onNext={() => setBacklogPage((p) => Math.min(backlogTotalPages, p + 1))}
+            />
+          )}
         </BacklogDropWrapper>
         </div>{/* end scrollable content */}
       </div>{/* end h-full flex-col */}

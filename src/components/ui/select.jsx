@@ -1,4 +1,4 @@
-import React, { useState, createContext, useContext, useEffect, useRef } from "react"
+import React, { useState, createContext, useContext, useEffect, useRef, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { ChevronDown, Check } from "lucide-react"
 
@@ -27,9 +27,15 @@ const Select = ({ children, value, onValueChange, defaultValue }) => {
         setOpen(false)
     }
 
-    const addLabel = (val, label) => {
-        setLabels(prev => ({ ...prev, [val]: label }))
-    }
+    // Stable reference (empty deps + functional setState) and a no-op guard
+    // when the label is already correct — SelectItem's mount effect depends
+    // on this function, so a reference that changed every render (as the
+    // previous plain-function version did) would re-fire that effect every
+    // time it called setLabels, looping forever ("Maximum update depth
+    // exceeded") once SelectContent stopped unmounting while closed.
+    const addLabel = useCallback((val, label) => {
+        setLabels(prev => (prev[val] === label ? prev : { ...prev, [val]: label }))
+    }, [])
 
     const containerRef = useRef(null)
 
@@ -82,10 +88,17 @@ const SelectValue = ({ placeholder, className }) => {
     )
 }
 
-const SelectContent = React.forwardRef(({ className, children, position = "popper", ...props }, ref) => {
+const SelectContent = React.forwardRef(({ className, children, position = "popper", style, ...props }, ref) => {
     const { open } = useContext(SelectContext)
-    if (!open) return null
 
+    // Stay mounted (but visually hidden) while closed instead of unmounting —
+    // SelectItem registers its label via a mount-time effect, so unmounting
+    // here meant SelectValue never learned the current value's label until
+    // the dropdown was opened at least once.
+    //
+    // display:none is set inline (not via a Tailwind class) so it can't lose
+    // to a consumer-supplied className and leave this absolutely-positioned,
+    // z-50, w-full panel sitting over other clickable UI while "closed".
     return (
         <div
             ref={ref}
@@ -93,6 +106,7 @@ const SelectContent = React.forwardRef(({ className, children, position = "poppe
                 "absolute z-50 min-w-[8rem] overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 mt-1 w-full max-h-96",
                 className
             )}
+            style={{ ...style, display: open ? style?.display : "none" }}
             {...props}
         >
             <div className="p-1">{children}</div>

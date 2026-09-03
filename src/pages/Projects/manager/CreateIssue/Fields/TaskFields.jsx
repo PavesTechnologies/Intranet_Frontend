@@ -38,6 +38,8 @@ const TaskFields = ({ formData, onChange, statuses, stories, sprints, users, tod
 
     <FormDatePicker label="Due Date" name="dueDate" value={formData.dueDate || ""} onChange={onChange} min={today} />
 
+    <FormInput label="Estimated Hours" name="estimatedHours" type="number" min="0" value={formData.estimatedHours ?? ""} onChange={onChange} />
+
     <FormSelect label="Billable" name="Billable" value={String(!!formData.Billable)} onChange={onChange}
       options={[
         { label: "Yes", value: "true" },

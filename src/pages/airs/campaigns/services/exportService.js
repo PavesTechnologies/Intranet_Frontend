@@ -70,7 +70,7 @@ export const exportCandidateList = async (campaignId, {
   return { queued: false };
 };
 
-// ── scorecards ───────────────────────────────────────────────────────
+// ── scorecard ────────────────────────────────────────────────────────
 
 export const exportScorecard = async (campaignId, campaignCandidateId) => {
   const response = await api.get(
@@ -80,24 +80,7 @@ export const exportScorecard = async (campaignId, campaignCandidateId) => {
   saveBlob(response, "scorecard.pdf");
 };
 
-export const exportBatchScorecards = async (campaignId, campaignCandidateIds, format = "PDF") => {
-  const response = await api.post(
-    `${ROOT}/campaigns/${campaignId}/scorecards/batch`,
-    { campaign_candidate_ids: campaignCandidateIds, format },
-    { headers: authHeaders(), responseType: "arraybuffer" },
-  );
-  saveBlob(response, format === "ZIP" ? "scorecards.zip" : "scorecards.pdf");
-};
-
-export const exportShortlistPackage = async (campaignId) => {
-  const response = await api.get(
-    `${ROOT}/campaigns/${campaignId}/shortlist-package`,
-    { headers: authHeaders(), responseType: "arraybuffer" },
-  );
-  saveBlob(response, "shortlist_package.pdf");
-};
-
-// ── audit & compliance ───────────────────────────────────────────────
+// ── audit trail ──────────────────────────────────────────────────────
 
 export const exportAuditTrail = async (campaignId) => {
   const response = await api.get(
@@ -105,12 +88,4 @@ export const exportAuditTrail = async (campaignId) => {
     { headers: authHeaders(), responseType: "arraybuffer" },
   );
   saveBlob(response, "audit_trail.xlsx");
-};
-
-export const exportComplianceSummary = async (campaignId) => {
-  const response = await api.get(
-    `${ROOT}/campaigns/${campaignId}/compliance-summary`,
-    { headers: authHeaders(), responseType: "arraybuffer" },
-  );
-  saveBlob(response, "compliance_summary.pdf");
 };

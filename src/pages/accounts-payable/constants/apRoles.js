@@ -35,3 +35,11 @@ export const AP_PAYMENT_VIEWER_ROLES = [
   AP_ROLES.AP_EXECUTIVE,
   AP_ROLES.FINANCE_EXECUTIVE,
 ];
+
+/**
+ * Can create/manage purchase requisitions, approve/reject them, manage quotations,
+ * select vendors, and generate purchase orders. There is no separate Requester/Approver
+ * role in this app yet, so procurement — like invoice processing — is one operational
+ * role plus Admin.
+ */
+export const AP_PROCUREMENT_ROLES = [AP_ROLES.ADMIN, AP_ROLES.AP_EXECUTIVE];

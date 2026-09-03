@@ -1,15 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Combobox } from "@headlessui/react";
-import { Check, ChevronDown, RefreshCw, AlertCircle } from "lucide-react";
+import { Check, ChevronDown, RefreshCw, AlertCircle, FolderKanban, Hash, CalendarRange, Building2, UserRound } from "lucide-react";
 import classNames from "classnames";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
-import { Fonts } from "../../../../components/Fonts/Fonts";
 import {
   getBillingConfigurationClients,
   getBillingConfigurationProjectsByClient,
+  fetchBillingConfigurations,
 } from "../../services/billingConfigService";
+
+function SummaryField({ icon, label, value, wide }) {
+  return (
+    <div className={`min-w-0 px-4 py-2.5 first:pl-0 last:pr-0 ${wide ? "min-w-[190px] flex-[1.6]" : "min-w-[130px] flex-1"}`}>
+      <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-400">
+        {icon}
+        {label}
+      </span>
+      <span className="mt-1 block whitespace-nowrap text-[13px] font-medium text-slate-700">{value}</span>
+    </div>
+  );
+}
 
 export default function ProjectStep({ value = {}, onChange }) {
   const [projects, setProjects] = useState([]);
@@ -17,6 +29,7 @@ export default function ProjectStep({ value = {}, onChange }) {
   const [loadingClients, setLoadingClients] = useState(true);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [clientQuery, setClientQuery] = useState("");
+  const [configuredProjectKeys, setConfiguredProjectKeys] = useState(new Set());
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -67,22 +80,100 @@ export default function ProjectStep({ value = {}, onChange }) {
       });
   }, [value.clientId]);
 
+  // Any project that already has a Billing Configuration for this client in
+  // Draft, Pending Approval, or Approved is not eligible for a new setup, so
+  // it's hidden from the picker. A Rejected configuration does NOT block a
+  // fresh setup — the Maker must be able to pick the same project again and
+  // resubmit — so it's excluded from this "already configured" set. (Note:
+  // getBillingConfigurations returns every configuration regardless of
+  // approvalStatus, so REJECTED ones reach the UI here and must be filtered
+  // out explicitly.)
+  useEffect(() => {
+    if (!value.clientId || !value.clientName) {
+      setConfiguredProjectKeys(new Set());
+      return;
+    }
+
+    let cancelled = false;
+    fetchBillingConfigurations()
+      .then((configs) => {
+        if (cancelled) return;
+        const belongsToClient = (config) =>
+          (value.clientId && config.clientId && String(config.clientId) === String(value.clientId)) ||
+          config.client === value.clientName;
+
+        const keys = new Set(
+          (Array.isArray(configs) ? configs : [])
+            .filter(belongsToClient)
+            .filter((config) => config.approvalStatus !== "REJECTED")
+            .flatMap((config) => [config.projectId, config.projectCode])
+            .filter(Boolean)
+            .map(String)
+        );
+        setConfiguredProjectKeys(keys);
+      })
+      .catch(() => {
+        if (!cancelled) setConfiguredProjectKeys(new Set());
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [value.clientId, value.clientName]);
+
   // Internal projectSource defaults to ENTERPRISE if not set
   const projectSource = value.projectSource || "ENTERPRISE";
 
   // clientOptions are loaded from backend via `getBillingConfigurationClients`
 
-  // Projects filtered by selected client
+  // Projects filtered by selected client, excluding ones that already have a
+  // Billing Configuration (Draft or Active) — except the project currently
+  // selected, so editing an existing Draft setup doesn't hide its own project.
+  const availableProjects = useMemo(() => {
+    return projects.filter((project) => {
+      const projectId = String(project.projectId || project.id || "");
+      if (value.projectId && projectId === String(value.projectId)) return true;
+      if (projectId && configuredProjectKeys.has(projectId)) return false;
+      if (project.projectCode && configuredProjectKeys.has(String(project.projectCode))) return false;
+      return true;
+    });
+  }, [projects, configuredProjectKeys, value.projectId]);
+
   const projectOptions = useMemo(() => {
     if (!value.clientId) return [];
-    return projects.map((project) => ({ value: String(project.projectId || project.id || ""), label: project.projectName }));
-  }, [projects, value.clientId]);
+    return availableProjects.map((project) => ({ value: String(project.projectId || project.id || ""), label: project.projectName }));
+  }, [availableProjects, value.clientId]);
 
   // Selected enterprise project details
   const matchedProject = useMemo(() => {
     if (!value.projectId) return null;
-    return projects.find((project) => String(project.id) === String(value.projectId)) || null;
+    return (
+      projects.find((project) => String(project.projectId || project.id || "") === String(value.projectId)) || null
+    );
   }, [projects, value.projectId]);
+
+  // A Draft billing configuration can come back from the backend without its
+  // project-derived fields (e.g. projectCode) persisted — once the client's
+  // project list loads, backfill anything missing from the matched project so
+  // the summary card and step validation don't see a false "missing" field.
+  useEffect(() => {
+    if (!matchedProject) return;
+    if (value.projectCode && value.projectDuration) return;
+
+    onChange({
+      ...value,
+      projectName: value.projectName || matchedProject.projectName,
+      projectCode: value.projectCode || matchedProject.projectCode,
+      projectDuration: value.projectDuration || matchedProject.projectDuration,
+      currency: value.currency || matchedProject.projectBudgetCurrency || matchedProject.currency || "",
+      projectBudget: value.projectBudget ?? matchedProject.projectBudget ?? "",
+      projectBudgetCurrency:
+        value.projectBudgetCurrency || matchedProject.projectBudgetCurrency || matchedProject.currency || "",
+      startDate: value.startDate || matchedProject.startDate,
+      endDate: value.endDate || matchedProject.endDate,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchedProject]);
 
   // Filter client list based on search query
   const filteredClientOptions = useMemo(() => {
@@ -221,15 +312,8 @@ export default function ProjectStep({ value = {}, onChange }) {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-start justify-between border-b border-slate-100 pb-4">
-        <div>
-          <h2 className={Fonts.heading3}>Project Selection</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Select an existing enterprise project or configure a standalone project.
-          </p>
-        </div>
-        {projectSource === "STANDALONE" && (
+      {projectSource === "STANDALONE" && (
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={switchToEnterprise}
@@ -238,8 +322,8 @@ export default function ProjectStep({ value = {}, onChange }) {
             <RefreshCw className="h-3.5 w-3.5" />
             Search Enterprise Projects
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Inputs Section */}
       <div className="space-y-5">
@@ -275,14 +359,14 @@ export default function ProjectStep({ value = {}, onChange }) {
                           className={({ active }) =>
                             classNames(
                               "relative cursor-pointer select-none py-2 px-4",
-                              active ? "bg-blue-50 text-blue-900 font-medium" : "text-slate-900"
+                              active ? "bg-indigo-50 text-indigo-900 font-medium" : "text-slate-900"
                             )
                           }
                         >
                           {({ selected }) => (
                             <div className="flex justify-between items-center gap-2">
                               <span>{option.label}</span>
-                              {selected && <Check className="w-4 h-4 text-blue-600" />}
+                              {selected && <Check className="w-4 h-4 text-indigo-600" />}
                             </div>
                           )}
                         </Combobox.Option>
@@ -293,7 +377,7 @@ export default function ProjectStep({ value = {}, onChange }) {
                         <button
                           type="button"
                           onClick={switchToStandalone}
-                          className="w-full inline-flex justify-center items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+                          className="w-full inline-flex justify-center items-center gap-1.5 rounded-md bg-[#0A0082] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#080066]"
                         >
                           Create standalone client &amp; project
                         </button>
@@ -340,10 +424,10 @@ export default function ProjectStep({ value = {}, onChange }) {
         ) : (
           /* STANDALONE FLOW */
           <div className="space-y-5">
-            <div className="flex items-center gap-2 rounded-lg bg-amber-50 p-4 text-sm text-amber-800 border border-amber-200">
-              <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+            <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-500" />
               <p>
-                No matching client found. Form switched to <strong>Standalone Project</strong> mode.
+                No matching client found. Form switched to <strong className="font-semibold">Standalone Project</strong> mode.
               </p>
             </div>
 
@@ -396,38 +480,41 @@ export default function ProjectStep({ value = {}, onChange }) {
 
       {/* Card 2: Project summary (Only for Enterprise, when selected) */}
       {projectSource === "ENTERPRISE" && value.projectId && (
-        <div className="rounded-2xl border border-slate-100 p-6 bg-slate-50/60 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
-            <h3 className={Fonts.subheading}>
-              Project summary
-            </h3>
-            <span className="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-2.5">
+            <div className="flex items-center gap-1.5">
+              <FolderKanban className="h-3.5 w-3.5 text-slate-400" strokeWidth={1.75} />
+              <h3 className="text-[13px] font-semibold text-slate-700">Project Summary</h3>
+            </div>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-600">
+              <span className="h-1 w-1 rounded-full bg-indigo-400" />
               Synced from PMS
             </span>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-4">
-            <div>
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Project Code</span>
-              <span className="text-sm font-bold text-slate-800 mt-1 block">{value.projectCode || "—"}</span>
-            </div>
-            <div>
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Project Duration</span>
-              <span className="text-sm font-bold text-slate-800 mt-1 block">
-                {getProjectDurationLabel(value)}
-              </span>
-            </div>
-            <div>
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Project Source</span>
-              <span className="text-sm font-bold text-slate-800 mt-1 block">Enterprise (PMS)</span>
-            </div>
+          <div className="flex divide-x divide-slate-100 overflow-x-auto px-4 py-1">
+            <SummaryField
+              icon={<Hash className="h-3 w-3" strokeWidth={1.75} />}
+              label="Project Code"
+              value={value.projectCode || "—"}
+            />
+            <SummaryField
+              icon={<CalendarRange className="h-3 w-3" strokeWidth={1.75} />}
+              label="Project Duration"
+              value={getProjectDurationLabel(value)}
+              wide
+            />
+            <SummaryField
+              icon={<Building2 className="h-3 w-3" strokeWidth={1.75} />}
+              label="Project Source"
+              value="Enterprise (PMS)"
+            />
             {matchedProject && (
-              <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Project Manager</span>
-                <span className="text-sm font-bold text-slate-800 mt-1 block">
-                  {matchedProject.projectManagerName || matchedProject.projectManagerId || "—"}
-                </span>
-              </div>
+              <SummaryField
+                icon={<UserRound className="h-3 w-3" strokeWidth={1.75} />}
+                label="Project Manager"
+                value={matchedProject.projectManagerName || matchedProject.projectManagerId || "—"}
+              />
             )}
           </div>
         </div>

@@ -695,10 +695,37 @@ export default function EmployeeProfileView() {
         : Promise.resolve({});
       parallelPromises.push(hrPromise);
 
-      const [deptData, desigData, hrResult] = await Promise.all(parallelPromises);
+      // reporting_manager_uuid actually holds the manager's employee_id, not a
+      // UUID — resolve it against the employee list to show a name instead.
+      const managerPromise = coreData.reporting_manager_uuid
+        ? api.get(`${BASE_URL}/permanent-employee/core-employee-details/`, { headers: { Authorization: `Bearer ${token}` } })
+          .then(r => (Array.isArray(r.data) ? r.data : r.data?.data || r.data?.results || []))
+          .catch(() => [])
+        : Promise.resolve([]);
+      parallelPromises.push(managerPromise);
+
+      const [deptData, desigData, hrResult, managerList] = await Promise.all(parallelPromises);
       coreData.resolved_department_name = deptData.department_name || coreData.department_uuid;
       coreData.resolved_designation_name = desigData.designation_name || desigData.name || coreData.designation_uuid;
+      const managerRecord = managerList.find(
+        (m) => String(m.employee_id) === String(coreData.reporting_manager_uuid)
+      );
+      coreData.resolved_reporting_manager_name = managerRecord
+        ? `${managerRecord.first_name || ""} ${managerRecord.last_name || ""}`.trim()
+        : coreData.reporting_manager_uuid;
       setEmployee(coreData);
+      // Header.jsx renders outside this page's component tree (it's part of
+      // the shared Layout), so it can't see this setEmployee update through
+      // props/state — it has its own independently-fetched copy of the name.
+      // This event is the cross-tree signal that tells it to refresh too, so
+      // an edited name updates the top nav immediately instead of only on
+      // next login/reload.
+      console.log("[profile-update-event] dispatching", {
+        employee_id: coreData.employee_id, first_name: coreData.first_name, last_name: coreData.last_name,
+      });
+      window.dispatchEvent(new CustomEvent("employee-profile-updated", {
+        detail: { employee_id: coreData.employee_id, first_name: coreData.first_name, last_name: coreData.last_name },
+      }));
       if (coreData.user_uuid) {
         fetchProfilePhoto(
           coreData.user_uuid
@@ -1159,7 +1186,7 @@ export default function EmployeeProfileView() {
     ),
     empId: employee.employee_id,
     department: employee.resolved_department_name || employee.department_uuid,
-    reportingManager: employee.reporting_manager_uuid || "N/A",
+    reportingManager: employee.resolved_reporting_manager_name || employee.reporting_manager_uuid || "N/A",
     joiningDate: employee.joining_date,
     employmentType: employee.employment_type,
   };

@@ -1,9 +1,25 @@
+import { Receipt } from "lucide-react";
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import { getActivePaymentTerms, getActiveTaxRegions, getApiErrorMessage } from "../../services/billingConfigurationService";
+import RadioCardGroup from "../common/RadioCardGroup";
+import ToggleSwitch from "../common/ToggleSwitch";
 import { useEffect, useState } from "react";
+
+const INVOICE_GENERATION_OPTIONS = [
+  {
+    value: "MANUAL",
+    label: "Manual",
+    description: "Invoices must be generated manually by finance administrators.",
+  },
+  {
+    value: "AUTOMATIC",
+    label: "Automatic",
+    description: "System automatically generates draft invoices at the end of each billing cycle.",
+  },
+];
 
 function getOrdinalSuffix(i) {
   const j = i % 10, k = i % 100;
@@ -125,14 +141,6 @@ export default function BillingControlsStep({ value = {}, onChange }) {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="border-b border-slate-100 pb-4">
-        <h2 className={Fonts.heading3}>Invoice Preferences</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Configure how invoices are generated and payment terms after the amount is calculated.
-        </p>
-      </div>
-
       {/* Section 1: Invoice generation */}
       <div className="space-y-5">
         <div>
@@ -144,40 +152,30 @@ export default function BillingControlsStep({ value = {}, onChange }) {
           </p>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           <label className="block text-sm font-medium text-slate-700">
             Invoice Generation Mode <span className="text-red-500">*</span>
           </label>
-          
-          <div className="inline-flex rounded-lg bg-slate-100 p-1">
-            <button
-              type="button"
-              onClick={() => update({ autoInvoiceGeneration: false, invoiceGenerationType: "MANUAL", invoiceGenerationDay: "" })}
-              className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
-                value.autoInvoiceGeneration === false
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Manual
-            </button>
-            <button
-              type="button"
-              onClick={() => update({ autoInvoiceGeneration: true, invoiceGenerationType: "AUTOMATIC" })}
-              className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
-                value.autoInvoiceGeneration === true
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Automatic
-            </button>
-          </div>
-          <p className="text-xs text-slate-400">
-            {value.autoInvoiceGeneration === true
-              ? "System automatically generates draft invoices at the end of each cycle."
-              : "Invoices must be generated manually by finance administrators."}
-          </p>
+
+          <RadioCardGroup
+            name="invoiceGenerationMode"
+            options={INVOICE_GENERATION_OPTIONS}
+            value={
+              value.autoInvoiceGeneration === true
+                ? "AUTOMATIC"
+                : value.autoInvoiceGeneration === false
+                ? "MANUAL"
+                : ""
+            }
+            onChange={(next) => {
+              if (next === "MANUAL") {
+                update({ autoInvoiceGeneration: false, invoiceGenerationType: "MANUAL", invoiceGenerationDay: "" });
+              } else {
+                update({ autoInvoiceGeneration: true, invoiceGenerationType: "AUTOMATIC" });
+              }
+            }}
+            columns={2}
+          />
         </div>
 
         {/* Dynamic field for Automatic Generation */}
@@ -258,25 +256,31 @@ export default function BillingControlsStep({ value = {}, onChange }) {
           </div>
           </div>
 
-          <div className="max-w-md rounded-lg border border-slate-200 p-4">
-            <label className="flex items-center gap-3 text-sm font-semibold text-slate-700">
-              <input
-                type="checkbox"
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/70 px-3.5 py-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Receipt className="h-4 w-4 shrink-0 text-slate-500" />
+                <div className="min-w-0">
+                  <span className="text-xs font-semibold text-slate-800">Expense Billing Eligible</span>
+                  <span className="ml-2 hidden text-[11px] text-slate-500 sm:inline">
+                    (Include project expenses on invoices)
+                  </span>
+                </div>
+              </div>
+              <ToggleSwitch
                 checked={Boolean(value.expenseBillingEligible)}
-                onChange={(event) => update({ expenseBillingEligible: event.target.checked })}
-                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                onChange={(checked) => update({ expenseBillingEligible: checked })}
               />
-              Expense billing eligible
-            </label>
-          </div>
-
-          {/* Payment preview summary block */}
-          {previewText && (
-            <div className="rounded-lg bg-blue-50/50 border border-blue-100 p-4 text-sm text-blue-800">
-              <span className="font-semibold block mb-1">Invoice timeline preview</span>
-              <span className="font-medium">{previewText}</span>
             </div>
-          )}
+
+            {/* Payment preview summary block */}
+            {previewText && (
+              <div className="rounded-xl border-l-4 border-l-indigo-500 border-y border-r border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <span className="mb-1 block font-semibold text-slate-900">Invoice timeline preview</span>
+                <span className="font-medium">{previewText}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -1,13 +1,16 @@
+<<<<<<< HEAD
 import React, { useState, useMemo } from "react";
 import { AlertTriangle, ChevronDown, ChevronRight, Inbox, Layers, ShieldAlert, Lock, FileStack, FilePlus2, Landmark } from "lucide-react";
+=======
+import React, { useState } from "react";
+import { AlertTriangle, Lock } from "lucide-react";
+>>>>>>> 3805354568548e3151912262197c663342409d28
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import { showStatusToast } from "@/components/toastfy/toast";
-import { useFinanceQueue, useVerifyLineItem, useQueryLineItem } from "./hooks/useFinanceVerification";
-import EmployeeLabel from "../../approval-engine/components/EmployeeLabel";
-import FinanceLineItemReviewPanel from "./components/FinanceLineItemReviewPanel";
+import { useFinanceQueue } from "./hooks/useFinanceVerification";
 import FinanceReviewPanel from "./components/FinanceReviewPanel";
+<<<<<<< HEAD
 import { formatMoney } from "../../approval-engine/constants/approvalLabels";
 import SearchInput from "@/components/filter/Searchbar";
 import FormSelect from "@/components/forms/FormSelect";
@@ -25,22 +28,32 @@ const merchantSummary = (lineItems) => {
 };
 
 const hasIneligibleLines = (lineItems) => (lineItems || []).some((l) => !l.eligibleForVerify);
+=======
+import FinanceQueueTable from "./components/FinanceQueueTable";
+>>>>>>> 3805354568548e3151912262197c663342409d28
 
+/**
+ * Finance's queue - one row per report, matching the same clean summary-table + single "Review"
+ * action pattern as the Manager's Pending Approvals page. Verify/Query stay inside
+ * FinanceReviewPanel rather than duplicated here as row-level shortcuts.
+ */
 export default function VerificationPage() {
   const [page, setPage] = useState(0);
-  const [expandedReportId, setExpandedReportId] = useState(null);
   const [reviewingReport, setReviewingReport] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [eligibilityFilter, setEligibilityFilter] = useState("");
 
   const { data, isLoading, isError, error, refetch } = useFinanceQueue(page, 20);
+<<<<<<< HEAD
   const { data: directory } = useEmployeeDirectory();
   const verifyLineItem = useVerifyLineItem();
   const queryLineItem = useQueryLineItem();
+=======
+>>>>>>> 3805354568548e3151912262197c663342409d28
 
   const items = data?.content || [];
-  const isMutating = verifyLineItem.isPending || queryLineItem.isPending;
 
+<<<<<<< HEAD
   const lineItemsQueries = useQueries({
     queries: items.map((item) => ({
       queryKey: ["reportLineItems", item.reportId],
@@ -150,17 +163,35 @@ export default function VerificationPage() {
           </div>
         </div>
         <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-16 shadow-sm">
+=======
+  const breadcrumbs = (
+    <Breadcrumb
+      items={[
+        { label: "Expense Management", to: "/expense-management/dashboard" },
+        { label: "Finance", to: "/expense-management/finance/verification" },
+        { label: "Verification" },
+      ]}
+    />
+  );
+
+  if (isLoading) {
+    return (
+      <div className="p-4 sm:p-6">
+        {breadcrumbs}
+        <h1 className="text-xl font-semibold text-gray-900 mt-3 mb-4">Finance Verification</h1>
+        <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-16">
+>>>>>>> 3805354568548e3151912262197c663342409d28
           <LoadingSpinner text="Loading verification queue…" />
         </div>
       </div>
     );
   }
 
-  // Handle error states (including 401 & 403)
   if (isError) {
     const errorStatus = error?.response?.status;
     const isAuthError = errorStatus === 401 || errorStatus === 403;
     return (
+<<<<<<< HEAD
       <div className="p-4 sm:p-6 space-y-3">
         <Breadcrumb
           items={[
@@ -176,6 +207,12 @@ export default function VerificationPage() {
           </div>
         </div>
         <div className="flex flex-col items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 py-10 text-center px-4 shadow-sm">
+=======
+      <div className="p-4 sm:p-6">
+        {breadcrumbs}
+        <h1 className="text-xl font-semibold text-gray-900 mt-3 mb-4">Finance Verification</h1>
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 py-10 text-center px-4">
+>>>>>>> 3805354568548e3151912262197c663342409d28
           {isAuthError ? <Lock className="h-6 w-6 text-rose-500" /> : <AlertTriangle className="h-6 w-6 text-rose-500" />}
           <p className="text-sm font-semibold text-rose-700">
             {errorStatus === 401
@@ -198,6 +235,7 @@ export default function VerificationPage() {
   }
 
   return (
+<<<<<<< HEAD
     <div className="p-4 sm:p-6 space-y-3">
       <Breadcrumb
         items={[
@@ -399,6 +437,20 @@ export default function VerificationPage() {
           </>
         )}
       </div>
+=======
+    <div className="p-4 sm:p-6">
+      {breadcrumbs}
+      <h1 className="text-xl font-semibold text-gray-900 mt-3 mb-4">Finance Verification</h1>
+
+      <FinanceQueueTable
+        items={items}
+        page={page}
+        totalPages={data?.totalPages || 1}
+        onPrevious={() => setPage((p) => p - 1)}
+        onNext={() => setPage((p) => p + 1)}
+        onReview={setReviewingReport}
+      />
+>>>>>>> 3805354568548e3151912262197c663342409d28
 
       {reviewingReport && (
         <FinanceReviewPanel

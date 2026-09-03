@@ -26,7 +26,6 @@ export default function CandidateRankingPage() {
     currentPage,
     setCurrentPage,
     totalPages,
-    toggleStar,
     loading,
     error,
     refetch,
@@ -88,7 +87,6 @@ export default function CandidateRankingPage() {
         <CandidateTable
           candidates={candidates}
           onView={(c) => navigate(`/airs/candidates/${c.id}`)}
-          onToggleStar={toggleStar}
           onDeleted={refetch}
         />
       </div>

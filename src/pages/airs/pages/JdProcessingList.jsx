@@ -2,10 +2,6 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  Circle,
   Clock,
   RefreshCw,
   AlertTriangle,
@@ -18,6 +14,9 @@ import { Badge } from "../../../components/ui/badge";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ExpandableList from "../../../components/List/List";
 import Pagination from "../../../components/Pagination/pagination";
+import StageStepper, { overallStatusMeta, buildStageMap, deriveOverallStatus } from "../components/ProcessingStageStepper";
+import useAirsSocket from "../websockets/useAirsSocket";
+import { dispatchAirsEvent } from "../websockets/airsEventDispatch";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -45,13 +44,6 @@ const STAGE_LABELS = {
   PERSISTENCE: "Persistence",
 };
 
-const formatStageLabel = (stage) =>
-  STAGE_LABELS[stage] ||
-  String(stage || "")
-    .split("_")
-    .map((w) => w.charAt(0) + w.slice(1).toLowerCase())
-    .join(" ");
-
 const formatDate = (iso) => {
   if (!iso) return "-";
   const d = new Date(iso);
@@ -63,59 +55,6 @@ const formatDate = (iso) => {
     minute: "2-digit",
   });
 };
-
-const overallStatusMeta = (status) => {
-  const s = String(status || "").toUpperCase();
-  if (s === "SUCCESS") return { label: "Completed", className: "bg-emerald-50 text-emerald-700 border-emerald-100", pulse: false };
-  if (s === "FAILURE" || s === "FAILED") return { label: "Failed", className: "bg-rose-50 text-rose-700 border-rose-100", pulse: false };
-  if (s === "DEAD") return { label: "Dead", className: "bg-rose-100 text-rose-800 border-rose-200", pulse: false };
-  if (s === "RETRY") return { label: "Retrying", className: "bg-orange-50 text-orange-700 border-orange-100", pulse: true, dotClassName: "bg-orange-500" };
-  if (s === "PAUSED") return { label: "Paused", className: "bg-slate-100 text-slate-600 border-slate-200", pulse: false };
-  if (s === "RUNNING") return { label: "Processing", className: "bg-blue-50 text-blue-700 border-blue-100", pulse: true, dotClassName: "bg-blue-500" };
-  if (s === "QUEUED") return { label: "Queued", className: "bg-amber-50 text-amber-700 border-amber-100", pulse: false };
-  return { label: status || "Unknown", className: "bg-slate-100 text-slate-700 border-slate-200", pulse: false };
-};
-
-function StageStep({ stage, status, errorMessage, isLast }) {
-  const s = String(status || "").toUpperCase();
-  let icon = <Circle className="h-3.5 w-3.5 text-slate-300" />;
-  let ring = "border-slate-200 bg-white";
-  let lineDone = false;
-  const isFailed = s === "FAILED" || s === "FAILURE";
-
-  if (s === "SUCCESS") {
-    icon = <CheckCircle2 className="h-4 w-4 text-white" />;
-    ring = "bg-emerald-500 border-emerald-500";
-    lineDone = true;
-  } else if (isFailed) {
-    icon = <XCircle className="h-4 w-4 text-white" />;
-    ring = "bg-rose-500 border-rose-500";
-  } else if (s === "RUNNING") {
-    icon = <Loader2 className="h-4 w-4 text-white animate-spin" />;
-    ring = "bg-blue-500 border-blue-500";
-  }
-
-  return (
-    <div className="flex items-start flex-1 min-w-[80px]">
-      <div className="flex flex-col items-center gap-1.5 flex-shrink-0 w-24">
-        <div className={`h-7 w-7 rounded-full border flex items-center justify-center ${ring}`}>
-          {icon}
-        </div>
-        <span className="text-[9px] font-bold uppercase tracking-tight text-slate-400 text-center leading-tight">
-          {formatStageLabel(stage)}
-        </span>
-        {isFailed && errorMessage && (
-          <span className="text-[9px] text-rose-600 font-medium text-center leading-tight">
-            {errorMessage}
-          </span>
-        )}
-      </div>
-      {!isLast && (
-        <div className={`flex-1 h-0.5 mx-1 mt-3.5 rounded-full ${lineDone ? "bg-emerald-400" : "bg-slate-200"}`} />
-      )}
-    </div>
-  );
-}
 
 export default function JdProcessingList() {
   const [uploads, setUploads] = useState([]);
@@ -170,6 +109,38 @@ export default function JdProcessingList() {
     }
   };
 
+  // Live updates after the initial REST load — patches only the affected
+  // upload record, never a full refetch/reload.
+  useAirsSocket("/ws/job-descriptions/my-uploads", {
+    onOpen: () => fetchUploads(true), // reconnect only: reconcile any missed events
+    onEvent: (message) =>
+      dispatchAirsEvent(message, {
+        "stage.completed": (data) => {
+          if (!data?.task_id) return;
+          setUploads((prev) =>
+            prev.map((u) => {
+              if (u.task_id !== data.task_id) return u;
+              const stages = [...(u.stages || [])];
+              const idx = stages.findIndex((s) => s.stage === data.stage);
+              const stageEntry = { stage: data.stage, status: data.status, error_message: data.error_message };
+              if (idx >= 0) stages[idx] = { ...stages[idx], ...stageEntry };
+              else stages.push(stageEntry);
+              // No overall_status field on this event — derive it from the
+              // accumulated per-stage statuses instead.
+              const status = deriveOverallStatus(buildStageMap(stages), ALL_STAGES, u.status);
+              return { ...u, stages, status };
+            })
+          );
+        },
+        "task.linked": (data) => {
+          if (!data?.task_id) return;
+          setUploads((prev) =>
+            prev.map((u) => (u.task_id === data.task_id ? { ...u, jd_id: data.document_id ?? u.jd_id } : u))
+          );
+        },
+      }),
+  });
+
   const totalPages = Math.max(1, Math.ceil(uploads.length / ITEMS_PER_PAGE));
 
   useEffect(() => {
@@ -210,20 +181,7 @@ export default function JdProcessingList() {
         <>
           {paginatedUploads.map((u) => {
             const meta = overallStatusMeta(u.status);
-            const stageMap = new Map();
-            (u.stages || []).forEach((s) => {
-              const existing = stageMap.get(s.stage);
-              const existingStatus = String(existing?.status || "").toUpperCase();
-              const incomingStatus = String(s.status || "").toUpperCase();
-              if (!existing || existingStatus === "SUCCESS") {
-                if (!existing || incomingStatus === "SUCCESS") {
-                  stageMap.set(s.stage, s);
-                }
-                // existing already SUCCESS and incoming isn't: keep existing success
-              } else {
-                stageMap.set(s.stage, s);
-              }
-            });
+            const stageMap = buildStageMap(u.stages);
             const isSuccess = String(u.status).toUpperCase() === "SUCCESS";
             const isFailure = ["FAILURE", "FAILED"].includes(String(u.status).toUpperCase());
             const isDeleting = deletingTaskId === u.task_id;
@@ -283,20 +241,7 @@ export default function JdProcessingList() {
                     </div>
                   )}
 
-                  <div className="flex items-start overflow-x-auto pb-1">
-                    {ALL_STAGES.map((stage, idx) => {
-                      const stageData = stageMap.get(stage);
-                      return (
-                        <StageStep
-                          key={stage}
-                          stage={stage}
-                          status={stageData?.status}
-                          errorMessage={stageData?.error_message}
-                          isLast={idx === ALL_STAGES.length - 1}
-                        />
-                      );
-                    })}
-                  </div>
+                  <StageStepper stages={ALL_STAGES} stageLabels={STAGE_LABELS} stageMap={stageMap} />
                 </li>
               </ExpandableList>
             );

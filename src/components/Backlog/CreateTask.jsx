@@ -30,6 +30,7 @@ const CreateTaskForm = ({
     assigneeId: "",
     startDate: "",
     dueDate: "",
+    estimatedHours: "",
     isBillable: "false",
   });
 
@@ -97,8 +98,9 @@ const CreateTaskForm = ({
       reporterId: Number(formData.reporterId),
       assigneeId: Number(formData.assigneeId) || null,
       sprintId: Number(formData.sprintId) || selectedStorySprint || null,
-      startDate: toISODate(formData.startDate), 
+      startDate: toISODate(formData.startDate),
       dueDate: toISODate(formData.dueDate),
+      estimatedHours: Number(formData.estimatedHours) || 0,
       billable: formData.isBillable === "true",
       projectId,
     };
@@ -188,6 +190,15 @@ const CreateTaskForm = ({
             value={formData.dueDate || ""}
             onChange={handleChange}
             min={today}
+          />
+
+          <FormInput
+            label="Estimated Hours"
+            name="estimatedHours"
+            type="number"
+            min="0"
+            value={formData.estimatedHours ?? ""}
+            onChange={handleChange}
           />
 
           <FormSelect

@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { exportApprovalPdf } from "../approvalPdf";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import api from "../../../api/axiosInstance";
 import { reviewTimesheet, handleBulkReviewAdmin, handleMixedReview } from "../api";
@@ -22,6 +21,9 @@ const AdminApprovalTable = ({
   groupedData = [],
   statusFilter = "All",
   onRefresh,
+  // Defaulted so every existing render path is unchanged. The approval pages
+  // override it to name the selected month and say why the list is empty.
+  emptyMessage = "No timesheets are waiting for your approval.",
 }) => {
   const [rejectionComments, setRejectionComments] = useState({});
   const [showCommentBox, setShowCommentBox] = useState({});
@@ -477,54 +479,12 @@ const AdminApprovalTable = ({
     document.body.removeChild(link);
   };
 
-  const exportPDF = () => {
-    const doc = new jsPDF();
-    doc.text("Manager Timesheet Report", 14, 10);
-    const body = [];
-
-    enrichedGroupedData.forEach((user) =>
-      user.weeklySummary.forEach((week) =>
-        week.timesheets.forEach((sheet) =>
-          sheet.entries.forEach((entry) =>
-            body.push([
-              user.userId,
-              user.userName,
-              entry.projectName,
-              entry.taskName,
-              new Date(entry.fromTime).toLocaleTimeString(),
-              new Date(entry.toTime).toLocaleTimeString(),
-              entry.workLocation || "-",
-              entry.description || "",
-              entry.hoursWorked?.toFixed(2) || 0,
-              new Date(sheet.workDate).toLocaleDateString(),
-              sheet.status,
-            ]),
-          ),
-        ),
-      ),
-    );
-
-    autoTable(doc, {
-      head: [
-        [
-          "User ID",
-          "User Name",
-          "Project",
-          "Task",
-          "Start",
-          "End",
-          "Work Type",
-          "Description",
-          "Hours",
-          "Date",
-          "Status",
-        ],
-      ],
-      body,
-      startY: 20,
+  const exportPDF = () =>
+    exportApprovalPdf({
+      roleLabel: "Admin View",
+      users: enrichedGroupedData,
+      fileSlug: "admin",
     });
-    doc.save("manager_timesheets.pdf");
-  };
 
   const renderUserWeeks = (user) =>
     user.weeklySummary
@@ -982,7 +942,7 @@ const AdminApprovalTable = ({
               </div>
               <p className="text-lg font-semibold text-gray-700">All caught up</p>
               <p className="text-sm text-gray-400">
-                No timesheets are waiting for your approval.
+                {emptyMessage}
               </p>
             </div>
           ) : (
