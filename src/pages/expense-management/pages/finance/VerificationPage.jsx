@@ -3,7 +3,10 @@ import { AlertTriangle, ChevronDown, ChevronRight, Inbox, Layers, ShieldAlert, L
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import { useFinanceQueue } from "./hooks/useFinanceVerification";
+import { showStatusToast } from "@/components/toastfy/toast";
+import { useFinanceQueue, useVerifyLineItem, useQueryLineItem } from "./hooks/useFinanceVerification";
+import EmployeeLabel from "../../approval-engine/components/EmployeeLabel";
+import FinanceLineItemReviewPanel from "./components/FinanceLineItemReviewPanel";
 import FinanceReviewPanel from "./components/FinanceReviewPanel";
 import { formatMoney } from "../../approval-engine/constants/approvalLabels";
 import SearchInput from "@/components/filter/Searchbar";
@@ -23,13 +26,9 @@ const merchantSummary = (lineItems) => {
 
 const hasIneligibleLines = (lineItems) => (lineItems || []).some((l) => !l.eligibleForVerify);
 
-/**
- * Finance's queue - one row per report, matching the same clean summary-table + single "Review"
- * action pattern as the Manager's Pending Approvals page. Verify/Query stay inside
- * FinanceReviewPanel rather than duplicated here as row-level shortcuts.
- */
 export default function VerificationPage() {
   const [page, setPage] = useState(0);
+  const [expandedReportId, setExpandedReportId] = useState(null);
   const [reviewingReport, setReviewingReport] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [eligibilityFilter, setEligibilityFilter] = useState("");
@@ -40,6 +39,7 @@ export default function VerificationPage() {
   const queryLineItem = useQueryLineItem();
 
   const items = data?.content || [];
+  const isMutating = verifyLineItem.isPending || queryLineItem.isPending;
 
   const lineItemsQueries = useQueries({
     queries: items.map((item) => ({
@@ -156,6 +156,7 @@ export default function VerificationPage() {
     );
   }
 
+  // Handle error states (including 401 & 403)
   if (isError) {
     const errorStatus = error?.response?.status;
     const isAuthError = errorStatus === 401 || errorStatus === 403;
