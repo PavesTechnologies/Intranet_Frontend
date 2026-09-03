@@ -356,23 +356,11 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
             { reportId, lineItemId: queryingLine.lineItemId, reason },
             {
               onSuccess: () => {
-<<<<<<< HEAD
                 showStatusToast("Correction requested successfully", "success");
-=======
-                refetchReviewData();
-                showStatusToast("Query raised successfully", "success");
->>>>>>> 3805354568548e3151912262197c663342409d28
                 setQueryingLine(null);
                 onClose();
               },
-<<<<<<< HEAD
               onError: (err) => showStatusToast(err.response?.data?.message || "Failed to request correction", "error"),
-=======
-              onError: (err) => {
-                refetchReviewData();
-                showStatusToast(err.response?.data?.message || "Failed to raise query", "error");
-              },
->>>>>>> 3805354568548e3151912262197c663342409d28
             }
           );
         }}

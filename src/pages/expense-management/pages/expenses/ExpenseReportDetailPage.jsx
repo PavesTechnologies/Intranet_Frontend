@@ -994,7 +994,6 @@ export default function ExpenseReportDetailPage() {
               </div>
             )}
 
-<<<<<<< HEAD
             {report.reportStatus === "QUERY_RAISED" && queriedLines.length > 0 && (
               <div className="mt-4 rounded-lg bg-orange-50 border border-orange-200 px-4 py-3">
                 <p className="text-sm font-semibold text-orange-800">
@@ -1011,9 +1010,6 @@ export default function ExpenseReportDetailPage() {
                 <p className="mt-2 text-xs text-orange-600">Fix the flagged line(s) below, then click Resubmit above.</p>
               </div>
             )}
-=======
-            <FinanceQueryPanel reportId={reportId} lineItems={lineItems} />
->>>>>>> 3805354568548e3151912262197c663342409d28
 
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <DetailField icon={<FileText size={16} />} label="Business Purpose" value={report.businessPurpose || "—"} />
