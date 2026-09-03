@@ -1,5 +1,5 @@
 import React from "react";
-import { ChevronDown, User, CheckCircle2 } from "lucide-react";
+import { ChevronDown, User, CheckCircle2, Landmark } from "lucide-react";
 import { useEmployeeDirectory } from "../hooks/useEmployeeDirectory";
 import { describeLevel, QUORUM_LABELS } from "../constants/approvalLabels";
 
@@ -27,11 +27,22 @@ const Arrow = () => (
   </div>
 );
 
+/** A Finance Verification level gets a distinct icon/tone in the chain so it still reads clearly as "the Finance step" - but it's real configured level data, not a fixed stage bolted on afterward. */
+const levelBadge = (level, idx) =>
+  level.levelType === "FINANCE_VERIFICATION" ? (
+    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+      <Landmark className="h-3 w-3" />
+    </span>
+  ) : (
+    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#0A0082] text-[10px] font-bold text-white">{idx + 1}</span>
+  );
+
 /**
- * "Approval Path" preview (spec §9): renders Employee -> each configured level -> Approved so an
- * Admin can confirm how a flow will actually behave without saving/leaving the builder. Reads the
- * builder's own local `levels` shape (LevelsBuilder.jsx / ApprovalFlowBuilderPage.jsx state) so it
- * updates live as the admin edits, no save round-trip required.
+ * "Approval Path" preview (spec §9): renders Employee -> every configured level, in order, exactly
+ * as the backend will materialize them (including a Finance Verification level if one is
+ * configured) -> Approved. Reads the builder's own local `levels` shape (LevelsBuilder.jsx /
+ * ApprovalFlowBuilderPage.jsx state, each carrying its own `levelType`) so it updates live as the
+ * admin edits, no save round-trip required.
  */
 export default function FlowPreview({ whenLabel, levels }) {
   const { data: directory } = useEmployeeDirectory();
@@ -58,9 +69,10 @@ export default function FlowPreview({ whenLabel, levels }) {
         configuredLevels.map((level, idx) => (
           <React.Fragment key={level.id || idx}>
             <Chip
-              icon={<span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#0A0082] text-[10px] font-bold text-white">{idx + 1}</span>}
+              icon={levelBadge(level, idx)}
               title={describeLevel(level, employeeNameById)}
               subtitle={level.approvers.length > 1 ? `${level.approvers.length} approvers · ${QUORUM_LABELS[level.quorum] || level.quorum}` : null}
+              tone={level.levelType === "FINANCE_VERIFICATION" ? "bg-blue-50 border-blue-100" : "bg-white border-gray-200"}
             />
             <Arrow />
           </React.Fragment>

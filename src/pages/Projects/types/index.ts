@@ -27,6 +27,7 @@ export interface Task {
   createdAt: Date;
   isStarred: boolean;
   storyPoints?: number;
+  estimatedHours?: number;
 }
 
 export interface Sprint {

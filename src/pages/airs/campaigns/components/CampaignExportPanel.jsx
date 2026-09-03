@@ -1,13 +1,10 @@
 import React, { useState } from "react";
 import { toast } from "react-toastify";
-import { Download, FileSpreadsheet, FileText, Package, ShieldCheck } from "lucide-react";
+import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/ui/Modal";
 import { useAuth } from "../../../../contexts/AuthContext";
-import {
-  exportAuditTrail, exportCandidateList, exportComplianceSummary,
-  exportShortlistPackage,
-} from "../services/exportService";
+import { exportAuditTrail, exportCandidateList } from "../services/exportService";
 
 function ExportButton({ icon: Icon, label, hint, onClick }) {
   const [busy, setBusy] = useState(false);
@@ -33,8 +30,8 @@ function ExportButton({ icon: Icon, label, hint, onClick }) {
   );
 }
 
-// Grouped by intent (take the list away, brief a hiring manager, satisfy an
-// auditor) rather than by output format, which users don't choose between.
+// Grouped by intent (take the list away, satisfy an auditor) rather than by
+// output format, which users don't choose between.
 export default function CampaignExportPanel({ campaignId }) {
   const { hasRole } = useAuth();
   const isHrAdmin = hasRole(["HR_ADMIN"]);
@@ -86,26 +83,10 @@ export default function CampaignExportPanel({ campaignId }) {
         />
         {isHrAdmin && (
           <ExportButton
-            icon={Package}
-            label="Shortlist package (PDF)"
-            hint="Cover page, ranking summary and a scorecard per shortlisted candidate"
-            onClick={wrap(() => exportShortlistPackage(campaignId), "Shortlist package downloaded.")}
-          />
-        )}
-        {isHrAdmin && (
-          <ExportButton
             icon={FileText}
             label="Audit trail (XLSX)"
             hint="All events, stage transitions and score history"
             onClick={wrap(() => exportAuditTrail(campaignId), "Audit trail downloaded.")}
-          />
-        )}
-        {isHrAdmin && (
-          <ExportButton
-            icon={ShieldCheck}
-            label="Compliance summary (PDF)"
-            hint="Aggregate figures only — no candidate or reviewer identities"
-            onClick={wrap(() => exportComplianceSummary(campaignId), "Compliance summary downloaded.")}
           />
         )}
       </div>

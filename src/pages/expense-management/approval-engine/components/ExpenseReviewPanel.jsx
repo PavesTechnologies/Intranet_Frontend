@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   X,
   Check,
@@ -10,6 +10,7 @@ import {
   Wallet,
   User,
   Layers,
+  ArrowRight,
 } from "lucide-react";
 import Button from "@/components/Button/Button";
 import { showStatusToast } from "@/components/toastfy/toast";
@@ -22,7 +23,15 @@ import ApprovalLevelTimeline from "./ApprovalLevelTimeline";
 import ReceiptViewer from "./ReceiptViewer";
 import CommentPromptModal from "./CommentPromptModal";
 import { useApprovalStatus, useLineItemReviews, useReviewLineItem, useRejectReport, useBulkApprove } from "../hooks/useApprovalWorkflow";
-import { formatMoney, formatDate, formatDateTime } from "../constants/approvalLabels";
+import { formatMoney, formatDate, formatDateTime, friendlyApprovalError } from "../constants/approvalLabels";
+
+/**
+ * The only report statuses in which an APPROVAL-stage action still makes sense here. Anything else
+ * (PENDING_FINANCE_VERIFICATION, APPROVED, REJECTED, CANCELLED, ...) means the report has already
+ * moved past this approver's stage - most commonly because the report open in this exact panel was
+ * itself the final approval, or a co-approver under ANY_OF/ALL_OF quorum completed it first.
+ */
+const APPROVAL_ACTIVE_STATUSES = new Set(["PENDING_APPROVAL", "AWAITING_CORRECTION"]);
 
 const normalizeViolations = (line) => {
   if (Array.isArray(line?.policyWarnings)) return line.policyWarnings;
@@ -68,6 +77,7 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
   const [flaggingLine, setFlaggingLine] = useState(null);
   const [isRejecting, setIsRejecting] = useState(false);
 
+  const queryClient = useQueryClient();
   const { data: approvalStatus } = useApprovalStatus(isOpen ? reportId : null);
   const { data: lineItemReviews } = useLineItemReviews(isOpen ? reportId : null);
   const reviewLineItem = useReviewLineItem();
@@ -94,8 +104,18 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
     staleTime: 30_000,
   });
 
-  const reportStatus = historyItem?.reportStatus || fullReport?.reportStatus;
+  // fullReport is the one source here that's actually refetched after every action below (see
+  // refetchReviewData) - queueItem/historyItem are point-in-time snapshots from when this panel was
+  // opened and never update again, so they're only a same-render fallback until fullReport loads.
+  const reportStatus = fullReport?.reportStatus || queueItem?.reportStatus || historyItem?.reportStatus;
   const isQueueMode = mode === "queue";
+  const hasMovedPastApproval = isQueueMode && !!reportStatus && !APPROVAL_ACTIVE_STATUSES.has(reportStatus);
+
+  /** Every approval action below can move the report out of this approver's stage entirely - re-pull the two locally-owned queries too, not just the shared approval-workflow caches, so this exact open panel reflects it immediately instead of showing stale action buttons. */
+  const refetchReviewData = () => {
+    queryClient.invalidateQueries({ queryKey: ["expenseReviewReport", reportId] });
+    queryClient.invalidateQueries({ queryKey: ["expenseReviewLineItems", reportId] });
+  };
 
   const lineItems = fullLineItems?.length ? fullLineItems : queueItem?.pendingLineItems || [];
 
@@ -143,13 +163,13 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
   const reportNumber = queueItem?.reportNumber || historyItem?.reportNumber || fullReport?.reportNumber;
   const title = historyItem?.title || fullReport?.title;
   const businessPurpose = historyItem?.businessPurpose || fullReport?.businessPurpose;
-  const costCenterName = historyItem?.costCenterName || fullReport?.costCenterName;
-  const submittedAt = historyItem?.createdAt || fullReport?.createdAt;
+  const costCenterName = queueItem?.costCenterName || historyItem?.costCenterName || fullReport?.costCenterName;
+  const submittedAt = queueItem?.submittedAt || historyItem?.createdAt || fullReport?.createdAt;
   const totalAmount = queueItem?.totalAmount ?? historyItem?.totalAmount ?? fullReport?.totalAmount;
   const currencyCode = queueItem?.currencyCode || historyItem?.currencyCode || fullReport?.currencyCode;
 
   const isMutating = reviewLineItem.isPending || rejectReport.isPending || bulkApprove.isPending;
-  const canAct = isQueueMode && reportStatus !== "APPROVED" && reportStatus !== "REJECTED";
+  const canAct = isQueueMode && APPROVAL_ACTIVE_STATUSES.has(reportStatus);
 
   if (!isOpen) return null;
 
@@ -157,17 +177,43 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
     if (!selectedLine) return;
     reviewLineItem.mutate(
       { reportId, lineItemId: selectedLine.lineItemId, decision: "APPROVED" },
-      { onError: (err) => showStatusToast(err.response?.data?.message || "Failed to approve line item", "error") },
+      {
+        // The mutation response is the freshest possible signal - reading reportStatus straight off
+        // it (rather than waiting on a refetch) means a final approval closes this exact panel
+        // immediately, instead of leaving stale Approve/Reject buttons showing until some other
+        // render happens to re-check the (by-then-invalidated) caches.
+        onSuccess: (data) => {
+          refetchReviewData();
+          if (data?.reportStatus && !APPROVAL_ACTIVE_STATUSES.has(data.reportStatus)) {
+            showStatusToast(
+              data.reportStatus === "PENDING_FINANCE_VERIFICATION"
+                ? "Final approval complete - this report has moved to Finance Verification."
+                : "This report has moved past the approval stage.",
+              "success",
+            );
+            onClose();
+          }
+        },
+        onError: (err) => {
+          refetchReviewData();
+          showStatusToast(friendlyApprovalError(err.response?.data?.message, "Failed to approve line item"), "error");
+        },
+      },
     );
   };
 
   const handleBulkApprove = () => {
     bulkApprove.mutate(reportId, {
       onSuccess: () => {
+        refetchReviewData();
         showStatusToast("Report bulk-approved", "success");
         onClose();
       },
-      onError: (err) => showStatusToast(err.response?.data?.message || "Bulk approve failed", "error"),
+      onError: (err) => {
+        refetchReviewData();
+        showStatusToast(friendlyApprovalError(err.response?.data?.message, "Bulk approve failed"), "error");
+        if (err.response?.data?.message?.includes("use the Finance Verification API")) onClose();
+      },
     });
   };
 
@@ -185,6 +231,22 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
           <X className="h-5 w-5" />
         </button>
       </header>
+
+      {hasMovedPastApproval && (
+        <div className="shrink-0 border-b border-blue-200 bg-blue-50 px-4 py-3 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-blue-800">
+              <ArrowRight className="h-4 w-4" />
+              {reportStatus === "PENDING_FINANCE_VERIFICATION"
+                ? "This report has moved on to Finance Verification - no further approval action is possible here."
+                : "This report is no longer awaiting your approval."}
+            </p>
+            <Button size="small" variant="outline" onClick={onClose}>
+              Back to Approval Queue
+            </Button>
+          </div>
+        </div>
+      )}
 
       {needsCorrectionLines.length > 0 && (
         <div className="shrink-0 border-b border-orange-200 bg-orange-50 px-4 py-3 sm:px-6">
@@ -356,11 +418,15 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
             { reportId, comment },
             {
               onSuccess: () => {
+                refetchReviewData();
                 showStatusToast("Report rejected", "success");
                 setIsRejecting(false);
                 onClose();
               },
-              onError: (err) => showStatusToast(err.response?.data?.message || "Failed to reject report", "error"),
+              onError: (err) => {
+                refetchReviewData();
+                showStatusToast(friendlyApprovalError(err.response?.data?.message, "Failed to reject report"), "error");
+              },
             },
           );
         }}

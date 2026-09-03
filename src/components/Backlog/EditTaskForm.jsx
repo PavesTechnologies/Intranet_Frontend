@@ -47,6 +47,7 @@ const EditTaskForm = ({
     storyId: "",
     startDate: "",
     dueDate: "",
+    estimatedHours: "",
     billable: "false",
   });
 
@@ -113,6 +114,7 @@ const EditTaskForm = ({
 
           startDate: task.startDate ? task.startDate.split("T")[0] : "",
           dueDate: task.dueDate ? task.dueDate.split("T")[0] : "",
+          estimatedHours: task.estimatedHours ?? "",
           billable: task.billable ? "true" : "false",
         };
 
@@ -200,6 +202,8 @@ const EditTaskForm = ({
     });
 
     updatedPayload.billable = updatedPayload.billable === "true";
+    updatedPayload.estimatedHours =
+      updatedPayload.estimatedHours !== "" ? Number(updatedPayload.estimatedHours) : 0;
 
     // 🔥 convert LocalDate to LocalDateTime
     if (updatedPayload.startDate) {
@@ -380,6 +384,15 @@ const EditTaskForm = ({
             min={today}
           />
         </div>
+
+        <FormInput
+          label="Estimated Hours"
+          name="estimatedHours"
+          type="number"
+          min="0"
+          value={formData.estimatedHours}
+          onChange={handleChange}
+        />
 
         <FormSelect
           label="Billable"

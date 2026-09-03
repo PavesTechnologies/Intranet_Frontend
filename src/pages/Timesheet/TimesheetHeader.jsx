@@ -5,7 +5,10 @@ import { useAuth } from "../../contexts/AuthContext";
 import ManagerMonthlyReport from "./ManagerMonthlyReport";
 import { ArrowLeft } from "lucide-react";
 
-const TimesheetHeader = () => {
+// `rightSlot` renders at the end of the button row. Only the manager-approval view
+// passes it (its month-scope dropdown); every other consumer omits it and is
+// unaffected, since null renders nothing.
+const TimesheetHeader = ({ rightSlot = null }) => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { user } = useAuth();
@@ -43,7 +46,7 @@ const TimesheetHeader = () => {
       </div>
 
       {/* --- Right Section: Buttons --- */}
-      <div className="flex gap-4">
+      <div className="flex items-center gap-4">
         {pathname === "/timesheets" && (
           <>
             <Button
@@ -104,6 +107,8 @@ const TimesheetHeader = () => {
             )}
           </>
         )}
+
+        {rightSlot}
 
         {canApprove && pathname === "/timesheets" && (
           <Button

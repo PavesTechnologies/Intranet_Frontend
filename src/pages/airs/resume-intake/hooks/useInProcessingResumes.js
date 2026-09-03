@@ -21,12 +21,14 @@ export default function useInProcessingResumes({ campaignFilter, statusFilter, s
   const [sortBy, sortDir] = sortValue.split(":");
   const statusesToFetch = statusFilter ? [statusFilter] : IN_PROCESS_STATUSES;
 
+  // Initial REST load only — live progress after this comes from each row's
+  // own WS subscription (ResumeProcessingCard), which also triggers
+  // refreshInProcessing() once a resume leaves PENDING/PARSING so it drops
+  // out of this list without a poll loop.
   useEffect(() => {
     if (!enabled) return undefined;
 
     let cancelled = false;
-    let isFetching = false;
-    let timerId = null;
 
     const baseParams = {
       campaign_id: campaignFilter || undefined,
@@ -37,13 +39,8 @@ export default function useInProcessingResumes({ campaignFilter, statusFilter, s
       sort_dir: sortDir,
     };
 
-    const fetchInProcessing = async (isFirstLoad) => {
-      if (isFetching || cancelled) return;
-      isFetching = true;
-      if (isFirstLoad) setIsLoading(true);
-
-      let itemCount = 0;
-
+    const fetchInProcessing = async () => {
+      setIsLoading(true);
       try {
         const responses = await Promise.all(
           statusesToFetch.map((parse_status) => getAllResumes({ ...baseParams, parse_status }))
@@ -51,7 +48,6 @@ export default function useInProcessingResumes({ campaignFilter, statusFilter, s
         if (cancelled) return;
 
         const items = responses.flatMap((res) => res?.data?.items || []);
-        itemCount = items.length;
         items.sort((a, b) => {
           const dir = sortDir === "asc" ? 1 : -1;
           if (sortBy === "parse_status") return a.parse_status.localeCompare(b.parse_status) * dir;
@@ -63,22 +59,14 @@ export default function useInProcessingResumes({ campaignFilter, statusFilter, s
       } catch (err) {
         // Transient failures keep the last known list rather than clearing it.
       } finally {
-        isFetching = false;
-        if (!cancelled && isFirstLoad) setIsLoading(false);
-
-        // Schedule next poll ONLY after response returns and if there are active in-progress items
-        if (!cancelled && itemCount > 0) {
-          clearTimeout(timerId);
-          timerId = setTimeout(() => fetchInProcessing(false), 8000);
-        }
+        if (!cancelled) setIsLoading(false);
       }
     };
 
-    fetchInProcessing(true);
+    fetchInProcessing();
 
     return () => {
       cancelled = true;
-      clearTimeout(timerId);
     };
   }, [campaignFilter, statusFilter, sourceFilter, sortBy, sortDir, enabled]);
 

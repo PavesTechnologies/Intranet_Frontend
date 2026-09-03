@@ -3,6 +3,7 @@ import GenericTable from "../../../../components/Table/table";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { formatCurrency, formatDate, calculateBalance, isOverdue } from "../../utils/formatters";
 import { AP_ROUTES } from "../../constants/routes";
+import { INVOICE_TYPE_LABELS } from "../../constants/invoiceTypes";
 import InvoiceRowActions from "./InvoiceRowActions";
 
 const HEADERS = ["Invoice #", "Vendor", "Invoice Date", "Due Date", "Type", "Net Amount", "Paid", "Balance", "Status", "Actions"];
@@ -32,7 +33,7 @@ export default function InvoiceTable({ invoices, loading }) {
           {overdue ? <span className="ml-1 text-xs">(Overdue)</span> : null}
         </span>
       ),
-      type: invoice.invoiceType,
+      type: INVOICE_TYPE_LABELS[invoice.invoiceType] || invoice.invoiceType,
       netAmount: formatCurrency(invoice.netAmount, symbol),
       paid: formatCurrency(invoice.amountPaid, symbol),
       balance: (

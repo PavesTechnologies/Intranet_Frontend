@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 const fmt = (d) => (d ? new Date(d).toLocaleString() : null);
 
@@ -27,14 +27,9 @@ export default function PlatformHealthStrip({ breakers }) {
 
   const degraded = breakers.filter((b) => b.state !== "CLOSED");
 
-  if (degraded.length === 0) {
-    return (
-      <p className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1.5">
-        <CheckCircle2 className="h-3.5 w-3.5" />
-        All {breakers.length} services healthy
-      </p>
-    );
-  }
+  // Healthy is the common case and needs no confirmation on screen — only
+  // degraded services are worth surfacing here.
+  if (degraded.length === 0) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-2">

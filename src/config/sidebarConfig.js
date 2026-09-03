@@ -1,4 +1,4 @@
-import { AP_ALL_ROLES } from "../pages/accounts-payable/constants/apRoles";
+import { AP_ALL_ROLES, AP_ROLES } from "../pages/accounts-payable/constants/apRoles";
 import { AP_ROUTES } from "../pages/accounts-payable/constants/routes";
 
 /**
@@ -19,6 +19,14 @@ export const ROLES = {
   // Expense Management (XMS) roles
   MANAGER:           "Manager",
   FINANCE:           "Finance",
+  // Accounts Receivable (AR) Maker-Checker roles.
+  // FINANCE_EXECUTIVE mirrors the ad-hoc "Finance_Executive" literal already used
+  // by XMS_FINANCE/XMS_EVERYONE/AP_ROLES.FINANCE_EXECUTIVE below — same real
+  // backend role, now also exposed as a named constant for AR's own use.
+  // FINANCE_MANAGER is AR's Checker role (approve/reject billing configurations);
+  // it does not exist anywhere else in the app.
+  FINANCE_EXECUTIVE: "Finance_Executive",
+  FINANCE_MANAGER:   "Finance_Manager",
 };
 
 const ADMIN_ROLES      = [ROLES.ADMIN, ROLES.SUPER_ADMIN];
@@ -38,14 +46,34 @@ export const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, "Fin
 const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
 
 /**
+ * Accounts Receivable (AR) Maker-Checker role groups.
+ *
+ * AR_MAKER_ROLES   — Finance Executive: create/save-draft/edit-draft/submit
+ *                    the Project Billing Setup wizard. Super Admin keeps this
+ *                    too (existing AR access is unchanged for Super Admin).
+ * AR_CHECKER_ROLES — Finance Manager: review/approve/reject submitted billing
+ *                    configurations (Billing Approvals). Super Admin keeps
+ *                    this too, same reasoning.
+ *
+ * Deliberately two separate exports (not one shared AR_ALL_ROLES) — routes and
+ * sidebar menus for Maker screens must allow only AR_MAKER_ROLES, and Checker
+ * screens only AR_CHECKER_ROLES, so a Finance Executive can never reach
+ * Billing Approvals and a Finance Manager can never reach the create/edit
+ * wizard. See App.jsx route guards and Sidebar.jsx's AR submenu split.
+ */
+export const AR_MAKER_ROLES = [ROLES.SUPER_ADMIN, ROLES.FINANCE_EXECUTIVE];
+export const AR_CHECKER_ROLES = [ROLES.SUPER_ADMIN, ROLES.FINANCE_MANAGER];
+export const AR_ALL_ROLES = [...new Set([...AR_MAKER_ROLES, ...AR_CHECKER_ROLES])];
+
+/**
  * Union of every role that can see at least one Finance Management module
  * (Expense Management, Accounts Payable, Accounts Receivable). Composed from
  * each module's own existing role set — not a new authorization mechanism —
- * so it stays correct as long as XMS_EVERYONE / AP_ALL_ROLES / the AR
- * SUPER_ADMIN gate (see Sidebar.jsx / App.jsx) stay in sync.
+ * so it stays correct as long as XMS_EVERYONE / AP_ALL_ROLES / AR_ALL_ROLES
+ * (see Sidebar.jsx / App.jsx) stay in sync.
  */
 export const FINANCE_ALL_ROLES = [
-  ...new Set([...XMS_EVERYONE, ...AP_ALL_ROLES, ROLES.SUPER_ADMIN]),
+  ...new Set([...XMS_EVERYONE, ...AP_ALL_ROLES, ...AR_ALL_ROLES, ROLES.SUPER_ADMIN]),
 ];
 
 /**
@@ -194,6 +222,14 @@ export const XMS_SUBMENU = [
     ],
   },
   {
+    // AP_EXECUTIVE-only (matches ApPaymentController's own @PreAuthorize("hasRole('AP_EXECUTIVE')")
+    // exactly, with no Admin override) - the backend endpoints this page calls give Admin no
+    // access either, so gating the entry any wider would just show a page whose actions 403.
+    label: "AP Payments",
+    to: "/expense-management/ap-payments/queue",
+    allowedRoles: [AP_ROLES.AP_EXECUTIVE],
+  },
+  {
     label: "Client Billing",
     to: "/expense-management/client-billing/billable-expenses",
     allowedRoles: XMS_FINANCE,
@@ -272,17 +308,24 @@ export const XMS_SUBMENU = [
  * additionally gates the entire flyout <li> on hasRole(AP_ALL_ROLES) (see Sidebar.jsx),
  * matching the Account Receivable module's pattern rather than EO/XMS's ungated one.
  *
- * Deliberately 4 flat items, not 9 — each links to that area's primary list/overview page,
+ * Deliberately 5 flat items, not 9 — each links to that area's primary list/overview page,
  * which carries its own "create new" action as a page-level button (e.g. VendorListPage's
  * "Register Vendor", InvoiceListPage's "Upload Invoice") rather than as a separate sidebar
  * entry. Sub-views reached from within a page (Vendor Onboarding/Detail/Update, OCR Review
  * Queue, Validation Queue, Payment History, Mark as Paid) still have their own routes from
- * Phase 2 — they're just no longer direct sidebar destinations.
+ * Phase 2 — they're just no longer direct sidebar destinations. System Configuration is the
+ * exception: it's a masters/admin screen, not a business-object list, so it stays a direct
+ * sidebar destination on its own.
  *
  * Per-item role differentiation (e.g. Vendor Management restricted to Admin/Vendor_Intake)
  * is deferred to the business-logic phases — see constants/permissions.js's
  * AP_PERMISSION_ROLES map for the intended per-capability breakdown.
  */
 export const AP_SUBMENU = [
-  { label: "Payment Queue", to: AP_ROUTES.PAYMENT_QUEUE, allowedRoles: ["AP_Executive", "Admin", "Super_Admin"] },
+  { label: "Dashboard", to: AP_ROUTES.DASHBOARD, allowedRoles: AP_ALL_ROLES },
+  { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
+  { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, allowedRoles: AP_ALL_ROLES },
+  { label: "Payments", to: AP_ROUTES.PAYMENT_READY, allowedRoles: AP_ALL_ROLES },
+  { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
+  { label: "System Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: AP_ALL_ROLES },
 ];

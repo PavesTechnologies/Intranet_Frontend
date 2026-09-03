@@ -3,11 +3,9 @@ import { AlertTriangle, ChevronDown, ChevronRight, Inbox, Layers, ShieldAlert, L
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import { showStatusToast } from "@/components/toastfy/toast";
-import { useFinanceQueue, useVerifyLineItem, useQueryLineItem } from "./hooks/useFinanceVerification";
-import EmployeeLabel from "../../approval-engine/components/EmployeeLabel";
-import FinanceLineItemReviewPanel from "./components/FinanceLineItemReviewPanel";
+import { useFinanceQueue } from "./hooks/useFinanceVerification";
 import FinanceReviewPanel from "./components/FinanceReviewPanel";
+import FinanceLineItemReviewPanel from "./components/FinanceLineItemReviewPanel";
 import { formatMoney } from "../../approval-engine/constants/approvalLabels";
 import SearchInput from "@/components/filter/Searchbar";
 import FormSelect from "@/components/forms/FormSelect";
@@ -28,7 +26,6 @@ const hasIneligibleLines = (lineItems) => (lineItems || []).some((l) => !l.eligi
 
 export default function VerificationPage() {
   const [page, setPage] = useState(0);
-  const [expandedReportId, setExpandedReportId] = useState(null);
   const [reviewingReport, setReviewingReport] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [eligibilityFilter, setEligibilityFilter] = useState("");
@@ -156,7 +153,6 @@ export default function VerificationPage() {
     );
   }
 
-  // Handle error states (including 401 & 403)
   if (isError) {
     const errorStatus = error?.response?.status;
     const isAuthError = errorStatus === 401 || errorStatus === 403;

@@ -3,85 +3,74 @@ import { useNavigate } from "react-router-dom";
 import {
   FolderKanban,
   FileText,
-  Cable,
-  PenLine,
+  Clock,
+  XCircle,
   CheckCircle2,
   Eye,
   Pencil,
   ArrowRightCircle,
   Ban,
-  XCircle,
+  Trash2,
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
-import FilterCard from "../../../components/ui/FilterCard";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import { KPICard } from "../../../components/kpi/KPI";
 import Button from "../../../components/Button/Button";
 import SearchInput from "../../../components/filter/Searchbar";
-import FormSelect from "../../../components/forms/FormSelect";
-import GenericTable from "../../../components/Table/table";
+import ARTable from "../components/common/ARTable";
 import Pagination from "../../../components/Pagination/pagination";
 import StatusBadge from "../../../components/status/statusbadge";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import ActionMenu from "../components/common/ActionMenu";
-import Modal from "../../../components/Modal/modal";
-import FormTextArea from "../../../components/forms/FormTextArea";
 
 import {
   fetchBillingConfigurations,
   deactivateBillingConfiguration,
-  approveBillingConfiguration,
-  rejectBillingConfiguration,
+  deleteBillingConfiguration,
   getApiErrorMessage,
   getBillingConfigurationStats,
-  getBillingConfigurationActivity,
 } from "../services/billingConfigService";
 
-const INITIAL_FILTERS = { search: "", status: "", source: "" };
+// Finance Executive (Maker) view — create/save-draft/edit/submit only.
+// Approve/Reject are Finance Manager (Checker) actions and live entirely in
+// BillingApprovals.jsx / billingApprovalService.js; this page must never call
+// them, and never calls the removed /activate endpoint either.
+const INITIAL_FILTERS = { search: "" };
 const PAGE_SIZE = 6;
 
-const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Source", "Status", "Actions"];
-const TABLE_COLUMNS = ["client", "project", "billingType", "source", "status", "actions"];
-
-const SOURCE_BADGE_CLASSES = {
-  Enterprise: "bg-indigo-100 text-indigo-700",
-  Standalone: "bg-slate-100 text-slate-700",
+// Keys for the interactive KPI-as-filter row below. "ACTIVE" is a synthetic
+// bucket (APPROVED + billingStatus ACTIVE) that has no direct match against
+// config.approvalStatus, so it's handled separately in filteredConfigs.
+const STATUS_FILTERS = {
+  ALL: "ALL",
+  ACTIVE: "ACTIVE",
+  PENDING_APPROVAL: "PENDING_APPROVAL",
+  DRAFT: "DRAFT",
+  REJECTED: "REJECTED",
 };
 
-function SourceBadge({ source }) {
-  return (
-    <span
-      className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-        SOURCE_BADGE_CLASSES[source] || "bg-slate-100 text-slate-700"
-      }`}
-    >
-      {source}
-    </span>
-  );
-}
+const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Approval Status", "Billing Status", "Actions"];
+const TABLE_COLUMNS = ["client", "project", "billingType", "approvalStatus", "billingStatus", "actions"];
 
 export default function Overview() {
   const navigate = useNavigate();
 
-  // Overview Stats & Recent Activity State
+  // Overview Stats State
   const [stats, setStats] = useState(null);
-  const [activity, setActivity] = useState([]);
   const [loadingStats, setLoadingStats] = useState(true);
 
   // Billing Configurations State
   const [configs, setConfigs] = useState([]);
   const [loadingConfigs, setLoadingConfigs] = useState(true);
   const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const [statusFilter, setStatusFilter] = useState(STATUS_FILTERS.ALL);
   const [currentPage, setCurrentPage] = useState(1);
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [deactivateLoading, setDeactivateLoading] = useState(false);
-  const [approveTarget, setApproveTarget] = useState(null);
-  const [approveLoading, setApproveLoading] = useState(false);
-  const [rejectTarget, setRejectTarget] = useState(null);
-  const [rejectLoading, setRejectLoading] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   // load configurations helper available to handlers
   const loadConfigurations = async () => {
     setLoadingStats(true);
@@ -90,15 +79,12 @@ export default function Overview() {
       const configsResult = await fetchBillingConfigurations();
       setConfigs(configsResult);
 
-      // derive stats and activity from configurations
+      // derive stats from configurations
       const statsResult = await getBillingConfigurationStats();
-      const activityResult = await getBillingConfigurationActivity();
       setStats(statsResult);
-      setActivity(activityResult);
     } catch (error) {
       showStatusToast(getApiErrorMessage(error, "Failed to load billing configuration overview."), "error");
       setStats(null);
-      setActivity([]);
     } finally {
       setLoadingStats(false);
       setLoadingConfigs(false);
@@ -114,9 +100,8 @@ export default function Overview() {
     };
   }, []);
 
-  const handleFilterChange = (event) => {
-    const { name, value } = event.target;
-    setFilters((prev) => ({ ...prev, [name]: value }));
+  const handleSearchInputChange = (event) => {
+    setFilters((prev) => ({ ...prev, search: event.target.value }));
     setCurrentPage(1);
   };
 
@@ -125,19 +110,10 @@ export default function Overview() {
     setCurrentPage(1);
   };
 
-  const filterOptions = useMemo(() => {
-    const uniqueOptions = (field, defaultLabel) => [
-      { value: "", label: defaultLabel },
-      ...Array.from(new Set(configs.map((config) => config[field]).filter(Boolean)))
-        .sort((a, b) => String(a).localeCompare(String(b)))
-        .map((value) => ({ value, label: value })),
-    ];
-
-    return {
-      status: uniqueOptions("status", "All Statuses"),
-      source: uniqueOptions("source", "All Sources"),
-    };
-  }, [configs]);
+  const handleStatusFilterClick = (key) => {
+    setStatusFilter(key);
+    setCurrentPage(1);
+  };
 
   const filteredConfigs = useMemo(() => {
     const search = filters.search.trim().toLowerCase();
@@ -148,12 +124,17 @@ export default function Overview() {
         String(config.projectName || "").toLowerCase().includes(search) ||
         String(config.projectCode || "").toLowerCase().includes(search) ||
         String(config.client || "").toLowerCase().includes(search);
-      const matchesStatus = !filters.status || String(config.status) === String(filters.status);
-      const matchesSource = !filters.source || String(config.source) === String(filters.source);
 
-      return matchesSearch && matchesStatus && matchesSource;
+      let matchesStatus = true;
+      if (statusFilter === STATUS_FILTERS.ACTIVE) {
+        matchesStatus = config.approvalStatus === "APPROVED" && config.billingStatus === "ACTIVE";
+      } else if (statusFilter !== STATUS_FILTERS.ALL) {
+        matchesStatus = config.approvalStatus === statusFilter;
+      }
+
+      return matchesSearch && matchesStatus;
     });
-  }, [configs, filters]);
+  }, [configs, filters, statusFilter]);
 
   const totalPages = Math.ceil(filteredConfigs.length / PAGE_SIZE) || 1;
   const paginatedConfigs = filteredConfigs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -184,52 +165,25 @@ export default function Overview() {
     }
   };
 
-  const handleConfirmApprove = async () => {
-    setApproveLoading(true);
+  const handleConfirmDelete = async () => {
+    setDeleteLoading(true);
     try {
-      await approveBillingConfiguration(approveTarget.id);
+      await deleteBillingConfiguration(deleteTarget.id);
       await loadConfigurations();
-      showStatusToast("Billing configuration approved.", "success");
-      setApproveTarget(null);
+      showStatusToast("Draft billing configuration deleted.", "success");
+      setDeleteTarget(null);
     } catch (error) {
-      showStatusToast(getApiErrorMessage(error, "Failed to approve billing configuration."), "error");
+      showStatusToast(getApiErrorMessage(error, "Failed to delete draft billing configuration."), "error");
     } finally {
-      setApproveLoading(false);
+      setDeleteLoading(false);
     }
   };
 
-  const handleConfirmReject = async () => {
-    if (!rejectionReason.trim()) {
-      showStatusToast("Please enter a rejection reason.", "warning");
-      return;
-    }
-
-    setRejectLoading(true);
-    try {
-      await rejectBillingConfiguration(rejectTarget.id, rejectionReason.trim());
-      await loadConfigurations();
-      showStatusToast("Billing configuration rejected.", "success");
-      setRejectTarget(null);
-      setRejectionReason("");
-    } catch (error) {
-      showStatusToast(getApiErrorMessage(error, "Failed to reject billing configuration."), "error");
-    } finally {
-      setRejectLoading(false);
+  const closeDeleteModal = () => {
+    if (!deleteLoading) {
+      setDeleteTarget(null);
     }
   };
-
-  const openRejectModal = (config) => {
-    setRejectTarget(config);
-    setRejectionReason("");
-  };
-
-  const closeRejectModal = () => {
-    if (rejectLoading) return;
-    setRejectTarget(null);
-    setRejectionReason("");
-  };
-
-  const canApproveOrReject = (status) => !["Active", "Inactive", "Rejected"].includes(status);
 
   const closeDeactivateModal = () => {
     if (!deactivateLoading) {
@@ -248,8 +202,8 @@ export default function Overview() {
           </div>
         ),
         billingType: config.billingType,
-        source: <SourceBadge source={config.source} />,
-        status: <StatusBadge label={config.status} size="sm" />,
+        approvalStatus: <StatusBadge label={config.approvalStatusLabel} size="sm" />,
+        billingStatus: <StatusBadge label={config.billingStatusLabel} size="sm" />,
         actions: (
           <ActionMenu
             items={[
@@ -257,34 +211,28 @@ export default function Overview() {
               {
                 label: "Continue Draft",
                 icon: <ArrowRightCircle className="h-4 w-4" />,
-                hidden: config.status !== "Draft",
+                hidden: config.approvalStatus !== "DRAFT",
                 onClick: () => handleContinueDraft(config),
               },
               {
                 label: "Edit",
                 icon: <Pencil className="h-4 w-4 text-gray-600" />,
-                hidden: config.status === "Draft",
+                hidden: config.approvalStatus === "DRAFT",
                 onClick: () => handleEdit(config),
-              },
-              {
-                label: "Approve",
-                icon: <CheckCircle2 className="h-4 w-4" />,
-                hidden: !canApproveOrReject(config.status),
-                onClick: () => setApproveTarget(config),
-              },
-              {
-                label: "Reject",
-                icon: <XCircle className="h-4 w-4" />,
-                hidden: !canApproveOrReject(config.status),
-                danger: true,
-                onClick: () => openRejectModal(config),
               },
               {
                 label: "Deactivate",
                 icon: <Ban className="h-4 w-4" />,
-                hidden: config.status !== "Active",
+                hidden: !(config.approvalStatus === "APPROVED" && config.billingStatus === "ACTIVE"),
                 danger: true,
                 onClick: () => setDeactivateTarget(config),
+              },
+              {
+                label: "Delete",
+                icon: <Trash2 className="h-4 w-4" />,
+                hidden: config.approvalStatus !== "DRAFT",
+                danger: true,
+                onClick: () => setDeleteTarget(config),
               },
             ]}
           />
@@ -294,42 +242,62 @@ export default function Overview() {
     [paginatedConfigs]
   );
 
+  // Each KPI doubles as a status filter for the table below — clicking one
+  // toggles statusFilter instead of a separate dropdown/tab control.
   const kpiCards = [
     {
-      key: "total",
+      key: STATUS_FILTERS.ALL,
       label: "Total Configurations",
       value: stats?.total ?? "—",
       icon: FolderKanban,
-      color: "bg-slate-500 text-white",
+      color: "bg-[#0A0082] text-white",
     },
     {
-      key: "active",
-      label: "Active Projects",
+      key: STATUS_FILTERS.ACTIVE,
+      label: "Active",
       value: stats?.active ?? "—",
       icon: CheckCircle2,
       color: "bg-emerald-600 text-white",
     },
     {
-      key: "draft",
-      label: "Draft Configurations",
-      value: stats?.draft ?? "—",
-      icon: FileText,
+      key: STATUS_FILTERS.PENDING_APPROVAL,
+      label: "Pending Approval",
+      value: stats?.pending ?? "—",
+      icon: Clock,
       color: "bg-amber-500 text-white",
     },
     {
-      key: "integrated",
-      label: "Enterprise Projects",
-      value: stats?.integrated ?? "—",
-      icon: Cable,
-      color: "bg-indigo-600 text-white",
+      key: STATUS_FILTERS.DRAFT,
+      label: "Draft",
+      value: stats?.draft ?? "—",
+      icon: FileText,
+      color: "bg-slate-400 text-white",
     },
     {
-      key: "manual",
-      label: "Standalone Projects",
-      value: stats?.manual ?? "—",
-      icon: PenLine,
-      color: "bg-orange-500 text-white",
+      key: STATUS_FILTERS.REJECTED,
+      label: "Rejected",
+      value: stats?.rejected ?? "—",
+      icon: XCircle,
+      color: "bg-rose-600 text-white",
     },
+  ];
+
+  const tabCounts = useMemo(() => {
+    return {
+      ALL: configs.length,
+      ACTIVE: configs.filter((c) => c.approvalStatus === "APPROVED" && c.billingStatus === "ACTIVE").length,
+      PENDING_APPROVAL: configs.filter((c) => c.approvalStatus === "PENDING_APPROVAL").length,
+      DRAFT: configs.filter((c) => c.approvalStatus === "DRAFT").length,
+      REJECTED: configs.filter((c) => c.approvalStatus === "REJECTED").length,
+    };
+  }, [configs]);
+
+  const tabs = [
+    { key: STATUS_FILTERS.ALL, label: "All Records", icon: FolderKanban, count: tabCounts.ALL },
+    { key: STATUS_FILTERS.ACTIVE, label: "Active", icon: CheckCircle2, count: tabCounts.ACTIVE },
+    { key: STATUS_FILTERS.PENDING_APPROVAL, label: "Pending Approval", icon: Clock, count: tabCounts.PENDING_APPROVAL },
+    { key: STATUS_FILTERS.DRAFT, label: "Draft", icon: FileText, count: tabCounts.DRAFT },
+    { key: STATUS_FILTERS.REJECTED, label: "Rejected", icon: XCircle, count: tabCounts.REJECTED },
   ];
 
   return (
@@ -348,72 +316,99 @@ export default function Overview() {
         }
       />
 
-      {/* 2. KPIs Row */}
+      {/* 2. KPIs Row — each card is also a status filter for the table below */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {kpiCards.map((kpi) => (
-          <KPICard
-            key={kpi.key}
-            label={kpi.label}
-            value={loadingStats ? "…" : kpi.value}
-            icon={<kpi.icon className="h-5 w-5" />}
-            color={kpi.color}
-            className="h-full w-full bg-white shadow-sm"
-          />
+          <button key={kpi.key} type="button" onClick={() => handleStatusFilterClick(kpi.key)} className="text-left">
+            <KPICard
+              label={kpi.label}
+              value={loadingStats ? "…" : kpi.value}
+              icon={<kpi.icon className="h-5 w-5" />}
+              color={kpi.color}
+              className="h-full w-full cursor-pointer bg-white shadow-sm transition-shadow hover:shadow-md"
+            />
+          </button>
         ))}
       </div>
 
-      {/* 3. Filters Box */}
-      <FilterCard title="Filters" description="Search and narrow down billing configurations.">
-        <div className="w-full sm:flex-[2] sm:min-w-[260px]">
-          <SearchInput
-            value={filters.search}
-            onChange={handleFilterChange}
-            onSearch={handleSearch}
-            placeholder="Search by project, code or client..."
-          />
-        </div>
-        <div className="w-full sm:flex-1 sm:min-w-[200px]">
-          <FormSelect
-            name="status"
-            value={filters.status}
-            onChange={handleFilterChange}
-            options={filterOptions.status}
-          />
-        </div>
-        <div className="w-full sm:flex-1 sm:min-w-[200px]">
-          <FormSelect
-            name="source"
-            value={filters.source}
-            onChange={handleFilterChange}
-            options={filterOptions.source}
-          />
-        </div>
-      </FilterCard>
-
-      {/* 4. Billing Configurations Table */}
+      {/* 3. Billing Configurations */}
       <PageCard>
-        <PageCardContent className="p-4 sm:p-5">
+        <PageCardContent className="p-4 sm:p-5 space-y-4">
+          {/* Enterprise Status Tabs */}
+          <div className="border-b border-slate-200">
+            <nav className="-mb-px flex space-x-2 overflow-x-auto sm:space-x-4" aria-label="Status Tabs">
+              {tabs.map((tab) => {
+                const isActive = statusFilter === tab.key;
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => handleStatusFilterClick(tab.key)}
+                    className={`group inline-flex items-center gap-2 border-b-2 py-2.5 px-3 text-xs font-semibold whitespace-nowrap transition-all ${
+                      isActive
+                        ? "border-[#0A0082] text-[#0A0082]"
+                        : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                    }`}
+                  >
+                    <Icon className={`h-4 w-4 ${isActive ? "text-[#0A0082]" : "text-slate-400 group-hover:text-slate-500"}`} />
+                    <span>{tab.label}</span>
+                    <span
+                      className={`ml-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                        isActive
+                          ? "bg-[#0A0082]/10 text-[#0A0082]"
+                          : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
+                      }`}
+                    >
+                      {loadingConfigs ? "…" : tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="w-full sm:max-w-md">
+              <SearchInput
+                value={filters.search}
+                onChange={handleSearchInputChange}
+                onSearch={handleSearch}
+                placeholder="Search by project, code or client..."
+              />
+            </div>
+            {statusFilter !== STATUS_FILTERS.ALL && (
+              <button
+                type="button"
+                onClick={() => handleStatusFilterClick(STATUS_FILTERS.ALL)}
+                className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-200 sm:self-auto"
+              >
+                Filtered: {kpiCards.find((kpi) => kpi.key === statusFilter)?.label}
+                <span aria-hidden="true">&times;</span>
+              </button>
+            )}
+          </div>
 
           {!loadingConfigs && filteredConfigs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100">
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
                 <FileText className="h-6 w-6 text-slate-400" />
               </div>
               <h3 className="mb-1 text-sm font-semibold text-slate-900">No Billing Configurations Found</h3>
               <p className="text-xs text-slate-500">
-                Try adjusting your search query, or create a new billing setup.
+                {statusFilter !== STATUS_FILTERS.ALL || filters.search
+                  ? "Try adjusting your search or filter, or create a new billing setup."
+                  : "Try adjusting your search query, or create a new billing setup."}
               </p>
             </div>
           ) : (
             <>
-              <div className="w-full overflow-x-auto">
-                <GenericTable
-                  headers={TABLE_HEADERS}
-                  columns={TABLE_COLUMNS}
-                  rows={tableRows}
-                  loading={loadingConfigs}
-                />
-              </div>
+              <ARTable
+                headers={TABLE_HEADERS}
+                columns={TABLE_COLUMNS}
+                rows={tableRows}
+                loading={loadingConfigs}
+              />
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
@@ -421,35 +416,6 @@ export default function Overview() {
                 onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
               />
             </>
-          )}
-        </PageCardContent>
-      </PageCard>
-
-      {/* 5. Recent Activity (Bottom) */}
-      <PageCard>
-        <PageCardContent className="p-4 sm:p-5">
-          <h2 className="mb-3 text-base font-semibold text-slate-900">Recent Activity</h2>
-
-          {loadingStats ? (
-            <div className="py-6 text-center text-sm text-slate-500">Loading recent activity…</div>
-          ) : activity.length === 0 ? (
-            <div className="py-6 text-center text-sm text-slate-500">No recent activity yet.</div>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {activity.map((item, index) => (
-                <li
-                  key={`${item.configId}-${index}`}
-                  className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
-                >
-                  <div>
-                    <span className="text-slate-600">{item.action}</span>
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    {item.user} · {item.time}
-                  </div>
-                </li>
-              ))}
-            </ul>
           )}
         </PageCardContent>
       </PageCard>
@@ -470,52 +436,21 @@ export default function Overview() {
         onConfirm={handleConfirmDeactivate}
       />
 
+      {/* Delete Draft Modal */}
       <ConfirmationModal
-        isOpen={Boolean(approveTarget)}
-        title="Approve Billing Configuration"
+        isOpen={Boolean(deleteTarget)}
+        title="Delete Draft Billing Configuration"
         message={
-          approveTarget
-            ? `Approve the billing setup for ${approveTarget.projectName}?`
+          deleteTarget
+            ? `Are you sure you want to permanently delete the draft billing setup for ${deleteTarget.projectName}? This action cannot be undone.`
             : ""
         }
-        confirmText="Approve"
-        variant="success"
-        isLoading={approveLoading}
-        onCancel={() => !approveLoading && setApproveTarget(null)}
-        onConfirm={handleConfirmApprove}
+        confirmText="Delete"
+        variant="danger"
+        isLoading={deleteLoading}
+        onCancel={closeDeleteModal}
+        onConfirm={handleConfirmDelete}
       />
-
-      <Modal
-        isOpen={Boolean(rejectTarget)}
-        onClose={closeRejectModal}
-        title="Reject Billing Configuration"
-        width="480px"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-slate-600">
-            {rejectTarget
-              ? `Enter the reason for rejecting ${rejectTarget.projectName}.`
-              : ""}
-          </p>
-          <FormTextArea
-            label="Rejection Reason"
-            name="rejectionReason"
-            value={rejectionReason}
-            onChange={(event) => setRejectionReason(event.target.value)}
-            placeholder="Add rejection reason"
-            rows={4}
-            disabled={rejectLoading}
-          />
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="small" onClick={closeRejectModal} disabled={rejectLoading}>
-              Cancel
-            </Button>
-            <Button variant="danger" size="small" onClick={handleConfirmReject} loading={rejectLoading} loadingText="Rejecting...">
-              Reject
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }
