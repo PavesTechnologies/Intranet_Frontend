@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { AlertTriangle, ChevronDown, ChevronRight, Inbox, Layers, ShieldAlert, XCircle } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
@@ -17,6 +17,9 @@ import LineItemReviewPanel from "../components/LineItemReviewPanel";
 import CommentPromptModal from "../components/CommentPromptModal";
 import MyDelegateCard from "../components/MyDelegateCard";
 import ExpenseReviewPanel from "../components/ExpenseReviewPanel";
+import { useQueries } from "@tanstack/react-query";
+import { lineItemService } from "@/pages/expense-management/api/expenseReportsApi";
+import { approvalWorkflowApi } from "../api/approvalWorkflowApi";
 
 const merchantSummary = (lineItems) => {
   if (!lineItems?.length) return "—";
@@ -32,7 +35,7 @@ const hasPolicyIssue = (lineItems) => (lineItems || []).some((l) => l.policyViol
  * offers the fast quick-approve line panel; "Review" opens the full ExpenseReviewPanel (receipt +
  * full detail + timeline) for reports that need a closer look.
  */
-export default function PendingApprovalsPage() {
+export default function PendingApprovalsPage({ searchTerm = "" }) {
   const [page, setPage] = useState(0);
   const [expandedReportId, setExpandedReportId] = useState(null);
   const [rejectingReport, setRejectingReport] = useState(null);
@@ -46,6 +49,63 @@ export default function PendingApprovalsPage() {
   const bulkApprove = useBulkApprove();
 
   const items = data?.content || [];
+
+  const lineItemsQueries = useQueries({
+    queries: items.map((item) => ({
+      queryKey: ["reportLineItems", item.reportId],
+      queryFn: async () => {
+        const res = await lineItemService.getAll(item.reportId);
+        const payload = res.data?.data;
+        return Array.isArray(payload) ? payload : payload?.lineItems || payload?.content || payload?.data || [];
+      },
+      staleTime: 30_000,
+    })),
+  });
+
+  const reviewsQueries = useQueries({
+    queries: items.map((item) => ({
+      queryKey: ["reportReviews", item.reportId],
+      queryFn: async () => {
+        const res = await approvalWorkflowApi.getLineItemReviews(item.reportId);
+        return res.data?.data || [];
+      },
+      staleTime: 15_000,
+    })),
+  });
+
+  const resolvedItems = useMemo(() => {
+    return items.map((item, idx) => {
+      const allLines = lineItemsQueries[idx]?.data || [];
+      const reportReviews = reviewsQueries[idx]?.data || [];
+
+      // A line is pending if it has no review at the current level, or the review status is "PENDING"
+      // or not "APPROVED" / "NEEDS_CORRECTION".
+      const pendingLineItems = allLines.filter((line) => {
+        const lineReviews = reportReviews.filter((r) => r.lineItemId === line.lineItemId);
+        const currentLevelReview = lineReviews.find(
+          (r) => r.levelOrder === item.levelOrder || r.levelOrder === item.currentLevelOrder
+        );
+        if (!currentLevelReview) return true;
+        return (
+          currentLevelReview.status === "PENDING" ||
+          (currentLevelReview.status !== "APPROVED" && currentLevelReview.status !== "NEEDS_CORRECTION")
+        );
+      });
+
+      return {
+        ...item,
+        pendingLineItems,
+      };
+    });
+  }, [items, lineItemsQueries, reviewsQueries]);
+
+  const filteredItems = resolvedItems.filter((item) => {
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    const reportNum = (item.reportNumber || "").toLowerCase();
+    const merchant = merchantSummary(item.pendingLineItems).toLowerCase();
+    return reportNum.includes(q) || merchant.includes(q);
+  });
   const isMutating = reviewLineItem.isPending || rejectReport.isPending || bulkApprove.isPending;
 
   const handleApproveLine = (reportId, lineItemId) => {
@@ -118,55 +178,61 @@ export default function PendingApprovalsPage() {
         </div>
       )}
 
-      {!isLoading && !isError && items.length === 0 && (
+      {!isLoading && !isError && filteredItems.length === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-16 text-center">
           <Inbox className="h-8 w-8 text-gray-300" />
-          <p className="text-sm font-medium text-gray-600">Nothing waiting on you right now.</p>
-          <p className="text-xs text-gray-400">Reports assigned to you for approval will show up here.</p>
+          <p className="text-sm font-medium text-gray-600">
+            {searchTerm ? "No approvals match the search criteria." : "Nothing waiting on you right now."}
+          </p>
+          {!searchTerm && <p className="text-xs text-gray-400">Reports assigned to you for approval will show up here.</p>}
         </div>
       )}
 
-      {items.length > 0 && (
+      {filteredItems.length > 0 && (
         <>
           {/* Desktop / tablet table */}
           <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+                <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase">
                   <tr>
-                    <th className="w-8 px-4 py-3" />
-                    <th className="px-4 py-3">Report</th>
-                    <th className="px-4 py-3">Employee</th>
-                    <th className="px-4 py-3">Merchant / Category</th>
-                    <th className="px-4 py-3">Items Pending</th>
-                    <th className="px-4 py-3">Level</th>
-                    <th className="px-4 py-3">Policy</th>
-                    <th className="px-4 py-3">Amount</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
+                    <th className="w-8 px-2.5 py-2" />
+                    <th className="px-2.5 py-2">Report</th>
+                    <th className="px-2.5 py-2">Employee</th>
+                    <th className="px-2.5 py-2">Merchant / Category</th>
+                    <th className="px-2.5 py-2">Items Pending</th>
+                    <th className="px-2.5 py-2">Level</th>
+                    <th className="px-2.5 py-2">Policy</th>
+                    <th className="px-2.5 py-2">Amount</th>
+                    <th className="px-2.5 py-2 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {items.map((item) => {
+                  {filteredItems.map((item, index) => {
                     const isExpanded = expandedReportId === item.reportId;
                     const flagged = hasPolicyIssue(item.pendingLineItems);
                     return (
                       <React.Fragment key={item.reportId}>
-                        <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedReportId(isExpanded ? null : item.reportId)}>
-                          <td className="px-4 py-3 text-gray-400">
+                        <tr className={`transition cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`} onClick={() => setExpandedReportId(isExpanded ? null : item.reportId)}>
+                          <td className="px-2.5 py-1.5 text-gray-400">
                             {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                           </td>
-                          <td className="px-4 py-3 font-medium text-gray-900">{item.reportNumber}</td>
-                          <td className="px-4 py-3 text-gray-600">
-                            <EmployeeLabel employeeId={item.employeeId} />
+                          <td className="px-2.5 py-1.5">
+                            <span className="font-mono text-[11px] font-semibold text-gray-700">{item.reportNumber}</span>
                           </td>
-                          <td className="px-4 py-3 text-gray-600 max-w-[220px] truncate">{merchantSummary(item.pendingLineItems)}</td>
-                          <td className="px-4 py-3 text-gray-600">{item.pendingLineItems?.length ?? 0}</td>
-                          <td className="px-4 py-3 text-gray-600">
+                          <td className="px-2.5 py-1.5">
+                            <span className="font-medium text-xs text-gray-900">
+                              <EmployeeLabel employeeId={item.employeeId} />
+                            </span>
+                          </td>
+                          <td className="px-2.5 py-1.5 text-gray-600 max-w-[220px] truncate text-xs">{merchantSummary(item.pendingLineItems)}</td>
+                          <td className="px-2.5 py-1.5 text-gray-600 text-xs">{item.pendingLineItems?.length ?? 0}</td>
+                          <td className="px-2.5 py-1.5 text-gray-600 text-xs">
                             <span className="inline-flex items-center gap-1">
                               <Layers className="h-3.5 w-3.5" /> Level {item.levelOrder}
                             </span>
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-2.5 py-1.5">
                             {flagged ? (
                               <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
                                 <ShieldAlert className="h-3 w-3" /> Warning
@@ -177,8 +243,8 @@ export default function PendingApprovalsPage() {
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-gray-900 font-medium whitespace-nowrap">{formatMoney(item.totalAmount, item.currencyCode)}</td>
-                          <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                          <td className="px-2.5 py-1.5 text-gray-900 font-medium whitespace-nowrap text-xs">{formatMoney(item.totalAmount, item.currencyCode)}</td>
+                          <td className="px-2.5 py-1.5 text-right text-xs" onClick={(e) => e.stopPropagation()}>
                             {renderActions(item)}
                           </td>
                         </tr>
@@ -210,7 +276,7 @@ export default function PendingApprovalsPage() {
 
           {/* Mobile card list */}
           <div className="md:hidden space-y-3">
-            {items.map((item) => {
+            {filteredItems.map((item) => {
               const flagged = hasPolicyIssue(item.pendingLineItems);
               return (
                 <div key={item.reportId} className="rounded-xl border border-gray-200 bg-white p-4">

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AlertTriangle, Check, HelpCircle, Landmark } from "lucide-react";
+import { AlertTriangle, Check, MessageSquareWarning, Landmark } from "lucide-react";
 import Button from "@/components/Button/Button";
 import CommentPromptModal from "../../../approval-engine/components/CommentPromptModal";
 
@@ -64,7 +64,7 @@ export default function FinanceLineItemReviewPanel({ reportId, lineItems, onVeri
                 disabled={isBusy}
                 onClick={() => setQueryingLineItemId(line.lineItemId)}
               >
-                <HelpCircle className="h-3.5 w-3.5" /> Query
+                <MessageSquareWarning className="h-3.5 w-3.5" /> Needs Correction
               </Button>
             </div>
           </div>
@@ -73,9 +73,9 @@ export default function FinanceLineItemReviewPanel({ reportId, lineItems, onVeri
 
       <CommentPromptModal
         isOpen={queryingLineItemId != null}
-        title="Raise Finance Query"
-        description="Specify the reason for this query. The employee will see this feedback and can edit/re-upload details for this specific line item."
-        confirmLabel="Raise Query"
+        title="Request correction"
+        description="The employee will see this comment and can fix this line item, then resubmit the report."
+        confirmLabel="Request Correction"
         confirmVariant="danger"
         isLoading={isBusy}
         onCancel={() => setQueryingLineItemId(null)}

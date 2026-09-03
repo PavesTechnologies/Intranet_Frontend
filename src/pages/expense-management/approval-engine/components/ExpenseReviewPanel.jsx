@@ -332,7 +332,10 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
           reviewLineItem.mutate(
             { reportId, lineItemId: flaggingLine.lineItemId, decision: "NEEDS_CORRECTION", comment },
             {
-              onSuccess: () => showStatusToast("Line item flagged for correction", "success"),
+              onSuccess: () => {
+                showStatusToast("Line item flagged for correction", "success");
+                onClose();
+              },
               onError: (err) => showStatusToast(err.response?.data?.message || "Failed to flag line item", "error"),
             },
           );

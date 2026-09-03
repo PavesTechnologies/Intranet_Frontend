@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   X,
   Check,
-  HelpCircle,
+  MessageSquareWarning,
   Landmark,
   FileText,
   Wallet,
@@ -288,7 +288,7 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
                 disabled={isMutating || !selectedLine}
                 onClick={() => setQueryingLine(selectedLine)}
               >
-                <HelpCircle className="h-4 w-4" /> Query Line
+                <MessageSquareWarning className="h-4 w-4" /> Request Correction
               </Button>
               <Button
                 variant="success"
@@ -305,10 +305,10 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
 
       <CommentPromptModal
         isOpen={!!queryingLine}
-        title="Raise Finance Query"
-        description="Specify the reason for querying this line item. The employee will see this comment and can fix the line item details."
-        contextLabel={queryingLine ? `Querying: ${queryingLine.merchantName || queryingLine.categoryName || "Line item"} — ${formatMoney(queryingLine.amount, queryingLine.currencyCode)}` : ""}
-        confirmLabel="Raise Query"
+        title="Request correction"
+        description="The employee will see this comment and can fix the line item details, then resubmit the report."
+        contextLabel={queryingLine ? `Correcting: ${queryingLine.merchantName || queryingLine.categoryName || "Line item"} — ${formatMoney(queryingLine.amount, queryingLine.currencyCode)}` : ""}
+        confirmLabel="Request Correction"
         confirmVariant="danger"
         isLoading={queryLineItem.isPending}
         onCancel={() => setQueryingLine(null)}
@@ -317,10 +317,11 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
             { reportId, lineItemId: queryingLine.lineItemId, reason },
             {
               onSuccess: () => {
-                showStatusToast("Query raised successfully", "success");
+                showStatusToast("Correction requested successfully", "success");
                 setQueryingLine(null);
+                onClose();
               },
-              onError: (err) => showStatusToast(err.response?.data?.message || "Failed to raise query", "error"),
+              onError: (err) => showStatusToast(err.response?.data?.message || "Failed to request correction", "error"),
             }
           );
         }}
