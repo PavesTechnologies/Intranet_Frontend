@@ -35,7 +35,7 @@ const hasPolicyIssue = (lineItems) => (lineItems || []).some((l) => (l.policyVio
  * offers the fast quick-approve line panel; "Review" opens the full ExpenseReviewPanel (receipt +
  * full detail + timeline) for reports that need a closer look.
  */
-export default function PendingApprovalsPage({ searchTerm = "" }) {
+export default function PendingApprovalsPage() {
   const [page, setPage] = useState(0);
   const [expandedReportId, setExpandedReportId] = useState(null);
   const [rejectingReport, setRejectingReport] = useState(null);
@@ -202,17 +202,15 @@ export default function PendingApprovalsPage({ searchTerm = "" }) {
         </div>
       )}
 
-      {!isLoading && !isError && filteredItems.length === 0 && (
+      {!isLoading && !isError && items.length === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-16 text-center">
           <Inbox className="h-8 w-8 text-gray-300" />
-          <p className="text-sm font-medium text-gray-600">
-            {searchTerm ? "No approvals match the search criteria." : "Nothing waiting on you right now."}
-          </p>
-          {!searchTerm && <p className="text-xs text-gray-400">Reports assigned to you for approval will show up here.</p>}
+          <p className="text-sm font-medium text-gray-600">Nothing waiting on you right now.</p>
+          <p className="text-xs text-gray-400">Reports assigned to you for approval will show up here.</p>
         </div>
       )}
 
-      {filteredItems.length > 0 && (
+      {items.length > 0 && (
         <>
           {/* Desktop / tablet table */}
           <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
