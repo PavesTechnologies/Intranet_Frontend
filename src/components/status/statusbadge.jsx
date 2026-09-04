@@ -163,6 +163,37 @@ const StatusBadge = ({ label, size = "md" }) => {
     textColor = "text-rose-700";
   }
 
+  // Procurement (PR / RFQ) statuses not covered by the generic keyword branches above.
+  if (normalized === "returned" || normalized === "returned for clarification") {
+    bgColor = "bg-orange-100 border border-orange-300";
+    textColor = "text-orange-800 font-bold";
+  }
+
+  if (normalized === "sent") {
+    bgColor = "bg-blue-100";
+    textColor = "text-blue-700";
+  }
+
+  if (normalized === "response received") {
+    bgColor = "bg-indigo-100";
+    textColor = "text-indigo-700";
+  }
+
+  if (normalized === "closed" || normalized === "vendor selection") {
+    bgColor = "bg-indigo-100";
+    textColor = "text-indigo-700";
+  }
+
+  if (normalized === "po generated" || normalized === "selected") {
+    bgColor = "bg-green-100";
+    textColor = "text-green-700";
+  }
+
+  if (normalized === "received") {
+    bgColor = "bg-blue-100";
+    textColor = "text-blue-700";
+  }
+
   const sizeStyles = {
     sm: "text-xs px-2 py-0.5",
     md: "text-sm px-3 py-1",
