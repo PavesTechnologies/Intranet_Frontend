@@ -17,7 +17,7 @@ export default function ProcurementPage() {
   const TABS = [
     { id: "prRequest", label: "PR Request" },
     ...(canApprovePR ? [{ id: "prApprovals", label: "PR Approvals" }] : []),
-    { id: "quotation", label: "Quotation" },
+    { id: "quotation", label: "RFQ & Quotations" },
     { id: "vendorSelection", label: "Vendor Selection" },
     { id: "purchaseOrders", label: "Purchase Orders" },
   ];
@@ -32,7 +32,7 @@ export default function ProcurementPage() {
     <div className="p-6">
       <PageHeader
         title="Procurement"
-        subtitle="Raise purchase requisitions, route them for approval, collect quotations, select a vendor, and generate purchase orders."
+        subtitle="Raise purchase requisitions, obtain approvals, collect quotations, select vendors, and generate purchase orders."
       />
 
       <div className="flex gap-6 border-b border-gray-200">
