@@ -50,6 +50,7 @@ import SystemConfigurationPage from "./pages/accounts-payable/system-configurati
 import ProcurementPage from "./pages/accounts-payable/procurement/pages/ProcurementPage.jsx";
 import PrDetailPage from "./pages/accounts-payable/procurement/pages/PrDetailPage.jsx";
 import PurchaseOrderDetailPage from "./pages/accounts-payable/procurement/pages/PurchaseOrderDetailPage.jsx";
+import RfqDetailPage from "./pages/accounts-payable/procurement/pages/RfqDetailPage.jsx";
 
 
 // Resource Management
@@ -627,6 +628,14 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
                 <PurchaseOrderDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.PROCUREMENT_RFQ_DETAIL()}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <RfqDetailPage />
               </ProtectedRoute>
             }
           />
