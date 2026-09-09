@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import procurementService from "../services/procurementService";
 
-export const PR_QUOTATIONS_KEY = (prId) => ["accountsPayable", "procurement", "quotations", prId];
+// Same string-coercion reason as PR_DETAIL_KEY/RFQ_DETAIL_KEY — callers pass this prId as both a
+// route-param string and a numeric pr.id field, so the key must normalize or invalidation misses.
+export const PR_QUOTATIONS_KEY = (prId) => ["accountsPayable", "procurement", "quotations", String(prId)];
 export const QUOTATION_DETAIL_KEY = (quotationId) => [
   "accountsPayable",
   "procurement",

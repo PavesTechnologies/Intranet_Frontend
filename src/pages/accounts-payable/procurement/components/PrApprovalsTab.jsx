@@ -16,6 +16,7 @@ import { useApPermissions } from "../../hooks/useApPermissions";
 import usePendingApprovals from "../hooks/usePendingApprovals";
 import RequesterLabel from "./RequesterLabel";
 import EmptyState from "./EmptyState";
+import { isPrRequester } from "../utils/prAuthorization";
 import useDepartments from "../../system-configuration/hooks/useDepartments";
 import usePurchaseCategories from "../../system-configuration/hooks/usePurchaseCategories";
 import {
@@ -113,10 +114,7 @@ export default function PrApprovalsTab() {
       </button>
     ),
     requester: (
-      <RequesterLabel
-        createdBy={pr.created_by}
-        isRequester={pr.created_by != null && user?.user_id != null && String(pr.created_by) === String(user.user_id)}
-      />
+      <RequesterLabel createdBy={pr.created_by} isRequester={isPrRequester(pr, user)} />
     ),
     department: departmentNameById.get(pr.department_id) || "—",
     category: categoryNameById.get(pr.purchase_category_id) || "—",

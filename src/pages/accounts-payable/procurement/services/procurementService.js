@@ -68,6 +68,14 @@ export const procurementService = {
     return res.data;
   },
 
+  /** Persisted workflow history for a PR (module master, GET /purchase-requisitions/{pr_id}/timeline). */
+  getPrTimeline: async (prId) => {
+    const res = await api.get(`${BASE}/purchase-requisitions/${prId}/timeline`, {
+      headers: authHeaders(),
+    });
+    return res.data;
+  },
+
   updatePurchaseRequisition: async (prId, payload) => {
     const res = await api.put(`${BASE}/purchase-requisitions/${prId}`, payload, {
       headers: authHeaders(),

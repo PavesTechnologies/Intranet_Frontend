@@ -10,8 +10,15 @@
  * Two intentional non-1:1 mappings inherited from the backend (see useApPermissions.js):
  *   - Cancel PR uses PR_SUBMIT (no dedicated PR_CANCEL permission exists).
  *   - Return-for-clarification uses PR_REJECT (no dedicated return permission exists).
- *   - The "sourcing decision" (creating an RFQ / recording a quotation) uses QUOTATION_CREATE,
- *     not PR_EDIT — sourcing happens after PR approval and is Procurement Officer territory.
+ *   - Creating an RFQ, and recording a quotation, both use QUOTATION_CREATE, not PR_EDIT —
+ *     sourcing happens after PR approval and is Procurement Officer territory.
+ *   - Closing an RFQ (POST /rfq/{rfq_id}/close) uses QUOTATION_UPDATE — there is no dedicated
+ *     RFQ_CLOSE permission.
+ *
+ * Inviting vendors and sending an RFQ are each their own distinct backend permission —
+ * INVITE_VENDOR and SEND_RFQ respectively (Backend/API_Layer/routes/rfq_route.py) — NOT
+ * QUOTATION_CREATE, and there is no RFQ_VIEW/RFQ_CREATE/RFQ_CLOSE permission anywhere in the
+ * backend; do not invent those names.
  */
 export const PROCUREMENT_PERMISSIONS = {
   PR_VIEW: "PR_VIEW",
@@ -29,6 +36,9 @@ export const PROCUREMENT_PERMISSIONS = {
   QUOTATION_CREATE: "QUOTATION_CREATE",
   QUOTATION_UPDATE: "QUOTATION_UPDATE",
   QUOTATION_DELETE: "QUOTATION_DELETE",
+
+  INVITE_VENDOR: "INVITE_VENDOR",
+  SEND_RFQ: "SEND_RFQ",
 
   VENDOR_SELECTION_VIEW: "VENDOR_SELECTION_VIEW",
   VENDOR_SELECT: "VENDOR_SELECT",

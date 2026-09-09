@@ -1,6 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import procurementService from "../services/procurementService";
-import { PR_DETAIL_KEY } from "./usePurchaseRequisitionDetail";
+import { PR_DETAIL_KEY, PR_TIMELINE_KEY } from "./usePurchaseRequisitionDetail";
+import { PR_QUOTATIONS_KEY } from "./useQuotations";
+
+// Only mutations whose backend method actually records a PR timeline event (see
+// Backend/Business_Layer/services/procurement_service.py's _record_pr_history calls) invalidate
+// PR_TIMELINE_KEY below — cancel_purchase_requisition, generate_purchase_order, and the line
+// CRUD methods (add/update/delete_line) record no event, so invalidating the timeline there
+// would just be a wasted refetch of data that hasn't changed.
+const invalidatePrTimeline = (qc, prId) => qc.invalidateQueries({ queryKey: PR_TIMELINE_KEY(prId) });
 
 const invalidatePrLists = (qc) =>
   qc.invalidateQueries({ queryKey: ["accountsPayable", "procurement", "purchaseRequisitions"] });
@@ -23,6 +31,7 @@ export const useUpdatePurchaseRequisition = (prId) => {
     mutationFn: (payload) => procurementService.updatePurchaseRequisition(prId, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: PR_DETAIL_KEY(prId) });
+      invalidatePrTimeline(qc, prId);
       invalidatePrLists(qc);
     },
   });
@@ -42,6 +51,7 @@ export const useSubmitPurchaseRequisition = (prId) => {
     mutationFn: () => procurementService.submitPurchaseRequisition(prId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: PR_DETAIL_KEY(prId) });
+      invalidatePrTimeline(qc, prId);
       invalidatePrLists(qc);
       invalidatePendingApprovals(qc);
     },
@@ -66,6 +76,7 @@ export const useApprovePurchaseRequisition = (prId) => {
     mutationFn: (comment) => procurementService.approvePurchaseRequisition(prId, comment),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: PR_DETAIL_KEY(prId) });
+      invalidatePrTimeline(qc, prId);
       invalidatePrLists(qc);
       invalidatePendingApprovals(qc);
     },
@@ -78,6 +89,7 @@ export const useRejectPurchaseRequisition = (prId) => {
     mutationFn: (comment) => procurementService.rejectPurchaseRequisition(prId, comment),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: PR_DETAIL_KEY(prId) });
+      invalidatePrTimeline(qc, prId);
       invalidatePrLists(qc);
       invalidatePendingApprovals(qc);
     },
@@ -90,6 +102,7 @@ export const useReturnPurchaseRequisition = (prId) => {
     mutationFn: (reason) => procurementService.returnPurchaseRequisition(prId, reason),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: PR_DETAIL_KEY(prId) });
+      invalidatePrTimeline(qc, prId);
       invalidatePrLists(qc);
       invalidatePendingApprovals(qc);
     },
@@ -102,6 +115,7 @@ export const useResubmitPurchaseRequisition = (prId) => {
     mutationFn: () => procurementService.resubmitPurchaseRequisition(prId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: PR_DETAIL_KEY(prId) });
+      invalidatePrTimeline(qc, prId);
       invalidatePrLists(qc);
       invalidatePendingApprovals(qc);
     },
@@ -151,7 +165,8 @@ export const useSelectVendor = (prId) => {
     mutationFn: ({ quotationId, reason }) => procurementService.selectVendor(prId, quotationId, reason),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: PR_DETAIL_KEY(prId) });
-      qc.invalidateQueries({ queryKey: ["accountsPayable", "procurement", "quotations", prId] });
+      invalidatePrTimeline(qc, prId);
+      qc.invalidateQueries({ queryKey: PR_QUOTATIONS_KEY(prId) });
       invalidatePrLists(qc);
     },
   });
