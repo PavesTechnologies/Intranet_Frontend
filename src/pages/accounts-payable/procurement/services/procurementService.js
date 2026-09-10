@@ -166,6 +166,22 @@ export const procurementService = {
   // ── Quotation ────────────────────────────────────────────────────────────
 
   /**
+   * Runs AWS Textract-based field extraction on a quotation document the PR Officer just
+   * selected, before the quotation itself is created. Modeled on the invoice module's
+   * analogous `/invoice-extract/extract-fields` (see ../../invoice/services/invoiceService.js).
+   * @param {File} file
+   * @returns {Promise<{success: boolean, data: {vendor_id: number|null, vendor_name: string|null,
+   *   quotation_number: string|null, total_amount: number|string|null, quotation_date: string|null,
+   *   valid_until: string|null, delivery_days: number|null, payment_terms: string|null}}>}
+   */
+  extractQuotationFields: async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await api.post(`${BASE}/quotations/extract`, formData);
+    return res.data;
+  },
+
+  /**
    * Multipart create — the backend requires a file. Content-Type/boundary is left to the
    * axios instance's request interceptor (it strips the default JSON header for FormData).
    * @param {{vendorId: number, quotationNumber?: string, quotationDate?: string,

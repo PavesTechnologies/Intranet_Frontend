@@ -96,6 +96,15 @@ export const useCreateQuotation = (prId) => {
   });
 };
 
+/**
+ * Runs OCR extraction on a just-selected quotation document. This is a preview-only
+ * operation — nothing is persisted, so no query invalidation is needed.
+ */
+export const useExtractQuotationFields = () =>
+  useMutation({
+    mutationFn: (file) => procurementService.extractQuotationFields(file),
+  });
+
 export const useDeleteQuotation = (prId) => {
   const qc = useQueryClient();
 

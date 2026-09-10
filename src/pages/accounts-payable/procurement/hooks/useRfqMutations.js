@@ -135,14 +135,16 @@ export const useInviteVendors = (rfqId) => {
 /**
  * Send RFQ to invited vendors.
  */
+/**
+ * Send RFQ to selected invited vendors.
+ */
 export const useSendRfq = (rfqId) => {
   const qc = useQueryClient();
-
   const normalizedRfqId = normalizeId(rfqId);
 
   return useMutation({
-    mutationFn: () =>
-      rfqService.sendRfq(normalizedRfqId),
+    mutationFn: (vendorIds) =>
+      rfqService.sendRfq(normalizedRfqId, vendorIds),
 
     onSuccess: async () => {
       await Promise.all([
@@ -150,9 +152,7 @@ export const useSendRfq = (rfqId) => {
           queryKey: RFQ_DETAIL_KEY(normalizedRfqId),
           refetchType: "active",
         }),
-
         invalidateRfqLists(qc),
-
         invalidateOwningPr(qc, normalizedRfqId),
       ]);
 

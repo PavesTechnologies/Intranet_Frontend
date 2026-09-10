@@ -185,6 +185,8 @@ export default function RfqDetailPage() {
   const [sendOpen, setSendOpen] =
     useState(false);
 
+  const [selectedVendorIds, setSelectedVendorIds] = useState([]);
+
   const [closeOpen, setCloseOpen] =
     useState(false);
 
@@ -374,32 +376,61 @@ export default function RfqDetailPage() {
     : AP_ROUTES.PROCUREMENT;
 
   const handleSend = async () => {
-    try {
-      const result =
-        await sendRfq.mutateAsync();
+  if (!selectedVendorIds.length) {
+    toast.error("Please select at least one vendor.");
+    return;
+  }
 
-      setSendOpen(false);
+  try {
+    const result = await sendRfq.mutateAsync(selectedVendorIds);
 
-      const results =
-        extractRfqSendResults(result);
+    setSendOpen(false);
+    setSelectedVendorIds([]);
 
-      if (results) {
-        setSendResults(results);
-      } else {
-        toast.success(
-          `${rfq.rfq_number} sent to invited vendors.`
-        );
-      }
-    } catch (err) {
-      toast.error(
-        getApiErrorMessage(
-          err,
-          "Could not send this RFQ."
-        )
+    const results = extractRfqSendResults(result);
+
+    if (results) {
+      setSendResults(results);
+    } else {
+      toast.success(
+        `${rfq.rfq_number} sent to ${selectedVendorIds.length} selected vendor(s).`
       );
     }
-  };
+  } catch (err) {
+    toast.error(getApiErrorMessage(err, "Could not send this RFQ."));
+  }
+};
+  const handleOpenSend = () => {
+  setSelectedVendorIds([]);
+  setSendOpen(true);
+};
 
+const handleToggleVendor = (vendorId) => {
+  const normalizedId = Number(vendorId);
+
+  setSelectedVendorIds((current) =>
+    current.includes(normalizedId)
+      ? current.filter((id) => id !== normalizedId)
+      : [...current, normalizedId]
+  );
+};
+
+const handleSelectAllVendors = () => {
+  setSelectedVendorIds(
+    invitedVendorIds.map((vendorId) => Number(vendorId))
+  );
+};
+
+const handleClearSelectedVendors = () => {
+  setSelectedVendorIds([]);
+};
+
+const handleCancelSend = () => {
+  if (sendRfq.isPending) return;
+
+  setSendOpen(false);
+  setSelectedVendorIds([]);
+};
   const handleCloseRfq = async () => {
     try {
       await closeRfq.mutateAsync();
@@ -732,9 +763,7 @@ export default function RfqDetailPage() {
               {canSend && (
                 <Button
                   variant="primary"
-                  onClick={() =>
-                    setSendOpen(true)
-                  }
+                  onClick={handleOpenSend}
                 >
                   Send RFQ
                 </Button>
@@ -992,21 +1021,147 @@ export default function RfqDetailPage() {
         </PageCardContent>
       </PageCard>
 
-      <ConfirmationModal
-        isOpen={sendOpen}
-        title="Send RFQ"
-        message={`Send ${rfq.rfq_number} to ${invitedVendors.length} invited vendor(s)? This cannot be undone.`}
-        confirmText="Send RFQ"
-        cancelText="Cancel"
-        isLoading={
-          sendRfq.isPending
-        }
-        onConfirm={handleSend}
-        onCancel={() =>
-          setSendOpen(false)
-        }
+      <Modal
+  isOpen={sendOpen}
+  onClose={handleCancelSend}
+  title="Send RFQ"
+  size="sm"
+  footer={
+    <div className="flex justify-end gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={handleCancelSend}
+        disabled={sendRfq.isPending}
+      >
+        Cancel
+      </Button>
+
+      <Button
+        type="button"
         variant="primary"
-      />
+        onClick={handleSend}
+        disabled={
+          sendRfq.isPending ||
+          selectedVendorIds.length === 0
+        }
+      >
+        {sendRfq.isPending
+          ? "Sending..."
+          : `Send RFQ${
+              selectedVendorIds.length
+                ? ` (${selectedVendorIds.length})`
+                : ""
+            }`}
+      </Button>
+    </div>
+  }
+>
+  <div className="space-y-4">
+    <div>
+      <p className="text-sm text-gray-700">
+        Select the vendors you want to send{" "}
+        <span className="font-semibold">
+          {rfq.rfq_number}
+        </span>{" "}
+        to.
+      </p>
+
+      <p className="mt-1 text-xs text-gray-500">
+        Only the selected vendors will receive this RFQ.
+      </p>
+    </div>
+
+    <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+      <span className="text-sm font-medium text-gray-700">
+        {selectedVendorIds.length} of{" "}
+        {invitedVendors.length} selected
+      </span>
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={handleSelectAllVendors}
+          disabled={sendRfq.isPending}
+          className="text-xs font-semibold text-[#0A0082] hover:underline disabled:opacity-50"
+        >
+          Select All
+        </button>
+
+        <button
+          type="button"
+          onClick={handleClearSelectedVendors}
+          disabled={sendRfq.isPending}
+          className="text-xs font-semibold text-gray-600 hover:underline disabled:opacity-50"
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+
+    <div className="max-h-80 space-y-2 overflow-y-auto">
+      {invitedVendors.map((invitedVendor) => {
+        const vendorId = Number(
+          invitedVendor.vendor_id
+        );
+
+        const vendor = vendors.find(
+          (item) =>
+            Number(item.vendor_id) === vendorId
+        );
+
+        const vendorName =
+          vendorNameById.get(
+            invitedVendor.vendor_id
+          ) ||
+          vendorNameById.get(vendorId) ||
+          `Vendor #${vendorId}`;
+
+        const email = vendor?.email || "—";
+
+        const isSelected =
+          selectedVendorIds.includes(vendorId);
+
+        return (
+          <label
+            key={vendorId}
+            className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${
+              isSelected
+                ? "border-[#0A0082] bg-blue-50"
+                : "border-gray-200 hover:bg-gray-50"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() =>
+                handleToggleVendor(vendorId)
+              }
+              disabled={sendRfq.isPending}
+              className="mt-1 h-4 w-4 rounded border-gray-300"
+            />
+
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-gray-900">
+                {vendorName}
+              </p>
+
+              <p className="mt-0.5 text-xs text-gray-500">
+                {email}
+              </p>
+            </div>
+          </label>
+        );
+      })}
+    </div>
+
+    {selectedVendorIds.length === 0 && (
+      <p className="text-xs text-amber-600">
+        Select at least one vendor to send the RFQ.
+      </p>
+    )}
+  </div>
+</Modal>
 
       <ConfirmationModal
         isOpen={closeOpen}
