@@ -32,6 +32,18 @@ const StatusBadge = ({ label, size = "md" }) => {
     displayLabel = "Invoice Generated";
     bgColor = "bg-emerald-100 border border-emerald-300";
     textColor = "text-emerald-800 font-bold";
+  } else if (rawUpper === "PENDING_APPROVAL" || normalized === "pending approval") {
+    displayLabel = "Pending Approval";
+    bgColor = "bg-amber-100 border border-amber-300";
+    textColor = "text-amber-800 font-bold";
+  } else if (rawUpper === "APPROVED" || normalized === "approved") {
+    displayLabel = "Approved";
+    bgColor = "bg-emerald-100 border border-emerald-300";
+    textColor = "text-emerald-800 font-bold";
+  } else if (rawUpper === "REJECTED" || normalized === "rejected") {
+    displayLabel = "Rejected";
+    bgColor = "bg-rose-100 border border-rose-300";
+    textColor = "text-rose-800 font-bold";
   } else if (rawUpper === "INVOICED" || normalized === "invoiced") {
     displayLabel = "Invoiced";
     bgColor = "bg-blue-100 border border-blue-300";

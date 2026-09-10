@@ -110,6 +110,10 @@ const accountReceivableSubmenu = [
     to: "/account-receivable/invoice-generation",
   },
   {
+    label: "Invoice Approval",
+    to: "/account-receivable/invoice-approval",
+  },
+  {
     label: "Configurations",
     to: "/account-receivable/master-data",
   },
@@ -125,7 +129,7 @@ const accountReceivableMakerSubmenu = accountReceivableSubmenu.filter(
   (item) => item.label !== "Billing Approvals",
 );
 const accountReceivableCheckerSubmenu = accountReceivableSubmenu.filter(
-  (item) => item.label === "Billing Approvals",
+  (item) => item.label === "Billing Approvals" || item.label === "Invoice Approval",
 );
 
 const airsSubmenu = [

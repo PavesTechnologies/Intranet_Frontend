@@ -73,6 +73,10 @@ export default function InvoiceGeneration() {
       // Status filter
       if (statusFilter === "GENERATED") {
         if (st !== "GENERATED") return false;
+      } else if (statusFilter === "PENDING_APPROVAL") {
+        if (st !== "PENDING_APPROVAL") return false;
+      } else if (statusFilter === "APPROVED") {
+        if (st !== "APPROVED") return false;
       }
 
       // Search query
@@ -129,9 +133,9 @@ export default function InvoiceGeneration() {
   }, [invoices, backendSummary]);
 
   const handleViewInvoice = (inv) => {
-    const targetSnapshotId = inv.billingSnapshotId || inv.snapshotId;
+    const targetSnapshotId = inv.billingSnapshotId || inv.snapshotId || inv.invoiceId;
     if (!targetSnapshotId) {
-      showStatusToast("Snapshot identifier is missing for this invoice.", "error");
+      showStatusToast("Identifier is missing for this invoice.", "error");
       return;
     }
     navigate(`/account-receivable/invoices/${targetSnapshotId}`);
@@ -344,7 +348,11 @@ export default function InvoiceGeneration() {
         className="text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-semibold"
       >
         <Eye className="mr-1.5 h-3.5 w-3.5" />
-        View Invoice
+        {item.invoiceStatus === "GENERATED"
+          ? "Submit for Approval"
+          : item.invoiceStatus === "PENDING_APPROVAL"
+          ? "Pending Approval"
+          : "View Invoice"}
       </Button>
     ),
   }));
@@ -436,6 +444,8 @@ export default function InvoiceGeneration() {
               >
                 <option value="ALL">All Statuses</option>
                 <option value="GENERATED">Invoice Generated</option>
+                <option value="PENDING_APPROVAL">Pending Approval</option>
+                <option value="APPROVED">Approved</option>
               </select>
             </div>
           </div>
