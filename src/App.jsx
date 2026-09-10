@@ -24,7 +24,7 @@ import Calendar from "./pages/Calendar";
 
 // Finance Management (Application Switcher landing page)
 import FinanceDashboard from "./pages/finance/FinanceDashboard";
-import { FINANCE_ALL_ROLES, AR_MAKER_ROLES, AR_CHECKER_ROLES } from "./config/sidebarConfig";
+import { FINANCE_ALL_ROLES, AR_MAKER_ROLES, AR_CHECKER_ROLES, AR_ALL_ROLES } from "./config/sidebarConfig";
 
 // Accounts Payable
 import { AP_ROUTES } from "./pages/accounts-payable/constants/routes";
@@ -300,6 +300,7 @@ import BillingDataAcquisition from "./pages/account_receivable/pages/BillingData
 import AcquisitionDetail from "./pages/account_receivable/pages/AcquisitionDetail.jsx";
 import TaxCalculationPage from "./pages/account_receivable/pages/TaxCalculation.jsx";
 import InvoiceGeneration from "./pages/account_receivable/pages/InvoiceGeneration.jsx";
+import InvoiceApproval from "./pages/account_receivable/pages/InvoiceApproval.jsx";
 import InvoiceDetail from "./pages/account_receivable/pages/InvoiceDetail.jsx";
 import Configurations from "./pages/account_receivable/pages/Configurations.jsx";
 import MasterDataOverview from "./pages/account_receivable/pages/master-data/MasterDataOverview.jsx";
@@ -745,8 +746,12 @@ const AppRoutes = () => {
               element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><InvoiceGeneration /></ProtectedRoute>}
             />
             <Route
+              path="invoice-approval"
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><InvoiceApproval /></ProtectedRoute>}
+            />
+            <Route
               path="invoices/:snapshotId"
-              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><InvoiceDetail /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><InvoiceDetail /></ProtectedRoute>}
             />
             <Route
               path="configurations"

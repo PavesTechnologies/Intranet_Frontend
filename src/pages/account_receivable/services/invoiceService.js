@@ -56,19 +56,25 @@ export const getInvoiceErrorMessage = (
 
   if (status === 404) {
     if (detail.toLowerCase().includes("invoice")) {
-      return "Invoice could not be found for this billing snapshot.";
+      return "Invoice not found. Please verify the invoice or refresh the queue.";
     }
     if (detail.toLowerCase().includes("tax")) {
       return "Tax calculation not found. Tax calculation must be completed before generating an invoice.";
     }
-    return "Billing snapshot could not be found.";
+    return "Billing snapshot or invoice could not be found.";
   }
 
   if (status === 409 || detail.toLowerCase().includes("already exists") || detail.toLowerCase().includes("already generated")) {
+    if (detail.toLowerCase().includes("approval") || detail.toLowerCase().includes("status")) {
+      return "Invoice status transition conflict. The invoice may have already been processed or is not in the required state.";
+    }
     return "Invoice already generated for this billing snapshot.";
   }
 
   if (status === 400 || status === 422) {
+    if (detail.toLowerCase().includes("status") || detail.toLowerCase().includes("transition") || detail.toLowerCase().includes("pending")) {
+      return detail || "Invalid invoice status transition. Please refresh the invoice and try again.";
+    }
     if (
       detail.toLowerCase().includes("tax_completed") ||
       detail.toLowerCase().includes("tax not completed") ||
@@ -87,7 +93,7 @@ export const getInvoiceErrorMessage = (
   }
 
   if (status === 403) {
-    return "You do not have permission to generate or view invoices.";
+    return "You do not have permission to perform this invoice operation.";
   }
 
   if (status >= 500) {
@@ -328,17 +334,162 @@ export const generateInvoice = async (snapshotId) => {
 };
 
 /**
+ * Normalizes an item returned by GET /api/v1/invoices/approval-workspace.
+ * Uses backend-provided fields directly.
+ */
+export const normalizeApprovalWorkspaceItem = (item = {}) => {
+  const source = item && typeof item === "object" ? item : {};
+  const periodStart = toIsoDateOnly(source.billingPeriodStart);
+  const periodEnd = toIsoDateOnly(source.billingPeriodEnd);
+  const displayPeriod =
+    periodStart && periodEnd ? formatBillingPeriod(periodStart, periodEnd) : (source.billingPeriod || "—");
+
+  return {
+    invoiceId: source.invoiceId || source.id || "",
+    invoiceNumber: source.invoiceNumber || "—",
+    status: (source.status || source.invoiceStatus || "PENDING_APPROVAL").toUpperCase(),
+    invoiceStatus: (source.status || source.invoiceStatus || "PENDING_APPROVAL").toUpperCase(),
+    billingSnapshotId: source.billingSnapshotId || source.snapshotId || "",
+    billingSnapshotNumber: source.billingSnapshotNumber || source.snapshotNumber || null,
+    clientName: source.clientName || "—",
+    projectName: source.projectName || "—",
+    billingPeriod: displayPeriod,
+    billingPeriodStart: periodStart,
+    billingPeriodEnd: periodEnd,
+    invoiceDate: toIsoDateOnly(source.invoiceDate) || "",
+    dueDate: toIsoDateOnly(source.dueDate) || "",
+    currency: source.currencyCode || source.currency || "USD",
+    currencyCode: source.currencyCode || source.currency || "USD",
+    grandTotal:
+      source.grandTotal !== undefined && source.grandTotal !== null ? Number(source.grandTotal) : 0,
+    submittedAt: source.submittedAt || null,
+    submittedBy: source.submittedBy || "—",
+    lastAction: source.lastAction || "—",
+    lastActionAt: source.lastActionAt || null,
+  };
+};
+
+/**
+ * GET /api/v1/invoices/approval-workspace
+ * Retrieves all invoices in the approval workflow (pending, approved, rejected)
+ * for the persistent approval dashboard.
+ */
+export const getInvoiceApprovalWorkspace = async () => {
+  const url = `${AR_BASE_URL}/api/v1/invoices/approval-workspace`;
+  const response = await api.get(url);
+  const rawData = unwrapData(response);
+
+  let items = [];
+  if (Array.isArray(rawData)) {
+    items = rawData;
+  } else if (rawData && typeof rawData === "object") {
+    if (Array.isArray(rawData.content)) items = rawData.content;
+    else if (Array.isArray(rawData.invoices)) items = rawData.invoices;
+    else if (Array.isArray(rawData.items)) items = rawData.items;
+    else if (Array.isArray(rawData.workspace)) items = rawData.workspace;
+  }
+
+  return items.map(normalizeApprovalWorkspaceItem).filter(Boolean);
+};
+
+/**
  * GET /api/v1/billing-snapshots/{snapshotId}/invoice
  * Retrieves the persisted invoice for the given billing snapshot.
- * Uses the real BillingSnapshot UUID.
+ * Safely resolves snapshot UUID, invoice UUID, or snapshot number without triggering 500 errors.
  */
-export const getInvoice = async (snapshotId) => {
-  if (!snapshotId) {
-    throw new Error("Billing snapshot UUID is required to retrieve an invoice.");
+export const getInvoice = async (snapshotIdOrInvoiceId) => {
+  if (!snapshotIdOrInvoiceId) {
+    throw new Error("Billing snapshot UUID or Invoice ID is required to retrieve an invoice.");
   }
-  const url = `${AR_BASE_URL}/api/v1/billing-snapshots/${snapshotId}/invoice`;
-  const response = await api.get(url);
-  return normalizeInvoice(unwrapData(response));
+
+  const rawId = String(snapshotIdOrInvoiceId).trim();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawId);
+
+  // 1. If it's a valid UUID, try fetching by billing snapshot endpoint
+  if (isUuid) {
+    try {
+      const url = `${AR_BASE_URL}/api/v1/billing-snapshots/${rawId}/invoice`;
+      const response = await api.get(url);
+      return normalizeInvoice(unwrapData(response));
+    } catch (err) {
+      if (err?.response?.status !== 404) {
+        throw err;
+      }
+      // If 404, rawId might be an invoiceId instead of billingSnapshotId; proceed to resolve
+    }
+  }
+
+  // 2. Resolve target billingSnapshotId from workspace or invoices API
+  let targetSnapshotId = null;
+
+  try {
+    const workspaceItems = await getInvoiceApprovalWorkspace();
+    const matched = workspaceItems.find(
+      (w) =>
+        w.invoiceId === rawId ||
+        w.billingSnapshotId === rawId ||
+        (w.invoiceNumber && w.invoiceNumber.toLowerCase() === rawId.toLowerCase()) ||
+        (w.billingSnapshotNumber && w.billingSnapshotNumber.toLowerCase() === rawId.toLowerCase())
+    );
+    if (matched?.billingSnapshotId) {
+      targetSnapshotId = matched.billingSnapshotId;
+    }
+  } catch (wErr) {
+    console.warn("[invoiceService] Lookup in approval workspace skipped:", wErr?.message);
+  }
+
+  if (!targetSnapshotId) {
+    try {
+      const { invoices } = await getInvoices();
+      const matched = invoices.find(
+        (i) =>
+          i.invoiceId === rawId ||
+          i.billingSnapshotId === rawId ||
+          (i.invoiceNumber && i.invoiceNumber.toLowerCase() === rawId.toLowerCase()) ||
+          (i.snapshotNumber && i.snapshotNumber.toLowerCase() === rawId.toLowerCase())
+      );
+      if (matched?.billingSnapshotId) {
+        targetSnapshotId = matched.billingSnapshotId;
+      }
+    } catch (iErr) {
+      console.warn("[invoiceService] Lookup in invoices list skipped:", iErr?.message);
+    }
+  }
+
+  // Check localStorage for acquired snapshot metadata
+  if (!targetSnapshotId) {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("ar_snapshot_period_")) {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const meta = JSON.parse(raw);
+            if (meta?.snapshotNumber === rawId || meta?.snapshotId === rawId) {
+              targetSnapshotId = meta.snapshotId;
+              break;
+            }
+          }
+        }
+      }
+    } catch (lsErr) {
+      console.warn("[invoiceService] Lookup in localStorage skipped:", lsErr?.message);
+    }
+  }
+
+  if (targetSnapshotId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetSnapshotId)) {
+    const url = `${AR_BASE_URL}/api/v1/billing-snapshots/${targetSnapshotId}/invoice`;
+    const response = await api.get(url);
+    const normalized = normalizeInvoice(unwrapData(response));
+    if (normalized && !normalized.snapshotNumber && rawId.startsWith("BS-")) {
+      normalized.snapshotNumber = rawId;
+    }
+    return normalized;
+  }
+
+  const notFoundErr = new Error("Invoice could not be found for the provided identifier.");
+  notFoundErr.response = { status: 404, data: { message: "Invoice could not be found." } };
+  throw notFoundErr;
 };
 
 /**
@@ -383,11 +534,100 @@ export const getInvoices = async () => {
   };
 };
 
+/**
+ * GET /api/v1/invoices/pending-approval
+ * Retrieves invoices currently waiting for approval directly from the backend.
+ * Uses dedicated backend endpoint exclusively without snapshot scanning.
+ */
+export const getPendingApprovalInvoices = async () => {
+  const url = `${AR_BASE_URL}/api/v1/invoices/pending-approval`;
+  const response = await api.get(url);
+  const rawData = unwrapData(response);
+
+  let items = [];
+  if (Array.isArray(rawData)) {
+    items = rawData;
+  } else if (rawData && typeof rawData === "object") {
+    if (Array.isArray(rawData.content)) items = rawData.content;
+    else if (Array.isArray(rawData.invoices)) items = rawData.invoices;
+    else if (Array.isArray(rawData.items)) items = rawData.items;
+  }
+
+  return items.map(normalizeInvoice).filter(Boolean);
+};
+
+/**
+ * POST /api/v1/invoices/{invoiceId}/submit-for-approval
+ * Transitions invoice from GENERATED to PENDING_APPROVAL.
+ */
+export const submitInvoiceForApproval = async (invoiceId) => {
+  if (!invoiceId) {
+    throw new Error("Invoice ID is required to submit for approval.");
+  }
+  const url = `${AR_BASE_URL}/api/v1/invoices/${invoiceId}/submit-for-approval`;
+  const response = await api.post(url);
+  return normalizeInvoice(unwrapData(response));
+};
+
+/**
+ * POST /api/v1/invoices/{invoiceId}/approve
+ * Transitions invoice from PENDING_APPROVAL to APPROVED.
+ */
+export const approveInvoice = async (invoiceId) => {
+  if (!invoiceId) {
+    throw new Error("Invoice ID is required to approve the invoice.");
+  }
+  const url = `${AR_BASE_URL}/api/v1/invoices/${invoiceId}/approve`;
+  const response = await api.post(url);
+  return normalizeInvoice(unwrapData(response));
+};
+
+/**
+ * GET /api/v1/invoices/{invoiceId}/approval-history
+ * Retrieves chronological approval audits for the given invoice.
+ */
+export const getInvoiceApprovalHistory = async (invoiceId) => {
+  if (!invoiceId) {
+    throw new Error("Invoice ID is required to fetch approval history.");
+  }
+  const url = `${AR_BASE_URL}/api/v1/invoices/${invoiceId}/approval-history`;
+  const response = await api.get(url);
+  const rawData = unwrapData(response);
+
+  let list = [];
+  if (Array.isArray(rawData)) {
+    list = rawData;
+  } else if (rawData && typeof rawData === "object") {
+    if (Array.isArray(rawData.history)) list = rawData.history;
+    else if (Array.isArray(rawData.content)) list = rawData.content;
+    else if (Array.isArray(rawData.items)) list = rawData.items;
+  }
+
+  return list.map((item, idx) => {
+    const src = item && typeof item === "object" ? item : {};
+    return {
+      id: src.id || src.auditId || src.historyId || `hist-${idx}`,
+      action: src.action || src.approvalAction || "SUBMITTED",
+      previousStatus: src.previousStatus || src.fromStatus || "—",
+      newStatus: src.newStatus || src.toStatus || src.status || "—",
+      actionBy: src.actionBy || src.performedBy || src.userName || "SYSTEM",
+      actionAt: src.actionAt || src.performedAt || src.createdAt || src.timestamp || "",
+      comment: src.comment || src.comments || src.notes || "",
+    };
+  });
+};
+
 export default {
   generateInvoice,
   getInvoice,
   getInvoices,
+  getPendingApprovalInvoices,
+  getInvoiceApprovalWorkspace,
+  submitInvoiceForApproval,
+  approveInvoice,
+  getInvoiceApprovalHistory,
   getInvoiceErrorMessage,
   normalizeInvoice,
 };
+
 

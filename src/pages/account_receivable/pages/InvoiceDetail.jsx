@@ -13,6 +13,8 @@ import {
   Clock,
   Briefcase,
   CheckCircle2,
+  Send,
+  ThumbsUp,
 } from "lucide-react";
 
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
@@ -20,12 +22,21 @@ import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
 import StatusBadge from "../../../components/status/statusbadge";
 import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
+import Modal from "../../../components/Modal/Modal";
 import { showStatusToast } from "../../../components/toastfy/toast";
-import { formatCurrency, formatDisplayDate } from "../utils/format";
-import { getInvoice, getInvoiceErrorMessage } from "../services/invoiceService";
+import { formatCurrency, formatDisplayDate, formatDisplayDateTime } from "../utils/format";
+import {
+  getInvoice,
+  submitInvoiceForApproval,
+  approveInvoice,
+  getInvoiceApprovalHistory,
+  getInvoiceErrorMessage,
+} from "../services/invoiceService";
 import { formatBillingPeriod } from "../services/billingDataAcquisitionService";
 
 const TAX_WORKSPACE_PATH = "/account-receivable/tax-calculation";
+const INVOICE_WORKSPACE_PATH = "/account-receivable/invoice-generation";
+const INVOICE_APPROVAL_PATH = "/account-receivable/invoice-approval";
 
 const formatRatePercentage = (rate) => {
   if (rate === null || rate === undefined || rate === "") return null;
@@ -76,9 +87,24 @@ export default function InvoiceDetail() {
   const navigate = useNavigate();
 
   const [invoice, setInvoice] = useState(null);
+  const [approvalHistory, setApprovalHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+
+  const loadApprovalHistory = async (invoiceId) => {
+    if (!invoiceId) return;
+    try {
+      const history = await getInvoiceApprovalHistory(invoiceId);
+      setApprovalHistory(history || []);
+    } catch (err) {
+      console.warn("[InvoiceDetail] Could not load approval history:", err);
+      setApprovalHistory([]);
+    }
+  };
 
   const loadInvoice = async (isManual = false) => {
     if (!snapshotId) {
@@ -95,6 +121,13 @@ export default function InvoiceDetail() {
       const data = await getInvoice(snapshotId);
       if (data) {
         setInvoice(data);
+        if (data.invoiceId) {
+          try {
+            await loadApprovalHistory(data.invoiceId);
+          } catch (histErr) {
+            console.warn("[InvoiceDetail] Non-blocking approval history error:", histErr);
+          }
+        }
         if (isManual) {
           showStatusToast("Invoice details refreshed.", "success");
         }
@@ -109,6 +142,55 @@ export default function InvoiceDetail() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const handleSubmitForApproval = async () => {
+    if (!invoice?.invoiceId || submitting) return;
+    setSubmitting(true);
+    try {
+      const updated = await submitInvoiceForApproval(invoice.invoiceId);
+      showStatusToast("Invoice submitted for approval successfully.", "success");
+      if (updated) {
+        setInvoice((prev) => ({
+          ...prev,
+          invoiceStatus: updated.invoiceStatus || "PENDING_APPROVAL",
+        }));
+      }
+      await loadInvoice(false);
+    } catch (err) {
+      console.error("[InvoiceDetail] Error submitting invoice for approval:", err);
+      const msg = getInvoiceErrorMessage(err, "Failed to submit invoice for approval.");
+      showStatusToast(msg, "error");
+      // Refresh to ensure state is synchronized with backend
+      await loadInvoice(false);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!invoice?.invoiceId || approving) return;
+    setApproving(true);
+    setIsConfirmOpen(false);
+    try {
+      const updated = await approveInvoice(invoice.invoiceId);
+      showStatusToast("Invoice approved successfully.", "success");
+      if (updated) {
+        setInvoice((prev) => ({
+          ...prev,
+          invoiceStatus: updated.invoiceStatus || "APPROVED",
+        }));
+      }
+      await loadInvoice(false);
+    } catch (err) {
+      console.error("[InvoiceDetail] Error approving invoice:", err);
+      const msg = getInvoiceErrorMessage(err, "Failed to approve invoice.");
+      showStatusToast(msg, "error");
+      // Refresh to ensure state is synchronized with backend
+      await loadInvoice(false);
+    } finally {
+      setApproving(false);
     }
   };
 
@@ -234,13 +316,50 @@ export default function InvoiceDetail() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Action: Submit for Approval (for GENERATED invoices) */}
+          {(invoice?.invoiceStatus === "GENERATED" || !invoice?.invoiceStatus) && (
+            <Button
+              variant="primary"
+              size="small"
+              onClick={handleSubmitForApproval}
+              disabled={submitting || refreshing}
+              className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold"
+            >
+              <Send className="h-3.5 w-3.5" />
+              {submitting ? "Submitting..." : "Submit for Approval"}
+            </Button>
+          )}
+
+          {/* Action: Approve (for PENDING_APPROVAL invoices) */}
+          {invoice?.invoiceStatus === "PENDING_APPROVAL" && (
+            <Button
+              variant="primary"
+              size="small"
+              onClick={() => setIsConfirmOpen(true)}
+              disabled={approving || refreshing}
+              className="bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 text-xs font-semibold"
+            >
+              <ThumbsUp className="h-3.5 w-3.5" />
+              {approving ? "Approving..." : "Approve"}
+            </Button>
+          )}
+
           <Button
             variant="outline"
             size="small"
-            onClick={() => navigate(TAX_WORKSPACE_PATH)}
+            onClick={() => navigate(INVOICE_APPROVAL_PATH)}
             className="flex items-center gap-1.5 text-xs text-slate-600"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Tax Workspace
+            <ArrowLeft className="h-3.5 w-3.5" /> Invoice Approval Queue
+          </Button>
+
+          <Button
+            variant="outline"
+            size="small"
+            onClick={() => navigate(INVOICE_WORKSPACE_PATH)}
+            className="flex items-center gap-1.5 text-xs text-slate-600"
+          >
+            Invoice Workspace
           </Button>
 
           {snapshotId && (
@@ -258,7 +377,7 @@ export default function InvoiceDetail() {
             variant="outline"
             size="small"
             onClick={() => loadInvoice(true)}
-            disabled={refreshing}
+            disabled={refreshing || submitting || approving}
             className="flex items-center gap-1.5 text-xs"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Refresh
@@ -522,7 +641,7 @@ export default function InvoiceDetail() {
           <div className="rounded-xl border-2 border-indigo-200 bg-indigo-50/80 p-4 sm:p-5 flex items-center justify-between shadow-sm">
             <div>
               <span className="block text-xs font-bold uppercase tracking-wider text-indigo-700">Grand Total</span>
-              <span className="text-xs text-indigo-600">Subtotal + Total Tax (Backend Authoritative)</span>
+              <span className="text-xs text-indigo-600">Subtotal + Total Tax</span>
             </div>
             <div className="font-mono text-2xl font-extrabold text-indigo-950 sm:text-3xl">
               {formatCurrency(invoice?.grandTotal, currency)}
@@ -539,6 +658,52 @@ export default function InvoiceDetail() {
           Invoice amounts and tax breakdowns are generated by the backend financial engine and are read-only for this billing snapshot.
         </p>
       </div>
+
+      {/* Confirmation Modal for Approve */}
+      <Modal
+        isOpen={isConfirmOpen}
+        onClose={() => !approving && setIsConfirmOpen(false)}
+        title="Approve Invoice"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Are you sure you want to approve this invoice?
+          </p>
+          <div className="rounded-lg bg-slate-50 p-3 text-xs space-y-1 text-slate-600">
+            <div>
+              <span className="font-semibold">Invoice Number:</span>{" "}
+              <span className="font-mono text-indigo-700 font-bold">{invoice?.invoiceNumber || "—"}</span>
+            </div>
+            <div>
+              <span className="font-semibold">Grand Total:</span>{" "}
+              <span className="font-mono font-bold text-slate-800">
+                {formatCurrency(invoice?.grandTotal, currency)}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <Button
+              variant="outline"
+              size="small"
+              onClick={() => setIsConfirmOpen(false)}
+              disabled={approving}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="small"
+              onClick={handleApprove}
+              disabled={approving}
+              className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold"
+            >
+              {approving ? "Approving..." : "Yes, Approve Invoice"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
