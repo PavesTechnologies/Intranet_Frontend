@@ -42,3 +42,22 @@ export const VENDOR_SELECTION_ELIGIBLE_PR_STATUS = "VENDOR_SELECTION";
 
 /** A PO can only be generated while the PR is in this status and already has a selection. */
 export const PO_GENERATION_ELIGIBLE_PR_STATUS = "VENDOR_SELECTION";
+
+/**
+ * Display labels for PR workflow timeline events (GET /purchase-requisitions/{pr_id}/timeline).
+ * Mirrors Backend/Business_Layer/utils/pr_workflow_events.py exactly — that file is the single
+ * source of truth for the event string values themselves.
+ */
+export const PR_TIMELINE_EVENT_LABELS = {
+  PR_REQUEST_RAISED: "PR Request Raised",
+  SUBMITTED_FOR_APPROVAL: "Submitted for Approval",
+  PR_UPDATED: "PR Updated",
+  PR_APPROVED: "PR Approved",
+  PR_REJECTED: "PR Rejected",
+  PR_SENT_BACK_FOR_CLARIFICATION: "Sent Back for Clarification",
+  PR_RESUBMITTED: "PR Resubmitted",
+  VENDOR_INVITED: "Vendor Invited",
+  RFQ_SENT: "RFQ Sent",
+  QUOTATION_RECEIVED: "Quotation Received",
+  VENDOR_SELECTED: "Vendor Selected",
+};
