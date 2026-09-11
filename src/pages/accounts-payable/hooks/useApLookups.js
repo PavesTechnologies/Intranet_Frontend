@@ -15,6 +15,10 @@ export const PAYMENT_TERMS_KEY = ["accountsPayable", "lookups", "paymentTerms"];
 export const VENDOR_STATUSES_KEY = ["accountsPayable", "lookups", "vendorStatuses"];
 export const PO_STATUSES_KEY = ["accountsPayable", "lookups", "poStatuses"];
 export const PAYMENT_STATUSES_KEY = ["accountsPayable", "lookups", "paymentStatuses"];
+export const PR_STATUSES_KEY = ["accountsPayable", "lookups", "prStatuses"];
+export const QUOTATION_STATUSES_KEY = ["accountsPayable", "lookups", "quotationStatuses"];
+export const RFQ_STATUSES_KEY = ["accountsPayable", "lookups", "rfqStatuses"];
+export const UOM_MASTER_KEY = ["accountsPayable", "lookups", "uoms"];
 
 export const useCountries = () =>
   useQuery({
@@ -56,6 +60,39 @@ export const usePaymentStatuses = () =>
   useQuery({
     queryKey: PAYMENT_STATUSES_KEY,
     queryFn: apLookupService.getPaymentStatuses,
+    ...MASTER_DATA_OPTIONS,
+  });
+
+/** Purchase requisition lifecycle statuses (module_name "PURCHASE_REQUISITION"). */
+export const usePrStatuses = () =>
+  useQuery({
+    queryKey: PR_STATUSES_KEY,
+    queryFn: apLookupService.getPrStatuses,
+    ...MASTER_DATA_OPTIONS,
+  });
+
+/** Quotation statuses — RECEIVED / SELECTED / REJECTED (module_name "QUOTATION"). */
+export const useQuotationStatuses = () =>
+  useQuery({
+    queryKey: QUOTATION_STATUSES_KEY,
+    queryFn: apLookupService.getQuotationStatuses,
+    ...MASTER_DATA_OPTIONS,
+  });
+
+/** RFQ lifecycle statuses — DRAFT / SENT / RESPONSE_RECEIVED / CLOSED (module_name "RFQ"). */
+export const useRfqStatuses = () =>
+  useQuery({
+    queryKey: RFQ_STATUSES_KEY,
+    queryFn: apLookupService.getRfqStatuses,
+    ...MASTER_DATA_OPTIONS,
+  });
+
+/** Active units of measure (module master, GET /apm/master/uoms) — replaces the old hardcoded
+ *  procurement UOM_OPTIONS list; row shape is {id, code, name, category, allows_decimal, is_active}. */
+export const useUoms = () =>
+  useQuery({
+    queryKey: UOM_MASTER_KEY,
+    queryFn: () => apLookupService.getUoms(),
     ...MASTER_DATA_OPTIONS,
   });
 

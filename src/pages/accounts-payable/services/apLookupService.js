@@ -52,6 +52,42 @@ export const apLookupService = {
     return res.data;
   },
 
+  /** Purchase requisition lifecycle statuses (module_name "PURCHASE_REQUISITION"). */
+  getPrStatuses: async () => {
+    const res = await api.get(`${BASE}/system/status`, {
+      params: { module_name: "PURCHASE_REQUISITION" },
+      headers: authHeaders(),
+    });
+    return res.data;
+  },
+
+  /** Quotation statuses — RECEIVED / SELECTED / REJECTED only (module_name "QUOTATION"). */
+  getQuotationStatuses: async () => {
+    const res = await api.get(`${BASE}/system/status`, {
+      params: { module_name: "QUOTATION" },
+      headers: authHeaders(),
+    });
+    return res.data;
+  },
+
+  /** RFQ lifecycle statuses — DRAFT / SENT / RESPONSE_RECEIVED / CLOSED (module_name "RFQ"). */
+  getRfqStatuses: async () => {
+    const res = await api.get(`${BASE}/system/status`, {
+      params: { module_name: "RFQ" },
+      headers: authHeaders(),
+    });
+    return res.data;
+  },
+
+  /** Active units of measure (module master, GET /apm/master/uoms) — id/code/name/category/allows_decimal. */
+  getUoms: async ({ activeOnly = true } = {}) => {
+    const res = await api.get(`${BASE}/master/uoms`, {
+      params: { active_only: activeOnly },
+      headers: authHeaders(),
+    });
+    return res.data;
+  },
+
   getGstinDetails: async (gstin) => {
     const res = await api.get(`${BASE}/system/gstin/${encodeURIComponent(gstin)}`, {
       headers: authHeaders(),

@@ -33,4 +33,9 @@ export const AP_ROUTES = {
   REPORTS: `${BASE}/reports`,
   SETTINGS: `${BASE}/settings`,
   SYSTEM_CONFIG: `${BASE}/system-configuration`,
+
+  PROCUREMENT: `${BASE}/procurement`,
+  PROCUREMENT_PR_DETAIL: (prId = ":prId") => `${BASE}/procurement/requisitions/${prId}`,
+  PROCUREMENT_PO_DETAIL: (poId = ":poId") => `${BASE}/procurement/purchase-orders/${poId}`,
+  PROCUREMENT_RFQ_DETAIL: (rfqId = ":rfqId") => `${BASE}/procurement/rfqs/${rfqId}`,
 };

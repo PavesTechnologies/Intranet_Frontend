@@ -20,9 +20,6 @@ export default function BillingReadinessCard({
   acquisitionResults,
   onViewPending,
   onRemindPM,
-  onReValidate,
-  onReAcquire,
-  loading = false,
   reminding = false,
 }) {
   if (!config) return null;
@@ -31,9 +28,10 @@ export default function BillingReadinessCard({
   const laborRes = acquisitionResults?.labor || {};
   const readiness = laborRes.readiness || {};
 
-  const approvedCount = readiness.approvedCount ?? (status === "READY" ? laborRes.records?.length || 0 : 0);
+  const isApprovedStatus = ["READY", "READY_TO_TAX", "READY_FOR_TAX", "TAX_COMPLETED", "IN_TAX"].includes(status);
+  const approvedCount = readiness.approvedCount ?? (isApprovedStatus ? laborRes.records?.length || 0 : 0);
   const pendingCount = readiness.pendingCount ?? 0;
-  const approvedHours = readiness.approvedHours ?? (status === "READY" ? laborRes.records?.reduce((acc, r) => acc + Number(r.hours || 0), 0) : 0);
+  const approvedHours = readiness.approvedHours ?? (isApprovedStatus ? laborRes.records?.reduce((acc, r) => acc + Number(r.hours || 0), 0) : 0);
   const pendingHours = readiness.pendingHours ?? 0;
 
   return (
@@ -68,14 +66,22 @@ export default function BillingReadinessCard({
             Checking timesheet approval readiness and billing configuration rules...
           </p>
         </div>
-      ) : status === "READY" ? (
+      ) : status === "READY" || status === "READY_TO_TAX" || status === "READY_FOR_TAX" || status === "TAX_COMPLETED" || status === "IN_TAX" ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-emerald-900 space-y-2">
           <div className="flex items-center gap-1.5 font-bold text-emerald-800 text-xs">
             <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
-            100% Approved — Ready for Billing
+            {status === "TAX_COMPLETED"
+              ? "Tax Calculation Completed"
+              : status === "IN_TAX"
+              ? "Tax Calculation In Progress"
+              : "100% Approved — Ready for Billing"}
           </div>
           <p className="text-xs text-emerald-700">
-            All required timesheets are approved and billing is ready.
+            {status === "TAX_COMPLETED"
+              ? "Tax has been calculated successfully for this billing snapshot."
+              : status === "IN_TAX"
+              ? "Tax calculation is currently processing."
+              : "All required timesheets are approved and billing is ready."}
           </p>
           <div className="flex items-center gap-3 text-xs font-semibold text-emerald-800 border-t border-emerald-200/60 pt-1.5">
             <span>Approved: <strong className="font-mono">{approvedCount}</strong></span>
@@ -158,42 +164,27 @@ export default function BillingReadinessCard({
         </div>
       )}
 
-      {/* Control Actions */}
-      <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
-        {(status === "PARTIALLY_READY" || status === "PENDING_APPROVAL") && (
-          <>
-            <Button variant="outline" size="small" onClick={onViewPending} className="text-xs py-1">
-              <Eye className="h-3 w-3" />
-              View Pending ({pendingCount})
-            </Button>
-
-            <Button
-              variant="primary"
-              size="small"
-              onClick={onRemindPM}
-              disabled={reminding}
-              className="bg-amber-600 hover:bg-amber-700 text-white border-amber-600 text-xs py-1"
-            >
-              <BellRing className={`h-3 w-3 ${reminding ? "animate-spin" : ""}`} />
-              {reminding ? "Sending..." : "Remind PM"}
-            </Button>
-          </>
-        )}
-
-        {status === "READY" && (
-          <Button variant="outline" size="small" onClick={() => onReAcquire(config)} disabled={loading} className="text-xs py-1">
-            <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-            Refresh Snapshot
+      {/* Contextual Actions — approval-chase actions only; acquire/re-validate
+          live as the page-level primary action to avoid duplicate controls */}
+      {(status === "PARTIALLY_READY" || status === "PENDING_APPROVAL") && (
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
+          <Button variant="outline" size="small" onClick={onViewPending} className="text-xs py-1">
+            <Eye className="h-3 w-3" />
+            View Pending ({pendingCount})
           </Button>
-        )}
 
-        {(status === "PARTIALLY_READY" || status === "PENDING_APPROVAL") && (
-          <Button variant="outline" size="small" onClick={onReValidate} disabled={loading} className="text-xs py-1">
-            <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-            Re-Validate
+          <Button
+            variant="primary"
+            size="small"
+            onClick={onRemindPM}
+            disabled={reminding}
+            className="bg-amber-600 hover:bg-amber-700 text-white border-amber-600 text-xs py-1"
+          >
+            <BellRing className={`h-3 w-3 ${reminding ? "animate-spin" : ""}`} />
+            {reminding ? "Sending..." : "Remind PM"}
           </Button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

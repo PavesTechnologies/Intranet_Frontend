@@ -610,8 +610,14 @@ export default function EmployeeCreateModal({
       onClose();
     } catch (err) {
       console.error("Failed to update employee", err);
-      setError("Something went wrong while updating employee.");
-      showStatusToast("Failed to update employee", "error");
+
+      if (err?.response?.status === 403) {
+        showStatusToast("You don't have permission to update this employee.", "error");
+        onClose();
+      } else {
+        setError("Something went wrong while updating employee.");
+        showStatusToast("Failed to update employee", "error");
+      }
     } finally {
       setUpdating(false);
     }

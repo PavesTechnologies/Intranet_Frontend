@@ -35,3 +35,7 @@ export const AP_PAYMENT_VIEWER_ROLES = [
   AP_ROLES.AP_EXECUTIVE,
   AP_ROLES.FINANCE_EXECUTIVE,
 ];
+
+// Procurement (PR_Creator / PR_Approver / Procurement_Officer) is authorized entirely by UMS
+// JWT permission codes, not by a role array here — see constants/procurementPermissions.js
+// and useApPermissions.js. There is deliberately no AP_PROCUREMENT_ROLES.

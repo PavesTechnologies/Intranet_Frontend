@@ -9,9 +9,12 @@ import {
 
 /**
  * Named AP permissions — one per distinct capability in the nav/role matrix from the
- * architecture doc. useApPermissions.js (Phase 3) derives its boolean flags from
- * AP_PERMISSION_ROLES instead of inlining role arrays, so a capability's allowed roles
- * live in exactly one place.
+ * architecture doc. useApPermissions.js derives its boolean flags from AP_PERMISSION_ROLES
+ * instead of inlining role arrays, so a capability's allowed roles live in exactly one place.
+ *
+ * Procurement is NOT here — it's authorized by real UMS JWT permission codes
+ * (PR_VIEW/PR_CREATE/... in constants/procurementPermissions.js) read directly via
+ * hasPermission(), not a frontend role -> permission map. See useApPermissions.js.
  */
 export const AP_PERMISSIONS = {
   VIEW_DASHBOARD: "view_dashboard",
