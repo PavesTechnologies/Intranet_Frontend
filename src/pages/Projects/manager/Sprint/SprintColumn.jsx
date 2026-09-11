@@ -11,7 +11,6 @@ import {
 } from "../../../../components/icons";
 import StoryCard from "./StoryCard";
 import TaskCard from "./TaskCard";
-import { jwtDecode } from "jwt-decode";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 
 
@@ -26,6 +25,10 @@ const SprintColumn = ({
   permissions,
   projectId,
   navigate,
+  // Whether the current user is a Project Manager — moving a story/task into
+  // or out of a sprint (drag-and-drop, and the cards' "Move to Sprint" menu)
+  // is a Project Manager-only action.
+  isManager = false,
 
   onDropStory,
   onDropTask,
@@ -87,17 +90,6 @@ const SprintColumn = ({
   const end = formatPrettyDate(sprint.endDateReadable || sprint.endDate);
 
   const totalItems = stories.length + tasks.length;
-  // const isManager = (() => {
-  //   const token = localStorage.getItem("token");
-  //   if (!token) return false;
-
-  //   try {
-  //     const decoded = jwtDecode(token);
-  //     return decoded?.roles?.includes("Manager");
-  //   } catch {
-  //     return false;
-  //   }
-  // })();
 
   /** -----------------------------------------
    * DND TO SUPPORT BOTH STORY + TASK
@@ -106,9 +98,9 @@ const SprintColumn = ({
   const [{ isOver }, dropRef] = useDrop(
     () => ({
       accept: ["STORY", "TASK"],
-      canDrop: () => !isCompleted,
+      canDrop: () => !isCompleted && isManager,
       drop: (item) => {
-        if (isCompleted) return;
+        if (isCompleted || !isManager) return;
         if (item.type === "TASK") {
           onDropTask?.(item.id, sprint.id);
         } else {
@@ -116,10 +108,10 @@ const SprintColumn = ({
         }
       },
       collect: (monitor) => ({
-        isOver: monitor.isOver() && !isCompleted,
+        isOver: monitor.isOver() && !isCompleted && isManager,
       }),
     }),
-    [isCompleted]
+    [isCompleted, isManager]
   );
 
   // Sort base items
@@ -278,6 +270,7 @@ const SprintColumn = ({
                       onSelectEpic={onSelectEpic}
                       onClick={() => onStoryClick(story.id)}
                       readOnly={isCompleted}
+                      canMoveSprint={isManager}
                       projectId={projectId}
                       navigate={navigate}
                     />
@@ -297,6 +290,7 @@ const SprintColumn = ({
                         onAddToSprint={onDropTask}
                         onClick={() => onTaskClick(task.id)}
                         readOnly={isCompleted}
+                        canMoveSprint={isManager}
                         projectId={projectId}
                         navigate={navigate}
                       />
@@ -324,6 +318,7 @@ const SprintColumn = ({
                       onAddToSprint={onDropTask}
                       onClick={() => onTaskClick(task.id)}
                       readOnly={isCompleted}
+                      canMoveSprint={isManager}
                       projectId={projectId}
                       navigate={navigate}
                     />
