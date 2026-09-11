@@ -58,12 +58,18 @@ export function useApPermissions() {
 
     // ── Quotations / RFQ sourcing ──────────────────────────────────────────
     canViewQuotation: hasPermission(PROCUREMENT_PERMISSIONS.QUOTATION_VIEW),
-    // Also covers the "sourcing decision" (creating an RFQ, sending it, inviting vendors,
-    // recording a quotation) — intentionally QUOTATION_CREATE, not PR_EDIT. Sourcing happens
-    // after PR approval and belongs to the Procurement Officer's permission set.
+    // Creating an RFQ and recording a quotation are both intentionally QUOTATION_CREATE, not
+    // PR_EDIT. Sourcing happens after PR approval and belongs to the Procurement Officer's
+    // permission set.
     canCreateQuotation: hasPermission(PROCUREMENT_PERMISSIONS.QUOTATION_CREATE),
+    // Closing an RFQ (POST /rfq/{rfq_id}/close) is authorized under QUOTATION_UPDATE server-side
+    // — there is no dedicated RFQ_CLOSE permission.
     canUpdateQuotation: hasPermission(PROCUREMENT_PERMISSIONS.QUOTATION_UPDATE),
     canDeleteQuotation: hasPermission(PROCUREMENT_PERMISSIONS.QUOTATION_DELETE),
+    // Invite Vendor and Send RFQ are each their own backend permission — INVITE_VENDOR and
+    // SEND_RFQ — distinct from QUOTATION_CREATE. Do not fold these back into canCreateQuotation.
+    canInviteVendor: hasPermission(PROCUREMENT_PERMISSIONS.INVITE_VENDOR),
+    canSendRfq: hasPermission(PROCUREMENT_PERMISSIONS.SEND_RFQ),
 
     // ── Vendor Selection ───────────────────────────────────────────────────
     canViewVendorSelection: hasPermission(PROCUREMENT_PERMISSIONS.VENDOR_SELECTION_VIEW),

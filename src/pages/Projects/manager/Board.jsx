@@ -36,6 +36,8 @@ import TaskCard from "../../../components/Board/TaskCard";
 import { Avatar } from "../../../components/Board/TaskCard";
 import SwimlaneBoard from "./SwimlaneBoard";
 import Button from "../../../components/Button/Button";
+import { useQueryClient } from "@tanstack/react-query";
+import { invalidateSummaryCache } from "../Summary/Summary";
 
 const headersWithToken = () => {
   const token = localStorage.getItem("token");
@@ -100,6 +102,16 @@ const ViewToggle = ({ view, onChange }) => (
 
 const Board = ({ projectId, sprintId, projectName }) => {
   const [viewMode, setViewMode] = useState("board");
+
+  // My Work (React Query) and the Summary tab (its own module-level cache)
+  // both hold snapshots of this project's tasks/stories, so a mutation made
+  // here needs to invalidate both or they show stale data for up to a minute.
+  const qc = useQueryClient();
+  const notifyWorkDataChanged = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ["myWork"] });
+    qc.invalidateQueries({ queryKey: ["myWorkCompleted"] });
+    invalidateSummaryCache(projectId);
+  }, [qc, projectId]);
 
   // data
   const [statuses, setStatuses] = useState(() => getCachedBoardSnapshot(projectId)?.statuses || []);
@@ -409,6 +421,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
       showStatusToast("Column deleted", "success");
       setStatuses((prev) => prev.filter((s) => s.id !== statusId));
       await loadBoard();
+      notifyWorkDataChanged();
     } catch (err) {
       console.error(err);
       showStatusToast("Delete failed", "error");
@@ -428,6 +441,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
       setIsDeleteModalOpen(false);
       setStatusToDelete(null);
       await loadBoard();
+      notifyWorkDataChanged();
     } catch (err) {
       console.error(err);
       showStatusToast("Delete/migrate failed", "error");
@@ -462,6 +476,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
       showStatusToast("Sprint finished successfully", "success");
       setSprintPopup(null);
       await loadBoard();
+      notifyWorkDataChanged();
     } catch (err) {
       console.error(err);
       showStatusToast("Failed to finish sprint", "error");
@@ -542,6 +557,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
           { headers: headersWithToken() }
         );
         showStatusToast("Task moved", "success");
+        notifyWorkDataChanged();
       }
     } catch (err) {
       console.error(err);
@@ -594,6 +610,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
   const handleTaskCreated = async (created) => {
     setTasks((prev) => [...prev, created]);
     try { await loadBoard(); } catch (e) { console.error(e); }
+    notifyWorkDataChanged();
   };
 
   if (loading)
@@ -890,7 +907,7 @@ const Board = ({ projectId, sprintId, projectName }) => {
             taskId={selectedTask.id}
             projectId={projectId}
             onClose={() => { setIsTaskPanelOpen(false); setSelectedTask(null); }}
-            onUpdated={async () => { await loadBoard(); setIsTaskPanelOpen(false); }}
+            onUpdated={async () => { await loadBoard(); notifyWorkDataChanged(); setIsTaskPanelOpen(false); }}
           />
         )}
       </RightSidePanel>

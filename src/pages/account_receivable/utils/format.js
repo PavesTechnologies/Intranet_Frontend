@@ -31,10 +31,23 @@ export function formatDisplayDate(value) {
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export function formatDisplayDateTime(isoValue) {
-  if (!isoValue) return "—";
-  const date = new Date(isoValue);
-  if (Number.isNaN(date.getTime())) return isoValue;
+export function formatDisplayDateTime(value) {
+  if (value === null || value === undefined || value === "") return "—";
+
+  let date;
+  if (Array.isArray(value)) {
+    const [year, month, day, hour = 0, minute = 0, second = 0] = value;
+    if (year == null || month == null || day == null) return "—";
+    date = new Date(year, month - 1, day, hour, minute, second);
+  } else if (typeof value === "string") {
+    date = new Date(value);
+  } else if (value instanceof Date) {
+    date = value;
+  } else {
+    return String(value);
+  }
+
+  if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString("en-GB", {
     day: "2-digit",
     month: "short",
