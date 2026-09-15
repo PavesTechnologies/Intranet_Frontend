@@ -38,6 +38,13 @@ const saveSummaryCache = (projectId, data) => {
   summaryCache.set(projectId, { data, timestamp: Date.now() });
 };
 
+// Called by Board/Backlog/IssueTracker after a task/story/bug mutation so the
+// Summary tab doesn't show a stale snapshot for up to SUMMARY_CACHE_TTL_MS
+// when the user switches over right after editing elsewhere.
+export const invalidateSummaryCache = (projectId) => {
+  if (projectId) summaryCache.delete(projectId);
+};
+
 const EMPTY_PROJECT_DATA = {
   epics: null,
   stories: null,
@@ -137,14 +144,17 @@ const Summary = ({ projectId, projectName }) => {
 
     return [
       ...(projectData.tasks || []).map(t => ({
+        ...t,
         status: { name: t.statusName || "UNKNOWN" }
       })),
 
       ...(projectData.stories || []).map(s => ({
+        ...s,
         status: { name: s.statusName || "UNKNOWN" }
       })),
 
       // ...(projectData.bugs || []).map(b => ({
+      //   ...b,
       //   status: { name: b.status || "UNKNOWN" }
       // })),
     ];

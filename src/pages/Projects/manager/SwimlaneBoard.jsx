@@ -39,6 +39,8 @@ import Avatar from "../../../components/Board/Avatar";
 import StoryRowHeader from "./SwimlaneBoard/StoryRowHeader";
 import TaskCard from "../../../components/Board/TaskCard";
 import UnassignedRowHeader from "./SwimlaneBoard/UnassignedRowHeader";
+import { useQueryClient } from "@tanstack/react-query";
+import { invalidateSummaryCache } from "../Summary/Summary";
 
 const STORY_HEX = [
   "#6366f1", "#0ea5e9", "#10b981", "#f59e0b",
@@ -198,6 +200,16 @@ const SwimlaneBoard = ({
   const [members,        setMembers]        = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [activeSprintId, setActiveSprintId] = useState(null);
+
+  // My Work (React Query) and the Summary tab (its own module-level cache)
+  // both hold snapshots of this project's tasks/stories, so a mutation made
+  // here needs to invalidate both or they show stale data for up to a minute.
+  const qc = useQueryClient();
+  const notifyWorkDataChanged = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ["myWork"] });
+    qc.invalidateQueries({ queryKey: ["myWorkCompleted"] });
+    invalidateSummaryCache(projectId);
+  }, [qc, projectId]);
 
   // column management
   const [showAddInput,    setShowAddInput]    = useState(false);
@@ -451,6 +463,7 @@ const SwimlaneBoard = ({
           { headers: headersWithToken() }
         );
         showStatusToast("Task moved", "success");
+        notifyWorkDataChanged();
       }
     } catch (err) {
       console.error(err);
@@ -495,6 +508,7 @@ const SwimlaneBoard = ({
       showStatusToast("Column deleted", "success");
       setStatuses((prev) => prev.filter((s) => s.id !== statusId));
       await loadBoard();
+      notifyWorkDataChanged();
     } catch (err) {
       console.error(err);
       showStatusToast("Delete failed", "error");
@@ -512,6 +526,7 @@ const SwimlaneBoard = ({
       setStatuses((prev) => prev.filter((s) => s.id !== statusToDelete.id));
       setIsDeleteModalOpen(false); setStatusToDelete(null);
       await loadBoard();
+      notifyWorkDataChanged();
     } catch (err) {
       console.error(err);
       showStatusToast("Delete/migrate failed", "error");
@@ -553,6 +568,7 @@ const SwimlaneBoard = ({
       showStatusToast("Sprint finished", "success");
       setSprintPopup(null);
       await loadBoard();
+      notifyWorkDataChanged();
     } catch (err) {
       console.error(err);
       showStatusToast("Failed to finish sprint", "error");
@@ -1016,7 +1032,7 @@ const SwimlaneBoard = ({
         onClose={() => setIsCreateOpen(false)}
         defaultStatusId={createDefaultStatusId}
         projectId={projectId}
-        onCreated={async (created) => { setTasks((prev) => [...prev, created]); await loadBoard(); }}
+        onCreated={async (created) => { setTasks((prev) => [...prev, created]); await loadBoard(); notifyWorkDataChanged(); }}
       />
       <RightSidePanel
         isOpen={isTaskPanelOpen}
@@ -1028,7 +1044,7 @@ const SwimlaneBoard = ({
             taskId={selectedTask.id}
             projectId={projectId}
             onClose={() => { setIsTaskPanelOpen(false); setSelectedTask(null); }}
-            onUpdated={async () => { await loadBoard(); setIsTaskPanelOpen(false); }}
+            onUpdated={async () => { await loadBoard(); notifyWorkDataChanged(); setIsTaskPanelOpen(false); }}
           />
         )}
       </RightSidePanel>
@@ -1078,6 +1094,7 @@ const SwimlaneBoard = ({
               setOpenCreateTaskModal(null);
               setTasks((prev) => [...prev, created]);
               try { await loadBoard(); } catch (e) { console.error(e); }
+              notifyWorkDataChanged();
             }}
           />
         </div>

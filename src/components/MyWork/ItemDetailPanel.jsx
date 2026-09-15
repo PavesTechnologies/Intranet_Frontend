@@ -9,7 +9,7 @@ import { TYPE_CONFIG, PRIORITY_CONFIG } from "../../pages/Projects/MyWork/utils/
 const ENTITY_TYPE_MAP = {
   TASK:  "task",
   STORY: "story",
-  // BUG:   "bug",
+  BUG:   "bug",
 };
 
 export default function ItemDetailPanel({ item, onClose }) {
