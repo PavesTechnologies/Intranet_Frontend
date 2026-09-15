@@ -117,6 +117,10 @@ export default function PrCreateModal({ isOpen, onClose, onCreated }) {
       subtitle="Create the requisition header, then add line items on the next screen."
       size="lg"
       closeOnBackdrop={false}
+      // Modal's body only ever sets overflow-y — an absolutely-positioned FormSelect dropdown
+      // (department/category names can run long) can otherwise force a horizontal scrollbar on
+      // the modal. Fixed locally here rather than in the shared Modal component.
+      bodyClassName="max-w-full overflow-x-hidden p-4 sm:p-5"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" onClick={handleClose} className="w-full sm:w-auto">
@@ -135,8 +139,8 @@ export default function PrCreateModal({ isOpen, onClose, onCreated }) {
         </div>
       }
     >
-      <form id="pr-create-form" onSubmit={handleSubmit} className="space-y-4 py-2">
-        <div className="grid grid-cols-2 gap-4">
+      <form id="pr-create-form" onSubmit={handleSubmit} className="w-full min-w-0 space-y-4 py-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormSelect
             label="Department"
             name="departmentId"
@@ -164,7 +168,7 @@ export default function PrCreateModal({ isOpen, onClose, onCreated }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormSelect
             label="Priority"
             name="priority"

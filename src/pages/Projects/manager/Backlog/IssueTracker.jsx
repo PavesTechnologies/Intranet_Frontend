@@ -22,6 +22,8 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Button from "../../../../components/Button/Button";
 import RiskBadge from "../RiskBadge";
 import Pagination from "../../../../components/Pagination/pagination";
+import { useQueryClient } from "@tanstack/react-query";
+import { invalidateSummaryCache } from "../../Summary/Summary";
 
 const EPIC_PAGE_SIZE = 10;
 
@@ -90,6 +92,16 @@ const IssueTracker = () => {
     assignee: "ALL",
   });
   const [epicPage, setEpicPage] = useState(1);
+
+  // My Work (React Query) and the Summary tab (its own module-level cache)
+  // both hold snapshots of this project's tasks/stories, so a mutation made
+  // here needs to invalidate both or they show stale data for up to a minute.
+  const qc = useQueryClient();
+  const notifyWorkDataChanged = () => {
+    qc.invalidateQueries({ queryKey: ["myWork"] });
+    qc.invalidateQueries({ queryKey: ["myWorkCompleted"] });
+    invalidateSummaryCache(projectId);
+  };
 
   const token = localStorage.getItem("token");
   const headers = {
@@ -278,6 +290,7 @@ const IssueTracker = () => {
       });
       fetchIssues();
       showStatusToast(`${issue.type} deleted successfully!`, "success");
+      notifyWorkDataChanged();
     } catch (err) {
       showStatusToast(`Failed to delete ${issue.type}`, "error");
     }
@@ -352,6 +365,7 @@ const IssueTracker = () => {
     setBulkDeleteConfirmOpen(false);
     setSelectedIssues([]);
     fetchIssues();
+    notifyWorkDataChanged();
 
     const messages = [];
     let anyDeleted = false;
@@ -392,6 +406,7 @@ const IssueTracker = () => {
       setOpenEpics([]);
       setOpenStories([]);
       fetchIssues();
+      notifyWorkDataChanged();
     }, 300);
   };
 

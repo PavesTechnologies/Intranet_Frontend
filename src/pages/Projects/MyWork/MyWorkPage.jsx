@@ -2,13 +2,12 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useAuth } from "../../../contexts/AuthContext";
 import { ROLES } from "../../../config/sidebarConfig";
-import api from "../../../api/axiosInstance";
 import { RefreshCw, CheckCheck } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useMyWorkData, useUpdateStatus, useMarkDone, MY_WORK_KEY } from "./hooks/useMyWork";
 import { useMyWorkStore } from "./hooks/myWorkStore";
-import { applyFilters } from "./utils/myWorkUtils";
+import { applyFilters, groupManagerItems } from "./utils/myWorkUtils";
 import { ArrowLeft } from "lucide-react";
 import SnapshotBar      from "../../../components/MyWork/SnapshotBar";
 import FilterBar        from "../../../components/MyWork/FilterBar";
@@ -43,23 +42,6 @@ export default function MyWorkPage() {
     store.setViewMode(hasRole([ROLES.PROJECT_MANAGER]) ? "manager" : "member");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ── Which projects is this user the owner/PM of? ─────────────────────────────
-  // Cross-referenced against the project groups in /api/my-work so a project
-  // shows under "As Project Manager" only when the user actually owns it there,
-  // and under "As Member" otherwise — a project's own role, not a global one.
-  const [ownerProjectIds, setOwnerProjectIds] = useState(new Set());
-  useEffect(() => {
-    if (!userId) return;
-    api
-      .get(`${window.__APP_CONFIG__.PMS_BASE_URL}/api/projects/owner/${userId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      })
-      .then((res) => {
-        setOwnerProjectIds(new Set((res.data || []).map((p) => p.id)));
-      })
-      .catch(() => setOwnerProjectIds(new Set()));
-  }, [userId]);
 
   // ── Client-side filtering (instant — no network) ─────────────────────────────
   const filteredData = useMemo(() => applyFilters(data, {
@@ -106,26 +88,25 @@ export default function MyWorkPage() {
     </div>
   );
 
-  // Toggle is available to every user, manager or general. Each project group
-  // from /api/my-work is routed to "manager" or "member" based on whether this
-  // user actually owns that specific project (per /api/projects/owner/{id}) —
-  // so a PM on Project A but plain member on Project B sees A under "As
-  // Project Manager" and B under "As Member", not one bucket for everything.
+  // Toggle is available to every user, manager or general. The backend already
+  // sends two independent views: `projects` is grouped by project and scoped
+  // to items assigned to this user; `project_MANAGERItems` is a flat list of
+  // every item (any assignee) in a project this user manages. Manager view
+  // groups that flat list by project client-side to match ProjectGroup's shape.
   const isManagerView = store.viewMode === "manager";
 
   // Unfiltered split — used for the "Projects" filter dropdown options so they
   // don't shrink as other filters are applied.
-  const rawProjects        = data?.projects || [];
-  const rawManagerProjects = rawProjects.filter((g) => ownerProjectIds.has(g.projectId));
-  const rawMemberProjects  = rawProjects.filter((g) => !ownerProjectIds.has(g.projectId));
+  const rawManagerProjects = groupManagerItems(data?.project_MANAGERItems);
+  const rawMemberProjects  = data?.projects || [];
 
   // Filtered split — used for the actual rendered list.
-  const allProjects     = filteredData?.projects || [];
-  const managerProjects = allProjects.filter((g) => ownerProjectIds.has(g.projectId));
-  const memberProjects  = allProjects.filter((g) => !ownerProjectIds.has(g.projectId));
+  const managerProjects = groupManagerItems(filteredData?.project_MANAGERItems);
+  const memberProjects  = filteredData?.projects || [];
   const projects         = isManagerView ? managerProjects : memberProjects;
   const isEmpty  = !isLoading && projects.length === 0 && !store.activeChip
-    && !store.selectedProjects.length && !store.selectedTypes.length;
+    && !store.selectedProjects.length && !store.selectedTypes.length
+    && !store.selectedPriorities.length;
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -192,8 +173,8 @@ export default function MyWorkPage() {
               </div>
             )}
 
-            {/* ── Project groups (owned-by-me projects in manager view, the
-                 rest in member view) ─────────────────────────────────────── */}
+            {/* ── Project groups (every item in a managed project when in
+                 manager view, items assigned to me otherwise) ────────────── */}
             {projects.map((group) => (
               <ProjectGroup
                 key={group.projectId}

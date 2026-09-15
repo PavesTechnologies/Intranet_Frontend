@@ -17,13 +17,18 @@ const TeamWorkload = ({ workItems, users }) => {
   useEffect(() => {
     if (!users || !workItems) return;
 
-    const userMap = new Map(users.map((u) => [u.id, { ...u, count: 0 }]));
+    // Task/story assignee ids and member ids don't always come back as the
+    // same JS type (number vs numeric string) from different endpoints, so
+    // key/lookup by String(id) — otherwise a strict Map match silently fails
+    // and every assigned item gets miscounted as Unassigned.
+    const userMap = new Map(users.map((u) => [String(u.id), { ...u, count: 0 }]));
     const unassigned = { id: null, name: "Unassigned", count: 0, color: "#9ca3af" };
 
     workItems.forEach((item) => {
-      const assignedTo = item.assigneeId || item.assignee?.id;
-      if (assignedTo && userMap.has(assignedTo)) {
-        userMap.get(assignedTo).count++;
+      const assignedTo = item.assigneeId ?? item.assignee?.id;
+      const key = assignedTo != null ? String(assignedTo) : null;
+      if (key && userMap.has(key)) {
+        userMap.get(key).count++;
       } else {
         unassigned.count++;
       }

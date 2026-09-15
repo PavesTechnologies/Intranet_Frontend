@@ -24,7 +24,7 @@ import Calendar from "./pages/Calendar";
 
 // Finance Management (Application Switcher landing page)
 import FinanceDashboard from "./pages/finance/FinanceDashboard";
-import { FINANCE_ALL_ROLES, AR_MAKER_ROLES, AR_CHECKER_ROLES } from "./config/sidebarConfig";
+import { FINANCE_ALL_ROLES, AR_MAKER_ROLES, AR_CHECKER_ROLES, AR_ALL_ROLES } from "./config/sidebarConfig";
 
 // Accounts Payable
 import { AP_ROUTES } from "./pages/accounts-payable/constants/routes";
@@ -299,6 +299,9 @@ import BillingApprovals from "./pages/account_receivable/pages/BillingApprovals.
 import BillingDataAcquisition from "./pages/account_receivable/pages/BillingDataAcquisition.jsx";
 import AcquisitionDetail from "./pages/account_receivable/pages/AcquisitionDetail.jsx";
 import TaxCalculationPage from "./pages/account_receivable/pages/TaxCalculation.jsx";
+import InvoiceGeneration from "./pages/account_receivable/pages/InvoiceGeneration.jsx";
+import InvoiceApproval from "./pages/account_receivable/pages/InvoiceApproval.jsx";
+import InvoiceDetail from "./pages/account_receivable/pages/InvoiceDetail.jsx";
 import Configurations from "./pages/account_receivable/pages/Configurations.jsx";
 import MasterDataOverview from "./pages/account_receivable/pages/master-data/MasterDataOverview.jsx";
 import BillingTypeMasterPage from "./pages/account_receivable/pages/master-data/BillingTypeMasterPage.jsx";
@@ -341,10 +344,10 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
       normalizedAllowedRoles.includes(role.toUpperCase())
     );
     // console.log("ProtectedRoute check:", {
-      // isAuthenticated,
-      // user,
-      // allowedRoles,
-      // match: hasRole,
+    // isAuthenticated,
+    // user,
+    // allowedRoles,
+    // match: hasRole,
     // });
 
     if (!hasRole) {
@@ -683,7 +686,7 @@ const AppRoutes = () => {
               access to everything below unchanged; Finance Executive only
               gets the Maker (create/draft/submit) routes; Finance Manager
               only gets the Checker (billing-approvals) route. */}
-          <Route path="/account-receivable/*" element={<AccountReceivableLayout />}>
+          <Route path="/account-receivable" element={<AccountReceivableLayout />}>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><AccountReceivableDashboard /></ProtectedRoute>} />
             <Route
@@ -741,6 +744,18 @@ const AppRoutes = () => {
             <Route
               path="tax-calculation/occurrence/:occurrenceId"
               element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxCalculationPage /></ProtectedRoute>}
+            />
+            <Route
+              path="invoice-generation"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><InvoiceGeneration /></ProtectedRoute>}
+            />
+            <Route
+              path="invoice-approval"
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><InvoiceApproval /></ProtectedRoute>}
+            />
+            <Route
+              path="invoices/:snapshotId"
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><InvoiceDetail /></ProtectedRoute>}
             />
             <Route
               path="configurations"
@@ -1381,7 +1396,7 @@ const AppRoutes = () => {
             }
           />          {/* AI Screening (AIRS) Routes */}
           <Route
-            path="/airs/dashboard"
+            path="/ai-screening/dashboard"
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <RecruiterDashboardPage />
@@ -1389,7 +1404,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/jds"
+            path="/ai-screening/jds"
             element={
               <ProtectedRoute roles={["General"]}>
                 <JdLibrary />
@@ -1397,7 +1412,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/jds/create"
+            path="/ai-screening/jds/create"
             element={
               <ProtectedRoute roles={["General"]}>
                 <JdCreate />
@@ -1405,7 +1420,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/jds/:id"
+            path="/ai-screening/jds/:id"
             element={
               <ProtectedRoute roles={["General"]}>
                 <JdDetails />
@@ -1413,7 +1428,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/campaigns"
+            path="/ai-screening/campaigns"
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <Campaigns />
@@ -1421,7 +1436,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/campaigns/:id"
+            path="/ai-screening/campaigns/:id"
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <CampaignDetails />
@@ -1433,7 +1448,7 @@ const AppRoutes = () => {
               (canSeePipeline = HR_ADMIN/RECRUITER); HIRING_MANAGER is
               deliberately excluded, matching the tab's old visibility. */}
           <Route
-            path="/airs/interview-calendar"
+            path="/ai-screening/interview-calendar"
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER"]}>
                 <InterviewCalendarPage />
@@ -1441,7 +1456,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/resume-intake"
+            path="/ai-screening/resume-intake"
             element={
               <ProtectedRoute roles={["General"]}>
                 <ResumeIntakePage />
@@ -1449,7 +1464,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/resume-intake/new"
+            path="/ai-screening/resume-intake/new"
             element={
               <ProtectedRoute roles={["General"]}>
                 <IntakeFlowPage />
@@ -1457,7 +1472,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/resume-intake/review/:candidateId"
+            path="/ai-screening/resume-intake/review/:candidateId"
             element={
               <ProtectedRoute roles={["General"]}>
                 <ReviewPage />
@@ -1465,7 +1480,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/candidates"
+            path="/ai-screening/candidates"
             element={
               <ProtectedRoute roles={["General"]}>
                 <CandidateRankingPage />
@@ -1473,7 +1488,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/candidates/:candidateId"
+            path="/ai-screening/candidates/:candidateId"
             element={
               <ProtectedRoute roles={["General"]}>
                 <CandidateScorePage />
@@ -1481,7 +1496,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/interview-queue"
+            path="/ai-screening/interview-queue"
             element={
               <ProtectedRoute allowedRoles={["HIRING_MANAGER", "HR_ADMIN"]}>
                 <InterviewQueuePage />
@@ -1489,7 +1504,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/pipeline"
+            path="/ai-screening/pipeline"
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <PipelineBoardPage />
@@ -1497,7 +1512,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/pipeline/candidates/:candidateId"
+            path="/ai-screening/pipeline/candidates/:candidateId"
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <PipelineCandidateScorecardPage />
@@ -1505,11 +1520,11 @@ const AppRoutes = () => {
             }
           />
           {/* Global Candidate Directory (GET /candidates) — distinct from
-              /airs/candidates below, which is the campaign-scoped
+              /ai-screening/candidates below, which is the campaign-scoped
               Candidates & Ranking page. HR_ADMIN only, matching the
               backend's require_roles(UserRole.HR_ADMIN) on this endpoint. */}
           <Route
-            path="/airs/global-candidates"
+            path="/ai-screening/global-candidates"
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
                 <GlobalCandidatesPage />
@@ -1517,7 +1532,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/talent-pool"
+            path="/ai-screening/talent-pool"
             element={
               <ProtectedRoute roles={["General"]}>
                 <TalentPoolPage />
@@ -1525,7 +1540,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/talent-pool/:candidateId"
+            path="/ai-screening/talent-pool/:candidateId"
             element={
               <ProtectedRoute roles={["General"]}>
                 <TalentPoolCandidateProfilePage />
@@ -1533,7 +1548,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/analytics"
+            path="/ai-screening/analytics"
             element={
               <ProtectedRoute roles={["General"]}>
                 <AnalyticsPage />
@@ -1541,7 +1556,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/settings"
+            path="/ai-screening/settings"
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
                 <SettingsPage />
@@ -1549,7 +1564,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/skill-ontology"
+            path="/ai-screening/skill-ontology"
             element={
               <ProtectedRoute roles={["General"]}>
                 <SkillOntologyPage />
@@ -1557,7 +1572,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/skill-ontology/hierarchy"
+            path="/ai-screening/skill-ontology/hierarchy"
             element={
               <ProtectedRoute roles={["General"]}>
                 <HierarchyPage />
@@ -1565,7 +1580,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/skill-ontology/:skillId"
+            path="/ai-screening/skill-ontology/:skillId"
             element={
               <ProtectedRoute roles={["General"]}>
                 <SkillDetailPage />
@@ -1573,7 +1588,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/skill-ontology/unknown/:unknownSkillId"
+            path="/ai-screening/skill-ontology/unknown/:unknownSkillId"
             element={
               <ProtectedRoute roles={["General"]}>
                 <UnknownSkillDetailPage />
@@ -1588,7 +1603,7 @@ const AppRoutes = () => {
               AddPromptTemplateModal/EditPromptTemplateModal), matching the
               skill-ontology module's pattern — only List and View are routed. */}
           <Route
-            path="/airs/prompt-templates"
+            path="/ai-screening/prompt-templates"
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
                 <PromptTemplatesPage />
@@ -1596,7 +1611,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/airs/prompt-templates/:id/view"
+            path="/ai-screening/prompt-templates/:id/view"
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
                 <PromptTemplateViewPage />

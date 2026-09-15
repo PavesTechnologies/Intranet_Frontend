@@ -79,6 +79,15 @@ export const apLookupService = {
     return res.data;
   },
 
+  /** Active units of measure (module master, GET /apm/master/uoms) — id/code/name/category/allows_decimal. */
+  getUoms: async ({ activeOnly = true } = {}) => {
+    const res = await api.get(`${BASE}/master/uoms`, {
+      params: { active_only: activeOnly },
+      headers: authHeaders(),
+    });
+    return res.data;
+  },
+
   getGstinDetails: async (gstin) => {
     const res = await api.get(`${BASE}/system/gstin/${encodeURIComponent(gstin)}`, {
       headers: authHeaders(),
