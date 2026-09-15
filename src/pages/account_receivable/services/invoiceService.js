@@ -92,8 +92,11 @@ export const getInvoiceErrorMessage = (
     if (detail.toLowerCase().includes("already")) {
       return "Invoice already generated for this billing snapshot.";
     }
+    if (detail.toLowerCase().includes("client name") || detail.toLowerCase().includes("project name") || detail.toLowerCase().includes("correction")) {
+      return detail;
+    }
     if (detail.toLowerCase().includes("client") || detail.toLowerCase().includes("address")) {
-      return "Client billing details are incomplete in the configuration.";
+      return detail || "Client billing details are incomplete in the configuration.";
     }
     return detail || "Invoice request validation failed. Please check the snapshot details.";
   }
@@ -675,6 +678,33 @@ export const refreshInvoiceAfterCorrection = async (invoiceId) => {
   return normalizeInvoice(unwrapData(response));
 };
 
+/**
+ * PATCH /api/v1/invoices/{invoiceId}/non-financial-correction
+ * Refreshes non-financial fields (clientName, projectName) on a REJECTED invoice.
+ * Does not modify or send financial values.
+ */
+export const correctNonFinancialInvoice = async (invoiceId, payload = {}) => {
+  if (!invoiceId) {
+    throw new Error("Invoice ID is required to correct the invoice.");
+  }
+  const cleanClientName = typeof payload.clientName === "string" ? payload.clientName.trim() : "";
+  const cleanProjectName = typeof payload.projectName === "string" ? payload.projectName.trim() : "";
+
+  if (!cleanClientName) {
+    throw new Error("Client Name is required.");
+  }
+  if (!cleanProjectName) {
+    throw new Error("Project Name is required.");
+  }
+
+  const url = `${AR_BASE_URL}/api/v1/invoices/${invoiceId}/non-financial-correction`;
+  const response = await api.patch(url, {
+    clientName: cleanClientName,
+    projectName: cleanProjectName,
+  });
+  return normalizeInvoice(unwrapData(response));
+};
+
 export default {
   generateInvoice,
   getInvoice,
@@ -685,6 +715,7 @@ export default {
   approveInvoice,
   rejectInvoice,
   refreshInvoiceAfterCorrection,
+  correctNonFinancialInvoice,
   getInvoiceApprovalHistory,
   getInvoiceErrorMessage,
   normalizeInvoice,
