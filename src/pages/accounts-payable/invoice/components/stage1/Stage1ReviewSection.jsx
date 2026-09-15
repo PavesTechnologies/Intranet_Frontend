@@ -7,7 +7,6 @@ import InvoiceLineItemsSection from "./InvoiceLineItemsSection";
 import PartyValidationPanel from "./PartyValidationPanel";
 import GstTaxValidationPanel from "./GstTaxValidationPanel";
 import InvoiceDocumentViewer from "./InvoiceDocumentViewer";
-import FieldDocumentConnector from "./FieldDocumentConnector";
 import { getFieldLocation } from "../../utils/fieldLocation";
 import {
   useCorrectVendorMutation,
@@ -20,7 +19,10 @@ const TAB_ORDER = ["vendor", "buyer", "gst"];
 
 /**
  * Full-width Stage 1 review workspace, rendered by InvoiceUploadPage once extraction has
- * produced field data. Pipeline status (Stage1Header's stepper) always renders first.
+ * produced field data. Pipeline status (Stage1Header's stepper) renders first, then a two-column
+ * layout: the editable form/tabs on the left (scrolls normally with the page — it can get long
+ * once Invoice Details/Amounts/Line Items are all showing), the original document preview
+ * pinned (`sticky`) on the right so it stays visible the whole time instead of scrolling away.
  *
  * Two distinct modes below it, matching whether there's anything real to compare against yet:
  *  - Extraction Validation FAILED: Vendor/Buyer/GST never ran (they're SKIPPED, not WAITING),
@@ -56,7 +58,6 @@ export default function Stage1ReviewSection({
   const [selectedLocation, setSelectedLocation] = useState(null);
   const prevActiveTab = useRef(activeTab);
 
-  const gridRef = useRef(null);
   const selectedRowRef = useRef(null);
   const highlightRef = useRef(null);
 
@@ -102,8 +103,6 @@ export default function Stage1ReviewSection({
     setActiveTab(key);
   };
 
-  const showConnector = !extractionFailed && (activeTab === "vendor" || activeTab === "buyer");
-
   return (
     <div>
       <Stage1Header stages={stages} activeTab={extractionFailed ? null : activeTab} onSelectStage={extractionFailed ? undefined : handleSelectStage} />
@@ -136,7 +135,7 @@ export default function Stage1ReviewSection({
         </div>
       )}
 
-      <div ref={gridRef} className="relative grid grid-cols-1 gap-6 lg:grid-cols-[44%_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[44%_1fr] lg:items-start">
         <div className="space-y-6">
           {extractionFailed ? (
             <>
@@ -199,7 +198,7 @@ export default function Stage1ReviewSection({
           )}
         </div>
 
-        <div className="h-[75vh] min-h-[520px]">
+        <div className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-auto">
           <InvoiceDocumentViewer
             fileUrl={fileUrl}
             originalFilename={originalFilename}
@@ -209,15 +208,6 @@ export default function Stage1ReviewSection({
             noteMessage={selectedFieldKey && !selectedLocation ? "No document location available for the selected field." : null}
           />
         </div>
-
-        {showConnector && (
-          <FieldDocumentConnector
-            containerRef={gridRef}
-            fromRef={selectedRowRef}
-            toRef={highlightRef}
-            active={Boolean(selectedFieldKey && selectedLocation)}
-          />
-        )}
       </div>
     </div>
   );
