@@ -14,6 +14,7 @@ import {
 import Button from "@/components/Button/Button";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { expenseReportService, lineItemService } from "@/pages/expense-management/api/expenseReportsApi";
+import { PolicyResultBanner } from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
 import ApprovalStatusPill from "../../../approval-engine/components/ApprovalStatusPill";
 import EmployeeLabel from "../../../approval-engine/components/EmployeeLabel";
 import LineReviewStatusBadge, { deriveLineReviewState } from "../../../approval-engine/components/LineReviewStatusBadge";
@@ -28,6 +29,16 @@ const isLineEligible = (line) => {
   if (line.eligibleForVerify === false || line.eligible === false || line.isEligible === false) return false;
   if (line.ineligibleReason && String(line.ineligibleReason).trim().length > 0) return false;
   return true;
+};
+
+// FinancePendingLineItemResponse (the queue's own line shape) carries no policy detail at all —
+// only ExpenseLineItemResponse (this panel's separately-fetched fullLineItems, needed anyway to
+// show every line, not just still-pending ones) has policyWarnings. mergedLineItems below already
+// spreads fullLineItems first, so selectedLine.policyWarnings is available with no extra API call.
+const normalizeViolations = (line) => {
+  if (Array.isArray(line?.policyWarnings)) return line.policyWarnings;
+  if (Array.isArray(line?.policyViolations)) return line.policyViolations.map((v) => ({ ...v, enforcementType: v.enforcementType || "WARN" }));
+  return [];
 };
 
 const Section = ({ icon, title, children }) => (
@@ -125,7 +136,8 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
 
   const selectedLine = mergedLineItems.find((l) => l.lineItemId === selectedLineItemId) || null;
   const selectedReview = selectedLine ? reviewsByLineItem.get(selectedLine.lineItemId) : null;
-  const hasPolicyWarnings = (selectedLine?.policyViolations?.length > 0) || (selectedLine?.policyWarnings?.length > 0);
+  const selectedViolations = normalizeViolations(selectedLine);
+  const hasPolicyWarnings = selectedViolations.length > 0;
 
   const employeeId = queueItem?.employeeId || fullReport?.employeeId;
   const reportNumber = queueItem?.reportNumber || fullReport?.reportNumber;
@@ -276,6 +288,10 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
                     <Field label="Report Total" value={formatMoney(totalAmount, currencyCode)} />
                   </div>
                 </Section>
+
+                {selectedViolations.length > 0 && (
+                  <PolicyResultBanner lineStatus={selectedLine.lineStatus} policyWarnings={selectedViolations} />
+                )}
               </>
             ) : (
               <Section icon={<FileText className="h-4 w-4 text-gray-400" />} title="Expense Information">
@@ -324,7 +340,7 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
             { reportId, lineItemId: queryingLine.lineItemId, reason },
             {
               onSuccess: () => {
-                showStatusToast("Correction requested successfully", "success");
+                showStatusToast("Correction requested — the report has been returned to the employee.", "success");
                 setQueryingLine(null);
                 onClose();
               },

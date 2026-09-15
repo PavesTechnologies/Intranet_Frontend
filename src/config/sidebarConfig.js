@@ -41,6 +41,12 @@ const HR_MANAGEMENT    = [ROLES.HR, ROLES.REPORTING_MANAGER];
 const XMS_EMPLOYEE   = [ROLES.GENERAL];
 const XMS_MANAGER    = [ROLES.MANAGER];
 const XMS_FINANCE    = [ROLES.FINANCE, "Finance_Executive"];
+// Finance Verification's own action surface requires exactly FINANCE_EXECUTIVE on the backend
+// (FinanceVerificationController's @PreAuthorize) — unlike XMS_FINANCE above (used by Client
+// Billing, a read/placeholder area), the generic "Finance" viewing role does NOT satisfy this
+// controller, so including it here would let a Finance-role user into a page where every action
+// 403s. Kept separate from XMS_FINANCE so Client Billing's own role list is unaffected.
+const XMS_FINANCE_VERIFICATION = [ROLES.FINANCE_EXECUTIVE];
 const XMS_ADMIN      = ADMIN_ROLES;
 export const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
 const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
@@ -214,7 +220,7 @@ export const XMS_SUBMENU = [
   {
     label: "Finance",
     to: "/expense-management/finance/verification",
-    allowedRoles: XMS_FINANCE,
+    allowedRoles: XMS_FINANCE_VERIFICATION,
     children: [
       { label: "Verification",    to: "/expense-management/finance/verification" },
       { label: "Reimbursements",  to: "/expense-management/finance/reimbursements" },
