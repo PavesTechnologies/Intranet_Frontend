@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   RefreshCw,
   FileText,
@@ -10,29 +10,20 @@ import {
   ArrowLeft,
 } from "lucide-react";
 
-import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
-import Button from "../../../components/Button/Button";
-import Loader from "../../../components/ui/Loader";
-import StatusBadge from "../../../components/status/statusbadge";
-import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
-import { showStatusToast } from "../../../components/toastfy/toast";
-import { formatCurrency, formatDisplayDate } from "../utils/format";
+import { PageCard } from "../../../../components/Cards/PageCard";
+import Button from "../../../../components/Button/Button";
+import Loader from "../../../../components/ui/Loader";
+import StatusBadge from "../../../../components/status/statusbadge";
+import Breadcrumb from "../../../../components/Breadcrumb/Breadcrumb";
+import { showStatusToast } from "../../../../components/toastfy/toast";
+import { formatCurrency, formatDisplayDate } from "../../utils/format";
 
 import {
-  calculateTax,
-  getTaxCalculation,
-  getTaxCalculationErrorMessage,
-} from "../services/taxCalculationService";
-import {
-  getBillingSnapshotByPeriod,
-  getAcquiredSnapshotMetadata,
-  saveAcquiredSnapshotMetadata,
-  fetchActiveBillingConfigurations,
-  formatBillingPeriod,
-  toIsoDateOnly,
-} from "../services/billingDataAcquisitionService";
-import TaxCalculationConsole from "../components/tax_calculation/TaxCalculationConsole";
-import OccurrenceTaxCalculationDetail from "../components/tax_calculation/OccurrenceTaxCalculationDetail";
+  getBillingOccurrence,
+  getOccurrenceTaxCalculation,
+  calculateOccurrenceTax,
+  getOccurrenceErrorMessage,
+} from "../../services/billingOccurrenceService";
 
 const CONSOLE_PATH = "/account-receivable/tax-calculation";
 
@@ -63,6 +54,17 @@ const humanizeApplicability = (value) => {
     .join(" ");
 };
 
+// Billing Type is a display label only — derived from the backend's own
+// scheduleType, falling back to which configuration id was returned.
+const humanizeBillingType = (occurrence) => {
+  const raw = String(occurrence?.scheduleType || "").trim().toUpperCase();
+  if (raw.includes("RECUR")) return "Recurring";
+  if (raw.includes("FIXED")) return "Fixed Price";
+  if (occurrence?.recurringConfigurationId) return "Recurring";
+  if (occurrence?.billingConfigurationId) return "Fixed Price";
+  return raw ? raw.replace(/_/g, " ") : "Billing Occurrence";
+};
+
 function Field({ label, children }) {
   return (
     <div>
@@ -74,128 +76,67 @@ function Field({ label, children }) {
   );
 }
 
-export default function TaxCalculation() {
-  const { snapshotId, occurrenceId } = useParams();
+/**
+ * Tax Calculation detail view for a Fixed Price / Recurring Billing
+ * Occurrence. Mirrors the layout of the T&M snapshot detail view
+ * (TaxCalculation.jsx) so both billing flows share one visual language,
+ * but reads/writes exclusively through the BillingOccurrenceController
+ * endpoints — it never touches the billing-snapshot tax APIs.
+ */
+export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
   const navigate = useNavigate();
   const location = useLocation();
-
   const passedState = location.state || {};
-  const [taxCalc, setTaxCalc] = useState(passedState.taxCalculation || null);
-  const [snapshotData, setSnapshotData] = useState(passedState.config || null);
-  const [acquisitionResults, setAcquisitionResults] = useState(passedState.acquisitionResults || null);
-  const [loading, setLoading] = useState(Boolean(snapshotId));
+
+  const [occurrence, setOccurrence] = useState(passedState.occurrence || null);
+  const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(false);
   const [calcError, setCalcError] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
 
-  const effectiveSnapshotId = snapshotId || taxCalc?.billingSnapshotId || snapshotData?.snapshotId || null;
-
-  const loadData = async () => {
-    if (!effectiveSnapshotId) {
-      setLoading(false);
-      return;
-    }
-
+  const loadOccurrenceDetail = async () => {
     setLoading(true);
-    setErrorMsg("");
     setCalcError("");
-
-    let existingCalc = null;
-    // 1. Check if tax calculation already completed in backend
     try {
-      existingCalc = await getTaxCalculation(effectiveSnapshotId);
-      if (existingCalc) {
-        setTaxCalc(existingCalc);
+      const base = await getBillingOccurrence(occurrenceId);
+      let merged = base;
+
+      const taxStatusUpper = (base?.taxStatus || "").toUpperCase();
+      if (base && (taxStatusUpper === "TAX_CALCULATED" || base.isInvoiced)) {
+        try {
+          const taxCalc = await getOccurrenceTaxCalculation(occurrenceId);
+          if (taxCalc) merged = { ...base, ...taxCalc };
+        } catch (err) {
+          // Tax calculation not yet retrievable — show the base occurrence as-is.
+          console.log("[OccurrenceTaxCalculationDetail] No tax calculation found for occurrence.");
+        }
       }
+
+      setOccurrence(merged);
     } catch (err) {
-      // Not yet calculated: expected when navigating from Billing Data Acquisition
-      console.log("[TaxCalculation] No previous tax calculation found, awaiting calculation.");
+      showStatusToast(getOccurrenceErrorMessage(err, "Unable to load billing occurrence."), "error");
+    } finally {
+      setLoading(false);
     }
-
-    // 2. Hydrate snapshot data if not passed in location.state or incomplete
-    if (!snapshotData || !snapshotData.snapshotNumber || !snapshotData.totalAmount) {
-      try {
-        const configs = await fetchActiveBillingConfigurations();
-        let matched = null;
-        let snapDetails = null;
-
-        for (const cfg of configs) {
-          const meta = getAcquiredSnapshotMetadata(cfg.projectId);
-          if (
-            meta?.snapshotId === effectiveSnapshotId ||
-            String(cfg.projectId) === String(snapshotData?.projectId) ||
-            String(cfg.projectId) === "23"
-          ) {
-            matched = { ...cfg, ...meta };
-            const qStart = meta?.billingPeriodStart || cfg.periodStart;
-            const qEnd = meta?.billingPeriodEnd || cfg.periodEnd;
-            snapDetails = await getBillingSnapshotByPeriod(cfg.projectId, qStart, qEnd);
-            break;
-          }
-        }
-
-        if (matched) {
-          const start = snapDetails?.billingPeriodStart || matched.billingPeriodStart;
-          const end = snapDetails?.billingPeriodEnd || matched.billingPeriodEnd;
-          const period = snapDetails?.billingPeriod || formatBillingPeriod(start, end) || matched.billingPeriod;
-
-          setSnapshotData({
-            ...matched,
-            snapshotId: effectiveSnapshotId,
-            snapshotNumber: snapDetails?.snapshotNumber || matched.snapshotNumber || (existingCalc?.snapshotNumber) || "BS-20260908164549",
-            billingPeriod: period,
-            billingPeriodStart: start,
-            billingPeriodEnd: end,
-            currency: snapDetails?.currencyCode || matched.currency || "USD",
-            subtotal: snapDetails?.subtotal ?? matched.subtotal ?? 5500,
-            totalAmount: snapDetails?.totalAmount ?? matched.totalAmount ?? 5500,
-            billingStatus: existingCalc ? "TAX_COMPLETED" : (snapDetails?.status || matched.status || "READY_FOR_TAX"),
-          });
-        }
-      } catch (err) {
-        console.warn("[TaxCalculation] Hydration error:", err);
-      }
-    }
-
-    setLoading(false);
   };
 
   useEffect(() => {
-    if (effectiveSnapshotId) {
-      loadData();
-    } else {
-      setLoading(false);
+    if (occurrenceId) {
+      loadOccurrenceDetail();
     }
-  }, [effectiveSnapshotId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [occurrenceId]);
 
   const handleCalculateTax = async () => {
-    if (!effectiveSnapshotId || calculating) return;
+    if (!occurrenceId || calculating) return;
 
     setCalculating(true);
     setCalcError("");
-
     try {
-      const result = await calculateTax(effectiveSnapshotId);
-      setTaxCalc(result);
+      await calculateOccurrenceTax(occurrenceId);
       showStatusToast("Tax calculation completed successfully.", "success");
-
-      setSnapshotData((prev) =>
-        prev
-          ? {
-              ...prev,
-              billingStatus: "TAX_COMPLETED",
-              status: "TAX_COMPLETED",
-            }
-          : prev
-      );
-
-      if (snapshotData?.projectId) {
-        saveAcquiredSnapshotMetadata(snapshotData.projectId, {
-          status: "TAX_COMPLETED",
-        });
-      }
+      await loadOccurrenceDetail();
     } catch (err) {
-      const msg = getTaxCalculationErrorMessage(err, "Tax calculation failed. Please review tax configuration.");
+      const msg = getOccurrenceErrorMessage(err, "Tax calculation failed. Please review tax configuration.");
       setCalcError(msg);
       showStatusToast(msg, "error");
     } finally {
@@ -203,99 +144,50 @@ export default function TaxCalculation() {
     }
   };
 
-  // Fixed Price / Recurring Billing Occurrences are a distinct backend
-  // contract (BillingOccurrenceController) from the T&M billing-snapshot
-  // flow above — routed separately (tax-calculation/occurrence/:occurrenceId).
-  // This branch renders only the occurrence view; every hook above still runs
-  // unconditionally on every render, it's just that its T&M state stays unused here.
-  if (occurrenceId) {
-    return <OccurrenceTaxCalculationDetail occurrenceId={occurrenceId} />;
-  }
-
-  // If no snapshotId exists (standalone route /account-receivable/tax-calculation), render Tax Calculation Console
-  if (!effectiveSnapshotId) {
-    return <TaxCalculationConsole />;
-  }
-
-  if (loading) {
+  if (loading && !occurrence) {
     return (
       <div className="flex h-80 items-center justify-center">
-        <Loader size="lg" text="Loading snapshot tax details..." />
+        <Loader size="lg" text="Loading billing occurrence..." />
       </div>
     );
   }
 
-  // Derive metadata and currency
-  const currency =
-    taxCalc?.currencyCode ||
-    taxCalc?.currency ||
-    snapshotData?.currency ||
-    passedState.currency ||
-    "USD";
+  if (!occurrence) {
+    return (
+      <div className="mx-auto w-full max-w-5xl space-y-4">
+        <Breadcrumb items={[{ label: "Tax Calculation", to: CONSOLE_PATH }, { label: "Not Found" }]} />
+        <PageCard>
+          <div className="p-8 text-center text-sm text-slate-500">
+            This billing occurrence could not be found.
+          </div>
+        </PageCard>
+      </div>
+    );
+  }
 
-  const projectName =
-    taxCalc?.projectName ||
-    taxCalc?.project_name ||
-    snapshotData?.projectName ||
-    snapshotData?.project ||
-    passedState.projectName ||
-    "—";
+  const currency = occurrence.currencyCode || "USD";
+  const billingType = humanizeBillingType(occurrence);
+  const period =
+    occurrence.periodStartDate || occurrence.periodEndDate
+      ? `${formatDisplayDate(occurrence.periodStartDate)} - ${formatDisplayDate(occurrence.periodEndDate)}`
+      : "—";
 
-  const clientName =
-    taxCalc?.clientName ||
-    taxCalc?.client_name ||
-    snapshotData?.client ||
-    snapshotData?.clientName ||
-    passedState.clientName ||
-    "—";
+  const components = Array.isArray(occurrence.taxComponents) ? occurrence.taxComponents : [];
+  const taxStatus = (occurrence.taxStatus || "").toUpperCase();
+  const isTaxCompleted = taxStatus === "TAX_CALCULATED" || occurrence.isInvoiced;
+  const isReady = taxStatus === "TAX_PENDING";
 
-  const snapshotNum =
-    taxCalc?.snapshotNumber ||
-    taxCalc?.snapshot_number ||
-    snapshotData?.snapshotNumber ||
-    passedState.config?.snapshotNumber ||
-    effectiveSnapshotId;
-
-  const rawPeriodStart =
-    taxCalc?.billingPeriodStart ||
-    taxCalc?.billing_period_start ||
-    snapshotData?.billingPeriodStart ||
-    snapshotData?.snapshotPeriodStart;
-
-  const rawPeriodEnd =
-    taxCalc?.billingPeriodEnd ||
-    taxCalc?.billing_period_end ||
-    snapshotData?.billingPeriodEnd ||
-    snapshotData?.snapshotPeriodEnd;
-
-  const billingPeriod =
-    rawPeriodStart && rawPeriodEnd
-      ? formatBillingPeriod(rawPeriodStart, rawPeriodEnd)
-      : snapshotData?.billingPeriod || passedState.billingPeriod || "—";
-
-  // Tax Breakdown: render whatever components the backend returned
-  const components = Array.isArray(taxCalc?.components) ? taxCalc.components : [];
-
-  const taxableAmount =
-    taxCalc?.taxableAmount ??
-    snapshotData?.totalAmount ??
-    snapshotData?.subtotal ??
-    acquisitionResults?.labor?.amount ??
-    5500;
-  const totalTaxAmount = taxCalc?.totalTaxAmount ?? 0;
-  const grandTotal = taxCalc?.grandTotal ?? (taxableAmount + totalTaxAmount);
-  const isTaxCompleted = Boolean(taxCalc && (taxCalc.components !== undefined || taxCalc.totalTaxAmount !== undefined));
-  const displayStatus = isTaxCompleted
-    ? (taxCalc?.status || "TAX_COMPLETED")
-    : (snapshotData?.status || snapshotData?.billingStatus || "READY_FOR_TAX");
+  const taxableAmount = occurrence.taxableAmount ?? occurrence.billingAmount ?? 0;
+  const totalTaxAmount = occurrence.totalTaxAmount ?? 0;
+  const grandTotal = occurrence.grandTotal ?? (isTaxCompleted ? taxableAmount + totalTaxAmount : null);
+  const displayStatus = occurrence.isInvoiced ? "INVOICED" : occurrence.taxStatus || occurrence.periodStatus;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5">
       <Breadcrumb
         items={[
-          { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition" },
           { label: "Tax Calculation", to: CONSOLE_PATH },
-          { label: snapshotNum },
+          { label: `${billingType} Occurrence` },
         ]}
       />
 
@@ -304,15 +196,15 @@ export default function TaxCalculation() {
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Tax Calculation</h1>
+            <span className="inline-block rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
+              {billingType}
+            </span>
             <StatusBadge label={displayStatus} size="sm" />
           </div>
           <p className="text-sm text-slate-600">
-            Snapshot <span className="ml-1 font-mono font-semibold text-slate-800">{snapshotNum}</span>
-          </p>
-          <p className="text-sm text-slate-600">
-            <span className="font-semibold text-slate-800">{projectName}</span>
+            <span className="font-semibold text-slate-800">{occurrence.projectName || "—"}</span>
             <span className="mx-1.5 text-slate-300">&middot;</span>
-            {clientName}
+            {occurrence.clientName || "—"}
           </p>
         </div>
 
@@ -326,20 +218,11 @@ export default function TaxCalculation() {
             <ArrowLeft className="h-3.5 w-3.5" /> Back to Tax Workspace
           </Button>
 
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => navigate("/account-receivable/billing-data-acquisition")}
-            className="flex items-center gap-1.5 text-xs text-slate-600"
-          >
-            Acquisition Detail
-          </Button>
-
           {isTaxCompleted ? (
-            <Button variant="outline" size="small" onClick={loadData} className="flex items-center gap-1.5 text-xs">
+            <Button variant="outline" size="small" onClick={loadOccurrenceDetail} className="flex items-center gap-1.5 text-xs">
               <RefreshCw className="h-3.5 w-3.5" /> Refresh
             </Button>
-          ) : (
+          ) : isReady ? (
             <Button
               variant="primary"
               size="small"
@@ -357,11 +240,10 @@ export default function TaxCalculation() {
                 </>
               )}
             </Button>
-          )}
+          ) : null}
         </div>
       </div>
 
-      {/* Backend Tax Engine Error Alert if calculation POST failed */}
       {calcError && (
         <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 shadow-sm">
           <AlertTriangle className="h-4 w-4 flex-shrink-0 text-rose-600 mt-0.5" />
@@ -369,7 +251,7 @@ export default function TaxCalculation() {
             <div className="font-semibold text-rose-900">Tax Calculation Error</div>
             <div className="font-mono text-rose-800">{calcError}</div>
             <div className="text-[11px] text-rose-600 pt-1">
-              Backend tax engine rejected calculation. Please review the tax rate configuration for this project's jurisdiction.
+              Backend tax engine rejected calculation. Please review the tax rate configuration for this occurrence's jurisdiction.
             </div>
           </div>
         </div>
@@ -381,15 +263,15 @@ export default function TaxCalculation() {
         <div className="p-5">
           <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Calculation Context</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-            <Field label="Project">{projectName}</Field>
-            <Field label="Client">{clientName}</Field>
-            <Field label="Snapshot">
-              <span className="font-mono">{snapshotNum}</span>
-            </Field>
-            <Field label="Billing Period">{billingPeriod}</Field>
+            <Field label="Billing Type">{billingType}</Field>
+            <Field label="Project">{occurrence.projectName}</Field>
+            <Field label="Client">{occurrence.clientName}</Field>
+            <Field label="Billing Period">{period}</Field>
+            <Field label="Billing Date">{formatDisplayDate(occurrence.billingDate)}</Field>
             <Field label="Currency">
               <span className="font-mono">{currency}</span>
             </Field>
+            {occurrence.taxRegionName && <Field label="Tax Region">{occurrence.taxRegionName}</Field>}
           </div>
         </div>
 
@@ -397,14 +279,6 @@ export default function TaxCalculation() {
         <div className="p-5">
           <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Commercial Value</h2>
           <div className="max-w-sm space-y-1.5 text-sm">
-            <div className="flex items-center justify-between text-slate-600">
-              <span>Subtotal</span>
-              <span className="font-mono font-semibold text-slate-800">{formatCurrency(taxableAmount, currency)}</span>
-            </div>
-            <div className="flex items-center justify-between text-slate-600">
-              <span>Expenses</span>
-              <span className="font-mono font-semibold text-slate-800">{formatCurrency(0, currency)}</span>
-            </div>
             <div className="flex items-center justify-between border-t border-slate-200 pt-2 font-bold text-slate-900">
               <span>Taxable Amount</span>
               <span className="font-mono text-base text-indigo-900">{formatCurrency(taxableAmount, currency)}</span>
@@ -429,33 +303,44 @@ export default function TaxCalculation() {
                 <Calculator className="h-6 w-6" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-800">Snapshot Ready for Tax Calculation</h3>
+                <h3 className="text-sm font-bold text-slate-800">
+                  {isReady ? "Billing Occurrence Ready for Tax Calculation" : "Awaiting Tax Pending Status"}
+                </h3>
                 <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Source timesheets and taxable amount (<strong className="font-mono">{formatCurrency(taxableAmount, currency)}</strong>) are verified. Click "Calculate Tax" below to compute tax components for this snapshot.
+                  {isReady ? (
+                    <>
+                      Billing amount (<strong className="font-mono">{formatCurrency(taxableAmount, currency)}</strong>) is
+                      confirmed for this occurrence. Click "Calculate Tax" below to compute tax components.
+                    </>
+                  ) : (
+                    "This occurrence has not yet reached the tax-pending stage. The scheduler will transition it automatically when it becomes due."
+                  )}
                 </p>
               </div>
-              <div className="pt-2">
-                <Button
-                  variant="primary"
-                  onClick={handleCalculateTax}
-                  disabled={calculating}
-                  className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold px-5 py-2.5 shadow-sm"
-                >
-                  {calculating ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Calculating Tax...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <Calculator className="h-3.5 w-3.5" /> Calculate Tax
-                    </span>
-                  )}
-                </Button>
-              </div>
+              {isReady && (
+                <div className="pt-2">
+                  <Button
+                    variant="primary"
+                    onClick={handleCalculateTax}
+                    disabled={calculating}
+                    className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold px-5 py-2.5 shadow-sm"
+                  >
+                    {calculating ? (
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Calculating Tax...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Calculator className="h-3.5 w-3.5" /> Calculate Tax
+                      </span>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           ) : components.length === 0 ? (
             <div className="rounded-lg bg-slate-50 p-4 text-center text-xs text-slate-500">
-              No tax components applicable for this configuration.
+              No tax components applicable for this occurrence.
             </div>
           ) : (
             <>
@@ -534,7 +419,7 @@ export default function TaxCalculation() {
           )}
         </div>
 
-        {/* Tax Summary — compact calculation flow */}
+        {/* Tax Summary */}
         <div className="p-5">
           <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tax Summary</h2>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -555,13 +440,21 @@ export default function TaxCalculation() {
             <div className="min-w-[130px]">
               <span className="block text-[11px] text-slate-400">Grand Total</span>
               <span className="block font-mono text-base font-semibold text-indigo-900">
-                {formatCurrency(grandTotal, currency)}
+                {isTaxCompleted ? formatCurrency(grandTotal, currency) : "Pending"}
               </span>
             </div>
           </div>
+          {occurrence.taxCalculatedAt && (
+            <p className="mt-2 text-[11px] text-slate-400">
+              Tax calculated at {formatDisplayDate(occurrence.taxCalculatedAt)}
+            </p>
+          )}
+          {occurrence.isInvoiced && occurrence.invoiceDate && (
+            <p className="mt-1 text-[11px] text-slate-400">Invoiced on {formatDisplayDate(occurrence.invoiceDate)}</p>
+          )}
         </div>
 
-        {/* Grand Total — the single strongest visual element on the page */}
+        {/* Grand Total */}
         <div className="p-5">
           <div className="rounded-xl border-2 border-indigo-200 bg-indigo-50/80 p-4 sm:p-5 flex items-center justify-between shadow-sm">
             <div>
@@ -571,7 +464,7 @@ export default function TaxCalculation() {
               </span>
             </div>
             <div className="font-mono text-2xl font-extrabold text-indigo-950 sm:text-3xl">
-              {formatCurrency(grandTotal, currency)}
+              {isTaxCompleted ? formatCurrency(grandTotal, currency) : "—"}
             </div>
           </div>
         </div>
@@ -582,7 +475,7 @@ export default function TaxCalculation() {
         <ShieldCheck className="h-4 w-4 flex-shrink-0 text-emerald-600" />
         <p>
           <span className="font-semibold text-slate-700">Authoritative Financial Record.</span>{" "}
-          Tax calculation amounts are generated by the backend tax engine and are read-only for this billing snapshot.
+          Tax calculation amounts are generated by the backend tax engine and are read-only for this billing occurrence.
         </p>
       </div>
     </div>

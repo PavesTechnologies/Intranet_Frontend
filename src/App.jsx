@@ -739,6 +739,10 @@ const AppRoutes = () => {
               element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxCalculationPage /></ProtectedRoute>}
             />
             <Route
+              path="tax-calculation/occurrence/:occurrenceId"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxCalculationPage /></ProtectedRoute>}
+            />
+            <Route
               path="configurations"
               element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><Configurations /></ProtectedRoute>}
             />

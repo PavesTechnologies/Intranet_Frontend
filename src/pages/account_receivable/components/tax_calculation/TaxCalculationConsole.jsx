@@ -33,8 +33,15 @@ import {
   getTaxCalculationErrorMessage,
 } from "../../services/taxCalculationService";
 import { getActiveTaxRegions } from "../../services/taxRateConfigurationService";
+import {
+  getBillingOccurrences,
+  calculateOccurrenceTax,
+  getOccurrenceErrorMessage,
+} from "../../services/billingOccurrenceService";
+import BillingOccurrenceCard from "./BillingOccurrenceCard";
 
 const ACQUISITION_PATH = "/account-receivable/billing-data-acquisition";
+const OCCURRENCE_DETAIL_BASE = "/account-receivable/tax-calculation/occurrence";
 
 export default function TaxCalculationConsole() {
   const navigate = useNavigate();
@@ -49,6 +56,67 @@ export default function TaxCalculationConsole() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [regionFilter, setRegionFilter] = useState("ALL");
+
+  // Billing Occurrences — Fixed Price / Recurring records feeding this same
+  // Tax Calculation workspace. Each section is fetched by the exact backend
+  // status it represents; the frontend never re-derives eligibility.
+  const [occLoading, setOccLoading] = useState(true);
+  const [readyOccurrences, setReadyOccurrences] = useState([]);
+  const [upcomingOccurrences, setUpcomingOccurrences] = useState([]);
+  const [processedOccurrences, setProcessedOccurrences] = useState([]);
+  const [calculatingOccIds, setCalculatingOccIds] = useState({});
+
+  const loadOccurrences = async () => {
+    setOccLoading(true);
+    try {
+      const [ready, upcoming, processed] = await Promise.all([
+        getBillingOccurrences({ taxStatus: "TAX_PENDING" }).catch(() => []),
+        getBillingOccurrences({ periodStatus: "SCHEDULED" }).catch(() => []),
+        getBillingOccurrences({ taxStatus: "TAX_CALCULATED" }).catch(() => []),
+      ]);
+      setReadyOccurrences(ready);
+      setUpcomingOccurrences(upcoming);
+      setProcessedOccurrences(processed);
+    } catch (err) {
+      console.error("[TaxCalculationConsole] Error loading billing occurrences:", err);
+    } finally {
+      setOccLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOccurrences();
+  }, []);
+
+  const handleViewOccurrence = (occurrence) => {
+    navigate(`${OCCURRENCE_DETAIL_BASE}/${occurrence.billingScheduleId}`, {
+      state: { occurrence },
+    });
+  };
+
+  const handleCalculateOccurrenceTax = async (occurrence) => {
+    const occId = occurrence.billingScheduleId;
+    if (!occId || calculatingOccIds[occId]) return;
+
+    setCalculatingOccIds((prev) => ({ ...prev, [occId]: true }));
+    try {
+      await calculateOccurrenceTax(occId);
+      showStatusToast("Tax calculation completed successfully.", "success");
+      await loadOccurrences();
+      navigate(`${OCCURRENCE_DETAIL_BASE}/${occId}`, { state: { occurrence } });
+    } catch (err) {
+      showStatusToast(
+        getOccurrenceErrorMessage(err, "Tax calculation failed. Please review tax configuration."),
+        "error"
+      );
+    } finally {
+      setCalculatingOccIds((prev) => {
+        const next = { ...prev };
+        delete next[occId];
+        return next;
+      });
+    }
+  };
 
   const loadData = async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
@@ -361,15 +429,26 @@ export default function TaxCalculationConsole() {
     );
   }
 
-  // Genuine Empty State (when zero relevant snapshots exist)
-  if (!loading && relevantSnapshots.length === 0) {
+  const hasAnyOccurrences =
+    readyOccurrences.length > 0 || upcomingOccurrences.length > 0 || processedOccurrences.length > 0;
+
+  // Genuine Empty State (when zero relevant snapshots AND zero billing occurrences exist)
+  if (!loading && relevantSnapshots.length === 0 && !occLoading && !hasAnyOccurrences) {
     return (
       <div className="w-full space-y-6">
         <PageHeader
           title="Tax Calculation"
           subtitle="Calculate and review tax for acquired billing snapshots."
           action={
-            <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={refreshing}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                loadData(true);
+                loadOccurrences();
+              }}
+              disabled={refreshing}
+            >
               <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
               Refresh
             </Button>
@@ -461,9 +540,17 @@ export default function TaxCalculationConsole() {
       {/* Header */}
       <PageHeader
         title="Tax Calculation"
-        subtitle="Calculate and review tax for acquired billing snapshots."
+        subtitle="Calculate and review tax for acquired billing snapshots and billing occurrences."
         action={
-          <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={refreshing}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              loadData(true);
+              loadOccurrences();
+            }}
+            disabled={refreshing}
+          >
             <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
           </Button>
@@ -505,7 +592,10 @@ export default function TaxCalculationConsole() {
         </div>
       </div>
 
-      {/* Queue Card & Filters */}
+      {/* Time & Material — Billing Snapshot Queue & Filters */}
+      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        Time &amp; Material — Billing Snapshots
+      </h2>
       <PageCard>
         <PageCardContent className="space-y-4 p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -563,6 +653,77 @@ export default function TaxCalculationConsole() {
           />
         </PageCardContent>
       </PageCard>
+
+      {/* Fixed Price / Recurring — Billing Occurrences */}
+      <div className="space-y-3">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          Ready for Tax Calculation — Fixed Price &amp; Recurring
+        </h2>
+        {occLoading ? (
+          <div className="flex h-24 items-center justify-center">
+            <Loader size="sm" text="Loading billing occurrences..." />
+          </div>
+        ) : readyOccurrences.length === 0 ? (
+          <PageCard>
+            <PageCardContent className="py-6 text-center text-sm text-slate-500">
+              No billing occurrences are currently pending tax calculation.
+            </PageCardContent>
+          </PageCard>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {readyOccurrences.map((occurrence) => (
+              <BillingOccurrenceCard
+                key={occurrence.billingScheduleId}
+                occurrence={occurrence}
+                variant="ready"
+                calculating={Boolean(calculatingOccIds[occurrence.billingScheduleId])}
+                onCalculateTax={handleCalculateOccurrenceTax}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          Upcoming Billing Occurrences
+        </h2>
+        {occLoading ? (
+          <div className="flex h-24 items-center justify-center">
+            <Loader size="sm" text="Loading billing occurrences..." />
+          </div>
+        ) : upcomingOccurrences.length === 0 ? (
+          <PageCard>
+            <PageCardContent className="py-6 text-center text-sm text-slate-500">
+              No upcoming billing occurrences are scheduled.
+            </PageCardContent>
+          </PageCard>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {upcomingOccurrences.map((occurrence) => (
+              <BillingOccurrenceCard key={occurrence.billingScheduleId} occurrence={occurrence} variant="upcoming" />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {processedOccurrences.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Processed Billing Occurrences
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {processedOccurrences.map((occurrence) => (
+              <BillingOccurrenceCard
+                key={occurrence.billingScheduleId}
+                occurrence={occurrence}
+                variant="processed"
+                onView={handleViewOccurrence}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
