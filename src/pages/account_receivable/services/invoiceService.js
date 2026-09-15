@@ -72,6 +72,12 @@ export const getInvoiceErrorMessage = (
   }
 
   if (status === 400 || status === 422) {
+    if (detail.toLowerCase().includes("refresh") || detail.toLowerCase().includes("resubmission")) {
+      return detail || "Invoice must be refreshed after correction before resubmission.";
+    }
+    if (detail.toLowerCase().includes("reason")) {
+      return detail || "A valid rejection reason is required.";
+    }
     if (detail.toLowerCase().includes("status") || detail.toLowerCase().includes("transition") || detail.toLowerCase().includes("pending")) {
       return detail || "Invalid invoice status transition. Please refresh the invoice and try again.";
     }
@@ -257,6 +263,21 @@ export const normalizeInvoice = (payload = {}) => {
     invoiceDate: toIsoDateOnly(data.invoiceDate || data.invoice_date || data.issueDate || data.createdAt) || "",
     dueDate: toIsoDateOnly(data.dueDate || data.due_date) || "",
 
+    // Rejection reason if returned directly on invoice
+    rejectionReason:
+      data.rejectionReason ||
+      data.rejection_reason ||
+      data.reason ||
+      data.comment ||
+      "",
+
+    // Phase 2B correction fields (authoritative from backend)
+    correctionRequired:
+      data.correctionRequired !== undefined && data.correctionRequired !== null
+        ? Boolean(data.correctionRequired)
+        : false,
+    lastCorrectedAt: data.lastCorrectedAt || data.last_corrected_at || null,
+
     // Billing snapshot link
     billingSnapshotId: data.billingSnapshotId || data.billing_snapshot_id || data.snapshotId || "",
     snapshotNumber:
@@ -366,6 +387,11 @@ export const normalizeApprovalWorkspaceItem = (item = {}) => {
     submittedBy: source.submittedBy || "—",
     lastAction: source.lastAction || "—",
     lastActionAt: source.lastActionAt || null,
+    correctionRequired:
+      source.correctionRequired !== undefined && source.correctionRequired !== null
+        ? Boolean(source.correctionRequired)
+        : false,
+    lastCorrectedAt: source.lastCorrectedAt || source.last_corrected_at || null,
   };
 };
 
@@ -617,6 +643,38 @@ export const getInvoiceApprovalHistory = async (invoiceId) => {
   });
 };
 
+/**
+ * POST /api/v1/invoices/{invoiceId}/reject
+ * Rejects an invoice with a mandatory reason comment.
+ * Transitions invoice from PENDING_APPROVAL to REJECTED.
+ */
+export const rejectInvoice = async (invoiceId, reason) => {
+  if (!invoiceId) {
+    throw new Error("Invoice ID is required to reject the invoice.");
+  }
+  const trimmedReason = typeof reason === "string" ? reason.trim() : "";
+  if (!trimmedReason) {
+    throw new Error("Rejection reason is required.");
+  }
+  const url = `${AR_BASE_URL}/api/v1/invoices/${invoiceId}/reject`;
+  const response = await api.post(url, { reason: trimmedReason });
+  return normalizeInvoice(unwrapData(response));
+};
+
+/**
+ * POST /api/v1/invoices/{invoiceId}/refresh-after-correction
+ * Refreshes a rejected invoice from the authoritative billing snapshot & tax calculation data.
+ * No request body.
+ */
+export const refreshInvoiceAfterCorrection = async (invoiceId) => {
+  if (!invoiceId) {
+    throw new Error("Invoice ID is required to refresh invoice after correction.");
+  }
+  const url = `${AR_BASE_URL}/api/v1/invoices/${invoiceId}/refresh-after-correction`;
+  const response = await api.post(url);
+  return normalizeInvoice(unwrapData(response));
+};
+
 export default {
   generateInvoice,
   getInvoice,
@@ -625,6 +683,8 @@ export default {
   getInvoiceApprovalWorkspace,
   submitInvoiceForApproval,
   approveInvoice,
+  rejectInvoice,
+  refreshInvoiceAfterCorrection,
   getInvoiceApprovalHistory,
   getInvoiceErrorMessage,
   normalizeInvoice,
