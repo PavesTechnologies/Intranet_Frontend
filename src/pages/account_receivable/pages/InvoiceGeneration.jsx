@@ -71,12 +71,8 @@ export default function InvoiceGeneration() {
       const st = (inv.invoiceStatus || "").toUpperCase();
 
       // Status filter
-      if (statusFilter === "GENERATED") {
-        if (st !== "GENERATED") return false;
-      } else if (statusFilter === "PENDING_APPROVAL") {
-        if (st !== "PENDING_APPROVAL") return false;
-      } else if (statusFilter === "APPROVED") {
-        if (st !== "APPROVED") return false;
+      if (statusFilter !== "ALL") {
+        if (st !== statusFilter) return false;
       }
 
       // Search query
@@ -332,10 +328,23 @@ export default function InvoiceGeneration() {
       </span>
     ),
     status: (
-      <StatusBadge
-        label={item.invoiceStatus || "GENERATED"}
-        size="sm"
-      />
+      <div className="flex flex-col items-start gap-1">
+        <StatusBadge
+          label={item.invoiceStatus || "GENERATED"}
+          size="sm"
+        />
+        {(item.invoiceStatus || "").toUpperCase() === "REJECTED" && (
+          <span
+            className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+              item.correctionRequired
+                ? "bg-rose-50 text-rose-700 border-rose-200"
+                : "bg-emerald-50 text-emerald-700 border-emerald-200"
+            }`}
+          >
+            {item.correctionRequired ? "Correction Required" : "Ready to Resubmit"}
+          </span>
+        )}
+      </div>
     ),
     action: (
       <Button
@@ -345,13 +354,19 @@ export default function InvoiceGeneration() {
           e.stopPropagation();
           handleViewInvoice(item);
         }}
-        className="text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-semibold"
+        className={
+          (item.invoiceStatus || "").toUpperCase() === "REJECTED"
+            ? "text-xs text-rose-700 border-rose-300 hover:bg-rose-50 font-semibold"
+            : "text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-semibold"
+        }
       >
         <Eye className="mr-1.5 h-3.5 w-3.5" />
-        {item.invoiceStatus === "GENERATED"
+        {(item.invoiceStatus || "").toUpperCase() === "GENERATED"
           ? "Submit for Approval"
-          : item.invoiceStatus === "PENDING_APPROVAL"
-          ? "Pending Approval"
+          : (item.invoiceStatus || "").toUpperCase() === "PENDING_APPROVAL"
+          ? "Pending Approval / View Invoice"
+          : (item.invoiceStatus || "").toUpperCase() === "REJECTED"
+          ? "Review Rejection"
           : "View Invoice"}
       </Button>
     ),
@@ -446,6 +461,7 @@ export default function InvoiceGeneration() {
                 <option value="GENERATED">Invoice Generated</option>
                 <option value="PENDING_APPROVAL">Pending Approval</option>
                 <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
               </select>
             </div>
           </div>

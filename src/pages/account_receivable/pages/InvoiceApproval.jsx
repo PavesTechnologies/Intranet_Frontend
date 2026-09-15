@@ -323,7 +323,9 @@ export default function InvoiceApproval() {
   ];
 
   const tableRows = filteredInvoices.map((item) => {
-    const isPending = (item.status || item.invoiceStatus || "").toUpperCase() === "PENDING_APPROVAL";
+    const rawStatus = (item.status || item.invoiceStatus || "").toUpperCase();
+    const isPending = rawStatus === "PENDING_APPROVAL";
+    const isRejected = rawStatus === "REJECTED";
 
     return {
       onRowClick: () => handleReviewInvoice(item),
@@ -372,10 +374,23 @@ export default function InvoiceApproval() {
         </span>
       ),
       status: (
-        <StatusBadge
-          label={item.status || item.invoiceStatus || "PENDING_APPROVAL"}
-          size="sm"
-        />
+        <div className="flex flex-col items-start gap-1">
+          <StatusBadge
+            label={item.status || item.invoiceStatus || "PENDING_APPROVAL"}
+            size="sm"
+          />
+          {isRejected && (
+            <span
+              className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                item.correctionRequired
+                  ? "bg-rose-50 text-rose-700 border-rose-200"
+                  : "bg-emerald-50 text-emerald-700 border-emerald-200"
+              }`}
+            >
+              {item.correctionRequired ? "Correction Required" : "Ready to Resubmit"}
+            </span>
+          )}
+        </div>
       ),
       submittedAt: (
         <div className="text-left text-xs">
@@ -408,6 +423,19 @@ export default function InvoiceApproval() {
             handleReviewInvoice(item);
           }}
           className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold"
+        >
+          <Eye className="mr-1.5 h-3.5 w-3.5" />
+          Review Invoice
+        </Button>
+      ) : isRejected ? (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleReviewInvoice(item);
+          }}
+          className="text-xs text-rose-700 border-rose-300 hover:bg-rose-50 font-semibold"
         >
           <Eye className="mr-1.5 h-3.5 w-3.5" />
           Review Invoice
