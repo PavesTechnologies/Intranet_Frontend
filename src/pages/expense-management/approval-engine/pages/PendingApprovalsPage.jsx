@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronRight, Inbox, Layers, ShieldAlert, XCircle } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
@@ -7,35 +7,39 @@ import { showStatusToast } from "@/components/toastfy/toast";
 import {
   useMyQueue,
   useReviewLineItem,
+  useReviewSplit,
   useRejectReport,
   useBulkApprove,
 } from "../hooks/useApprovalWorkflow";
 import { useApprovalLiveSync } from "../hooks/useApprovalLiveSync";
 import { formatMoney } from "../constants/approvalLabels";
+import { resolveQueueItem } from "../utils/approvalAmounts";
 import EmployeeLabel from "../components/EmployeeLabel";
 import LineItemReviewPanel from "../components/LineItemReviewPanel";
 import CommentPromptModal from "../components/CommentPromptModal";
 import MyDelegateCard from "../components/MyDelegateCard";
 import ExpenseReviewPanel from "../components/ExpenseReviewPanel";
-import { useQueries } from "@tanstack/react-query";
-import { lineItemService } from "@/pages/expense-management/api/expenseReportsApi";
-import { approvalWorkflowApi } from "../api/approvalWorkflowApi";
 
-const merchantSummary = (lineItems) => {
-  if (!lineItems?.length) return "—";
-  const first = lineItems[0]?.merchantName || lineItems[0]?.categoryName || lineItems[0]?.merchant || lineItems[0]?.category || "Line item";
-  return lineItems.length > 1 ? `${first} +${lineItems.length - 1} more` : first;
+const hasPolicyIssue = (relevantLines) =>
+  (relevantLines || []).some((l) => (l.source?.policyViolations?.length || 0) > 0);
+
+const merchantSummary = (relevantLines) => {
+  if (!relevantLines?.length) return "—";
+  const first = relevantLines[0]?.source?.merchantName || relevantLines[0]?.source?.categoryName || "Line item";
+  return relevantLines.length > 1 ? `${first} +${relevantLines.length - 1} more` : first;
 };
-
-const hasPolicyIssue = (lineItems) => (lineItems || []).some((l) => (l.policyViolations && l.policyViolations.length > 0) || (l.policyWarnings && l.policyWarnings.length > 0));
 
 /**
  * The approver's queue - every report where the caller (or their active delegate) currently has an
- * ACTIVE assignment (GET /xms/approvals/my-queue, server-side paginated). Row expansion still
- * offers the fast quick-approve line panel; "Review" opens the full ExpenseReviewPanel (receipt +
- * full detail + timeline) for reports that need a closer look.
+ * ACTIVE assignment (GET /xms/approvals/my-queue, server-side paginated). This is the ONLY network
+ * call this page makes for its content: ApprovalQueueItemResponse already carries everything a row
+ * needs (pendingLineItems, pendingSplits, eligibleForBulkApprove, costCenterName, reportStatus) -
+ * resolveQueueItem (utils/approvalAmounts.js) derives the caller-relevant amount/line list from
+ * that data alone, replacing what used to be two extra per-row API calls
+ * (lineItemService.getAll + getLineItemReviews) that only reconstructed what the queue endpoint
+ * already returned.
  */
-export default function PendingApprovalsPage({ searchTerm = "" }) {
+export default function PendingApprovalsPage({ searchTerm = "", hideHeader = false, noPadding = false }) {
   const [page, setPage] = useState(0);
   const [expandedReportId, setExpandedReportId] = useState(null);
   const [rejectingReport, setRejectingReport] = useState(null);
@@ -45,146 +49,122 @@ export default function PendingApprovalsPage({ searchTerm = "" }) {
 
   const { data, isLoading, isError, refetch } = useMyQueue(page, 20);
   const reviewLineItem = useReviewLineItem();
+  const reviewSplit = useReviewSplit();
   const rejectReport = useRejectReport();
   const bulkApprove = useBulkApprove();
 
   const items = data?.content || [];
 
-  const lineItemsQueries = useQueries({
-    queries: items.map((item) => ({
-      queryKey: ["reportLineItems", item.reportId],
-      queryFn: async () => {
-        try {
-          const res = await lineItemService.getAll(item.reportId);
-          const payload = res.data?.data;
-          return Array.isArray(payload) ? payload : payload?.lineItems || payload?.content || payload?.data || [];
-        } catch {
-          return [];
-        }
-      },
-      staleTime: 30_000,
-    })),
-  });
-
-  const reviewsQueries = useQueries({
-    queries: items.map((item) => ({
-      queryKey: ["reportReviews", item.reportId],
-      queryFn: async () => {
-        try {
-          const res = await approvalWorkflowApi.getLineItemReviews(item.reportId);
-          return res.data?.data || [];
-        } catch {
-          return [];
-        }
-      },
-      staleTime: 15_000,
-    })),
-  });
-
-  const resolvedItems = useMemo(() => {
-    return items.map((item, idx) => {
-      const queriedLines = lineItemsQueries[idx]?.data;
-      const backendLines = item.pendingLineItems || item.lineItems || item.items || item.pendingLines || [];
-      const allLines = (queriedLines && queriedLines.length > 0) ? queriedLines : backendLines;
-      const reportReviews = reviewsQueries[idx]?.data || [];
-
-      const currentLevel = item.levelOrder ?? item.currentLevelOrder;
-
-      const pendingLineItems = allLines.filter((line) => {
-        const lineReviews = reportReviews.filter((r) => r.lineItemId === line.lineItemId);
-        if (!lineReviews.length) return true;
-        const currentLevelReview = lineReviews.find(
-          (r) => (currentLevel != null ? r.levelOrder === currentLevel : true)
-        );
-        if (!currentLevelReview) return true;
-        return (
-          currentLevelReview.status === "PENDING" ||
-          (currentLevelReview.status !== "APPROVED" && currentLevelReview.status !== "NEEDS_CORRECTION")
-        );
-      });
-
-      const finalPendingLines = pendingLineItems.length > 0 ? pendingLineItems : allLines;
-
-      return {
-        ...item,
-        pendingLineItems: finalPendingLines,
-        levelOrder: item.levelOrder ?? item.currentLevelOrder ?? 1,
-      };
-    });
-  }, [items, lineItemsQueries, reviewsQueries]);
+  const resolvedItems = useMemo(
+    () =>
+      items.map((item) => {
+        const resolved = resolveQueueItem(item);
+        return { ...item, ...resolved };
+      }),
+    [items]
+  );
 
   const filteredItems = useMemo(() => {
     const filtered = resolvedItems.filter((item) => {
       if (!searchTerm) return true;
       const q = searchTerm.toLowerCase();
       const reportNum = (item.reportNumber || "").toLowerCase();
-      const merchant = merchantSummary(item.pendingLineItems).toLowerCase();
+      const merchant = merchantSummary(item.relevantLines).toLowerCase();
       return reportNum.includes(q) || merchant.includes(q);
     });
 
     return filtered.sort((a, b) => {
-      const dateA = a.submittedAt || a.createdAt || a.approvedAt || a.submittedDate || a.expenseDate || a.date;
-      const dateB = b.submittedAt || b.createdAt || b.approvedAt || b.submittedDate || b.expenseDate || b.date;
-      const timeA = dateA ? new Date(dateA).getTime() : 0;
-      const timeB = dateB ? new Date(dateB).getTime() : 0;
+      const timeA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+      const timeB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
       return timeB - timeA;
     });
   }, [resolvedItems, searchTerm]);
-  const isMutating = reviewLineItem.isPending || rejectReport.isPending || bulkApprove.isPending;
 
-  const handleApproveLine = (reportId, lineItemId) => {
-    reviewLineItem.mutate(
-      { reportId, lineItemId, decision: "APPROVED" },
-      {
-        onError: (err) => showStatusToast(err.response?.data?.message || "Failed to approve line item", "error"),
-      },
+  const isMutating = reviewLineItem.isPending || reviewSplit.isPending || rejectReport.isPending || bulkApprove.isPending;
+
+  // A split-owned line fans out to one reviewSplit call per cost-center split the caller owns on
+  // it (almost always exactly one); a normal-track line is a single reviewLineItem call.
+  const approveLine = (reportId, relevantLine) => {
+    if (relevantLine.isSplit) {
+      return Promise.all(
+        relevantLine.mySplits.map((s) => reviewSplit.mutateAsync({ reportId, splitId: s.splitId, decision: "APPROVED" }))
+      );
+    }
+    return reviewLineItem.mutateAsync({ reportId, lineItemId: relevantLine.lineItemId, decision: "APPROVED" });
+  };
+
+  const flagLine = (reportId, relevantLine, comment) => {
+    if (relevantLine.isSplit) {
+      return Promise.all(
+        relevantLine.mySplits.map((s) =>
+          reviewSplit.mutateAsync({ reportId, splitId: s.splitId, decision: "NEEDS_CORRECTION", comment })
+        )
+      );
+    }
+    return reviewLineItem.mutateAsync({ reportId, lineItemId: relevantLine.lineItemId, decision: "NEEDS_CORRECTION", comment });
+  };
+
+  const handleApproveLine = (reportId, relevantLine) => {
+    approveLine(reportId, relevantLine).catch((err) =>
+      showStatusToast(err.response?.data?.message || "Failed to approve", "error")
     );
   };
 
-  const handleFlagLine = (reportId, lineItemId, comment) => {
-    reviewLineItem.mutate(
-      { reportId, lineItemId, decision: "NEEDS_CORRECTION", comment },
-      {
-        onSuccess: () => showStatusToast("Line item flagged for correction", "success"),
-        onError: (err) => showStatusToast(err.response?.data?.message || "Failed to flag line item", "error"),
-      },
-    );
+  const handleFlagLine = (reportId, relevantLine, comment) => {
+    flagLine(reportId, relevantLine, comment)
+      .then(() => showStatusToast("Flagged for correction", "success"))
+      .catch((err) => showStatusToast(err.response?.data?.message || "Failed to flag for correction", "error"));
   };
 
   const handleBulkApprove = (reportId) => {
     bulkApprove.mutate(reportId, {
-      onSuccess: () => showStatusToast("Report bulk-approved", "success"),
-      onError: (err) => showStatusToast(err.response?.data?.message || "Bulk approve failed", "error"),
+      onSuccess: () => showStatusToast("Report approved", "success"),
+      onError: (err) => showStatusToast(err.response?.data?.message || "Approve failed", "error"),
     });
   };
 
-  const renderActions = (item) => (
-    <div className="inline-flex flex-wrap items-center justify-end gap-2">
-      <Button size="small" variant="outline" disabled={isMutating} onClick={() => setReviewingItem(item)}>
-        Review
-      </Button>
-      {item.eligibleForBulkApprove && (
-        <Button size="small" variant="success" disabled={isMutating} onClick={() => handleBulkApprove(item.reportId)}>
-          Bulk Approve
+  const renderActions = (item) => {
+    const flagged = hasPolicyIssue(item.relevantLines);
+    return (
+      <div className="inline-flex flex-wrap items-center justify-end gap-2">
+        <Button size="small" variant="outline" disabled={isMutating} onClick={() => setReviewingItem(item)}>
+          Review
         </Button>
-      )}
-      <Button size="small" variant="outline" disabled={isMutating} onClick={() => setRejectingReport(item)}>
-        <XCircle className="h-3.5 w-3.5" /> Reject
-      </Button>
-    </div>
-  );
+        <Button
+          size="small"
+          variant="success"
+          disabled={isMutating || !item.eligibleForBulkApprove}
+          title={!item.eligibleForBulkApprove ? "Has open policy violations — review and act line-by-line instead." : undefined}
+          onClick={() => handleBulkApprove(item.reportId)}
+        >
+          Approve
+        </Button>
+        <Button size="small" variant="outline" disabled={isMutating} onClick={() => setRejectingReport(item)}>
+          <XCircle className="h-3.5 w-3.5" /> Reject
+        </Button>
+        {flagged && (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700">
+            <ShieldAlert className="h-3 w-3" /> Not eligible for one-click Approve
+          </span>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <div className="p-4 sm:p-6">
-      <Breadcrumb
-        items={[
-          { label: "Expense Management", to: "/expense-management/dashboard" },
-          { label: "Approvals" },
-          { label: "Pending" },
-        ]}
-      />
-
-      <h1 className="text-xl font-semibold text-gray-900 mt-3 mb-4">Pending Approvals</h1>
+    <div className={noPadding ? "" : "p-4 sm:p-6"}>
+      {!hideHeader && (
+        <>
+          <Breadcrumb
+            items={[
+              { label: "Expense Management", to: "/expense-management/dashboard" },
+              { label: "Approvals" },
+              { label: "Pending" },
+            ]}
+          />
+          <h1 className="text-xl font-semibold text-gray-900 mt-3 mb-4">Pending Approvals</h1>
+        </>
+      )}
 
       <MyDelegateCard />
 
@@ -205,12 +185,19 @@ export default function PendingApprovalsPage({ searchTerm = "" }) {
       {!isLoading && !isError && items.length === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-16 text-center">
           <Inbox className="h-8 w-8 text-gray-300" />
-          <p className="text-sm font-medium text-gray-600">Nothing waiting on you right now.</p>
+          <p className="text-sm font-medium text-gray-600">No pending approvals.</p>
           <p className="text-xs text-gray-400">Reports assigned to you for approval will show up here.</p>
         </div>
       )}
 
-      {items.length > 0 && (
+      {!isLoading && !isError && items.length > 0 && filteredItems.length === 0 && (
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-16 text-center">
+          <Inbox className="h-8 w-8 text-gray-300" />
+          <p className="text-sm font-medium text-gray-600">No pending approvals match your search.</p>
+        </div>
+      )}
+
+      {filteredItems.length > 0 && (
         <>
           {/* Desktop / tablet table */}
           <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -222,37 +209,53 @@ export default function PendingApprovalsPage({ searchTerm = "" }) {
                     <th className="px-2.5 py-2">Report</th>
                     <th className="px-2.5 py-2">Employee</th>
                     <th className="px-2.5 py-2">Merchant / Category</th>
-                    <th className="px-2.5 py-2">Items Pending</th>
                     <th className="px-2.5 py-2">Level</th>
+                    <th className="px-2.5 py-2">Expenses</th>
                     <th className="px-2.5 py-2">Policy</th>
-                    <th className="px-2.5 py-2">Amount</th>
+                    <th className="px-2.5 py-2">Amount for My Approval</th>
                     <th className="px-2.5 py-2 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredItems.map((item, index) => {
                     const isExpanded = expandedReportId === item.reportId;
-                    const flagged = hasPolicyIssue(item.pendingLineItems);
+                    const flagged = hasPolicyIssue(item.relevantLines);
+                    const needsCorrection = item.reportStatus === "AWAITING_CORRECTION";
                     return (
                       <React.Fragment key={item.reportId}>
-                        <tr className={`transition cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`} onClick={() => setExpandedReportId(isExpanded ? null : item.reportId)}>
+                        <tr
+                          className={`transition cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`}
+                          onClick={() => setExpandedReportId(isExpanded ? null : item.reportId)}
+                        >
                           <td className="px-2.5 py-1.5 text-gray-400">
                             {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                           </td>
                           <td className="px-2.5 py-1.5">
                             <span className="font-mono text-[11px] font-semibold text-gray-700">{item.reportNumber}</span>
+                            {needsCorrection && (
+                              <span className="ml-1.5 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-800">
+                                Awaiting employee
+                              </span>
+                            )}
                           </td>
                           <td className="px-2.5 py-1.5">
                             <span className="font-medium text-xs text-gray-900">
                               <EmployeeLabel employeeId={item.employeeId} />
                             </span>
                           </td>
-                          <td className="px-2.5 py-1.5 text-gray-600 max-w-[220px] truncate text-xs">{merchantSummary(item.pendingLineItems)}</td>
-                          <td className="px-2.5 py-1.5 text-gray-600 text-xs">{item.pendingLineItems?.length ?? 0}</td>
+                          <td className="px-2.5 py-1.5 text-gray-600 max-w-[220px] truncate text-xs">{merchantSummary(item.relevantLines)}</td>
                           <td className="px-2.5 py-1.5 text-gray-600 text-xs">
                             <span className="inline-flex items-center gap-1">
                               <Layers className="h-3.5 w-3.5" /> Level {item.levelOrder}
                             </span>
+                          </td>
+                          <td className="px-2.5 py-1.5 text-gray-600 text-xs">
+                            {item.relevantLines.length}
+                            {item.splitCount > 0 && (
+                              <span className="ml-1.5 inline-flex items-center rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                {item.splitCount} split
+                              </span>
+                            )}
                           </td>
                           <td className="px-2.5 py-1.5">
                             {flagged ? (
@@ -265,7 +268,12 @@ export default function PendingApprovalsPage({ searchTerm = "" }) {
                               </span>
                             )}
                           </td>
-                          <td className="px-2.5 py-1.5 text-gray-900 font-medium whitespace-nowrap text-xs">{formatMoney(item.totalAmount, item.currencyCode)}</td>
+                          <td className="px-2.5 py-1.5 whitespace-nowrap text-xs">
+                            <span className="font-semibold text-gray-900">{formatMoney(item.relevantTotal, item.currencyCode)}</span>
+                            {item.relevantTotal !== item.totalAmount && (
+                              <span className="ml-1 text-gray-400">of {formatMoney(item.totalAmount, item.currencyCode)} report total</span>
+                            )}
+                          </td>
                           <td className="px-2.5 py-1.5 text-right text-xs" onClick={(e) => e.stopPropagation()}>
                             {renderActions(item)}
                           </td>
@@ -275,15 +283,15 @@ export default function PendingApprovalsPage({ searchTerm = "" }) {
                             <td colSpan={9} className="bg-gray-50/60 p-0">
                               {flagged && (
                                 <p className="flex items-center gap-1.5 text-xs text-amber-700 px-4 pt-3">
-                                  <ShieldAlert className="h-3.5 w-3.5" /> Has open policy violations - not eligible for bulk approval.
+                                  <ShieldAlert className="h-3.5 w-3.5" /> Has open policy violations - not eligible for one-click Approve.
                                 </p>
                               )}
                               <LineItemReviewPanel
                                 reportId={item.reportId}
-                                lineItems={item.pendingLineItems}
+                                relevantLines={item.relevantLines}
                                 isBusy={isMutating}
-                                onApproveLine={(lineItemId) => handleApproveLine(item.reportId, lineItemId)}
-                                onFlagLine={(lineItemId, comment) => handleFlagLine(item.reportId, lineItemId, comment)}
+                                onApproveLine={(line) => handleApproveLine(item.reportId, line)}
+                                onFlagLine={(line, comment) => handleFlagLine(item.reportId, line, comment)}
                               />
                             </td>
                           </tr>
@@ -299,7 +307,7 @@ export default function PendingApprovalsPage({ searchTerm = "" }) {
           {/* Mobile card list */}
           <div className="md:hidden space-y-3">
             {filteredItems.map((item) => {
-              const flagged = hasPolicyIssue(item.pendingLineItems);
+              const flagged = hasPolicyIssue(item.relevantLines);
               return (
                 <div key={item.reportId} className="rounded-xl border border-gray-200 bg-white p-4">
                   <div className="flex items-start justify-between gap-2">
@@ -309,14 +317,22 @@ export default function PendingApprovalsPage({ searchTerm = "" }) {
                         <EmployeeLabel employeeId={item.employeeId} />
                       </p>
                     </div>
-                    <p className="shrink-0 font-semibold text-gray-900">{formatMoney(item.totalAmount, item.currencyCode)}</p>
+                    <div className="shrink-0 text-right">
+                      <p className="font-semibold text-gray-900">{formatMoney(item.relevantTotal, item.currencyCode)}</p>
+                      {item.relevantTotal !== item.totalAmount && (
+                        <p className="text-[11px] text-gray-400">of {formatMoney(item.totalAmount, item.currencyCode)} total</p>
+                      )}
+                    </div>
                   </div>
-                  <p className="mt-2 truncate text-sm text-gray-600">{merchantSummary(item.pendingLineItems)}</p>
+                  <p className="mt-2 truncate text-sm text-gray-600">{merchantSummary(item.relevantLines)}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                     <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">
                       <Layers className="h-3 w-3" /> Level {item.levelOrder}
                     </span>
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">{item.pendingLineItems?.length ?? 0} pending</span>
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">{item.relevantLines.length} expense(s)</span>
+                    {item.splitCount > 0 && (
+                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700">{item.splitCount} split</span>
+                    )}
                     {flagged && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">
                         <ShieldAlert className="h-3 w-3" /> Policy warning
