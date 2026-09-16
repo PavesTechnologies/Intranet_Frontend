@@ -248,8 +248,12 @@ export default function AcquisitionDetail() {
     async function initialize() {
       if (!config) {
         try {
+          // Acquisition Detail is a Timesheet/T&M-only view -- Fixed Price
+          // and Recurring never route here, so scope the match pool to T&M
+          // the same way the Data Acquisition console does.
           const list = await fetchActiveBillingConfigurations();
-          const match = list.find(
+          const tmList = list.filter((item) => item.billingTypeCode === "TIME_MATERIAL");
+          const match = tmList.find(
             (item) => String(item.projectId || item.id) === String(projectId)
           );
           if (isMounted && match) {

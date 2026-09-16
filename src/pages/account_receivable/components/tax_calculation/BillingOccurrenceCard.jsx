@@ -20,22 +20,26 @@ const humanizeBillingType = (occurrence) => {
 
 /**
  * A single Billing Occurrence card used across the Ready / Upcoming /
- * Processed sections of the Tax Calculation workspace. `variant` controls
- * which action (if any) is shown — the backend's periodStatus/taxStatus
- * decide which variant a card is rendered in, never a frontend date check.
+ * Processed / Invoiced sections of the Tax Calculation workspace. `variant`
+ * controls which action (if any) is shown — the backend's periodStatus/
+ * taxStatus/isInvoiced decide which variant a card is rendered in, never a
+ * frontend date check.
  */
 export default function BillingOccurrenceCard({
   occurrence,
-  variant = "ready", // "ready" | "upcoming" | "processed"
+  variant = "ready", // "ready" | "upcoming" | "processed" | "invoiced"
   calculating = false,
   onCalculateTax,
+  onOpenTaxCalculation,
   onView,
 }) {
   const currency = occurrence.currencyCode || "USD";
   const billingType = humanizeBillingType(occurrence);
   const period =
-    occurrence.periodStartDate || occurrence.periodEndDate
-      ? `${formatDisplayDate(occurrence.periodStartDate)} → ${formatDisplayDate(occurrence.periodEndDate)}`
+    occurrence.periodStartDate && occurrence.periodEndDate
+      ? `${formatDisplayDate(occurrence.periodStartDate)} – ${formatDisplayDate(occurrence.periodEndDate)}`
+      : occurrence.periodStartDate || occurrence.periodEndDate
+      ? formatDisplayDate(occurrence.periodStartDate || occurrence.periodEndDate)
       : "—";
 
   return (
@@ -44,7 +48,7 @@ export default function BillingOccurrenceCard({
         <span className="inline-block rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
           {billingType}
         </span>
-        <StatusBadge label={occurrence.taxStatus || occurrence.periodStatus} size="sm" />
+        <StatusBadge label={occurrence.isInvoiced ? "INVOICED" : occurrence.periodStatus || occurrence.taxStatus} size="sm" />
       </div>
 
       <div>
@@ -73,6 +77,18 @@ export default function BillingOccurrenceCard({
             <span className="mt-0.5 block font-medium text-slate-700">{occurrence.taxRegionName}</span>
           </div>
         )}
+        {occurrence.taxStatus && (
+          <div>
+            <span className="block font-bold uppercase tracking-wider text-slate-400">Tax Status</span>
+            <span className="mt-0.5 block font-medium text-slate-700">{occurrence.taxStatus}</span>
+          </div>
+        )}
+        {occurrence.taxCalculationStatus && (
+          <div>
+            <span className="block font-bold uppercase tracking-wider text-slate-400">Tax Calc. Status</span>
+            <span className="mt-0.5 block font-medium text-slate-700">{occurrence.taxCalculationStatus}</span>
+          </div>
+        )}
       </div>
 
       {variant === "upcoming" && (
@@ -82,7 +98,7 @@ export default function BillingOccurrenceCard({
         </div>
       )}
 
-      {variant === "processed" && (
+      {(variant === "processed" || variant === "invoiced") && (
         <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-2.5 text-xs">
           <div>
             <span className="block text-slate-400">Total Tax</span>
@@ -96,6 +112,12 @@ export default function BillingOccurrenceCard({
               {occurrence.grandTotal !== null ? formatCurrency(occurrence.grandTotal, currency) : "—"}
             </span>
           </div>
+          {variant === "invoiced" && occurrence.invoiceDate && (
+            <div className="col-span-2">
+              <span className="block text-slate-400">Invoiced On</span>
+              <span className="font-medium text-slate-700">{formatDisplayDate(occurrence.invoiceDate)}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -103,30 +125,30 @@ export default function BillingOccurrenceCard({
         <Button
           variant="primary"
           size="small"
-          onClick={() => onCalculateTax?.(occurrence)}
+          onClick={() => (onOpenTaxCalculation || onCalculateTax || onView)?.(occurrence)}
           disabled={calculating}
           className="w-full justify-center bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold"
         >
           {calculating ? (
             <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Calculating Tax...
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Opening Tax Calculation...
             </>
           ) : (
             <>
-              <Calculator className="h-3.5 w-3.5" /> Calculate Tax
+              <Calculator className="h-3.5 w-3.5" /> Open Tax Calculation
             </>
           )}
         </Button>
       )}
 
-      {variant === "processed" && (
+      {(variant === "processed" || variant === "invoiced") && (
         <Button
           variant="outline"
           size="small"
           onClick={() => onView?.(occurrence)}
           className="w-full justify-center text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-semibold"
         >
-          <Eye className="h-3.5 w-3.5" /> View Tax Details
+          <Eye className="h-3.5 w-3.5" /> {variant === "invoiced" ? "View Invoice Details" : "View Tax Details"}
         </Button>
       )}
     </div>

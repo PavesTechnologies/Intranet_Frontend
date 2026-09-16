@@ -28,8 +28,13 @@ const StatusBadge = ({ label, size = "md" }) => {
     displayLabel = "Ready for Tax";
     bgColor = "bg-emerald-100 border border-emerald-300";
     textColor = "text-emerald-800 font-bold";
-  } else if (rawUpper === "TAX_CALCULATED" || normalized === "tax calculated") {
-    displayLabel = "Tax Calculated";
+  } else if (
+    rawUpper === "TAX_CALCULATED" ||
+    normalized === "tax calculated" ||
+    rawUpper === "CALCULATED" ||
+    normalized === "calculated"
+  ) {
+    displayLabel = "Calculated";
     bgColor = "bg-blue-100 border border-blue-300";
     textColor = "text-blue-800 font-bold";
   } else if (rawUpper === "SCHEDULED" || normalized === "scheduled") {

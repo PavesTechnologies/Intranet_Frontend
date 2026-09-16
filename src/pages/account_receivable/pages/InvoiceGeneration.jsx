@@ -133,6 +133,17 @@ export default function InvoiceGeneration() {
   }, [invoices, backendSummary]);
 
   const handleViewInvoice = (inv) => {
+    // Fixed Price/Recurring invoices are sourced from a Billing Occurrence,
+    // never a Billing Snapshot — routing these through /invoices/{id} would
+    // make InvoiceDetail.jsx call the Billing Snapshot invoice API with an
+    // occurrence id. There is no occurrence-based invoice detail endpoint
+    // yet, so send these to the occurrence's own Tax Calculation detail
+    // page instead, which already renders its invoiced/read-only state.
+    if (inv.billingScheduleId && !inv.billingSnapshotId) {
+      navigate(`/account-receivable/tax-calculation/occurrence/${inv.billingScheduleId}`);
+      return;
+    }
+
     const targetSnapshotId = inv.billingSnapshotId || inv.snapshotId || inv.invoiceId;
     if (!targetSnapshotId) {
       showStatusToast("Identifier is missing for this invoice.", "error");

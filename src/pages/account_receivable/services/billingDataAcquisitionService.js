@@ -29,8 +29,11 @@ function sumAmount(records) {
 
 /**
  * Normalise a billing type name string (from billing_type_master) → internal UI key.
+ * Exported so callers can filter active configurations down to a specific
+ * billing type (e.g. TIME_MATERIAL) without re-implementing this mapping —
+ * see fetchActiveBillingConfigurations's billingTypeCode field below.
  */
-function normalizeBillingTypeName(name) {
+export function normalizeBillingTypeName(name) {
   if (!name) return "";
   const upper = String(name).trim().toUpperCase().replace(/\s+/g, "_");
   if (["TIME_AND_MATERIAL", "TIME_MATERIAL", "TIMESHEET_BASED"].includes(upper)) return "TIME_MATERIAL";
@@ -182,6 +185,10 @@ export async function fetchActiveBillingConfigurations() {
       // Billing type — the API returns the human-readable master name directly
       // (e.g. "Timesheet Based", "Fixed Price"). Pass it through as-is.
       billingType: cfg.billingType ?? "\u2014",
+      // Normalised UI key (TIME_MATERIAL, FIXED_PRICE, RECURRING, MILESTONE)
+      // so callers needing one billing type only (Data Acquisition / T&M Tax
+      // Calculation) can filter without re-deriving this mapping themselves.
+      billingTypeCode: normalizeBillingTypeName(cfg.billingType),
 
       // Frequency — the API returns the human-readable name (e.g. "Monthly").
       // frequencyLabel() handles capitalisation so pass through directly.

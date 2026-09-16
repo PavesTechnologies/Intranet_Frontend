@@ -929,6 +929,7 @@ function FixedPriceForm({
   billingFrequency,
   billingFrequencyLabel,
   billingConfigurationId,
+  ensureBillingConfigurationId,
   projectStartDate,
   projectEndDate,
 }) {
@@ -1110,10 +1111,6 @@ function FixedPriceForm({
       return;
     }
 
-    // This button only ever reads billingConfigurationId — it never creates the
-    // parent draft itself. The draft is created once, up front, when the wizard is
-    // first entered (see ensureBillingConfigurationId in NewConfigurationWizard), so
-    // by the time the user reaches this step the id is already in state.
     if (!billingConfigurationId) {
       showStatusToast(
         "Unable to save fixed price configuration: billing configuration id is missing. Please reload and try again.",
@@ -1124,6 +1121,17 @@ function FixedPriceForm({
 
     setSaving(true);
     try {
+      // The parent billing configuration's draft may have been created before
+      // Billing Frequency was selected (it's auto-created as soon as Billing
+      // Type is known), so it can still be missing billingFrequencyId here.
+      // Re-sync the parent with the current selection first — the Fixed
+      // Price API requires billingFrequencyId to already be set on it.
+      let resolvedConfigId = billingConfigurationId;
+      if (ensureBillingConfigurationId) {
+        const syncedId = await ensureBillingConfigurationId();
+        if (syncedId) resolvedConfigId = syncedId;
+      }
+
       const payload = buildFixedPricePayload();
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
@@ -1134,14 +1142,14 @@ function FixedPriceForm({
       // load effect (above) hasn't resolved yet — re-check the backend directly so a
       // record that already exists is updated, never re-created as a duplicate.
       let existingId = value.fixedPriceConfigurationId;
-      if (!existingId && billingConfigurationId) {
-        const existingRecord = await getFixedPriceByBillingConfiguration(billingConfigurationId);
+      if (!existingId && resolvedConfigId) {
+        const existingRecord = await getFixedPriceByBillingConfiguration(resolvedConfigId);
         existingId = existingRecord?.fixedPriceConfigurationId || existingRecord?.id || null;
       }
 
       const saved = existingId
         ? await updateFixedPriceConfiguration(existingId, payload)
-        : await createFixedPriceConfiguration(billingConfigurationId, payload);
+        : await createFixedPriceConfiguration(resolvedConfigId, payload);
 
       update({
         fixedPriceConfigurationId:
@@ -1622,6 +1630,7 @@ function RecurringBillingForm({
   projectBudget,
   billingFrequencyOption,
   billingConfigurationId,
+  ensureBillingConfigurationId,
   projectStartDate,
   projectEndDate,
 }) {
@@ -1816,6 +1825,17 @@ function RecurringBillingForm({
 
     setSaving(true);
     try {
+      // The parent billing configuration's draft may have been created before
+      // Billing Frequency was selected (it's auto-created as soon as Billing
+      // Type is known), so it can still be missing billingFrequencyId here.
+      // Re-sync the parent with the current selection first — the Recurring
+      // API requires billingFrequencyId to already be set on it.
+      let resolvedConfigId = billingConfigurationId;
+      if (ensureBillingConfigurationId) {
+        const syncedId = await ensureBillingConfigurationId();
+        if (syncedId) resolvedConfigId = syncedId;
+      }
+
       const payload = buildRecurringRequestPayload(value, billingFrequencyOption.billingFrequencyId);
 
       // value.recurringConfigurationId can still be unset here if the
@@ -1823,18 +1843,18 @@ function RecurringBillingForm({
       // backend directly so an existing record is updated, never duplicated.
       let existingId = value.recurringConfigurationId;
       if (!existingId) {
-        const existingRecord = await getBillingRecurringByBillingConfigurationId(billingConfigurationId);
+        const existingRecord = await getBillingRecurringByBillingConfigurationId(resolvedConfigId);
         existingId = existingRecord?.recurringConfigurationId || existingRecord?.subscriptionConfigurationId || existingRecord?.id || null;
       }
 
       const saved = existingId
         ? await updateBillingRecurring(existingId, payload)
-        : await createBillingRecurring(billingConfigurationId, payload);
+        : await createBillingRecurring(resolvedConfigId, payload);
       const savedId = saved?.recurringConfigurationId || saved?.subscriptionConfigurationId || saved?.id || existingId;
 
       update({ recurringConfigurationId: savedId || value.recurringConfigurationId || null });
       showStatusToast("Recurring configuration saved.", "success");
-      await loadSchedule(savedId, billingConfigurationId);
+      await loadSchedule(savedId, resolvedConfigId);
     } catch (error) {
       showStatusToast(
         getApiErrorMessage(error, "Unable to save recurring configuration."),
@@ -2391,6 +2411,7 @@ export default function BillingConfigurationStep({
                 billingFrequency={billingFrequency}
                 billingFrequencyLabel={frequencyLabel(billingFrequency)}
                 billingConfigurationId={value.billingConfigurationId || value.id}
+                ensureBillingConfigurationId={ensureBillingConfigurationId}
                 projectStartDate={projectInfo.startDate}
                 projectEndDate={projectInfo.endDate}
               />
@@ -2415,6 +2436,7 @@ export default function BillingConfigurationStep({
                   (option) => String(option.billingFrequencyId) === String(billingFrequencyId),
                 )}
                 billingConfigurationId={value.billingConfigurationId || value.id}
+                ensureBillingConfigurationId={ensureBillingConfigurationId}
                 projectStartDate={projectInfo.startDate}
                 projectEndDate={projectInfo.endDate}
               />

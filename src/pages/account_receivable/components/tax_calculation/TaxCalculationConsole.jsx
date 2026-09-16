@@ -37,8 +37,6 @@ import { getInvoice } from "../../services/invoiceService";
 import { getActiveTaxRegions } from "../../services/taxRateConfigurationService";
 import {
   getBillingOccurrences,
-  calculateOccurrenceTax,
-  getOccurrenceErrorMessage,
 } from "../../services/billingOccurrenceService";
 import BillingOccurrenceCard from "./BillingOccurrenceCard";
 
@@ -66,19 +64,30 @@ export default function TaxCalculationConsole() {
   const [readyOccurrences, setReadyOccurrences] = useState([]);
   const [upcomingOccurrences, setUpcomingOccurrences] = useState([]);
   const [processedOccurrences, setProcessedOccurrences] = useState([]);
-  const [calculatingOccIds, setCalculatingOccIds] = useState({});
+  const [invoicedOccurrences, setInvoicedOccurrences] = useState([]);
 
   const loadOccurrences = async () => {
     setOccLoading(true);
     try {
+      // periodStatus and taxStatus are two separate backend fields (never
+      // assume they're the same) -- periodStatus is the occurrence's own
+      // lifecycle (SCHEDULED -> TAX_PENDING -> TAX_CALCULATED, advanced only
+      // by the backend scheduler) and is what both bucket membership here
+      // and calculate-tax eligibility are keyed on; taxStatus/
+      // taxCalculationStatus are informational fields shown on the card/
+      // detail view only.
       const [ready, upcoming, processed] = await Promise.all([
-        getBillingOccurrences({ taxStatus: "TAX_PENDING" }).catch(() => []),
+        getBillingOccurrences({ periodStatus: "TAX_PENDING" }).catch(() => []),
         getBillingOccurrences({ periodStatus: "SCHEDULED" }).catch(() => []),
-        getBillingOccurrences({ taxStatus: "TAX_CALCULATED" }).catch(() => []),
+        getBillingOccurrences({ periodStatus: "TAX_CALCULATED" }).catch(() => []),
       ]);
       setReadyOccurrences(ready);
       setUpcomingOccurrences(upcoming);
-      setProcessedOccurrences(processed);
+      // Invoiced is not its own periodStatus/taxStatus value — it's the
+      // backend's isInvoiced flag on an already-tax-calculated occurrence,
+      // so it's split out here rather than queried separately.
+      setProcessedOccurrences(processed.filter((o) => !o.isInvoiced));
+      setInvoicedOccurrences(processed.filter((o) => o.isInvoiced));
     } catch (err) {
       console.error("[TaxCalculationConsole] Error loading billing occurrences:", err);
     } finally {
@@ -96,28 +105,10 @@ export default function TaxCalculationConsole() {
     });
   };
 
-  const handleCalculateOccurrenceTax = async (occurrence) => {
-    const occId = occurrence.billingScheduleId;
-    if (!occId || calculatingOccIds[occId]) return;
-
-    setCalculatingOccIds((prev) => ({ ...prev, [occId]: true }));
-    try {
-      await calculateOccurrenceTax(occId);
-      showStatusToast("Tax calculation completed successfully.", "success");
-      await loadOccurrences();
-      navigate(`${OCCURRENCE_DETAIL_BASE}/${occId}`, { state: { occurrence } });
-    } catch (err) {
-      showStatusToast(
-        getOccurrenceErrorMessage(err, "Tax calculation failed. Please review tax configuration."),
-        "error"
-      );
-    } finally {
-      setCalculatingOccIds((prev) => {
-        const next = { ...prev };
-        delete next[occId];
-        return next;
-      });
-    }
+  const handleOpenOccurrenceTaxCalculation = (occurrence) => {
+    navigate(`${OCCURRENCE_DETAIL_BASE}/${occurrence.billingScheduleId}`, {
+      state: { occurrence },
+    });
   };
 
   const loadData = async (isManualRefresh = false) => {
@@ -125,7 +116,13 @@ export default function TaxCalculationConsole() {
     setLoading(true);
 
     try {
-      const activeConfigs = await fetchActiveBillingConfigurations();
+      // This table is the Time & Material billing-snapshot queue only --
+      // Fixed Price/Recurring occurrences are loaded separately below via
+      // getBillingOccurrences(). fetchActiveBillingConfigurations() returns
+      // every active configuration regardless of billing type, so it must
+      // be filtered down here the same way Data Acquisition does.
+      const allActiveConfigs = await fetchActiveBillingConfigurations();
+      const activeConfigs = allActiveConfigs.filter((cfg) => cfg.billingTypeCode === "TIME_MATERIAL");
       const regionsList = await getActiveTaxRegions().catch(() => []);
 
       const loadedSnapshots = (
@@ -473,7 +470,10 @@ export default function TaxCalculationConsole() {
   }
 
   const hasAnyOccurrences =
-    readyOccurrences.length > 0 || upcomingOccurrences.length > 0 || processedOccurrences.length > 0;
+    readyOccurrences.length > 0 ||
+    upcomingOccurrences.length > 0 ||
+    processedOccurrences.length > 0 ||
+    invoicedOccurrences.length > 0;
 
   // Genuine Empty State (when zero relevant snapshots AND zero billing occurrences exist)
   if (!loading && relevantSnapshots.length === 0 && !occLoading && !hasAnyOccurrences) {
@@ -728,8 +728,8 @@ export default function TaxCalculationConsole() {
                 key={occurrence.billingScheduleId}
                 occurrence={occurrence}
                 variant="ready"
-                calculating={Boolean(calculatingOccIds[occurrence.billingScheduleId])}
-                onCalculateTax={handleCalculateOccurrenceTax}
+                onOpenTaxCalculation={handleOpenOccurrenceTaxCalculation}
+                onCalculateTax={handleOpenOccurrenceTaxCalculation}
               />
             ))}
           </div>
@@ -770,6 +770,24 @@ export default function TaxCalculationConsole() {
                 key={occurrence.billingScheduleId}
                 occurrence={occurrence}
                 variant="processed"
+                onView={handleViewOccurrence}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {invoicedOccurrences.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Invoiced Billing Occurrences
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {invoicedOccurrences.map((occurrence) => (
+              <BillingOccurrenceCard
+                key={occurrence.billingScheduleId}
+                occurrence={occurrence}
+                variant="invoiced"
                 onView={handleViewOccurrence}
               />
             ))}

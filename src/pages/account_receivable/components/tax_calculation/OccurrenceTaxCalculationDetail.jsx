@@ -23,7 +23,12 @@ import {
   getOccurrenceTaxCalculation,
   calculateOccurrenceTax,
   getOccurrenceErrorMessage,
+  mergeOccurrenceWithTaxCalc,
 } from "../../services/billingOccurrenceService";
+import {
+  getActiveTaxRateConfigurations,
+  getTaxRateConfigurationsByTaxRegion,
+} from "../../services/taxRateConfigurationService";
 
 const CONSOLE_PATH = "/account-receivable/tax-calculation";
 
@@ -89,6 +94,7 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
   const passedState = location.state || {};
 
   const [occurrence, setOccurrence] = useState(passedState.occurrence || null);
+  const [taxConfig, setTaxConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(false);
   const [calcError, setCalcError] = useState("");
@@ -100,18 +106,53 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
       const base = await getBillingOccurrence(occurrenceId);
       let merged = base;
 
+      const periodStatusUpper = (base?.periodStatus || "").toUpperCase();
       const taxStatusUpper = (base?.taxStatus || "").toUpperCase();
-      if (base && (taxStatusUpper === "TAX_CALCULATED" || base.isInvoiced)) {
-        try {
-          const taxCalc = await getOccurrenceTaxCalculation(occurrenceId);
-          if (taxCalc) merged = { ...base, ...taxCalc };
-        } catch (err) {
-          // Tax calculation not yet retrievable — show the base occurrence as-is.
-          console.log("[OccurrenceTaxCalculationDetail] No tax calculation found for occurrence.");
+      const calcStatusUpper = (base?.taxCalculationStatus || "").toUpperCase();
+      const isCalculated =
+        periodStatusUpper === "TAX_CALCULATED" ||
+        taxStatusUpper === "TAX_CALCULATED" ||
+        taxStatusUpper === "CALCULATED" ||
+        calcStatusUpper === "CALCULATED" ||
+        base?.isInvoiced;
+
+      if (base && isCalculated) {
+        // If taxComponents or totalTaxAmount are not yet present on base, fetch from tax-calculation endpoint
+        if (!base.taxComponents?.length || base.totalTaxAmount === null) {
+          try {
+            const taxCalc = await getOccurrenceTaxCalculation(occurrenceId);
+            if (taxCalc) merged = mergeOccurrenceWithTaxCalc(base, taxCalc);
+          } catch (err) {
+            console.log("[OccurrenceTaxCalculationDetail] No secondary tax calculation response, using occurrence data.");
+          }
         }
       }
 
       setOccurrence(merged);
+
+      // Read-only GET of applicable tax configuration for this occurrence's tax region
+      try {
+        const regionId = merged?.taxRegionId || base?.taxRegionId;
+        const regionCode = merged?.taxRegionCode || base?.taxRegionCode;
+        const regionName = merged?.taxRegionName || base?.taxRegionName;
+
+        if (regionId) {
+          const configs = await getTaxRateConfigurationsByTaxRegion(regionId);
+          if (Array.isArray(configs) && configs.length > 0) {
+            setTaxConfig(configs.find((c) => c.active) || configs[0]);
+          }
+        } else if (regionCode || regionName) {
+          const allActive = await getActiveTaxRateConfigurations();
+          const match = allActive.find(
+            (c) =>
+              (regionCode && c.taxRegionCode?.toUpperCase() === regionCode.toUpperCase()) ||
+              (regionName && c.taxRegionName?.toUpperCase() === regionName.toUpperCase())
+          );
+          if (match) setTaxConfig(match);
+        }
+      } catch (e) {
+        console.warn("[OccurrenceTaxCalculationDetail] Could not load tax configuration preview:", e?.message);
+      }
     } catch (err) {
       showStatusToast(getOccurrenceErrorMessage(err, "Unable to load billing occurrence."), "error");
     } finally {
@@ -132,8 +173,13 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
     setCalculating(true);
     setCalcError("");
     try {
-      await calculateOccurrenceTax(occurrenceId);
+      const calcResult = await calculateOccurrenceTax(occurrenceId);
       showStatusToast("Tax calculation completed successfully.", "success");
+      // Immediately merge the calculate POST response into state
+      if (calcResult) {
+        setOccurrence((prev) => mergeOccurrenceWithTaxCalc(prev, calcResult));
+      }
+      // Re-fetch authoritative occurrence from GET /api/billing-occurrences/{id}
       await loadOccurrenceDetail();
     } catch (err) {
       const msg = getOccurrenceErrorMessage(err, "Tax calculation failed. Please review tax configuration.");
@@ -168,19 +214,52 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
   const currency = occurrence.currencyCode || "USD";
   const billingType = humanizeBillingType(occurrence);
   const period =
-    occurrence.periodStartDate || occurrence.periodEndDate
-      ? `${formatDisplayDate(occurrence.periodStartDate)} - ${formatDisplayDate(occurrence.periodEndDate)}`
+    occurrence.periodStartDate && occurrence.periodEndDate
+      ? `${formatDisplayDate(occurrence.periodStartDate)} – ${formatDisplayDate(occurrence.periodEndDate)}`
+      : occurrence.periodStartDate || occurrence.periodEndDate
+      ? formatDisplayDate(occurrence.periodStartDate || occurrence.periodEndDate)
       : "—";
 
-  const components = Array.isArray(occurrence.taxComponents) ? occurrence.taxComponents : [];
-  const taxStatus = (occurrence.taxStatus || "").toUpperCase();
-  const isTaxCompleted = taxStatus === "TAX_CALCULATED" || occurrence.isInvoiced;
-  const isReady = taxStatus === "TAX_PENDING";
+  const components = Array.isArray(occurrence.taxComponents)
+    ? occurrence.taxComponents
+    : Array.isArray(occurrence.components)
+    ? occurrence.components
+    : [];
 
-  const taxableAmount = occurrence.taxableAmount ?? occurrence.billingAmount ?? 0;
+  const periodStatus = (occurrence.periodStatus || "").toUpperCase();
+  const taxStatus = (occurrence.taxStatus || "").toUpperCase();
+  const calcStatus = (occurrence.taxCalculationStatus || occurrence.status || "").toUpperCase();
+
+  const isTaxCompleted =
+    periodStatus === "TAX_CALCULATED" ||
+    taxStatus === "TAX_CALCULATED" ||
+    taxStatus === "CALCULATED" ||
+    calcStatus === "CALCULATED" ||
+    occurrence.isInvoiced;
+
+  const isReady = (periodStatus === "TAX_PENDING" || taxStatus === "TAX_PENDING") && !isTaxCompleted;
+
+  const billingAmount =
+    occurrence.billingAmount !== null && occurrence.billingAmount !== undefined
+      ? occurrence.billingAmount
+      : occurrence.taxableAmount !== null && occurrence.taxableAmount !== undefined
+      ? occurrence.taxableAmount
+      : 0;
+
+  const taxableAmount =
+    occurrence.taxableAmount !== null && occurrence.taxableAmount !== undefined
+      ? occurrence.taxableAmount
+      : occurrence.billingAmount !== null && occurrence.billingAmount !== undefined
+      ? occurrence.billingAmount
+      : 0;
+
   const totalTaxAmount = occurrence.totalTaxAmount ?? 0;
   const grandTotal = occurrence.grandTotal ?? (isTaxCompleted ? taxableAmount + totalTaxAmount : null);
-  const displayStatus = occurrence.isInvoiced ? "INVOICED" : occurrence.taxStatus || occurrence.periodStatus;
+  const displayStatus = occurrence.isInvoiced
+    ? "INVOICED"
+    : isTaxCompleted
+    ? "Calculated"
+    : occurrence.periodStatus || occurrence.taxStatus || "TAX_PENDING";
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5">
@@ -272,6 +351,17 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
               <span className="font-mono">{currency}</span>
             </Field>
             {occurrence.taxRegionName && <Field label="Tax Region">{occurrence.taxRegionName}</Field>}
+            {(taxConfig?.taxRegime || occurrence.taxRegionName) && (
+              <Field label="Tax Regime">{taxConfig?.taxRegime || "GST"}</Field>
+            )}
+            <Field label="Tax Status">
+              <StatusBadge label={isTaxCompleted ? "Calculated" : occurrence.taxStatus || occurrence.periodStatus} size="sm" />
+            </Field>
+            {(occurrence.taxCalculationStatus || isTaxCompleted) && (
+              <Field label="Tax Calculation Status">
+                <StatusBadge label={occurrence.taxCalculationStatus || "Calculated"} size="sm" />
+              </Field>
+            )}
           </div>
         </div>
 
@@ -279,6 +369,12 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
         <div className="p-5">
           <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Commercial Value</h2>
           <div className="max-w-sm space-y-1.5 text-sm">
+            <div className="flex items-center justify-between text-slate-600">
+              <span>Billing Amount</span>
+              <span className="font-mono font-semibold text-slate-800">
+                {formatCurrency(billingAmount, currency)}
+              </span>
+            </div>
             <div className="flex items-center justify-between border-t border-slate-200 pt-2 font-bold text-slate-900">
               <span>Taxable Amount</span>
               <span className="font-mono text-base text-indigo-900">{formatCurrency(taxableAmount, currency)}</span>
@@ -298,7 +394,7 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
           </div>
 
           {!isTaxCompleted ? (
-            <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/60 to-slate-50 p-6 text-center space-y-3">
+            <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/60 to-slate-50 p-6 text-center space-y-4">
               <div className="inline-flex p-3 rounded-full bg-indigo-100 text-indigo-700">
                 <Calculator className="h-6 w-6" />
               </div>
@@ -317,6 +413,46 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
                   )}
                 </p>
               </div>
+
+              {/* Applicable Tax Configuration Preview */}
+              {isReady && (
+                <div className="mx-auto max-w-md rounded-lg border border-indigo-100 bg-white/90 p-3.5 text-left text-xs shadow-xs space-y-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Applicable Tax Configuration
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5 text-xs">
+                    <div>
+                      <span className="block text-[11px] text-slate-500">Tax Region</span>
+                      <span className="font-semibold text-slate-800">
+                        {occurrence.taxRegionName || taxConfig?.taxRegionLabel || "—"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[11px] text-slate-500">Tax Regime</span>
+                      <span className="font-semibold text-slate-800">{taxConfig?.taxRegime || "GST"}</span>
+                    </div>
+                    {taxConfig?.cgstRate !== null && taxConfig?.cgstRate !== undefined && (
+                      <div>
+                        <span className="block text-[11px] text-slate-500">CGST Rate</span>
+                        <span className="font-mono font-semibold text-slate-800">{taxConfig.cgstRate}%</span>
+                      </div>
+                    )}
+                    {taxConfig?.sgstRate !== null && taxConfig?.sgstRate !== undefined && (
+                      <div>
+                        <span className="block text-[11px] text-slate-500">SGST Rate</span>
+                        <span className="font-mono font-semibold text-slate-800">{taxConfig.sgstRate}%</span>
+                      </div>
+                    )}
+                    {taxConfig?.igstRate !== null && taxConfig?.igstRate !== undefined && (
+                      <div className="col-span-2">
+                        <span className="block text-[11px] text-slate-500">IGST Rate</span>
+                        <span className="font-mono font-semibold text-slate-800">{taxConfig.igstRate}%</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {isReady && (
                 <div className="pt-2">
                   <Button

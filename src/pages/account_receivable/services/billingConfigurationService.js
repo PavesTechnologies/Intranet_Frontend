@@ -1378,6 +1378,22 @@ export const ensureBillingConfigurationDraft = async (payload) => {
   return extractedId;
 };
 
+// Re-syncs the parent billing configuration's own fields (billingTypeId,
+// billingFrequencyId, etc.) onto a DRAFT record that already exists, via PUT
+// .../draft. The initial draft is created (ensureBillingConfigurationDraft,
+// above) as soon as billingTypeId alone is known — typically before the user
+// has picked a Billing Frequency — so billingFrequencyId can still be empty
+// on the parent record afterward. Sub-configuration create calls (Fixed
+// Price, Recurring) require billingFrequencyId to already be set on the
+// parent, so callers should await this immediately before them to push the
+// current wizard selection first.
+export const syncBillingConfigurationDraft = async (payload, billingConfigurationId) => {
+  const requestPayload = buildBillingConfigurationRequestPayload(payload);
+  assertBillingConfigurationPayload(requestPayload);
+  const configResponse = await updateBillingConfigurationDraft(billingConfigurationId, requestPayload);
+  return extractBillingConfigurationId(configResponse) || billingConfigurationId;
+};
+
 const buildTmRateCardRequestPayload = (card = {}, pricingModel, billingConfigurationId) => ({
   billingConfigurationId,
   roleName: pricingModel === "ROLE_BASED" ? String(card.roleName || card.role || "").trim() : null,

@@ -257,8 +257,15 @@ export const normalizeInvoice = (payload = {}) => {
     invoiceDate: toIsoDateOnly(data.invoiceDate || data.invoice_date || data.issueDate || data.createdAt) || "",
     dueDate: toIsoDateOnly(data.dueDate || data.due_date) || "",
 
-    // Billing snapshot link
+    // Billing snapshot link (Timesheet/T&M invoices only)
     billingSnapshotId: data.billingSnapshotId || data.billing_snapshot_id || data.snapshotId || "",
+    // Billing occurrence link (Fixed Price/Recurring invoices only) — an
+    // invoice never carries both; whichever is present identifies which
+    // detail/tax-calculation flow this invoice belongs to. There is no
+    // occurrence-based invoice detail endpoint yet (see billingOccurrenceService.js),
+    // so callers must not build a Billing Snapshot invoice/tax-calculation
+    // URL from this id.
+    billingScheduleId: data.billingScheduleId || data.billing_schedule_id || data.occurrenceId || data.occurrence_id || "",
     snapshotNumber:
       data.snapshotNumber ||
       data.snapshot_number ||
@@ -351,6 +358,9 @@ export const normalizeApprovalWorkspaceItem = (item = {}) => {
     invoiceStatus: (source.status || source.invoiceStatus || "PENDING_APPROVAL").toUpperCase(),
     billingSnapshotId: source.billingSnapshotId || source.snapshotId || "",
     billingSnapshotNumber: source.billingSnapshotNumber || source.snapshotNumber || null,
+    // Fixed Price/Recurring workspace entries carry this instead of a
+    // billingSnapshotId — see normalizeInvoice above.
+    billingScheduleId: source.billingScheduleId || source.billing_schedule_id || source.occurrenceId || source.occurrence_id || "",
     clientName: source.clientName || "—",
     projectName: source.projectName || "—",
     billingPeriod: displayPeriod,

@@ -145,7 +145,12 @@ export default function TaxCalculation() {
     // 3. Hydrate snapshot data if not passed in location.state or incomplete
     if (!snapshotData || !snapshotData.snapshotNumber || !snapshotData.totalAmount) {
       try {
-        const configs = await fetchActiveBillingConfigurations();
+        // This hydration path only ever backs the T&M billing-snapshot detail
+        // view (the occurrenceId branch above returns before this runs for
+        // Fixed Price/Recurring), so scope the match pool to T&M the same
+        // way Data Acquisition and the console's T&M table do.
+        const allConfigs = await fetchActiveBillingConfigurations();
+        const configs = allConfigs.filter((cfg) => cfg.billingTypeCode === "TIME_MATERIAL");
         let matched = null;
         let snapDetails = null;
 

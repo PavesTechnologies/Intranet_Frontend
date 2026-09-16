@@ -94,21 +94,52 @@ export const normalizeBillingOccurrence = (item = {}) => {
     ? item.components
     : [];
 
+  const rawBillingAmount =
+    item.billingAmount !== undefined && item.billingAmount !== null
+      ? Number(item.billingAmount)
+      : item.taxableAmount !== undefined && item.taxableAmount !== null
+      ? Number(item.taxableAmount)
+      : null;
+
+  const rawTaxableAmount =
+    item.taxableAmount !== undefined && item.taxableAmount !== null
+      ? Number(item.taxableAmount)
+      : item.billingAmount !== undefined && item.billingAmount !== null
+      ? Number(item.billingAmount)
+      : null;
+
+  const rawStatus = (item.status || item.taxCalculationStatus || "").toUpperCase();
+  const rawPeriodStatus = (item.periodStatus || "").toUpperCase();
+  const rawTaxStatus = (item.taxStatus || "").toUpperCase();
+
+  const isCalculated =
+    rawPeriodStatus === "TAX_CALCULATED" ||
+    rawTaxStatus === "TAX_CALCULATED" ||
+    rawTaxStatus === "CALCULATED" ||
+    rawStatus === "CALCULATED";
+
+  const periodStatus =
+    item.periodStatus ||
+    (isCalculated ? "TAX_CALCULATED" : "");
+
+  const taxStatus =
+    item.taxStatus ||
+    (isCalculated ? "TAX_CALCULATED" : "");
+
   return {
     ...item,
     billingScheduleId: item.billingScheduleId ?? item.occurrenceId ?? item.id ?? "",
     billingConfigurationId: item.billingConfigurationId ?? null,
     recurringConfigurationId: item.recurringConfigurationId ?? null,
     periodNumber: item.periodNumber ?? null,
-    periodStartDate: item.periodStartDate ?? "",
-    periodEndDate: item.periodEndDate ?? "",
-    billingDate: item.billingDate ?? "",
-    billingAmount:
-      item.billingAmount !== undefined && item.billingAmount !== null ? Number(item.billingAmount) : null,
+    periodStartDate: item.periodStartDate ?? item.billingPeriodStart ?? item.billingPeriodStartDate ?? "",
+    periodEndDate: item.periodEndDate ?? item.billingPeriodEnd ?? item.billingPeriodEndDate ?? "",
+    billingDate: item.billingDate ?? item.invoiceDate ?? "",
+    billingAmount: rawBillingAmount,
     scheduleType: item.scheduleType ?? "",
     isPartialPeriod: Boolean(item.isPartialPeriod),
-    periodStatus: item.periodStatus ?? "",
-    taxStatus: item.taxStatus ?? "",
+    periodStatus: periodStatus,
+    taxStatus: taxStatus,
     isInvoiced: Boolean(item.isInvoiced),
     invoiceDate: item.invoiceDate ?? null,
     remarks: item.remarks ?? "",
@@ -119,20 +150,98 @@ export const normalizeBillingOccurrence = (item = {}) => {
     // Configuration context, when returned alongside the occurrence.
     projectName: item.projectName ?? "",
     clientName: item.clientName ?? "",
-    currencyCode: item.currencyCode ?? "",
+    currencyCode: item.currencyCode ?? "USD",
     taxRegionName: item.taxRegionName ?? "",
     taxRegionCode: item.taxRegionCode ?? "",
 
     // Tax calculation result, present once taxStatus has moved past TAX_PENDING.
     taxCalculationId: item.taxCalculationId ?? null,
-    taxCalculationStatus: item.taxCalculationStatus ?? "",
-    taxableAmount:
-      item.taxableAmount !== undefined && item.taxableAmount !== null ? Number(item.taxableAmount) : null,
+    taxCalculationStatus: item.taxCalculationStatus ?? item.status ?? (isCalculated ? "CALCULATED" : ""),
+    taxableAmount: rawTaxableAmount,
     totalTaxAmount:
-      item.totalTaxAmount !== undefined && item.totalTaxAmount !== null ? Number(item.totalTaxAmount) : null,
-    grandTotal: item.grandTotal !== undefined && item.grandTotal !== null ? Number(item.grandTotal) : null,
+      item.totalTaxAmount !== undefined && item.totalTaxAmount !== null
+        ? Number(item.totalTaxAmount)
+        : item.totalTax !== undefined && item.totalTax !== null
+        ? Number(item.totalTax)
+        : null,
+    grandTotal:
+      item.grandTotal !== undefined && item.grandTotal !== null ? Number(item.grandTotal) : null,
     taxCalculatedAt: item.taxCalculatedAt ?? "",
     taxComponents: rawComponents.map(normalizeTaxComponent),
+  };
+};
+
+export const mergeOccurrenceWithTaxCalc = (base = {}, taxCalc = {}) => {
+  if (!base && !taxCalc) return null;
+  if (!base) return normalizeBillingOccurrence(taxCalc);
+  if (!taxCalc) return normalizeBillingOccurrence(base);
+
+  const b = normalizeBillingOccurrence(base) || {};
+  const c = normalizeBillingOccurrence(taxCalc) || {};
+
+  const components =
+    c.taxComponents?.length > 0
+      ? c.taxComponents
+      : b.taxComponents?.length > 0
+      ? b.taxComponents
+      : [];
+
+  const isCalculated =
+    b.periodStatus === "TAX_CALCULATED" ||
+    c.periodStatus === "TAX_CALCULATED" ||
+    b.taxStatus === "TAX_CALCULATED" ||
+    c.taxStatus === "TAX_CALCULATED" ||
+    (b.taxCalculationStatus || "").toUpperCase() === "CALCULATED" ||
+    (c.taxCalculationStatus || "").toUpperCase() === "CALCULATED";
+
+  return {
+    ...b,
+    ...c,
+
+    billingScheduleId: b.billingScheduleId || c.billingScheduleId,
+    projectName: b.projectName || c.projectName,
+    clientName: b.clientName || c.clientName,
+    currencyCode: b.currencyCode || c.currencyCode || "USD",
+    taxRegionName: b.taxRegionName || c.taxRegionName,
+    taxRegionCode: b.taxRegionCode || c.taxRegionCode,
+    scheduleType: b.scheduleType || c.scheduleType,
+
+    periodStartDate: b.periodStartDate || c.periodStartDate,
+    periodEndDate: b.periodEndDate || c.periodEndDate,
+    billingDate: b.billingDate || c.billingDate,
+
+    billingAmount:
+      b.billingAmount !== null && b.billingAmount !== undefined
+        ? b.billingAmount
+        : c.billingAmount,
+
+    periodStatus: isCalculated
+      ? "TAX_CALCULATED"
+      : b.periodStatus || c.periodStatus || "TAX_PENDING",
+    taxStatus: isCalculated
+      ? "TAX_CALCULATED"
+      : b.taxStatus || c.taxStatus || "TAX_PENDING",
+    taxCalculationStatus: isCalculated
+      ? (c.taxCalculationStatus || b.taxCalculationStatus || "CALCULATED")
+      : (b.taxCalculationStatus || c.taxCalculationStatus || ""),
+
+    taxCalculationId: c.taxCalculationId || b.taxCalculationId,
+    taxableAmount:
+      c.taxableAmount !== null && c.taxableAmount !== undefined
+        ? c.taxableAmount
+        : b.taxableAmount !== null && b.taxableAmount !== undefined
+        ? b.taxableAmount
+        : b.billingAmount,
+    totalTaxAmount:
+      c.totalTaxAmount !== null && c.totalTaxAmount !== undefined
+        ? c.totalTaxAmount
+        : b.totalTaxAmount,
+    grandTotal:
+      c.grandTotal !== null && c.grandTotal !== undefined
+        ? c.grandTotal
+        : b.grandTotal,
+    taxComponents: components,
+    taxCalculatedAt: c.taxCalculatedAt || b.taxCalculatedAt,
   };
 };
 
@@ -161,7 +270,10 @@ export const getBillingOccurrences = async (params = {}) => {
 
   const response = await api.get(OCCURRENCES_URL, { params: query });
   const data = unwrapData(response);
-  const list = Array.isArray(data) ? data : [];
+  // Accept either a bare array or a Spring-style paginated page object
+  // ({ content: [...] }) -- guards against a bucket silently rendering
+  // empty if the backend ever wraps this particular query in pagination.
+  const list = Array.isArray(data) ? data : Array.isArray(data?.content) ? data.content : [];
   return list.map(normalizeBillingOccurrence).filter(Boolean);
 };
 

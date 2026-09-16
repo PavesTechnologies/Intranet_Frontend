@@ -20,6 +20,7 @@ import {
   saveDraftConfiguration,
   submitConfigurationForApproval,
   ensureBillingConfigurationDraft,
+  syncBillingConfigurationDraft,
   saveBillingConfigurationRecord,
 } from "../services/billingConfigService";
 import { getActiveCurrencies } from "../services/toolPricingService";
@@ -486,7 +487,15 @@ export default function NewConfigurationWizard() {
   // rate card row (and deletes any absent from wizard state), which would race with
   // the single-row create/update the rate card button is about to perform itself.
   const ensureBillingConfigurationId = async () => {
-    if (savedConfigId) return savedConfigId;
+    if (savedConfigId) {
+      // The draft may have been created (below) before billingFrequencyId —
+      // or a later billingTypeId change — was known; re-push the current
+      // wizard selection onto the already-created parent record so it's
+      // never stale by the time a sub-configuration (Fixed Price, Recurring,
+      // TM rate card) is created against it.
+      const syncedId = await syncBillingConfigurationDraft(wizardData, savedConfigId);
+      return applyBillingConfigurationId(syncedId) || savedConfigId;
+    }
     const guardMessage = getDraftGuardMessage(wizardData);
     if (guardMessage) {
       showStatusToast(guardMessage, "warning");
