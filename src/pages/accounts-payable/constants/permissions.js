@@ -12,9 +12,10 @@ import {
  * architecture doc. useApPermissions.js derives its boolean flags from AP_PERMISSION_ROLES
  * instead of inlining role arrays, so a capability's allowed roles live in exactly one place.
  *
- * Procurement is NOT here — it's authorized by real UMS JWT permission codes
- * (PR_VIEW/PR_CREATE/... in constants/procurementPermissions.js) read directly via
- * hasPermission(), not a frontend role -> permission map. See useApPermissions.js.
+ * Procurement and Invoice Approval are NOT here — they're authorized by real UMS JWT
+ * permission codes (PR_VIEW/PR_CREATE/... in constants/procurementPermissions.js,
+ * INVOICE_APPROVE/... in constants/approvalPermissions.js) read directly via hasPermission(),
+ * not a frontend role -> permission map. See useApPermissions.js.
  */
 export const AP_PERMISSIONS = {
   VIEW_DASHBOARD: "view_dashboard",
@@ -24,7 +25,6 @@ export const AP_PERMISSIONS = {
   UPLOAD_INVOICE: "upload_invoice",
   REVIEW_OCR: "review_ocr",
   VALIDATE_INVOICE: "validate_invoice",
-  APPROVE_INVOICE: "approve_invoice",
   VIEW_INVOICE: "view_invoice",
   MARK_PAID: "mark_paid",
   VIEW_PAYMENT: "view_payment",
@@ -38,7 +38,6 @@ export const AP_PERMISSION_ROLES = {
   [AP_PERMISSIONS.UPLOAD_INVOICE]: AP_INVOICE_PROCESSOR_ROLES,
   [AP_PERMISSIONS.REVIEW_OCR]: AP_INVOICE_PROCESSOR_ROLES,
   [AP_PERMISSIONS.VALIDATE_INVOICE]: AP_INVOICE_PROCESSOR_ROLES,
-  [AP_PERMISSIONS.APPROVE_INVOICE]: AP_INVOICE_PROCESSOR_ROLES,
   [AP_PERMISSIONS.VIEW_INVOICE]: AP_INVOICE_VIEWER_ROLES,
   [AP_PERMISSIONS.MARK_PAID]: AP_PAYMENT_ACTION_ROLES,
   [AP_PERMISSIONS.VIEW_PAYMENT]: AP_PAYMENT_VIEWER_ROLES,

@@ -1,8 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { reviewQueueService } from "../services/reviewQueueService";
-import { invoiceService } from "../services/invoiceService";
 import { INVOICE_SUMMARY_KEY } from "./useInvoiceSummary";
-import { INVOICE_STATUS_ID } from "../../constants/invoiceStatus";
 
 export const REVIEW_QUEUE_KEY = (params) => ["accountsPayable", "reviewQueue", params];
 
@@ -18,21 +16,18 @@ export function useReviewQueue(params = {}) {
 }
 
 /**
- * Saves OCR field corrections for one inbound document (Path A or Path B), then — for Path A
- * items, which carry an `invoiceId` because the invoice already exists — advances that invoice
- * from OCR Review Pending to Pending Approval via the status-update endpoint. Path B items have
- * no invoiceId yet at this point, so no status transition is fired for them.
+ * Saves OCR field corrections for one inbound document (Path A or Path B). No separate status
+ * transition is fired here — Backend/Business_Layer/services/invoice_process_service.py's
+ * apply_ocr_review already unconditionally advances the invoice to Pending Approval (or straight
+ * to Approved, if it qualifies for auto-approval) as part of this same save. A prior version of
+ * this hook additionally called PUT /invoice/status-update/{id} to do that client-side — besides
+ * being redundant, that endpoint doesn't actually exist in the backend, so every save was
+ * silently throwing after the review had already been persisted successfully.
  */
 export function useSaveOcrReviewMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ inboundDocumentId, payload, invoiceId }) => {
-      const result = await reviewQueueService.saveOcrReview(inboundDocumentId, payload);
-      if (invoiceId) {
-        await invoiceService.updateInvoiceStatus(invoiceId, INVOICE_STATUS_ID.PENDING_APPROVAL);
-      }
-      return result;
-    },
+    mutationFn: ({ inboundDocumentId, payload }) => reviewQueueService.saveOcrReview(inboundDocumentId, payload),
     // Returning this (rather than firing invalidation and moving on) keeps the mutation pending
     // until the review queue/invoice list have actually refetched, so callers that close a
     // modal/dialog on success don't do so before the underlying table has reloaded.
@@ -40,6 +35,7 @@ export function useSaveOcrReviewMutation() {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: ["accountsPayable", "reviewQueue"] }),
         queryClient.invalidateQueries({ queryKey: ["accountsPayable", "invoices"] }),
+        queryClient.invalidateQueries({ queryKey: ["accountsPayable", "invoice"] }),
         queryClient.invalidateQueries({ queryKey: INVOICE_SUMMARY_KEY }),
       ]),
   });
