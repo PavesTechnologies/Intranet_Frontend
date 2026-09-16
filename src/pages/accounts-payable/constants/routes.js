@@ -33,6 +33,9 @@ export const AP_ROUTES = {
   REPORTS: `${BASE}/reports`,
   SETTINGS: `${BASE}/settings`,
   SYSTEM_CONFIG: `${BASE}/system-configuration`,
+  SYSTEM_CONFIG_APPROVAL_POLICY_NEW: `${BASE}/system-configuration/approval-policies/new`,
+  SYSTEM_CONFIG_APPROVAL_POLICY_EDIT: (policyId = ":policyId") =>
+    `${BASE}/system-configuration/approval-policies/${policyId}/edit`,
 
   PROCUREMENT: `${BASE}/procurement`,
   PROCUREMENT_PR_DETAIL: (prId = ":prId") => `${BASE}/procurement/requisitions/${prId}`,
