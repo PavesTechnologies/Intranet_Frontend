@@ -15,8 +15,13 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
 import { showStatusToast } from "@/components/toastfy/toast";
-import { expenseReportService, lookupService } from "@/pages/expense-management/api/expenseReportsApi";
-import ReportFormFields from "@/pages/expense-management/components/expense-reports/ReportFormFields";
+import {
+  expenseReportService,
+  lookupService,
+  REPORT_EDITABLE_STATUSES,
+  REPORT_DELETABLE_STATUSES,
+} from "@/pages/expense-management/api/expenseReportsApi";
+import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -46,7 +51,9 @@ const emptyReportForm = {
 export default function MyExpensesPage() {
   const navigate = useNavigate();
   const { hasRole } = useAuth();
-  const canManage = hasRole(["General", "Manager"]);
+  // Manager is read-only on the backend for report writes (ExpenseReportController
+  // allows only ADMIN/GENERAL to create/update/delete/submit) — don't show write actions.
+  const canManage = hasRole(["General"]);
 
   const [reports, setReports] = useState([]);
   const [isServerPaginated, setIsServerPaginated] = useState(false);
@@ -206,6 +213,8 @@ export default function MyExpensesPage() {
     }
     if (!formData.costCenterId) errors.costCenterId = "Cost center is required.";
     if (!formData.currencyId) errors.currencyId = "Report currency is required.";
+    const businessPurposeError = validateBusinessPurpose(formData.businessPurpose);
+    if (businessPurposeError) errors.businessPurpose = businessPurposeError;
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -331,35 +340,35 @@ export default function MyExpensesPage() {
         >
           <Eye size={14} />
         </Button>
-        {canManage && (
-          <>
-            <Button
-              type="button"
-              variant="link"
-              size="icon"
-              title="Edit Report"
-              className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800 transition rounded-md"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEditClick(r);
-              }}
-            >
-              <Pencil size={14} />
-            </Button>
-            <Button
-              type="button"
-              variant="link"
-              size="icon"
-              title="Delete Report"
-              className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 hover:text-red-800 transition rounded-md"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeleteClick(r);
-              }}
-            >
-              <Trash2 size={14} />
-            </Button>
-          </>
+        {canManage && REPORT_EDITABLE_STATUSES.includes(r.reportStatus) && (
+          <Button
+            type="button"
+            variant="link"
+            size="icon"
+            title="Edit Report"
+            className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800 transition rounded-md"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEditClick(r);
+            }}
+          >
+            <Pencil size={14} />
+          </Button>
+        )}
+        {canManage && REPORT_DELETABLE_STATUSES.includes(r.reportStatus) && (
+          <Button
+            type="button"
+            variant="link"
+            size="icon"
+            title="Delete Report"
+            className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 hover:text-red-800 transition rounded-md"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteClick(r);
+            }}
+          >
+            <Trash2 size={14} />
+          </Button>
         )}
       </div>
     ),

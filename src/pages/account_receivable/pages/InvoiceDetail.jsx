@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   FileText,
@@ -15,6 +15,9 @@ import {
   CheckCircle2,
   Send,
   ThumbsUp,
+  XCircle,
+  Edit3,
+  Save,
 } from "lucide-react";
 
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
@@ -29,6 +32,9 @@ import {
   getInvoice,
   submitInvoiceForApproval,
   approveInvoice,
+  rejectInvoice,
+  refreshInvoiceAfterCorrection,
+  correctNonFinancialInvoice,
   getInvoiceApprovalHistory,
   getInvoiceErrorMessage,
 } from "../services/invoiceService";
@@ -93,7 +99,35 @@ export default function InvoiceDetail() {
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isRejectOpen, setIsRejectOpen] = useState(false);
+  const [isResubmitOpen, setIsResubmitOpen] = useState(false);
+  const [isRefreshModalOpen, setIsRefreshModalOpen] = useState(false);
+  const [refreshingAfterCorrection, setRefreshingAfterCorrection] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectError, setRejectError] = useState("");
+
+  // Phase 2C Non-Financial Correction state
+  const [editClientName, setEditClientName] = useState("");
+  const [editProjectName, setEditProjectName] = useState("");
+  const [clientNameError, setClientNameError] = useState("");
+  const [projectNameError, setProjectNameError] = useState("");
+  const [savingCorrection, setSavingCorrection] = useState(false);
+  const [isEditingCorrection, setIsEditingCorrection] = useState(false);
+
+  const latestRejectionReason = useMemo(() => {
+    if (invoice?.rejectionReason) return invoice.rejectionReason;
+    if (!Array.isArray(approvalHistory) || approvalHistory.length === 0) return "";
+    const rejectedRecords = approvalHistory.filter(
+      (h) =>
+        (h.action || "").toUpperCase() === "REJECTED" ||
+        (h.newStatus || "").toUpperCase() === "REJECTED"
+    );
+    if (rejectedRecords.length === 0) return "";
+    const latest = rejectedRecords[rejectedRecords.length - 1];
+    return latest.comment || "";
+  }, [invoice, approvalHistory]);
 
   const loadApprovalHistory = async (invoiceId) => {
     if (!invoiceId) return;
@@ -191,6 +225,180 @@ export default function InvoiceDetail() {
       await loadInvoice(false);
     } finally {
       setApproving(false);
+    }
+  };
+
+  const handleReject = async () => {
+    const trimmed = (rejectionReason || "").trim();
+    if (!trimmed) {
+      setRejectError("Rejection reason is required.");
+      return;
+    }
+    if (trimmed.length > 500) {
+      setRejectError("Rejection reason cannot exceed 500 characters.");
+      return;
+    }
+
+    if (!invoice?.invoiceId || rejecting) return;
+    setRejecting(true);
+    setRejectError("");
+    try {
+      const updated = await rejectInvoice(invoice.invoiceId, trimmed);
+      setIsRejectOpen(false);
+      setRejectionReason("");
+      showStatusToast("Invoice rejected successfully.", "success");
+      if (updated) {
+        setInvoice((prev) => ({
+          ...prev,
+          ...updated,
+          invoiceStatus: updated.invoiceStatus || "REJECTED",
+          rejectionReason: trimmed,
+        }));
+      }
+      await loadInvoice(false);
+    } catch (err) {
+      console.error("[InvoiceDetail] Error rejecting invoice:", err);
+      const msg = getInvoiceErrorMessage(err, "Failed to reject invoice.");
+      setRejectError(msg);
+      showStatusToast(msg, "error");
+      await loadInvoice(false);
+    } finally {
+      setRejecting(false);
+    }
+  };
+
+  const handleResubmit = async () => {
+    if (!invoice?.invoiceId || submitting) return;
+    setSubmitting(true);
+    setIsResubmitOpen(false);
+    try {
+      const updated = await submitInvoiceForApproval(invoice.invoiceId);
+      showStatusToast("Invoice resubmitted for approval.", "success");
+      if (updated) {
+        setInvoice((prev) => ({
+          ...prev,
+          ...updated,
+          invoiceStatus: updated.invoiceStatus || "PENDING_APPROVAL",
+        }));
+      }
+      await loadInvoice(false);
+    } catch (err) {
+      console.error("[InvoiceDetail] Error resubmitting invoice for approval:", err);
+      const msg = getInvoiceErrorMessage(err, "Failed to resubmit invoice for approval.");
+      showStatusToast(msg, "error");
+      await loadInvoice(false);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRefreshAfterCorrection = async () => {
+    if (!invoice?.invoiceId || refreshingAfterCorrection) return;
+    setRefreshingAfterCorrection(true);
+    try {
+      const updated = await refreshInvoiceAfterCorrection(invoice.invoiceId);
+      setIsRefreshModalOpen(false);
+      showStatusToast("Invoice refreshed successfully. It is ready for resubmission.", "success");
+      if (updated) {
+        setInvoice((prev) => ({
+          ...prev,
+          ...updated,
+          invoiceStatus: updated.invoiceStatus || "REJECTED",
+        }));
+      }
+      await loadInvoice(false);
+    } catch (err) {
+      console.error("[InvoiceDetail] Error refreshing invoice after correction:", err);
+      const msg = getInvoiceErrorMessage(err, "Failed to refresh invoice after correction.");
+      showStatusToast(msg, "error");
+    } finally {
+      setRefreshingAfterCorrection(false);
+    }
+  };
+
+  useEffect(() => {
+    if (invoice) {
+      setEditClientName(invoice.clientName || "");
+      setEditProjectName(invoice.projectName || "");
+      setClientNameError("");
+      setProjectNameError("");
+      if (invoice.invoiceStatus === "REJECTED" && invoice.correctionRequired) {
+        setIsEditingCorrection(true);
+      } else {
+        setIsEditingCorrection(false);
+      }
+    }
+  }, [
+    invoice?.clientName,
+    invoice?.projectName,
+    invoice?.invoiceId,
+    invoice?.invoiceStatus,
+    invoice?.correctionRequired,
+  ]);
+
+  const handleSaveCorrection = async () => {
+    const trimmedClient = (editClientName || "").trim();
+    const trimmedProject = (editProjectName || "").trim();
+
+    let hasError = false;
+    if (!trimmedClient) {
+      setClientNameError("Client Name is required.");
+      hasError = true;
+    } else if (trimmedClient.length > 150) {
+      setClientNameError("Client Name cannot exceed 150 characters.");
+      hasError = true;
+    } else {
+      setClientNameError("");
+    }
+
+    if (!trimmedProject) {
+      setProjectNameError("Project Name is required.");
+      hasError = true;
+    } else if (trimmedProject.length > 150) {
+      setProjectNameError("Project Name cannot exceed 150 characters.");
+      hasError = true;
+    } else {
+      setProjectNameError("");
+    }
+
+    if (hasError) return;
+
+    if (!invoice?.invoiceId || savingCorrection) return;
+
+    setSavingCorrection(true);
+    try {
+      const updated = await correctNonFinancialInvoice(invoice.invoiceId, {
+        clientName: trimmedClient,
+        projectName: trimmedProject,
+      });
+      showStatusToast("Non-financial correction saved successfully.", "success");
+      if (updated) {
+        setInvoice((prev) => ({
+          ...prev,
+          ...updated,
+          invoiceStatus: updated.invoiceStatus || "REJECTED",
+          correctionRequired: false,
+        }));
+      }
+      setIsEditingCorrection(false);
+      await loadInvoice(false);
+    } catch (err) {
+      console.error("[InvoiceDetail] Error saving non-financial correction:", err);
+      const msg = getInvoiceErrorMessage(err, "Failed to save invoice correction.");
+      showStatusToast(msg, "error");
+      await loadInvoice(false);
+    } finally {
+      setSavingCorrection(false);
+    }
+  };
+
+  const handleResetCorrection = () => {
+    setEditClientName(invoice?.clientName || "");
+    setEditProjectName(invoice?.projectName || "");
+    setClientNameError("");
+    setProjectNameError("");
+    if (!invoice?.correctionRequired) {
+      setIsEditingCorrection(false);
     }
   };
 
@@ -330,18 +538,62 @@ export default function InvoiceDetail() {
             </Button>
           )}
 
-          {/* Action: Approve (for PENDING_APPROVAL invoices) */}
+          {/* Actions: Approve & Reject (for PENDING_APPROVAL invoices) */}
           {invoice?.invoiceStatus === "PENDING_APPROVAL" && (
-            <Button
-              variant="primary"
-              size="small"
-              onClick={() => setIsConfirmOpen(true)}
-              disabled={approving || refreshing}
-              className="bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 text-xs font-semibold"
-            >
-              <ThumbsUp className="h-3.5 w-3.5" />
-              {approving ? "Approving..." : "Approve"}
-            </Button>
+            <>
+              <Button
+                variant="primary"
+                size="small"
+                onClick={() => setIsConfirmOpen(true)}
+                disabled={approving || rejecting || refreshing}
+                className="bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 text-xs font-semibold"
+              >
+                <ThumbsUp className="h-3.5 w-3.5" />
+                {approving ? "Approving..." : "Approve"}
+              </Button>
+
+              <Button
+                variant="outline"
+                size="small"
+                onClick={() => {
+                  setRejectionReason("");
+                  setRejectError("");
+                  setIsRejectOpen(true);
+                }}
+                disabled={approving || rejecting || refreshing}
+                className="border-rose-300 text-rose-700 hover:bg-rose-50 hover:border-rose-400 flex items-center gap-1.5 text-xs font-semibold"
+              >
+                <XCircle className="h-3.5 w-3.5 text-rose-600" />
+                Reject Invoice
+              </Button>
+            </>
+          )}
+
+          {/* Action: Resubmit for Approval / Refresh Invoice (for REJECTED invoices) */}
+          {invoice?.invoiceStatus === "REJECTED" && (
+            invoice?.correctionRequired === false ? (
+              <Button
+                variant="primary"
+                size="small"
+                onClick={() => setIsResubmitOpen(true)}
+                disabled={submitting || refreshing || refreshingAfterCorrection || savingCorrection}
+                className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold"
+              >
+                <Send className="h-3.5 w-3.5" />
+                {submitting ? "Submitting..." : "Resubmit for Approval"}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="small"
+                onClick={() => setIsRefreshModalOpen(true)}
+                disabled={refreshing || refreshingAfterCorrection || savingCorrection}
+                className="border-indigo-300 text-indigo-700 hover:bg-indigo-50 flex items-center gap-1.5 text-xs font-semibold"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshingAfterCorrection ? "animate-spin" : ""}`} />
+                {refreshingAfterCorrection ? "Refreshing..." : "Refresh Invoice"}
+              </Button>
+            )
           )}
 
           <Button
@@ -377,13 +629,334 @@ export default function InvoiceDetail() {
             variant="outline"
             size="small"
             onClick={() => loadInvoice(true)}
-            disabled={refreshing || submitting || approving}
+            disabled={refreshing || submitting || approving || rejecting || refreshingAfterCorrection}
             className="flex items-center gap-1.5 text-xs"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Refresh
           </Button>
         </div>
       </div>
+
+      {/* Correction Section (Phase 2B & Phase 2C Non-Financial Correction) */}
+      {invoice?.invoiceStatus === "REJECTED" && (
+        <div
+          className={`rounded-xl border p-5 space-y-4 shadow-sm ${
+            invoice.correctionRequired
+              ? "border-rose-200 bg-rose-50/70"
+              : "border-emerald-200 bg-emerald-50/50"
+          }`}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 border-b pb-4 border-slate-200/80">
+            <div className="flex items-start gap-3">
+              <div
+                className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                  invoice.correctionRequired
+                    ? "bg-rose-100 text-rose-600"
+                    : "bg-emerald-100 text-emerald-600"
+                }`}
+              >
+                {invoice.correctionRequired ? (
+                  <AlertTriangle className="h-5 w-5" />
+                ) : (
+                  <CheckCircle2 className="h-5 w-5" />
+                )}
+              </div>
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h2 className="text-base font-bold text-slate-900">
+                    {invoice.correctionRequired ? "Correction Required" : "Correction Completed"}
+                  </h2>
+                  <StatusBadge label="REJECTED" size="sm" />
+                  {invoice.correctionRequired ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                      Correction Required
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      Ready to Resubmit
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-700">
+                  {invoice.correctionRequired
+                    ? "This invoice was rejected and requires correction before it can be resubmitted. Client Name and Project Name can be edited below. Financial data remains strictly read-only."
+                    : "Non-financial correction has been completed. The invoice is ready to be resubmitted for approval."}
+                </p>
+                {invoice.lastCorrectedAt && (
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Last corrected: {formatDisplayDateTime(invoice.lastCorrectedAt)}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto shrink-0 pt-1 sm:pt-0">
+              {snapshotId && (
+                <Button
+                  variant="outline"
+                  size="small"
+                  onClick={() => navigate(`/account-receivable/tax-calculation/${snapshotId}`)}
+                  className="text-xs bg-white text-slate-700 border-slate-300 hover:bg-slate-100/50 font-medium"
+                >
+                  Review Tax Calculation
+                </Button>
+              )}
+
+              <Button
+                variant="outline"
+                size="small"
+                onClick={() => setIsRefreshModalOpen(true)}
+                disabled={refreshing || refreshingAfterCorrection || savingCorrection}
+                className="text-xs bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-medium flex items-center gap-1.5"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshingAfterCorrection ? "animate-spin" : ""}`} />
+                {refreshingAfterCorrection ? "Refreshing..." : "Refresh Invoice"}
+              </Button>
+
+              {invoice.correctionRequired === false ? (
+                <Button
+                  variant="primary"
+                  size="small"
+                  onClick={() => setIsResubmitOpen(true)}
+                  disabled={submitting || refreshing || refreshingAfterCorrection || savingCorrection}
+                  className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold flex items-center gap-1.5"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  {submitting ? "Resubmitting..." : "Resubmit for Approval"}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Context Details: Invoice Number, Current Status, Rejection Reason */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Invoice Number:</span>
+                <span className="font-mono font-bold text-indigo-700">{invoice?.invoiceNumber || "—"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Current Status:</span>
+                <StatusBadge label="REJECTED" size="sm" />
+              </div>
+              {invoice?.lastCorrectedAt && (
+                <div className="flex items-center justify-between border-t border-slate-100 pt-1.5">
+                  <span className="text-slate-500 font-medium">Last Corrected:</span>
+                  <span className="font-medium text-slate-700">{formatDisplayDateTime(invoice.lastCorrectedAt)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-rose-600">
+                Rejection Reason (Audit Record)
+              </span>
+              <p className="mt-1 text-sm font-medium text-slate-800 italic">
+                "{latestRejectionReason || "No specific rejection reason recorded."}"
+              </p>
+            </div>
+          </div>
+
+          {/* Controlled Non-Financial Correction: Editable when correctionRequired === true */}
+          {invoice.correctionRequired ? (
+            <div className="rounded-lg border border-amber-200 bg-white p-4 space-y-3 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-2.5">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <Edit3 className="h-4 w-4 text-indigo-600" />
+                    Non-Financial Correction
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Client Name and Project Name can be corrected. All financial details (quantities, rates, taxes, and amounts) remain authoritative and read-only.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                {/* Client Name Input */}
+                <div className="space-y-1">
+                  <label htmlFor="edit-client-name" className="block text-xs font-bold text-slate-700">
+                    Client Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    id="edit-client-name"
+                    type="text"
+                    value={editClientName}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditClientName(val);
+                      if (val.trim()) {
+                        setClientNameError(val.length > 150 ? "Client Name cannot exceed 150 characters." : "");
+                      }
+                    }}
+                    placeholder="Enter client name..."
+                    disabled={savingCorrection}
+                    className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 ${
+                      clientNameError
+                        ? "border-rose-300 focus:border-rose-500 focus:ring-rose-500 bg-rose-50/30"
+                        : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
+                    }`}
+                  />
+                  <div className="flex items-center justify-between text-[11px]">
+                    <div>{clientNameError && <span className="text-rose-600 font-medium">{clientNameError}</span>}</div>
+                    <span className={editClientName.length > 150 ? "text-rose-600 font-bold" : "text-slate-400"}>
+                      {editClientName.length}/150
+                    </span>
+                  </div>
+                </div>
+
+                {/* Project Name Input */}
+                <div className="space-y-1">
+                  <label htmlFor="edit-project-name" className="block text-xs font-bold text-slate-700">
+                    Project Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    id="edit-project-name"
+                    type="text"
+                    value={editProjectName}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditProjectName(val);
+                      if (val.trim()) {
+                        setProjectNameError(val.length > 150 ? "Project Name cannot exceed 150 characters." : "");
+                      }
+                    }}
+                    placeholder="Enter project name..."
+                    disabled={savingCorrection}
+                    className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 ${
+                      projectNameError
+                        ? "border-rose-300 focus:border-rose-500 focus:ring-rose-500 bg-rose-50/30"
+                        : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
+                    }`}
+                  />
+                  <div className="flex items-center justify-between text-[11px]">
+                    <div>{projectNameError && <span className="text-rose-600 font-medium">{projectNameError}</span>}</div>
+                    <span className={editProjectName.length > 150 ? "text-rose-600 font-bold" : "text-slate-400"}>
+                      {editProjectName.length}/150
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <Button
+                  variant="outline"
+                  size="small"
+                  onClick={handleResetCorrection}
+                  disabled={savingCorrection}
+                  className="text-xs"
+                >
+                  Reset
+                </Button>
+                <Button
+                  variant="primary"
+                  size="small"
+                  onClick={handleSaveCorrection}
+                  disabled={savingCorrection || !editClientName.trim() || !editProjectName.trim()}
+                  className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold flex items-center gap-1.5"
+                >
+                  <Save className={`h-3.5 w-3.5 ${savingCorrection ? "animate-spin" : ""}`} />
+                  {savingCorrection ? "Saving Correction..." : "Save Correction"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* When correctionRequired === false */
+            <div className="rounded-lg border border-emerald-200 bg-white p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+                    Corrected Non-Financial Details
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Correction saved. Ready to resubmit for approval.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="small"
+                  onClick={() => setIsEditingCorrection(true)}
+                  className="text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50 flex items-center gap-1"
+                >
+                  <Edit3 className="h-3 w-3" />
+                  Edit Correction
+                </Button>
+              </div>
+
+              {isEditingCorrection ? (
+                <div className="space-y-3 pt-2 border-t border-slate-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label htmlFor="edit-client-name-re" className="block text-xs font-bold text-slate-700">
+                        Client Name <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="edit-client-name-re"
+                        type="text"
+                        value={editClientName}
+                        onChange={(e) => setEditClientName(e.target.value)}
+                        disabled={savingCorrection}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      {clientNameError && <p className="text-xs text-rose-600">{clientNameError}</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <label htmlFor="edit-project-name-re" className="block text-xs font-bold text-slate-700">
+                        Project Name <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="edit-project-name-re"
+                        type="text"
+                        value={editProjectName}
+                        onChange={(e) => setEditProjectName(e.target.value)}
+                        disabled={savingCorrection}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      {projectNameError && <p className="text-xs text-rose-600">{projectNameError}</p>}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <Button
+                      variant="outline"
+                      size="small"
+                      onClick={() => {
+                        handleResetCorrection();
+                        setIsEditingCorrection(false);
+                      }}
+                      disabled={savingCorrection}
+                      className="text-xs"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="small"
+                      onClick={handleSaveCorrection}
+                      disabled={savingCorrection || !editClientName.trim() || !editProjectName.trim()}
+                      className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold flex items-center gap-1.5"
+                    >
+                      <Save className={`h-3.5 w-3.5 ${savingCorrection ? "animate-spin" : ""}`} />
+                      {savingCorrection ? "Saving..." : "Save Correction"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <div>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Client Name</span>
+                    <span className="font-semibold text-slate-800 text-sm mt-0.5 block">{invoice?.clientName || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Project Name</span>
+                    <span className="font-semibold text-slate-800 text-sm mt-0.5 block">{invoice?.projectName || "—"}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Main Invoice Card */}
       <PageCard className="divide-y divide-slate-100">
@@ -700,6 +1273,210 @@ export default function InvoiceDetail() {
               className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold"
             >
               {approving ? "Approving..." : "Yes, Approve Invoice"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Confirmation Modal for Reject Invoice (Section 3) */}
+      <Modal
+        isOpen={isRejectOpen}
+        onClose={() => !rejecting && setIsRejectOpen(false)}
+        title="Reject Invoice"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Please provide the rejection reason for this invoice. The rejection reason is mandatory and will be recorded for audit and correction tracking.
+          </p>
+
+          {/* Basic Invoice Context */}
+          <div className="rounded-lg bg-slate-50 p-3.5 text-xs space-y-1.5 border border-slate-200">
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">Invoice Number:</span>
+              <span className="font-mono font-bold text-indigo-700">{invoice?.invoiceNumber || "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">Client:</span>
+              <span className="font-semibold text-slate-800">{invoice?.clientName || "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">Project:</span>
+              <span className="font-semibold text-slate-800">{invoice?.projectName || "—"}</span>
+            </div>
+            <div className="flex justify-between border-t border-slate-200 pt-1.5">
+              <span className="text-slate-700 font-bold">Grand Total:</span>
+              <span className="font-mono font-bold text-slate-900">
+                {formatCurrency(invoice?.grandTotal, currency)}
+              </span>
+            </div>
+          </div>
+
+          {/* Rejection Reason Input */}
+          <div className="space-y-1.5">
+            <label htmlFor="rejection-reason" className="block text-xs font-bold text-slate-700">
+              Rejection Reason <span className="text-rose-500">*</span>
+            </label>
+            <textarea
+              id="rejection-reason"
+              rows={4}
+              value={rejectionReason}
+              onChange={(e) => {
+                const val = e.target.value;
+                setRejectionReason(val);
+                if (val.length > 500) {
+                  setRejectError("Rejection reason cannot exceed 500 characters.");
+                } else {
+                  setRejectError("");
+                }
+              }}
+              placeholder="Enter the reason for rejecting this invoice..."
+              className={`w-full rounded-lg border p-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 ${
+                rejectError
+                  ? "border-rose-300 focus:border-rose-500 focus:ring-rose-500 bg-rose-50/30"
+                  : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
+              }`}
+              disabled={rejecting}
+            />
+            <div className="flex items-center justify-between text-xs">
+              <div>
+                {rejectError && <span className="text-rose-600 font-medium">{rejectError}</span>}
+              </div>
+              <span className={rejectionReason.length > 500 ? "text-rose-600 font-bold" : "text-slate-400"}>
+                {rejectionReason.length}/500
+              </span>
+            </div>
+          </div>
+
+          {/* Modal Buttons */}
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <Button
+              variant="outline"
+              size="small"
+              onClick={() => setIsRejectOpen(false)}
+              disabled={rejecting}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="small"
+              onClick={handleReject}
+              disabled={
+                rejecting ||
+                !rejectionReason.trim() ||
+                rejectionReason.length > 500
+              }
+              className="bg-rose-700 hover:bg-rose-800 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {rejecting ? "Rejecting..." : "Reject Invoice"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Confirmation Modal for Resubmit Invoice (Section 7) */}
+      <Modal
+        isOpen={isResubmitOpen}
+        onClose={() => !submitting && setIsResubmitOpen(false)}
+        title="Resubmit Invoice for Approval"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-700">
+            The invoice has been refreshed from the latest billing and tax data. Are you sure you want to resubmit it for approval?
+          </p>
+
+          <div className="rounded-lg bg-slate-50 p-3.5 text-xs space-y-1.5 border border-slate-200">
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">Invoice Number:</span>
+              <span className="font-mono font-bold text-indigo-700">{invoice?.invoiceNumber || "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">Client:</span>
+              <span className="font-semibold text-slate-800">{invoice?.clientName || "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">Project:</span>
+              <span className="font-semibold text-slate-800">{invoice?.projectName || "—"}</span>
+            </div>
+            <div className="flex justify-between border-t border-slate-200 pt-1.5">
+              <span className="text-slate-700 font-bold">Grand Total:</span>
+              <span className="font-mono font-bold text-slate-900">
+                {formatCurrency(invoice?.grandTotal, currency)}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <Button
+              variant="outline"
+              size="small"
+              onClick={() => setIsResubmitOpen(false)}
+              disabled={submitting}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="small"
+              onClick={handleResubmit}
+              disabled={submitting}
+              className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold"
+            >
+              {submitting ? "Resubmitting..." : "Resubmit for Approval"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Confirmation Modal for Refresh Invoice (Section 4 - Phase 2B) */}
+      <Modal
+        isOpen={isRefreshModalOpen}
+        onClose={() => !refreshingAfterCorrection && setIsRefreshModalOpen(false)}
+        title="Refresh Invoice"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm font-semibold text-slate-800">
+            Refresh this invoice from the latest billing and tax data?
+          </p>
+          <p className="text-xs text-slate-600">
+            The invoice will remain rejected, but its financial details will be refreshed from the authoritative billing and tax data. You can resubmit it for approval afterward.
+          </p>
+
+          <div className="rounded-lg bg-slate-50 p-3.5 text-xs space-y-1.5 border border-slate-200">
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">Invoice Number:</span>
+              <span className="font-mono font-bold text-indigo-700">{invoice?.invoiceNumber || "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">Status:</span>
+              <StatusBadge label="REJECTED" size="sm" />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <Button
+              variant="outline"
+              size="small"
+              onClick={() => setIsRefreshModalOpen(false)}
+              disabled={refreshingAfterCorrection}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="small"
+              onClick={handleRefreshAfterCorrection}
+              disabled={refreshingAfterCorrection}
+              className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold flex items-center gap-1.5"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshingAfterCorrection ? "animate-spin" : ""}`} />
+              {refreshingAfterCorrection ? "Refreshing..." : "Refresh Invoice"}
             </Button>
           </div>
         </div>
