@@ -350,6 +350,7 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
             <Field label="Currency">
               <span className="font-mono">{currency}</span>
             </Field>
+            {occurrence.primaryLocation && <Field label="Primary Location">{occurrence.primaryLocation}</Field>}
             {occurrence.taxRegionName && <Field label="Tax Region">{occurrence.taxRegionName}</Field>}
             {(taxConfig?.taxRegime || occurrence.taxRegionName) && (
               <Field label="Tax Regime">{taxConfig?.taxRegime || "GST"}</Field>

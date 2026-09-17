@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, CheckCircle2, XCircle, ClipboardCheck, Clock, FolderKanban, Building2, Calendar, Receipt, Wallet, Info } from "lucide-react";
+import { Eye, CheckCircle2, XCircle, ClipboardCheck, Clock, FolderKanban, Building2, Calendar, Receipt, Wallet, Info, AlertTriangle } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
@@ -32,6 +32,10 @@ const STATUS_TABS = {
   PENDING: "PENDING_APPROVAL",
   APPROVED: "APPROVED",
   REJECTED: "REJECTED",
+  // Not a real backend approvalStatus — a client-side-only filter derived from
+  // approvalStatus === APPROVED plus effectiveTo/project end date having
+  // already passed (see isBillingSetupExpired below).
+  EXPIRED: "EXPIRED",
   ALL: "ALL",
 };
 
@@ -81,6 +85,24 @@ function formatDate(value) {
   const date = parseTimestamp(value);
   if (!date) return typeof value === "string" && !value.includes(",") ? value : "—";
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+// An Approved billing setup is Expired once its applicable/project duration
+// (config.effectiveTo — already the tighter of the billing effective end date
+// and the project end date, see loadAllApprovals below) has ended. Compares
+// calendar dates only (time-of-day stripped) so "today" always reflects the
+// current date, not a stale snapshot from when the list was last loaded.
+// Applies uniformly to every billing type since effectiveTo is already
+// normalized the same way for Time & Material, Fixed Price, Milestone, and
+// Recurring configurations.
+function isBillingSetupExpired(config) {
+  if (config.approvalStatus !== "APPROVED") return false;
+  const endDate = parseTimestamp(config.effectiveTo);
+  if (!endDate) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  endDate.setHours(0, 0, 0, 0);
+  return endDate < today;
 }
 
 function formatDateTime(value) {
@@ -204,15 +226,17 @@ export default function BillingApprovals() {
       PENDING: configs.filter((c) => c.approvalStatus === "PENDING_APPROVAL").length,
       APPROVED: configs.filter((c) => c.approvalStatus === "APPROVED").length,
       REJECTED: configs.filter((c) => c.approvalStatus === "REJECTED").length,
+      EXPIRED: configs.filter(isBillingSetupExpired).length,
       ALL: configs.length,
     };
   }, [configs]);
 
   const kpiCards = [
-    { label: "Total Requests", value: tabCounts.ALL, icon: FolderKanban, color: "bg-[#0A0082] text-white" },
-    { label: "Pending Approvals", value: tabCounts.PENDING, icon: Clock, color: "bg-amber-500 text-white" },
-    { label: "Approved", value: tabCounts.APPROVED, icon: CheckCircle2, color: "bg-emerald-600 text-white" },
-    { label: "Rejected", value: tabCounts.REJECTED, icon: XCircle, color: "bg-rose-600 text-white" },
+    { key: STATUS_TABS.ALL, label: "Total Requests", value: tabCounts.ALL, icon: FolderKanban, color: "bg-[#0A0082] text-white" },
+    { key: STATUS_TABS.PENDING, label: "Pending Approvals", value: tabCounts.PENDING, icon: Clock, color: "bg-amber-500 text-white" },
+    { key: STATUS_TABS.APPROVED, label: "Approved", value: tabCounts.APPROVED, icon: CheckCircle2, color: "bg-emerald-600 text-white" },
+    { key: STATUS_TABS.REJECTED, label: "Rejected", value: tabCounts.REJECTED, icon: XCircle, color: "bg-rose-600 text-white" },
+    { key: STATUS_TABS.EXPIRED, label: "Expired", value: tabCounts.EXPIRED, icon: AlertTriangle, color: "bg-orange-600 text-white" },
   ];
 
   const handleTabChange = (key) => {
@@ -224,7 +248,9 @@ export default function BillingApprovals() {
     const q = searchQuery.trim().toLowerCase();
     return configs.filter((c) => {
       let matchesTab = true;
-      if (statusTab !== STATUS_TABS.ALL) {
+      if (statusTab === STATUS_TABS.EXPIRED) {
+        matchesTab = isBillingSetupExpired(c);
+      } else if (statusTab !== STATUS_TABS.ALL) {
         matchesTab = c.approvalStatus === statusTab;
       }
       const matchesSearch =
@@ -352,6 +378,7 @@ export default function BillingApprovals() {
     { key: STATUS_TABS.PENDING, label: "Pending Approvals", icon: Clock, count: tabCounts.PENDING },
     { key: STATUS_TABS.APPROVED, label: "Approved", icon: CheckCircle2, count: tabCounts.APPROVED },
     { key: STATUS_TABS.REJECTED, label: "Rejected", icon: XCircle, count: tabCounts.REJECTED },
+    { key: STATUS_TABS.EXPIRED, label: "Expired", icon: AlertTriangle, count: tabCounts.EXPIRED },
     { key: STATUS_TABS.ALL, label: "All Requests", icon: FolderKanban, count: tabCounts.ALL },
   ];
 
@@ -363,18 +390,28 @@ export default function BillingApprovals() {
         subtitle="Review, approve, or reject billing configuration setups submitted by Finance Executives."
       />
 
-      {/* 2. Summary KPI Cards (Total, Pending, Approved, Rejected) */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {kpiCards.map((kpi) => (
-          <KPICard
-            key={kpi.label}
-            label={kpi.label}
-            value={loading ? "…" : kpi.value}
-            icon={<kpi.icon className="h-5 w-5" />}
-            color={kpi.color}
-            className="h-full w-full bg-white shadow-sm"
-          />
-        ))}
+      {/* 2. Summary KPI Cards (Total, Pending, Approved, Rejected, Expired) */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {kpiCards.map((kpi) => {
+          const isActive = statusTab === kpi.key;
+          return (
+            <div
+              key={kpi.key}
+              onClick={() => handleTabChange(kpi.key)}
+              className={`cursor-pointer rounded-xl transition-all duration-150 ${
+                isActive ? "ring-2 ring-[#0A0082] ring-offset-2" : "hover:shadow-sm opacity-90 hover:opacity-100"
+              }`}
+            >
+              <KPICard
+                label={kpi.label}
+                value={loading ? "…" : kpi.value}
+                icon={<kpi.icon className="h-5 w-5" />}
+                color={kpi.color}
+                className="h-full w-full bg-white shadow-sm"
+              />
+            </div>
+          );
+        })}
       </div>
 
       {/* 3. Main Data Card */}

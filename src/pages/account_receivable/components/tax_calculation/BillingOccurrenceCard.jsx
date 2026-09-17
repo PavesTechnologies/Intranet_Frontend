@@ -71,6 +71,12 @@ export default function BillingOccurrenceCard({
             {formatCurrency(occurrence.billingAmount, currency)}
           </span>
         </div>
+        {occurrence.primaryLocation && (
+          <div>
+            <span className="block font-bold uppercase tracking-wider text-slate-400">Primary Location</span>
+            <span className="mt-0.5 block font-medium text-slate-700">{occurrence.primaryLocation}</span>
+          </div>
+        )}
         {occurrence.taxRegionName && (
           <div>
             <span className="block font-bold uppercase tracking-wider text-slate-400">Tax Region</span>

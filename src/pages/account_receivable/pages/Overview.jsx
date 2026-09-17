@@ -12,6 +12,7 @@ import {
   Ban,
   Trash2,
   FilterX,
+  AlertTriangle,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -52,6 +53,7 @@ const CONFIG_STATUS_OPTIONS = [
   { label: "All Configuration Statuses", value: "ALL" },
   { label: "Active", value: "ACTIVE" },
   { label: "Inactive", value: "INACTIVE" },
+  { label: "Expired", value: "EXPIRED" },
 ];
 
 const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Approval Status", "Configuration Status", "Actions"];
@@ -122,6 +124,9 @@ export default function Overview() {
       setApprovalStatusFilter("ALL");
     } else if (key === "INACTIVE") {
       setConfigStatusFilter((prev) => (prev === "INACTIVE" ? "ALL" : "INACTIVE"));
+      setApprovalStatusFilter("ALL");
+    } else if (key === "EXPIRED") {
+      setConfigStatusFilter((prev) => (prev === "EXPIRED" ? "ALL" : "EXPIRED"));
       setApprovalStatusFilter("ALL");
     } else {
       setApprovalStatusFilter((prev) => (prev === key ? "ALL" : key));
@@ -354,6 +359,15 @@ export default function Overview() {
       icon: Ban,
       color: "bg-slate-500 text-white",
       active: configStatusFilter === "INACTIVE" && approvalStatusFilter === "ALL",
+    },
+    {
+      key: "EXPIRED",
+      label: "Expired",
+      subLabel: null,
+      value: stats?.expired ?? configs.filter((c) => c.billingStatus === "EXPIRED").length,
+      icon: AlertTriangle,
+      color: "bg-orange-600 text-white",
+      active: configStatusFilter === "EXPIRED" && approvalStatusFilter === "ALL",
     },
   ];
 

@@ -309,7 +309,19 @@ export default function NewConfigurationWizard() {
 
         const { summary, detail } = result;
         if (detail) {
-          setWizardData((prev) => ({ ...prev, ...detail }));
+          // The existing project may be excluded from the available-projects
+          // list (it's already configured), so its projectCode isn't always
+          // present on the raw detail response. Some backends key the PMS
+          // project by its projectId with no separate code — fall back to the
+          // existing projectId so Project Summary/validation never see a
+          // blank code for a project that's already selected.
+          const projectInfo = detail.projectInfo || {};
+          const projectCode = projectInfo.projectCode || (projectInfo.projectId ? String(projectInfo.projectId) : "");
+          setWizardData((prev) => ({
+            ...prev,
+            ...detail,
+            projectInfo: { ...projectInfo, projectCode },
+          }));
         }
         setSavedConfigId(summary.id || configId);
         setApprovalStatus(summary.approvalStatus || null);

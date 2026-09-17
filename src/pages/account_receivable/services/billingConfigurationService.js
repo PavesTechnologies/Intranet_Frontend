@@ -1055,6 +1055,19 @@ export const getBillingConfigurationProjectsByClient = async (clientId) => {
   return asArray(unwrapData(response)).map(normalizeProject);
 };
 
+// Returns only the projects eligible for a NEW billing configuration for this
+// client — the backend already excludes projects that are Draft, Pending
+// Approval, or Active (Approved + billingStatus ACTIVE), and includes
+// Rejected/Expired/never-configured projects. The frontend must not
+// re-implement or layer any of that eligibility logic on top of this list.
+export const getAvailableProjectsForBillingConfiguration = async (clientId) => {
+  if (!clientId) return [];
+  const response = await api.get(`${BILLING_CONFIGURATIONS_URL}/available-projects`, {
+    params: { clientId },
+  });
+  return asArray(unwrapData(response)).map(normalizeProject);
+};
+
 // --- Time & Material Rate Card APIs ---
 export const getTmRateCardsByBillingConfiguration = async (billingConfigurationId) => {
   if (!billingConfigurationId) return [];
