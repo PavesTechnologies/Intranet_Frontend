@@ -3,6 +3,7 @@ import { AlertTriangle, Inbox } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import FormSelect from "@/components/forms/FormSelect";
 import ApprovalStatusPill from "../components/ApprovalStatusPill";
 import EmployeeLabel from "../components/EmployeeLabel";
 import ExpenseReviewPanel from "../components/ExpenseReviewPanel";
@@ -10,16 +11,26 @@ import { useMyHistory } from "../hooks/useApprovalWorkflow";
 import { useApprovalLiveSync } from "../hooks/useApprovalLiveSync";
 import { formatMoney, formatDate } from "../constants/approvalLabels";
 
+const OUTCOME_OPTIONS = [
+  { label: "All Outcomes", value: "" },
+  { label: "Approved", value: "APPROVED" },
+  { label: "Rejected", value: "REJECTED" },
+];
+
 /**
- * Approved/Rejected tabs share this one component (outcome is the only real difference) - both are
- * GET /xms/approvals/my-history?outcome=..., server-side paginated. Rows open the same
- * ExpenseReviewPanel used by the pending queue, in read-only "history" mode.
+ * Approved and History share this one component — both are GET /xms/approvals/my-history?outcome=,
+ * server-side paginated; `outcome` fixed by the caller (Approved tab) or, with
+ * `allowOutcomeFilter`, chosen in-page from the same two backend-supported values (History tab
+ * defaults to both/undefined). Rows open the same ExpenseReviewPanel used by the pending queue, in
+ * read-only "history" mode.
  */
-export default function ApprovalHistoryPage({ outcome, title, breadcrumbLabel, searchTerm = "" }) {
+export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, breadcrumbLabel, searchTerm = "", hideHeader = false, allowOutcomeFilter = false, noPadding = false }) {
   const [page, setPage] = useState(0);
+  const [outcomeFilter, setOutcomeFilter] = useState(fixedOutcome || "");
   const [reviewingItem, setReviewingItem] = useState(null);
   useApprovalLiveSync();
 
+  const outcome = allowOutcomeFilter ? outcomeFilter || undefined : fixedOutcome;
   const { data, isLoading, isError, refetch } = useMyHistory(outcome, page, 20);
   const items = data?.content || [];
 
@@ -43,16 +54,34 @@ export default function ApprovalHistoryPage({ outcome, title, breadcrumbLabel, s
   }, [items, searchTerm]);
 
   return (
-    <div className="p-4 sm:p-6">
-      <Breadcrumb
-        items={[
-          { label: "Expense Management", to: "/expense-management/dashboard" },
-          { label: "Approvals" },
-          { label: breadcrumbLabel },
-        ]}
-      />
+    <div className={noPadding ? "" : "p-4 sm:p-6"}>
+      {!hideHeader && (
+        <Breadcrumb
+          items={[
+            { label: "Expense Management", to: "/expense-management/dashboard" },
+            { label: "Approvals" },
+            { label: breadcrumbLabel },
+          ]}
+        />
+      )}
 
-      <h1 className="text-xl font-semibold text-gray-900 mt-3 mb-4">{title}</h1>
+      <div className={`flex flex-wrap items-center justify-between gap-3 ${hideHeader ? "" : "mt-3"} mb-4`}>
+        {!hideHeader && <h1 className="text-xl font-semibold text-gray-900">{title}</h1>}
+        {allowOutcomeFilter && (
+          <FormSelect
+            label=""
+            name="outcomeFilter"
+            value={outcomeFilter}
+            onChange={(e) => {
+              setOutcomeFilter(e.target.value);
+              setPage(0);
+            }}
+            options={OUTCOME_OPTIONS}
+            className="w-48"
+            buttonClassName="!py-1.5 !px-3 !text-xs"
+          />
+        )}
+      </div>
 
       {isLoading && (
         <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-16">
@@ -72,7 +101,11 @@ export default function ApprovalHistoryPage({ outcome, title, breadcrumbLabel, s
         <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-16 text-center">
           <Inbox className="h-8 w-8 text-gray-300" />
           <p className="text-sm font-medium text-gray-600">
-            {searchTerm ? "No approvals match the search criteria." : "Nothing here yet."}
+            {searchTerm
+              ? "No approvals match the search criteria."
+              : allowOutcomeFilter
+              ? "No approval history"
+              : "No approved expenses yet"}
           </p>
         </div>
       )}

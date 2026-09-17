@@ -198,6 +198,23 @@ const EMPTY_RATE_CARD = {
   isSaved: false,
 };
 
+// TM rate card dates come back from the backend as Java LocalDate arrays
+// ([year, month, day], e.g. [2026, 9, 11]) rather than "yyyy-mm-dd" strings.
+// Left as-is, that array is truthy so it flows straight into the native date
+// input's value (which silently renders blank) and into string date
+// comparisons (where "2026,9,11" sorts lexically differently than
+// "2026-09-11", producing bogus before/after-project-date errors even for a
+// date equal to the boundary). Normalize to the zero-padded string every
+// other date field already uses; strings pass through unchanged.
+function normalizeRateCardDate(date) {
+  if (Array.isArray(date)) {
+    const [year, month, day] = date;
+    if (!year || !month || !day) return "";
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+  return date || "";
+}
+
 const mapRateCard = (card = {}, includeRole = true) => ({
   ...(includeRole
     ? { role: card.roleName || card.role || card.name || "" }
@@ -205,8 +222,8 @@ const mapRateCard = (card = {}, includeRole = true) => ({
   roleName: card.roleName || card.role || card.name || "",
   rate: card.rate ?? card.amount ?? "",
   ratePeriod: card.ratePeriod || card.period || "HOURLY",
-  effectiveFrom: card.effectiveFrom || card.validFrom || "",
-  effectiveTo: card.effectiveTo || card.validTo || "",
+  effectiveFrom: normalizeRateCardDate(card.effectiveFrom || card.validFrom),
+  effectiveTo: normalizeRateCardDate(card.effectiveTo || card.validTo),
   rateCardId: card.id || card.rateCardId || card.tmRateCardId || null,
   isSaved: Boolean(card.id || card.rateCardId || card.tmRateCardId),
 });
@@ -341,6 +358,12 @@ function TimeAndMaterialForm({
 }) {
   const update = (patch) => onChange({ ...value, ...patch });
   const isOneTime = isOneTimeFrequency(billingFrequency);
+  // Project dates can arrive as a full timestamp depending on which backend
+  // lookup supplied them; the date input's min/max (and every comparison
+  // below) need a plain yyyy-mm-dd, same normalization FixedPriceForm/
+  // RecurringBillingForm already apply to these same props.
+  const projectStartDateOnly = toDateOnly(projectStartDate);
+  const projectEndDateOnly = toDateOnly(projectEndDate);
   const standardRate = {
     ...EMPTY_RATE_CARD,
     rate: value.rate || "",
@@ -350,16 +373,15 @@ function TimeAndMaterialForm({
     rateCardId: value.rateCardId || null,
     isSaved: Boolean(value.rateCardId),
   };
-  // Effective From/To on Timesheet-based (Time & Material) rates are never
-  // bound to the project's own start/end date — that constraint only applies
-  // to Recurring billing (see RecurringBillingForm). projectStartDate/
-  // projectEndDate are intentionally omitted here so getEffectiveDateErrors
-  // only enforces From <= To, not the project date range.
+  // Effective From/To on Timesheet-based (Time & Material) rates must fall
+  // within the project's own start/end date, same as Fixed Price/Recurring.
   const standardDateErrors = isOneTime
     ? { effectiveFrom: "", effectiveTo: "" }
     : getEffectiveDateErrors({
         effectiveFrom: standardRate.effectiveFrom,
         effectiveTo: standardRate.effectiveTo,
+        projectStartDate: projectStartDateOnly,
+        projectEndDate: projectEndDateOnly,
       });
 
   const [rows, setRows] = useState(() =>
@@ -456,6 +478,36 @@ function TimeAndMaterialForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOneTime]);
 
+  // If the project duration shrinks, a previously valid Effective From/To can
+  // fall outside the new range — clear it (not just show the inline error)
+  // rather than let a now-invalid date sit in state or reach the payload.
+  useEffect(() => {
+    if (isOneTime) return;
+    const isOutOfRange = (date) =>
+      Boolean(
+        date &&
+          ((projectStartDateOnly && date < projectStartDateOnly) ||
+            (projectEndDateOnly && date > projectEndDateOnly)),
+      );
+
+    if (isOutOfRange(standardRate.effectiveFrom) || isOutOfRange(standardRate.effectiveTo)) {
+      update({
+        effectiveFrom: isOutOfRange(standardRate.effectiveFrom) ? "" : standardRate.effectiveFrom,
+        effectiveTo: isOutOfRange(standardRate.effectiveTo) ? "" : standardRate.effectiveTo,
+      });
+    }
+    if (rows.some((row) => isOutOfRange(row.effectiveFrom) || isOutOfRange(row.effectiveTo))) {
+      syncParent(
+        rows.map((row) => ({
+          ...row,
+          effectiveFrom: isOutOfRange(row.effectiveFrom) ? "" : row.effectiveFrom,
+          effectiveTo: isOutOfRange(row.effectiveTo) ? "" : row.effectiveTo,
+        })),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOneTime, projectStartDateOnly, projectEndDateOnly]);
+
   useEffect(() => {
     let mounted = true;
 
@@ -543,7 +595,18 @@ function TimeAndMaterialForm({
       const payload = buildTmRateCardPayload(standardRate, resolvedConfigId);
       const saved = await saveTmRateCard(resolvedConfigId, payload);
 
-      update(mapRateCard(saved, false));
+      const mappedSaved = mapRateCard(saved, false);
+      update({
+        ...mappedSaved,
+        // The save response doesn't always echo back effectiveFrom/effectiveTo,
+        // so mapRateCard would otherwise blank out the dates the user just
+        // entered (and that were just persisted) — fall back to what's already
+        // in state. mappedSaved's dates are already normalized to "yyyy-mm-dd"
+        // (see normalizeRateCardDate), so this must not read saved.effectiveFrom/
+        // effectiveTo directly — those are still raw LocalDate arrays.
+        effectiveFrom: mappedSaved.effectiveFrom || standardRate.effectiveFrom,
+        effectiveTo: mappedSaved.effectiveTo || standardRate.effectiveTo,
+      });
       showStatusToast("Rate card saved", "success");
     } catch (error) {
       showStatusToast(
@@ -672,6 +735,8 @@ function TimeAndMaterialForm({
                   onChange={(event) =>
                     update({ effectiveFrom: event.target.value })
                   }
+                  min={projectStartDateOnly || undefined}
+                  max={projectEndDateOnly || undefined}
                   error={standardDateErrors.effectiveFrom}
                 />
                 <FormDatePicker
@@ -679,6 +744,8 @@ function TimeAndMaterialForm({
                   name="effectiveTo"
                   value={standardRate.effectiveTo}
                   onChange={(event) => update({ effectiveTo: event.target.value })}
+                  min={standardRate.effectiveFrom || projectStartDateOnly || undefined}
+                  max={projectEndDateOnly || undefined}
                   error={standardDateErrors.effectiveTo}
                 />
               </>
@@ -746,6 +813,8 @@ function TimeAndMaterialForm({
                         : getEffectiveDateErrors({
                             effectiveFrom: item.effectiveFrom,
                             effectiveTo: item.effectiveTo,
+                            projectStartDate: projectStartDateOnly,
+                            projectEndDate: projectEndDateOnly,
                           });
                       return (
                       <tr
@@ -799,6 +868,8 @@ function TimeAndMaterialForm({
                                     e.target.value,
                                   )
                                 }
+                                min={projectStartDateOnly || undefined}
+                                max={projectEndDateOnly || undefined}
                                 error={roleDateErrors.effectiveFrom}
                               />
                             </td>
@@ -812,6 +883,8 @@ function TimeAndMaterialForm({
                                     e.target.value,
                                   )
                                 }
+                                min={item.effectiveFrom || projectStartDateOnly || undefined}
+                                max={projectEndDateOnly || undefined}
                                 error={roleDateErrors.effectiveTo}
                               />
                             </td>
@@ -929,6 +1002,7 @@ function FixedPriceForm({
   billingFrequency,
   billingFrequencyLabel,
   billingConfigurationId,
+  ensureBillingConfigurationId,
   projectStartDate,
   projectEndDate,
 }) {
@@ -1110,10 +1184,6 @@ function FixedPriceForm({
       return;
     }
 
-    // This button only ever reads billingConfigurationId — it never creates the
-    // parent draft itself. The draft is created once, up front, when the wizard is
-    // first entered (see ensureBillingConfigurationId in NewConfigurationWizard), so
-    // by the time the user reaches this step the id is already in state.
     if (!billingConfigurationId) {
       showStatusToast(
         "Unable to save fixed price configuration: billing configuration id is missing. Please reload and try again.",
@@ -1124,6 +1194,17 @@ function FixedPriceForm({
 
     setSaving(true);
     try {
+      // The parent billing configuration's draft may have been created before
+      // Billing Frequency was selected (it's auto-created as soon as Billing
+      // Type is known), so it can still be missing billingFrequencyId here.
+      // Re-sync the parent with the current selection first — the Fixed
+      // Price API requires billingFrequencyId to already be set on it.
+      let resolvedConfigId = billingConfigurationId;
+      if (ensureBillingConfigurationId) {
+        const syncedId = await ensureBillingConfigurationId();
+        if (syncedId) resolvedConfigId = syncedId;
+      }
+
       const payload = buildFixedPricePayload();
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
@@ -1134,14 +1215,14 @@ function FixedPriceForm({
       // load effect (above) hasn't resolved yet — re-check the backend directly so a
       // record that already exists is updated, never re-created as a duplicate.
       let existingId = value.fixedPriceConfigurationId;
-      if (!existingId && billingConfigurationId) {
-        const existingRecord = await getFixedPriceByBillingConfiguration(billingConfigurationId);
+      if (!existingId && resolvedConfigId) {
+        const existingRecord = await getFixedPriceByBillingConfiguration(resolvedConfigId);
         existingId = existingRecord?.fixedPriceConfigurationId || existingRecord?.id || null;
       }
 
       const saved = existingId
         ? await updateFixedPriceConfiguration(existingId, payload)
-        : await createFixedPriceConfiguration(billingConfigurationId, payload);
+        : await createFixedPriceConfiguration(resolvedConfigId, payload);
 
       update({
         fixedPriceConfigurationId:
@@ -1622,6 +1703,7 @@ function RecurringBillingForm({
   projectBudget,
   billingFrequencyOption,
   billingConfigurationId,
+  ensureBillingConfigurationId,
   projectStartDate,
   projectEndDate,
 }) {
@@ -1816,6 +1898,17 @@ function RecurringBillingForm({
 
     setSaving(true);
     try {
+      // The parent billing configuration's draft may have been created before
+      // Billing Frequency was selected (it's auto-created as soon as Billing
+      // Type is known), so it can still be missing billingFrequencyId here.
+      // Re-sync the parent with the current selection first — the Recurring
+      // API requires billingFrequencyId to already be set on it.
+      let resolvedConfigId = billingConfigurationId;
+      if (ensureBillingConfigurationId) {
+        const syncedId = await ensureBillingConfigurationId();
+        if (syncedId) resolvedConfigId = syncedId;
+      }
+
       const payload = buildRecurringRequestPayload(value, billingFrequencyOption.billingFrequencyId);
 
       // value.recurringConfigurationId can still be unset here if the
@@ -1823,18 +1916,18 @@ function RecurringBillingForm({
       // backend directly so an existing record is updated, never duplicated.
       let existingId = value.recurringConfigurationId;
       if (!existingId) {
-        const existingRecord = await getBillingRecurringByBillingConfigurationId(billingConfigurationId);
+        const existingRecord = await getBillingRecurringByBillingConfigurationId(resolvedConfigId);
         existingId = existingRecord?.recurringConfigurationId || existingRecord?.subscriptionConfigurationId || existingRecord?.id || null;
       }
 
       const saved = existingId
         ? await updateBillingRecurring(existingId, payload)
-        : await createBillingRecurring(billingConfigurationId, payload);
+        : await createBillingRecurring(resolvedConfigId, payload);
       const savedId = saved?.recurringConfigurationId || saved?.subscriptionConfigurationId || saved?.id || existingId;
 
       update({ recurringConfigurationId: savedId || value.recurringConfigurationId || null });
       showStatusToast("Recurring configuration saved.", "success");
-      await loadSchedule(savedId, billingConfigurationId);
+      await loadSchedule(savedId, resolvedConfigId);
     } catch (error) {
       showStatusToast(
         getApiErrorMessage(error, "Unable to save recurring configuration."),
@@ -2391,6 +2484,7 @@ export default function BillingConfigurationStep({
                 billingFrequency={billingFrequency}
                 billingFrequencyLabel={frequencyLabel(billingFrequency)}
                 billingConfigurationId={value.billingConfigurationId || value.id}
+                ensureBillingConfigurationId={ensureBillingConfigurationId}
                 projectStartDate={projectInfo.startDate}
                 projectEndDate={projectInfo.endDate}
               />
@@ -2415,6 +2509,7 @@ export default function BillingConfigurationStep({
                   (option) => String(option.billingFrequencyId) === String(billingFrequencyId),
                 )}
                 billingConfigurationId={value.billingConfigurationId || value.id}
+                ensureBillingConfigurationId={ensureBillingConfigurationId}
                 projectStartDate={projectInfo.startDate}
                 projectEndDate={projectInfo.endDate}
               />

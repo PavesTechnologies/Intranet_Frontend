@@ -11,7 +11,11 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2,
+      // Never retry auth failures: the session is already being torn down, and
+      // the backoff schedule would otherwise fire a second expiry a few
+      // seconds later, after the logout guard has released.
+      retry: (failureCount, error) =>
+        ![401, 403].includes(error?.response?.status) && failureCount < 2,
       staleTime: 60_000,
     },
   },

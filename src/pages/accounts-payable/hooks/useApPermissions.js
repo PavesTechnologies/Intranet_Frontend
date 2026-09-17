@@ -1,6 +1,7 @@
 import { useAuth } from "../../../contexts/AuthContext";
 import { AP_PERMISSIONS, rolesForPermission } from "../constants/permissions";
 import { PROCUREMENT_PERMISSIONS } from "../constants/procurementPermissions";
+import { APPROVAL_PERMISSIONS, APPROVAL_ANY_VIEW_PERMISSIONS } from "../constants/approvalPermissions";
 
 /**
  * One boolean flag per capability, consumed by pages/buttons instead of calling
@@ -22,7 +23,7 @@ import { PROCUREMENT_PERMISSIONS } from "../constants/procurementPermissions";
  * action — holding a *_VIEW permission never implies any create/edit/approve/etc. capability.
  */
 export function useApPermissions() {
-  const { hasRole, hasPermission } = useAuth();
+  const { hasRole, hasPermission, hasAnyPermission } = useAuth();
 
   return {
     canViewDashboard: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_DASHBOARD)),
@@ -32,7 +33,6 @@ export function useApPermissions() {
     canUploadInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.UPLOAD_INVOICE)),
     canReviewOcr: hasRole(rolesForPermission(AP_PERMISSIONS.REVIEW_OCR)),
     canValidateInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.VALIDATE_INVOICE)),
-    canApproveInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.APPROVE_INVOICE)),
     canViewInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_INVOICE)),
     canMarkPaid: hasRole(rolesForPermission(AP_PERMISSIONS.MARK_PAID)),
     canViewPayment: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_PAYMENT)),
@@ -58,12 +58,18 @@ export function useApPermissions() {
 
     // ── Quotations / RFQ sourcing ──────────────────────────────────────────
     canViewQuotation: hasPermission(PROCUREMENT_PERMISSIONS.QUOTATION_VIEW),
-    // Also covers the "sourcing decision" (creating an RFQ, sending it, inviting vendors,
-    // recording a quotation) — intentionally QUOTATION_CREATE, not PR_EDIT. Sourcing happens
-    // after PR approval and belongs to the Procurement Officer's permission set.
+    // Creating an RFQ and recording a quotation are both intentionally QUOTATION_CREATE, not
+    // PR_EDIT. Sourcing happens after PR approval and belongs to the Procurement Officer's
+    // permission set.
     canCreateQuotation: hasPermission(PROCUREMENT_PERMISSIONS.QUOTATION_CREATE),
+    // Closing an RFQ (POST /rfq/{rfq_id}/close) is authorized under QUOTATION_UPDATE server-side
+    // — there is no dedicated RFQ_CLOSE permission.
     canUpdateQuotation: hasPermission(PROCUREMENT_PERMISSIONS.QUOTATION_UPDATE),
     canDeleteQuotation: hasPermission(PROCUREMENT_PERMISSIONS.QUOTATION_DELETE),
+    // Invite Vendor and Send RFQ are each their own backend permission — INVITE_VENDOR and
+    // SEND_RFQ — distinct from QUOTATION_CREATE. Do not fold these back into canCreateQuotation.
+    canInviteVendor: hasPermission(PROCUREMENT_PERMISSIONS.INVITE_VENDOR),
+    canSendRfq: hasPermission(PROCUREMENT_PERMISSIONS.SEND_RFQ),
 
     // ── Vendor Selection ───────────────────────────────────────────────────
     canViewVendorSelection: hasPermission(PROCUREMENT_PERMISSIONS.VENDOR_SELECTION_VIEW),
@@ -75,5 +81,22 @@ export function useApPermissions() {
     // is consistent, but this is UX only until that route is protected server-side too.
     canViewPO: hasPermission(PROCUREMENT_PERMISSIONS.PO_VIEW),
     canGeneratePO: hasPermission(PROCUREMENT_PERMISSIONS.PO_CREATE),
+
+    // ── Invoice Approval Workflow ──────────────────────────────────────────
+    // Configuring approval policies and department-approver mappings — gates the whole
+    // Approval Policies / Department Approvers tabs in System Configuration.
+    canManageApprovalPolicy: hasPermission(APPROVAL_PERMISSIONS.APPROVAL_POLICY_MANAGE),
+    // Moving an invoice into the approval workflow (POST .../send-for-approval).
+    canSendForApproval: hasPermission(APPROVAL_PERMISSIONS.INVOICE_SEND_FOR_APPROVAL),
+    // Seeing the approval status/timeline/history at all — held on its own by a pure viewer;
+    // an actual approver already has it implicitly via INVOICE_APPROVE/INVOICE_REJECT (the
+    // backend's GET .../approval endpoints accept any of the three, see
+    // constants/approvalPermissions.js's APPROVAL_ANY_VIEW_PERMISSIONS).
+    canViewInvoiceApproval: hasAnyPermission(APPROVAL_ANY_VIEW_PERMISSIONS),
+    // Holding this permission is necessary but not sufficient to approve/reject any given
+    // invoice — the backend alone determines whether the current user is an eligible approver
+    // for the invoice's active step. See InvoiceApprovalPanel for that check.
+    canApproveInvoice: hasPermission(APPROVAL_PERMISSIONS.INVOICE_APPROVE),
+    canRejectInvoice: hasPermission(APPROVAL_PERMISSIONS.INVOICE_REJECT),
   };
 }

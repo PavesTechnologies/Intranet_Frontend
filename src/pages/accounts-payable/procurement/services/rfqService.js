@@ -57,10 +57,25 @@ export const rfqService = {
     return res.data;
   },
 
-  sendRfq: async (rfqId) => {
-    const res = await api.post(`${BASE}/${rfqId}/send`, null, { headers: authHeaders() });
-    return res.data;
-  },
+  /**
+ * Send RFQ to selected invited vendors.
+ *
+ * @param {number|string} rfqId
+ * @param {number[]} vendorIds - Selected invited vendor IDs
+ */
+sendRfq: async (rfqId, vendorIds) => {
+  const res = await api.post(
+    `${BASE}/${rfqId}/send`,
+    {
+      vendor_ids: vendorIds,
+    },
+    {
+      headers: authHeaders(),
+    },
+  );
+
+  return res.data;
+},
 
   closeRfq: async (rfqId) => {
     const res = await api.post(`${BASE}/${rfqId}/close`, null, { headers: authHeaders() });

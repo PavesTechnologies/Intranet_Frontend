@@ -47,6 +47,8 @@ import PaymentDetailsPage from "./pages/accounts-payable/payment/pages/PaymentDe
 import APReportsPage from "./pages/accounts-payable/reports/pages/APReportsPage.jsx";
 import APSettingsPage from "./pages/accounts-payable/settings/pages/APSettingsPage.jsx";
 import SystemConfigurationPage from "./pages/accounts-payable/system-configuration/pages/SystemConfigurationPage.jsx";
+import ApprovalPolicyFormPage from "./pages/accounts-payable/system-configuration/pages/ApprovalPolicyFormPage.jsx";
+import { APPROVAL_PERMISSIONS } from "./pages/accounts-payable/constants/approvalPermissions";
 import {
   PROCUREMENT_PERMISSIONS,
   PROCUREMENT_ANY_VIEW_PERMISSIONS,
@@ -345,10 +347,10 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
       normalizedAllowedRoles.includes(role.toUpperCase())
     );
     // console.log("ProtectedRoute check:", {
-      // isAuthenticated,
-      // user,
-      // allowedRoles,
-      // match: hasRole,
+    // isAuthenticated,
+    // user,
+    // allowedRoles,
+    // match: hasRole,
     // });
 
     if (!hasRole) {
@@ -441,6 +443,9 @@ const AppRoutes = () => {
       <Routes>
         {/* Public Route */}
         <Route path="/" element={<LoginPage />} />
+        {/* No page lives here — "/" is the login route. This exists so the
+            legacy navigate("/login") calls don't render a blank screen. */}
+        <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="/register" element={<Register />} />
         {/* Fully public, unauthenticated — no session, no app shell. See
             src/pages/public/InterviewFeedbackFormPage.jsx. */}
@@ -616,6 +621,22 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path={AP_ROUTES.SYSTEM_CONFIG_APPROVAL_POLICY_NEW}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} permission={APPROVAL_PERMISSIONS.APPROVAL_POLICY_MANAGE}>
+                <ApprovalPolicyFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.SYSTEM_CONFIG_APPROVAL_POLICY_EDIT()}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} permission={APPROVAL_PERMISSIONS.APPROVAL_POLICY_MANAGE}>
+                <ApprovalPolicyFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path={AP_ROUTES.PROCUREMENT}
             element={
               // AP_ALL_ROLES stays as the coarse "is this an AP user at all" gate; the real
@@ -740,6 +761,10 @@ const AppRoutes = () => {
             />
             <Route
               path="tax-calculation/:snapshotId"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxCalculationPage /></ProtectedRoute>}
+            />
+            <Route
+              path="tax-calculation/occurrence/:occurrenceId"
               element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxCalculationPage /></ProtectedRoute>}
             />
             <Route
@@ -1659,9 +1684,12 @@ const AppRoutes = () => {
           <Route path="/expense-management/approval-rules/department-approvers" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsDepartmentApproversPage /></ProtectedRoute>} />
           <Route path="/expense-management/approval-rules/delegations" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsDelegationsPage /></ProtectedRoute>} />
 
-          <Route path="/expense-management/finance/verification" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsVerificationPage /></ProtectedRoute>} />
-          <Route path="/expense-management/finance/reimbursements" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsReimbursementsPage /></ProtectedRoute>} />
-          <Route path="/expense-management/finance/payment-status" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsPaymentStatusPage /></ProtectedRoute>} />
+          {/* FinanceVerificationController's @PreAuthorize requires exactly FINANCE_EXECUTIVE —
+              the generic "Finance" role passes this route gate but then 403s on every API call,
+              so it's deliberately excluded here (see sidebarConfig.js's XMS_FINANCE_VERIFICATION). */}
+          <Route path="/expense-management/finance/verification" element={<ProtectedRoute allowedRoles={["Finance_Executive"]}><XmsVerificationPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/reimbursements" element={<ProtectedRoute allowedRoles={["Finance_Executive"]}><XmsReimbursementsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/payment-status" element={<ProtectedRoute allowedRoles={["Finance_Executive"]}><XmsPaymentStatusPage /></ProtectedRoute>} />
           <Route path="/expense-management/ap-payments/queue" element={<ProtectedRoute allowedRoles={["AP_Executive"]}><XmsApPaymentQueuePage /></ProtectedRoute>} />
 
           <Route path="/expense-management/client-billing/billable-expenses" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsBillableExpensesPage /></ProtectedRoute>} />

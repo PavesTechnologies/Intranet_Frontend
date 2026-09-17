@@ -163,15 +163,6 @@ export default function InvoiceGeneration() {
     };
   }, [invoices, backendSummary]);
 
-  // If redirecting to dedicated workflow
-  if (targetSnapshotId) {
-    return (
-      <div className="flex h-80 items-center justify-center">
-        <Loader size="lg" text="Loading invoice..." />
-      </div>
-    );
-  }
-
   if (loading && !refreshing) {
     return (
       <div className="flex h-80 items-center justify-center">

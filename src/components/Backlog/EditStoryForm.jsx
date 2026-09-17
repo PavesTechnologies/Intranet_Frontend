@@ -64,6 +64,9 @@ const EditStoryForm = ({
   const [sprints, setSprints] = useState([]);
   const [statuses, setStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
+  // A story's status is normally rolled up from its tasks, so the dropdown
+  // is only meaningful (and shown) when the story has no tasks of its own.
+  const [taskCount, setTaskCount] = useState(0);
 
   const token = localStorage.getItem("token");
   const axiosConfig = {
@@ -117,6 +120,8 @@ const EditStoryForm = ({
           startDate: data.startDate || "",
           dueDate: data.dueDate || "",
         });
+
+        setTaskCount(Array.isArray(data.taskIds) ? data.taskIds.length : 0);
 
         setUsers(userRes.data.content || userRes.data || []);
         setEpics(epicRes.data || []);
@@ -306,16 +311,21 @@ const EditStoryForm = ({
             ]}
           />
 
-          {/* <FormSelect
-            label="Status *"
-            name="statusId"
-            value={formData.statusId || ""}
-            onChange={handleChange}
-            options={[
-              { label: "Select Status", value: "" },
-              ...statuses.map((s) => ({ label: s.name, value: s.id })),
-            ]}
-          /> */}
+          {/* A story's status is normally derived from its tasks' statuses,
+              so only let it be set directly here when there are no tasks
+              to derive it from. */}
+          {taskCount === 0 && (
+            <FormSelect
+              label="Status"
+              name="statusId"
+              value={formData.statusId || ""}
+              onChange={handleChange}
+              options={[
+                { label: "Select Status", value: "" },
+                ...statuses.map((s) => ({ label: s.name, value: s.id })),
+              ]}
+            />
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">

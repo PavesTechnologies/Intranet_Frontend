@@ -149,20 +149,20 @@ const normalizeInvoiceItem = (item = {}, index = 0) => {
       source.quantity !== undefined && source.quantity !== null
         ? Number(source.quantity)
         : source.hours !== undefined && source.hours !== null
-        ? Number(source.hours)
-        : 0,
+          ? Number(source.hours)
+          : 0,
     rate:
       source.rate !== undefined && source.rate !== null
         ? Number(source.rate)
         : source.hourlyRate !== undefined && source.hourlyRate !== null
-        ? Number(source.hourlyRate)
-        : 0,
+          ? Number(source.hourlyRate)
+          : 0,
     amount:
       source.amount !== undefined && source.amount !== null
         ? Number(source.amount)
         : source.total !== undefined && source.total !== null
-        ? Number(source.total)
-        : 0,
+          ? Number(source.total)
+          : 0,
   };
 };
 
@@ -193,14 +193,14 @@ const normalizeTaxComponent = (component = {}, index = 0) => {
       source.appliedRate !== undefined && source.appliedRate !== null
         ? Number(source.appliedRate)
         : source.rate !== undefined && source.rate !== null
-        ? Number(source.rate)
-        : null,
+          ? Number(source.rate)
+          : null,
     amount:
       source.taxAmount !== undefined && source.taxAmount !== null
         ? Number(source.taxAmount)
         : source.amount !== undefined && source.amount !== null
-        ? Number(source.amount)
-        : 0,
+          ? Number(source.amount)
+          : 0,
   };
 };
 
@@ -220,22 +220,22 @@ export const normalizeInvoice = (payload = {}) => {
   const rawItems = Array.isArray(data.items)
     ? data.items
     : Array.isArray(data.invoiceItems)
-    ? data.invoiceItems
-    : Array.isArray(data.lineItems)
-    ? data.lineItems
-    : Array.isArray(data.timesheets)
-    ? data.timesheets
-    : [];
+      ? data.invoiceItems
+      : Array.isArray(data.lineItems)
+        ? data.lineItems
+        : Array.isArray(data.timesheets)
+          ? data.timesheets
+          : [];
 
   const rawTaxComponents = Array.isArray(data.taxBreakdown)
     ? data.taxBreakdown
     : Array.isArray(data.taxComponents)
-    ? data.taxComponents
-    : Array.isArray(data.components)
-    ? data.components
-    : Array.isArray(data.taxes)
-    ? data.taxes
-    : [];
+      ? data.taxComponents
+      : Array.isArray(data.components)
+        ? data.components
+        : Array.isArray(data.taxes)
+          ? data.taxes
+          : [];
 
   // Actual snapshot billing period handling
   const periodStart = toIsoDateOnly(
@@ -287,8 +287,15 @@ export const normalizeInvoice = (payload = {}) => {
         : false,
     lastCorrectedAt: data.lastCorrectedAt || data.last_corrected_at || null,
 
-    // Billing snapshot link
+    // Billing snapshot link (Timesheet/T&M invoices only)
     billingSnapshotId: data.billingSnapshotId || data.billing_snapshot_id || data.snapshotId || "",
+    // Billing occurrence link (Fixed Price/Recurring invoices only) — an
+    // invoice never carries both; whichever is present identifies which
+    // detail/tax-calculation flow this invoice belongs to. There is no
+    // occurrence-based invoice detail endpoint yet (see billingOccurrenceService.js),
+    // so callers must not build a Billing Snapshot invoice/tax-calculation
+    // URL from this id.
+    billingScheduleId: data.billingScheduleId || data.billing_schedule_id || data.occurrenceId || data.occurrence_id || "",
     snapshotNumber:
       data.snapshotNumber ||
       data.snapshot_number ||
@@ -332,20 +339,20 @@ export const normalizeInvoice = (payload = {}) => {
       data.subtotal !== undefined && data.subtotal !== null
         ? Number(data.subtotal)
         : data.taxableAmount !== undefined && data.taxableAmount !== null
-        ? Number(data.taxableAmount)
-        : 0,
+          ? Number(data.taxableAmount)
+          : 0,
     totalTax:
       data.totalTax !== undefined && data.totalTax !== null
         ? Number(data.totalTax)
         : data.totalTaxAmount !== undefined && data.totalTaxAmount !== null
-        ? Number(data.totalTaxAmount)
-        : 0,
+          ? Number(data.totalTaxAmount)
+          : 0,
     grandTotal:
       data.grandTotal !== undefined && data.grandTotal !== null
         ? Number(data.grandTotal)
         : data.totalAmount !== undefined && data.totalAmount !== null
-        ? Number(data.totalAmount)
-        : 0,
+          ? Number(data.totalAmount)
+          : 0,
   };
 };
 
@@ -381,6 +388,9 @@ export const normalizeApprovalWorkspaceItem = (item = {}) => {
     invoiceStatus: (source.status || source.invoiceStatus || "PENDING_APPROVAL").toUpperCase(),
     billingSnapshotId: source.billingSnapshotId || source.snapshotId || "",
     billingSnapshotNumber: source.billingSnapshotNumber || source.snapshotNumber || null,
+    // Fixed Price/Recurring workspace entries carry this instead of a
+    // billingSnapshotId — see normalizeInvoice above.
+    billingScheduleId: source.billingScheduleId || source.billing_schedule_id || source.occurrenceId || source.occurrence_id || "",
     clientName: source.clientName || "—",
     projectName: source.projectName || "—",
     billingPeriod: displayPeriod,

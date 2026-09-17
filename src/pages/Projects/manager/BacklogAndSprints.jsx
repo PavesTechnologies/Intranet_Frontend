@@ -24,6 +24,8 @@ import SprintDetailsPanel from "./Sprint/SprintDetailsPanel";
 import SprintPendingModal from "./Sprint/SprintPendingModal";
 import ExcelImportPanel from "./Backlog/ExcelImportPanel";
 import Pagination from "../../../components/Pagination/pagination";
+import { useQueryClient } from "@tanstack/react-query";
+import { invalidateSummaryCache } from "../Summary/Summary";
 import { ca } from "date-fns/locale";
 import { useLocation } from "react-router-dom";
 
@@ -179,6 +181,29 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
     }
   })();
 
+  // My Work (React Query) and the Summary tab (its own module-level cache)
+  // both hold snapshots of this project's tasks/stories, so a mutation made
+  // here needs to invalidate both or they show stale data for up to a minute.
+  const qc = useQueryClient();
+  const notifyWorkDataChanged = () => {
+    qc.invalidateQueries({ queryKey: ["myWork"] });
+    qc.invalidateQueries({ queryKey: ["myWorkCompleted"] });
+    invalidateSummaryCache(projectId);
+  };
+
+  // Validation failures come back as { message: "Validation failed", errors:
+  // { fieldName: "field-specific message" } } — the generic top-level
+  // message alone ("Validation failed") isn't useful, so surface the actual
+  // field errors when present.
+  const extractErrorMessage = (err, fallback) => {
+    const data = err?.response?.data;
+    if (data?.errors && typeof data.errors === "object") {
+      const fieldMessages = Object.values(data.errors).filter(Boolean);
+      if (fieldMessages.length > 0) return fieldMessages.join(" ");
+    }
+    return data?.message || err?.message || fallback;
+  };
+
   // =======================================
   // Move Story (Sprint <-> Backlog)
   // =======================================
@@ -215,13 +240,9 @@ const BacklogAndSprints = ({ projectId, projectName }) => {
       );
       fetchStories();
       fetchTasks();
+      notifyWorkDataChanged();
     } catch (err) {
-      const errorMessage =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Failed to move story";
-
-      showStatusToast(errorMessage, "error");
+      showStatusToast(extractErrorMessage(err, "Failed to move story"), "error");
 
       // Rollback both stories and tasks to server truth
       fetchStories();
@@ -246,6 +267,7 @@ const handleSprintStatus = async (sprintId, action) => {
         );
         fetchSprints();
         fetchStories();
+        notifyWorkDataChanged();
 
     } catch (err) {
         const data = err.response?.data || {};
@@ -305,6 +327,7 @@ const handleSprintStatus = async (sprintId, action) => {
       );
       showStatusToast("Epic assigned successfully!", "success");
       fetchStories(); // Refresh the list
+      notifyWorkDataChanged();
     } catch (err) {
       showStatusToast("Failed to assign epic", "error");
     }
@@ -331,8 +354,12 @@ const handleSprintStatus = async (sprintId, action) => {
       );
       showStatusToast("Task moved!", "success");
       fetchTasks();
+      notifyWorkDataChanged();
     } catch (err) {
-      showStatusToast("Failed to move task", "error");
+      showStatusToast(extractErrorMessage(err, "Failed to move task"), "error");
+
+      // Rollback the optimistic move to server truth
+      fetchTasks();
     }
   };
 
@@ -348,6 +375,7 @@ const handleSprintStatus = async (sprintId, action) => {
       );
       showStatusToast("Task successfully assigned to story!", "success");
       fetchTasks(); // Refresh to update the UI hierarchy
+      notifyWorkDataChanged();
     } catch (err) {
       showStatusToast(err.response?.data?.message || "Failed to assign story", "error");
     }
@@ -541,7 +569,9 @@ const handleSprintStatus = async (sprintId, action) => {
   const BacklogDropWrapper = ({ children }) => {
     const [{ isOver }, dropRef] = useDrop(() => ({
       accept: ["STORY", "TASK"], // 👈 accept BOTH
+      canDrop: () => isManager,
       drop: (item) => {
+        if (!isManager) return;
         if (item.type === "TASK") {
           handleDropTask(item.id, null); // move TASK to backlog
         } else {
@@ -549,9 +579,9 @@ const handleSprintStatus = async (sprintId, action) => {
         }
       },
       collect: (monitor) => ({
-        isOver: monitor.isOver(),
+        isOver: monitor.isOver() && isManager,
       }),
-    }));
+    }), [isManager]);
 
     return (
       <div
@@ -669,6 +699,7 @@ const handleSprintStatus = async (sprintId, action) => {
                   allStories={stories}
                   sprints={activeAndPlanningSprints}
                   permissions={permissions}
+                  isManager={isManager}
                   projectId={projectId}
                   navigate={navigate}
                   onSelectParentStory={handleAssignTaskToStory}
@@ -741,6 +772,7 @@ const handleSprintStatus = async (sprintId, action) => {
                           allStories={stories}
                           sprints={sprints}
                           permissions={permissions}
+                          isManager={isManager}
                           projectId={projectId}
                           navigate={navigate}
                           onDropStory={handleDropStory}
@@ -824,6 +856,7 @@ const handleSprintStatus = async (sprintId, action) => {
                           setRightPanelOpen(true);
                         }}
                         riskCount={riskMap[`Story-${story.id}`] ?? 0}
+                        canMoveSprint={isManager}
                         projectId={projectId}
                         navigate={navigate}
                       />
@@ -847,6 +880,7 @@ const handleSprintStatus = async (sprintId, action) => {
                             setRightPanelOpen(true);
                           }}
                           riskCount={riskMap[`Task-${task.id}`] ?? 0}
+                          canMoveSprint={isManager}
                           projectId={projectId}
                           navigate={navigate}
                         />
@@ -882,6 +916,7 @@ const handleSprintStatus = async (sprintId, action) => {
                           setRightPanelOpen(true);
                         }}
                         riskCount={riskMap[`Task-${task.id}`] ?? 0}
+                        canMoveSprint={isManager}
                         projectId={projectId}
                         navigate={navigate}
                       />
@@ -911,6 +946,7 @@ const handleSprintStatus = async (sprintId, action) => {
           onCreated={() => {
             fetchStories();
             fetchTasks();
+            notifyWorkDataChanged();
           }}
           projectId={projectId}
         />
@@ -935,6 +971,7 @@ const handleSprintStatus = async (sprintId, action) => {
             onClose={() => setRightPanelOpen(false)}
             onUpdated={() => {
               fetchStories();
+              notifyWorkDataChanged();
               setRightPanelOpen(false);
             }}
           />
@@ -948,6 +985,7 @@ const handleSprintStatus = async (sprintId, action) => {
             onClose={() => setRightPanelOpen(false)}
             onUpdated={() => {
               fetchTasks();
+              notifyWorkDataChanged();
               setRightPanelOpen(false);
             }}
           />

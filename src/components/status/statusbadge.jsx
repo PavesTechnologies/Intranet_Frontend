@@ -24,6 +24,23 @@ const StatusBadge = ({ label, size = "md" }) => {
     displayLabel = "Tax Completed";
     bgColor = "bg-blue-100 border border-blue-300";
     textColor = "text-blue-800 font-bold";
+  } else if (rawUpper === "TAX_PENDING" || normalized === "tax pending") {
+    displayLabel = "Ready for Tax";
+    bgColor = "bg-emerald-100 border border-emerald-300";
+    textColor = "text-emerald-800 font-bold";
+  } else if (
+    rawUpper === "TAX_CALCULATED" ||
+    normalized === "tax calculated" ||
+    rawUpper === "CALCULATED" ||
+    normalized === "calculated"
+  ) {
+    displayLabel = "Calculated";
+    bgColor = "bg-blue-100 border border-blue-300";
+    textColor = "text-blue-800 font-bold";
+  } else if (rawUpper === "SCHEDULED" || normalized === "scheduled") {
+    displayLabel = "Scheduled";
+    bgColor = "bg-slate-100 border border-slate-300";
+    textColor = "text-slate-700 font-semibold";
   } else if (rawUpper === "IN_PROGRESS" || normalized === "in progress") {
     displayLabel = "In Progress";
     bgColor = "bg-indigo-50 border border-indigo-200";

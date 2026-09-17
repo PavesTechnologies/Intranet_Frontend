@@ -49,7 +49,13 @@ export default function BillingDataAcquisition() {
     setLastSyncTime(formatted);
 
     try {
-      const configs = await fetchActiveBillingConfigurations();
+      // Fixed Price and Recurring billing configurations flow through
+      // Billing Occurrence -> Tax Calculation, never through Data
+      // Acquisition -- fetchActiveBillingConfigurations() returns every
+      // active configuration regardless of billing type, so this console
+      // (Timesheet/T&M only) must filter down to TIME_MATERIAL itself.
+      const allConfigs = await fetchActiveBillingConfigurations();
+      const configs = allConfigs.filter((cfg) => cfg.billingTypeCode === "TIME_MATERIAL");
 
       // Batch query existing snapshots using the actual acquired snapshot period
       const updatedConfigs = await Promise.all(
