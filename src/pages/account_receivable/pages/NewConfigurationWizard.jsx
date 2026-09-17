@@ -715,62 +715,90 @@ export default function NewConfigurationWizard() {
   }
 
   return (
-    <div className="space-y-3">
-      {/* Minimal Header */}
-      <div>
-        <div className="mb-1 flex items-center gap-2">
-          <BackIconButton onClick={handleCancel} label="Back to Billing Setups" />
-          <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
-            {configId ? "Edit Billing Configuration" : "Create Billing Configuration"}
-          </h1>
-        </div>
-        <p className="mt-0.5 text-sm text-slate-500">Configure billing details for a project</p>
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 pb-8 sm:px-6 lg:px-8">
+  {/* Header */}
+  <div className="space-y-2">
+    <div className="flex items-center gap-3">
+      <BackIconButton
+        onClick={handleCancel}
+        label="Back to Billing Setups"
+      />
+
+      <div className="min-w-0">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+          {configId ? "Edit Billing Configuration" : "Create Billing Configuration"}
+        </h1>
+
+        <p className="mt-1 ml-0.5 text-sm leading-6 text-slate-500 sm:ml-1 sm:text-[15px]">
+          Configure billing details for a project
+        </p>
       </div>
-
-      <WizardStepper steps={STEPS} currentStep={currentStep} onStepClick={handleStepClick} />
-
-      {/* Active Form Step Container */}
-      <PageCard className="border-slate-200/80 shadow-sm rounded-2xl">
-        <PageCardContent className="p-4 sm:p-6 space-y-4">
-          {currentStep === 1 && (
-            <ProjectStep value={wizardData.projectInfo} onChange={handleProjectInfoChange} />
-          )}
-
-          {currentStep === 2 && (
-            <BillingConfigurationStep
-              value={wizardData.billingConfig}
-              onChange={handleBillingConfigChange}
-              setupMode={wizardData.setupMode}
-              projectInfo={wizardData.projectInfo}
-              onProjectInfoChange={handleProjectInfoChange}
-              ensureBillingConfigurationId={ensureBillingConfigurationId}
-            />
-          )}
-
-          {currentStep === 3 && (
-            <BillingControlsStep value={wizardData.controls} onChange={handleControlsChange} />
-          )}
-
-          {currentStep === 4 && <ReviewActivateStep wizardData={wizardData} onEditStep={handleStepClick} />}
-
-          <div className="border-t border-slate-100 pt-4">
-            <WizardNavigation
-              isFirstStep={currentStep === 1}
-              isLastStep={isLastStep}
-              nextDisabled={nextDisabled}
-              nextIncomplete={nextIncomplete}
-              finalLabel={isEditingExisting ? "Update Billing Setup" : "Create Billing Setup"}
-              finalLoadingText={isEditingExisting ? "Updating..." : "Submitting..."}
-              showSaveDraft={currentStep > 1}
-              saving={saving}
-              activating={submitting || creatingDraft}
-              onBack={handleBack}
-              onNext={isLastStep ? handleFinalSubmit : handleNext}
-              onSaveDraft={handleSaveDraft}
-            />
-          </div>
-        </PageCardContent>
-      </PageCard>
     </div>
+  </div>
+
+  {/* Wizard Stepper */}
+  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6">
+    <WizardStepper
+      steps={STEPS}
+      currentStep={currentStep}
+      onStepClick={handleStepClick}
+    />
+  </div>
+
+  {/* Active Form Step Container */}
+  <PageCard className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <PageCardContent className="space-y-6 p-5 sm:p-6 lg:p-8">
+      {currentStep === 1 && (
+        <ProjectStep
+          value={wizardData.projectInfo}
+          onChange={handleProjectInfoChange}
+        />
+      )}
+
+      {currentStep === 2 && (
+        <BillingConfigurationStep
+          value={wizardData.billingConfig}
+          onChange={handleBillingConfigChange}
+          setupMode={wizardData.setupMode}
+          projectInfo={wizardData.projectInfo}
+          onProjectInfoChange={handleProjectInfoChange}
+          ensureBillingConfigurationId={ensureBillingConfigurationId}
+        />
+      )}
+
+      {currentStep === 3 && (
+        <BillingControlsStep
+          value={wizardData.controls}
+          onChange={handleControlsChange}
+        />
+      )}
+
+      {currentStep === 4 && (
+        <ReviewActivateStep
+          wizardData={wizardData}
+          onEditStep={handleStepClick}
+        />
+      )}
+
+      {/* Navigation — existing component and props unchanged */}
+      <div className="mt-2 border-t border-slate-200 pt-5">
+        <WizardNavigation
+          isFirstStep={currentStep === 1}
+          isLastStep={isLastStep}
+          nextDisabled={nextDisabled}
+          nextIncomplete={nextIncomplete}
+          finalLabel={isEditingExisting ? "Update Billing Setup" : "Create Billing Setup"}
+          finalLoadingText={isEditingExisting ? "Updating..." : "Submitting..."}
+          showSaveDraft={currentStep > 1}
+          saving={saving}
+          activating={submitting || creatingDraft}
+          onBack={handleBack}
+          onNext={isLastStep ? handleFinalSubmit : handleNext}
+          onSaveDraft={handleSaveDraft}
+        />
+      </div>
+    </PageCardContent>
+  </PageCard>
+</div>
   );
 }

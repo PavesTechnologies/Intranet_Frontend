@@ -64,26 +64,22 @@ export default function AcquisitionMetrics({
           (selectedStatusFilter === "ALL" && kpi.key === "ALL");
 
         return (
-          <div
+          <button
             key={kpi.key}
+            type="button"
             onClick={() => handleCardClick(kpi.key)}
             title={kpi.tooltip}
-            className={`cursor-pointer transition-all duration-150 rounded-xl ${
-              isActive
-                ? "ring-2 ring-indigo-500 ring-offset-2 scale-[1.02] shadow-md"
-                : "hover:border-slate-300 hover:shadow-sm opacity-90 hover:opacity-100"
-            }`}
+            className="text-left rounded-xl transition-transform active:scale-[0.99] focus:outline-none"
           >
             <KPICard
               label={kpi.label}
               value={loading ? "…" : kpi.value}
               icon={<kpi.icon className="h-5 w-5" />}
               color={kpi.color}
-              className={`h-full w-full bg-white shadow-sm border ${
-                isActive ? "border-indigo-400 bg-indigo-50/20" : "border-slate-200"
-              }`}
+              active={isActive}
+              className="h-full w-full cursor-pointer bg-white shadow-sm border border-slate-200 transition-all hover:shadow-md"
             />
-          </div>
+          </button>
         );
       })}
     </div>

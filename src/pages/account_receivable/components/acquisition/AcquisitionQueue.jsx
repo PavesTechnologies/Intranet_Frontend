@@ -6,6 +6,7 @@ import FilterListbox from "../../../../components/filter/FilterListbox";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Pagination from "../../../../components/Pagination/pagination";
 import ARTable from "../common/ARTable";
+import ActionMenu from "../common/ActionMenu";
 import { normalizeAcquisitionStatus } from "../../services/billingDataAcquisitionService";
 import { getBillingTypeDisplayName } from "../../utils/billingType";
 
@@ -16,10 +17,20 @@ const BILLING_TYPE_LABELS = {
   RECURRING: "Recurring",
 };
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 5;
 
 const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Billing Period", "Status", "Reference", "Action"];
 const TABLE_COLUMNS = ["client", "project", "billingType", "billingPeriod", "status", "reference", "action"];
+
+const TABLE_ALIGNMENTS = {
+  client: "left",
+  project: "left",
+  billingType: "left",
+  billingPeriod: "left",
+  status: "center",
+  reference: "left",
+  action: "center",
+};
 
 const FILTER_BUTTON_CLASS =
   "flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-left text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/30";
@@ -185,38 +196,46 @@ export default function AcquisitionQueue({
             </span>
           ),
           billingPeriod: <span className="font-mono text-xs text-slate-600">{cfg.billingPeriod}</span>,
-          status: <StatusBadge label={cfg.billingStatus} size="sm" />,
+          status: (
+            <div className="flex items-center justify-center">
+              <StatusBadge label={cfg.billingStatus} size="sm" />
+            </div>
+          ),
           reference: (
-            <div className="text-left">
-              <div className="font-mono text-xs text-slate-600">{cfg.id}</div>
-              {(st === "READY_TO_TAX" || st === "IN_TAX" || st === "TAX_COMPLETED") && cfg.snapshotNumber && (
-                <div className="font-mono text-[11px] font-semibold text-emerald-600">{cfg.snapshotNumber}</div>
-              )}
+            <div className="flex flex-col items-start gap-0.5 text-left">
+              <span className="font-mono text-xs font-medium text-slate-700">{cfg.id}</span>
+              {(st === "READY_TO_TAX" || st === "IN_TAX" || st === "TAX_COMPLETED") && cfg.snapshotNumber ? (
+                <span className="font-mono text-[11px] font-semibold text-emerald-600">{cfg.snapshotNumber}</span>
+              ) : null}
             </div>
           ),
           action: (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewConfig(cfg);
-              }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
+            <div
+              className="flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
             >
-              {st === "TAX_COMPLETED" ? (
-                <>
-                  <Eye className="h-3 w-3" /> View Tax Calculation
-                </>
-              ) : isPending ? (
-                <>
-                  <Play className="h-3 w-3" /> Acquire
-                </>
-              ) : (
-                <>
-                  <Eye className="h-3 w-3" /> View
-                </>
-              )}
-            </button>
+              <ActionMenu
+                items={[
+                  {
+                    label:
+                      st === "TAX_COMPLETED"
+                        ? "View Tax Calculation"
+                        : isPending
+                          ? "Acquire"
+                          : "View",
+                    icon:
+                      st === "TAX_COMPLETED" ? (
+                        <Eye className="h-4 w-4 text-slate-600" />
+                      ) : isPending ? (
+                        <Play className="h-4 w-4 text-slate-600" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-slate-600" />
+                      ),
+                    onClick: () => onViewConfig(cfg),
+                  },
+                ]}
+              />
+            </div>
           ),
         };
       }),
@@ -227,7 +246,7 @@ export default function AcquisitionQueue({
   return (
     <PageCard>
       <PageCardContent className="space-y-4 p-4 sm:p-5">
-        {/* Header Title & Result Counter */}
+        {/* Header Title & Result Counter — "Acquisition Queue" preserved */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Layers className="h-4 w-4 text-indigo-600" />
@@ -240,7 +259,7 @@ export default function AcquisitionQueue({
           </div>
         </div>
 
-        {/* Controls Bar: Search Input + Global FilterListbox + Clear Button */}
+        {/* Controls Bar: Search Input + FilterListbox + Clear Button */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex-1">
             <SearchInput
@@ -287,8 +306,8 @@ export default function AcquisitionQueue({
                 {activeSearch && activeStatusFilter !== "ALL"
                   ? `No projects matching "${activeSearch}" found under status "${getStatusLabelText(activeStatusFilter)}".`
                   : activeSearch
-                  ? `No active billing setup projects match "${activeSearch}".`
-                  : `No projects currently in status "${getStatusLabelText(activeStatusFilter)}".`}
+                    ? `No active billing setup projects match "${activeSearch}".`
+                    : `No projects currently in status "${getStatusLabelText(activeStatusFilter)}".`}
               </p>
             </div>
             {isFilterActive && (
@@ -307,6 +326,7 @@ export default function AcquisitionQueue({
               headers={TABLE_HEADERS}
               columns={TABLE_COLUMNS}
               rows={tableRows}
+              alignments={TABLE_ALIGNMENTS}
               loading={loading}
               emptyMessage="No matching projects. Adjust your search or status filter."
             />
