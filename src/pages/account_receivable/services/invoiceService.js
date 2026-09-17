@@ -92,7 +92,13 @@ export const getInvoiceErrorMessage = (
     if (detail.toLowerCase().includes("already")) {
       return "Invoice already generated for this billing snapshot.";
     }
-    if (detail.toLowerCase().includes("client name") || detail.toLowerCase().includes("project name") || detail.toLowerCase().includes("correction")) {
+    if (
+      detail.toLowerCase().includes("client name") ||
+      detail.toLowerCase().includes("project name") ||
+      detail.toLowerCase().includes("correction") ||
+      detail.toLowerCase().includes("reacquire") ||
+      detail.toLowerCase().includes("re-acquire")
+    ) {
       return detail;
     }
     if (detail.toLowerCase().includes("client") || detail.toLowerCase().includes("address")) {
@@ -705,6 +711,21 @@ export const correctNonFinancialInvoice = async (invoiceId, payload = {}) => {
   return normalizeInvoice(unwrapData(response));
 };
 
+/**
+ * POST /api/v1/invoices/{invoiceId}/financial-correction/reacquire
+ * Re-acquires authoritative billing source data, rebuilds billing snapshot,
+ * recalculates tax calculation, and refreshes the REJECTED invoice.
+ * No request body.
+ */
+export const financialCorrectionReacquire = async (invoiceId) => {
+  if (!invoiceId) {
+    throw new Error("Invoice ID is required to re-acquire financial data.");
+  }
+  const url = `${AR_BASE_URL}/api/v1/invoices/${invoiceId}/financial-correction/reacquire`;
+  const response = await api.post(url);
+  return normalizeInvoice(unwrapData(response));
+};
+
 export default {
   generateInvoice,
   getInvoice,
@@ -716,6 +737,7 @@ export default {
   rejectInvoice,
   refreshInvoiceAfterCorrection,
   correctNonFinancialInvoice,
+  financialCorrectionReacquire,
   getInvoiceApprovalHistory,
   getInvoiceErrorMessage,
   normalizeInvoice,

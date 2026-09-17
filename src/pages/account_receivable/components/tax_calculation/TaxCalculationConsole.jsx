@@ -36,7 +36,7 @@ import {
 import { getInvoice } from "../../services/invoiceService";
 import { getActiveTaxRegions } from "../../services/taxRateConfigurationService";
 
-const ACQUISITION_PATH = "/account-receivable/billing-data-acquisition";
+const ACQUISITION_PATH = "/account-receivable/billing-data-acquisition/workspace";
 
 export default function TaxCalculationConsole() {
   const navigate = useNavigate();
@@ -66,8 +66,8 @@ export default function TaxCalculationConsole() {
             if (!cfg.projectId && !cfg.id) return null;
 
             const savedMeta = getAcquiredSnapshotMetadata(cfg.projectId);
-            const snapStart = savedMeta?.billingPeriodStart || null;
-            const snapEnd = savedMeta?.billingPeriodEnd || null;
+            const snapStart = cfg.billingPeriodStart || savedMeta?.billingPeriodStart || null;
+            const snapEnd = cfg.billingPeriodEnd || savedMeta?.billingPeriodEnd || null;
 
             let existingSnapshot = null;
             if (cfg.projectId && snapStart && snapEnd) {

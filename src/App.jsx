@@ -300,6 +300,7 @@ import BillingDataAcquisition from "./pages/account_receivable/pages/BillingData
 import AcquisitionDetail from "./pages/account_receivable/pages/AcquisitionDetail.jsx";
 import TaxCalculationPage from "./pages/account_receivable/pages/TaxCalculation.jsx";
 import InvoiceGeneration from "./pages/account_receivable/pages/InvoiceGeneration.jsx";
+import InvoiceGenerationDetail from "./pages/account_receivable/pages/InvoiceGenerationDetail.jsx";
 import InvoiceApproval from "./pages/account_receivable/pages/InvoiceApproval.jsx";
 import InvoiceDetail from "./pages/account_receivable/pages/InvoiceDetail.jsx";
 import Configurations from "./pages/account_receivable/pages/Configurations.jsx";
@@ -719,7 +720,7 @@ const AppRoutes = () => {
             />
             <Route
               path="billing-data-acquisition"
-              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><BillingDataAcquisition /></ProtectedRoute>}
+              element={<Navigate to="/account-receivable/billing-data-acquisition/workspace" replace />}
             />
             <Route
               path="billing-data-acquisition/workspace"
@@ -744,6 +745,10 @@ const AppRoutes = () => {
             <Route
               path="invoice-generation"
               element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><InvoiceGeneration /></ProtectedRoute>}
+            />
+            <Route
+              path="invoice-generation/:snapshotId"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><InvoiceGenerationDetail /></ProtectedRoute>}
             />
             <Route
               path="invoice-approval"
