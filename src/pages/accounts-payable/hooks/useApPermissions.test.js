@@ -59,6 +59,11 @@ describe("useApPermissions — Invoice Approval Workflow flags", () => {
     expect(renderHook(() => useApPermissions()).result.current.canViewInvoiceApproval).toBe(false);
   });
 
+  it("also grants canViewInvoiceApproval from INVOICE_VIEW alone — an AP Executive or Finance user tracking an invoice, not just an approver", () => {
+    mockAuth(["INVOICE_VIEW"]);
+    expect(renderHook(() => useApPermissions()).result.current.canViewInvoiceApproval).toBe(true);
+  });
+
   it("a user with none of the approval permissions gets every approval flag denied", () => {
     mockAuth([]);
     const { result } = renderHook(() => useApPermissions());
@@ -67,5 +72,47 @@ describe("useApPermissions — Invoice Approval Workflow flags", () => {
     expect(result.current.canViewInvoiceApproval).toBe(false);
     expect(result.current.canApproveInvoice).toBe(false);
     expect(result.current.canRejectInvoice).toBe(false);
+  });
+
+  it("grants canSendBackInvoice from INVOICE_SEND_BACK alone, independent of approve/reject", () => {
+    mockAuth(["INVOICE_SEND_BACK"]);
+    const { result } = renderHook(() => useApPermissions());
+    expect(result.current.canSendBackInvoice).toBe(true);
+    expect(result.current.canApproveInvoice).toBe(false);
+    expect(result.current.canRejectInvoice).toBe(false);
+  });
+
+  it("does not imply Send Back from holding Approve or Reject alone", () => {
+    mockAuth(["INVOICE_APPROVE", "INVOICE_REJECT"]);
+    const { result } = renderHook(() => useApPermissions());
+    expect(result.current.canSendBackInvoice).toBe(false);
+  });
+
+  it("derives canViewInvoiceHistory from any invoice-visibility or payment-view permission", () => {
+    for (const perm of ["INVOICE_APPROVAL_VIEW", "INVOICE_SEND_FOR_APPROVAL", "INVOICE_APPROVE", "INVOICE_REJECT", "PAYMENT_VIEW"]) {
+      mockAuth([perm]);
+      expect(renderHook(() => useApPermissions()).result.current.canViewInvoiceHistory).toBe(true);
+    }
+    mockAuth([]);
+    expect(renderHook(() => useApPermissions()).result.current.canViewInvoiceHistory).toBe(false);
+  });
+});
+
+describe("useApPermissions — Payment permission flags", () => {
+  it("canMarkPaid/canViewPayment are now permission-driven (PAYMENT_PROCESS/PAYMENT_VIEW), not role-derived", () => {
+    mockAuth(["PAYMENT_PROCESS"]);
+    let result = renderHook(() => useApPermissions()).result;
+    expect(result.current.canMarkPaid).toBe(true);
+    expect(result.current.canViewPayment).toBe(false);
+
+    mockAuth(["PAYMENT_VIEW"]);
+    result = renderHook(() => useApPermissions()).result;
+    expect(result.current.canMarkPaid).toBe(false);
+    expect(result.current.canViewPayment).toBe(true);
+
+    mockAuth([]);
+    result = renderHook(() => useApPermissions()).result;
+    expect(result.current.canMarkPaid).toBe(false);
+    expect(result.current.canViewPayment).toBe(false);
   });
 });

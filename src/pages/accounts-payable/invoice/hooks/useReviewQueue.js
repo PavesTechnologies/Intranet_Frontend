@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { reviewQueueService } from "../services/reviewQueueService";
 import { INVOICE_SUMMARY_KEY } from "./useInvoiceSummary";
+import { INVOICE_HISTORY_KEY } from "./useInvoiceHistory";
 
 export const REVIEW_QUEUE_KEY = (params) => ["accountsPayable", "reviewQueue", params];
 
@@ -31,12 +32,13 @@ export function useSaveOcrReviewMutation() {
     // Returning this (rather than firing invalidation and moving on) keeps the mutation pending
     // until the review queue/invoice list have actually refetched, so callers that close a
     // modal/dialog on success don't do so before the underlying table has reloaded.
-    onSuccess: () =>
+    onSuccess: (_, { invoiceId }) =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: ["accountsPayable", "reviewQueue"] }),
         queryClient.invalidateQueries({ queryKey: ["accountsPayable", "invoices"] }),
         queryClient.invalidateQueries({ queryKey: ["accountsPayable", "invoice"] }),
         queryClient.invalidateQueries({ queryKey: INVOICE_SUMMARY_KEY }),
+        ...(invoiceId ? [queryClient.invalidateQueries({ queryKey: INVOICE_HISTORY_KEY(invoiceId) })] : []),
       ]),
   });
 }
