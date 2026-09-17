@@ -16,27 +16,33 @@ import { getApiErrorMessage } from "../../utils/apiError";
  * happens this editor stops rendering (InvoiceDetailPage swaps it for the read-only
  * InvoiceOcrReviewPanel) and the "Send for Approval" action becomes available below.
  *
- * GET /invoice-details/invoice/{id} doesn't return vendor_id/currency_id/po_id/payment_term_id/
- * department_id/purchase_category_id — only vendor_name is available as display text. Every
- * field on the review PATCH is optional and the backend only overwrites a field when a non-null
- * value is submitted (see useInvoiceReviewForm), so those fields are safe to leave blank here:
- * doing so simply preserves whatever's already on the invoice. What IS known from the invoice
- * itself (number, type, dates, amounts) is pre-filled.
+ * Every field on the review PATCH is optional and the backend only overwrites a field when a
+ * non-null value is submitted (see useInvoiceReviewForm), so leaving anything blank is always
+ * safe — it just preserves whatever's already on the invoice. Everything the invoice-detail
+ * response now carries (number, type, dates, amounts, vendor, currency, PO, payment term,
+ * department, category) is pre-filled below.
  */
 export default function InvoiceReviewEditor({ invoice }) {
   const review = useInvoiceReviewForm({
     inboundDocumentId: invoice.inboundDocumentId,
     invoiceId: invoice.id,
     initial: {
+      vendorId: invoice.vendorId ?? null,
+      vendorLabel: invoice.vendor?.name || "",
       form: {
         invoice_number: invoice.invoiceNumber || "",
         invoice_type: invoice.invoiceType || "",
         invoice_date: invoice.invoiceDate || "",
         due_date: invoice.dueDate || "",
+        currency_id: invoice.currencyId ?? "",
         gross_amount: invoice.grossAmount ?? "",
         discount_amount: invoice.discountAmount ?? "",
         tax_amount: invoice.taxAmount ?? "",
         net_amount: invoice.netAmount ?? "",
+        po_id: invoice.poId ?? "",
+        payment_term_id: invoice.paymentTermId ?? "",
+        department_id: invoice.departmentId ?? "",
+        purchase_category_id: invoice.purchaseCategoryId ?? "",
       },
     },
   });
@@ -71,9 +77,8 @@ export default function InvoiceReviewEditor({ invoice }) {
           </div>
         </div>
         <p className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-          Vendor, currency, PO, payment term, department, and purchase category aren't returned by
-          this page's data yet, so those start blank below — verify against the source document.
-          Leaving any field blank keeps whatever is already saved on the invoice; it's only
+          Fields below are pre-filled from the invoice — verify against the source document before
+          saving. Leaving any field blank keeps whatever is already saved on the invoice; it's only
           overwritten if you fill it in.
         </p>
         <InvoiceReviewFieldsForm review={review} vendorHint={invoice.vendor?.name} />

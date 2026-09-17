@@ -1,8 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import InvoiceApprovalPanel from "./InvoiceApprovalPanel";
-import { useInvoiceApproval, useSendForApprovalMutation, useApproveInvoiceMutation, useRejectInvoiceMutation } from "../hooks/useInvoiceApprovals";
+import {
+  useInvoiceApproval,
+  useSendForApprovalMutation,
+  useApproveInvoiceMutation,
+  useRejectInvoiceMutation,
+  useSendBackInvoiceMutation,
+} from "../hooks/useInvoiceApprovals";
 import { useApPermissions } from "../../hooks/useApPermissions";
+import { useAuth } from "../../../../contexts/AuthContext";
 import { useApprovalPolicyDetail } from "../../system-configuration/hooks/useApprovalPolicies";
 
 vi.mock("../hooks/useInvoiceApprovals", () => ({
@@ -10,10 +18,15 @@ vi.mock("../hooks/useInvoiceApprovals", () => ({
   useSendForApprovalMutation: vi.fn(),
   useApproveInvoiceMutation: vi.fn(),
   useRejectInvoiceMutation: vi.fn(),
+  useSendBackInvoiceMutation: vi.fn(),
 }));
 
 vi.mock("../../hooks/useApPermissions", () => ({
   useApPermissions: vi.fn(),
+}));
+
+vi.mock("../../../../contexts/AuthContext", () => ({
+  useAuth: vi.fn(),
 }));
 
 vi.mock("../../system-configuration/components/ApproverLabel", () => ({
@@ -32,9 +45,10 @@ vi.mock("../../system-configuration/hooks/useApprovalPolicies", () => ({
   useApprovalPolicyDetail: vi.fn(),
 }));
 
-// Pending Approval, not OCR Review Pending — the backend's send-for-approval route rejects
-// anything still at OCR Review Pending (it has to be reviewed/saved first, which is what
-// advances it to Pending Approval in the first place; see InvoiceApprovalPanel's canOfferSend).
+// Pending Approval — the realistic status for most of the tests below, which are about an
+// approval already in flight (send_for_approval is what actually reaches Pending Approval now,
+// see InvoiceApprovalPanel's canOfferSend). The Send for Approval tests specifically override
+// this to "OCR Reviewed", the one status that action is actually offered from.
 const invoice = {
   id: 42,
   invoiceNumber: "INV-0042",
@@ -51,6 +65,7 @@ function setPermissions(overrides = {}) {
     canSendForApproval: true,
     canApproveInvoice: true,
     canRejectInvoice: true,
+    canSendBackInvoice: true,
     ...overrides,
   });
 }
@@ -64,10 +79,15 @@ beforeEach(() => {
   useSendForApprovalMutation.mockReturnValue({ ...idleMutation });
   useApproveInvoiceMutation.mockReturnValue({ ...idleMutation });
   useRejectInvoiceMutation.mockReturnValue({ ...idleMutation });
+  useSendBackInvoiceMutation.mockReturnValue({ ...idleMutation });
   useApprovalPolicyDetail.mockReturnValue({
     data: { id: 5, name: "IT Hardware Policy", department_id: 1, purchase_category_id: 10, is_default: false },
   });
   setPermissions();
+  // Every fixture below that expects Approve/Reject/Send Back to be visible uses "user-1" as
+  // the active step's pending approver — default the signed-in user to match it, so tests that
+  // aren't specifically about assignment don't each have to set this up themselves.
+  useAuth.mockReturnValue({ user: { user_id: "user-1" } });
 });
 
 describe("InvoiceApprovalPanel — approval timeline", () => {
@@ -77,9 +97,9 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
     expect(screen.getByText("Loading approval status...")).toBeInTheDocument();
   });
 
-  it("offers Send for Approval when there's no approval instance yet (404) and the user is permitted", () => {
+  it("offers Send for Approval once OCR Reviewed and the user is permitted", () => {
     setApproval({ data: undefined, isLoading: false, error: { status: 404 } });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
     expect(screen.getByText(/has not been sent for approval yet/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /send for approval/i })).toBeInTheDocument();
   });
@@ -87,7 +107,17 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
   it("hides Send for Approval when the user lacks canSendForApproval", () => {
     setPermissions({ canSendForApproval: false });
     setApproval({ data: undefined, isLoading: false, error: { status: 404 } });
-    render(<InvoiceApprovalPanel invoice={invoice} />);
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    expect(screen.queryByRole("button", { name: /send for approval/i })).not.toBeInTheDocument();
+  });
+
+  // OCR_REVIEWED vs. PENDING_APPROVAL is a real, distinct status transition performed by
+  // send_for_approval itself now (see InvoiceApprovalService) — an invoice still at Pending
+  // Approval has, by definition, already been sent, so it must never offer to send it again,
+  // regardless of whether the approval fetch happens to 404 for some other reason.
+  it("does not offer Send for Approval while still Pending Approval, even with no approval data", () => {
+    setApproval({ data: undefined, isLoading: false, error: { status: 404 } });
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "Pending Approval" }} />);
     expect(screen.queryByRole("button", { name: /send for approval/i })).not.toBeInTheDocument();
   });
 
@@ -261,6 +291,31 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
   });
 
+  it("hides Approve/Reject when the signed-in user is not the assigned approver for the active step, even with permission", () => {
+    useAuth.mockReturnValue({ user: { user_id: "someone-else" } });
+    setApproval({
+      data: {
+        status: "IN_PROGRESS",
+        steps: [
+          {
+            id: 1,
+            level_number: 1,
+            approver_type: "ROLE",
+            role_code: "AP_MANAGER",
+            approval_rule: "ANY_ONE",
+            status: "PENDING",
+            approvers: [{ id: 100, user_uuid: "user-1", status: "PENDING" }],
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+    render(<InvoiceApprovalPanel invoice={invoice} />);
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+  });
+
   it("shows which policy matched, resolved by name/department/category", () => {
     useApprovalPolicyDetail.mockReturnValue({
       data: { id: 5, name: "IT Hardware Policy", department_id: 1, purchase_category_id: 10, is_default: false },
@@ -381,5 +436,103 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
     });
     render(<InvoiceApprovalPanel invoice={invoice} />);
     expect(screen.getByText(/no eligible approver has been/)).toBeInTheDocument();
+  });
+});
+
+describe("InvoiceApprovalPanel — Send Back", () => {
+  const inFlightApproval = {
+    status: "IN_PROGRESS",
+    approval_policy_id: 5,
+    steps: [
+      {
+        id: 1,
+        level_number: 1,
+        approver_type: "ROLE",
+        role_code: "AP_MANAGER",
+        approval_rule: "ANY_ONE",
+        status: "PENDING",
+        approvers: [{ id: 100, user_uuid: "user-1", status: "PENDING" }],
+      },
+    ],
+  };
+
+  it("shows Send Back alongside Approve/Reject when the user holds the permission", () => {
+    setApproval({ data: inFlightApproval, isLoading: false, error: null });
+    render(<InvoiceApprovalPanel invoice={invoice} />);
+    expect(screen.getByRole("button", { name: /send back/i })).toBeInTheDocument();
+  });
+
+  it("hides Send Back for a user without canSendBackInvoice, even mid-flight", () => {
+    setPermissions({ canSendBackInvoice: false });
+    setApproval({ data: inFlightApproval, isLoading: false, error: null });
+    render(<InvoiceApprovalPanel invoice={invoice} />);
+    expect(screen.queryByRole("button", { name: /send back/i })).not.toBeInTheDocument();
+  });
+
+  it("requires a reason before Send Back can be confirmed", async () => {
+    setApproval({ data: inFlightApproval, isLoading: false, error: null });
+    const user = userEvent.setup();
+    render(<InvoiceApprovalPanel invoice={invoice} />);
+
+    await user.click(screen.getByRole("button", { name: /send back/i }));
+    // Both the row trigger and the modal's own submit button are now labeled "Send Back" — the
+    // modal's is the one added last.
+    const confirmButton = () => {
+      const matches = screen.getAllByRole("button", { name: "Send Back" });
+      return matches[matches.length - 1];
+    };
+    expect(confirmButton()).toBeDisabled();
+
+    await user.type(screen.getByLabelText("Reason"), "Please correct the GST amount");
+    expect(confirmButton()).toBeEnabled();
+  });
+
+  it("calls the send-back mutation with the invoice id and trimmed reason", async () => {
+    setApproval({ data: inFlightApproval, isLoading: false, error: null });
+    const mutate = vi.fn();
+    useSendBackInvoiceMutation.mockReturnValue({ mutate, isPending: false });
+    const user = userEvent.setup();
+    render(<InvoiceApprovalPanel invoice={invoice} />);
+
+    await user.click(screen.getByRole("button", { name: /send back/i }));
+    await user.type(screen.getByLabelText("Reason"), "  Please correct the GST amount  ");
+    const matches = screen.getAllByRole("button", { name: "Send Back" });
+    await user.click(matches[matches.length - 1]);
+
+    expect(mutate).toHaveBeenCalledWith(
+      { invoiceId: 42, comments: "Please correct the GST amount" },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+  });
+
+  it("hides Send Back when the signed-in user is not the assigned approver, even with the permission", () => {
+    useAuth.mockReturnValue({ user: { user_id: "someone-else" } });
+    setApproval({ data: inFlightApproval, isLoading: false, error: null });
+    render(<InvoiceApprovalPanel invoice={invoice} />);
+    expect(screen.queryByRole("button", { name: /send back/i })).not.toBeInTheDocument();
+  });
+
+  it("is not offered once the approval is terminal (already APPROVED)", () => {
+    setApproval({
+      data: {
+        status: "APPROVED",
+        approval_policy_id: 5,
+        steps: [
+          {
+            id: 1,
+            level_number: 1,
+            approver_type: "ROLE",
+            role_code: "AP_MANAGER",
+            approval_rule: "ANY_ONE",
+            status: "APPROVED",
+            approvers: [{ id: 100, user_uuid: "user-1", status: "APPROVED", decided_at: "2026-01-01T00:00:00Z" }],
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+    render(<InvoiceApprovalPanel invoice={invoice} />);
+    expect(screen.queryByRole("button", { name: /send back/i })).not.toBeInTheDocument();
   });
 });

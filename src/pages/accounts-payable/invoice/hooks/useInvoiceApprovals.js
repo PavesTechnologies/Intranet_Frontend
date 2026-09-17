@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { approvalService } from "../services/approvalService";
 import { INVOICE_DETAIL_KEY } from "./useInvoiceDetail";
+import { INVOICE_HISTORY_KEY } from "./useInvoiceHistory";
 
 export const INVOICE_APPROVAL_KEY = (invoiceId) => ["accountsPayable", "invoiceApproval", invoiceId];
 export const INVOICE_APPROVAL_STEPS_KEY = (invoiceId) => ["accountsPayable", "invoiceApprovalSteps", invoiceId];
@@ -9,6 +10,7 @@ function invalidateApproval(queryClient, invoiceId) {
   queryClient.invalidateQueries({ queryKey: INVOICE_DETAIL_KEY(invoiceId) });
   queryClient.invalidateQueries({ queryKey: INVOICE_APPROVAL_KEY(invoiceId) });
   queryClient.invalidateQueries({ queryKey: INVOICE_APPROVAL_STEPS_KEY(invoiceId) });
+  queryClient.invalidateQueries({ queryKey: INVOICE_HISTORY_KEY(invoiceId) });
   queryClient.invalidateQueries({ queryKey: ["accountsPayable", "invoices"] });
 }
 
@@ -66,6 +68,15 @@ export function useRejectInvoiceMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ invoiceId, comments }) => approvalService.reject(invoiceId, comments),
+    onSuccess: (_, variables) => invalidateApproval(queryClient, variables.invoiceId),
+  });
+}
+
+/** @param {{invoiceId: string|number, comments: string}} variables - comments (a reason) is required */
+export function useSendBackInvoiceMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ invoiceId, comments }) => approvalService.sendBack(invoiceId, comments),
     onSuccess: (_, variables) => invalidateApproval(queryClient, variables.invoiceId),
   });
 }
