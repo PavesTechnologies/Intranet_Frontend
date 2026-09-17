@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { AlertTriangle, CheckCircle2, Circle, Clock, Send, XCircle } from "lucide-react";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
@@ -8,6 +8,9 @@ import FormTextArea from "../../../../components/forms/FormTextArea";
 import StatusBadge from "../../../../components/status/statusbadge";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import ApproverLabel from "../../system-configuration/components/ApproverLabel";
+import useDepartments from "../../system-configuration/hooks/useDepartments";
+import usePurchaseCategories from "../../system-configuration/hooks/usePurchaseCategories";
+import { useApprovalPolicyDetail } from "../../system-configuration/hooks/useApprovalPolicies";
 import {
   useInvoiceApproval,
   useSendForApprovalMutation,
@@ -53,6 +56,15 @@ export default function InvoiceApprovalPanel({ invoice }) {
   const approveInvoice = useApproveInvoiceMutation();
   const rejectInvoice = useRejectInvoiceMutation();
 
+  // "Which policy matched" and "who's currently blocking this" — approval.approval_policy_id is
+  // just an id (Backend/API_Layer/interface/approval_interface.py), so the policy itself is
+  // fetched separately via the same policy-detail hook System Configuration uses.
+  const { data: policy } = useApprovalPolicyDetail(approval?.approval_policy_id);
+  const { data: departmentData } = useDepartments();
+  const { data: categoryData } = usePurchaseCategories();
+  const departmentsById = useMemo(() => new Map((departmentData || []).map((d) => [d.id, d])), [departmentData]);
+  const categoriesById = useMemo(() => new Map((categoryData || []).map((c) => [c.id, c])), [categoryData]);
+
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -80,6 +92,15 @@ export default function InvoiceApprovalPanel({ invoice }) {
         .map((a) => ({ ...a, level_number: step.level_number })),
     )
     .sort((a, b) => new Date(a.decided_at) - new Date(b.decided_at));
+
+  // The one step currently blocking progress — "who needs to approve it right now", as opposed
+  // to the full level-by-level timeline below. Levels advance in order, so at most one should
+  // ever be PENDING at a time.
+  const currentStep = steps.find((step) => step.status === "PENDING");
+  const currentApprovers = (currentStep?.approvers || []).filter((a) => a.status === "PENDING" || a.status === "WAITING");
+
+  const policyDepartment = policy ? departmentsById.get(policy.department_id) : null;
+  const policyCategory = policy ? categoriesById.get(policy.purchase_category_id) : null;
 
   const handleSend = () => {
     sendForApproval.mutate(invoice.id, {
@@ -164,6 +185,58 @@ export default function InvoiceApprovalPanel({ invoice }) {
           </div>
         ) : (
           <>
+            <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Applied Policy</p>
+              {policy ? (
+                <>
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-sm font-medium text-gray-900">
+                    {policy.name}
+                    {policy.is_default && (
+                      <span className="rounded-full border border-indigo-300 bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                        Default
+                      </span>
+                    )}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {policy.is_default
+                      ? "Catch-all fallback — no department/category-specific policy matched this invoice."
+                      : `${policyDepartment?.name || `Department #${policy.department_id}`} · ${policyCategory?.name || `Category #${policy.purchase_category_id}`}`}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1 text-sm text-gray-500">Loading policy details…</p>
+              )}
+            </div>
+
+            {isInFlight && (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Waiting On</p>
+                {!currentStep ? (
+                  <p className="mt-1 text-sm text-amber-800">Resolving the next approval step…</p>
+                ) : currentApprovers.length === 0 ? (
+                  <p className="mt-1 text-sm text-amber-800">
+                    Currently at level {currentStep.level_number} (
+                    {APPROVER_TYPE_LABEL[currentStep.approver_type] || currentStep.approver_type}
+                    {currentStep.role_code ? ` — ${currentStep.role_code}` : ""}) — no eligible approver has been
+                    assigned yet.
+                  </p>
+                ) : (
+                  <p className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-amber-800">
+                    Currently at level {currentStep.level_number}
+                    <span className="text-xs text-amber-600">
+                      ({APPROVAL_RULE_LABEL[currentStep.approval_rule] || currentStep.approval_rule}):
+                    </span>
+                    {currentApprovers.map((a, i) => (
+                      <span key={a.id} className="flex items-center gap-1 font-medium">
+                        <ApproverLabel userUuid={a.user_uuid} />
+                        {i < currentApprovers.length - 1 && <span className="text-amber-400">,</span>}
+                      </span>
+                    ))}
+                  </p>
+                )}
+              </div>
+            )}
+
             <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Approval Timeline</h4>
             <ol className="mb-4 space-y-3 border-l border-gray-200 pl-4">
               {steps.map((step) => (
