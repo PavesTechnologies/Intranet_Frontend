@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils"
 
 export function KPICard({ label, value, icon, color, active, onClick, suffix, className }) {
     return (
-        <div className={cn("flex items-center gap-3 rounded-xl border bg-card p-4 text-left transition-all", active ? "" : "", className)}>
+        <div className={cn("flex items-center gap-3 rounded-xl border bg-card p-4 text-left transition-all", active ? "ring-2 ring-primary bg-primary/5 border-primary/20" : "", className)}>
             <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", color || "bg-secondary text-secondary-foreground")}>
                 {icon}
             </div>
