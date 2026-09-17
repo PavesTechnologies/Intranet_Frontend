@@ -25,7 +25,7 @@ export default function QueueTable({ candidates, isLoading, permissions, campaig
   // c.id is the campaign_candidate_id (mapCampaignCandidateRow), matching
   // the id CandidateScorePage expects at /airs/candidates/:candidateId
   // elsewhere in AIRS (CampaignDetails, PipelineBoardPage).
-  const goToCandidate = (c) => navigate(`/airs/candidates/${c.id}`, { state: { candidate: c, campaignId } });
+  const goToCandidate = (c) => navigate(`/ai-screening/candidates/${c.id}`, { state: { candidate: c, campaignId } });
 
   const rows = candidates.map((c) => ({
     id: c.id,

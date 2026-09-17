@@ -109,7 +109,7 @@ export default function CandidateScorePage() {
         <ErrorState
           title="Candidate not found"
           message={messageByStatus[status] || "We couldn't find this candidate. They may have been removed."}
-          onRetry={status === "pending" ? refetch : () => navigate("/airs/campaigns")}
+          onRetry={status === "pending" ? refetch : () => navigate("/ai-screening/campaigns")}
         />
       </div>
     );

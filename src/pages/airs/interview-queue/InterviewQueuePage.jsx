@@ -99,7 +99,7 @@ export default function InterviewQueuePage() {
         <ErrorState
           title="No active campaign"
           message="You have no active campaigns to review. Open a campaign and choose &quot;Review Interviews&quot; instead."
-          onRetry={() => navigate("/airs/campaigns")}
+          onRetry={() => navigate("/ai-screening/campaigns")}
         />
       </div>
     );

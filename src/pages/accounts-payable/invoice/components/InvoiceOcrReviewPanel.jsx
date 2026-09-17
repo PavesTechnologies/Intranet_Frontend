@@ -6,12 +6,11 @@ import { invoiceService } from "../services/invoiceService";
 import { getApiErrorMessage } from "../../utils/apiError";
 
 /**
- * Read-only OCR/processing summary for an already-persisted invoice. Field-level correction now
- * happens in the OCR Review Queue (InvoiceOcrReviewQueuePage + OcrReviewModal), which operates on
- * inbound_document_id — a queue item may not have an invoice_id at all yet (Path B: extracted,
- * no vendor match), so that flow can't live on this invoice-keyed detail page. There's also no
- * endpoint that returns the original extracted field set or a confidence score for a persisted
- * invoice, so this card only shows what InvoiceDetailsResponse actually carries.
+ * Read-only OCR/processing summary for an invoice that's past the OCR Review Pending stage —
+ * while an invoice IS still OCR Review Pending, InvoiceDetailPage renders the editable
+ * InvoiceReviewEditor here instead, not this panel. There's also no endpoint that returns the
+ * original extracted field set or a confidence score for a persisted invoice, so this card only
+ * shows what InvoiceDetailsResponse actually carries.
  */
 export default function InvoiceOcrReviewPanel({ invoice }) {
   const handleView = async () => {

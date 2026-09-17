@@ -7,24 +7,27 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Button from "../../../../components/Button/Button";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import InvoiceAmountSummary from "../components/InvoiceAmountSummary";
-import InvoiceMatchingCard from "../components/InvoiceMatchingCard";
 import InvoiceAttachmentList from "../components/InvoiceAttachmentList";
 import InvoiceIssueList from "../components/InvoiceIssueList";
 import InvoiceOcrReviewPanel from "../components/InvoiceOcrReviewPanel";
+import InvoiceReviewEditor from "../components/InvoiceReviewEditor";
 import InvoiceValidationPanel from "../components/InvoiceValidationPanel";
 import InvoiceApprovalPanel from "../components/InvoiceApprovalPanel";
 import InvoiceAuditHistory from "../components/InvoiceAuditHistory";
 import { useInvoiceDetail } from "../hooks/useInvoiceDetail";
 import { AP_ROUTES } from "../../constants/routes";
+import { INVOICE_STATUS } from "../../constants/invoiceStatus";
 import { formatDate } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
 
 /**
- * Single detail route for the whole invoice lifecycle. OCR/Validation render as fixed
- * informational cards (their real corrective actions live elsewhere — the OCR Review Queue, and
- * nowhere yet for validation, since the backend has no standalone validation stage). Approval and
- * Matching are real, live data from their own endpoints; only Approval's action buttons are
- * stage-gated to Pending Approval.
+ * Single detail route for the whole invoice lifecycle. While an invoice is OCR Review Pending,
+ * the OCR/Validation slot renders the editable InvoiceReviewEditor — reviewing and saving here
+ * (PATCH .../ocr-review) is what moves it past this stage, per apply_ocr_review always advancing
+ * status on a successful save. Once it's moved on, that slot swaps to the read-only
+ * InvoiceOcrReviewPanel. Approval is real, live data from its own endpoint; only its action
+ * buttons are stage-gated (Send for Approval requires Pending Approval, not OCR Review Pending —
+ * the backend's send-for-approval route itself rejects anything still at OCR Review Pending).
  */
 export default function InvoiceDetailPage() {
   const { invoiceId } = useParams();
@@ -60,8 +63,6 @@ export default function InvoiceDetailPage() {
       </div>
     );
   }
-
-  const symbol = invoice.currency?.symbol || "₹";
 
   return (
     <div className="p-6">
@@ -104,10 +105,13 @@ export default function InvoiceDetailPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Main column */}
         <div className="space-y-4 lg:col-span-2">
-          <InvoiceOcrReviewPanel invoice={invoice} />
+          {invoice.status === INVOICE_STATUS.OCR_REVIEW_PENDING ? (
+            <InvoiceReviewEditor invoice={invoice} />
+          ) : (
+            <InvoiceOcrReviewPanel invoice={invoice} />
+          )}
           <InvoiceApprovalPanel invoice={invoice} />
           <InvoiceValidationPanel />
-          <InvoiceMatchingCard invoiceId={invoice.id} currencySymbol={symbol} />
 
           <PageCard>
             <PageCardContent>

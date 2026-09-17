@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
 import GeneralConfigurationTab from "../components/GeneralConfigurationTab";
 import FiscalYearTab from "../components/FiscalYearTab";
@@ -6,26 +7,45 @@ import TaxComplianceTab from "../components/TaxComplianceTab";
 import StatusMasterTab from "../components/StatusMasterTab";
 import TaxTypesTab from "../components/TaxTypesTab";
 import TaxRulesTab from "../components/TaxRulesTab";
-import ApprovalRulesTab from "../components/ApprovalRulesTab";
+import ApprovalPoliciesTab from "../components/ApprovalPoliciesTab";
+import DepartmentApproversTab from "../components/DepartmentApproversTab";
 import PaymentTermsTab from "../components/PaymentTermsTab";
-import DepartmentTab from "../components/DepartmentTab";
-import PurchaseCategoryTab from "../components/PurchaseCategoryTab";
+import DepartmentsAndCategoriesTab from "../components/DepartmentsAndCategoriesTab";
+import { useApPermissions } from "../../hooks/useApPermissions";
 
-const TABS = [
+const BASE_TABS = [
   { id: "general", label: "General Configuration" },
   { id: "fiscalYear", label: "Fiscal Years" },
   { id: "taxCompliance", label: "Tax & Compliance" },
   { id: "tax", label: "Tax Types" },
   { id: "taxRules", label: "Tax Rules" },
-  { id: "approvalRules", label: "Approval Rules" },
   { id: "paymentTerms", label: "Payment Terms" },
   { id: "status", label: "Status Master" },
-  { id: "department", label: "Department" },
-  { id: "purchaseCategory", label: "Purchase Category" },
+  { id: "departmentsAndCategories", label: "Departments & Categories" },
+];
+
+// Approval Policies / Department Approvers configure who approves what — real backend policy
+// engine (see approvalPolicyService.js), gated by APPROVAL_POLICY_MANAGE since misconfiguring
+// this affects every invoice sent for approval, not just this page.
+const APPROVAL_TABS = [
+  { id: "approvalPolicies", label: "Approval Policies" },
+  { id: "departmentApprovers", label: "Department Approvers" },
 ];
 
 export default function SystemConfigurationPage() {
-  const [activeTab, setActiveTab] = useState(TABS[0].id);
+  const { canManageApprovalPolicy } = useApPermissions();
+  const tabs = useMemo(
+    () => (canManageApprovalPolicy ? [...BASE_TABS, ...APPROVAL_TABS] : BASE_TABS),
+    [canManageApprovalPolicy],
+  );
+  // The Approval Policy create/edit page is a separate route (ApprovalPolicyFormPage) now, not a
+  // modal — navigating back here needs to land back on the Approval Policies tab, not reset to
+  // the first tab, so the caller passes it via router state.
+  const location = useLocation();
+  const requestedTab = location.state?.activeTab;
+  const [activeTab, setActiveTab] = useState(
+    requestedTab && tabs.some((t) => t.id === requestedTab) ? requestedTab : tabs[0].id,
+  );
 
   return (
     <div className="p-6">
@@ -35,7 +55,7 @@ export default function SystemConfigurationPage() {
       />
 
       <div className="flex gap-6 border-b border-gray-200">
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
@@ -58,10 +78,10 @@ export default function SystemConfigurationPage() {
         {activeTab === "status" && <StatusMasterTab />}
         {activeTab === "tax" && <TaxTypesTab />}
         {activeTab === "taxRules" && <TaxRulesTab />}
-        {activeTab === "approvalRules" && <ApprovalRulesTab />}
         {activeTab === "paymentTerms" && <PaymentTermsTab />}
-        {activeTab === "department" && <DepartmentTab />}
-        {activeTab === "purchaseCategory" && <PurchaseCategoryTab />}
+        {activeTab === "departmentsAndCategories" && <DepartmentsAndCategoriesTab />}
+        {activeTab === "approvalPolicies" && canManageApprovalPolicy && <ApprovalPoliciesTab />}
+        {activeTab === "departmentApprovers" && canManageApprovalPolicy && <DepartmentApproversTab />}
       </div>
     </div>
   );
