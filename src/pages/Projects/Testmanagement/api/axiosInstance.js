@@ -1,5 +1,6 @@
 // src/api/axiosInstance.js
 import api from "../../../../api/axiosInstance";
+import { notifySessionExpired } from "../../../../api/sessionExpiry";
 
 // Detect / load backend base URL
 const BASE_URL =
@@ -30,15 +31,19 @@ axiosInstance.interceptors.request.use(
 );
 
 // 🔥 RESPONSE INTERCEPTOR — Handle 401 errors
+//
+// NOTE: api.create() copies config but NOT interceptors, so this instance has
+// none of the main client's refresh logic. It previously deleted the token and
+// nothing else, which left the app rendered and "authenticated" while every
+// later request went out unauthenticated. Route through the shared bridge
+// instead and let AuthContext.logout() do the teardown.
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      console.warn("⚠️ 401 Unauthorized — Redirecting to login...");
-
-      // OPTIONAL:
-      localStorage.removeItem("token");
-      // window.location.href = "/login";
+      error.message = "Session expired. Please login again.";
+      error.isSessionExpired = true;
+      notifySessionExpired();
     }
     return Promise.reject(error);
   },

@@ -229,26 +229,3 @@ export const TAX_RULES_MOCK = [
   },
 ];
 
-/**
- * Approval Rules — invoice amount range -> required approval level, used
- * in place of hardcoded approval thresholds in invoice workflow code.
- * Intended backend contract:
- *   GET    /system/approval-rule    -> ApprovalRule[]
- *   POST   /system/approval-rule     <- { minAmount, maxAmount, approvalLevel, active }
- *   PUT    /system/approval-rule/{id}
- *   DELETE /system/approval-rule/{id}
- * maxAmount = null means "and above" (no upper bound).
- */
-export const APPROVAL_LEVEL_OPTIONS = [
-  { value: "AUTO", label: "Auto" },
-  { value: "AP_MANAGER", label: "AP Manager" },
-  { value: "FINANCE_MANAGER", label: "Finance Manager" },
-  { value: "CFO", label: "CFO" },
-];
-
-export const APPROVAL_RULES_MOCK = [
-  { id: 1, minAmount: 0, maxAmount: 5000, approvalLevel: "AUTO", active: true },
-  { id: 2, minAmount: 5001, maxAmount: 50000, approvalLevel: "AP_MANAGER", active: true },
-  { id: 3, minAmount: 50001, maxAmount: 500000, approvalLevel: "FINANCE_MANAGER", active: true },
-  { id: 4, minAmount: 500001, maxAmount: null, approvalLevel: "CFO", active: true },
-];
