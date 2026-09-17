@@ -346,10 +346,10 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
       normalizedAllowedRoles.includes(role.toUpperCase())
     );
     // console.log("ProtectedRoute check:", {
-      // isAuthenticated,
-      // user,
-      // allowedRoles,
-      // match: hasRole,
+    // isAuthenticated,
+    // user,
+    // allowedRoles,
+    // match: hasRole,
     // });
 
     if (!hasRole) {
@@ -760,6 +760,10 @@ const AppRoutes = () => {
             />
             <Route
               path="tax-calculation/:snapshotId"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxCalculationPage /></ProtectedRoute>}
+            />
+            <Route
+              path="tax-calculation/occurrence/:occurrenceId"
               element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxCalculationPage /></ProtectedRoute>}
             />
             <Route

@@ -1055,6 +1055,19 @@ export const getBillingConfigurationProjectsByClient = async (clientId) => {
   return asArray(unwrapData(response)).map(normalizeProject);
 };
 
+// Returns only the projects eligible for a NEW billing configuration for this
+// client — the backend already excludes projects that are Draft, Pending
+// Approval, or Active (Approved + billingStatus ACTIVE), and includes
+// Rejected/Expired/never-configured projects. The frontend must not
+// re-implement or layer any of that eligibility logic on top of this list.
+export const getAvailableProjectsForBillingConfiguration = async (clientId) => {
+  if (!clientId) return [];
+  const response = await api.get(`${BILLING_CONFIGURATIONS_URL}/available-projects`, {
+    params: { clientId },
+  });
+  return asArray(unwrapData(response)).map(normalizeProject);
+};
+
 // --- Time & Material Rate Card APIs ---
 export const getTmRateCardsByBillingConfiguration = async (billingConfigurationId) => {
   if (!billingConfigurationId) return [];
@@ -1376,6 +1389,22 @@ export const ensureBillingConfigurationDraft = async (payload) => {
   // [4] Extracted billingConfigurationId from the (already unwrapped) ApiResponse data.
   console.log("[billingConfigurationService] extracted billingConfigurationId:", extractedId);
   return extractedId;
+};
+
+// Re-syncs the parent billing configuration's own fields (billingTypeId,
+// billingFrequencyId, etc.) onto a DRAFT record that already exists, via PUT
+// .../draft. The initial draft is created (ensureBillingConfigurationDraft,
+// above) as soon as billingTypeId alone is known — typically before the user
+// has picked a Billing Frequency — so billingFrequencyId can still be empty
+// on the parent record afterward. Sub-configuration create calls (Fixed
+// Price, Recurring) require billingFrequencyId to already be set on the
+// parent, so callers should await this immediately before them to push the
+// current wizard selection first.
+export const syncBillingConfigurationDraft = async (payload, billingConfigurationId) => {
+  const requestPayload = buildBillingConfigurationRequestPayload(payload);
+  assertBillingConfigurationPayload(requestPayload);
+  const configResponse = await updateBillingConfigurationDraft(billingConfigurationId, requestPayload);
+  return extractBillingConfigurationId(configResponse) || billingConfigurationId;
 };
 
 const buildTmRateCardRequestPayload = (card = {}, pricingModel, billingConfigurationId) => ({

@@ -20,6 +20,7 @@ import {
   saveDraftConfiguration,
   submitConfigurationForApproval,
   ensureBillingConfigurationDraft,
+  syncBillingConfigurationDraft,
   saveBillingConfigurationRecord,
 } from "../services/billingConfigService";
 import { getActiveCurrencies } from "../services/toolPricingService";
@@ -308,7 +309,19 @@ export default function NewConfigurationWizard() {
 
         const { summary, detail } = result;
         if (detail) {
-          setWizardData((prev) => ({ ...prev, ...detail }));
+          // The existing project may be excluded from the available-projects
+          // list (it's already configured), so its projectCode isn't always
+          // present on the raw detail response. Some backends key the PMS
+          // project by its projectId with no separate code — fall back to the
+          // existing projectId so Project Summary/validation never see a
+          // blank code for a project that's already selected.
+          const projectInfo = detail.projectInfo || {};
+          const projectCode = projectInfo.projectCode || (projectInfo.projectId ? String(projectInfo.projectId) : "");
+          setWizardData((prev) => ({
+            ...prev,
+            ...detail,
+            projectInfo: { ...projectInfo, projectCode },
+          }));
         }
         setSavedConfigId(summary.id || configId);
         setApprovalStatus(summary.approvalStatus || null);
@@ -486,7 +499,15 @@ export default function NewConfigurationWizard() {
   // rate card row (and deletes any absent from wizard state), which would race with
   // the single-row create/update the rate card button is about to perform itself.
   const ensureBillingConfigurationId = async () => {
-    if (savedConfigId) return savedConfigId;
+    if (savedConfigId) {
+      // The draft may have been created (below) before billingFrequencyId —
+      // or a later billingTypeId change — was known; re-push the current
+      // wizard selection onto the already-created parent record so it's
+      // never stale by the time a sub-configuration (Fixed Price, Recurring,
+      // TM rate card) is created against it.
+      const syncedId = await syncBillingConfigurationDraft(wizardData, savedConfigId);
+      return applyBillingConfigurationId(syncedId) || savedConfigId;
+    }
     const guardMessage = getDraftGuardMessage(wizardData);
     if (guardMessage) {
       showStatusToast(guardMessage, "warning");

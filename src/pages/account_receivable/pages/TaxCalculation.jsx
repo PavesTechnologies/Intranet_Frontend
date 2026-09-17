@@ -39,6 +39,7 @@ import {
   toIsoDateOnly,
 } from "../services/billingDataAcquisitionService";
 import TaxCalculationConsole from "../components/tax_calculation/TaxCalculationConsole";
+import OccurrenceTaxCalculationDetail from "../components/tax_calculation/OccurrenceTaxCalculationDetail";
 
 const CONSOLE_PATH = "/account-receivable/tax-calculation";
 
@@ -81,7 +82,7 @@ function Field({ label, children }) {
 }
 
 export default function TaxCalculation() {
-  const { snapshotId } = useParams();
+  const { snapshotId, occurrenceId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -144,7 +145,12 @@ export default function TaxCalculation() {
     // 3. Hydrate snapshot data if not passed in location.state or incomplete
     if (!snapshotData || !snapshotData.snapshotNumber || !snapshotData.totalAmount) {
       try {
-        const configs = await fetchActiveBillingConfigurations();
+        // This hydration path only ever backs the T&M billing-snapshot detail
+        // view (the occurrenceId branch above returns before this runs for
+        // Fixed Price/Recurring), so scope the match pool to T&M the same
+        // way Data Acquisition and the console's T&M table do.
+        const allConfigs = await fetchActiveBillingConfigurations();
+        const configs = allConfigs.filter((cfg) => cfg.billingTypeCode === "TIME_MATERIAL");
         let matched = null;
         let snapDetails = null;
 
@@ -211,10 +217,10 @@ export default function TaxCalculation() {
       setSnapshotData((prev) =>
         prev
           ? {
-              ...prev,
-              billingStatus: "TAX_COMPLETED",
-              status: "TAX_COMPLETED",
-            }
+            ...prev,
+            billingStatus: "TAX_COMPLETED",
+            status: "TAX_COMPLETED",
+          }
           : prev
       );
 
@@ -232,63 +238,14 @@ export default function TaxCalculation() {
     }
   };
 
-  const handleGenerateInvoice = async () => {
-    if (!effectiveSnapshotId || generatingInvoice) return;
-
-    // Check if invoice is already known to exist
-    if (hasInvoice) {
-      showStatusToast("Invoice already generated.", "info");
-      navigate(`/account-receivable/invoices/${effectiveSnapshotId}`);
-      return;
-    }
-
-    setGeneratingInvoice(true);
-    setInvoiceError("");
-
-    try {
-      const inv = await generateInvoice(effectiveSnapshotId);
-      showStatusToast("Invoice generated successfully.", "success");
-      setHasInvoice(true);
-      setExistingInvoice(inv);
-
-      if (snapshotData?.projectId) {
-        saveAcquiredSnapshotMetadata(snapshotData.projectId, {
-          status: "INVOICED",
-        });
-      }
-
-      setSnapshotData((prev) =>
-        prev
-          ? {
-              ...prev,
-              billingStatus: "INVOICED",
-              status: "INVOICED",
-            }
-          : prev
-      );
-
-      navigate(`/account-receivable/invoices/${effectiveSnapshotId}`);
-    } catch (err) {
-      const status = err?.response?.status;
-      const msg = getInvoiceErrorMessage(err, "Invoice generation could not be completed.");
-
-      if (status === 409 || msg.toLowerCase().includes("already")) {
-        showStatusToast("Invoice already generated.", "info");
-        setHasInvoice(true);
-        try {
-          const inv = await getInvoice(effectiveSnapshotId);
-          if (inv) setExistingInvoice(inv);
-        } catch {
-          // ignore
-        }
-      } else {
-        setInvoiceError(msg);
-        showStatusToast(msg, "error");
-      }
-    } finally {
-      setGeneratingInvoice(false);
-    }
-  };
+  // Fixed Price / Recurring Billing Occurrences are a distinct backend
+  // contract (BillingOccurrenceController) from the T&M billing-snapshot
+  // flow above — routed separately (tax-calculation/occurrence/:occurrenceId).
+  // This branch renders only the occurrence view; every hook above still runs
+  // unconditionally on every render, it's just that its T&M state stays unused here.
+  if (occurrenceId) {
+    return <OccurrenceTaxCalculationDetail occurrenceId={occurrenceId} />;
+  }
 
   // If no snapshotId exists (standalone route /account-receivable/tax-calculation), render Tax Calculation Console
   if (!effectiveSnapshotId) {
@@ -367,8 +324,8 @@ export default function TaxCalculation() {
   const displayStatus = isInvoiced
     ? "INVOICED"
     : isTaxCompleted
-    ? (taxCalc?.status || "TAX_COMPLETED")
-    : (snapshotData?.status || snapshotData?.billingStatus || "READY_FOR_TAX");
+      ? (taxCalc?.status || "TAX_COMPLETED")
+      : (snapshotData?.status || snapshotData?.billingStatus || "READY_FOR_TAX");
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5">
