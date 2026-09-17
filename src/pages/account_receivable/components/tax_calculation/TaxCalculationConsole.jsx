@@ -131,8 +131,8 @@ export default function TaxCalculationConsole() {
             if (!cfg.projectId && !cfg.id) return null;
 
             const savedMeta = getAcquiredSnapshotMetadata(cfg.projectId);
-            const snapStart = savedMeta?.billingPeriodStart || null;
-            const snapEnd = savedMeta?.billingPeriodEnd || null;
+            const snapStart = cfg.billingPeriodStart || savedMeta?.billingPeriodStart || null;
+            const snapEnd = cfg.billingPeriodEnd || savedMeta?.billingPeriodEnd || null;
 
             let existingSnapshot = null;
             if (cfg.projectId && snapStart && snapEnd) {

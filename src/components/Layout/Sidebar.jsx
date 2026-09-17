@@ -89,17 +89,7 @@ const accountReceivableSubmenu = [
   },
   {
     label: "Billing Data Acquisition",
-    to: "/account-receivable/billing-data-acquisition",
-    children: [
-      {
-        label: "Overview",
-        to: "/account-receivable/billing-data-acquisition",
-      },
-      {
-        label: "Acquisition Workspace",
-        to: "/account-receivable/billing-data-acquisition/workspace",
-      },
-    ],
+    to: "/account-receivable/billing-data-acquisition/workspace",
   },
   {
     label: "Tax Calculation",

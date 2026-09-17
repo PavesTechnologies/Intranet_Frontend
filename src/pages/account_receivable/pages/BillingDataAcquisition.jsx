@@ -9,8 +9,10 @@ import {
   fetchActiveBillingConfigurations,
   getBillingSnapshotByPeriod,
   getAcquiredSnapshotMetadata,
+  clearAcquiredSnapshotMetadata,
   formatBillingPeriod,
   toIsoDateOnly,
+  normalizeAcquisitionStatus,
 } from "../services/billingDataAcquisitionService";
 
 import AcquisitionHeader from "../components/acquisition/AcquisitionHeader";
@@ -60,13 +62,31 @@ export default function BillingDataAcquisition() {
         configs.map(async (cfg) => {
           if (!cfg.projectId) return cfg;
 
-          // Check if there is an acquired snapshot period for this project
+          const isNotAcquired = String(cfg.billingStatus || "").trim().toUpperCase() === "NOT_ACQUIRED";
+          if (isNotAcquired) {
+            // Authoritative backend rule: NOT_ACQUIRED configurations must never query or populate acquired snapshot data
+            clearAcquiredSnapshotMetadata(cfg.projectId);
+            return {
+              ...cfg,
+              billingStatus: "NOT_ACQUIRED",
+              billingPeriodStart: null,
+              billingPeriodEnd: null,
+              billingPeriod: "—",
+              periodStart: "",
+              periodEnd: "",
+              snapshotId: null,
+              snapshotNumber: null,
+              existingSnapshot: null,
+            };
+          }
+
+          // Check if there is an acquired snapshot period for this genuinely acquired project
           const savedMeta = getAcquiredSnapshotMetadata(cfg.projectId);
-          const snapStart = savedMeta?.billingPeriodStart;
-          const snapEnd = savedMeta?.billingPeriodEnd;
+          const snapStart = cfg.billingPeriodStart || savedMeta?.billingPeriodStart || null;
+          const snapEnd = cfg.billingPeriodEnd || savedMeta?.billingPeriodEnd || null;
 
           // CRITICAL: Only query by-period if we have the actual acquired snapshot period.
-          // Do NOT call by-period using the project configuration period (cfg.periodStart / cfg.periodEnd).
+          // Do NOT call by-period using the project configuration period.
           if (snapStart && snapEnd) {
             const existingSnapshot = await getBillingSnapshotByPeriod(
               cfg.projectId,
@@ -81,8 +101,6 @@ export default function BillingDataAcquisition() {
 
               return {
                 ...cfg,
-                projectPeriodStart: cfg.periodStart,
-                projectPeriodEnd: cfg.periodEnd,
                 billingStatus: effectiveStatus,
                 snapshotNumber: existingSnapshot.snapshotNumber,
                 snapshotId: existingSnapshot.snapshotId,
@@ -95,7 +113,10 @@ export default function BillingDataAcquisition() {
               };
             }
           }
-          return cfg;
+          return {
+            ...cfg,
+            billingStatus: normalizeAcquisitionStatus(cfg.billingStatus, false),
+          };
         })
       );
 

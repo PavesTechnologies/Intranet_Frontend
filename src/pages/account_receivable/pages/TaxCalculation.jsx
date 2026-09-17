@@ -26,7 +26,6 @@ import {
   getTaxCalculationErrorMessage,
 } from "../services/taxCalculationService";
 import {
-  generateInvoice,
   getInvoice,
   getInvoiceErrorMessage,
 } from "../services/invoiceService";
@@ -98,8 +97,6 @@ export default function TaxCalculation() {
   // Invoice workflow states
   const [hasInvoice, setHasInvoice] = useState(false);
   const [existingInvoice, setExistingInvoice] = useState(null);
-  const [generatingInvoice, setGeneratingInvoice] = useState(false);
-  const [invoiceError, setInvoiceError] = useState("");
 
   const effectiveSnapshotId = snapshotId || taxCalc?.billingSnapshotId || snapshotData?.snapshotId || null;
 
@@ -112,7 +109,6 @@ export default function TaxCalculation() {
     setLoading(true);
     setErrorMsg("");
     setCalcError("");
-    setInvoiceError("");
 
     let existingCalc = null;
     // 1. Check if tax calculation already completed in backend
@@ -162,8 +158,8 @@ export default function TaxCalculation() {
             String(cfg.projectId) === "23"
           ) {
             matched = { ...cfg, ...meta };
-            const qStart = meta?.billingPeriodStart || cfg.periodStart;
-            const qEnd = meta?.billingPeriodEnd || cfg.periodEnd;
+            const qStart = cfg.billingPeriodStart || meta?.billingPeriodStart || cfg.periodStart;
+            const qEnd = cfg.billingPeriodEnd || meta?.billingPeriodEnd || cfg.periodEnd;
             snapDetails = await getBillingSnapshotByPeriod(cfg.projectId, qStart, qEnd);
             break;
           }
@@ -236,6 +232,22 @@ export default function TaxCalculation() {
     } finally {
       setCalculating(false);
     }
+  };
+
+  const handleGenerateInvoice = () => {
+    if (!effectiveSnapshotId) return;
+
+    navigate(`/account-receivable/invoice-generation/${effectiveSnapshotId}`, {
+      state: {
+        from: "tax-calculation",
+        source: "tax-calculation",
+        snapshotId: effectiveSnapshotId,
+        projectId: snapshotData?.projectId || null,
+        config: snapshotData,
+        taxCalculation: taxCalc,
+        acquisitionResults,
+      },
+    });
   };
 
   // Fixed Price / Recurring Billing Occurrences are a distinct backend
@@ -331,7 +343,7 @@ export default function TaxCalculation() {
     <div className="mx-auto w-full max-w-5xl space-y-5">
       <Breadcrumb
         items={[
-          { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition" },
+          { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" },
           { label: "Tax Calculation", to: CONSOLE_PATH },
           { label: snapshotNum },
         ]}
@@ -367,7 +379,7 @@ export default function TaxCalculation() {
           <Button
             variant="outline"
             size="small"
-            onClick={() => navigate("/account-receivable/billing-data-acquisition")}
+            onClick={() => navigate("/account-receivable/billing-data-acquisition/workspace")}
             className="flex items-center gap-1.5 text-xs text-slate-600"
           >
             Acquisition Detail
@@ -381,7 +393,11 @@ export default function TaxCalculation() {
               <Button
                 variant="primary"
                 size="small"
-                onClick={() => navigate(`/account-receivable/invoices/${effectiveSnapshotId}`)}
+                onClick={() =>
+                  navigate(`/account-receivable/invoices/${effectiveSnapshotId}`, {
+                    state: { from: "tax-calculation", source: "tax-calculation" },
+                  })
+                }
                 className="flex items-center gap-1.5 text-xs font-semibold bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm"
               >
                 <FileText className="h-3.5 w-3.5" /> View Invoice
@@ -396,18 +412,9 @@ export default function TaxCalculation() {
                 variant="primary"
                 size="small"
                 onClick={handleGenerateInvoice}
-                disabled={generatingInvoice}
                 className="flex items-center gap-1.5 text-xs font-semibold bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm"
               >
-                {generatingInvoice ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating Invoice...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="h-3.5 w-3.5" /> Generate Invoice
-                  </>
-                )}
+                <FileText className="h-3.5 w-3.5" /> Generate Invoice <ArrowRight className="h-3.5 w-3.5" />
               </Button>
             </>
           ) : (
@@ -449,7 +456,11 @@ export default function TaxCalculation() {
           <Button
             variant="primary"
             size="small"
-            onClick={() => navigate(`/account-receivable/invoices/${effectiveSnapshotId}`)}
+            onClick={() =>
+              navigate(`/account-receivable/invoices/${effectiveSnapshotId}`, {
+                state: { from: "tax-calculation", source: "tax-calculation" },
+              })
+            }
             className="flex items-center justify-center gap-1.5 text-xs font-semibold bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm shrink-0"
           >
             <FileText className="h-3.5 w-3.5" /> View Invoice <ArrowRight className="h-3.5 w-3.5" />
@@ -476,32 +487,15 @@ export default function TaxCalculation() {
             variant="primary"
             size="small"
             onClick={handleGenerateInvoice}
-            disabled={generatingInvoice}
+            disabled={calculating}
             className="flex items-center justify-center gap-1.5 text-xs font-semibold bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm shrink-0"
           >
-            {generatingInvoice ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating Invoice...
-              </>
-            ) : (
-              <>
-                <FileText className="h-3.5 w-3.5" /> Generate Invoice <ArrowRight className="h-3.5 w-3.5" />
-              </>
-            )}
+            <FileText className="h-3.5 w-3.5" /> Generate Invoice <ArrowRight className="h-3.5 w-3.5" />
           </Button>
         </div>
       ) : null}
 
-      {/* Invoice Generation Notice Alert */}
-      {invoiceError && (
-        <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 shadow-sm">
-          <AlertTriangle className="h-4 w-4 flex-shrink-0 text-rose-600 mt-0.5" />
-          <div className="space-y-1">
-            <div className="font-semibold text-rose-900">Invoice Generation Notice</div>
-            <div className="font-medium text-rose-800">{invoiceError}</div>
-          </div>
-        </div>
-      )}
+
 
       {/* Backend Tax Engine Error Alert if calculation POST failed */}
       {calcError && (
@@ -720,28 +714,14 @@ export default function TaxCalculation() {
                 <Button
                   variant="primary"
                   size="small"
-                  onClick={() => navigate(`/account-receivable/invoices/${effectiveSnapshotId}`)}
+                  onClick={() =>
+                    navigate(`/account-receivable/invoices/${effectiveSnapshotId}?source=tax-calculation`, {
+                      state: { from: "tax-calculation", source: "tax-calculation" },
+                    })
+                  }
                   className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold px-4 py-2 shadow-sm"
                 >
                   <FileText className="mr-1.5 h-3.5 w-3.5" /> View Invoice
-                </Button>
-              ) : isTaxCompleted ? (
-                <Button
-                  variant="primary"
-                  size="small"
-                  onClick={handleGenerateInvoice}
-                  disabled={generatingInvoice}
-                  className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold px-4 py-2 shadow-sm"
-                >
-                  {generatingInvoice ? (
-                    <span className="flex items-center gap-1.5">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating Invoice...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1.5">
-                      <FileText className="h-3.5 w-3.5" /> Generate Invoice
-                    </span>
-                  )}
                 </Button>
               ) : null}
             </div>
