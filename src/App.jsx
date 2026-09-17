@@ -442,6 +442,9 @@ const AppRoutes = () => {
       <Routes>
         {/* Public Route */}
         <Route path="/" element={<LoginPage />} />
+        {/* No page lives here — "/" is the login route. This exists so the
+            legacy navigate("/login") calls don't render a blank screen. */}
+        <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="/register" element={<Register />} />
         {/* Fully public, unauthenticated — no session, no app shell. See
             src/pages/public/InterviewFeedbackFormPage.jsx. */}
