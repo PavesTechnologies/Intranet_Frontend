@@ -64,7 +64,12 @@ export default function InvoiceApprovalPanel({ invoice }) {
   // "Which policy matched" and "who's currently blocking this" — approval.approval_policy_id is
   // just an id (Backend/API_Layer/interface/approval_interface.py), so the policy itself is
   // fetched separately via the same policy-detail hook System Configuration uses.
-  const { data: policy } = useApprovalPolicyDetail(approval?.approval_policy_id);
+  const {
+    data: policy,
+    isLoading: isPolicyLoading,
+    isError: isPolicyLoadFailure,
+    error: policyError,
+  } = useApprovalPolicyDetail(approval?.approval_policy_id);
   const { data: departmentData } = useDepartments();
   const { data: categoryData } = usePurchaseCategories();
   const departmentsById = useMemo(() => new Map((departmentData || []).map((d) => [d.id, d])), [departmentData]);
@@ -112,6 +117,13 @@ export default function InvoiceApprovalPanel({ invoice }) {
   // buttons stay hidden for everyone else rather than surfacing a permission the user can't
   // successfully use on this particular invoice.
   const isAssignedApprover = isEligibleApproverForStep(currentApprovers, user);
+  // A pure Approver (can decide, but isn't the one who sends invoices for approval) gets a
+  // trimmed view: just the summary, Approval History, and the decision buttons. Applied Policy,
+  // Waiting On, and the full per-level Approval Timeline (which lists every other resolved
+  // approver by name, PENDING or not) are AP Executive/admin-facing context an Approver doesn't
+  // need in order to decide. Anyone who also holds canSendForApproval (AP Executive, or an Admin
+  // covering both roles) keeps seeing everything.
+  const isPureApprover = (canApproveInvoice || canRejectInvoice || canSendBackInvoice) && !canSendForApproval;
 
   const policyDepartment = policy ? departmentsById.get(policy.department_id) : null;
   const policyCategory = policy ? categoriesById.get(policy.purchase_category_id) : null;
@@ -214,30 +226,50 @@ export default function InvoiceApprovalPanel({ invoice }) {
           </div>
         ) : (
           <>
-            <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Applied Policy</p>
-              {policy ? (
-                <>
-                  <p className="mt-1 flex flex-wrap items-center gap-2 text-sm font-medium text-gray-900">
-                    {policy.name}
-                    {policy.is_default && (
-                      <span className="rounded-full border border-indigo-300 bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                        Default
-                      </span>
-                    )}
-                  </p>
-                  <p className="mt-0.5 text-xs text-gray-500">
-                    {policy.is_default
-                      ? "Catch-all fallback — no department/category-specific policy matched this invoice."
-                      : `${policyDepartment?.name || `Department #${policy.department_id}`} · ${policyCategory?.name || `Category #${policy.purchase_category_id}`}`}
-                  </p>
-                </>
-              ) : (
-                <p className="mt-1 text-sm text-gray-500">Loading policy details…</p>
-              )}
-            </div>
+            {canOfferSend && (
+              <div className="mb-4 flex flex-col items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+                <span>
+                  This invoice was sent back for review and has since been resubmitted — it's ready to be sent for
+                  approval again.
+                </span>
+                <Button variant="primary" size="small" onClick={() => setSendConfirmOpen(true)}>
+                  <Send size={14} /> Send for Approval
+                </Button>
+              </div>
+            )}
 
-            {isInFlight && (
+            {!isPureApprover && (
+              <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Applied Policy</p>
+                {policy ? (
+                  <>
+                    <p className="mt-1 flex flex-wrap items-center gap-2 text-sm font-medium text-gray-900">
+                      {policy.name}
+                      {policy.is_default && (
+                        <span className="rounded-full border border-indigo-300 bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                          Default
+                        </span>
+                      )}
+                    </p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      {policy.is_default
+                        ? "Catch-all fallback — no department/category-specific policy matched this invoice."
+                        : `${policyDepartment?.name || `Department #${policy.department_id}`} · ${policyCategory?.name || `Category #${policy.purchase_category_id}`}`}
+                    </p>
+                  </>
+                ) : isPolicyLoadFailure ? (
+                  <p className="mt-1 text-sm text-red-600">
+                    {getApiErrorMessage(policyError, "Could not load the applied policy's details.")}
+                  </p>
+                ) : isPolicyLoading ? (
+                  <p className="mt-1 text-sm text-gray-500">Loading policy details…</p>
+                ) : (
+                  <p className="mt-1 text-sm text-gray-500">Policy details unavailable.</p>
+                )}
+              </div>
+            )}
+
+            {isInFlight && !isPureApprover && (
               <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Waiting On</p>
                 {!currentStep ? (
@@ -266,37 +298,41 @@ export default function InvoiceApprovalPanel({ invoice }) {
               </div>
             )}
 
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Approval Timeline</h4>
-            <ol className="mb-4 space-y-3 border-l border-gray-200 pl-4">
-              {steps.map((step) => (
-                <li key={step.id} className="relative">
-                  <span className="absolute -left-[21px] top-1 flex h-4 w-4 items-center justify-center rounded-full bg-white">
-                    <StepStatusIcon status={step.status} />
-                  </span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-gray-900">Level {step.level_number}</span>
-                    <span className="text-xs text-gray-500">
-                      {APPROVER_TYPE_LABEL[step.approver_type] || step.approver_type}
-                      {step.role_code ? ` — ${step.role_code}` : ""}
-                    </span>
-                    <span className="text-xs text-gray-400">· {APPROVAL_RULE_LABEL[step.approval_rule] || step.approval_rule}</span>
-                    <StatusBadge label={step.status} size="sm" />
-                  </div>
-                  {step.approvers?.length > 0 && (
-                    <ul className="mt-2 space-y-1">
-                      {step.approvers.map((a) => (
-                        <li key={a.id} className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
-                          <ApproverLabel userUuid={a.user_uuid} />
-                          <StatusBadge label={a.status} size="sm" />
-                          {a.decided_at && <span className="text-gray-400">{formatDate(a.decided_at)}</span>}
-                          {a.comments && <span className="italic text-gray-500">"{a.comments}"</span>}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-            </ol>
+            {!isPureApprover && (
+              <>
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Approval Timeline</h4>
+                <ol className="mb-4 space-y-3 border-l border-gray-200 pl-4">
+                  {steps.map((step) => (
+                    <li key={step.id} className="relative">
+                      <span className="absolute -left-[21px] top-1 flex h-4 w-4 items-center justify-center rounded-full bg-white">
+                        <StepStatusIcon status={step.status} />
+                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-900">Level {step.level_number}</span>
+                        <span className="text-xs text-gray-500">
+                          {APPROVER_TYPE_LABEL[step.approver_type] || step.approver_type}
+                          {step.role_code ? ` — ${step.role_code}` : ""}
+                        </span>
+                        <span className="text-xs text-gray-400">· {APPROVAL_RULE_LABEL[step.approval_rule] || step.approval_rule}</span>
+                        <StatusBadge label={step.status} size="sm" />
+                      </div>
+                      {step.approvers?.length > 0 && (
+                        <ul className="mt-2 space-y-1">
+                          {step.approvers.map((a) => (
+                            <li key={a.id} className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                              <ApproverLabel userUuid={a.user_uuid} />
+                              <StatusBadge label={a.status} size="sm" />
+                              {a.decided_at && <span className="text-gray-400">{formatDate(a.decided_at)}</span>}
+                              {a.comments && <span className="italic text-gray-500">"{a.comments}"</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </>
+            )}
 
             {isInFlight && isAssignedApprover && (canApproveInvoice || canRejectInvoice || canSendBackInvoice) && (
               <div className="mb-4 flex flex-wrap justify-end gap-2">
