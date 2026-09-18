@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Plus, Pencil, Trash2, Loader2, Landmark } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
@@ -21,7 +21,12 @@ import {
 } from "../../data/wizardOptions";
 import { formatCurrency, formatDisplayDate } from "../../utils/format";
 import { getBillingTypeDisplayName } from "../../utils/billingType";
-import { getRecurringDateErrors, hasRecurringDateErrors, toDateOnly } from "../../utils/recurringBillingSchedule";
+import {
+  getRecurringDateErrors,
+  hasRecurringDateErrors,
+  toDateOnly,
+  computeBillingSchedulePreview,
+} from "../../utils/recurringBillingSchedule";
 import {
   getActiveBillingTypes,
   getActiveBillingFrequencies,
@@ -1001,6 +1006,7 @@ function FixedPriceForm({
   projectBudget,
   billingFrequency,
   billingFrequencyLabel,
+  billingFrequencyOption,
   billingConfigurationId,
   ensureBillingConfigurationId,
   projectStartDate,
@@ -1127,6 +1133,31 @@ function FixedPriceForm({
         projectStartDate,
         projectEndDate,
       });
+
+  // Fixed Price has no backend-generated schedule endpoint of its own — this
+  // preview is computed entirely from the current (possibly unsaved) form
+  // state so it updates immediately as Billing Frequency/Effective From/
+  // Effective To/Contract Value change, without persisting anything.
+  const schedulePreview = useMemo(
+    () =>
+      isOneTime
+        ? []
+        : computeBillingSchedulePreview({
+            effectiveFrom: value.effectiveFrom,
+            effectiveTo: value.effectiveTo,
+            contractValue: value.totalContractValue,
+            durationValue: billingFrequencyOption?.durationValue,
+            durationUnit: billingFrequencyOption?.durationUnit,
+          }),
+    [
+      isOneTime,
+      value.effectiveFrom,
+      value.effectiveTo,
+      value.totalContractValue,
+      billingFrequencyOption?.durationValue,
+      billingFrequencyOption?.durationUnit,
+    ],
+  );
 
   // The backend requires a different field depending on contractValueSource: PMS
   // Budget sends the project budget as pmsProjectBudget (from the Billing
@@ -1459,6 +1490,61 @@ function FixedPriceForm({
             )}
           </div>
         )}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-slate-900">Billing Schedule (Preview)</h3>
+          <span className="text-xs text-slate-400">Calculated from the current form values.</span>
+        </div>
+
+        {schedulePreview.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-slate-200 py-6 text-center text-sm text-slate-500">
+            No billing schedule has been generated yet.
+          </p>
+        ) : (
+          <div className="max-h-96 w-full overflow-y-auto overflow-x-auto rounded-lg border border-slate-100">
+            <table className="w-full table-fixed divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="w-1/4 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Period</th>
+                  <th className="w-1/4 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">From</th>
+                  <th className="w-1/4 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">To</th>
+                  <th className="w-1/4 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {schedulePreview.map((period, index) => (
+                  <tr key={period.periodNumber ?? index}>
+                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                      Period {period.periodNumber ?? index + 1}
+                    </td>
+                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                      {formatDisplayDate(period.periodStartDate)}
+                    </td>
+                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                      {formatDisplayDate(period.periodEndDate)}
+                    </td>
+                    <td className="px-3 py-2.5 text-center align-middle font-medium text-slate-900">
+                      {period.billingAmount || period.billingAmount === 0
+                        ? formatCurrency(period.billingAmount, currency)
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+          <span className="text-sm font-semibold text-slate-900">Total Contract Value</span>
+          <span className="text-sm font-semibold text-slate-900">
+            {value.totalContractValue || value.totalContractValue === 0
+              ? formatCurrency(value.totalContractValue, currency)
+              : "—"}
+          </span>
+        </div>
       </div>
 
       <ConfirmationModal
@@ -1819,6 +1905,31 @@ function RecurringBillingForm({
     projectEndDate: projectEndDateOnly,
   });
 
+  // Computed purely from the current (possibly unsaved) form state so the
+  // preview updates immediately as Billing Frequency/dates/Contract Value
+  // change, without waiting on a save + backend fetch round-trip. Once the
+  // backend-generated schedule (`schedule`, fetched below) is available it
+  // still wins for display — this is only the fallback shown before that
+  // exists, so nothing about the already-working post-save preview changes.
+  const schedulePreview = useMemo(
+    () =>
+      computeBillingSchedulePreview({
+        effectiveFrom: value.recurringStartDate,
+        effectiveTo: value.recurringEndDate,
+        contractValue: value.contractValue,
+        durationValue: billingFrequencyOption?.durationValue,
+        durationUnit: billingFrequencyOption?.durationUnit,
+      }),
+    [
+      value.recurringStartDate,
+      value.recurringEndDate,
+      value.contractValue,
+      billingFrequencyOption?.durationValue,
+      billingFrequencyOption?.durationUnit,
+    ],
+  );
+  const displaySchedule = schedule.length > 0 ? schedule : schedulePreview;
+
   // Fires only when the user actually picks a complete date (native <input
   // type="date"> onChange never fires while browsing calendar months, only
   // once a full date is selected) — so no error ever appears mid-navigation.
@@ -2083,11 +2194,9 @@ function RecurringBillingForm({
 
         {loadingSchedule ? (
           <p className="text-sm text-slate-500">Loading billing schedule…</p>
-        ) : schedule.length === 0 ? (
+        ) : displaySchedule.length === 0 ? (
           <p className="rounded-lg border border-dashed border-slate-200 py-6 text-center text-sm text-slate-500">
-            {value.recurringConfigurationId
-              ? "No billing schedule has been generated yet."
-              : "Save the recurring configuration to generate the billing schedule."}
+            No billing schedule has been generated yet.
           </p>
         ) : (
           <div className="max-h-96 w-full overflow-y-auto overflow-x-auto rounded-lg border border-slate-100">
@@ -2103,7 +2212,7 @@ function RecurringBillingForm({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {schedule.map((period, index) => (
+                {displaySchedule.map((period, index) => (
                   <tr key={period.periodNumber ?? index}>
                     <td className="px-3 py-2.5 text-center align-middle text-slate-700">
                       Period {period.periodNumber ?? index + 1}
@@ -2483,6 +2592,9 @@ export default function BillingConfigurationStep({
                 projectBudget={projectInfo.projectBudget}
                 billingFrequency={billingFrequency}
                 billingFrequencyLabel={frequencyLabel(billingFrequency)}
+                billingFrequencyOption={activeBillingFrequencyOptions.find(
+                  (option) => String(option.billingFrequencyId) === String(billingFrequencyId),
+                )}
                 billingConfigurationId={value.billingConfigurationId || value.id}
                 ensureBillingConfigurationId={ensureBillingConfigurationId}
                 projectStartDate={projectInfo.startDate}

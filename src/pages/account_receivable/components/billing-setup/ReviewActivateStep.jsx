@@ -335,6 +335,9 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
               <p className="text-xs font-medium text-slate-500">
                 Project Code: <span className="font-bold text-slate-800">{projectInfo.projectCode || "—"}</span>
               </p>
+              <p className="text-xs font-medium text-slate-500">
+                Primary Location: <span className="font-bold text-slate-800">{projectInfo.primaryLocation || "—"}</span>
+              </p>
             </div>
           </div>
 
