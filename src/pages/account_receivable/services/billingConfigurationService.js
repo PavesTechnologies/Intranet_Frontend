@@ -580,6 +580,11 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
       projectId: firstPresent(rawProjectInfo.projectId, config.projectId, rawProjectInfo.id) || "",
       projectName: firstPresent(rawProjectInfo.projectName, config.projectName, rawProjectInfo.name, normalized.projectName) || "",
       projectCode: firstPresent(rawProjectInfo.projectCode, config.projectCode, rawProjectInfo.code, normalized.projectCode) || "",
+      // The flat GET .../{id} DTO carries this at the top level (config.primaryLocation),
+      // not nested under projectInfo/project — without this fallback, editing an existing
+      // configuration always showed a blank Primary Location even though the backend
+      // returned it, since the spread above only pulls from rawProjectInfo.
+      primaryLocation: firstPresent(rawProjectInfo.primaryLocation, config.primaryLocation, rawProjectInfo.location, config.location) || "",
       projectBudget: firstPresent(rawProjectInfo.projectBudget, config.projectBudget, rawProjectInfo.budget, rawProjectInfo.budgetAmount) || "",
       projectBudgetCurrency: currency,
       currency,
