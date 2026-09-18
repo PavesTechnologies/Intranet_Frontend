@@ -123,6 +123,26 @@ export const invoiceService = {
   },
 
   /**
+   * Chronological lifecycle events for one invoice (GET /invoice-details/invoice/{id}/history) —
+   * invoice creation/OCR-review/resubmission (invoice_process_service.py) plus approval
+   * decisions/send-backs (invoice_approval_service.py), all sourced from the same generic
+   * ap.audit_log table (table_name='invoice'). Payment events are NOT included — they're
+   * recorded against the payment's own record_id, not the invoice's.
+   * @param {string|number} invoiceId
+   * @returns {Promise<Array>} InvoiceHistoryEventDTO[] — {action, changed_by, changed_at,
+   *   old_values, new_values}, oldest first
+   */
+  async getInvoiceHistory(invoiceId) {
+    try {
+      const response = await api.get(`${AP_BASE_URL}/invoice-details/invoice/${Number(invoiceId)}/history`);
+      return response.data;
+    } catch (error) {
+      console.error("Error in invoiceService.getInvoiceHistory:", error);
+      throw withNormalizedStatus(error);
+    }
+  },
+
+  /**
    * Fetches a viewable reference (e.g. a presigned S3 URL) for the invoice's source document.
    * Only call this when the user explicitly asks to view the document — never on page load.
    * @param {string|number} inboundDocumentId
@@ -314,25 +334,6 @@ export const invoiceService = {
       return response.data;
     } catch (error) {
       console.error("Error in invoiceService.confirmExtractionSection:", error);
-      throw withNormalizedStatus(error);
-    }
-  },
-
-  /**
-   * Transitions an invoice to a new status via its numeric status_master id.
-   * @param {string|number} invoiceId
-   * @param {number} statusId
-   */
-  async updateInvoiceStatus(invoiceId, statusId) {
-    try {
-      const response = await api.put(
-        `${AP_BASE_URL}/invoice/status-update/${Number(invoiceId)}`,
-        null,
-        { params: { status_id: statusId } },
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error in invoiceService.updateInvoiceStatus:", error);
       throw withNormalizedStatus(error);
     }
   },

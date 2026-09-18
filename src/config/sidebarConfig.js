@@ -1,5 +1,6 @@
 import { AP_ALL_ROLES, AP_ROLES } from "../pages/accounts-payable/constants/apRoles";
 import { AP_ROUTES } from "../pages/accounts-payable/constants/routes";
+import { INVOICE_PERMISSIONS } from "../pages/accounts-payable/constants/invoicePermissions";
 
 /**
  * Canonical role identifiers.
@@ -327,11 +328,19 @@ export const XMS_SUBMENU = [
  * is deferred to the business-logic phases — see constants/permissions.js's
  * AP_PERMISSION_ROLES map for the intended per-capability breakdown.
  */
+// Invoice Management and Payments both ultimately read invoice data (invoice-details_route.py's
+// GET endpoints, which every Payment page also calls to show what it's paying) — gated on
+// INVOICE_VIEW alone, not a role list, since a pure Approver or Finance user need not hold any
+// of Admin/AP_Executive/Finance_Executive to legitimately belong here. INVOICE_VIEW is the one
+// permission every real AP Invoice group (Intake/Approver/Finance) carries by design, so a user
+// missing it shouldn't see a nav item whose page will just 403 on its own data.
+const _INVOICE_VIEW_PERMISSIONS = [INVOICE_PERMISSIONS.INVOICE_VIEW];
+
 export const AP_SUBMENU = [
   { label: "Dashboard", to: AP_ROUTES.DASHBOARD, allowedRoles: AP_ALL_ROLES },
   { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
-  { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, allowedRoles: AP_ALL_ROLES },
-  { label: "Payments", to: AP_ROUTES.PAYMENT_READY, allowedRoles: AP_ALL_ROLES },
+  { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
+  { label: "Payments", to: AP_ROUTES.PAYMENT_READY, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
   { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
   { label: "System Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: AP_ALL_ROLES },
 ];

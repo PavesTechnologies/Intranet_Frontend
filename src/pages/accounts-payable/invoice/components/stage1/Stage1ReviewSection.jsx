@@ -1,111 +1,65 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import Stage1Header from "./Stage1Header";
 import InvoiceDetailsPanel from "./InvoiceDetailsPanel";
 import InvoiceAmountsSection from "./InvoiceAmountsSection";
 import InvoiceLineItemsSection from "./InvoiceLineItemsSection";
-import PartyValidationPanel from "./PartyValidationPanel";
-import GstTaxValidationPanel from "./GstTaxValidationPanel";
 import InvoiceDocumentViewer from "./InvoiceDocumentViewer";
+import FieldStatusBadge from "./FieldStatusBadge";
 import { getFieldLocation } from "../../utils/fieldLocation";
-import {
-  useCorrectVendorMutation,
-  useCorrectBuyerMutation,
-  useCorrectTaxMutation,
-  useCorrectAmountsMutation,
-} from "../../hooks/useInvoiceMutations";
+import { buildTaxRuleFlow } from "../../utils/gstPresentation";
 
-const TAB_ORDER = ["vendor", "buyer", "gst"];
+const ISSUE_STAGE_KEYS = ["vendor", "buyer", "gst"];
 
 /**
  * Full-width Stage 1 review workspace, rendered by InvoiceUploadPage once extraction has
- * produced field data. Pipeline status (Stage1Header's stepper) renders first, then a two-column
- * layout: the editable form/tabs on the left (scrolls normally with the page — it can get long
- * once Invoice Details/Amounts/Line Items are all showing), the original document preview
- * pinned (`sticky`) on the right so it stays visible the whole time instead of scrolling away.
+ * produced field data. One unified review form regardless of whether validation passed or
+ * failed: Invoice Details, Amounts, and Line Items are always shown pre-filled from extraction
+ * for the AP Executive to check and save — there is no separate Vendor/Buyer/GST tab switcher
+ * with its own comparison tables, so a passed invoice looks and behaves the same as a failed
+ * one, just without the failure banner. Every field writes straight to local pipeline state;
+ * there's no per-section save, just the one page-level Save Invoice button.
  *
- * Two distinct modes below it, matching whether there's anything real to compare against yet:
- *  - Extraction Validation FAILED: Vendor/Buyer/GST never ran (they're SKIPPED, not WAITING),
- *    so there's nothing to switch between — this renders one plain form (Invoice Details,
- *    Amounts, Line Items) instead of a tab switcher. Every field writes straight to local
- *    pipeline state; there's no per-section save, just the one page-level Save Invoice button.
- *  - Otherwise: the normal Vendor/Buyer/GST tab switcher with real field-comparison verdicts,
- *    stepper-driven, unchanged from before.
+ * When GST validation actually ran (stages.gst.field_comparisons present), a read-only Tax Rule
+ * Validation summary (Vendor State -> Place of Supply -> Supply Type -> Expected Tax -> Invoice
+ * Tax -> Match/Mismatch) is appended below the form — informational only, since the fields it
+ * summarizes are already editable above. Any issues flagged by the Vendor/Buyer/GST stages are
+ * surfaced in a plain list underneath, so a failure there doesn't go silently unmentioned just
+ * because there's no dedicated per-stage panel anymore.
  *
  * @param {Object} props
  * @param {Object} props.extractedInvoice - pipeline.extractionResult.extracted_invoice
  * @param {Record<string, Object>} props.stages - pipeline.validation.stages
- * @param {string|null} props.extractionId
  * @param {string|null} props.fileUrl - local blob URL of the just-uploaded file, or null
  * @param {string} [props.originalFilename]
- * @param {(section: "vendor"|"buyer"|"tax"|"amounts", updatedSection: Object, corrections: Array) => void} props.onCorrected
  * @param {(section: string, field: string, value: string) => void} props.onFieldChange
  * @param {(index: number, field: string, value: string) => void} props.onLineChange
  */
 export default function Stage1ReviewSection({
   extractedInvoice,
   stages,
-  extractionId,
   fileUrl,
   originalFilename,
-  onCorrected,
   onFieldChange,
   onLineChange,
 }) {
-  const [activeTab, setActiveTab] = useState("vendor");
-  const [manualTab, setManualTab] = useState(false);
   const [selectedFieldKey, setSelectedFieldKey] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
-  const prevActiveTab = useRef(activeTab);
-
-  const selectedRowRef = useRef(null);
-  const highlightRef = useRef(null);
-
-  const correctVendor = useCorrectVendorMutation();
-  const correctBuyer = useCorrectBuyerMutation();
-  const correctTax = useCorrectTaxMutation();
-  const correctAmounts = useCorrectAmountsMutation();
 
   const extractionFailed = stages?.extraction?.status === "FAILED";
   const extractionIssues = stages?.extraction?.issues || [];
 
-  // Follow validation progress (auto-advance to the furthest-reached stage) until the user
-  // manually picks a stepper item, then stop overriding their choice. No-op while extraction has
-  // failed — there's no tab switcher in that mode.
-  useEffect(() => {
-    if (manualTab || extractionFailed) return;
-    let next = "vendor";
-    for (const key of TAB_ORDER) {
-      if (stages?.[key]?.status && stages[key].status !== "WAITING") next = key;
-    }
-    setActiveTab(next);
-  }, [stages, manualTab, extractionFailed]);
-
-  useEffect(() => {
-    if (prevActiveTab.current !== activeTab) {
-      setSelectedFieldKey(null);
-      setSelectedLocation(null);
-      prevActiveTab.current = activeTab;
-    }
-  }, [activeTab]);
-
-  const handleFieldSelect = (rawKey, location) => {
+  const handleAmountFieldFocus = (rawKey) => {
     setSelectedFieldKey(rawKey);
-    setSelectedLocation(location);
+    setSelectedLocation(rawKey ? getFieldLocation(extractedInvoice?.extraction, rawKey) : null);
   };
 
-  const handleAmountFieldFocus = (rawKey) =>
-    handleFieldSelect(rawKey, rawKey ? getFieldLocation(extractedInvoice?.extraction, rawKey) : null);
-
-  const handleSelectStage = (key) => {
-    if (stages?.[key]?.status === "WAITING" || !stages?.[key]?.status) return;
-    setManualTab(true);
-    setActiveTab(key);
-  };
+  const taxRuleFlow = buildTaxRuleFlow(stages?.gst?.field_comparisons, extractedInvoice);
+  const stageIssues = ISSUE_STAGE_KEYS.flatMap((key) => stages?.[key]?.issues || []).filter(Boolean);
 
   return (
     <div>
-      <Stage1Header stages={stages} activeTab={extractionFailed ? null : activeTab} onSelectStage={extractionFailed ? undefined : handleSelectStage} />
+      <Stage1Header stages={stages} />
 
       {extractionFailed && (
         <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4">
@@ -137,64 +91,56 @@ export default function Stage1ReviewSection({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[44%_1fr] lg:items-start">
         <div className="space-y-6">
-          {extractionFailed ? (
-            <>
-              <InvoiceDetailsPanel extractedInvoice={extractedInvoice} onFieldChange={onFieldChange} />
-              <InvoiceAmountsSection
-                extractedInvoice={extractedInvoice}
-                extraction={extractedInvoice?.extraction}
-                onFieldFocus={handleAmountFieldFocus}
-                onFieldChange={onFieldChange}
-              />
-              <InvoiceLineItemsSection lines={extractedInvoice?.invoice_lines} onLineChange={onLineChange} />
-            </>
-          ) : (
-            <>
-              <InvoiceDetailsPanel extractedInvoice={extractedInvoice} onFieldChange={onFieldChange} />
-              {activeTab === "vendor" && (
-                <PartyValidationPanel
-                  section="vendor"
-                  title="Vendor"
-                  extractedParty={extractedInvoice?.vendor}
-                  stageState={stages?.vendor}
-                  extraction={extractedInvoice?.extraction}
-                  selectedFieldKey={selectedFieldKey}
-                  onFieldSelect={handleFieldSelect}
-                  correctionMutation={correctVendor}
-                  extractionId={extractionId}
-                  onCorrected={onCorrected}
-                  selectedRowRef={selectedRowRef}
-                />
-              )}
-              {activeTab === "buyer" && (
-                <PartyValidationPanel
-                  section="buyer"
-                  title="Buyer"
-                  extractedParty={extractedInvoice?.buyer}
-                  stageState={stages?.buyer}
-                  extraction={extractedInvoice?.extraction}
-                  selectedFieldKey={selectedFieldKey}
-                  onFieldSelect={handleFieldSelect}
-                  correctionMutation={correctBuyer}
-                  extractionId={extractionId}
-                  onCorrected={onCorrected}
-                  selectedRowRef={selectedRowRef}
-                />
-              )}
-              {activeTab === "gst" && (
-                <GstTaxValidationPanel
-                  extractedInvoice={extractedInvoice}
-                  stageState={stages?.gst}
-                  extraction={extractedInvoice?.extraction}
-                  selectedFieldKey={selectedFieldKey}
-                  onFieldSelect={handleFieldSelect}
-                  taxCorrectionMutation={correctTax}
-                  amountsCorrectionMutation={correctAmounts}
-                  extractionId={extractionId}
-                  onCorrected={onCorrected}
-                />
-              )}
-            </>
+          <InvoiceDetailsPanel extractedInvoice={extractedInvoice} onFieldChange={onFieldChange} />
+          <InvoiceAmountsSection
+            extractedInvoice={extractedInvoice}
+            extraction={extractedInvoice?.extraction}
+            onFieldFocus={handleAmountFieldFocus}
+            onFieldChange={onFieldChange}
+          />
+          <InvoiceLineItemsSection lines={extractedInvoice?.invoice_lines} onLineChange={onLineChange} />
+
+          {taxRuleFlow && (
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <h3 className="mb-3 text-sm font-semibold text-gray-800">Tax Rule Validation</h3>
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                {[
+                  ["Vendor State", taxRuleFlow.vendorState],
+                  ["Place of Supply", taxRuleFlow.placeOfSupply],
+                  ["Supply Type", taxRuleFlow.supplyType],
+                  ["Expected Tax", taxRuleFlow.expectedTax],
+                  ["Invoice Tax", taxRuleFlow.invoiceTax],
+                ].map(([label, value], index) => (
+                  <span key={label} className="flex items-center gap-2">
+                    {index > 0 && <span className="text-gray-300">→</span>}
+                    <span className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700">
+                      {label}: <span className="font-medium">{value ?? "—"}</span>
+                    </span>
+                  </span>
+                ))}
+                <span className="text-gray-300">→</span>
+                <FieldStatusBadge status={taxRuleFlow.status} />
+                <span className="text-xs text-gray-500">{taxRuleFlow.ruleResult}</span>
+              </div>
+            </div>
+          )}
+
+          {stageIssues.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">Validation flagged the following</p>
+                  <ul className="mt-1.5 space-y-1">
+                    {stageIssues.map((issue, index) => (
+                      <li key={index} className="text-sm text-amber-700">
+                        • {issue}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
@@ -204,7 +150,6 @@ export default function Stage1ReviewSection({
             originalFilename={originalFilename}
             page={selectedLocation?.page}
             highlights={selectedLocation ? [selectedLocation] : []}
-            highlightRef={highlightRef}
             noteMessage={selectedFieldKey && !selectedLocation ? "No document location available for the selected field." : null}
           />
         </div>
@@ -212,4 +157,3 @@ export default function Stage1ReviewSection({
     </div>
   );
 }
-

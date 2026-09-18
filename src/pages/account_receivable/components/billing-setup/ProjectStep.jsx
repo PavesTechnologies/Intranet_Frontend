@@ -99,7 +99,17 @@ export default function ProjectStep({ value = {}, onChange }) {
     const alreadyListed = projects.some(
       (project) => String(project.projectId || project.id || "") === String(value.projectId)
     );
-    if (alreadyListed) return projects;
+    if (alreadyListed) {
+      // The available-projects API entry may not carry primaryLocation (it's a
+      // slim "eligible for a new configuration" DTO) — never let a missing/null
+      // value from it clobber the primaryLocation already known from the
+      // configuration being edited.
+      return projects.map((project) =>
+        String(project.projectId || project.id || "") === String(value.projectId)
+          ? { ...project, primaryLocation: value.primaryLocation || project.primaryLocation }
+          : project
+      );
+    }
     return [
       ...projects,
       {

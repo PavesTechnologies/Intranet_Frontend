@@ -550,6 +550,28 @@ export default function BillingApprovals() {
               ? "PMS Project Budget"
               : "Manual Input";
 
+          // PMS Project Budget and Contract Value can represent the exact same
+          // amount (when the source is PMS) — showing them as two separate rows
+          // alongside a third "Contract Value Source" row was redundant. Combine
+          // them into a single row whose LABEL carries the source (so the value
+          // stays a plain amount, never "amount / source"): PMS source reads as
+          // "Contract / PMS Project Budget", Manual source reads as "Contract Value".
+          const hasCommercialValue = hasContractVal || hasPmsBudget;
+          const combinedContractValue = hasContractVal ? contractVal : pmsBudgetVal;
+          const isPmsContractSource = sourceLabel === "PMS Project Budget";
+          const contractValueLabelText = isPmsContractSource ? "Contract / PMS Project Budget" : "Contract Value";
+          const contractValueRowLabel = (
+            <span className="flex flex-wrap items-center gap-1.5">
+              <span>{contractValueLabelText}</span>
+              {isDifferentAmount && (
+                <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200">
+                  Billing Amount Used
+                </span>
+              )}
+            </span>
+          );
+          const contractValueRowValue = hasCommercialValue ? formatMoney(combinedContractValue, currency) : null;
+
           const retentionPercent = Number(reviewTarget.retentionPercent) || 0;
           const retentionAmount = Number(reviewTarget.retentionAmount) || 0;
           const hasRetention = retentionAmount > 0 || retentionPercent > 0;
@@ -582,24 +604,8 @@ export default function BillingApprovals() {
                   },
                   { label: "Billing Frequency", value: billingFreqLabel },
                   { label: "Currency", value: currency },
-                  { label: "PMS Project Budget", value: formatMoney(pmsBudgetVal, currency) },
-                  ...(hasContractVal
-                    ? [
-                        {
-                          label: (
-                            <span className="flex flex-wrap items-center gap-1.5">
-                              <span>Contract Value</span>
-                              {isDifferentAmount && (
-                                <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200">
-                                  Billing Amount Used
-                                </span>
-                              )}
-                            </span>
-                          ),
-                          value: formatMoney(contractVal, currency),
-                        },
-                        { label: "Contract Value Source", value: sourceLabel },
-                      ]
+                  ...(hasCommercialValue
+                    ? [{ label: contractValueRowLabel, value: contractValueRowValue }]
                     : []),
                   ...(isTimesheetBased && reviewTarget.pricingModel
                     ? [{ label: "Pricing Model", value: BILLING_MODE_LABELS[reviewTarget.pricingModel] || reviewTarget.pricingModel }]
@@ -663,16 +669,8 @@ export default function BillingApprovals() {
                     {/* Financial Breakdown Table */}
                     <div className="divide-y divide-slate-100 text-xs">
                       <div className="flex justify-between py-2">
-                        <span className="text-slate-500 font-medium">Contract Value (Billing Amount)</span>
-                        <span className="font-bold text-slate-900">{formatMoney(contractVal, currency) || "—"}</span>
-                      </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-slate-500 font-medium">PMS Project Budget</span>
-                        <span className="font-bold text-slate-900">{formatMoney(pmsBudgetVal, currency) || "—"}</span>
-                      </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-slate-500 font-medium">Contract Value Source</span>
-                        <span className="font-bold text-slate-900">{sourceLabel}</span>
+                        <span className="text-slate-500 font-medium">{contractValueLabelText}</span>
+                        <span className="font-bold text-slate-900">{contractValueRowValue || "—"}</span>
                       </div>
                       <div className="flex justify-between py-2">
                         <span className="text-slate-500 font-medium">Retention %</span>
@@ -729,9 +727,7 @@ export default function BillingApprovals() {
                   <ReviewSection
                     title="Recurring Pricing Details"
                     rows={[
-                      { label: "Contract Value (Billing Amount)", value: formatMoney(contractVal, currency) },
-                      { label: "PMS Project Budget", value: formatMoney(pmsBudgetVal, currency) },
-                      { label: "Contract Value Source", value: sourceLabel },
+                      { label: contractValueLabelText, value: contractValueRowValue },
                     ]}
                   />
                 </div>

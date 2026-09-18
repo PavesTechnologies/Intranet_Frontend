@@ -180,7 +180,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   const isIntranet = activeApplication === APPLICATIONS.INTRANET;
   const isFinance = activeApplication === APPLICATIONS.FINANCE;
   const location = useLocation();
-  const { user, hasRole } = useAuth();
+  const { user, hasRole, hasAnyPermission } = useAuth();
 
   // Filter main navigation based on allowedRoles
   const filteredNavigation = navigation.filter((item) => {
@@ -212,8 +212,9 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   // Role-filtered Expense Management (XMS) submenu
   const filteredXmsSubmenu = filterMenuByRole(XMS_SUBMENU, hasRole);
 
-  // Role-filtered Accounts Payable (AP) submenu
-  const filteredApSubmenu = filterMenuByRole(AP_SUBMENU, hasRole);
+  // Role- and permission-filtered Accounts Payable (AP) submenu — Invoice Management/Payments
+  // additionally require INVOICE_VIEW (see sidebarConfig.js), the rest are role-only.
+  const filteredApSubmenu = filterMenuByRole(AP_SUBMENU, hasRole, hasAnyPermission);
 
   // Role checks
   const isAdmin = hasRole(["ADMIN"]);

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { AlertTriangle, CheckCircle2, Circle, Clock, Send, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Circle, Clock, CornerUpLeft, Send, XCircle } from "lucide-react";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
@@ -16,11 +16,14 @@ import {
   useSendForApprovalMutation,
   useApproveInvoiceMutation,
   useRejectInvoiceMutation,
+  useSendBackInvoiceMutation,
 } from "../hooks/useInvoiceApprovals";
 import { useApPermissions } from "../../hooks/useApPermissions";
+import { useAuth } from "../../../../contexts/AuthContext";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { INVOICE_STATUS } from "../../constants/invoiceStatus";
+import { isEligibleApproverForStep } from "../utils/invoiceApprovalAuthorization";
 
 const APPROVER_TYPE_LABEL = {
   DEPARTMENT_APPROVER: "Department Approver",
@@ -50,11 +53,13 @@ function StepStatusIcon({ status }) {
  * than a client-side guess at eligibility.
  */
 export default function InvoiceApprovalPanel({ invoice }) {
-  const { canSendForApproval, canApproveInvoice, canRejectInvoice } = useApPermissions();
+  const { canSendForApproval, canApproveInvoice, canRejectInvoice, canSendBackInvoice } = useApPermissions();
+  const { user } = useAuth();
   const { data: approval, isLoading, error } = useInvoiceApproval(invoice.id);
   const sendForApproval = useSendForApprovalMutation();
   const approveInvoice = useApproveInvoiceMutation();
   const rejectInvoice = useRejectInvoiceMutation();
+  const sendBackInvoice = useSendBackInvoiceMutation();
 
   // "Which policy matched" and "who's currently blocking this" — approval.approval_policy_id is
   // just an id (Backend/API_Layer/interface/approval_interface.py), so the policy itself is
@@ -68,8 +73,10 @@ export default function InvoiceApprovalPanel({ invoice }) {
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [sendBackOpen, setSendBackOpen] = useState(false);
   const [approveComments, setApproveComments] = useState("");
   const [rejectComments, setRejectComments] = useState("");
+  const [sendBackComments, setSendBackComments] = useState("");
 
   const symbol = invoice.currency?.symbol || "₹";
   // A 404 here means send-for-approval was never called for this invoice — "no approval
@@ -79,11 +86,13 @@ export default function InvoiceApprovalPanel({ invoice }) {
 
   const steps = (approval?.steps || []).slice().sort((a, b) => a.level_number - b.level_number);
   const isInFlight = approval && IN_FLIGHT_STATUSES.includes(approval.status);
-  // The backend's send-for-approval route itself rejects anything not already at Pending
-  // Approval ("Invoice N cannot be sent for approval while in status ...") — an invoice still at
-  // OCR Review Pending has to be reviewed/saved first (InvoiceReviewEditor), which is what
-  // actually advances it to Pending Approval in the first place (apply_ocr_review).
-  const canOfferSend = invoice.status === INVOICE_STATUS.PENDING_APPROVAL && canSendForApproval && (hasNoApprovalYet || !approval);
+  // The backend's send-for-approval route itself rejects anything not already at OCR Reviewed
+  // ("Invoice N cannot be sent for approval while in status ...") — an invoice still at OCR
+  // Review Pending has to be reviewed/saved first (InvoiceReviewEditor), which is what actually
+  // advances it to OCR Reviewed. Status alone is enough here now — OCR_REVIEWED unambiguously
+  // means "not yet sent" (see invoice_process_service.apply_ocr_review's docstring), so this no
+  // longer needs to also check whether an approval instance already exists.
+  const canOfferSend = invoice.status === INVOICE_STATUS.OCR_REVIEWED && canSendForApproval;
 
   const decidedApprovers = steps
     .flatMap((step) =>
@@ -98,6 +107,11 @@ export default function InvoiceApprovalPanel({ invoice }) {
   // ever be PENDING at a time.
   const currentStep = steps.find((step) => step.status === "PENDING");
   const currentApprovers = (currentStep?.approvers || []).filter((a) => a.status === "PENDING" || a.status === "WAITING");
+  // Holding INVOICE_APPROVE/REJECT/SEND_BACK is necessary but not sufficient — the backend only
+  // accepts the decision from whoever is actually assigned on the currently active step, so the
+  // buttons stay hidden for everyone else rather than surfacing a permission the user can't
+  // successfully use on this particular invoice.
+  const isAssignedApprover = isEligibleApproverForStep(currentApprovers, user);
 
   const policyDepartment = policy ? departmentsById.get(policy.department_id) : null;
   const policyCategory = policy ? categoriesById.get(policy.purchase_category_id) : null;
@@ -140,6 +154,21 @@ export default function InvoiceApprovalPanel({ invoice }) {
           setRejectComments("");
         },
         onError: (err) => toast.error(getApiErrorMessage(err, "Could not reject this invoice.")),
+      },
+    );
+  };
+
+  const handleSendBack = () => {
+    if (!sendBackComments.trim()) return;
+    sendBackInvoice.mutate(
+      { invoiceId: invoice.id, comments: sendBackComments.trim() },
+      {
+        onSuccess: () => {
+          toast.success(`Invoice ${invoice.invoiceNumber} sent back for review.`);
+          setSendBackOpen(false);
+          setSendBackComments("");
+        },
+        onError: (err) => toast.error(getApiErrorMessage(err, "Could not send this invoice back for review.")),
       },
     );
   };
@@ -269,8 +298,13 @@ export default function InvoiceApprovalPanel({ invoice }) {
               ))}
             </ol>
 
-            {isInFlight && (canApproveInvoice || canRejectInvoice) && (
+            {isInFlight && isAssignedApprover && (canApproveInvoice || canRejectInvoice || canSendBackInvoice) && (
               <div className="mb-4 flex flex-wrap justify-end gap-2">
+                {canSendBackInvoice && (
+                  <Button variant="outline" onClick={() => setSendBackOpen(true)}>
+                    <CornerUpLeft size={14} /> Send Back
+                  </Button>
+                )}
                 {canRejectInvoice && (
                   <Button variant="outline" onClick={() => setRejectOpen(true)}>
                     Reject
@@ -382,6 +416,44 @@ export default function InvoiceApprovalPanel({ invoice }) {
           value={rejectComments}
           onChange={(e) => setRejectComments(e.target.value)}
           placeholder="Explain why this invoice is being rejected..."
+          rows={3}
+          required
+        />
+      </Modal>
+
+      <Modal
+        isOpen={sendBackOpen}
+        onClose={() => setSendBackOpen(false)}
+        title="Return Invoice for Review"
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setSendBackOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSendBack}
+              disabled={!sendBackComments.trim()}
+              loading={sendBackInvoice.isPending}
+            >
+              Send Back
+            </Button>
+          </div>
+        }
+      >
+        <p className="mb-3 flex items-start gap-2 text-sm text-gray-700">
+          <CornerUpLeft className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+          Return invoice <span className="font-semibold">{invoice.invoiceNumber}</span> to the AP Executive for
+          correction. This cancels the current approval cycle — a new one starts once it's resubmitted. A reason
+          is required.
+        </p>
+        <FormTextArea
+          label="Reason"
+          name="sendBackComments"
+          value={sendBackComments}
+          onChange={(e) => setSendBackComments(e.target.value)}
+          placeholder="Explain what needs to be corrected..."
           rows={3}
           required
         />

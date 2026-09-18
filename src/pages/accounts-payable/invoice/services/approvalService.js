@@ -65,6 +65,27 @@ export const approvalService = {
   },
 
   /**
+   * Returns the invoice to the AP Executive for correction instead of approving/rejecting it
+   * outright — distinct from reject() (Backend/Business_Layer/services/invoice_approval_service.py:
+   * REJECTED is terminal, RETURNED_FOR_REVIEW lets the AP Executive edit and resubmit). Cancels
+   * this approval cycle; resubmitting (via the OCR-review save, then Send for Approval again)
+   * creates a brand new one.
+   * @param {string|number} invoiceId
+   * @param {string} comments - required reason
+   * @returns {Promise<Object>} InvoiceApprovalDTO
+   */
+  async sendBack(invoiceId, comments) {
+    try {
+      const response = await api.post(`${AP_BASE_URL}/invoice/${Number(invoiceId)}/send-back`, {
+        comments,
+      });
+      return response.data;
+    } catch (error) {
+      throw withNormalizedStatus(error);
+    }
+  },
+
+  /**
    * The latest approval instance for this invoice — status, policy id, created/completed
    * timestamps, and its full step list (same steps getApprovalSteps returns standalone).
    * @param {string|number} invoiceId

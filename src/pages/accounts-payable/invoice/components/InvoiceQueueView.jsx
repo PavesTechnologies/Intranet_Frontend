@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
@@ -9,9 +9,10 @@ import InvoiceTable from "./InvoiceTable";
 import InvoiceKpiCards from "./InvoiceKpiCards";
 import { useInvoices } from "../hooks/useInvoices";
 import { useInvoiceFilters } from "../hooks/useInvoiceFilters";
-import { QUEUE_STATUS_FILTERS } from "../../constants/queueTypes";
+import { QUEUE_STATUS_FILTERS, getVisibleQueueTypes } from "../../constants/queueTypes";
 import { AP_ROUTES } from "../../constants/routes";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { useApPermissions } from "../../hooks/useApPermissions";
 
 const PAGE_SIZE = 10;
 
@@ -23,12 +24,32 @@ const PAGE_SIZE = 10;
  *
  * KPI cards are opt-in (showKpis) so only Invoice Management gains them — the OCR Review and
  * Validation queue pages stay exactly as they were.
+ *
+ * Upload and the starting tab are both permission-aware: Upload only for whoever can actually
+ * create an invoice (INVOICE_CREATE), and if the caller's requested defaultQueueType isn't one
+ * of this user's visible tabs (see InvoiceStatusTabs/getVisibleQueueTypes), fall back to their
+ * first visible one instead of landing on a tab they can't see.
  */
 export default function InvoiceQueueView({ title, subtitle, defaultQueueType, showUploadAction = false, showKpis = false }) {
   const navigate = useNavigate();
-  const [queueType, setQueueType] = useState(defaultQueueType);
+  const permissions = useApPermissions();
+  const visibleQueueTypes = getVisibleQueueTypes(permissions);
+  const [queueType, setQueueType] = useState(
+    visibleQueueTypes.includes(defaultQueueType) ? defaultQueueType : visibleQueueTypes[0],
+  );
   const { filters, setSearch, setInvoiceType, setStatus, setDateRange, setPage, resetFilters, hasActiveFilters } =
     useInvoiceFilters();
+
+  // The permission set can go from "not yet loaded" to real values between the first render and
+  // the auth context settling (see AuthContext's mount-time token decode) — if that changes
+  // which tab is valid, snap back to a visible one rather than silently querying a hidden tab's
+  // statuses forever.
+  useEffect(() => {
+    if (!visibleQueueTypes.includes(queueType)) {
+      setQueueType(visibleQueueTypes[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleQueueTypes.join(",")]);
 
   const { invoices, page, totalPages, isLoading, isError, error } = useInvoices({
     ...filters,
@@ -47,7 +68,7 @@ export default function InvoiceQueueView({ title, subtitle, defaultQueueType, sh
         title={title}
         subtitle={subtitle}
         actions={
-          showUploadAction ? (
+          showUploadAction && permissions.canUploadInvoice ? (
             <Button variant="primary" onClick={() => navigate(AP_ROUTES.INVOICE_UPLOAD)}>
               Upload Invoice
             </Button>
