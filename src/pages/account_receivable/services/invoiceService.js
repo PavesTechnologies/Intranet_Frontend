@@ -72,6 +72,12 @@ export const getInvoiceErrorMessage = (
   }
 
   if (status === 400 || status === 422) {
+    if (detail.toLowerCase().includes("refresh") || detail.toLowerCase().includes("resubmission")) {
+      return detail || "Invoice must be refreshed after correction before resubmission.";
+    }
+    if (detail.toLowerCase().includes("reason")) {
+      return detail || "A valid rejection reason is required.";
+    }
     if (detail.toLowerCase().includes("status") || detail.toLowerCase().includes("transition") || detail.toLowerCase().includes("pending")) {
       return detail || "Invalid invoice status transition. Please refresh the invoice and try again.";
     }
@@ -86,8 +92,17 @@ export const getInvoiceErrorMessage = (
     if (detail.toLowerCase().includes("already")) {
       return "Invoice already generated for this billing snapshot.";
     }
+    if (
+      detail.toLowerCase().includes("client name") ||
+      detail.toLowerCase().includes("project name") ||
+      detail.toLowerCase().includes("correction") ||
+      detail.toLowerCase().includes("reacquire") ||
+      detail.toLowerCase().includes("re-acquire")
+    ) {
+      return detail;
+    }
     if (detail.toLowerCase().includes("client") || detail.toLowerCase().includes("address")) {
-      return "Client billing details are incomplete in the configuration.";
+      return detail || "Client billing details are incomplete in the configuration.";
     }
     return detail || "Invoice request validation failed. Please check the snapshot details.";
   }
@@ -134,20 +149,20 @@ const normalizeInvoiceItem = (item = {}, index = 0) => {
       source.quantity !== undefined && source.quantity !== null
         ? Number(source.quantity)
         : source.hours !== undefined && source.hours !== null
-        ? Number(source.hours)
-        : 0,
+          ? Number(source.hours)
+          : 0,
     rate:
       source.rate !== undefined && source.rate !== null
         ? Number(source.rate)
         : source.hourlyRate !== undefined && source.hourlyRate !== null
-        ? Number(source.hourlyRate)
-        : 0,
+          ? Number(source.hourlyRate)
+          : 0,
     amount:
       source.amount !== undefined && source.amount !== null
         ? Number(source.amount)
         : source.total !== undefined && source.total !== null
-        ? Number(source.total)
-        : 0,
+          ? Number(source.total)
+          : 0,
   };
 };
 
@@ -178,14 +193,14 @@ const normalizeTaxComponent = (component = {}, index = 0) => {
       source.appliedRate !== undefined && source.appliedRate !== null
         ? Number(source.appliedRate)
         : source.rate !== undefined && source.rate !== null
-        ? Number(source.rate)
-        : null,
+          ? Number(source.rate)
+          : null,
     amount:
       source.taxAmount !== undefined && source.taxAmount !== null
         ? Number(source.taxAmount)
         : source.amount !== undefined && source.amount !== null
-        ? Number(source.amount)
-        : 0,
+          ? Number(source.amount)
+          : 0,
   };
 };
 
@@ -205,22 +220,22 @@ export const normalizeInvoice = (payload = {}) => {
   const rawItems = Array.isArray(data.items)
     ? data.items
     : Array.isArray(data.invoiceItems)
-    ? data.invoiceItems
-    : Array.isArray(data.lineItems)
-    ? data.lineItems
-    : Array.isArray(data.timesheets)
-    ? data.timesheets
-    : [];
+      ? data.invoiceItems
+      : Array.isArray(data.lineItems)
+        ? data.lineItems
+        : Array.isArray(data.timesheets)
+          ? data.timesheets
+          : [];
 
   const rawTaxComponents = Array.isArray(data.taxBreakdown)
     ? data.taxBreakdown
     : Array.isArray(data.taxComponents)
-    ? data.taxComponents
-    : Array.isArray(data.components)
-    ? data.components
-    : Array.isArray(data.taxes)
-    ? data.taxes
-    : [];
+      ? data.taxComponents
+      : Array.isArray(data.components)
+        ? data.components
+        : Array.isArray(data.taxes)
+          ? data.taxes
+          : [];
 
   // Actual snapshot billing period handling
   const periodStart = toIsoDateOnly(
@@ -257,8 +272,30 @@ export const normalizeInvoice = (payload = {}) => {
     invoiceDate: toIsoDateOnly(data.invoiceDate || data.invoice_date || data.issueDate || data.createdAt) || "",
     dueDate: toIsoDateOnly(data.dueDate || data.due_date) || "",
 
-    // Billing snapshot link
+    // Rejection reason if returned directly on invoice
+    rejectionReason:
+      data.rejectionReason ||
+      data.rejection_reason ||
+      data.reason ||
+      data.comment ||
+      "",
+
+    // Phase 2B correction fields (authoritative from backend)
+    correctionRequired:
+      data.correctionRequired !== undefined && data.correctionRequired !== null
+        ? Boolean(data.correctionRequired)
+        : false,
+    lastCorrectedAt: data.lastCorrectedAt || data.last_corrected_at || null,
+
+    // Billing snapshot link (Timesheet/T&M invoices only)
     billingSnapshotId: data.billingSnapshotId || data.billing_snapshot_id || data.snapshotId || "",
+    // Billing occurrence link (Fixed Price/Recurring invoices only) — an
+    // invoice never carries both; whichever is present identifies which
+    // detail/tax-calculation flow this invoice belongs to. There is no
+    // occurrence-based invoice detail endpoint yet (see billingOccurrenceService.js),
+    // so callers must not build a Billing Snapshot invoice/tax-calculation
+    // URL from this id.
+    billingScheduleId: data.billingScheduleId || data.billing_schedule_id || data.occurrenceId || data.occurrence_id || "",
     snapshotNumber:
       data.snapshotNumber ||
       data.snapshot_number ||
@@ -302,20 +339,20 @@ export const normalizeInvoice = (payload = {}) => {
       data.subtotal !== undefined && data.subtotal !== null
         ? Number(data.subtotal)
         : data.taxableAmount !== undefined && data.taxableAmount !== null
-        ? Number(data.taxableAmount)
-        : 0,
+          ? Number(data.taxableAmount)
+          : 0,
     totalTax:
       data.totalTax !== undefined && data.totalTax !== null
         ? Number(data.totalTax)
         : data.totalTaxAmount !== undefined && data.totalTaxAmount !== null
-        ? Number(data.totalTaxAmount)
-        : 0,
+          ? Number(data.totalTaxAmount)
+          : 0,
     grandTotal:
       data.grandTotal !== undefined && data.grandTotal !== null
         ? Number(data.grandTotal)
         : data.totalAmount !== undefined && data.totalAmount !== null
-        ? Number(data.totalAmount)
-        : 0,
+          ? Number(data.totalAmount)
+          : 0,
   };
 };
 
@@ -351,6 +388,9 @@ export const normalizeApprovalWorkspaceItem = (item = {}) => {
     invoiceStatus: (source.status || source.invoiceStatus || "PENDING_APPROVAL").toUpperCase(),
     billingSnapshotId: source.billingSnapshotId || source.snapshotId || "",
     billingSnapshotNumber: source.billingSnapshotNumber || source.snapshotNumber || null,
+    // Fixed Price/Recurring workspace entries carry this instead of a
+    // billingSnapshotId — see normalizeInvoice above.
+    billingScheduleId: source.billingScheduleId || source.billing_schedule_id || source.occurrenceId || source.occurrence_id || "",
     clientName: source.clientName || "—",
     projectName: source.projectName || "—",
     billingPeriod: displayPeriod,
@@ -366,6 +406,11 @@ export const normalizeApprovalWorkspaceItem = (item = {}) => {
     submittedBy: source.submittedBy || "—",
     lastAction: source.lastAction || "—",
     lastActionAt: source.lastActionAt || null,
+    correctionRequired:
+      source.correctionRequired !== undefined && source.correctionRequired !== null
+        ? Boolean(source.correctionRequired)
+        : false,
+    lastCorrectedAt: source.lastCorrectedAt || source.last_corrected_at || null,
   };
 };
 
@@ -617,6 +662,80 @@ export const getInvoiceApprovalHistory = async (invoiceId) => {
   });
 };
 
+/**
+ * POST /api/v1/invoices/{invoiceId}/reject
+ * Rejects an invoice with a mandatory reason comment.
+ * Transitions invoice from PENDING_APPROVAL to REJECTED.
+ */
+export const rejectInvoice = async (invoiceId, reason) => {
+  if (!invoiceId) {
+    throw new Error("Invoice ID is required to reject the invoice.");
+  }
+  const trimmedReason = typeof reason === "string" ? reason.trim() : "";
+  if (!trimmedReason) {
+    throw new Error("Rejection reason is required.");
+  }
+  const url = `${AR_BASE_URL}/api/v1/invoices/${invoiceId}/reject`;
+  const response = await api.post(url, { reason: trimmedReason });
+  return normalizeInvoice(unwrapData(response));
+};
+
+/**
+ * POST /api/v1/invoices/{invoiceId}/refresh-after-correction
+ * Refreshes a rejected invoice from the authoritative billing snapshot & tax calculation data.
+ * No request body.
+ */
+export const refreshInvoiceAfterCorrection = async (invoiceId) => {
+  if (!invoiceId) {
+    throw new Error("Invoice ID is required to refresh invoice after correction.");
+  }
+  const url = `${AR_BASE_URL}/api/v1/invoices/${invoiceId}/refresh-after-correction`;
+  const response = await api.post(url);
+  return normalizeInvoice(unwrapData(response));
+};
+
+/**
+ * PATCH /api/v1/invoices/{invoiceId}/non-financial-correction
+ * Refreshes non-financial fields (clientName, projectName) on a REJECTED invoice.
+ * Does not modify or send financial values.
+ */
+export const correctNonFinancialInvoice = async (invoiceId, payload = {}) => {
+  if (!invoiceId) {
+    throw new Error("Invoice ID is required to correct the invoice.");
+  }
+  const cleanClientName = typeof payload.clientName === "string" ? payload.clientName.trim() : "";
+  const cleanProjectName = typeof payload.projectName === "string" ? payload.projectName.trim() : "";
+
+  if (!cleanClientName) {
+    throw new Error("Client Name is required.");
+  }
+  if (!cleanProjectName) {
+    throw new Error("Project Name is required.");
+  }
+
+  const url = `${AR_BASE_URL}/api/v1/invoices/${invoiceId}/non-financial-correction`;
+  const response = await api.patch(url, {
+    clientName: cleanClientName,
+    projectName: cleanProjectName,
+  });
+  return normalizeInvoice(unwrapData(response));
+};
+
+/**
+ * POST /api/v1/invoices/{invoiceId}/financial-correction/reacquire
+ * Re-acquires authoritative billing source data, rebuilds billing snapshot,
+ * recalculates tax calculation, and refreshes the REJECTED invoice.
+ * No request body.
+ */
+export const financialCorrectionReacquire = async (invoiceId) => {
+  if (!invoiceId) {
+    throw new Error("Invoice ID is required to re-acquire financial data.");
+  }
+  const url = `${AR_BASE_URL}/api/v1/invoices/${invoiceId}/financial-correction/reacquire`;
+  const response = await api.post(url);
+  return normalizeInvoice(unwrapData(response));
+};
+
 export default {
   generateInvoice,
   getInvoice,
@@ -625,6 +744,10 @@ export default {
   getInvoiceApprovalWorkspace,
   submitInvoiceForApproval,
   approveInvoice,
+  rejectInvoice,
+  refreshInvoiceAfterCorrection,
+  correctNonFinancialInvoice,
+  financialCorrectionReacquire,
   getInvoiceApprovalHistory,
   getInvoiceErrorMessage,
   normalizeInvoice,

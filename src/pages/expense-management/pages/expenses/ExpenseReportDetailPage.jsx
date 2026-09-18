@@ -43,8 +43,10 @@ import {
   lineItemService,
   lookupService,
   receiptService,
+  splitService,
+  REPORT_EDITABLE_STATUSES,
 } from "@/pages/expense-management/api/expenseReportsApi";
-import ReportFormFields from "@/pages/expense-management/components/expense-reports/ReportFormFields";
+import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
 import SummaryPanel from "@/pages/expense-management/components/expense-reports/SummaryPanel";
 import api from "@/api/axiosInstance";
 import Select from "react-select";
@@ -79,6 +81,10 @@ const formatDate = (value) => {
 const formatAmount = (value) =>
   (Number(value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// Backend rejects a future expense date outright (ExpenseLineItemServiceImpl) — used as the
+// `max` bound on every expense-date input so the picker itself can't offer an invalid date.
+const todayStr = new Date().toISOString().split("T")[0];
+
 const DetailField = ({ icon, label, value }) => (
   <div className="flex items-start gap-3 rounded-xl bg-gray-50 p-3">
     <div className="mt-0.5 shrink-0 text-blue-700">{icon}</div>
@@ -101,7 +107,10 @@ export default function ExpenseReportDetailPage() {
   const { reportId } = useParams();
   const navigate = useNavigate();
   const { hasRole } = useAuth();
-  const canManage = hasRole(["General", "Manager"]);
+  // Manager is read-only on the backend for report/line-item writes
+  // (ExpenseReportController/ExpenseLineItemController allow only ADMIN/GENERAL)
+  // — don't show write actions (Edit/Delete/Add Line Item/Submit) to Manager.
+  const canManage = hasRole(["General"]);
 
   useApprovalLiveSync();
   const { data: approvalStatus } = useApprovalStatus(reportId);
@@ -114,13 +123,25 @@ export default function ExpenseReportDetailPage() {
   const isLifecycleBusy = submitReport.isPending || recallReport.isPending || cancelReport.isPending;
   const [report, setReport] = useState(null);
   const [lineItems, setLineItems] = useState([]);
+  // { [lineItemId]: ExpenseSplitResponse[] } — populated so the compact table can show a "Split"
+  // badge; a line item's own list response never embeds split info, so this is fetched separately.
+  const [lineItemSplitsMap, setLineItemSplitsMap] = useState({});
 
   const needsCorrectionLines = (lineItemReviews || []).filter((r) => r.status === "NEEDS_CORRECTION");
   const queriedLines = (financeReviews || []).filter((r) => r.status === "QUERIED" || r.status === "QUERY_RAISED" || r.reason);
   // Mirrors the backend's ReportStatus.isEditable() set exactly (EMS/enums/ReportStatus.java) -
   // report-level Edit/Delete must stay available during AWAITING_CORRECTION (that's the whole
-  // point of the correction loop), not just DRAFT.
-  const isReportEditable = ["DRAFT", "POLICY_REJECTED", "QUERY_RAISED", "AWAITING_CORRECTION"].includes(report?.reportStatus);
+  // point of the correction loop), not just DRAFT. Also gates Add/Edit/Delete Line Item and
+  // Submit, since the backend rejects all of those once the report leaves this status set.
+  const isReportEditable = REPORT_EDITABLE_STATUSES.includes(report?.reportStatus);
+
+  // Enforcement (not severity) decides whether submission is actually blocked — see
+  // PolicyStatusBadge.derivePolicyStatus. Submit/Resubmit must stay disabled while any
+  // line item is BLOCKED, matching the backend's submission-time policy gate exactly.
+  const blockedLineItems = lineItems.filter(
+    (li) => derivePolicyStatus(li.lineStatus, li.policyWarnings).status === "BLOCKED"
+  );
+  const hasBlockedLineItem = blockedLineItems.length > 0;
 
     const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -252,6 +273,33 @@ export default function ExpenseReportDetailPage() {
     await Promise.all([fetchReport(), fetchLineItems()]);
     setLoading(false);
   }, [fetchReport, fetchLineItems]);
+
+  // Refreshed alongside the line-item list itself (add/delete/edit, including a split-only edit)
+  // so the table's "Split" badge never goes stale. One GET per line item — same per-row pattern
+  // already used elsewhere in this module (e.g. Finance's queue table).
+  useEffect(() => {
+    const ids = lineItems.map((li) => li.lineItemId).filter(Boolean);
+    if (ids.length === 0) {
+      setLineItemSplitsMap({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.allSettled(ids.map((id) => splitService.getAll(id)));
+      if (cancelled) return;
+      const map = {};
+      results.forEach((res, i) => {
+        if (res.status === "fulfilled") {
+          const payload = res.value.data?.data;
+          map[ids[i]] = Array.isArray(payload) ? payload : Array.isArray(res.value.data) ? res.value.data : [];
+        }
+      });
+      setLineItemSplitsMap(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [lineItems]);
 
   const fetchLookups = useCallback(async () => {
     try {
@@ -651,6 +699,8 @@ export default function ExpenseReportDetailPage() {
     if (!editFormData.title.trim()) errors.title = "Report title is required.";
     if (!editFormData.costCenterId) errors.costCenterId = "Cost center is required.";
     if (!editFormData.currencyId) errors.currencyId = "Report currency is required.";
+    const businessPurposeError = validateBusinessPurpose(editFormData.businessPurpose);
+    if (businessPurposeError) errors.businessPurpose = businessPurposeError;
     setEditFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -727,12 +777,10 @@ export default function ExpenseReportDetailPage() {
     { label: report?.title || "Report Details" },
   ];
 
-  const headers = canManage
-    ? ["Category", "Merchant", "Date", "Amount", "Policy", "GST", "Net Amount", "Base Amount", "Billable", "Actions"]
-    : ["Category", "Merchant", "Date", "Amount", "Policy", "GST", "Net Amount", "Base Amount", "Billable"];
-  const columns = canManage
-    ? ["category", "merchant", "date", "amount", "policy", "gst", "net", "base", "billable", "actions"]
-    : ["category", "merchant", "date", "amount", "policy", "gst", "net", "base", "billable"];
+  // The Actions column always renders (it holds "View", which every role that can reach
+  // this page is allowed to use) — only the Edit/Delete buttons inside it are role/status-gated.
+  const headers = ["Category", "Merchant", "Date", "Amount", "Policy", "GST", "Net Amount", "Base Amount", "Cost Center", "Billable", "Actions"];
+  const columns = ["category", "merchant", "date", "amount", "policy", "gst", "net", "base", "costCenter", "billable", "actions"];
 
   const tableRows = filteredLineItems.map((li) => {
     const showCurrency = li.currencyCode && (li.currencyCode === "EUR" || li.currencyCode !== li.baseCurrencyCode);
@@ -766,6 +814,27 @@ export default function ExpenseReportDetailPage() {
           {formatAmount(li.baseAmount)} <span className="text-xs text-gray-400">{li.baseCurrencyCode}</span>
         </span>
       ),
+      costCenter: (() => {
+        const splits = lineItemSplitsMap[li.lineItemId] || [];
+        if (splits.length === 0) {
+          return <span className="text-xs text-gray-700">{li.costCenterName || "—"}</span>;
+        }
+        const breakdown = splits
+          .map((s) =>
+            s.splitType === "PERCENTAGE"
+              ? `${s.costCenterName}: ${Number(s.percentage).toFixed(0)}%`
+              : `${s.costCenterName}: ${formatAmount(s.allocatedAmount)}`
+          )
+          .join(", ");
+        return (
+          <span
+            title={breakdown}
+            className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 cursor-help"
+          >
+            <Layers size={10} /> Split ({splits.length})
+          </span>
+        );
+      })(),
       billable: li.clientBillable ? (
         <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">Yes</span>
       ) : (
@@ -773,19 +842,19 @@ export default function ExpenseReportDetailPage() {
       ),
     };
 
-    if (canManage) {
-      rowObj.actions = (
-        <div className="flex items-center gap-1 justify-center">
-          <Button
-            type="button"
-            variant="link"
-            size="icon"
-            title="View Line Item"
-            className="h-8 w-8 p-0 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-800 transition rounded-md"
-            onClick={() => openViewLineItem(li)}
-          >
-            <Eye size={16} />
-          </Button>
+    rowObj.actions = (
+      <div className="flex items-center gap-1 justify-center">
+        <Button
+          type="button"
+          variant="link"
+          size="icon"
+          title="View Line Item"
+          className="h-8 w-8 p-0 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-800 transition rounded-md"
+          onClick={() => openViewLineItem(li)}
+        >
+          <Eye size={16} />
+        </Button>
+        {canManage && isReportEditable && (
           <Button
             type="button"
             variant="link"
@@ -796,6 +865,8 @@ export default function ExpenseReportDetailPage() {
           >
             <Pencil size={16} />
           </Button>
+        )}
+        {canManage && isReportEditable && (
           <Button
             type="button"
             variant="link"
@@ -806,9 +877,9 @@ export default function ExpenseReportDetailPage() {
           >
             <Trash2 size={16} />
           </Button>
-        </div>
-      );
-    }
+        )}
+      </div>
+    );
 
     return rowObj;
   });
@@ -841,7 +912,11 @@ export default function ExpenseReportDetailPage() {
     if (!ocrReviewData.currencyId) errors.currencyId = "Currency is required.";
     if (!ocrReviewData.categoryId) errors.categoryId = "Category is required.";
     if (!ocrReviewData.costCenterId) errors.costCenterId = "Cost center is required.";
-    if (!ocrReviewData.expenseDate) errors.expenseDate = "Expense date is required.";
+    if (!ocrReviewData.expenseDate) {
+      errors.expenseDate = "Expense date is required.";
+    } else if (ocrReviewData.expenseDate > todayStr) {
+      errors.expenseDate = "Expense date cannot be in the future.";
+    }
     if (ocrReviewData.clientBillable && !ocrReviewData.projectId) {
       errors.projectId = "Project is required when billable.";
     }
@@ -955,19 +1030,36 @@ export default function ExpenseReportDetailPage() {
                       loading={submitReport.isPending}
                       loadingText="Submitting..."
                       onClick={handleSubmitOrResubmit}
-                      disabled={report.reportStatus !== "DRAFT" || lineItems.length === 0 || isLifecycleBusy}
+                      disabled={report.reportStatus !== "DRAFT" || lineItems.length === 0 || hasBlockedLineItem || isLifecycleBusy}
+                      title={hasBlockedLineItem ? "Resolve the blocked policy violation(s) below before submitting." : undefined}
                       className={lineItems.length === 0 ? "!pointer-events-auto cursor-not-allowed" : ""}
                     >
                       Submit for Approval
                     </Button>
                   )}
                   {report.reportStatus === "AWAITING_CORRECTION" && (
-                    <Button variant="primary" size="small" loading={submitReport.isPending} loadingText="Resubmitting..." onClick={handleSubmitOrResubmit}>
+                    <Button
+                      variant="primary"
+                      size="small"
+                      loading={submitReport.isPending}
+                      loadingText="Resubmitting..."
+                      onClick={handleSubmitOrResubmit}
+                      disabled={hasBlockedLineItem || isLifecycleBusy}
+                      title={hasBlockedLineItem ? "Resolve the blocked policy violation(s) below before resubmitting." : undefined}
+                    >
                       Resubmit
                     </Button>
                   )}
                   {report.reportStatus === "QUERY_RAISED" && (
-                    <Button variant="primary" size="small" loading={submitReport.isPending} loadingText="Resubmitting..." onClick={handleSubmitOrResubmit}>
+                    <Button
+                      variant="primary"
+                      size="small"
+                      loading={submitReport.isPending}
+                      loadingText="Resubmitting..."
+                      onClick={handleSubmitOrResubmit}
+                      disabled={hasBlockedLineItem || isLifecycleBusy}
+                      title={hasBlockedLineItem ? "Resolve the blocked policy violation(s) below before resubmitting." : undefined}
+                    >
                       Resubmit
                     </Button>
                   )}
@@ -1031,6 +1123,19 @@ export default function ExpenseReportDetailPage() {
               </div>
             )}
 
+            {hasBlockedLineItem && ["DRAFT", "AWAITING_CORRECTION", "QUERY_RAISED"].includes(report.reportStatus) && (
+              <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3">
+                <p className="text-sm font-semibold text-red-800">
+                  This report cannot be submitted — {blockedLineItems.length} line item{blockedLineItems.length > 1 ? "s are" : " is"} blocked by policy.
+                </p>
+                <p className="mt-1 text-xs text-red-600">
+                  A policy violation on {blockedLineItems.length > 1 ? "these line items" : "this line item"} requires enforcement and cannot be
+                  overridden by justification alone. Fix the flagged {blockedLineItems.length > 1 ? "amounts/details" : "amount/details"} in the
+                  "Policy" column below before submitting.
+                </p>
+              </div>
+            )}
+
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <DetailField icon={<FileText size={16} />} label="Business Purpose" value={report.businessPurpose || "—"} />
               <DetailField icon={<Briefcase size={16} />} label="Cost Center" value={report.costCenterName || "—"} />
@@ -1048,7 +1153,7 @@ export default function ExpenseReportDetailPage() {
                 </div>
                 <h2 className="text-base font-bold text-gray-900">Line Items</h2>
               </div>
-              {canManage && (
+              {canManage && isReportEditable && (
                 <Button variant="primary" size="small" onClick={openAddLineItem} className="shadow-sm">
                   <Plus size={14} />
                   Add Line Item
@@ -1794,6 +1899,7 @@ export default function ExpenseReportDetailPage() {
                         value={ocrReviewData.expenseDate}
                         onChange={handleOcrInputChange}
                         disabled={ocrSubmitting}
+                        max={todayStr}
                         className={`w-full px-2.5 py-1.5 rounded-md border text-xs transition focus:outline-none focus:ring-2 ${
                           ocrReviewErrors.expenseDate
                             ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
@@ -2081,6 +2187,19 @@ function LineItemDrawer({
   const [ocrReceiptId, setOcrReceiptId] = useState(null);
   const [projects, setProjects] = useState([]);
 
+  // Split Allocation (ExpenseSplitController) — layered on top of the line item's own
+  // costCenterId above, not a replacement for it. Whole-set replace, so `splitRows` always
+  // holds the complete intended set; saving sends every row (or an empty list to revert).
+  const [splitEnabled, setSplitEnabled] = useState(false);
+  const [splitMode, setSplitMode] = useState("PERCENTAGE"); // mirrors enums/SplitType.java
+  const [splitRows, setSplitRows] = useState([]); // [{ key, costCenterId, percentage, allocatedAmount }]
+  const [splitErrors, setSplitErrors] = useState({});
+  const [loadingSplits, setLoadingSplits] = useState(false);
+  // Tracks whether the line item had an active split set as of the last load, so an unchecked
+  // "Split this expense" on an item that previously had one still sends the [] revert-to-normal
+  // PUT — while a line item that never had splits skips the splits call entirely.
+  const [hadExistingSplits, setHadExistingSplits] = useState(false);
+
   const [editActiveReceiptUrl, setEditActiveReceiptUrl] = useState("");
   const [editActiveReceiptFile, setEditActiveReceiptFile] = useState(null);
   const [editZoom, setEditZoom] = useState(1);
@@ -2123,6 +2242,11 @@ function LineItemDrawer({
       setPendingFiles([]);
       setReceipts([]);
       setOcrReceiptId(null);
+      setSplitEnabled(false);
+      setSplitMode("PERCENTAGE");
+      setSplitRows([]);
+      setSplitErrors({});
+      setHadExistingSplits(false);
       return;
     }
 
@@ -2176,9 +2300,58 @@ function LineItemDrawer({
       setFormData(emptyForm(defaultCostCenterId));
       setSavedLineItem(null);
       setOcrReceiptId(null);
+      setSplitEnabled(false);
+      setSplitMode("PERCENTAGE");
+      setSplitRows([]);
+      setHadExistingSplits(false);
     }
     setFormErrors({});
+    setSplitErrors({});
   }, [isOpen, lineItem, defaultCostCenterId]);
+
+  // Load existing splits only for a line item that actually exists yet (never call the splits
+  // endpoint for a brand-new, not-yet-created line item — there is no lineItemId to call it with).
+  useEffect(() => {
+    const idToLoad = lineItem?.lineItemId;
+    if (!isOpen || !idToLoad) {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingSplits(true);
+        const res = await splitService.getAll(idToLoad);
+        if (cancelled) return;
+        const payload = res.data?.data;
+        const list = Array.isArray(payload) ? payload : Array.isArray(res.data) ? res.data : [];
+        if (list.length > 0) {
+          setSplitEnabled(true);
+          setSplitMode(list[0].splitType || "PERCENTAGE");
+          setSplitRows(
+            list.map((s) => ({
+              key: s.splitId || Math.random().toString(36).slice(2),
+              costCenterId: s.costCenterId,
+              percentage: s.percentage != null ? String(s.percentage) : "",
+              allocatedAmount: s.allocatedAmount != null ? String(s.allocatedAmount) : "",
+            }))
+          );
+          setHadExistingSplits(true);
+        } else {
+          setSplitEnabled(false);
+          setSplitRows([]);
+          setHadExistingSplits(false);
+        }
+      } catch (err) {
+        console.error("Failed to load existing split allocation:", err);
+        showStatusToast("Failed to load this line item's existing split allocation.", "error");
+      } finally {
+        if (!cancelled) setLoadingSplits(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, lineItem?.lineItemId]);
 
   // Set the first receipt as active when receipts load or pending files change
   useEffect(() => {
@@ -2262,6 +2435,165 @@ function LineItemDrawer({
   const handleSelectChange = (name, value) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const emptySplitRow = () => ({ key: Math.random().toString(36).slice(2), costCenterId: "", percentage: "", allocatedAmount: "" });
+
+  const handleToggleSplit = (checked) => {
+    setSplitEnabled(checked);
+    setSplitErrors({});
+    if (checked && splitRows.length < 2) {
+      setSplitRows([emptySplitRow(), emptySplitRow()]);
+    }
+  };
+
+  // Switching mode clears the now-irrelevant values instead of trying to convert them (e.g. a
+  // percentage doesn't map onto a fixed amount without knowing the total) — cost center selections
+  // are kept since they're independent of mode.
+  const handleSplitModeChange = (mode) => {
+    setSplitMode(mode);
+    setSplitRows((prev) => prev.map((row) => ({ ...row, percentage: "", allocatedAmount: "" })));
+    setSplitErrors({});
+  };
+
+  const handleSplitRowChange = (idx, field, value) => {
+    setSplitRows((prev) => prev.map((row, i) => (i === idx ? { ...row, [field]: value } : row)));
+    setSplitErrors((prev) => {
+      if (!prev.rows?.[idx]?.[field]) return prev;
+      const rows = { ...prev.rows, [idx]: { ...prev.rows[idx], [field]: "" } };
+      return { ...prev, rows };
+    });
+  };
+
+  const handleAddSplitRow = () => setSplitRows((prev) => [...prev, emptySplitRow()]);
+
+  // A split allocation is only meaningful with 2+ rows (backend rejects exactly 1); dropping to
+  // 1 or 0 reverts the line item to a normal, single-cost-center expense rather than blocking removal.
+  const handleRemoveSplitRow = (idx) => {
+    setSplitRows((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      if (next.length < 2) {
+        setSplitEnabled(false);
+        setSplitErrors({});
+        return [];
+      }
+      return next;
+    });
+  };
+
+  // Backend validates against the line item's BASE-currency amount (ExpenseSplitServiceImpl uses
+  // lineItem.getBaseAmount(), not the display `amount`), since CostCenterBudget/BudgetEncumbrance
+  // are both base-currency pools. Before the line item is first created, baseAmount isn't known yet
+  // (it's computed server-side from the exchange rate), so the entered display amount is the best
+  // available reference until the first save returns the authoritative baseAmount.
+  const splitTotalBasis = Number(savedLineItem?.baseAmount ?? formData.amount) || 0;
+  const splitTotalCurrencyLabel =
+    savedLineItem?.baseCurrencyCode ||
+    currencyOptions.find((o) => o.value === formData.currencyId)?.label?.split(" - ")[0] ||
+    "";
+
+  // Mirrors ExpenseSplitServiceImpl.buildPercentageSplits exactly: every row but the last is
+  // rounded to 4 decimals, and the last absorbs whatever remainder is left so the displayed total
+  // always reconciles to splitTotalBasis, matching what the backend will actually store.
+  const computedSplitAmounts = useMemo(() => {
+    if (!splitEnabled || splitMode !== "PERCENTAGE") return {};
+    const amounts = {};
+    let running = 0;
+    splitRows.forEach((row, i) => {
+      const isLast = i === splitRows.length - 1;
+      if (isLast) {
+        amounts[i] = Math.max(splitTotalBasis - running, 0);
+      } else {
+        const amt = Math.round(((splitTotalBasis * (Number(row.percentage) || 0)) / 100) * 10000) / 10000;
+        amounts[i] = amt;
+        running += amt;
+      }
+    });
+    return amounts;
+  }, [splitEnabled, splitMode, splitRows, splitTotalBasis]);
+
+  const splitTotalPercentage = splitRows.reduce((sum, r) => sum + (Number(r.percentage) || 0), 0);
+  const splitTotalAllocated =
+    splitMode === "PERCENTAGE"
+      ? Object.values(computedSplitAmounts).reduce((sum, v) => sum + v, 0)
+      : splitRows.reduce((sum, r) => sum + (Number(r.allocatedAmount) || 0), 0);
+
+  const validateSplitRows = () => {
+    if (!splitEnabled) return {};
+    const errors = { rows: {} };
+    if (splitRows.length < 2) {
+      errors.general = "A split allocation needs at least 2 cost centers — add another row or turn off splitting.";
+      return errors;
+    }
+
+    const seen = new Set();
+    splitRows.forEach((row, i) => {
+      const rowErr = {};
+      if (!row.costCenterId) {
+        rowErr.costCenterId = "Select a cost center.";
+      } else if (seen.has(row.costCenterId)) {
+        rowErr.costCenterId = "Already used in another row.";
+      } else {
+        seen.add(row.costCenterId);
+      }
+
+      if (splitMode === "PERCENTAGE") {
+        const pct = Number(row.percentage);
+        if (row.percentage === "" || Number.isNaN(pct)) rowErr.percentage = "Required.";
+        else if (pct <= 0) rowErr.percentage = "Must be > 0.";
+      } else {
+        const amt = Number(row.allocatedAmount);
+        if (row.allocatedAmount === "" || Number.isNaN(amt)) rowErr.allocatedAmount = "Required.";
+        else if (amt <= 0) rowErr.allocatedAmount = "Must be > 0.";
+      }
+      if (Object.keys(rowErr).length > 0) errors.rows[i] = rowErr;
+    });
+
+    if (Object.keys(errors.rows).length === 0) {
+      if (splitMode === "PERCENTAGE") {
+        if (Math.abs(splitTotalPercentage - 100) > 0.01) {
+          errors.general = `Percentages must add up to 100% — currently ${splitTotalPercentage.toFixed(2)}%.`;
+        }
+      } else if (Math.abs(splitTotalAllocated - splitTotalBasis) > 0.01) {
+        errors.general = `Allocated amounts must add up to the line item total (${formatAmount(splitTotalBasis)}) — currently ${formatAmount(
+          splitTotalAllocated
+        )}.`;
+      }
+    }
+    return errors;
+  };
+
+  // Whole-set replace: builds the complete intended split list (or [] to revert to normal).
+  // Returns null when there's nothing to do at all (never split, still not split).
+  const buildSplitPayload = () => {
+    if (!splitEnabled) {
+      return hadExistingSplits ? { splits: [] } : null;
+    }
+    return {
+      splits: splitRows.map((row) => ({
+        costCenterId: row.costCenterId,
+        splitType: splitMode,
+        percentage: splitMode === "PERCENTAGE" ? Number(row.percentage) : null,
+        allocatedAmount: splitMode === "FIXED_AMOUNT" ? Number(row.allocatedAmount) : null,
+      })),
+    };
+  };
+
+  // Saves (or reverts) the split allocation once the line item itself is known to exist. Never
+  // throws — callers decide how to present a failure, since "line item saved, split failed" needs
+  // different handling than a normal save error (the line item must not be reported as lost).
+  const trySaveSplits = async (lineItemId) => {
+    const payload = buildSplitPayload();
+    if (!payload) return { ok: true };
+    try {
+      const res = await splitService.replace(lineItemId, payload);
+      const saved = res.data?.data || res.data || [];
+      setHadExistingSplits(Array.isArray(saved) && saved.length > 0);
+      return { ok: true };
+    } catch (err) {
+      const message = err.response?.data?.message || err.response?.data?.detail || "Failed to save the split allocation.";
+      return { ok: false, message };
+    }
   };
 
   const handleFileChange = (files) => {
@@ -2372,7 +2704,11 @@ function LineItemDrawer({
     if (!formData.currencyId) errors.currencyId = "Currency is required.";
     if (!formData.categoryId) errors.categoryId = "Category is required.";
     if (!formData.costCenterId) errors.costCenterId = "Cost center is required.";
-    if (!formData.expenseDate) errors.expenseDate = "Expense date is required.";
+    if (!formData.expenseDate) {
+      errors.expenseDate = "Expense date is required.";
+    } else if (formData.expenseDate > todayStr) {
+      errors.expenseDate = "Expense date cannot be in the future.";
+    }
     if (formData.clientBillable && !formData.projectId) {
       errors.projectId = "Project is required when billable.";
     }
@@ -2416,6 +2752,12 @@ function LineItemDrawer({
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
+    const splitValidation = validateSplitRows();
+    if (splitValidation.general || Object.keys(splitValidation.rows || {}).length > 0) {
+      setSplitErrors(splitValidation);
+      return;
+    }
+    setSplitErrors({});
 
     const payload = {
       categoryId: formData.categoryId,
@@ -2454,6 +2796,14 @@ function LineItemDrawer({
 
         const updatedItem = res.data?.data || res.data || { ...payload, lineItemId };
         fetchReceipts();
+
+        const splitResult = await trySaveSplits(lineItemId);
+        if (!splitResult.ok) {
+          setSavedLineItem(updatedItem);
+          showStatusToast(`Line item updated, but the split allocation could not be saved: ${splitResult.message}`, "error");
+          onSaved?.();
+          return;
+        }
         finalizeLineItemSave(updatedItem, "Line item updated successfully!");
       } else if (ocrReceiptId) {
         // OCR Confirm flow
@@ -2467,6 +2817,15 @@ function LineItemDrawer({
           }
         });
         const createdItem = res.data?.data || res.data;
+        const lineItemId = createdItem?.lineItemId;
+
+        const splitResult = lineItemId ? await trySaveSplits(lineItemId) : { ok: true };
+        if (!splitResult.ok) {
+          setSavedLineItem(createdItem);
+          showStatusToast(`Line item created, but the split allocation could not be saved: ${splitResult.message}`, "error");
+          onSaved?.();
+          return;
+        }
         finalizeLineItemSave(createdItem, "Line item created and receipt confirmed successfully!", { closeOnSuccess: true });
       } else {
         res = await lineItemService.create(reportId, payload);
@@ -2487,6 +2846,13 @@ function LineItemDrawer({
           }
         }
 
+        const splitResult = lineItemId ? await trySaveSplits(lineItemId) : { ok: true };
+        if (!splitResult.ok) {
+          setSavedLineItem(createdItem);
+          showStatusToast(`Line item added, but the split allocation could not be saved: ${splitResult.message}`, "error");
+          onSaved?.();
+          return;
+        }
         finalizeLineItemSave(createdItem, "Line item added successfully!", { closeOnSuccess: true });
       }
     } catch (err) {
@@ -2544,6 +2910,9 @@ function LineItemDrawer({
             type="date"
             value={formData.expenseDate}
             onChange={handleInputChange}
+            max={todayStr}
+            disabled={submitting}
+            error={formErrors.expenseDate}
             className="space-y-0.5"
             labelClassName="block text-xs font-semibold text-gray-600"
             inputClassName="w-full text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm h-8"
@@ -2581,6 +2950,129 @@ function LineItemDrawer({
             />
             {formErrors.costCenterId && <span className="text-[11px] text-red-600 block mt-0.5">{formErrors.costCenterId}</span>}
           </div>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3 space-y-2">
+          <label className="flex items-center gap-2 text-xs font-semibold text-gray-700">
+            <input
+              type="checkbox"
+              checked={splitEnabled}
+              onChange={(e) => handleToggleSplit(e.target.checked)}
+              disabled={submitting || loadingSplits}
+              className="h-3.5 w-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            Split this expense across multiple cost centers
+          </label>
+
+          {loadingSplits && (
+            <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
+              <Loader2 className="animate-spin" size={12} /> Loading existing split allocation...
+            </div>
+          )}
+
+          {splitEnabled && !loadingSplits && (
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Split Allocation</span>
+                <select
+                  value={splitMode}
+                  onChange={(e) => handleSplitModeChange(e.target.value)}
+                  disabled={submitting}
+                  className="text-[11px] px-2 py-1 border border-gray-300 bg-white rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="PERCENTAGE">By Percentage</option>
+                  <option value="FIXED_AMOUNT">By Fixed Amount</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                {splitRows.map((row, idx) => {
+                  const rowError = splitErrors.rows?.[idx] || {};
+                  const rowCostCenterOptions = costCenterOptions.filter(
+                    (o) => o.value === row.costCenterId || !splitRows.some((r, j) => j !== idx && r.costCenterId === o.value)
+                  );
+                  return (
+                    <div key={row.key} className="flex items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <Select
+                          options={rowCostCenterOptions}
+                          value={costCenterOptions.find((o) => o.value === row.costCenterId) || null}
+                          onChange={(opt) => handleSplitRowChange(idx, "costCenterId", opt ? opt.value : "")}
+                          placeholder="Select cost center..."
+                          isSearchable
+                          styles={compactSelectStyles}
+                          isDisabled={submitting}
+                        />
+                        {rowError.costCenterId && <span className="text-[11px] text-red-600 block mt-0.5">{rowError.costCenterId}</span>}
+                      </div>
+                      <div className="w-24 shrink-0">
+                        <FormInput
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder={splitMode === "PERCENTAGE" ? "%" : "Amount"}
+                          value={splitMode === "PERCENTAGE" ? row.percentage : row.allocatedAmount}
+                          onChange={(e) =>
+                            handleSplitRowChange(idx, splitMode === "PERCENTAGE" ? "percentage" : "allocatedAmount", e.target.value)
+                          }
+                          disabled={submitting}
+                          inputClassName="w-full text-xs px-2 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm h-8"
+                          error={splitMode === "PERCENTAGE" ? rowError.percentage : rowError.allocatedAmount}
+                        />
+                      </div>
+                      {splitMode === "PERCENTAGE" && (
+                        <div className="w-20 shrink-0 pt-1.5 text-right text-xs font-mono text-gray-500">
+                          {formatAmount(computedSplitAmounts[idx] ?? 0)}
+                        </div>
+                      )}
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="icon"
+                        title="Remove row"
+                        className="h-8 w-8 p-0 text-red-500 hover:bg-red-50 shrink-0"
+                        onClick={() => handleRemoveSplitRow(idx)}
+                        disabled={submitting}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="small"
+                onClick={handleAddSplitRow}
+                disabled={submitting || splitRows.length >= costCenterOptions.length}
+              >
+                <Plus size={12} />
+                Add Cost Center
+              </Button>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-semibold">
+                <span
+                  className={
+                    (splitMode === "PERCENTAGE"
+                      ? Math.abs(splitTotalPercentage - 100) <= 0.01
+                      : Math.abs(splitTotalAllocated - splitTotalBasis) <= 0.01)
+                      ? "text-emerald-600"
+                      : "text-red-600"
+                  }
+                >
+                  Total: {splitMode === "PERCENTAGE" ? `${splitTotalPercentage.toFixed(2)}%` : formatAmount(splitTotalAllocated)}
+                  {splitMode === "PERCENTAGE" && ` / ${formatAmount(splitTotalAllocated)}`}
+                </span>
+                <span className="text-gray-400">
+                  Line Item Amount: {formatAmount(splitTotalBasis)} {splitTotalCurrencyLabel}
+                </span>
+              </div>
+
+              {splitErrors.general && <p className="text-[11px] text-red-600">{splitErrors.general}</p>}
+            </div>
+          )}
         </div>
 
         <div className="space-y-0.5">

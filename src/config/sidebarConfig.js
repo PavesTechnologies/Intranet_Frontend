@@ -1,5 +1,6 @@
 import { AP_ALL_ROLES, AP_ROLES } from "../pages/accounts-payable/constants/apRoles";
 import { AP_ROUTES } from "../pages/accounts-payable/constants/routes";
+import { INVOICE_PERMISSIONS } from "../pages/accounts-payable/constants/invoicePermissions";
 
 /**
  * Canonical role identifiers.
@@ -41,6 +42,12 @@ const HR_MANAGEMENT    = [ROLES.HR, ROLES.REPORTING_MANAGER];
 const XMS_EMPLOYEE   = [ROLES.GENERAL];
 const XMS_MANAGER    = [ROLES.MANAGER];
 const XMS_FINANCE    = [ROLES.FINANCE, "Finance_Executive"];
+// Finance Verification's own action surface requires exactly FINANCE_EXECUTIVE on the backend
+// (FinanceVerificationController's @PreAuthorize) — unlike XMS_FINANCE above (used by Client
+// Billing, a read/placeholder area), the generic "Finance" viewing role does NOT satisfy this
+// controller, so including it here would let a Finance-role user into a page where every action
+// 403s. Kept separate from XMS_FINANCE so Client Billing's own role list is unaffected.
+const XMS_FINANCE_VERIFICATION = [ROLES.FINANCE_EXECUTIVE];
 const XMS_ADMIN      = ADMIN_ROLES;
 export const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
 const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
@@ -214,7 +221,7 @@ export const XMS_SUBMENU = [
   {
     label: "Finance",
     to: "/expense-management/finance/verification",
-    allowedRoles: XMS_FINANCE,
+    allowedRoles: XMS_FINANCE_VERIFICATION,
     children: [
       { label: "Verification",    to: "/expense-management/finance/verification" },
       { label: "Reimbursements",  to: "/expense-management/finance/reimbursements" },
@@ -321,11 +328,19 @@ export const XMS_SUBMENU = [
  * is deferred to the business-logic phases — see constants/permissions.js's
  * AP_PERMISSION_ROLES map for the intended per-capability breakdown.
  */
+// Invoice Management and Payments both ultimately read invoice data (invoice-details_route.py's
+// GET endpoints, which every Payment page also calls to show what it's paying) — gated on
+// INVOICE_VIEW alone, not a role list, since a pure Approver or Finance user need not hold any
+// of Admin/AP_Executive/Finance_Executive to legitimately belong here. INVOICE_VIEW is the one
+// permission every real AP Invoice group (Intake/Approver/Finance) carries by design, so a user
+// missing it shouldn't see a nav item whose page will just 403 on its own data.
+const _INVOICE_VIEW_PERMISSIONS = [INVOICE_PERMISSIONS.INVOICE_VIEW];
+
 export const AP_SUBMENU = [
   { label: "Dashboard", to: AP_ROUTES.DASHBOARD, allowedRoles: AP_ALL_ROLES },
   { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
-  { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, allowedRoles: AP_ALL_ROLES },
-  { label: "Payments", to: AP_ROUTES.PAYMENT_READY, allowedRoles: AP_ALL_ROLES },
+  { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
+  { label: "Payments", to: AP_ROUTES.PAYMENT_READY, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
   { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
   { label: "System Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: AP_ALL_ROLES },
 ];

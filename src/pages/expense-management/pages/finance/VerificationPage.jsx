@@ -6,33 +6,38 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { useFinanceQueue, useVerifyLineItem, useQueryLineItem } from "./hooks/useFinanceVerification";
 import EmployeeLabel from "../../approval-engine/components/EmployeeLabel";
+import { useEmployeeDirectory } from "../../approval-engine/hooks/useEmployeeDirectory";
 import FinanceLineItemReviewPanel from "./components/FinanceLineItemReviewPanel";
 import FinanceReviewPanel from "./components/FinanceReviewPanel";
-import { formatMoney } from "../../approval-engine/constants/approvalLabels";
+import { formatMoney, formatDate } from "../../approval-engine/constants/approvalLabels";
 import SearchInput from "@/components/filter/Searchbar";
 import FormSelect from "@/components/forms/FormSelect";
 import { PageCard, PageCardContent } from "@/components/Cards/PageCard";
 import Pagination from "@/components/Pagination/pagination";
-import { useEmployeeDirectory } from "../../approval-engine/hooks/useEmployeeDirectory";
-import { useQueries } from "@tanstack/react-query";
-import { lineItemService } from "@/pages/expense-management/api/expenseReportsApi";
-import { financeVerificationApi } from "./api/financeVerificationApi";
 
 const merchantSummary = (lineItems) => {
   if (!lineItems?.length) return "—";
-  const first = lineItems[0]?.merchantName || lineItems[0]?.categoryName || lineItems[0]?.merchant || lineItems[0]?.category || "Line item";
+  const first = lineItems[0]?.merchantName || lineItems[0]?.categoryName || "Line item";
   return lineItems.length > 1 ? `${first} +${lineItems.length - 1} more` : first;
 };
 
 const isLineEligible = (line) => {
   if (!line) return false;
-  if (line.eligibleForVerify === false || line.eligible === false || line.isEligible === false) return false;
+  if (line.eligibleForVerify === false) return false;
   if (line.ineligibleReason && String(line.ineligibleReason).trim().length > 0) return false;
   return true;
 };
 
 const hasIneligibleLines = (lineItems) => (lineItems || []).some((l) => !isLineEligible(l));
 
+/**
+ * The Finance Verification queue - GET /xms/finance-verification/my-queue is the ONLY network call
+ * this page's content depends on. FinanceQueueItemResponse.pendingLineItems already carries every
+ * field a row/expanded-panel needs (amount, glAccountCode, eligibleForVerify, ineligibleReason,
+ * clientBillable) — there is no per-row reconstruction here, unlike the previous version which fired
+ * two extra queries (lineItemService.getAll + financeVerificationApi.getReviews) per report purely
+ * to rebuild what this one response already provides correctly.
+ */
 export default function VerificationPage() {
   const [page, setPage] = useState(0);
   const [expandedReportId, setExpandedReportId] = useState(null);
@@ -48,57 +53,6 @@ export default function VerificationPage() {
   const items = data?.content || [];
   const isMutating = verifyLineItem.isPending || queryLineItem.isPending;
 
-  const lineItemsQueries = useQueries({
-    queries: items.map((item) => ({
-      queryKey: ["reportLineItems", item.reportId],
-      queryFn: async () => {
-        const res = await lineItemService.getAll(item.reportId);
-        const payload = res.data?.data;
-        return Array.isArray(payload) ? payload : payload?.lineItems || payload?.content || payload?.data || [];
-      },
-      staleTime: 30_000,
-    })),
-  });
-
-  const reviewsQueries = useQueries({
-    queries: items.map((item) => ({
-      queryKey: ["financeReviews", item.reportId],
-      queryFn: async () => {
-        const res = await financeVerificationApi.getReviews(item.reportId);
-        return res.data?.data || [];
-      },
-      staleTime: 15_000,
-    })),
-  });
-
-  const resolvedItems = useMemo(() => {
-    return items.map((item, idx) => {
-      const queriedLines = lineItemsQueries[idx]?.data;
-      const backendLines = item.pendingLineItems || item.lineItems || item.items || item.pendingLines || [];
-      const baseLines = (queriedLines && queriedLines.length > 0) ? queriedLines : backendLines;
-      const reportReviews = reviewsQueries[idx]?.data || [];
-
-      const mergedLines = baseLines.map((line) => {
-        const qi = backendLines.find((b) => b.lineItemId === line.lineItemId) || {};
-        return { ...line, ...qi };
-      });
-
-      // A line is pending verification if it has not been verified or queried.
-      const pendingLineItems = mergedLines.filter((line) => {
-        const lineReviews = reportReviews.filter((r) => r.lineItemId === line.lineItemId);
-        const hasVerifiedOrQueried = lineReviews.some((r) => r.status === "VERIFIED" || r.status === "QUERIED");
-        return !hasVerifiedOrQueried;
-      });
-
-      const finalPending = pendingLineItems.length > 0 ? pendingLineItems : mergedLines;
-
-      return {
-        ...item,
-        pendingLineItems: finalPending,
-      };
-    });
-  }, [items, lineItemsQueries, reviewsQueries]);
-
   const handleVerifyLine = (reportId, lineItemId) => {
     verifyLineItem.mutate(
       { reportId, lineItemId },
@@ -113,32 +67,33 @@ export default function VerificationPage() {
     queryLineItem.mutate(
       { reportId, lineItemId, reason },
       {
-        onSuccess: () => showStatusToast("Query raised successfully", "success"),
+        onSuccess: () =>
+          showStatusToast("Correction requested — the report has been returned to the employee.", "success"),
         onError: (err) => showStatusToast(err.response?.data?.message || "Failed to raise query", "error"),
       }
     );
   };
 
-  // Stats calculation
-  const totalReportsCount = data?.totalElements ?? resolvedItems.length;
-  const totalPendingLines = resolvedItems.reduce((sum, item) => sum + (item.pendingLineItems?.length ?? 0), 0);
-  const totalQueueValue = resolvedItems.reduce((sum, item) => sum + (Number(item.totalAmount) || 0), 0);
-  const firstCurrency = resolvedItems[0]?.currencyCode || "INR";
+  // Accurate: comes straight from the backend's own count of ALL reports currently
+  // PENDING_FINANCE_VERIFICATION, independent of page size.
+  const totalReportsCount = data?.totalElements ?? 0;
+  // NOT globally accurate — the backend has no endpoint that sums pending line items or queue
+  // value across the whole queue, only per-page data. Labeled "current page" rather than presented
+  // as a global total, per the explicit instruction not to invent one.
+  const pageLineItemsCount = items.reduce((sum, item) => sum + (item.pendingLineItems?.length ?? 0), 0);
+  const pageQueueValue = items.reduce((sum, item) => sum + (Number(item.totalAmount) || 0), 0);
+  const firstCurrency = items[0]?.currencyCode || "INR";
 
-  // Client-side filtering & sorting by date (latest first)
+  // Client-side, over the currently loaded page only — search does not query the backend (it has
+  // no such parameter), so results are scoped to what's already on screen.
   const filteredItems = useMemo(() => {
-    const filtered = resolvedItems.filter((item) => {
+    const filtered = items.filter((item) => {
       const reportNumber = (item.reportNumber || "").toLowerCase();
       const merchant = merchantSummary(item.pendingLineItems).toLowerCase();
       const empEntry = directory?.get(item.employeeId);
       const empName = (empEntry?.name || item.employeeId || "").toLowerCase();
-
       const query = searchTerm.toLowerCase();
-      const matchesSearch =
-        !query ||
-        reportNumber.includes(query) ||
-        merchant.includes(query) ||
-        empName.includes(query);
+      const matchesSearch = !query || reportNumber.includes(query) || merchant.includes(query) || empName.includes(query);
 
       const hasIneligible = hasIneligibleLines(item.pendingLineItems);
       const matchesEligibility =
@@ -150,31 +105,32 @@ export default function VerificationPage() {
     });
 
     return filtered.sort((a, b) => {
-      const dateA = a.submittedAt || a.createdAt || a.approvedAt || a.submittedDate || a.expenseDate || a.date;
-      const dateB = b.submittedAt || b.createdAt || b.approvedAt || b.submittedDate || b.expenseDate || b.date;
-      const timeA = dateA ? new Date(dateA).getTime() : 0;
-      const timeB = dateB ? new Date(dateB).getTime() : 0;
+      const timeA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+      const timeB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
       return timeB - timeA;
     });
-  }, [resolvedItems, searchTerm, eligibilityFilter, directory]);
+  }, [items, searchTerm, eligibilityFilter, directory]);
 
-  // Handle loading state
+  const breadcrumbs = [
+    { label: "Expense Management", to: "/expense-management/dashboard" },
+    { label: "Finance", to: "/expense-management/finance/verification" },
+    { label: "Verification" },
+  ];
+
+  const Header = () => (
+    <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm sm:p-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="min-w-0">
+        <h1 className="text-lg font-bold text-[#0a174e]">Finance Verification</h1>
+        <p className="text-xs text-gray-500 mt-0.5">Review and verify expense report line items for reimbursement.</p>
+      </div>
+    </div>
+  );
+
   if (isLoading) {
     return (
       <div className="p-4 sm:p-6 space-y-3">
-        <Breadcrumb
-          items={[
-            { label: "Expense Management", to: "/expense-management/dashboard" },
-            { label: "Finance", to: "/expense-management/finance/verification" },
-            { label: "Verification" },
-          ]}
-        />
-        <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm sm:p-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-lg font-bold text-[#0a174e]">Finance Verification</h1>
-            <p className="text-xs text-gray-500 mt-0.5">Review and verify expense report line items for reimbursement.</p>
-          </div>
-        </div>
+        <Breadcrumb items={breadcrumbs} />
+        <Header />
         <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-16 shadow-sm">
           <LoadingSpinner text="Loading verification queue…" />
         </div>
@@ -182,32 +138,20 @@ export default function VerificationPage() {
     );
   }
 
-  // Handle error states (including 401 & 403)
   if (isError) {
     const errorStatus = error?.response?.status;
     const isAuthError = errorStatus === 401 || errorStatus === 403;
     return (
       <div className="p-4 sm:p-6 space-y-3">
-        <Breadcrumb
-          items={[
-            { label: "Expense Management", to: "/expense-management/dashboard" },
-            { label: "Finance", to: "/expense-management/finance/verification" },
-            { label: "Verification" },
-          ]}
-        />
-        <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm sm:p-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-lg font-bold text-[#0a174e]">Finance Verification</h1>
-            <p className="text-xs text-gray-500 mt-0.5">Review and verify expense report line items for reimbursement.</p>
-          </div>
-        </div>
+        <Breadcrumb items={breadcrumbs} />
+        <Header />
         <div className="flex flex-col items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 py-10 text-center px-4 shadow-sm">
           {isAuthError ? <Lock className="h-6 w-6 text-rose-500" /> : <AlertTriangle className="h-6 w-6 text-rose-500" />}
           <p className="text-sm font-semibold text-rose-700">
             {errorStatus === 401
               ? "Your session has expired. Please log in again."
               : errorStatus === 403
-              ? "Access denied. You do not have the required role (FINANCE_EXECUTIVE) to view this page."
+              ? "Access denied. You do not have the required role (Finance Executive) to view this page."
               : "Failed to load verification queue."}
           </p>
           <p className="text-xs text-rose-500 max-w-md">
@@ -225,25 +169,27 @@ export default function VerificationPage() {
 
   return (
     <div className="p-4 sm:p-6 space-y-3">
-      <Breadcrumb
-        items={[
-          { label: "Expense Management", to: "/expense-management/dashboard" },
-          { label: "Finance", to: "/expense-management/finance/verification" },
-          { label: "Verification" },
-        ]}
-      />
+      <Breadcrumb items={breadcrumbs} />
+      <Header />
 
-      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm sm:p-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-lg font-bold text-[#0a174e]">Finance Verification</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Review and verify expense report line items for reimbursement.</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {/* Summary cards. "Pending Verification" and "Total Reports" intentionally show the same
+          accurate totalElements count — Finance's entire queue IS the pending set (there is no
+          separate history bucket to distinguish them from). "Pending Line Items" and "Queue Value"
+          are explicitly current-page sums, not global totals the backend can't provide. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
           <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
             <FileStack size={18} />
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Pending Verification</p>
+            <p className="text-xl font-bold text-gray-900 mt-0.5">{totalReportsCount}</p>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
+          <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg">
+            <Layers size={18} />
           </div>
           <div>
             <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Total Reports</p>
@@ -256,8 +202,8 @@ export default function VerificationPage() {
             <FilePlus2 size={18} />
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Pending Line Items</p>
-            <p className="text-xl font-bold text-amber-600 mt-0.5">{totalPendingLines}</p>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Pending Line Items (This Page)</p>
+            <p className="text-xl font-bold text-amber-600 mt-0.5">{pageLineItemsCount}</p>
           </div>
         </div>
 
@@ -266,8 +212,8 @@ export default function VerificationPage() {
             <Landmark size={18} />
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Total Queue Value</p>
-            <p className="text-xl font-bold text-green-600 mt-0.5">{formatMoney(totalQueueValue, firstCurrency)}</p>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Queue Value (This Page)</p>
+            <p className="text-xl font-bold text-green-600 mt-0.5">{formatMoney(pageQueueValue, firstCurrency)}</p>
           </div>
         </div>
       </div>
@@ -275,7 +221,7 @@ export default function VerificationPage() {
       <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
           <div className="lg:col-span-2">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Search (current page)</label>
             <SearchInput
               value={searchTerm}
               onSearch={(val) => setSearchTerm(val || "")}
@@ -304,7 +250,7 @@ export default function VerificationPage() {
           <PageCard>
             <PageCardContent className="flex flex-col items-center justify-center text-center py-16">
               <Inbox className="h-10 w-10 text-gray-300 mb-3" />
-              <h2 className="text-sm font-semibold text-gray-700">Nothing waiting on you right now</h2>
+              <h2 className="text-sm font-semibold text-gray-700">No pending verifications</h2>
               <p className="text-xs text-gray-400 mt-1 max-w-sm">Expense reports awaiting Finance verification will show up here.</p>
             </PageCardContent>
           </PageCard>
@@ -313,24 +259,25 @@ export default function VerificationPage() {
             <PageCardContent className="flex flex-col items-center justify-center text-center py-16">
               <Layers className="h-10 w-10 text-gray-300 mb-3" />
               <h2 className="text-sm font-semibold text-gray-700">No Reports Found</h2>
-              <p className="text-xs text-gray-400 mt-1 max-w-sm">No verification items match the selected search criteria or filters.</p>
+              <p className="text-xs text-gray-400 mt-1 max-w-sm">No verification items on this page match the selected search criteria or filters.</p>
             </PageCardContent>
           </PageCard>
         ) : (
           <>
-            <div className="w-full overflow-x-auto rounded-lg border border-gray-200 shadow-sm [&_td]:!py-2 [&_td]:!px-3 [&_td]:!text-xs [&_th]:!py-2.5 [&_th]:!px-3 [&_th]:!text-xs [&_table]:!text-xs [&_.rounded-full]:!text-[10px] [&_.rounded-full]:!px-2 [&_.rounded-full]:!py-0.5">
+            {/* Desktop / tablet table */}
+            <div className="hidden md:block w-full overflow-x-auto rounded-lg border border-gray-200 shadow-sm [&_td]:!py-2 [&_td]:!px-3 [&_td]:!text-xs [&_th]:!py-2.5 [&_th]:!px-3 [&_th]:!text-xs [&_table]:!text-xs [&_.rounded-full]:!text-[10px] [&_.rounded-full]:!px-2 [&_.rounded-full]:!py-0.5">
               <table className="w-full border-collapse text-sm">
                 <thead className="bg-gradient-to-r from-blue-900 to-indigo-900 text-left text-xs font-semibold text-white uppercase tracking-wider">
                   <tr>
                     <th className="w-8 px-3 py-2.5 text-white" />
                     <th className="px-3 py-2.5 text-white">Report</th>
                     <th className="px-3 py-2.5 text-white">Employee</th>
-                    <th className="px-3 py-2.5 text-white">Merchant / Category</th>
-                    <th className="px-3 py-2.5 text-white">Items Pending</th>
+                    <th className="px-3 py-2.5 text-white">Submitted</th>
                     <th className="px-3 py-2.5 text-white">Level</th>
+                    <th className="px-3 py-2.5 text-white">Pending Expenses</th>
                     <th className="px-3 py-2.5 text-white">Eligibility</th>
-                    <th className="px-3 py-2.5 text-white">Amount</th>
-                    <th className="px-3 py-2.5 text-right text-white">Actions</th>
+                    <th className="px-3 py-2.5 text-white">Report Total</th>
+                    <th className="px-3 py-2.5 text-right text-white">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
@@ -350,14 +297,15 @@ export default function VerificationPage() {
                           <td className="px-3 py-2 text-gray-600 font-medium">
                             <EmployeeLabel employeeId={item.employeeId} />
                           </td>
-                          <td className="px-3 py-2 text-gray-600 max-w-[220px] truncate">
-                            {merchantSummary(item.pendingLineItems)}
-                          </td>
-                          <td className="px-3 py-2 text-gray-600 font-medium">{item.pendingLineItems?.length ?? 0}</td>
+                          <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{formatDate(item.submittedAt)}</td>
                           <td className="px-3 py-2 text-gray-600">
                             <span className="inline-flex items-center gap-1">
-                              <Layers className="h-3.5 w-3.5" /> Level {item.levelOrder}
+                              <Layers className="h-3.5 w-3.5" /> Finance Verification
                             </span>
+                          </td>
+                          <td className="px-3 py-2 text-gray-600 font-medium">
+                            {item.pendingLineItems?.length ?? 0}
+                            <span className="ml-1 text-gray-400 font-normal">{merchantSummary(item.pendingLineItems)}</span>
                           </td>
                           <td className="px-3 py-2">
                             {hasIneligible ? (
@@ -374,17 +322,15 @@ export default function VerificationPage() {
                             {formatMoney(item.totalAmount, item.currencyCode)}
                           </td>
                           <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                            <div className="inline-flex flex-wrap items-center justify-end gap-2">
-                              <Button
-                                size="small"
-                                variant="outline"
-                                className="!py-1 !px-2.5 !text-xs font-semibold shadow-sm hover:bg-slate-50 transition"
-                                disabled={isMutating}
-                                onClick={() => setReviewingReport(item)}
-                              >
-                                Review
-                              </Button>
-                            </div>
+                            <Button
+                              size="small"
+                              variant="outline"
+                              className="!py-1 !px-2.5 !text-xs font-semibold shadow-sm hover:bg-slate-50 transition"
+                              disabled={isMutating}
+                              onClick={() => setReviewingReport(item)}
+                            >
+                              Review
+                            </Button>
                           </td>
                         </tr>
                         {isExpanded && (
@@ -412,6 +358,47 @@ export default function VerificationPage() {
               </table>
             </div>
 
+            {/* Mobile card list */}
+            <div className="md:hidden space-y-3">
+              {filteredItems.map((item) => {
+                const hasIneligible = hasIneligibleLines(item.pendingLineItems);
+                return (
+                  <div key={item.reportId} className="rounded-xl border border-gray-200 bg-white p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-mono text-xs font-semibold text-gray-700">{item.reportNumber}</p>
+                        <p className="text-sm text-gray-900 font-medium mt-0.5">
+                          <EmployeeLabel employeeId={item.employeeId} />
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">Submitted {formatDate(item.submittedAt)}</p>
+                      </div>
+                      <p className="shrink-0 font-semibold text-gray-900">{formatMoney(item.totalAmount, item.currencyCode)}</p>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">
+                        <Layers className="h-3 w-3" /> Finance Verification
+                      </span>
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">
+                        {item.pendingLineItems?.length ?? 0} pending expense(s)
+                      </span>
+                      {hasIneligible ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">
+                          <ShieldAlert className="h-3 w-3" /> Constraints
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800">Ready</span>
+                      )}
+                    </div>
+                    <div className="mt-3">
+                      <Button size="small" variant="outline" disabled={isMutating} onClick={() => setReviewingReport(item)} className="w-full">
+                        Review
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
             {data?.totalPages > 1 && (
               <div className="mt-4 flex justify-center">
                 <Pagination
@@ -437,4 +424,3 @@ export default function VerificationPage() {
     </div>
   );
 }
-

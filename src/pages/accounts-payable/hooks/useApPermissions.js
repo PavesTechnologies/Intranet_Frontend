@@ -1,6 +1,13 @@
 import { useAuth } from "../../../contexts/AuthContext";
 import { AP_PERMISSIONS, rolesForPermission } from "../constants/permissions";
 import { PROCUREMENT_PERMISSIONS } from "../constants/procurementPermissions";
+import {
+  APPROVAL_PERMISSIONS,
+  APPROVAL_ANY_VIEW_PERMISSIONS,
+  INVOICE_HISTORY_VIEW_PERMISSIONS,
+} from "../constants/approvalPermissions";
+import { PAYMENT_PERMISSIONS } from "../constants/paymentPermissions";
+import { INVOICE_PERMISSIONS } from "../constants/invoicePermissions";
 
 /**
  * One boolean flag per capability, consumed by pages/buttons instead of calling
@@ -22,20 +29,29 @@ import { PROCUREMENT_PERMISSIONS } from "../constants/procurementPermissions";
  * action — holding a *_VIEW permission never implies any create/edit/approve/etc. capability.
  */
 export function useApPermissions() {
-  const { hasRole, hasPermission } = useAuth();
+  const { hasRole, hasPermission, hasAnyPermission } = useAuth();
 
   return {
     canViewDashboard: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_DASHBOARD)),
     canOnboardVendor: hasRole(rolesForPermission(AP_PERMISSIONS.ONBOARD_VENDOR)),
     canEditVendor: hasRole(rolesForPermission(AP_PERMISSIONS.EDIT_VENDOR)),
     canViewVendor: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_VENDOR)),
-    canUploadInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.UPLOAD_INVOICE)),
-    canReviewOcr: hasRole(rolesForPermission(AP_PERMISSIONS.REVIEW_OCR)),
-    canValidateInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.VALIDATE_INVOICE)),
-    canApproveInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.APPROVE_INVOICE)),
-    canViewInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_INVOICE)),
-    canMarkPaid: hasRole(rolesForPermission(AP_PERMISSIONS.MARK_PAID)),
-    canViewPayment: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_PAYMENT)),
+    // Invoice intake/OCR/view now carry real UMS permissions (invoice_extraction_route.py,
+    // invoice_process_route.py, invoice_details_route.py) — migrated off the frontend
+    // role -> permission guess the same way canMarkPaid/canViewPayment already were.
+    canUploadInvoice: hasPermission(INVOICE_PERMISSIONS.INVOICE_CREATE),
+    canReviewOcr: hasPermission(INVOICE_PERMISSIONS.INVOICE_OCR_REVIEW),
+    // The standalone Validation Queue page is part of the same OCR/intake pipeline — no
+    // separate backend permission exists for it.
+    canValidateInvoice: hasPermission(INVOICE_PERMISSIONS.INVOICE_OCR_REVIEW),
+    canViewInvoice: hasPermission(INVOICE_PERMISSIONS.INVOICE_VIEW),
+    // Payment routes previously had zero backend permission gating at all, so these were
+    // role-derived like every other flag on this page — PAYMENT_VIEW/PAYMENT_PROCESS now exist
+    // (payment_route.py), so these migrate to the same UMS-permission-driven model the approval
+    // workflow already uses, per the same reasoning: backend authorization is authoritative, not
+    // a frontend role guess.
+    canMarkPaid: hasPermission(PAYMENT_PERMISSIONS.PAYMENT_PROCESS),
+    canViewPayment: hasPermission(PAYMENT_PERMISSIONS.PAYMENT_VIEW),
 
     // ── PR Request ─────────────────────────────────────────────────────────
     canViewPR: hasPermission(PROCUREMENT_PERMISSIONS.PR_VIEW),
@@ -81,5 +97,30 @@ export function useApPermissions() {
     // is consistent, but this is UX only until that route is protected server-side too.
     canViewPO: hasPermission(PROCUREMENT_PERMISSIONS.PO_VIEW),
     canGeneratePO: hasPermission(PROCUREMENT_PERMISSIONS.PO_CREATE),
+
+    // ── Invoice Approval Workflow ──────────────────────────────────────────
+    // Configuring approval policies and department-approver mappings — gates the whole
+    // Approval Policies / Department Approvers tabs in System Configuration.
+    canManageApprovalPolicy: hasPermission(APPROVAL_PERMISSIONS.APPROVAL_POLICY_MANAGE),
+    // Moving an invoice into the approval workflow (POST .../send-for-approval).
+    canSendForApproval: hasPermission(APPROVAL_PERMISSIONS.INVOICE_SEND_FOR_APPROVAL),
+    // Seeing the approval status/timeline/history at all — held on its own by a pure viewer;
+    // an actual approver already has it implicitly via INVOICE_APPROVE/INVOICE_REJECT (the
+    // backend's GET .../approval endpoints accept any of the three, see
+    // constants/approvalPermissions.js's APPROVAL_ANY_VIEW_PERMISSIONS).
+    canViewInvoiceApproval: hasAnyPermission(APPROVAL_ANY_VIEW_PERMISSIONS),
+    // Holding this permission is necessary but not sufficient to approve/reject any given
+    // invoice — the backend alone determines whether the current user is an eligible approver
+    // for the invoice's active step. See InvoiceApprovalPanel for that check.
+    canApproveInvoice: hasPermission(APPROVAL_PERMISSIONS.INVOICE_APPROVE),
+    canRejectInvoice: hasPermission(APPROVAL_PERMISSIONS.INVOICE_REJECT),
+    // Returns the invoice to the AP Executive for correction (RETURNED_FOR_REVIEW) instead of
+    // approving/rejecting outright — same "necessary but not sufficient" caveat as
+    // canApproveInvoice/canRejectInvoice: the backend alone determines eligibility for the
+    // invoice's current active step.
+    canSendBackInvoice: hasPermission(APPROVAL_PERMISSIONS.INVOICE_SEND_BACK),
+    // The Activity/History tab — reuses every permission that already implies invoice
+    // visibility (see constants/approvalPermissions.js's INVOICE_HISTORY_VIEW_PERMISSIONS).
+    canViewInvoiceHistory: hasAnyPermission(INVOICE_HISTORY_VIEW_PERMISSIONS),
   };
 }

@@ -47,6 +47,9 @@ import PaymentDetailsPage from "./pages/accounts-payable/payment/pages/PaymentDe
 import APReportsPage from "./pages/accounts-payable/reports/pages/APReportsPage.jsx";
 import APSettingsPage from "./pages/accounts-payable/settings/pages/APSettingsPage.jsx";
 import SystemConfigurationPage from "./pages/accounts-payable/system-configuration/pages/SystemConfigurationPage.jsx";
+import ApprovalPolicyFormPage from "./pages/accounts-payable/system-configuration/pages/ApprovalPolicyFormPage.jsx";
+import { APPROVAL_PERMISSIONS } from "./pages/accounts-payable/constants/approvalPermissions";
+import { INVOICE_PERMISSIONS } from "./pages/accounts-payable/constants/invoicePermissions";
 import {
   PROCUREMENT_PERMISSIONS,
   PROCUREMENT_ANY_VIEW_PERMISSIONS,
@@ -300,6 +303,7 @@ import BillingDataAcquisition from "./pages/account_receivable/pages/BillingData
 import AcquisitionDetail from "./pages/account_receivable/pages/AcquisitionDetail.jsx";
 import TaxCalculationPage from "./pages/account_receivable/pages/TaxCalculation.jsx";
 import InvoiceGeneration from "./pages/account_receivable/pages/InvoiceGeneration.jsx";
+import InvoiceGenerationDetail from "./pages/account_receivable/pages/InvoiceGenerationDetail.jsx";
 import InvoiceApproval from "./pages/account_receivable/pages/InvoiceApproval.jsx";
 import InvoiceDetail from "./pages/account_receivable/pages/InvoiceDetail.jsx";
 import Configurations from "./pages/account_receivable/pages/Configurations.jsx";
@@ -317,8 +321,8 @@ import OnboardingSummaryPage from "./pages/employee-onboarding/summary-page/Summ
 
 
 
-const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { isAuthenticated, user, logout } = useAuth();
+const ProtectedRoute = ({ children, allowedRoles, requiredPermissions }) => {
+  const { isAuthenticated, user, logout, hasAnyPermission } = useAuth();
   const location = useLocation();
   const isfirsttlogin = localStorage.getItem("isfirsttlogin");
 
@@ -344,13 +348,23 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
       normalizedAllowedRoles.includes(role.toUpperCase())
     );
     // console.log("ProtectedRoute check:", {
-      // isAuthenticated,
-      // user,
-      // allowedRoles,
-      // match: hasRole,
+    // isAuthenticated,
+    // user,
+    // allowedRoles,
+    // match: hasRole,
     // });
 
     if (!hasRole) {
+      return <Navigate to="/unauthorized" replace />;
+    }
+  }
+
+  // ✅ Permission-based restriction check (any-of) — for modules where UMS permission codes are
+  // the source of truth instead of a frontend role list (e.g. Invoice Management: a pure
+  // Approver or Finance user need not hold any of Admin/AP_Executive/Finance_Executive to be
+  // let in). Independent of allowedRoles above — a route may use either, not necessarily both.
+  if (requiredPermissions && requiredPermissions.length > 0) {
+    if (!hasAnyPermission(requiredPermissions)) {
       return <Navigate to="/unauthorized" replace />;
     }
   }
@@ -440,6 +454,9 @@ const AppRoutes = () => {
       <Routes>
         {/* Public Route */}
         <Route path="/" element={<LoginPage />} />
+        {/* No page lives here — "/" is the login route. This exists so the
+            legacy navigate("/login") calls don't render a blank screen. */}
+        <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="/register" element={<Register />} />
         {/* Fully public, unauthenticated — no session, no app shell. See
             src/pages/public/InterviewFeedbackFormPage.jsx. */}
@@ -513,7 +530,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.INVOICE_UPLOAD}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <InvoiceUploadPage />
               </ProtectedRoute>
             }
@@ -521,7 +538,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.INVOICE_OCR_REVIEW}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <InvoiceOcrReviewQueuePage />
               </ProtectedRoute>
             }
@@ -529,7 +546,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.INVOICE_VALIDATION}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <InvoiceValidationQueuePage />
               </ProtectedRoute>
             }
@@ -537,7 +554,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.INVOICE_LIST}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <InvoiceListPage />
               </ProtectedRoute>
             }
@@ -545,7 +562,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.INVOICE_DETAIL()}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <InvoiceDetailPage />
               </ProtectedRoute>
             }
@@ -553,7 +570,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.PAYMENT_QUEUE}
             element={
-              <ProtectedRoute allowedRoles={["AP_Executive", "Admin", "Super_Admin"]}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <PaymentQueuePage />
               </ProtectedRoute>
             }
@@ -561,7 +578,7 @@ const AppRoutes = () => {
           {/* <Route
             path={AP_ROUTES.PAYMENT_QUEUE_DETAIL()}
             element={
-              <ProtectedRoute allowedRoles={["AP_Executive", "Admin", "Super_Admin"]}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <PaymentDetailsPage />
               </ProtectedRoute>
             }
@@ -569,7 +586,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.PAYMENT_READY}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <PaymentReadyPage />
               </ProtectedRoute>
             }
@@ -577,7 +594,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.PAYMENT_HISTORY}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <PaymentHistoryPage />
               </ProtectedRoute>
             }
@@ -585,7 +602,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.PAYMENT_MARK_PAID()}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <PaymentMarkAsPaidPage />
               </ProtectedRoute>
             }
@@ -611,6 +628,22 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
                 <SystemConfigurationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.SYSTEM_CONFIG_APPROVAL_POLICY_NEW}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} permission={APPROVAL_PERMISSIONS.APPROVAL_POLICY_MANAGE}>
+                <ApprovalPolicyFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.SYSTEM_CONFIG_APPROVAL_POLICY_EDIT()}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} permission={APPROVAL_PERMISSIONS.APPROVAL_POLICY_MANAGE}>
+                <ApprovalPolicyFormPage />
               </ProtectedRoute>
             }
           />
@@ -719,7 +752,7 @@ const AppRoutes = () => {
             />
             <Route
               path="billing-data-acquisition"
-              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><BillingDataAcquisition /></ProtectedRoute>}
+              element={<Navigate to="/account-receivable/billing-data-acquisition/workspace" replace />}
             />
             <Route
               path="billing-data-acquisition/workspace"
@@ -742,8 +775,16 @@ const AppRoutes = () => {
               element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxCalculationPage /></ProtectedRoute>}
             />
             <Route
+              path="tax-calculation/occurrence/:occurrenceId"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxCalculationPage /></ProtectedRoute>}
+            />
+            <Route
               path="invoice-generation"
               element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><InvoiceGeneration /></ProtectedRoute>}
+            />
+            <Route
+              path="invoice-generation/:snapshotId"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><InvoiceGenerationDetail /></ProtectedRoute>}
             />
             <Route
               path="invoice-approval"
@@ -1654,9 +1695,12 @@ const AppRoutes = () => {
           <Route path="/expense-management/approval-rules/department-approvers" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsDepartmentApproversPage /></ProtectedRoute>} />
           <Route path="/expense-management/approval-rules/delegations" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsDelegationsPage /></ProtectedRoute>} />
 
-          <Route path="/expense-management/finance/verification" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsVerificationPage /></ProtectedRoute>} />
-          <Route path="/expense-management/finance/reimbursements" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsReimbursementsPage /></ProtectedRoute>} />
-          <Route path="/expense-management/finance/payment-status" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsPaymentStatusPage /></ProtectedRoute>} />
+          {/* FinanceVerificationController's @PreAuthorize requires exactly FINANCE_EXECUTIVE —
+              the generic "Finance" role passes this route gate but then 403s on every API call,
+              so it's deliberately excluded here (see sidebarConfig.js's XMS_FINANCE_VERIFICATION). */}
+          <Route path="/expense-management/finance/verification" element={<ProtectedRoute allowedRoles={["Finance_Executive"]}><XmsVerificationPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/reimbursements" element={<ProtectedRoute allowedRoles={["Finance_Executive"]}><XmsReimbursementsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/finance/payment-status" element={<ProtectedRoute allowedRoles={["Finance_Executive"]}><XmsPaymentStatusPage /></ProtectedRoute>} />
           <Route path="/expense-management/ap-payments/queue" element={<ProtectedRoute allowedRoles={["AP_Executive"]}><XmsApPaymentQueuePage /></ProtectedRoute>} />
 
           <Route path="/expense-management/client-billing/billable-expenses" element={<ProtectedRoute allowedRoles={["Finance", "Finance_Executive"]}><XmsBillableExpensesPage /></ProtectedRoute>} />

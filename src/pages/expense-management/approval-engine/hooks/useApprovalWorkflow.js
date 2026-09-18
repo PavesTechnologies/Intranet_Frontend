@@ -100,6 +100,17 @@ export const useReviewLineItem = () => {
   });
 };
 
+export const useReviewSplit = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reportId, splitId, decision, comment }) =>
+      approvalWorkflowApi.reviewSplit(reportId, splitId, decision, comment).then(unwrap),
+    // Same rationale as useReviewLineItem: refresh on failure too, since a rejection here usually
+    // means the row shown was already stale (level moved on since the queue was last fetched).
+    onSettled: (_data, _err, { reportId }) => invalidateApprovalCaches(qc, reportId),
+  });
+};
+
 export const useRejectReport = () => {
   const qc = useQueryClient();
   return useMutation({
