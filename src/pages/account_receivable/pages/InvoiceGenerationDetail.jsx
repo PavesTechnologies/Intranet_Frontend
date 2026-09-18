@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Send,
   Eye,
+  MailCheck,
 } from "lucide-react";
 
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
@@ -17,8 +18,10 @@ import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
 import StatusBadge from "../../../components/status/statusbadge";
 import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
+import Modal from "../../../components/Modal/modal";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { formatCurrency, formatDisplayDate } from "../utils/format";
+import InvoiceDocument from "../components/invoice/InvoiceDocument";
 
 import {
   getTaxCalculation,
@@ -44,20 +47,29 @@ import {
   DEMO_PROJECT,
   DEMO_TAX_CONTEXT,
   DEMO_TERMS,
+  DEMO_DELIVERY_STATUS,
+  DEMO_SENT_BY,
+  getDemoDelivery,
+  saveDemoDelivery,
 } from "../utils/invoiceDemoData";
 
 const INVOICE_WORKSPACE_PATH = "/account-receivable/invoice-generation";
 const INVOICE_APPROVAL_PATH = "/account-receivable/invoice-approval";
 
 
-function Field({ label, children }) {
+function Field({
+  label,
+  children,
+  truncate = true,
+  className = "",
+}) {
   return (
-    <div>
+    <div className={className}>
       <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
         {label}
       </span>
       <span
-        className="mt-0.5 block truncate text-sm font-semibold text-slate-800"
+        className={`mt-0.5 block text-sm font-semibold text-slate-800 ${truncate ? "truncate" : "whitespace-nowrap"}`}
         title={typeof children === "string" ? children : undefined}
       >
         {children || "—"}
@@ -85,6 +97,23 @@ export default function InvoiceGenerationDetail() {
   const [invoice, setInvoice] = useState(null);
   const [snapshotData, setSnapshotData] = useState(passedState.config || null);
   const [items, setItems] = useState([]);
+
+  // Preview Modal & Delivery workflow states
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [deliveryState, setDeliveryState] = useState(() => ({
+    deliveryStatus: DEMO_DELIVERY_STATUS.NOT_SENT,
+    sentAt: null,
+    sentBy: null,
+  }));
+  const [sendingToClient, setSendingToClient] = useState(false);
+
+  // Sync demo delivery status whenever invoiceId is known
+  useEffect(() => {
+    if (invoice?.invoiceId) {
+      const stored = getDemoDelivery(invoice.invoiceId);
+      setDeliveryState(stored);
+    }
+  }, [invoice?.invoiceId]);
 
   const loadData = async (isManual = false) => {
     if (!snapshotId) {
@@ -266,16 +295,33 @@ export default function InvoiceGenerationDetail() {
     try {
       const updated = await submitInvoiceForApproval(invoice.invoiceId);
       showStatusToast("Invoice submitted for approval successfully.", "success");
-      if (updated) {
-        setInvoice((prev) => ({
-          ...prev,
-          invoiceStatus: updated.invoiceStatus || "PENDING_APPROVAL",
-        }));
-      } else {
-        setInvoice((prev) => ({
-          ...prev,
-          invoiceStatus: "PENDING_APPROVAL",
-        }));
+
+      // Authoritative reload of invoice from backend
+      try {
+        const refreshed = await getInvoice(snapshotId);
+        if (refreshed && (refreshed.invoiceId || refreshed.invoiceNumber)) {
+          setInvoice(refreshed);
+          if (Array.isArray(refreshed.items) && refreshed.items.length > 0) {
+            setItems(refreshed.items);
+          }
+        } else if (updated) {
+          setInvoice((prev) => ({
+            ...prev,
+            invoiceStatus: updated.invoiceStatus || "PENDING_APPROVAL",
+          }));
+        }
+      } catch {
+        if (updated) {
+          setInvoice((prev) => ({
+            ...prev,
+            invoiceStatus: updated.invoiceStatus || "PENDING_APPROVAL",
+          }));
+        } else {
+          setInvoice((prev) => ({
+            ...prev,
+            invoiceStatus: "PENDING_APPROVAL",
+          }));
+        }
       }
     } catch (err) {
       console.error("[InvoiceGenerationDetail] Error submitting for approval:", err);
@@ -284,6 +330,26 @@ export default function InvoiceGenerationDetail() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Demo Send to Client action (when invoice is APPROVED)
+  const handleSendToClient = () => {
+    if (!invoice?.invoiceId || sendingToClient) return;
+    setSendingToClient(true);
+    setTimeout(() => {
+      const entry = {
+        deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT,
+        sentAt: new Date().toISOString(),
+        sentBy: DEMO_SENT_BY,
+      };
+      saveDemoDelivery(invoice.invoiceId, entry);
+      setDeliveryState(entry);
+      setSendingToClient(false);
+      showStatusToast(
+        `Invoice ${invoice.invoiceNumber || invoice.invoiceId} marked as sent to client.`,
+        "success"
+      );
+    }, 600);
   };
 
   if (loading && !refreshing) {
@@ -488,10 +554,10 @@ export default function InvoiceGenerationDetail() {
             <Button
               variant="outline"
               size="small"
-              onClick={() => navigate(`/account-receivable/invoices/${snapshotId}`)}
+              onClick={() => setIsPreviewModalOpen(true)}
               className="bg-white text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 text-xs"
             >
-              <Eye className="h-3.5 w-3.5" /> View Invoice Details
+              <Eye className="h-3.5 w-3.5" /> Preview Invoice
             </Button>
           </div>
         </div>
@@ -545,13 +611,15 @@ export default function InvoiceGenerationDetail() {
               <StatusBadge label={invoiceStatus} size="sm" />
             )}
           </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-            <Field label="Project">{projectName}</Field>
-            <Field label="Project Code">{projectCode}</Field>
-            <Field label="Client">{clientName}</Field>
-            <Field label="Billing Period">{billingPeriod}</Field>
-            <Field label="Currency">{currency}</Field>
-            <Field label="Payment Terms">{paymentTerms}</Field>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-12">
+            <Field label="Project" className="lg:col-span-2">{projectName}</Field>
+            <Field label="Project Code" className="lg:col-span-2">{projectCode}</Field>
+            <Field label="Client" className="lg:col-span-2">{clientName}</Field>
+            <Field label="Billing Period" className="lg:col-span-3" truncate={false}>
+              {billingPeriod}
+            </Field>
+            <Field label="Currency" className="lg:col-span-1">{currency}</Field>
+            <Field label="Payment Terms" className="lg:col-span-2">{paymentTerms}</Field>
           </div>
 
           {isInvoiceGenerated && (
@@ -673,6 +741,17 @@ export default function InvoiceGenerationDetail() {
           </div>
 
           <div className="flex items-center gap-2">
+            {isInvoiceGenerated && (
+              <Button
+                variant="outline"
+                size="small"
+                onClick={() => setIsPreviewModalOpen(true)}
+                className="bg-white text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 text-xs font-semibold px-4 py-2"
+              >
+                <Eye className="h-3.5 w-3.5" /> Preview Invoice
+              </Button>
+            )}
+
             {!isInvoiceGenerated ? (
               <Button
                 variant="primary"
@@ -722,6 +801,89 @@ export default function InvoiceGenerationDetail() {
           </div>
         </div>
       </PageCard>
+
+      {/* Full-Screen/Large Invoice Preview Modal With Workflow Actions */}
+      <Modal
+        isOpen={isPreviewModalOpen}
+        onClose={() => setIsPreviewModalOpen(false)}
+        title="Preview Invoice"
+        subtitle="Review invoice details and submit for approval"
+        className="w-[92vw] max-w-[1000px]"
+        maxHeight="max-h-[90vh]"
+        scrollable={true}
+        bodyClassName="p-4 sm:p-5 bg-slate-100/60"
+        footerClassName="p-4 sm:p-5 bg-white border-t border-slate-200"
+        footer={
+          <div className="flex flex-wrap items-center justify-end gap-3 w-full">
+              <Button
+                variant="outline"
+                size="small"
+                onClick={() => setIsPreviewModalOpen(false)}
+                className="text-xs text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 px-4 py-2"
+              >
+                Close
+              </Button>
+
+              {invoiceStatus === "GENERATED" && (
+                <Button
+                  variant="primary"
+                  size="small"
+                  onClick={handleSubmitForApproval}
+                  disabled={submitting}
+                  className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold shadow-sm px-4 py-2"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-3.5 w-3.5" /> Submit for Approval
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {invoiceStatus === "APPROVED" && (
+                <Button
+                  variant="primary"
+                  size="small"
+                  onClick={handleSendToClient}
+                  disabled={
+                    sendingToClient ||
+                    deliveryState?.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
+                  }
+                  className={`${
+                    deliveryState?.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
+                      ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                      : "bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm"
+                  } flex items-center gap-1.5 text-xs font-semibold px-4 py-2`}
+                >
+                  {sendingToClient ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending...
+                    </>
+                  ) : (
+                    <>
+                      <MailCheck className="h-3.5 w-3.5" />
+                      {deliveryState?.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
+                        ? "Sent to Client"
+                        : "Send to Client"}
+                    </>
+                  )}
+                </Button>
+              )}
+          </div>
+        }
+      >
+        <InvoiceDocument
+          invoice={invoice}
+          snapshotId={snapshotId}
+          deliveryState={deliveryState}
+          taxCalc={taxCalc}
+          snapshotData={snapshotData}
+        />
+      </Modal>
     </div>
   );
 }
