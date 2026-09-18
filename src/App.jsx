@@ -150,10 +150,9 @@ import ResumeIntakePage from "./pages/airs/resume-intake/ResumeIntakePage.jsx";
 import IntakeFlowPage from "./pages/airs/resume-intake/intake/IntakeFlowPage.jsx";
 import ReviewPage from "./pages/airs/resume-intake/intake/ReviewPage.jsx";
 import CandidateScorePage from "./pages/airs/candidates/CandidateScore/CandidateScorePage.jsx";
-import InterviewQueuePage from "./pages/airs/interview-queue/InterviewQueuePage.jsx";
+import HMReviewPage from "./pages/airs/hm-review/HMReviewPage.jsx";
 import InterviewCalendarPage from "./pages/airs/interview-calendar/InterviewCalendarPage.jsx";
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
-import GlobalCandidatesPage from "./pages/airs/global-candidates/GlobalCandidatesPage.jsx";
 import PipelineCandidateScorecardPage from "./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
 import TalentPoolCandidateProfilePage from "./pages/airs/talent-pool/profile/TalentPoolCandidateProfilePage.jsx";
@@ -404,6 +403,19 @@ const RoleOffEntry = () => {
   }
 
   return <Navigate to="/resource-management/roleoff/pm" replace />;
+};
+
+// AIRS routes were renamed /airs/* -> /ai-screening/*. Old links (bookmarks,
+// open tabs, anything shared before the rename) still point at /airs/*, so
+// they're redirected instead of falling through to "no routes matched".
+const LegacyAirsRedirect = () => {
+  const { pathname, search, hash } = useLocation();
+  return (
+    <Navigate
+      to={`${pathname.replace("/airs", "/ai-screening")}${search}${hash}`}
+      replace
+    />
+  );
 };
 
 // ✅ Application Routes
@@ -1501,10 +1513,10 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/ai-screening/interview-queue"
+            path="/ai-screening/hm-review"
             element={
               <ProtectedRoute allowedRoles={["HIRING_MANAGER"]}>
-                <InterviewQueuePage />
+                <HMReviewPage />
               </ProtectedRoute>
             }
           />
@@ -1521,17 +1533,6 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <PipelineCandidateScorecardPage />
-              </ProtectedRoute>
-            }
-          />
-          {/* Global Candidate Directory (GET /candidates). HR_ADMIN only,
-              matching the backend's require_roles(UserRole.HR_ADMIN) on this
-              endpoint. */}
-          <Route
-            path="/ai-screening/global-candidates"
-            element={
-              <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
-                <GlobalCandidatesPage />
               </ProtectedRoute>
             }
           />
@@ -1614,6 +1615,9 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+
+          {/* Legacy /airs/* links -> the current /ai-screening/* paths. */}
+          <Route path="/airs/*" element={<LegacyAirsRedirect />} />
 
           {/* employee exit routes*/}
 

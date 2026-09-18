@@ -96,6 +96,7 @@ export default function JdDetails() {
   const { hasRole } = useAuth();
   const isHRAdmin = hasRole(["HR_ADMIN"]);
   const isRecruiter = hasRole(["RECRUITER"]);
+  const isHiringManager = hasRole(["HIRING_MANAGER"]);
   const canViewPipeline = hasRole(["HR_ADMIN", "RECRUITER"]);
 
   const jd = jds.find((j) => j.id === id);
@@ -1007,8 +1008,8 @@ export default function JdDetails() {
           { id: "extracted_json", label: "Extracted JSON" },
           { id: "jd_skills", label: "JD Skill" },
           { id: "jd_unknown_skills", label: "JD Unknown Skills" },
-          // RECRUITER doesn't get the Campaigns tab here.
-          { id: "campaigns", label: "Campaigns", show: !isRecruiter },
+          // RECRUITER and HIRING_MANAGER don't get the Campaigns tab here.
+          { id: "campaigns", label: "Campaigns", show: !isRecruiter && !isHiringManager },
           { id: "versions", label: "Version History" },
         ].filter((t) => t.show !== false).map((t) => (
           <button
@@ -1307,7 +1308,7 @@ export default function JdDetails() {
       )}
 
       {/* --- CAMPAIGNS TAB --- */}
-      {activeTab === "campaigns" && !isRecruiter && (
+      {activeTab === "campaigns" && !isRecruiter && !isHiringManager && (
         <div className="space-y-6">
           {/* Header row */}
           <div className="flex justify-between items-center bg-slate-50/50 p-5 rounded-xl border border-slate-200">

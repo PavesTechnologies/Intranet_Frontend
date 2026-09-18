@@ -152,12 +152,8 @@ const interviewCalendarItem = { label: "Interview Calendar", to: "/ai-screening/
 
 // HR_ADMIN gets a trimmed-down AIRS menu — only these items, plus
 // Prompt Templates below (HR_ADMIN-only, not part of the general airsSubmenu).
-// "Candidates" here is deliberately its own entry (not filtered in from
-// airsSubmenu above) — it points at the HR_ADMIN-only Global Candidate
-// Directory (/ai-screening/global-candidates, GET /candidates).
 const hrAdminAirsSubmenu = [
   ...airsSubmenu.filter((item) => ["Dashboard", "JD Management", "Campaigns", "Pipeline"].includes(item.label)),
-  { label: "Candidates", to: "/ai-screening/global-candidates" },
   ...airsSubmenu.filter((item) => ["Talent Pool", "Skill Ontology"].includes(item.label)),
   interviewCalendarItem,
   { label: "Prompt Templates", to: "/ai-screening/prompt-templates" },
@@ -175,8 +171,8 @@ const recruiterAirsSubmenu = [
 const hiringManagerAirsSubmenu = [
   ...airsSubmenu.filter((item) => ["Campaigns", "Pipeline"].includes(item.label)),
   interviewCalendarItem,
-  // /ai-screening/interview-queue is HIRING_MANAGER-only (see App.jsx ProtectedRoute).
-  { label: "Candidate Review", to: "/ai-screening/interview-queue" },
+  // /ai-screening/hm-review is HIRING_MANAGER-only (see App.jsx ProtectedRoute).
+  { label: "HM Review", to: "/ai-screening/hm-review" },
 ];
 
 

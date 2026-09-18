@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom"
 import { toast } from "react-toastify";
 import {
   ArrowLeft, Users, Activity, AlertTriangle, Lock, Target,
-  UserCog, FileText, ArrowRight, Filter, ChevronDown, Clock,
+  UserCog, FileText, Filter, ChevronDown, Clock,
   ExternalLink, ListChecks,
   RotateCcw, Inbox, Hourglass, PieChart, CheckCircle2, XCircle, ServerCrash,
   Send, Flag, SkipForward, Lightbulb, FileUp, AlertOctagon,
@@ -62,7 +62,6 @@ export default function CampaignDetails() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { canManageCampaigns, canViewPipeline, canViewTimeline, canViewCampaigns, isHiringManager, isRecruiter } = useCampaignPermissions();
-  const canReviewInterviews = isHiringManager;
 
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -247,8 +246,6 @@ export default function CampaignDetails() {
           campaignId={id}
           isActive={isActive}
           canViewTiming={canViewTimeline}
-          canReviewInterviews={canReviewInterviews}
-          onReviewInterviews={() => navigate(`/ai-screening/interview-queue?campaign=${id}`)}
           onStageClick={(stage) => {
             setCandidateStageFilter(stage);
             setActiveTab("candidates");
@@ -557,6 +554,8 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const [sendingBulkRejectionEmail, setSendingBulkRejectionEmail] = useState(false);
   const { hasRole } = useAuth();
   const canAct = hasRole(["HR_ADMIN", "RECRUITER"]);
+  const isHrAdmin = hasRole(["HR_ADMIN"]);
+  const isHiringManager = hasRole(["HIRING_MANAGER"]);
 
   useEffect(() => {
     let cancelled = false;
@@ -757,7 +756,9 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
       <CandidateTable
         candidates={pageItems}
         onView={(c) => navigate(`/ai-screening/candidates/${c.id}`, { state: { candidate: c, campaignId } })}
+        onDeleted={() => setReloadKey((k) => k + 1)}
         showViewButton={false}
+        showActionsColumn={!isHiringManager}
         selectable={canAct}
         selectedIds={selectedIds}
         noteCounts={noteCounts}
@@ -773,11 +774,15 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
         })}
         renderExtraActions={canAct ? (c) => (
           <>
-            <button type="button" title="Move to another stage"
-              onClick={(e) => { e.stopPropagation(); setAction({ kind: "move", candidate: c }); }}
-              className="h-8 w-8 inline-flex items-center justify-center text-slate-400 hover:text-indigo-600">
-              <ArrowRightLeft className="h-4 w-4" />
-            </button>
+            {/* Stage moves are the recruiter's call — HR_ADMIN administers the
+                campaign but doesn't walk candidates through the pipeline. */}
+            {!isHrAdmin && (
+              <button type="button" title="Move to another stage"
+                onClick={(e) => { e.stopPropagation(); setAction({ kind: "move", candidate: c }); }}
+                className="h-8 w-8 inline-flex items-center justify-center text-slate-400 hover:text-indigo-600">
+                <ArrowRightLeft className="h-4 w-4" />
+              </button>
+            )}
             {(c.stage || "").toUpperCase() !== "REJECTED" && (
               <button type="button" title="Reject with a reason"
                 onClick={(e) => { e.stopPropagation(); setAction({ kind: "reject", candidate: c }); }}
@@ -813,7 +818,7 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
 }
 
 /* ---------------- Pipeline Tab ---------------- */
-function PipelineTab({ campaignId, isActive, onReviewInterviews, onStageClick, canViewTiming, canReviewInterviews }) {
+function PipelineTab({ campaignId, isActive, onStageClick, canViewTiming }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   // HR_ADMIN-only overlay, fetched lazily on first toggle so
@@ -877,11 +882,6 @@ function PipelineTab({ campaignId, isActive, onReviewInterviews, onStageClick, c
               <Clock className="h-3.5 w-3.5" /> {showTiming ? "Hide" : "Show"} Timing
             </Button>
           )} */}
-          {canReviewInterviews && (
-            <Button size="small" variant="outline" onClick={onReviewInterviews}>
-              Review Interviews <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-          )}
         </div>
       </div>
 

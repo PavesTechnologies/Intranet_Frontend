@@ -1,13 +1,12 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRightCircle, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowRightLeft, Ban } from "lucide-react";
 import GenericTable from "@/components/Table/table";
-import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { renderStageBadge } from "../../candidates/utils/candidateUtils.jsx";
 import EmptyState from "./EmptyState";
 
-export default function QueueTable({ candidates, isLoading, permissions, campaignId, onAdvance, onSelect, onReject }) {
+export default function QueueTable({ candidates, isLoading, permissions, campaignId, onMove, onReject }) {
   const navigate = useNavigate();
   if (isLoading) {
     return (
@@ -42,20 +41,25 @@ export default function QueueTable({ candidates, isLoading, permissions, campaig
     score: <span className="font-semibold text-slate-900">{c.composite}</span>,
     actions: (
       <div className="flex items-center justify-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-        {c.stage === "HM_REVIEW" && permissions.canAdvanceToInterview && (
-          <Button variant="outline" size="small" onClick={() => onAdvance(c)}>
-            <ArrowRightCircle className="h-3.5 w-3.5" /> Advance to Interview
-          </Button>
+        {permissions.canMoveCandidate && (
+          <button
+            type="button"
+            title="Move to another stage"
+            onClick={() => onMove(c)}
+            className="h-8 w-8 inline-flex items-center justify-center text-slate-400 hover:text-indigo-600"
+          >
+            <ArrowRightLeft className="h-4 w-4" />
+          </button>
         )}
-        {c.stage === "INTERVIEW" && permissions.canSelectCandidate && (
-          <Button variant="outline" size="small" onClick={() => onSelect(c)}>
-            <CheckCircle2 className="h-3.5 w-3.5" /> Select
-          </Button>
-        )}
-        {c.stage === "INTERVIEW" && permissions.canRejectAtInterview && (
-          <Button variant="danger" size="small" onClick={() => onReject(c)}>
-            <XCircle className="h-3.5 w-3.5" /> Reject
-          </Button>
+        {permissions.canRejectCandidate && (
+          <button
+            type="button"
+            title="Reject with a reason"
+            onClick={() => onReject(c)}
+            className="h-8 w-8 inline-flex items-center justify-center text-slate-400 hover:text-red-600"
+          >
+            <Ban className="h-4 w-4" />
+          </button>
         )}
       </div>
     ),

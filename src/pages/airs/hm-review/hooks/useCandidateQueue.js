@@ -4,20 +4,20 @@ import { mapCampaignCandidateList } from "../../candidates/utils/mapCampaignCand
 import { filterCandidates, paginate } from "../../candidates/utils/candidateUtils.jsx";
 import { CANDIDATE_PAGE_SIZE } from "../../candidates/constants/candidateConstants";
 
-// Candidates this queue ever shows — everything else (SCREENING, SELECTED,
-// REJECTED, ...) is out of scope for an HM review/interview queue.
-const QUEUE_STAGES = ["HM_REVIEW", "INTERVIEW"];
+// This page is scoped to HM Review only — a candidate who's moved on
+// (Interview, Selected, Rejected, ...) is out of scope and drops out of the
+// list rather than staying visible read-only.
+const QUEUE_STAGE = "HM_REVIEW";
 
 // Same shape as useCandidateRanking — getCampaignCandidates returns a whole
 // campaign's candidate list in one call, so there's no per-filter round
-// trip to debounce; search/stage filtering/pagination all happen
-// client-side against that one fetch.
+// trip to debounce; search/pagination all happen client-side against that
+// one fetch.
 export default function useCandidateQueue(campaignId) {
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
-  const [stageFilter, setStageFilter] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
 
   const fetchCandidates = useCallback(async () => {
@@ -35,7 +35,7 @@ export default function useCandidateQueue(campaignId) {
       // unwrap one level for the envelope, then again for the paginated list.
       const data = response && response.data !== undefined ? response.data : response;
       const list = Array.isArray(data) ? data : data?.items || [];
-      const mapped = mapCampaignCandidateList(list).filter((c) => QUEUE_STAGES.includes(c.stage));
+      const mapped = mapCampaignCandidateList(list).filter((c) => c.stage === QUEUE_STAGE);
       setCandidates(mapped);
     } catch (err) {
       setError(err);
@@ -51,11 +51,11 @@ export default function useCandidateQueue(campaignId) {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, stageFilter]);
+  }, [search]);
 
   const filtered = useMemo(
-    () => filterCandidates(candidates, { search, stage: stageFilter }),
-    [candidates, search, stageFilter]
+    () => filterCandidates(candidates, { search }),
+    [candidates, search]
   );
 
   const { pageItems, totalPages, currentPage: safePage } = useMemo(
@@ -63,15 +63,10 @@ export default function useCandidateQueue(campaignId) {
     [filtered, currentPage]
   );
 
-  // A successful advance/select/reject moves a candidate's stage — apply
-  // that locally instead of refetching. If the new stage falls outside the
-  // queue's own scope (SELECTED/REJECTED), the row simply drops out of it.
-  const applyStageChange = useCallback((campaignCandidateId, nextStage) => {
-    setCandidates((prev) =>
-      QUEUE_STAGES.includes(nextStage)
-        ? prev.map((c) => (c.id === campaignCandidateId ? { ...c, stage: nextStage } : c))
-        : prev.filter((c) => c.id !== campaignCandidateId)
-    );
+  // A successful move/reject takes a candidate out of HM Review — drop the
+  // row locally instead of refetching.
+  const removeCandidate = useCallback((campaignCandidateId) => {
+    setCandidates((prev) => prev.filter((c) => c.id !== campaignCandidateId));
   }, []);
 
   return {
@@ -79,14 +74,12 @@ export default function useCandidateQueue(campaignId) {
     totalResults: filtered.length,
     search,
     setSearch,
-    stageFilter,
-    setStageFilter,
     currentPage: safePage,
     setCurrentPage,
     totalPages,
     loading,
     error,
     refetch: fetchCandidates,
-    applyStageChange,
+    removeCandidate,
   };
 }
