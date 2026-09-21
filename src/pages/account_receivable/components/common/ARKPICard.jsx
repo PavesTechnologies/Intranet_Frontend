@@ -17,7 +17,7 @@ export default function ARKPICard({
       onClick={onClick}
       className={cn(
         "flex items-center gap-3 rounded-xl border bg-card p-4 text-left transition-all",
-        active ? "ring-2 ring-primary bg-primary/5 border-primary/20" : "",
+        active ? "" : "",
         className
       )}
     >

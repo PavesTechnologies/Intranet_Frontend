@@ -86,6 +86,39 @@ sendRfq: async (rfqId, vendorIds) => {
     const res = await api.get(`${BASE}/${rfqId}/quotations`, { headers: authHeaders() });
     return res.data;
   },
+
+  // ── RFQ Eligibility ───────────────────────────────────────────────────────
+  // Whether a vendor may take part in a PR's RFQ is decided entirely by
+  // Backend/Business_Layer/services/rfq_eligibility_service.py (PR / VENDOR / ONBOARDING /
+  // PRE_SCREEN / NDA gates). RFQService.require_eligible re-runs the same check server-side,
+  // so these calls are for showing the reason, never for enforcing the rule.
+
+  /**
+   * GET /apm/rfq/eligibility?pr_id=&vendor_id=
+   * @returns {Promise<{pr_id:number, vendor_id:number, eligible:boolean, reason:string|null,
+   *   checks:{check:string, status:string, passed:boolean, message:string|null}[],
+   *   failed_checks:{check:string, status:string, passed:boolean, message:string|null}[]}>}
+   */
+  getRfqEligibility: async (prId, vendorId) => {
+    const res = await api.get(`${BASE}/eligibility`, {
+      params: { pr_id: prId, vendor_id: vendorId },
+      headers: authHeaders(),
+    });
+    return res.data;
+  },
+
+  /**
+   * POST /apm/rfq/eligibility/check — one call for a whole vendor list.
+   * @returns {Promise<{pr_id:number, results:object[]}>}
+   */
+  checkRfqEligibility: async (prId, vendorIds) => {
+    const res = await api.post(
+      `${BASE}/eligibility/check`,
+      { pr_id: Number(prId), vendor_ids: vendorIds.map(Number) },
+      { headers: authHeaders() },
+    );
+    return res.data;
+  },
 };
 
 export default rfqService;

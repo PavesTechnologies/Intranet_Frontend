@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   FileText,
   ShieldCheck,
@@ -18,6 +18,7 @@ import {
   XCircle,
   Edit3,
   Save,
+  MailCheck,
 } from "lucide-react";
 
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
@@ -35,10 +36,23 @@ import {
   rejectInvoice,
   refreshInvoiceAfterCorrection,
   correctNonFinancialInvoice,
+  financialCorrectionReacquire,
   getInvoiceApprovalHistory,
   getInvoiceErrorMessage,
 } from "../services/invoiceService";
 import { formatBillingPeriod } from "../services/billingDataAcquisitionService";
+import {
+  DEMO_SELLER,
+  DEMO_CLIENT,
+  DEMO_PROJECT,
+  DEMO_TAX_CONTEXT,
+  DEMO_TERMS,
+  DEMO_DELIVERY_STATUS,
+  DEMO_SENT_BY,
+  getDemoDelivery,
+  saveDemoDelivery,
+} from "../utils/invoiceDemoData";
+import InvoiceDocument from "../components/invoice/InvoiceDocument";
 
 const TAX_WORKSPACE_PATH = "/account-receivable/tax-calculation";
 const INVOICE_WORKSPACE_PATH = "/account-receivable/invoice-generation";
@@ -89,8 +103,27 @@ function Field({ label, children, emptyLabel = "Not provided" }) {
 }
 
 export default function InvoiceDetail() {
-  const { snapshotId } = useParams();
+  const { snapshotId, occurrenceId: paramOccurrenceId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  const effectiveId =
+    snapshotId ||
+    paramOccurrenceId ||
+    location.state?.occurrenceId ||
+    location.state?.billingScheduleId ||
+    location.state?.invoiceId ||
+    "";
+
+  // Source tracking: determines if invoice is being inspected from Tax Calculation vs Invoice Generation
+  const source =
+    searchParams.get("source") ||
+    searchParams.get("from") ||
+    location.state?.from ||
+    location.state?.source ||
+    "";
+  const isFromTaxCalculation = source === "tax-calculation";
 
   const [invoice, setInvoice] = useState(null);
   const [approvalHistory, setApprovalHistory] = useState([]);
@@ -108,6 +141,22 @@ export default function InvoiceDetail() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejectError, setRejectError] = useState("");
 
+  const isOccurrenceMode = Boolean(
+    paramOccurrenceId ||
+    invoice?.billingScheduleId ||
+    location.state?.occurrenceId ||
+    location.state?.billingScheduleId ||
+    location.pathname.includes("/occurrence/")
+  );
+
+  const backToTaxUrl = isOccurrenceMode
+    ? (paramOccurrenceId || invoice?.billingScheduleId || location.state?.occurrenceId || location.state?.billingScheduleId
+        ? `/account-receivable/tax-calculation/occurrence/${paramOccurrenceId || invoice?.billingScheduleId || location.state?.occurrenceId || location.state?.billingScheduleId}`
+        : TAX_WORKSPACE_PATH)
+    : (snapshotId
+        ? `/account-receivable/tax-calculation/${snapshotId}`
+        : TAX_WORKSPACE_PATH);
+
   // Phase 2C Non-Financial Correction state
   const [editClientName, setEditClientName] = useState("");
   const [editProjectName, setEditProjectName] = useState("");
@@ -115,6 +164,19 @@ export default function InvoiceDetail() {
   const [projectNameError, setProjectNameError] = useState("");
   const [savingCorrection, setSavingCorrection] = useState(false);
   const [isEditingCorrection, setIsEditingCorrection] = useState(false);
+
+  // Phase 2B Financial Correction state
+  const [isReacquireModalOpen, setIsReacquireModalOpen] = useState(false);
+  const [reacquiring, setReacquiring] = useState(false);
+
+  // Demo: Send to Client delivery state (separate from invoice approval status)
+  const [isSendToClientOpen, setIsSendToClientOpen] = useState(false);
+  const [sendingToClient, setSendingToClient] = useState(false);
+  const [deliveryState, setDeliveryState] = useState({
+    deliveryStatus: DEMO_DELIVERY_STATUS.NOT_SENT,
+    sentAt: null,
+    sentBy: null,
+  });
 
   const latestRejectionReason = useMemo(() => {
     if (invoice?.rejectionReason) return invoice.rejectionReason;
@@ -141,8 +203,8 @@ export default function InvoiceDetail() {
   };
 
   const loadInvoice = async (isManual = false) => {
-    if (!snapshotId) {
-      setErrorMsg("No Billing Snapshot identifier provided.");
+    if (!effectiveId) {
+      setErrorMsg("No invoice identifier provided.");
       setLoading(false);
       return;
     }
@@ -152,7 +214,7 @@ export default function InvoiceDetail() {
     setErrorMsg("");
 
     try {
-      const data = await getInvoice(snapshotId);
+      const data = await getInvoice(effectiveId);
       if (data) {
         setInvoice(data);
         if (data.invoiceId) {
@@ -178,6 +240,10 @@ export default function InvoiceDetail() {
       setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    loadInvoice();
+  }, [effectiveId]);
 
   const handleSubmitForApproval = async () => {
     if (!invoice?.invoiceId || submitting) return;
@@ -402,9 +468,64 @@ export default function InvoiceDetail() {
     }
   };
 
+  const handleFinancialReacquire = async () => {
+    if (!invoice?.invoiceId || reacquiring) return;
+    setReacquiring(true);
+    try {
+      const updated = await financialCorrectionReacquire(invoice.invoiceId);
+      setIsReacquireModalOpen(false);
+      showStatusToast("Financial data re-acquired and invoice recalculated successfully.", "success");
+      if (updated) {
+        setInvoice(updated);
+      } else {
+        await loadInvoice(false);
+      }
+    } catch (err) {
+      console.error("[InvoiceDetail] Error re-acquiring financial data:", err);
+      const msg = getInvoiceErrorMessage(err, "Failed to re-acquire financial data.");
+      showStatusToast(msg, "error");
+    } finally {
+      setReacquiring(false);
+    }
+  };
+
   useEffect(() => {
     loadInvoice();
   }, [snapshotId]);
+
+  // Load demo delivery state from localStorage once invoice (and invoiceId) is known
+  useEffect(() => {
+    if (invoice?.invoiceId) {
+      const stored = getDemoDelivery(invoice.invoiceId);
+      setDeliveryState(stored);
+    }
+  }, [invoice?.invoiceId]);
+
+  /**
+   * Demo Send to Client action.
+   * No email is sent. No backend API is called.
+   * Only the localStorage-based delivery state is updated.
+   */
+  const handleSendToClient = () => {
+    if (!invoice?.invoiceId || sendingToClient) return;
+    setSendingToClient(true);
+    // Simulate a brief async handoff
+    setTimeout(() => {
+      const entry = {
+        deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT,
+        sentAt: new Date().toISOString(),
+        sentBy: DEMO_SENT_BY,
+      };
+      saveDemoDelivery(invoice.invoiceId, entry);
+      setDeliveryState(entry);
+      setIsSendToClientOpen(false);
+      setSendingToClient(false);
+      showStatusToast(
+        `Invoice ${invoice.invoiceNumber || invoice.invoiceId} marked as sent to client.`,
+        "success"
+      );
+    }, 800);
+  };
 
   if (loading) {
     return (
@@ -419,7 +540,7 @@ export default function InvoiceDetail() {
       <div className="mx-auto w-full max-w-4xl space-y-6">
         <Breadcrumb
           items={[
-            { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition" },
+            { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" },
             { label: "Tax Calculation", to: TAX_WORKSPACE_PATH },
             { label: "Invoice" },
           ]}
@@ -443,11 +564,11 @@ export default function InvoiceDetail() {
               >
                 <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back to Tax Workspace
               </Button>
-              {snapshotId && (
+              {effectiveId && (
                 <Button
                   variant="outline"
                   size="small"
-                  onClick={() => navigate(`/account-receivable/tax-calculation/${snapshotId}`)}
+                  onClick={() => navigate(backToTaxUrl)}
                   className="text-xs"
                 >
                   Go to Tax Calculation
@@ -477,18 +598,68 @@ export default function InvoiceDetail() {
     invoice?.billingPeriod ||
     (invoice?.billingPeriodStart && invoice?.billingPeriodEnd
       ? formatBillingPeriod(invoice.billingPeriodStart, invoice.billingPeriodEnd)
-      : "—");
+      : DEMO_TERMS.billingPeriod);
+
+  const projectName =
+    invoice?.projectName ||
+    DEMO_PROJECT.name;
+
+  const projectCode =
+    invoice?.projectCode ||
+    (invoice?.projectId ? `PRJ-${invoice.projectId}` : null) ||
+    DEMO_PROJECT.code;
+
+  const clientName =
+    invoice?.clientName ||
+    DEMO_CLIENT.legalName;
+
+  const effectiveTaxBreakdown =
+    taxBreakdown.length > 0
+      ? taxBreakdown
+      : invoice?.totalTax && invoice.totalTax > 0
+      ? [
+          {
+            id: "demo-cgst",
+            taxComponent: "Central Goods and Services Tax",
+            taxTypeCode: "CGST",
+            applicability: "SAME_JURISDICTION",
+            rate: 9.0,
+            amount: invoice.totalTax / 2,
+          },
+          {
+            id: "demo-sgst",
+            taxComponent: "State Goods and Services Tax",
+            taxTypeCode: "SGST",
+            applicability: "SAME_JURISDICTION",
+            rate: 9.0,
+            amount: invoice.totalTax / 2,
+          },
+        ]
+      : [];
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5">
       {/* Breadcrumb */}
       <Breadcrumb
-        items={[
-          { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition" },
-          { label: "Tax Calculation", to: TAX_WORKSPACE_PATH },
-          { label: "Invoice" },
-          { label: invoice?.invoiceNumber || invoice?.snapshotNumber || snapshotId },
-        ]}
+        items={
+          isFromTaxCalculation
+            ? [
+                ...(isOccurrenceMode
+                  ? []
+                  : [{ label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" }]),
+                { label: "Tax Calculation", to: backToTaxUrl },
+                { label: "Invoice" },
+                { label: invoice?.invoiceNumber || invoice?.snapshotNumber || effectiveId },
+              ]
+            : [
+                ...(isOccurrenceMode
+                  ? []
+                  : [{ label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" }]),
+                { label: "Invoice Generation", to: INVOICE_WORKSPACE_PATH },
+                { label: "Invoice" },
+                { label: invoice?.invoiceNumber || invoice?.snapshotNumber || effectiveId },
+              ]
+        }
       />
 
       {/* Header */}
@@ -524,6 +695,22 @@ export default function InvoiceDetail() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Action: Send to Client (for APPROVED invoices — demo delivery action) */}
+          {invoice?.invoiceStatus === "APPROVED" && (
+            <Button
+              variant="primary"
+              size="small"
+              onClick={() => setIsSendToClientOpen(true)}
+              disabled={sendingToClient || refreshing}
+              className="bg-teal-700 hover:bg-teal-800 text-white flex items-center gap-1.5 text-xs font-semibold"
+            >
+              <MailCheck className="h-3.5 w-3.5" />
+              {deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
+                ? "Sent to Client"
+                : "Send to Client"}
+            </Button>
+          )}
+
           {/* Action: Submit for Approval (for GENERATED invoices) */}
           {(invoice?.invoiceStatus === "GENERATED" || !invoice?.invoiceStatus) && (
             <Button
@@ -537,6 +724,7 @@ export default function InvoiceDetail() {
               {submitting ? "Submitting..." : "Submit for Approval"}
             </Button>
           )}
+
 
           {/* Actions: Approve & Reject (for PENDING_APPROVAL invoices) */}
           {invoice?.invoiceStatus === "PENDING_APPROVAL" && (
@@ -576,18 +764,18 @@ export default function InvoiceDetail() {
                 variant="primary"
                 size="small"
                 onClick={() => setIsResubmitOpen(true)}
-                disabled={submitting || refreshing || refreshingAfterCorrection || savingCorrection}
+                disabled={submitting || refreshing || refreshingAfterCorrection || savingCorrection || reacquiring}
                 className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold"
               >
                 <Send className="h-3.5 w-3.5" />
-                {submitting ? "Submitting..." : "Resubmit for Approval"}
+                {submitting ? "Resubmitting..." : "Resubmit for Approval"}
               </Button>
             ) : (
               <Button
                 variant="outline"
                 size="small"
                 onClick={() => setIsRefreshModalOpen(true)}
-                disabled={refreshing || refreshingAfterCorrection || savingCorrection}
+                disabled={refreshing || refreshingAfterCorrection || savingCorrection || reacquiring}
                 className="border-indigo-300 text-indigo-700 hover:bg-indigo-50 flex items-center gap-1.5 text-xs font-semibold"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${refreshingAfterCorrection ? "animate-spin" : ""}`} />
@@ -614,11 +802,11 @@ export default function InvoiceDetail() {
             Invoice Workspace
           </Button>
 
-          {snapshotId && (
+          {effectiveId && (
             <Button
               variant="outline"
               size="small"
-              onClick={() => navigate(`/account-receivable/tax-calculation/${snapshotId}`)}
+              onClick={() => navigate(backToTaxUrl)}
               className="flex items-center gap-1.5 text-xs text-slate-600"
             >
               Tax Calculation
@@ -629,13 +817,99 @@ export default function InvoiceDetail() {
             variant="outline"
             size="small"
             onClick={() => loadInvoice(true)}
-            disabled={refreshing || submitting || approving || rejecting || refreshingAfterCorrection}
+            disabled={refreshing || submitting || approving || rejecting || refreshingAfterCorrection || savingCorrection || reacquiring}
             className="flex items-center gap-1.5 text-xs"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Refresh
           </Button>
         </div>
       </div>
+
+      {/* Delivery Status Banner — APPROVED invoices only */}
+      {invoice?.invoiceStatus === "APPROVED" && (
+        <div
+          className={`rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+            deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
+              ? "border-teal-200 bg-teal-50/70"
+              : "border-amber-200 bg-amber-50/60"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
+                  ? "bg-teal-100 text-teal-700"
+                  : "bg-amber-100 text-amber-700"
+              }`}
+            >
+              <MailCheck className="h-5 w-5" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-bold text-slate-900">Invoice Delivery</span>
+                {deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                    Sent to Client
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                    Not Sent
+                  </span>
+                )}
+              </div>
+              {deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT ? (
+                <div className="space-y-0.5 text-xs text-slate-600">
+                  <p>
+                    <span className="font-semibold text-slate-700">Sent On: </span>
+                    {deliveryState.sentAt
+                      ? new Date(deliveryState.sentAt).toLocaleString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "—"}
+                  </p>
+                  <p>
+                    <span className="font-semibold text-slate-700">Sent By: </span>
+                    {deliveryState.sentBy || DEMO_SENT_BY}
+                  </p>
+                  <p className="text-[11px] text-teal-600 italic">Demo delivery — no actual email was sent.</p>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-600">
+                  Invoice is approved and ready to be sent to the client.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.NOT_SENT ? (
+            <Button
+              variant="primary"
+              size="small"
+              onClick={() => setIsSendToClientOpen(true)}
+              disabled={sendingToClient || refreshing}
+              className="bg-teal-700 hover:bg-teal-800 text-white flex items-center gap-1.5 text-xs font-semibold shrink-0"
+            >
+              <MailCheck className="h-3.5 w-3.5" />
+              Send to Client
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="small"
+              onClick={() => setIsSendToClientOpen(true)}
+              disabled={sendingToClient || refreshing}
+              className="border-teal-300 text-teal-700 hover:bg-teal-50 flex items-center gap-1.5 text-xs font-semibold shrink-0"
+            >
+              <MailCheck className="h-3.5 w-3.5" />
+              Resend (Demo)
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Correction Section (Phase 2B & Phase 2C Non-Financial Correction) */}
       {invoice?.invoiceStatus === "REJECTED" && (
@@ -679,8 +953,8 @@ export default function InvoiceDetail() {
                 </div>
                 <p className="text-xs text-slate-700">
                   {invoice.correctionRequired
-                    ? "This invoice was rejected and requires correction before it can be resubmitted. Client Name and Project Name can be edited below. Financial data remains strictly read-only."
-                    : "Non-financial correction has been completed. The invoice is ready to be resubmitted for approval."}
+                    ? "This invoice was rejected and requires correction before it can be resubmitted. Financial or non-financial corrections can be performed below."
+                    : "Correction completed. Financial data has been refreshed from the authoritative billing source."}
                 </p>
                 {invoice.lastCorrectedAt && (
                   <p className="text-[11px] text-slate-500 font-medium">
@@ -691,11 +965,11 @@ export default function InvoiceDetail() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto shrink-0 pt-1 sm:pt-0">
-              {snapshotId && (
+              {effectiveId && (
                 <Button
                   variant="outline"
                   size="small"
-                  onClick={() => navigate(`/account-receivable/tax-calculation/${snapshotId}`)}
+                  onClick={() => navigate(backToTaxUrl)}
                   className="text-xs bg-white text-slate-700 border-slate-300 hover:bg-slate-100/50 font-medium"
                 >
                   Review Tax Calculation
@@ -706,7 +980,7 @@ export default function InvoiceDetail() {
                 variant="outline"
                 size="small"
                 onClick={() => setIsRefreshModalOpen(true)}
-                disabled={refreshing || refreshingAfterCorrection || savingCorrection}
+                disabled={refreshing || refreshingAfterCorrection || savingCorrection || reacquiring}
                 className="text-xs bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-medium flex items-center gap-1.5"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${refreshingAfterCorrection ? "animate-spin" : ""}`} />
@@ -718,7 +992,7 @@ export default function InvoiceDetail() {
                   variant="primary"
                   size="small"
                   onClick={() => setIsResubmitOpen(true)}
-                  disabled={submitting || refreshing || refreshingAfterCorrection || savingCorrection}
+                  disabled={submitting || refreshing || refreshingAfterCorrection || savingCorrection || reacquiring}
                   className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold flex items-center gap-1.5"
                 >
                   <Send className="h-3.5 w-3.5" />
@@ -757,477 +1031,324 @@ export default function InvoiceDetail() {
             </div>
           </div>
 
-          {/* Controlled Non-Financial Correction: Editable when correctionRequired === true */}
+          {/* Correction Paths when correctionRequired === true */}
           {invoice.correctionRequired ? (
-            <div className="rounded-lg border border-amber-200 bg-white p-4 space-y-3 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-2.5">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                    <Edit3 className="h-4 w-4 text-indigo-600" />
-                    Non-Financial Correction
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Client Name and Project Name can be corrected. All financial details (quantities, rates, taxes, and amounts) remain authoritative and read-only.
+            <div className="space-y-4">
+              {/* Path 1: Non-Financial Correction (Phase 2C) */}
+              <div className="rounded-lg border border-amber-200 bg-white p-4 space-y-3 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-2.5">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                      <Edit3 className="h-4 w-4 text-indigo-600" />
+                      Non-Financial Correction
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Client Name and Project Name can be corrected. All financial details (quantities, rates, taxes, and amounts) remain authoritative and read-only.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                  {/* Client Name Input */}
+                  <div className="space-y-1">
+                    <label htmlFor="edit-client-name" className="block text-xs font-bold text-slate-700">
+                      Client Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      id="edit-client-name"
+                      type="text"
+                      value={editClientName}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditClientName(val);
+                        if (val.trim()) {
+                          setClientNameError(val.length > 150 ? "Client Name cannot exceed 150 characters." : "");
+                        }
+                      }}
+                      placeholder="Enter client name..."
+                      disabled={savingCorrection || reacquiring}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 ${
+                        clientNameError
+                          ? "border-rose-300 focus:border-rose-500 focus:ring-rose-500 bg-rose-50/30"
+                          : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
+                      }`}
+                    />
+                    <div className="flex items-center justify-between text-[11px]">
+                      <div>{clientNameError && <span className="text-rose-600 font-medium">{clientNameError}</span>}</div>
+                      <span className={editClientName.length > 150 ? "text-rose-600 font-bold" : "text-slate-400"}>
+                        {editClientName.length}/150
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Project Name Input */}
+                  <div className="space-y-1">
+                    <label htmlFor="edit-project-name" className="block text-xs font-bold text-slate-700">
+                      Project Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      id="edit-project-name"
+                      type="text"
+                      value={editProjectName}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditProjectName(val);
+                        if (val.trim()) {
+                          setProjectNameError(val.length > 150 ? "Project Name cannot exceed 150 characters." : "");
+                        }
+                      }}
+                      placeholder="Enter project name..."
+                      disabled={savingCorrection || reacquiring}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 ${
+                        projectNameError
+                          ? "border-rose-300 focus:border-rose-500 focus:ring-rose-500 bg-rose-50/30"
+                          : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
+                      }`}
+                    />
+                    <div className="flex items-center justify-between text-[11px]">
+                      <div>{projectNameError && <span className="text-rose-600 font-medium">{projectNameError}</span>}</div>
+                      <span className={editProjectName.length > 150 ? "text-rose-600 font-bold" : "text-slate-400"}>
+                        {editProjectName.length}/150
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <Button
+                    variant="outline"
+                    size="small"
+                    onClick={handleResetCorrection}
+                    disabled={savingCorrection || reacquiring}
+                    className="text-xs"
+                  >
+                    Reset
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="small"
+                    onClick={handleSaveCorrection}
+                    disabled={savingCorrection || reacquiring || !editClientName.trim() || !editProjectName.trim()}
+                    className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold flex items-center gap-1.5"
+                  >
+                    <Save className={`h-3.5 w-3.5 ${savingCorrection ? "animate-spin" : ""}`} />
+                    {savingCorrection ? "Saving Correction..." : "Save Correction"}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Path 2: Financial Correction (Phase 2B) */}
+              <div className="rounded-lg border border-indigo-200 bg-white p-4 space-y-3 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-2.5">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                      <RefreshCw className="h-4 w-4 text-indigo-600" />
+                      Financial Correction
+                    </h3>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Financial values are read-only. Correct the underlying billing source first, then use Re-acquire & Recalculate to refresh this invoice.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
+                  <div>
+                    <span className="text-slate-500 font-medium block">Current Subtotal:</span>
+                    <span className="font-mono font-bold text-slate-800 text-sm mt-0.5 block">
+                      {formatCurrency(invoice?.subtotal, currency)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium block">Current Total Tax:</span>
+                    <span className="font-mono font-bold text-slate-800 text-sm mt-0.5 block">
+                      {formatCurrency(invoice?.totalTax, currency)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium block">Current Grand Total:</span>
+                    <span className="font-mono font-bold text-indigo-900 text-sm mt-0.5 block">
+                      {formatCurrency(invoice?.grandTotal, currency)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+                  <p className="text-[11px] text-slate-500 italic">
+                    Re-acquires approved time & charges from the authoritative source, rebuilds the snapshot, recalculates tax, and updates invoice totals.
                   </p>
+                  <Button
+                    variant="primary"
+                    size="small"
+                    onClick={() => setIsReacquireModalOpen(true)}
+                    disabled={reacquiring || savingCorrection}
+                    className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold flex items-center gap-1.5 shrink-0 self-end sm:self-auto"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${reacquiring ? "animate-spin" : ""}`} />
+                    {reacquiring ? "Re-acquiring financial data..." : "Re-acquire & Recalculate"}
+                  </Button>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                {/* Client Name Input */}
-                <div className="space-y-1">
-                  <label htmlFor="edit-client-name" className="block text-xs font-bold text-slate-700">
-                    Client Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    id="edit-client-name"
-                    type="text"
-                    value={editClientName}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setEditClientName(val);
-                      if (val.trim()) {
-                        setClientNameError(val.length > 150 ? "Client Name cannot exceed 150 characters." : "");
-                      }
-                    }}
-                    placeholder="Enter client name..."
-                    disabled={savingCorrection}
-                    className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 ${
-                      clientNameError
-                        ? "border-rose-300 focus:border-rose-500 focus:ring-rose-500 bg-rose-50/30"
-                        : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
-                    }`}
-                  />
-                  <div className="flex items-center justify-between text-[11px]">
-                    <div>{clientNameError && <span className="text-rose-600 font-medium">{clientNameError}</span>}</div>
-                    <span className={editClientName.length > 150 ? "text-rose-600 font-bold" : "text-slate-400"}>
-                      {editClientName.length}/150
-                    </span>
-                  </div>
-                </div>
-
-                {/* Project Name Input */}
-                <div className="space-y-1">
-                  <label htmlFor="edit-project-name" className="block text-xs font-bold text-slate-700">
-                    Project Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    id="edit-project-name"
-                    type="text"
-                    value={editProjectName}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setEditProjectName(val);
-                      if (val.trim()) {
-                        setProjectNameError(val.length > 150 ? "Project Name cannot exceed 150 characters." : "");
-                      }
-                    }}
-                    placeholder="Enter project name..."
-                    disabled={savingCorrection}
-                    className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 ${
-                      projectNameError
-                        ? "border-rose-300 focus:border-rose-500 focus:ring-rose-500 bg-rose-50/30"
-                        : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
-                    }`}
-                  />
-                  <div className="flex items-center justify-between text-[11px]">
-                    <div>{projectNameError && <span className="text-rose-600 font-medium">{projectNameError}</span>}</div>
-                    <span className={editProjectName.length > 150 ? "text-rose-600 font-bold" : "text-slate-400"}>
-                      {editProjectName.length}/150
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <Button
-                  variant="outline"
-                  size="small"
-                  onClick={handleResetCorrection}
-                  disabled={savingCorrection}
-                  className="text-xs"
-                >
-                  Reset
-                </Button>
-                <Button
-                  variant="primary"
-                  size="small"
-                  onClick={handleSaveCorrection}
-                  disabled={savingCorrection || !editClientName.trim() || !editProjectName.trim()}
-                  className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold flex items-center gap-1.5"
-                >
-                  <Save className={`h-3.5 w-3.5 ${savingCorrection ? "animate-spin" : ""}`} />
-                  {savingCorrection ? "Saving Correction..." : "Save Correction"}
-                </Button>
               </div>
             </div>
           ) : (
             /* When correctionRequired === false */
-            <div className="rounded-lg border border-emerald-200 bg-white p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800">
-                    Corrected Non-Financial Details
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Correction saved. Ready to resubmit for approval.
-                  </p>
+            <div className="space-y-4">
+              {/* Financial Success Summary */}
+              <div className="rounded-lg border border-emerald-200 bg-white p-4 space-y-3 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-2.5">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      Authoritative Financial Summary
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Financial data has been refreshed from the authoritative billing source. All values remain read-only.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="small"
+                    onClick={() => setIsReacquireModalOpen(true)}
+                    disabled={reacquiring || savingCorrection || submitting}
+                    className="text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50 flex items-center gap-1"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${reacquiring ? "animate-spin" : ""}`} />
+                    Re-acquire Again
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="small"
-                  onClick={() => setIsEditingCorrection(true)}
-                  className="text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50 flex items-center gap-1"
-                >
-                  <Edit3 className="h-3 w-3" />
-                  Edit Correction
-                </Button>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100 text-xs">
+                  <div>
+                    <span className="text-slate-500 font-medium block">Refreshed Subtotal</span>
+                    <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">
+                      {formatCurrency(invoice?.subtotal, currency)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium block">Refreshed Total Tax</span>
+                    <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">
+                      {formatCurrency(invoice?.totalTax, currency)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium block">Refreshed Grand Total</span>
+                    <span className="font-mono font-bold text-emerald-900 text-sm mt-0.5 block">
+                      {formatCurrency(invoice?.grandTotal, currency)}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              {isEditingCorrection ? (
-                <div className="space-y-3 pt-2 border-t border-slate-100">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label htmlFor="edit-client-name-re" className="block text-xs font-bold text-slate-700">
-                        Client Name <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        id="edit-client-name-re"
-                        type="text"
-                        value={editClientName}
-                        onChange={(e) => setEditClientName(e.target.value)}
-                        disabled={savingCorrection}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      />
-                      {clientNameError && <p className="text-xs text-rose-600">{clientNameError}</p>}
-                    </div>
-                    <div className="space-y-1">
-                      <label htmlFor="edit-project-name-re" className="block text-xs font-bold text-slate-700">
-                        Project Name <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        id="edit-project-name-re"
-                        type="text"
-                        value={editProjectName}
-                        onChange={(e) => setEditProjectName(e.target.value)}
-                        disabled={savingCorrection}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      />
-                      {projectNameError && <p className="text-xs text-rose-600">{projectNameError}</p>}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                    <Button
-                      variant="outline"
-                      size="small"
-                      onClick={() => {
-                        handleResetCorrection();
-                        setIsEditingCorrection(false);
-                      }}
-                      disabled={savingCorrection}
-                      className="text-xs"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="small"
-                      onClick={handleSaveCorrection}
-                      disabled={savingCorrection || !editClientName.trim() || !editProjectName.trim()}
-                      className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold flex items-center gap-1.5"
-                    >
-                      <Save className={`h-3.5 w-3.5 ${savingCorrection ? "animate-spin" : ""}`} />
-                      {savingCorrection ? "Saving..." : "Save Correction"}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50 p-3 rounded-lg border border-slate-100">
+              {/* Non-Financial Details Summary */}
+              <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <div>
-                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Client Name</span>
-                    <span className="font-semibold text-slate-800 text-sm mt-0.5 block">{invoice?.clientName || "—"}</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                      Non-Financial Details
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Correction saved. Ready to resubmit for approval.
+                    </p>
                   </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Project Name</span>
-                    <span className="font-semibold text-slate-800 text-sm mt-0.5 block">{invoice?.projectName || "—"}</span>
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="small"
+                    onClick={() => setIsEditingCorrection(true)}
+                    disabled={reacquiring || savingCorrection || submitting}
+                    className="text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50 flex items-center gap-1"
+                  >
+                    <Edit3 className="h-3 w-3" />
+                    Edit Correction
+                  </Button>
                 </div>
-              )}
+
+                {isEditingCorrection ? (
+                  <div className="space-y-3 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label htmlFor="edit-client-name-re" className="block text-xs font-bold text-slate-700">
+                          Client Name <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          id="edit-client-name-re"
+                          type="text"
+                          value={editClientName}
+                          onChange={(e) => setEditClientName(e.target.value)}
+                          disabled={savingCorrection || reacquiring}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                        {clientNameError && <p className="text-xs text-rose-600">{clientNameError}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <label htmlFor="edit-project-name-re" className="block text-xs font-bold text-slate-700">
+                          Project Name <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          id="edit-project-name-re"
+                          type="text"
+                          value={editProjectName}
+                          onChange={(e) => setEditProjectName(e.target.value)}
+                          disabled={savingCorrection || reacquiring}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                        {projectNameError && <p className="text-xs text-rose-600">{projectNameError}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                      <Button
+                        variant="outline"
+                        size="small"
+                        onClick={() => {
+                          handleResetCorrection();
+                          setIsEditingCorrection(false);
+                        }}
+                        disabled={savingCorrection || reacquiring}
+                        className="text-xs"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="small"
+                        onClick={handleSaveCorrection}
+                        disabled={savingCorrection || reacquiring || !editClientName.trim() || !editProjectName.trim()}
+                        className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold flex items-center gap-1.5"
+                      >
+                        <Save className={`h-3.5 w-3.5 ${savingCorrection ? "animate-spin" : ""}`} />
+                        {savingCorrection ? "Saving..." : "Save Correction"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <div>
+                      <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Client Name</span>
+                      <span className="font-semibold text-slate-800 text-sm mt-0.5 block">{invoice?.clientName || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider block">Project Name</span>
+                      <span className="font-semibold text-slate-800 text-sm mt-0.5 block">{invoice?.projectName || "—"}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Main Invoice Card */}
-      <PageCard className="divide-y divide-slate-100">
-        {/* Section 1: BILL TO */}
-        <div className="p-5">
-          <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-            <Building2 className="h-3.5 w-3.5 text-indigo-600" /> Bill To
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Field label="Client Name">{invoice?.clientName}</Field>
-            <Field label="Billing Address">{invoice?.billingAddress}</Field>
-            <Field label="GSTIN / Tax ID">{invoice?.gstin}</Field>
-            <Field label="Contact">{invoice?.contact}</Field>
-          </div>
-        </div>
-
-        {/* Section 2: INVOICE CONTEXT */}
-        <div className="p-5">
-          <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-            <Briefcase className="h-3.5 w-3.5 text-indigo-600" /> Invoice Context
-          </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-            <Field label="Project">
-              {invoice?.projectName || "—"}
-            </Field>
-            <Field label="Project Code">
-              <span className="font-mono">{invoice?.projectCode || "—"}</span>
-            </Field>
-            <Field label="Actual Billing Period">
-              <span className="font-medium text-slate-900">{billingPeriod}</span>
-            </Field>
-            <Field label="Currency">
-              <span className="font-mono font-bold text-slate-800">{currency}</span>
-            </Field>
-            <Field label="Payment Terms">
-              {invoice?.paymentTerms || "Net 30"}
-            </Field>
-            <Field label="Invoice Date">
-              {formatDisplayDate(invoice?.invoiceDate)}
-            </Field>
-            <Field label="Due Date">
-              {formatDisplayDate(invoice?.dueDate)}
-            </Field>
-            <Field label="Snapshot Number">
-              <span className="font-mono">{invoice?.snapshotNumber || "—"}</span>
-            </Field>
-            <Field label="Invoice Number">
-              <span className="font-mono font-semibold text-indigo-800">{invoice?.invoiceNumber || "—"}</span>
-            </Field>
-          </div>
-        </div>
-
-        {/* Section 3: INVOICE ITEMS */}
-        <div className="p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-              <FileText className="h-3.5 w-3.5 text-indigo-600" /> Invoice Items
-            </span>
-            <span className="text-[11px] font-medium text-slate-400">
-              {items.length} {items.length === 1 ? "Line Item" : "Line Items"}
-            </span>
-          </div>
-
-          {items.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 p-6 text-center text-xs text-slate-500">
-              No individual invoice items returned by the backend.
-            </div>
-          ) : (
-            <>
-              {/* Desktop / Tablet Table */}
-              <div className="hidden overflow-x-auto sm:block">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      <th className="pb-2 pr-3 font-bold">Resource / Item</th>
-                      <th className="pb-2 px-3 font-bold">Role</th>
-                      <th className="pb-2 px-3 font-bold">Work Date</th>
-                      <th className="pb-2 px-3 text-right font-bold">Quantity / Hours</th>
-                      <th className="pb-2 px-3 text-right font-bold">Rate</th>
-                      <th className="pb-2 pl-3 text-right font-bold">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {items.map((it) => (
-                      <tr key={it.id}>
-                        <td className="py-3 pr-3 align-top font-semibold text-slate-800">
-                          {it.itemName || it.item || "—"}
-                        </td>
-                        <td className="py-3 px-3 align-top text-slate-600">
-                          {it.role}
-                        </td>
-                        <td className="py-3 px-3 align-top font-mono text-xs text-slate-600">
-                          {formatDisplayDate(it.workDate)}
-                        </td>
-                        <td className="py-3 px-3 align-top text-right font-mono font-medium text-slate-700">
-                          {it.quantity}
-                        </td>
-                        <td className="py-3 px-3 align-top text-right font-mono font-medium text-slate-700">
-                          {formatCurrency(it.rate, currency)}
-                        </td>
-                        <td className="py-3 pl-3 align-top text-right font-mono font-bold text-slate-900">
-                          {formatCurrency(it.amount, currency)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile Stacked Cards */}
-              <div className="space-y-2.5 sm:hidden">
-                {items.map((it) => (
-                  <div key={it.id} className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-semibold text-slate-800">{it.itemName || it.item || "—"}</span>
-                      <span className="shrink-0 font-mono font-bold text-slate-900">
-                        {formatCurrency(it.amount, currency)}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
-                      <span>{it.role}</span>
-                      <span>&middot;</span>
-                      <span className="font-mono">{formatDisplayDate(it.workDate)}</span>
-                    </div>
-                    <div className="mt-2.5 flex items-center justify-between border-t border-slate-200 pt-2 text-xs text-slate-600">
-                      <span>
-                        {it.quantity} hrs @ {formatCurrency(it.rate, currency)}
-                      </span>
-                      <span className="font-mono font-semibold text-slate-800">
-                        {formatCurrency(it.amount, currency)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Section 4: TAX BREAKDOWN */}
-        <div className="p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-              <Layers className="h-3.5 w-3.5 text-indigo-600" /> Tax Breakdown
-            </span>
-            <span className="text-[11px] font-medium text-slate-400">
-              {taxBreakdown.length} {taxBreakdown.length === 1 ? "Component" : "Components"}
-            </span>
-          </div>
-
-          {taxBreakdown.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 p-4 text-center text-xs text-slate-500">
-              No tax components applicable for this invoice.
-            </div>
-          ) : (
-            <>
-              {/* Desktop / Tablet Table */}
-              <div className="hidden overflow-x-auto sm:block">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      <th className="pb-2 pr-3 font-bold">Tax Component</th>
-                      <th className="pb-2 px-3 font-bold">Applicability</th>
-                      <th className="pb-2 px-3 text-right font-bold">Rate</th>
-                      <th className="pb-2 pl-3 text-right font-bold">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {taxBreakdown.map((comp) => (
-                      <tr key={comp.id}>
-                        <td className="py-3 pr-3 align-top font-semibold text-slate-800">
-                          {comp.taxComponent}
-                          {comp.taxTypeCode && (
-                            <span className="ml-2 inline-block rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
-                              {comp.taxTypeCode}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-3 align-top text-slate-600">
-                          {humanizeApplicability(comp.applicability)}
-                        </td>
-                        <td className="py-3 px-3 align-top text-right font-mono font-semibold text-slate-700">
-                          {formatRatePercentage(comp.rate) ?? "—"}
-                        </td>
-                        <td className="py-3 pl-3 align-top text-right font-mono font-bold text-slate-900">
-                          {formatCurrency(comp.amount, currency)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile Stacked Cards */}
-              <div className="space-y-2.5 sm:hidden">
-                {taxBreakdown.map((comp) => (
-                  <div key={comp.id} className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-semibold text-slate-800">{comp.taxComponent}</span>
-                      {comp.taxTypeCode && (
-                        <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
-                          {comp.taxTypeCode}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      {humanizeApplicability(comp.applicability)}
-                    </div>
-                    <div className="mt-2.5 flex items-center justify-between border-t border-slate-200 pt-2.5">
-                      <span className="text-xs text-slate-500">Rate</span>
-                      <span className="font-mono font-semibold text-slate-700">
-                        {formatRatePercentage(comp.rate) ?? "—"}
-                      </span>
-                    </div>
-                    <div className="mt-1.5 flex items-center justify-between">
-                      <span className="text-xs text-slate-500">Amount</span>
-                      <span className="font-mono font-bold text-slate-900">
-                        {formatCurrency(comp.amount, currency)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Section 5: FINANCIAL SUMMARY */}
-        <div className="p-5">
-          <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Financial Summary</h2>
-          <div className="max-w-md space-y-2 text-sm">
-            <div className="flex items-center justify-between text-slate-600">
-              <span>Subtotal</span>
-              <span className="font-mono font-semibold text-slate-800">
-                {formatCurrency(invoice?.subtotal, currency)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-slate-600">
-              <span>Total Tax</span>
-              <span className="font-mono font-semibold text-slate-800">
-                {formatCurrency(invoice?.totalTax, currency)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between border-t border-slate-200 pt-2 font-bold text-slate-900">
-              <span>Grand Total</span>
-              <span className="font-mono text-base text-indigo-900">
-                {formatCurrency(invoice?.grandTotal, currency)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Grand Total Hero Display */}
-        <div className="p-5">
-          <div className="rounded-xl border-2 border-indigo-200 bg-indigo-50/80 p-4 sm:p-5 flex items-center justify-between shadow-sm">
-            <div>
-              <span className="block text-xs font-bold uppercase tracking-wider text-indigo-700">Grand Total</span>
-              <span className="text-xs text-indigo-600">Subtotal + Total Tax</span>
-            </div>
-            <div className="font-mono text-2xl font-extrabold text-indigo-950 sm:text-3xl">
-              {formatCurrency(invoice?.grandTotal, currency)}
-            </div>
-          </div>
-        </div>
-      </PageCard>
+      {/* Customer-Facing Invoice Document */}
+      <InvoiceDocument
+        invoice={invoice}
+        snapshotId={snapshotId}
+        deliveryState={deliveryState}
+      />
 
       {/* Authoritative Record Notice */}
-      <div className="flex items-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-        <ShieldCheck className="h-4 w-4 flex-shrink-0 text-emerald-600" />
+      <div className="flex items-start gap-2.5 px-1 py-2 text-xs text-slate-400">
+        <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0 text-emerald-500 mt-0.5" />
         <p>
-          <span className="font-semibold text-slate-700">Authoritative Financial Record.</span>{" "}
+          <span className="font-semibold text-slate-500">Authoritative Financial Record.</span>{" "}
           Invoice amounts and tax breakdowns are generated by the backend financial engine and are read-only for this billing snapshot.
         </p>
       </div>
@@ -1477,6 +1598,131 @@ export default function InvoiceDetail() {
             >
               <RefreshCw className={`h-3.5 w-3.5 ${refreshingAfterCorrection ? "animate-spin" : ""}`} />
               {refreshingAfterCorrection ? "Refreshing..." : "Refresh Invoice"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Confirmation Modal for Re-acquire Financial Data (Phase 2B) */}
+      <Modal
+        isOpen={isReacquireModalOpen}
+        onClose={() => !reacquiring && setIsReacquireModalOpen(false)}
+        title="Re-acquire Financial Data"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm font-semibold text-slate-800">
+            Are you sure you want to re-acquire the financial data for this rejected invoice?
+          </p>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            The system will retrieve the latest approved billing source data, rebuild the billing snapshot, recalculate tax, and refresh the invoice values.
+          </p>
+
+          <div className="rounded-lg bg-slate-50 p-3.5 text-xs space-y-2 border border-slate-200">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500 font-medium">Invoice Number:</span>
+              <span className="font-mono font-bold text-indigo-700">{invoice?.invoiceNumber || "—"}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500 font-medium">Client:</span>
+              <span className="font-medium text-slate-800">{invoice?.clientName || "—"}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500 font-medium">Project:</span>
+              <span className="font-medium text-slate-800">{invoice?.projectName || "—"}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500 font-medium">Current Grand Total:</span>
+              <span className="font-mono font-bold text-indigo-900">{formatCurrency(invoice?.grandTotal, currency)}</span>
+            </div>
+            <div className="flex justify-between items-center pt-1 border-t border-slate-200/60">
+              <span className="text-slate-500 font-medium">Status after refresh:</span>
+              <span className="inline-flex items-center gap-1 font-semibold text-slate-700">
+                <StatusBadge label="REJECTED" size="sm" />
+                <span className="text-[11px] text-slate-500">(Must explicitly resubmit afterward)</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <Button
+              variant="outline"
+              size="small"
+              onClick={() => setIsReacquireModalOpen(false)}
+              disabled={reacquiring}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="small"
+              onClick={handleFinancialReacquire}
+              disabled={reacquiring}
+              className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold flex items-center gap-1.5"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${reacquiring ? "animate-spin" : ""}`} />
+              {reacquiring ? "Re-acquiring financial data..." : "Re-acquire & Recalculate"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Confirmation Modal for Send to Client (Demo) */}
+      <Modal
+        isOpen={isSendToClientOpen}
+        onClose={() => !sendingToClient && setIsSendToClientOpen(false)}
+        title="Send Invoice to Client"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Review the delivery details below and confirm to mark this invoice as sent.
+          </p>
+
+          <div className="rounded-lg bg-slate-50 p-3.5 text-xs space-y-1.5 border border-slate-200">
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">Invoice:</span>
+              <span className="font-mono font-bold text-indigo-700">{invoice?.invoiceNumber || "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">Client:</span>
+              <span className="font-semibold text-slate-800">{invoice?.clientName || "Account Management"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500 font-medium">Recipient:</span>
+              <span className="text-slate-400 italic">Not provided</span>
+            </div>
+            <div className="flex justify-between border-t border-slate-200 pt-1.5">
+              <span className="text-slate-700 font-bold">Grand Total:</span>
+              <span className="font-mono font-bold text-slate-900">{formatCurrency(invoice?.grandTotal, currency)}</span>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-800 space-y-1">
+            <p className="font-bold">Demo delivery action</p>
+            <p>This is currently a demo delivery action. No actual email will be sent. The invoice will be marked as sent to the client for demonstration purposes.</p>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <Button
+              variant="outline"
+              size="small"
+              onClick={() => setIsSendToClientOpen(false)}
+              disabled={sendingToClient}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="small"
+              onClick={handleSendToClient}
+              disabled={sendingToClient}
+              className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold flex items-center gap-1.5"
+            >
+              <MailCheck className="h-3.5 w-3.5" />
+              {sendingToClient ? "Marking as Sent..." : "Send Invoice"}
             </Button>
           </div>
         </div>

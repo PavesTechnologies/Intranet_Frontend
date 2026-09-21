@@ -16,6 +16,8 @@ import {
 
 import PageHeader from "../../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
+import { KPICard } from "../../../../components/kpi/KPI";
+import SearchInput from "../../../../components/filter/Searchbar";
 import Button from "../../../../components/Button/Button";
 import Loader from "../../../../components/ui/Loader";
 import StatusBadge from "../../../../components/status/statusbadge";
@@ -35,8 +37,13 @@ import {
 } from "../../services/taxCalculationService";
 import { getInvoice } from "../../services/invoiceService";
 import { getActiveTaxRegions } from "../../services/taxRateConfigurationService";
+import {
+  getBillingOccurrences,
+} from "../../services/billingOccurrenceService";
+import BillingOccurrenceCard from "./BillingOccurrenceCard";
 
 const ACQUISITION_PATH = "/account-receivable/billing-data-acquisition";
+const OCCURRENCE_DETAIL_BASE = "/account-receivable/tax-calculation/occurrence";
 
 export default function TaxCalculationConsole() {
   const navigate = useNavigate();
@@ -52,12 +59,39 @@ export default function TaxCalculationConsole() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [regionFilter, setRegionFilter] = useState("ALL");
 
+  // KPI card definitions (mirrors BillingApprovals pattern)
+  const kpiCardDefs = [
+    { key: "ALL", label: "Total Snapshots", icon: Layers, color: "bg-[#0A0082] text-white" },
+    { key: "READY_TO_TAX", label: "Ready for Tax", icon: CheckCircle2, color: "bg-emerald-600 text-white" },
+    { key: "IN_TAX", label: "In Tax", icon: Clock, color: "bg-amber-500 text-white" },
+    { key: "TAX_COMPLETED", label: "Tax Completed", icon: CheckCircle2, color: "bg-blue-600 text-white" },
+    { key: "INVOICED", label: "Invoiced", icon: FileText, color: "bg-indigo-600 text-white" },
+  ];
+
+  const handleKpiClick = (kpiKey) => {
+    if (kpiKey === "ALL") {
+      setStatusFilter("ALL");
+    } else {
+      setStatusFilter((prev) => (prev === kpiKey ? "ALL" : kpiKey));
+    }
+  };
+
+  const handleSearchInputChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
   const loadData = async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
     setLoading(true);
 
     try {
-      const activeConfigs = await fetchActiveBillingConfigurations();
+      // This table is the Time & Material billing-snapshot queue only --
+      // Fixed Price/Recurring occurrences are loaded separately below via
+      // getBillingOccurrences(). fetchActiveBillingConfigurations() returns
+      // every active configuration regardless of billing type, so it must
+      // be filtered down here the same way Data Acquisition does.
+      const allActiveConfigs = await fetchActiveBillingConfigurations();
+      const activeConfigs = allActiveConfigs.filter((cfg) => cfg.billingTypeCode === "TIME_MATERIAL");
       const regionsList = await getActiveTaxRegions().catch(() => []);
 
       const loadedSnapshots = (
@@ -66,8 +100,8 @@ export default function TaxCalculationConsole() {
             if (!cfg.projectId && !cfg.id) return null;
 
             const savedMeta = getAcquiredSnapshotMetadata(cfg.projectId);
-            const snapStart = savedMeta?.billingPeriodStart || null;
-            const snapEnd = savedMeta?.billingPeriodEnd || null;
+            const snapStart = cfg.billingPeriodStart || savedMeta?.billingPeriodStart || null;
+            const snapEnd = cfg.billingPeriodEnd || savedMeta?.billingPeriodEnd || null;
 
             let existingSnapshot = null;
             if (cfg.projectId && snapStart && snapEnd) {
@@ -404,15 +438,29 @@ export default function TaxCalculationConsole() {
     );
   }
 
-  // Genuine Empty State (when zero relevant snapshots exist)
-  if (!loading && relevantSnapshots.length === 0) {
+  const hasAnyOccurrences =
+    readyOccurrences.length > 0 ||
+    upcomingOccurrences.length > 0 ||
+    processedOccurrences.length > 0 ||
+    invoicedOccurrences.length > 0;
+
+  // Genuine Empty State (when zero relevant snapshots AND zero billing occurrences exist)
+  if (!loading && relevantSnapshots.length === 0 && !occLoading && !hasAnyOccurrences) {
     return (
       <div className="w-full space-y-6">
         <PageHeader
           title="Tax Calculation"
           subtitle="Calculate and review tax for acquired billing snapshots."
           action={
-            <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={refreshing}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                loadData(true);
+                loadOccurrences();
+              }}
+              disabled={refreshing}
+            >
               <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
               Refresh
             </Button>
@@ -504,9 +552,17 @@ export default function TaxCalculationConsole() {
       {/* Header */}
       <PageHeader
         title="Tax Calculation"
-        subtitle="Calculate and review tax for acquired billing snapshots."
+        subtitle="Calculate and review tax for acquired billing snapshots and billing occurrences."
         action={
-          <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={refreshing}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              loadData(true);
+              loadOccurrences();
+            }}
+            disabled={refreshing}
+          >
             <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
           </Button>
@@ -514,62 +570,55 @@ export default function TaxCalculationConsole() {
       />
 
       {/* KPI Summary Cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-5">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-medium uppercase tracking-wider">Total Snapshots</span>
-            <Layers className="h-4 w-4 text-indigo-600" />
-          </div>
-          <div className="mt-2 text-2xl font-extrabold text-slate-900">{kpis.totalSnapshots}</div>
-        </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+        {kpiCardDefs.map((kpi) => {
+          const isActive =
+            statusFilter === kpi.key ||
+            (statusFilter === "ALL" && kpi.key === "ALL");
 
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-sm">
-          <div className="flex items-center justify-between text-emerald-700">
-            <span className="text-xs font-semibold uppercase tracking-wider">Ready for Tax</span>
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-          </div>
-          <div className="mt-2 text-2xl font-extrabold text-emerald-900">{kpis.readyToTax}</div>
-        </div>
+          const kpiValue =
+            kpi.key === "ALL" ? kpis.totalSnapshots
+            : kpi.key === "READY_TO_TAX" ? kpis.readyToTax
+            : kpi.key === "IN_TAX" ? kpis.inTax
+            : kpi.key === "TAX_COMPLETED" ? kpis.taxCompleted
+            : kpis.invoiced;
 
-        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 shadow-sm">
-          <div className="flex items-center justify-between text-amber-700">
-            <span className="text-xs font-semibold uppercase tracking-wider">In Tax</span>
-            <Clock className="h-4 w-4 text-amber-600" />
-          </div>
-          <div className="mt-2 text-2xl font-extrabold text-amber-900">{kpis.inTax}</div>
-        </div>
-
-        <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm">
-          <div className="flex items-center justify-between text-blue-700">
-            <span className="text-xs font-semibold uppercase tracking-wider">Tax Completed</span>
-            <CheckCircle2 className="h-4 w-4 text-blue-600" />
-          </div>
-          <div className="mt-2 text-2xl font-extrabold text-blue-900">{kpis.taxCompleted}</div>
-        </div>
-
-        <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 shadow-sm col-span-2 sm:col-span-1">
-          <div className="flex items-center justify-between text-indigo-700">
-            <span className="text-xs font-semibold uppercase tracking-wider">Invoiced</span>
-            <FileText className="h-4 w-4 text-indigo-600" />
-          </div>
-          <div className="mt-2 text-2xl font-extrabold text-indigo-950">{kpis.invoiced}</div>
-        </div>
+          return (
+            <button
+              key={kpi.key}
+              type="button"
+              onClick={() => handleKpiClick(kpi.key)}
+              title={`Filter by ${kpi.label}`}
+              className="text-left rounded-xl transition-transform active:scale-[0.99] focus:outline-none"
+            >
+              <KPICard
+                label={kpi.label}
+                value={loading ? "…" : kpiValue}
+                icon={<kpi.icon className="h-5 w-5" />}
+                color={kpi.color}
+                active={isActive}
+                className="h-full w-full cursor-pointer bg-white shadow-sm border border-slate-200 transition-all hover:shadow-md"
+              />
+            </button>
+          );
+        })}
       </div>
 
-      {/* Queue Card & Filters */}
+      {/* Time & Material — Billing Snapshot Queue & Filters */}
+      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        Time &amp; Material — Billing Snapshots
+      </h2>
       <PageCard>
         <PageCardContent className="space-y-4 p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search by project, client, or snapshot number..."
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="w-full lg:max-w-md">
+                <SearchInput
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 pl-9 pr-4 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-            </div>
+                onChange={handleSearchInputChange}
+                onSearch={(val) => setSearchQuery(val)}
+                placeholder="Search by project, code, or client..."
+                />
+          </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
@@ -615,6 +664,95 @@ export default function TaxCalculationConsole() {
           />
         </PageCardContent>
       </PageCard>
+
+      {/* Fixed Price / Recurring — Billing Occurrences */}
+      <div className="space-y-3">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          Ready for Tax Calculation — Fixed Price &amp; Recurring
+        </h2>
+        {occLoading ? (
+          <div className="flex h-24 items-center justify-center">
+            <Loader size="sm" text="Loading billing occurrences..." />
+          </div>
+        ) : readyOccurrences.length === 0 ? (
+          <PageCard>
+            <PageCardContent className="py-6 text-center text-sm text-slate-500">
+              No billing occurrences are currently pending tax calculation.
+            </PageCardContent>
+          </PageCard>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {readyOccurrences.map((occurrence) => (
+              <BillingOccurrenceCard
+                key={occurrence.billingScheduleId}
+                occurrence={occurrence}
+                variant="ready"
+                onOpenTaxCalculation={handleOpenOccurrenceTaxCalculation}
+                onCalculateTax={handleOpenOccurrenceTaxCalculation}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          Upcoming Billing Occurrences
+        </h2>
+        {occLoading ? (
+          <div className="flex h-24 items-center justify-center">
+            <Loader size="sm" text="Loading billing occurrences..." />
+          </div>
+        ) : upcomingOccurrences.length === 0 ? (
+          <PageCard>
+            <PageCardContent className="py-6 text-center text-sm text-slate-500">
+              No upcoming billing occurrences are scheduled.
+            </PageCardContent>
+          </PageCard>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {upcomingOccurrences.map((occurrence) => (
+              <BillingOccurrenceCard key={occurrence.billingScheduleId} occurrence={occurrence} variant="upcoming" />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {processedOccurrences.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Processed Billing Occurrences
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {processedOccurrences.map((occurrence) => (
+              <BillingOccurrenceCard
+                key={occurrence.billingScheduleId}
+                occurrence={occurrence}
+                variant="processed"
+                onView={handleViewOccurrence}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {invoicedOccurrences.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Invoiced Billing Occurrences
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {invoicedOccurrences.map((occurrence) => (
+              <BillingOccurrenceCard
+                key={occurrence.billingScheduleId}
+                occurrence={occurrence}
+                variant="invoiced"
+                onView={handleViewOccurrence}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

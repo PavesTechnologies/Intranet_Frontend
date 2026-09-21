@@ -9,6 +9,9 @@
  * hasPermission(APPROVAL_PERMISSIONS.INVOICE_APPROVE). Mirrors
  * constants/procurementPermissions.js's pattern exactly.
  */
+import { PAYMENT_PERMISSIONS } from "./paymentPermissions";
+import { INVOICE_PERMISSIONS } from "./invoicePermissions";
+
 export const APPROVAL_PERMISSIONS = {
   // Approval Policy configuration (policies, roles/approvers metadata, department approvers) —
   // every route under approval_policy_route.py requires this single permission.
@@ -19,18 +22,38 @@ export const APPROVAL_PERMISSIONS = {
   INVOICE_APPROVAL_VIEW: "INVOICE_APPROVAL_VIEW",
   INVOICE_APPROVE: "INVOICE_APPROVE",
   INVOICE_REJECT: "INVOICE_REJECT",
+  // POST /invoice/{id}/send-back — distinct from INVOICE_REJECT (Send Back returns the invoice
+  // for correction/resubmission, Reject is terminal).
+  INVOICE_SEND_BACK: "INVOICE_SEND_BACK",
 };
 
 /**
- * GET /invoice/{id}/approval and .../approval/steps accept any one of these three (see
- * invoice_approval_route.py's permission_based_access(["INVOICE_APPROVAL_VIEW", "INVOICE_APPROVE",
- * "INVOICE_REJECT"])) — an approver can see the approval status without a separate view
- * permission. Route-level/visibility use only; do not reuse for an action check.
+ * GET /invoice/{id}/approval and .../approval/steps accept any of these (see
+ * invoice_approval_route.py's _APPROVAL_VIEW_PERMISSIONS) — viewing the approval status/timeline
+ * is broader than deciding on it: an AP Executive tracking what they submitted and a Finance
+ * user checking why an invoice isn't Approved yet both need read access here too, which
+ * INVOICE_VIEW alone already covers (every AP Invoice group carries it). Route-level/visibility
+ * use only; do not reuse for an action check.
  */
 export const APPROVAL_ANY_VIEW_PERMISSIONS = [
+  INVOICE_PERMISSIONS.INVOICE_VIEW,
   APPROVAL_PERMISSIONS.INVOICE_APPROVAL_VIEW,
   APPROVAL_PERMISSIONS.INVOICE_APPROVE,
   APPROVAL_PERMISSIONS.INVOICE_REJECT,
+];
+
+/**
+ * GET /invoice/{id}/history accepts any of these (plus INVOICE_VIEW/PAYMENT_VIEW — see
+ * constants/invoicePermissions.js and constants/paymentPermissions.js) — mirrors
+ * invoice_details_route.py's _HISTORY_VIEW_PERMISSIONS exactly.
+ */
+export const INVOICE_HISTORY_VIEW_PERMISSIONS = [
+  INVOICE_PERMISSIONS.INVOICE_VIEW,
+  APPROVAL_PERMISSIONS.INVOICE_APPROVAL_VIEW,
+  APPROVAL_PERMISSIONS.INVOICE_SEND_FOR_APPROVAL,
+  APPROVAL_PERMISSIONS.INVOICE_APPROVE,
+  APPROVAL_PERMISSIONS.INVOICE_REJECT,
+  PAYMENT_PERMISSIONS.PAYMENT_VIEW,
 ];
 
 export default APPROVAL_PERMISSIONS;

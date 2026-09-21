@@ -135,12 +135,31 @@ export default function InvoiceApproval() {
   }, [invoices]);
 
   const handleReviewInvoice = (inv) => {
+    if (inv.billingScheduleId && !inv.billingSnapshotId) {
+      navigate(`/account-receivable/invoices/occurrence/${inv.billingScheduleId}`, {
+        state: {
+          from: "invoice-approval",
+          source: "invoice-approval",
+          billingScheduleId: inv.billingScheduleId,
+          occurrenceId: inv.billingScheduleId,
+          invoiceId: inv.invoiceId,
+        },
+      });
+      return;
+    }
+
     const targetSnapshotId = inv.billingSnapshotId || inv.snapshotId || inv.invoiceId;
     if (!targetSnapshotId) {
       showStatusToast("Identifier is missing for this invoice.", "error");
       return;
     }
-    navigate(`/account-receivable/invoices/${targetSnapshotId}`);
+    navigate(`/account-receivable/invoices/${targetSnapshotId}`, {
+      state: {
+        from: "invoice-approval",
+        source: "invoice-approval",
+        invoiceId: inv.invoiceId,
+      },
+    });
   };
 
   if (loading && !refreshing) {

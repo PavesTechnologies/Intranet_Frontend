@@ -1,7 +1,17 @@
 import { useAuth } from "../../../contexts/AuthContext";
 import { AP_PERMISSIONS, rolesForPermission } from "../constants/permissions";
-import { PROCUREMENT_PERMISSIONS } from "../constants/procurementPermissions";
+import {
+  PROCUREMENT_PERMISSIONS,
+  ONBOARDING_ANY,
+  NDA_ANY,
+  VENDOR_AVAILABILITY_ANY,
+} from "../constants/procurementPermissions";
 import { APPROVAL_PERMISSIONS, APPROVAL_ANY_VIEW_PERMISSIONS } from "../constants/approvalPermissions";
+import {
+  INVOICE_HISTORY_VIEW_PERMISSIONS,
+} from "../constants/approvalPermissions";
+import { PAYMENT_PERMISSIONS } from "../constants/paymentPermissions";
+import { INVOICE_PERMISSIONS } from "../constants/invoicePermissions";
 
 /**
  * One boolean flag per capability, consumed by pages/buttons instead of calling
@@ -30,12 +40,22 @@ export function useApPermissions() {
     canOnboardVendor: hasRole(rolesForPermission(AP_PERMISSIONS.ONBOARD_VENDOR)),
     canEditVendor: hasRole(rolesForPermission(AP_PERMISSIONS.EDIT_VENDOR)),
     canViewVendor: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_VENDOR)),
-    canUploadInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.UPLOAD_INVOICE)),
-    canReviewOcr: hasRole(rolesForPermission(AP_PERMISSIONS.REVIEW_OCR)),
-    canValidateInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.VALIDATE_INVOICE)),
-    canViewInvoice: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_INVOICE)),
-    canMarkPaid: hasRole(rolesForPermission(AP_PERMISSIONS.MARK_PAID)),
-    canViewPayment: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_PAYMENT)),
+    // Invoice intake/OCR/view now carry real UMS permissions (invoice_extraction_route.py,
+    // invoice_process_route.py, invoice_details_route.py) — migrated off the frontend
+    // role -> permission guess the same way canMarkPaid/canViewPayment already were.
+    canUploadInvoice: hasPermission(INVOICE_PERMISSIONS.INVOICE_CREATE),
+    canReviewOcr: hasPermission(INVOICE_PERMISSIONS.INVOICE_OCR_REVIEW),
+    // The standalone Validation Queue page is part of the same OCR/intake pipeline — no
+    // separate backend permission exists for it.
+    canValidateInvoice: hasPermission(INVOICE_PERMISSIONS.INVOICE_OCR_REVIEW),
+    canViewInvoice: hasPermission(INVOICE_PERMISSIONS.INVOICE_VIEW),
+    // Payment routes previously had zero backend permission gating at all, so these were
+    // role-derived like every other flag on this page — PAYMENT_VIEW/PAYMENT_PROCESS now exist
+    // (payment_route.py), so these migrate to the same UMS-permission-driven model the approval
+    // workflow already uses, per the same reasoning: backend authorization is authoritative, not
+    // a frontend role guess.
+    canMarkPaid: hasPermission(PAYMENT_PERMISSIONS.PAYMENT_PROCESS),
+    canViewPayment: hasPermission(PAYMENT_PERMISSIONS.PAYMENT_VIEW),
 
     // ── PR Request ─────────────────────────────────────────────────────────
     canViewPR: hasPermission(PROCUREMENT_PERMISSIONS.PR_VIEW),
@@ -75,6 +95,25 @@ export function useApPermissions() {
     canViewVendorSelection: hasPermission(PROCUREMENT_PERMISSIONS.VENDOR_SELECTION_VIEW),
     canSelectVendor: hasPermission(PROCUREMENT_PERMISSIONS.VENDOR_SELECT),
 
+    // ── Vendor Availability / Vendor Onboarding branch ─────────────────────
+    // Each of these backend routes accepts any-of a permission list, so hasAnyPermission
+    // mirrors the server check exactly — a Procurement Officer carrying QUOTATION_* passes
+    // without a dedicated onboarding code, which is how the backend is configured today.
+    canCheckVendorAvailability: hasAnyPermission(VENDOR_AVAILABILITY_ANY),
+    canViewOnboarding: hasAnyPermission(ONBOARDING_ANY.VIEW),
+    canCreateOnboarding: hasAnyPermission(ONBOARDING_ANY.CREATE),
+    canAssignOnboarding: hasAnyPermission(ONBOARDING_ANY.ASSIGN),
+    // The Vendor Intaker's capability: run intake, pre-screen and complete the request.
+    canProcessOnboarding: hasAnyPermission(ONBOARDING_ANY.PROCESS),
+
+    // ── NDA lifecycle (Stage 2) ────────────────────────────────────────────
+    canViewNda: hasAnyPermission(NDA_ANY.VIEW),
+    canGenerateNda: hasAnyPermission(NDA_ANY.GENERATE),
+    // Sending and recording a status transition are the same backend permission (NDA_SEND).
+    canSendNda: hasAnyPermission(NDA_ANY.SEND),
+    // Uploading the vendor-signed PDF (POST /apm/nda/{id}/signed-document).
+    canUploadSignedNda: hasAnyPermission(NDA_ANY.UPLOAD_SIGNED),
+
     // ── Purchase Orders ────────────────────────────────────────────────────
     // purchase_order_route.py doesn't have permission_based_access wired up yet (known
     // backend gap, out of scope here) — PO_VIEW/PO_CREATE still gate the frontend so the UI
@@ -98,5 +137,13 @@ export function useApPermissions() {
     // for the invoice's active step. See InvoiceApprovalPanel for that check.
     canApproveInvoice: hasPermission(APPROVAL_PERMISSIONS.INVOICE_APPROVE),
     canRejectInvoice: hasPermission(APPROVAL_PERMISSIONS.INVOICE_REJECT),
+    // Returns the invoice to the AP Executive for correction (RETURNED_FOR_REVIEW) instead of
+    // approving/rejecting outright — same "necessary but not sufficient" caveat as
+    // canApproveInvoice/canRejectInvoice: the backend alone determines eligibility for the
+    // invoice's current active step.
+    canSendBackInvoice: hasPermission(APPROVAL_PERMISSIONS.INVOICE_SEND_BACK),
+    // The Activity/History tab — reuses every permission that already implies invoice
+    // visibility (see constants/approvalPermissions.js's INVOICE_HISTORY_VIEW_PERMISSIONS).
+    canViewInvoiceHistory: hasAnyPermission(INVOICE_HISTORY_VIEW_PERMISSIONS),
   };
 }

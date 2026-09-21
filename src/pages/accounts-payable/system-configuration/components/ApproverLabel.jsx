@@ -5,11 +5,12 @@ import { useEmployeeDirectory, resolveEmployeeName } from "../../../expense-mana
  * DepartmentApproverDTO, InvoiceApprovalStepApproverDTO) carry only opaque identity ids
  * (user_uuid/employee_uuid) — no name or email field exists anywhere in that data (CDC-synced
  * identity only). There's no AP-local user directory to resolve them, so this reuses the same
- * Employee Onboarding directory RequesterLabel.jsx already resolves Procurement's analogous
- * UUID-only `created_by` against (employee_uuid and user_uuid are confirmed to be the same
- * underlying identity per the CDC sync design — either can be used as the lookup key).
- * Falls back to a truncated uuid (never the raw full uuid) if the directory can't resolve it,
- * so the UI never looks broken even when a name genuinely isn't available.
+ * Employee Onboarding directory RequesterLabel.jsx resolves Procurement's numeric `created_by`
+ * against — useEmployeeDirectory now indexes that directory by BOTH the numeric employee_id and
+ * the employee_uuid every record also carries, so a uuid lookup resolves too (it previously
+ * didn't: this component always fell back to a truncated uuid until that indexing was added).
+ * Falls back to a truncated uuid (never the raw full uuid) if the directory genuinely can't
+ * resolve it, so the UI never looks broken even when a name isn't available.
  * @param {{ userUuid?: string, employeeUuid?: string, className?: string }} props
  */
 export default function ApproverLabel({ userUuid, employeeUuid, className = "" }) {
