@@ -39,40 +39,21 @@ const PLATFORM_ICON = { MEET: Video, ZOOM: Webcam, TEAMS: MonitorPlay, PHONE: Ph
 
 const unwrap = (res) => (res && res.data !== undefined ? res.data : res);
 
-// Every interview payload seen so far carries "Asia/Calcutta" — used as
-// the fallback whenever an entry is somehow missing its own `timezone`,
-// and for "now"/"today" so the live indicator lines up with zoned events
-// even when the viewer's own machine is set to a different timezone.
-const DEFAULT_TZ = "Asia/Calcutta";
-
-// The wall-clock date/time `date` reads as inside `timeZone` — e.g. the
-// same UTC instant is "03:04" in UTC but "08:34" in Asia/Calcutta; this
-// reads out the latter.
-function getZonedParts(date, timeZone) {
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-  });
-  const parts = fmt.formatToParts(date);
-  const get = (type) => Number(parts.find((p) => p.type === type)?.value);
-  return { year: get("year"), month: get("month") - 1, day: get("day"), hour: get("hour"), minute: get("minute") };
-}
-
-// A Date whose own local getters (getHours, getDate, getMonth, ...) read
-// out the wall-clock time in `timeZone` instead of the browser's own
-// zone. start_at/end_at arrive as UTC instants ("...Z") plus a separate
-// `timezone` field the interview was actually scheduled in — without
-// this, `new Date(iso).getHours()` silently reinterprets that instant
-// through whatever zone the viewer's machine happens to be set to, which
-// only matches the intended time by coincidence. Every place this
-// calendar positions or labels an event uses this instead of a raw
-// `new Date(iso)`.
-function toZonedDate(isoOrDate, timeZone) {
-  const date = isoOrDate instanceof Date ? isoOrDate : new Date(isoOrDate);
-  if (!timeZone) return date;
-  const { year, month, day, hour, minute } = getZonedParts(date, timeZone);
-  return new Date(year, month, day, hour, minute);
+// start_at/end_at are documented as UTC instants, but this endpoint has
+// been seen sending them with no trailing "Z"/offset (unlike the candidate
+// detail page's interview endpoint, which always includes one) — a bare
+// "2026-09-18T06:01:00" is parsed by `new Date()` as the *viewer's own
+// local* time instead of UTC, silently reinterpreting the instant instead
+// of leaving it needing conversion. Every place this calendar parses
+// start_at/end_at goes through this instead of a raw `new Date(iso)`, so
+// it's still correct even when the zone designator is missing. Each entry
+// also carries a `timezone` field, but that's only the zone the scheduler
+// happened to pick when creating the interview — informational, never
+// used here to pick a display zone.
+function parseInstant(iso) {
+  if (!iso) return null;
+  const hasZoneDesignator = /Z$|[+-]\d{2}:?\d{2}$/.test(iso);
+  return new Date(hasZoneDesignator ? iso : `${iso}Z`);
 }
 
 function toDateOnly(date) {
@@ -141,11 +122,11 @@ function formatClockTime(date) {
 // top of each other. Not a full "recombine trailing gaps" packer — good
 // enough for the handful of same-slot interviews this calendar sees.
 function layoutDayEvents(dayEntries) {
-  const sorted = [...dayEntries].sort((a, b) => new Date(a.start_at) - new Date(b.start_at));
+  const sorted = [...dayEntries].sort((a, b) => parseInstant(a.start_at) - parseInstant(b.start_at));
   const columnEnds = [];
   const placed = sorted.map((entry) => {
-    const start = new Date(entry.start_at);
-    const end = new Date(entry.end_at);
+    const start = parseInstant(entry.start_at);
+    const end = parseInstant(entry.end_at);
     let colIndex = columnEnds.findIndex((endTime) => endTime <= start);
     if (colIndex === -1) {
       colIndex = columnEnds.length;
@@ -183,53 +164,24 @@ function DayHeaderCell({ date, isToday }) {
   );
 }
 
-// A duration under this many pixels can't fit both the title and time
-// lines without clipping — those slots collapse to a single truncated
-// title line and only reveal the full card (every field: time, round,
-// platform, interviewer names) on hover, instead of forcing every short
-// meeting to a taller-than-real box.
-const COLLAPSE_HEIGHT_PX = 40;
-// Above this, there's room for a third line — round/interview type +
-// platform, straight from the API payload.
-const DETAILS_HEIGHT_PX = 62;
-// Above this, there's room for a fourth line — the interviewers' actual
-// names, not just a count.
-const NAMES_HEIGHT_PX = 84;
-// Per extra line's pixel cost, for sizing the hover-expanded box.
-const LINE_HEIGHT_PX = 15;
-
 // The meeting card — solid colored left bar, near-white pastel fill, no
 // rounded corners, bold colored title, lighter-shade time line — plus the
 // extra fields the backend actually sends (round/interview type,
-// platform, interviewer names) once the block is tall enough to hold
-// them. A card too short for that shows just the title, and hovering it
-// expands the box (floating above its neighbors, no layout shift) until
-// every field is fully visible — not just title+time. Full detail (every
+// platform, interviewer names). Collapsed by default to just the
+// candidate's name; hovering it expands the card in place to hold every
+// field that has data, wrapping instead of clipping — the card's own
+// height grows (`minHeight` off the duration-based slot as a floor while
+// collapsed) to fully contain that content rather than truncating it or
+// floating a fixed-size copy over its neighbors. Full detail (every
 // interviewer + status) is always in the tooltip regardless.
 // CANCELLED stays visible (never hidden) — just muted + struck through.
-function MeetingCard({ entry, style, onClick, isNarrow }) {
+function MeetingCard({ entry, style, onClick }) {
   const [hovered, setHovered] = useState(false);
   const tone = STATUS_CARD_STYLE[entry.status] || STATUS_CARD_STYLE.PENDING;
-  const isShort = style.height < COLLAPSE_HEIGHT_PX;
   const interviewerNames = (entry.interviewers || []).map((i) => i.name).filter(Boolean);
   const hasDetails = entry.platform || entry.round_number != null;
   const hasNames = interviewerNames.length > 0;
-  // Not just the shortest, single-line cards — anything whose real height
-  // can't already fit every field (time + round/platform + interviewer
-  // names) gets a hover-expand too, so a "medium" card that's only
-  // showing title+time still reveals the rest on hover. A tall-but-narrow
-  // card (splitting its column with another meeting at the same time)
-  // also needs it — plenty of vertical room doesn't help when the text
-  // itself is being clipped by a too-narrow width, not too little height.
-  const fullHeightNeeded = 40 + (hasDetails ? LINE_HEIGHT_PX : 0) + (hasNames ? LINE_HEIGHT_PX : 0);
-  const canExpand = isNarrow || style.height < fullHeightNeeded;
-  const expanded = canExpand && hovered;
-  const showDetails = (expanded || style.height >= DETAILS_HEIGHT_PX) && hasDetails;
-  const showNames = (expanded || style.height >= NAMES_HEIGHT_PX) && hasNames;
   const PlatformIcon = entry.platform && PLATFORM_ICON[entry.platform];
-  const tz = entry.timezone || DEFAULT_TZ;
-
-  const expandedMinHeight = 40 + (showDetails ? LINE_HEIGHT_PX : 0) + (showNames ? LINE_HEIGHT_PX : 0);
 
   return (
     <button
@@ -238,56 +190,54 @@ function MeetingCard({ entry, style, onClick, isNarrow }) {
         e.stopPropagation();
         onClick(entry);
       }}
-      onMouseEnter={() => canExpand && setHovered(true)}
-      onMouseLeave={() => canExpand && setHovered(false)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
-        ...style,
-        // Grows to the right from this card's own position (left stays
-        // put) instead of jumping to the day column's edge — a wide
-        // enough box that it's rarely cramped, floating over whatever it
-        // now overlaps (elevated z-index) rather than being squeezed to
-        // its original split-column width.
-        width: expanded ? 220 : style.width,
-        // Never shrinks below its real (possibly hours-tall) height —
-        // only `minHeight` grows to fit content when the box was too
-        // short. Forcing height:auto on an already-tall card would
-        // contract it out from under the cursor, firing mouseLeave,
-        // which un-expands it, moving the cursor back in — an infinite
-        // expand/collapse flicker.
-        minHeight: expanded ? expandedMinHeight : undefined,
-        zIndex: expanded ? 50 : undefined,
+        top: style.top,
+        left: style.left,
+        // A bit wider while hovered/expanded — still growing from this
+        // card's own left edge (unchanged above), not jumping to a fixed
+        // size, so it doesn't shift where the card visually starts.
+        width: hovered ? `calc(${style.width} + 40px)` : style.width,
+        // The real, duration-based height is only a floor while collapsed;
+        // hovering lets the card grow past it to fit every field instead
+        // of clipping.
+        minHeight: hovered ? undefined : style.height,
+        zIndex: hovered ? 30 : undefined,
       }}
-      className={`absolute text-center rounded-r-md border-l-8 ${tone.bg} ${tone.bar} ${expanded ? "shadow-lg" : "overflow-hidden"} ${
-        isShort && !expanded ? "flex items-center justify-center px-2.5 py-0" : "flex flex-col items-center justify-center px-3 py-1.5"
-      } hover:shadow-md transition-shadow`}
+      className={`absolute text-left rounded-r-md border-l-8 ${tone.bg} ${tone.bar} flex flex-col justify-center gap-0.5 px-3 py-1.5 ${
+        hovered ? "shadow-lg" : "overflow-hidden shadow-sm hover:shadow-md"
+      } transition-[width,box-shadow]`}
     >
-      <div className={`text-[12px] font-bold leading-snug ${expanded ? "" : "truncate"} ${tone.title}`}>
+      <div className={`text-[12px] font-bold leading-snug ${hovered ? "" : "truncate"} ${tone.title}`}>
         {entry.candidate_name}
       </div>
-      {(!isShort || expanded) && (
-        <div className={`text-[10.5px] font-medium mt-0.5 ${expanded ? "" : "truncate"} ${tone.time}`}>
-          {formatClockTime(toZonedDate(entry.start_at, tz))} - {formatClockTime(toZonedDate(entry.end_at, tz))}
-        </div>
-      )}
-      {showDetails && (
-        <div className={`flex items-center gap-2 text-[9.5px] font-semibold opacity-75 mt-0.5 ${expanded ? "flex-wrap" : "truncate"} ${tone.time}`}>
-          <span>
-            Round {entry.round_number}
-            {entry.interview_type ? ` · ${entry.interview_type}` : ""}
-          </span>
-          {entry.platform && (
-            <span className="flex items-center gap-0.5 shrink-0">
-              {PlatformIcon && <PlatformIcon size={9} />}
-              {entry.platform}
-            </span>
+      {hovered && (
+        <>
+          <div className={`text-[10.5px] font-medium ${tone.time}`}>
+            {formatClockTime(parseInstant(entry.start_at))} - {formatClockTime(parseInstant(entry.end_at))}
+          </div>
+          {hasDetails && (
+            <div className={`flex items-center gap-2 flex-wrap text-[9.5px] font-semibold opacity-75 ${tone.time}`}>
+              <span>
+                Round {entry.round_number}
+                {entry.interview_type ? ` · ${entry.interview_type}` : ""}
+              </span>
+              {entry.platform && (
+                <span className="flex items-center gap-0.5 shrink-0">
+                  {PlatformIcon && <PlatformIcon size={9} />}
+                  {entry.platform}
+                </span>
+              )}
+            </div>
           )}
-        </div>
-      )}
-      {showNames && (
-        <div className={`flex items-center gap-1 text-[9.5px] font-medium opacity-70 mt-0.5 ${expanded ? "" : "truncate"} ${tone.time}`}>
-          <Users size={9} className="shrink-0" />
-          <span className={expanded ? "" : "truncate"}>{interviewerNames.join(", ")}</span>
-        </div>
+          {hasNames && (
+            <div className={`flex items-start gap-1 text-[9.5px] font-medium opacity-70 ${tone.time}`}>
+              <Users size={9} className="shrink-0 mt-0.5" />
+              <span>{interviewerNames.join(", ")}</span>
+            </div>
+          )}
+        </>
       )}
     </button>
   );
@@ -390,19 +340,18 @@ export default function InterviewCalendarTab({ campaignId }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // Anchored to DEFAULT_TZ, not the browser's own zone — otherwise "today"/
-  // week boundaries and the now-line would land on a different day/hour
-  // than the zoned event cards whenever the viewer's machine isn't set to
-  // the same timezone the interviews were actually scheduled in.
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(toZonedDate(new Date(), DEFAULT_TZ)));
-  const [now, setNow] = useState(() => toZonedDate(new Date(), DEFAULT_TZ));
+  // Anchored to the viewer's own local time throughout — "today"/week
+  // boundaries and the now-line must land on the same local day/hour the
+  // event cards themselves are drawn in (see the module-level comment above).
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [now, setNow] = useState(() => new Date());
   const [statusFilter, setStatusFilter] = useState(""); // "" = no filter, matches every status
   const [interviewerEmailInput, setInterviewerEmailInput] = useState(""); // draft, bound to the input
   const [appliedInterviewerEmail, setAppliedInterviewerEmail] = useState(""); // last value actually sent to the backend
 
   // Ticks the "now" line forward once a minute — not tied to any fetch.
   useEffect(() => {
-    const t = setInterval(() => setNow(toZonedDate(new Date(), DEFAULT_TZ)), 60000);
+    const t = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(t);
   }, []);
 
@@ -444,7 +393,7 @@ export default function InterviewCalendarTab({ campaignId }) {
 
   const goPrevWeek = () => setWeekStart((w) => addDays(w, -7));
   const goNextWeek = () => setWeekStart((w) => addDays(w, 7));
-  const goToday = () => setWeekStart(startOfWeek(toZonedDate(new Date(), DEFAULT_TZ)));
+  const goToday = () => setWeekStart(startOfWeek(new Date()));
 
   const applyInterviewerEmail = () => setAppliedInterviewerEmail(interviewerEmailInput.trim());
 
@@ -472,19 +421,15 @@ export default function InterviewCalendarTab({ campaignId }) {
   const scheduledEntries = useMemo(() => filteredEntries.filter((e) => e.start_at && e.end_at), [filteredEntries]);
   const pendingEntries = useMemo(() => filteredEntries.filter((e) => !e.start_at || !e.end_at), [filteredEntries]);
 
-  // start_at/end_at are UTC instants ("...Z"); each entry also carries its
-  // own `timezone` (e.g. "Asia/Calcutta") — the zone it was actually
-  // scheduled in. toZonedDate() reads the instant back out in THAT zone,
-  // not whatever zone the viewer's own machine happens to be set to, so
-  // the grid position and label always agree with the intended wall-clock
-  // time regardless of who's looking at it.
+  // parseInstant() (see module-level comment above) — the current viewer's
+  // own local getters then read the grid position and label out correctly
+  // regardless of whether start_at/end_at carried a zone designator.
   const { minHour, maxHour } = useMemo(() => {
     let min = DEFAULT_START_HOUR;
     let max = DEFAULT_END_HOUR;
     scheduledEntries.forEach((e) => {
-      const tz = e.timezone || DEFAULT_TZ;
-      const s = toZonedDate(e.start_at, tz);
-      const en = toZonedDate(e.end_at, tz);
+      const s = parseInstant(e.start_at);
+      const en = parseInstant(e.end_at);
       min = Math.min(min, s.getHours());
       const endHour = en.getMinutes() > 0 ? en.getHours() + 1 : en.getHours();
       max = Math.max(max, endHour);
@@ -499,7 +444,7 @@ export default function InterviewCalendarTab({ campaignId }) {
   const entriesByDay = useMemo(() => {
     const buckets = weekDays.map(() => []);
     scheduledEntries.forEach((e) => {
-      const idx = weekDays.findIndex((d) => isSameDate(d, toZonedDate(e.start_at, e.timezone || DEFAULT_TZ)));
+      const idx = weekDays.findIndex((d) => isSameDate(d, parseInstant(e.start_at)));
       if (idx >= 0) buckets[idx].push(e);
     });
     return buckets.map(layoutDayEvents);
@@ -646,17 +591,15 @@ export default function InterviewCalendarTab({ campaignId }) {
                             )}
 
                             {entriesByDay[di].map(({ entry, colIndex, totalCols }) => {
-                              // Zoned for the row position (must match the
-                              // wall-clock hour the interview was actually
-                              // scheduled at); the true UTC instants for
-                              // duration, which is timezone-invariant either way.
-                              const zonedStart = toZonedDate(entry.start_at, entry.timezone || DEFAULT_TZ);
-                              const top = (((zonedStart.getHours() - minHour) * 60 + zonedStart.getMinutes()) / 60) * HOUR_ROW_PX;
-                              // Real proportional height, not padded up to a
-                              // minimum — accurate time-block sizing is what
-                              // triggers MeetingCard's own collapse/expand
-                              // behavior for anything too short to fit both lines.
-                              const durationMin = Math.max(5, (new Date(entry.end_at) - new Date(entry.start_at)) / 60000);
+                              // The viewer's own local hour/minute for this
+                              // instant — same reasoning as minHour/maxHour above.
+                              const localStart = parseInstant(entry.start_at);
+                              const top = (((localStart.getHours() - minHour) * 60 + localStart.getMinutes()) / 60) * HOUR_ROW_PX;
+                              // Real proportional height — MeetingCard treats
+                              // this as a floor (minHeight) only, growing
+                              // taller than its time slot when its content
+                              // needs more room.
+                              const durationMin = Math.max(5, (parseInstant(entry.end_at) - parseInstant(entry.start_at)) / 60000);
                               // -2px so back-to-back meetings (one ends
                               // exactly when the next starts) get a small
                               // visible gap instead of their edges touching
@@ -669,7 +612,6 @@ export default function InterviewCalendarTab({ campaignId }) {
                                   key={entry.id}
                                   entry={entry}
                                   onClick={goToCandidate}
-                                  isNarrow={totalCols > 1}
                                   style={{
                                     top,
                                     height,
