@@ -9,8 +9,13 @@ import VendorSelectionTab from "../components/VendorSelectionTab";
 import PurchaseOrdersTab from "../components/PurchaseOrdersTab";
 
 export default function ProcurementPage() {
-  const { canViewPR, canViewPRApprovals, canViewQuotation, canViewVendorSelection, canViewPO } =
-    useApPermissions();
+  const {
+    canViewPR,
+    canViewPRApprovals,
+    canViewQuotation,
+    canViewVendorSelection,
+    canViewPO,
+  } = useApPermissions();
   const [searchParams] = useSearchParams();
 
   // Each tab requires its own single UMS permission (PR_VIEW / PR_APPROVAL_VIEW /

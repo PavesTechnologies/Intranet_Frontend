@@ -40,6 +40,8 @@ import PrLineEditor from "../components/PrLineEditor";
 import ProcurementWorkflowStepper from "../components/ProcurementWorkflowStepper";
 import PrWorkflowTimeline from "../components/PrWorkflowTimeline";
 import RequesterLabel from "../components/RequesterLabel";
+import VendorAvailabilityPanel from "../components/VendorAvailabilityPanel";
+import { useOnboardingRequestsForPr } from "../hooks/useVendorOnboarding";
 import { isPrRequester } from "../utils/prAuthorization";
 
 function Field({ label, value }) {
@@ -63,6 +65,9 @@ export default function PrDetailPage() {
   const { data: categories = [] } = usePurchaseCategories();
   const { data: prStatuses = [] } = usePrStatuses();
   const { purchaseOrders } = usePurchaseOrderList({ limit: 200 });
+  // Drives the onboarding branch on the workflow stepper and is already cached for the
+  // availability panel below.
+  const { data: onboardingRequests = [] } = useOnboardingRequestsForPr(prId);
 
   const submitMutation = useSubmitPurchaseRequisition(prId);
   const cancelMutation = useCancelPurchaseRequisition(prId);
@@ -337,7 +342,10 @@ export default function PrDetailPage() {
       />
 
       <div className="mb-4">
-        <ProcurementWorkflowStepper prStatusCode={statusCode} />
+        <ProcurementWorkflowStepper
+          prStatusCode={statusCode}
+          onboardingRequests={onboardingRequests}
+        />
       </div>
 
       <PageCard className="mb-4">
@@ -565,6 +573,14 @@ export default function PrDetailPage() {
             )}
           </PageCardContent>
         </PageCard>
+      )}
+
+      {["APPROVED", "VENDOR_SELECTION"].includes(statusCode) && (
+        <VendorAvailabilityPanel
+          pr={pr}
+          departmentName={departmentName}
+          categoryName={categoryName}
+        />
       )}
 
       {["APPROVED", "VENDOR_SELECTION"].includes(statusCode) && (
