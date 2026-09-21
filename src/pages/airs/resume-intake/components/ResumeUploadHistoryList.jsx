@@ -8,6 +8,9 @@ import { useAuth } from "../../../../contexts/AuthContext";
 import { getResumeById, retryResume, replayResumeDlqEntry } from "../../service/resumeIntake";
 import { renderParseStatusBadge, renderSourceBadge, renderPipelineStageBadge, formatResumeDate } from "../utils/resumeIntakeUtils.jsx";
 import LoadingSpinner from "../../../../components/LoadingSpinner.jsx";
+import ProcessingErrorPanel from "../../components/ProcessingErrorPanel";
+import RetryAttemptBadge from "../../components/RetryAttemptBadge";
+import { retryErrorMessage } from "../../utils/retryErrors";
 
 // Progress indicators mapping to statuses
 const PARSE_STATUS_PROGRESS = {
@@ -54,7 +57,8 @@ export default function ResumeUploadHistoryList({ files, isLoading, onRetried })
       toast.success(res?.message || "Retry queued for this resume.");
       onRetried?.();
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to retry this resume.");
+      // 409 = nothing to replay (re-upload instead), 403 = someone else's upload.
+      toast.error(retryErrorMessage(err, "Failed to retry this resume."));
     } finally {
       setRetryingId(null);
     }
@@ -150,7 +154,25 @@ export default function ResumeUploadHistoryList({ files, isLoading, onRetried })
           </div>
         </div>
       ),
-      status: renderParseStatusBadge(f.parse_status),
+      status: (
+        <div className="flex flex-col items-center gap-1.5 min-w-[9rem] max-w-[16rem] mx-auto">
+          {renderParseStatusBadge(f.parse_status)}
+          <RetryAttemptBadge
+            status={f.parse_status}
+            retryCount={f.retry_count}
+            maxAttempts={f.max_attempts}
+          />
+          {/* error_message only — error_detail stays behind the panel's own
+              toggle so a stack trace never lands in the table. */}
+          {(f.error_message || f.error_detail) && (
+            <ProcessingErrorPanel
+              message={f.error_message}
+              detail={f.error_detail}
+              className="text-left w-full"
+            />
+          )}
+        </div>
+      ),
       pipelineStage: renderPipelineStageBadge(f),
       actions: (
         <div className="flex items-center gap-1 justify-center">

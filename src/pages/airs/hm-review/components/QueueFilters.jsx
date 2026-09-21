@@ -1,9 +1,14 @@
 import React from "react";
 import { Search } from "lucide-react";
-import FilterListbox from "../../../../components/filter/FilterListbox";
-import { CANDIDATE_STAGE_FILTER_OPTIONS, CANDIDATE_SORT_OPTIONS } from "../constants/candidateConstants";
+import FilterListbox from "@/components/filter/FilterListbox";
 
-export default function CandidateFilters({ search, setSearch, stageFilter, setStageFilter, sortValue, setSortValue }) {
+export default function QueueFilters({
+  search,
+  setSearch,
+  campaignOptions,
+  campaignId,
+  onCampaignChange,
+}) {
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm mb-6 flex flex-col lg:flex-row gap-4 items-center">
       <div className="relative flex-1 w-full">
@@ -17,10 +22,11 @@ export default function CandidateFilters({ search, setSearch, stageFilter, setSt
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full lg:w-auto lg:min-w-[380px]">
-        <FilterListbox options={CANDIDATE_STAGE_FILTER_OPTIONS} value={stageFilter} onChange={setStageFilter} />
-        <FilterListbox options={CANDIDATE_SORT_OPTIONS} value={sortValue} onChange={setSortValue} />
-      </div>
+      {campaignOptions && (
+        <div className="w-full lg:w-64">
+          <FilterListbox options={campaignOptions} value={campaignId || ""} onChange={onCampaignChange} />
+        </div>
+      )}
     </div>
   );
 }

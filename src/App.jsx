@@ -152,16 +152,13 @@ import AirsPlaceholder from "./pages/airs/pages/AirsPlaceholder.jsx";
 import ResumeIntakePage from "./pages/airs/resume-intake/ResumeIntakePage.jsx";
 import IntakeFlowPage from "./pages/airs/resume-intake/intake/IntakeFlowPage.jsx";
 import ReviewPage from "./pages/airs/resume-intake/intake/ReviewPage.jsx";
-import CandidateRankingPage from "./pages/airs/candidates/CandidateRankingPage.jsx";
 import CandidateScorePage from "./pages/airs/candidates/CandidateScore/CandidateScorePage.jsx";
-import InterviewQueuePage from "./pages/airs/interview-queue/InterviewQueuePage.jsx";
+import HMReviewPage from "./pages/airs/hm-review/HMReviewPage.jsx";
 import InterviewCalendarPage from "./pages/airs/interview-calendar/InterviewCalendarPage.jsx";
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
-import GlobalCandidatesPage from "./pages/airs/global-candidates/GlobalCandidatesPage.jsx";
 import PipelineCandidateScorecardPage from "./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
 import TalentPoolCandidateProfilePage from "./pages/airs/talent-pool/profile/TalentPoolCandidateProfilePage.jsx";
-import AnalyticsPage from "./pages/airs/analytics/AnalyticsPage.jsx";
 import SettingsPage from "./pages/airs/settings/SettingsPage.jsx";
 import SkillOntologyPage from "./pages/airs/skill-ontology/SkillOntologyPage.jsx";
 import SkillDetailPage from "./pages/airs/skill-ontology/SkillDetailPage.jsx";
@@ -420,6 +417,19 @@ const RoleOffEntry = () => {
   }
 
   return <Navigate to="/resource-management/roleoff/pm" replace />;
+};
+
+// AIRS routes were renamed /airs/* -> /ai-screening/*. Old links (bookmarks,
+// open tabs, anything shared before the rename) still point at /airs/*, so
+// they're redirected instead of falling through to "no routes matched".
+const LegacyAirsRedirect = () => {
+  const { pathname, search, hash } = useLocation();
+  return (
+    <Navigate
+      to={`${pathname.replace("/airs", "/ai-screening")}${search}${hash}`}
+      replace
+    />
+  );
 };
 
 // ✅ Application Routes
@@ -1507,13 +1517,14 @@ const AppRoutes = () => {
             }
           />
           {/* Was a tab inside CampaignDetails.jsx — moved to its own page with
-              a campaign selector. Same roles that could see that tab
-              (canSeePipeline = HR_ADMIN/RECRUITER); HIRING_MANAGER is
-              deliberately excluded, matching the tab's old visibility. */}
+              a campaign selector. Now also in HIRING_MANAGER's sidebar menu,
+              so it's allowed here too — the backend campaign list/interviews
+              calls are already scoped to whichever campaigns each role can
+              see. */}
           <Route
             path="/ai-screening/interview-calendar"
             element={
-              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <InterviewCalendarPage />
               </ProtectedRoute>
             }
@@ -1543,14 +1554,6 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/ai-screening/candidates"
-            element={
-              <ProtectedRoute roles={["General"]}>
-                <CandidateRankingPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/ai-screening/candidates/:candidateId"
             element={
               <ProtectedRoute roles={["General"]}>
@@ -1559,10 +1562,10 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/ai-screening/interview-queue"
+            path="/ai-screening/hm-review"
             element={
-              <ProtectedRoute allowedRoles={["HIRING_MANAGER", "HR_ADMIN"]}>
-                <InterviewQueuePage />
+              <ProtectedRoute allowedRoles={["HIRING_MANAGER"]}>
+                <HMReviewPage />
               </ProtectedRoute>
             }
           />
@@ -1582,18 +1585,6 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
-          {/* Global Candidate Directory (GET /candidates) — distinct from
-              /ai-screening/candidates below, which is the campaign-scoped
-              Candidates & Ranking page. HR_ADMIN only, matching the
-              backend's require_roles(UserRole.HR_ADMIN) on this endpoint. */}
-          <Route
-            path="/ai-screening/global-candidates"
-            element={
-              <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
-                <GlobalCandidatesPage />
-              </ProtectedRoute>
-            }
-          />
           <Route
             path="/ai-screening/talent-pool"
             element={
@@ -1607,14 +1598,6 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute roles={["General"]}>
                 <TalentPoolCandidateProfilePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ai-screening/analytics"
-            element={
-              <ProtectedRoute roles={["General"]}>
-                <AnalyticsPage />
               </ProtectedRoute>
             }
           />
@@ -1681,6 +1664,9 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+
+          {/* Legacy /airs/* links -> the current /ai-screening/* paths. */}
+          <Route path="/airs/*" element={<LegacyAirsRedirect />} />
 
           {/* employee exit routes*/}
 
