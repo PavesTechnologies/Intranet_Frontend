@@ -1,6 +1,11 @@
 import { useAuth } from "../../../contexts/AuthContext";
 import { AP_PERMISSIONS, rolesForPermission } from "../constants/permissions";
-import { PROCUREMENT_PERMISSIONS } from "../constants/procurementPermissions";
+import {
+  PROCUREMENT_PERMISSIONS,
+  ONBOARDING_ANY,
+  NDA_ANY,
+  VENDOR_AVAILABILITY_ANY,
+} from "../constants/procurementPermissions";
 import { APPROVAL_PERMISSIONS, APPROVAL_ANY_VIEW_PERMISSIONS } from "../constants/approvalPermissions";
 
 /**
@@ -74,6 +79,25 @@ export function useApPermissions() {
     // ── Vendor Selection ───────────────────────────────────────────────────
     canViewVendorSelection: hasPermission(PROCUREMENT_PERMISSIONS.VENDOR_SELECTION_VIEW),
     canSelectVendor: hasPermission(PROCUREMENT_PERMISSIONS.VENDOR_SELECT),
+
+    // ── Vendor Availability / Vendor Onboarding branch ─────────────────────
+    // Each of these backend routes accepts any-of a permission list, so hasAnyPermission
+    // mirrors the server check exactly — a Procurement Officer carrying QUOTATION_* passes
+    // without a dedicated onboarding code, which is how the backend is configured today.
+    canCheckVendorAvailability: hasAnyPermission(VENDOR_AVAILABILITY_ANY),
+    canViewOnboarding: hasAnyPermission(ONBOARDING_ANY.VIEW),
+    canCreateOnboarding: hasAnyPermission(ONBOARDING_ANY.CREATE),
+    canAssignOnboarding: hasAnyPermission(ONBOARDING_ANY.ASSIGN),
+    // The Vendor Intaker's capability: run intake, pre-screen and complete the request.
+    canProcessOnboarding: hasAnyPermission(ONBOARDING_ANY.PROCESS),
+
+    // ── NDA lifecycle (Stage 2) ────────────────────────────────────────────
+    canViewNda: hasAnyPermission(NDA_ANY.VIEW),
+    canGenerateNda: hasAnyPermission(NDA_ANY.GENERATE),
+    // Sending and recording a status transition are the same backend permission (NDA_SEND).
+    canSendNda: hasAnyPermission(NDA_ANY.SEND),
+    // Uploading the vendor-signed PDF (POST /apm/nda/{id}/signed-document).
+    canUploadSignedNda: hasAnyPermission(NDA_ANY.UPLOAD_SIGNED),
 
     // ── Purchase Orders ────────────────────────────────────────────────────
     // purchase_order_route.py doesn't have permission_based_access wired up yet (known
