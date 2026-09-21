@@ -17,7 +17,14 @@ const BILLING_TYPE_LABELS = {
   RECURRING: "Recurring",
 };
 
-const PAGE_SIZE = 5;
+const STATUS_DISPLAY_LABELS = {
+  NOT_ACQUIRED: "Not Acquired",
+  READY_FOR_TAX: "Ready for Tax",
+  TAX_COMPLETED: "Tax Completed",
+  INVOICED: "Invoiced",
+};
+
+const PAGE_SIZE = 8;
 
 const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Billing Period", "Status", "Reference", "Action"];
 const TABLE_COLUMNS = ["client", "project", "billingType", "billingPeriod", "status", "reference", "action"];
@@ -68,22 +75,23 @@ export default function AcquisitionQueue({
   // Canonical composable filtering pipeline
   const filteredConfigs = useMemo(() => {
     return configs.filter((c) => {
-      const st = normalizeAcquisitionStatus(c.billingStatus);
+      const hasSnapshot = Boolean(c.snapshotId || c.existingSnapshot);
+      const st = normalizeAcquisitionStatus(c.billingStatus, hasSnapshot);
 
       // 1. Status Filter (from active KPI card or status dropdown)
       let matchesStatus = true;
       if (activeStatusFilter === "NOT_ACQUIRED") {
         matchesStatus = st === "NOT_ACQUIRED";
-      } else if (activeStatusFilter === "NEEDS_APPROVAL") {
-        matchesStatus = st === "PARTIALLY_READY" || st === "PENDING_APPROVAL";
-      } else if (activeStatusFilter === "READY" || activeStatusFilter === "READY_TO_TAX") {
-        matchesStatus = st === "READY_TO_TAX" || st === "IN_TAX" || st === "TAX_COMPLETED";
-      } else if (activeStatusFilter === "NO_BILLABLE_DATA") {
-        matchesStatus = st === "NO_BILLABLE_DATA";
-      } else if (activeStatusFilter === "ACQUISITION_FAILED") {
-        matchesStatus = st === "ACQUISITION_FAILED";
-      } else if (activeStatusFilter === "CONFIGURATION_REQUIRED") {
-        matchesStatus = st === "CONFIGURATION_REQUIRED";
+      } else if (
+        activeStatusFilter === "READY_FOR_TAX" ||
+        activeStatusFilter === "READY_TO_TAX" ||
+        activeStatusFilter === "READY"
+      ) {
+        matchesStatus = st === "READY_FOR_TAX";
+      } else if (activeStatusFilter === "TAX_COMPLETED") {
+        matchesStatus = st === "TAX_COMPLETED";
+      } else if (activeStatusFilter === "INVOICED") {
+        matchesStatus = st === "INVOICED";
       }
 
       // 2. Search Filter (case-insensitive on projectName, projectCode, client)
@@ -108,41 +116,34 @@ export default function AcquisitionQueue({
   // Status option counts calculated over TOTAL population (configs)
   const populationCounts = useMemo(() => {
     let notAcquired = 0;
-    let needsApproval = 0;
-    let ready = 0;
-    let noData = 0;
-    let failed = 0;
-    let configReq = 0;
+    let readyForTax = 0;
+    let taxCompleted = 0;
+    let invoiced = 0;
 
     configs.forEach((c) => {
-      const st = normalizeAcquisitionStatus(c.billingStatus);
+      const hasSnapshot = Boolean(c.snapshotId || c.existingSnapshot);
+      const st = normalizeAcquisitionStatus(c.billingStatus, hasSnapshot);
       if (st === "NOT_ACQUIRED") notAcquired++;
-      else if (st === "PARTIALLY_READY" || st === "PENDING_APPROVAL") needsApproval++;
-      else if (st === "READY_TO_TAX" || st === "IN_TAX" || st === "TAX_COMPLETED") ready++;
-      else if (st === "NO_BILLABLE_DATA") noData++;
-      else if (st === "ACQUISITION_FAILED") failed++;
-      else if (st === "CONFIGURATION_REQUIRED") configReq++;
+      else if (st === "READY_FOR_TAX") readyForTax++;
+      else if (st === "TAX_COMPLETED") taxCompleted++;
+      else if (st === "INVOICED") invoiced++;
     });
 
     return {
       totalSetups: configs.length,
       notAcquired,
-      needsApproval,
-      ready,
-      noData,
-      failed,
-      configReq,
+      readyForTax,
+      taxCompleted,
+      invoiced,
     };
   }, [configs]);
 
   const tabs = [
     { key: "ALL", label: "All Setups", count: populationCounts.totalSetups },
     { key: "NOT_ACQUIRED", label: "Not Acquired", count: populationCounts.notAcquired },
-    { key: "NEEDS_APPROVAL", label: "Needs Approval", count: populationCounts.needsApproval },
-    { key: "READY_TO_TAX", label: "Ready for Tax", count: populationCounts.ready },
-    { key: "NO_BILLABLE_DATA", label: "No Billable Data", count: populationCounts.noData },
-    { key: "ACQUISITION_FAILED", label: "Acquisition Failed", count: populationCounts.failed },
-    { key: "CONFIGURATION_REQUIRED", label: "Configuration Required", count: populationCounts.configReq },
+    { key: "READY_FOR_TAX", label: "Ready for Tax", count: populationCounts.readyForTax },
+    { key: "TAX_COMPLETED", label: "Tax Completed", count: populationCounts.taxCompleted },
+    { key: "INVOICED", label: "Invoiced", count: populationCounts.invoiced },
   ];
 
   const statusFilterOptions = tabs.map((tab) => ({
@@ -159,17 +160,14 @@ export default function AcquisitionQueue({
     switch (key) {
       case "NOT_ACQUIRED":
         return "Not Acquired";
-      case "NEEDS_APPROVAL":
-        return "Needs Approval";
+      case "READY_FOR_TAX":
       case "READY_TO_TAX":
       case "READY":
         return "Ready for Tax";
-      case "NO_BILLABLE_DATA":
-        return "No Billable Data";
-      case "ACQUISITION_FAILED":
-        return "Acquisition Failed";
-      case "CONFIGURATION_REQUIRED":
-        return "Configuration Required";
+      case "TAX_COMPLETED":
+        return "Tax Completed";
+      case "INVOICED":
+        return "Invoiced";
       default:
         return "All Setups";
     }
@@ -178,8 +176,11 @@ export default function AcquisitionQueue({
   const tableRows = useMemo(
     () =>
       paginatedConfigs.map((cfg) => {
-        const st = normalizeAcquisitionStatus(cfg.billingStatus);
+        const hasSnapshot = Boolean(cfg.snapshotId || cfg.existingSnapshot);
+        const st = normalizeAcquisitionStatus(cfg.billingStatus, hasSnapshot);
         const isPending = st === "NOT_ACQUIRED";
+        const isTaxInProgress = String(cfg.billingStatus || "").trim().toUpperCase() === "IN_TAX";
+        const displayStatus = STATUS_DISPLAY_LABELS[st] || st;
 
         return {
           onRowClick: () => onViewConfig(cfg),

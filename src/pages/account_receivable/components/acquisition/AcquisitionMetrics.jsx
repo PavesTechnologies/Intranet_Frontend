@@ -1,5 +1,5 @@
 import React from "react";
-import { FolderKanban, Play, CheckCircle2, Clock } from "lucide-react";
+import { FolderKanban, Play, CheckCircle2, FileCheck, Receipt } from "lucide-react";
 import { KPICard } from "../../../../components/kpi/KPI";
 import { getAcquisitionKpis } from "../../services/billingDataAcquisitionService";
 
@@ -29,20 +29,28 @@ export default function AcquisitionMetrics({
       tooltip: "Active setups where source snapshot acquisition has not been initiated",
     },
     {
-      key: "NEEDS_APPROVAL",
-      label: "Needs Approval",
-      value: kpiData.needsApproval,
-      icon: Clock,
-      color: "bg-amber-500 text-white",
-      tooltip: "Projects with pending or partially approved timesheets blocking billing readiness",
-    },
-    {
-      key: "READY",
-      label: "Ready",
-      value: kpiData.ready,
+      key: "READY_FOR_TAX",
+      label: "Ready for Tax",
+      value: kpiData.readyForTax,
       icon: CheckCircle2,
       color: "bg-emerald-600 text-white",
-      tooltip: "Projects with 100% required timesheet approval ready for tax calculation",
+      tooltip: "Acquired billing snapshots ready for tax calculation",
+    },
+    {
+      key: "TAX_COMPLETED",
+      label: "Tax Completed",
+      value: kpiData.taxCompleted,
+      icon: FileCheck,
+      color: "bg-blue-600 text-white",
+      tooltip: "Snapshots with completed tax calculation ready for invoice generation",
+    },
+    {
+      key: "INVOICED",
+      label: "Invoiced",
+      value: kpiData.invoiced,
+      icon: Receipt,
+      color: "bg-indigo-600 text-white",
+      tooltip: "Snapshots that have been successfully billed and invoiced",
     },
   ];
 
@@ -57,7 +65,7 @@ export default function AcquisitionMetrics({
   };
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {kpis.map((kpi) => {
         const isActive =
           selectedStatusFilter === kpi.key ||

@@ -37,8 +37,13 @@ import {
 } from "../../services/taxCalculationService";
 import { getInvoice } from "../../services/invoiceService";
 import { getActiveTaxRegions } from "../../services/taxRateConfigurationService";
+import {
+  getBillingOccurrences,
+} from "../../services/billingOccurrenceService";
+import BillingOccurrenceCard from "./BillingOccurrenceCard";
 
 const ACQUISITION_PATH = "/account-receivable/billing-data-acquisition";
+const OCCURRENCE_DETAIL_BASE = "/account-receivable/tax-calculation/occurrence";
 
 export default function TaxCalculationConsole() {
   const navigate = useNavigate();
@@ -80,7 +85,13 @@ export default function TaxCalculationConsole() {
     setLoading(true);
 
     try {
-      const activeConfigs = await fetchActiveBillingConfigurations();
+      // This table is the Time & Material billing-snapshot queue only --
+      // Fixed Price/Recurring occurrences are loaded separately below via
+      // getBillingOccurrences(). fetchActiveBillingConfigurations() returns
+      // every active configuration regardless of billing type, so it must
+      // be filtered down here the same way Data Acquisition does.
+      const allActiveConfigs = await fetchActiveBillingConfigurations();
+      const activeConfigs = allActiveConfigs.filter((cfg) => cfg.billingTypeCode === "TIME_MATERIAL");
       const regionsList = await getActiveTaxRegions().catch(() => []);
 
       const loadedSnapshots = (
@@ -89,8 +100,8 @@ export default function TaxCalculationConsole() {
             if (!cfg.projectId && !cfg.id) return null;
 
             const savedMeta = getAcquiredSnapshotMetadata(cfg.projectId);
-            const snapStart = savedMeta?.billingPeriodStart || null;
-            const snapEnd = savedMeta?.billingPeriodEnd || null;
+            const snapStart = cfg.billingPeriodStart || savedMeta?.billingPeriodStart || null;
+            const snapEnd = cfg.billingPeriodEnd || savedMeta?.billingPeriodEnd || null;
 
             let existingSnapshot = null;
             if (cfg.projectId && snapStart && snapEnd) {
@@ -427,15 +438,29 @@ export default function TaxCalculationConsole() {
     );
   }
 
-  // Genuine Empty State (when zero relevant snapshots exist)
-  if (!loading && relevantSnapshots.length === 0) {
+  const hasAnyOccurrences =
+    readyOccurrences.length > 0 ||
+    upcomingOccurrences.length > 0 ||
+    processedOccurrences.length > 0 ||
+    invoicedOccurrences.length > 0;
+
+  // Genuine Empty State (when zero relevant snapshots AND zero billing occurrences exist)
+  if (!loading && relevantSnapshots.length === 0 && !occLoading && !hasAnyOccurrences) {
     return (
       <div className="w-full space-y-6">
         <PageHeader
           title="Tax Calculation"
           subtitle="Calculate and review tax for acquired billing snapshots."
           action={
-            <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={refreshing}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                loadData(true);
+                loadOccurrences();
+              }}
+              disabled={refreshing}
+            >
               <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
               Refresh
             </Button>
@@ -527,9 +552,17 @@ export default function TaxCalculationConsole() {
       {/* Header */}
       <PageHeader
         title="Tax Calculation"
-        subtitle="Calculate and review tax for acquired billing snapshots."
+        subtitle="Calculate and review tax for acquired billing snapshots and billing occurrences."
         action={
-          <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={refreshing}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              loadData(true);
+              loadOccurrences();
+            }}
+            disabled={refreshing}
+          >
             <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
           </Button>
@@ -571,7 +604,10 @@ export default function TaxCalculationConsole() {
         })}
       </div>
 
-      {/* Queue Card & Filters */}
+      {/* Time & Material — Billing Snapshot Queue & Filters */}
+      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        Time &amp; Material — Billing Snapshots
+      </h2>
       <PageCard>
         <PageCardContent className="space-y-4 p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -628,6 +664,95 @@ export default function TaxCalculationConsole() {
           />
         </PageCardContent>
       </PageCard>
+
+      {/* Fixed Price / Recurring — Billing Occurrences */}
+      <div className="space-y-3">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          Ready for Tax Calculation — Fixed Price &amp; Recurring
+        </h2>
+        {occLoading ? (
+          <div className="flex h-24 items-center justify-center">
+            <Loader size="sm" text="Loading billing occurrences..." />
+          </div>
+        ) : readyOccurrences.length === 0 ? (
+          <PageCard>
+            <PageCardContent className="py-6 text-center text-sm text-slate-500">
+              No billing occurrences are currently pending tax calculation.
+            </PageCardContent>
+          </PageCard>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {readyOccurrences.map((occurrence) => (
+              <BillingOccurrenceCard
+                key={occurrence.billingScheduleId}
+                occurrence={occurrence}
+                variant="ready"
+                onOpenTaxCalculation={handleOpenOccurrenceTaxCalculation}
+                onCalculateTax={handleOpenOccurrenceTaxCalculation}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          Upcoming Billing Occurrences
+        </h2>
+        {occLoading ? (
+          <div className="flex h-24 items-center justify-center">
+            <Loader size="sm" text="Loading billing occurrences..." />
+          </div>
+        ) : upcomingOccurrences.length === 0 ? (
+          <PageCard>
+            <PageCardContent className="py-6 text-center text-sm text-slate-500">
+              No upcoming billing occurrences are scheduled.
+            </PageCardContent>
+          </PageCard>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {upcomingOccurrences.map((occurrence) => (
+              <BillingOccurrenceCard key={occurrence.billingScheduleId} occurrence={occurrence} variant="upcoming" />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {processedOccurrences.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Processed Billing Occurrences
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {processedOccurrences.map((occurrence) => (
+              <BillingOccurrenceCard
+                key={occurrence.billingScheduleId}
+                occurrence={occurrence}
+                variant="processed"
+                onView={handleViewOccurrence}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {invoicedOccurrences.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Invoiced Billing Occurrences
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {invoicedOccurrences.map((occurrence) => (
+              <BillingOccurrenceCard
+                key={occurrence.billingScheduleId}
+                occurrence={occurrence}
+                variant="invoiced"
+                onView={handleViewOccurrence}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

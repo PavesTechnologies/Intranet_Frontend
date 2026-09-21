@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Combobox } from "@headlessui/react";
-import { Check, ChevronDown, RefreshCw, AlertCircle, FolderKanban, Hash, CalendarRange, Building2, UserRound } from "lucide-react";
+import { Check, ChevronDown, RefreshCw, AlertCircle, FolderKanban, Hash, CalendarRange, Building2, MapPin } from "lucide-react";
 import classNames from "classnames";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
 import {
   getBillingConfigurationClients,
-  getBillingConfigurationProjectsByClient,
-  fetchBillingConfigurations,
+  getAvailableProjectsForBillingConfiguration,
 } from "../../services/billingConfigService";
 
 function SummaryField({ icon, label, value, wide }) {
@@ -29,7 +28,6 @@ export default function ProjectStep({ value = {}, onChange }) {
   const [loadingClients, setLoadingClients] = useState(true);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [clientQuery, setClientQuery] = useState("");
-  const [configuredProjectKeys, setConfiguredProjectKeys] = useState(new Set());
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -65,7 +63,7 @@ export default function ProjectStep({ value = {}, onChange }) {
     if (!value.clientId) return;
 
     setLoadingProjects(true);
-    getBillingConfigurationProjectsByClient(value.clientId)
+    getAvailableProjectsForBillingConfiguration(value.clientId)
       .then((projectList) => {
         if (!isMounted.current) return;
         setProjects(Array.isArray(projectList) ? projectList : []);
@@ -80,84 +78,79 @@ export default function ProjectStep({ value = {}, onChange }) {
       });
   }, [value.clientId]);
 
-  // A project is only blocked from a new Billing Setup while a configuration
-  // for it is still in progress (Draft/Pending Approval) or is currently
-  // active (Approved + billingStatus ACTIVE — same definition used for the
-  // "Active" stat in billingConfigurationService.js). Rejected configs never
-  // block, and an Approved config that was later deactivated (billingStatus
-  // flips to INACTIVE, approvalStatus stays APPROVED — see
-  // deactivateBillingConfiguration) no longer blocks either, so the project
-  // becomes available again for a fresh setup. (Note: getBillingConfigurations
-  // returns every configuration regardless of status, so this filtering must
-  // happen here.)
-  useEffect(() => {
-    if (!value.clientId || !value.clientName) {
-      setConfiguredProjectKeys(new Set());
-      return;
-    }
-
-    let cancelled = false;
-    fetchBillingConfigurations()
-      .then((configs) => {
-        if (cancelled) return;
-        const belongsToClient = (config) =>
-          (value.clientId && config.clientId && String(config.clientId) === String(value.clientId)) ||
-          config.client === value.clientName;
-
-        const blocksNewSetup = (config) => {
-          if (config.approvalStatus === "DRAFT" || config.approvalStatus === "PENDING_APPROVAL") return true;
-          return config.approvalStatus === "APPROVED" && config.billingStatus === "ACTIVE";
-        };
-
-        const keys = new Set(
-          (Array.isArray(configs) ? configs : [])
-            .filter(belongsToClient)
-            .filter(blocksNewSetup)
-            .flatMap((config) => [config.projectId, config.projectCode])
-            .filter(Boolean)
-            .map(String)
-        );
-        setConfiguredProjectKeys(keys);
-      })
-      .catch(() => {
-        if (!cancelled) setConfiguredProjectKeys(new Set());
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [value.clientId, value.clientName]);
-
   // Internal projectSource defaults to ENTERPRISE if not set
   const projectSource = value.projectSource || "ENTERPRISE";
 
   // clientOptions are loaded from backend via `getBillingConfigurationClients`
 
-  // Projects filtered by selected client, excluding ones that already have a
-  // Billing Configuration (Draft or Active) — except the project currently
-  // selected, so editing an existing Draft setup doesn't hide its own project.
-  const availableProjects = useMemo(() => {
-    return projects.filter((project) => {
-      const projectId = String(project.projectId || project.id || "");
-      if (value.projectId && projectId === String(value.projectId)) return true;
-      if (projectId && configuredProjectKeys.has(projectId)) return false;
-      if (project.projectCode && configuredProjectKeys.has(String(project.projectCode))) return false;
-      return true;
-    });
-  }, [projects, configuredProjectKeys, value.projectId]);
+  // `projects` is already exactly the set of projects eligible for a new
+  // Billing Configuration (see getAvailableProjectsForBillingConfiguration) —
+  // the backend is the sole source of truth for that eligibility, so no
+  // further filtering happens here.
+  //
+  // When editing an existing configuration, its own project may be absent
+  // from that eligibility list (e.g. it's already configured, so it no longer
+  // qualifies as available for a NEW configuration). Rather than treat that as
+  // "no projects found", fall back to the project data already carried on the
+  // configuration itself (`value`) so it stays selectable/displayed here —
+  // this never affects the New Billing Configuration list or its API.
+  const displayProjects = useMemo(() => {
+    if (!value.projectId) return projects;
+    const alreadyListed = projects.some(
+      (project) => String(project.projectId || project.id || "") === String(value.projectId)
+    );
+    if (alreadyListed) {
+      // The available-projects API entry may not carry primaryLocation (it's a
+      // slim "eligible for a new configuration" DTO) — never let a missing/null
+      // value from it clobber the primaryLocation already known from the
+      // configuration being edited.
+      return projects.map((project) =>
+        String(project.projectId || project.id || "") === String(value.projectId)
+          ? { ...project, primaryLocation: value.primaryLocation || project.primaryLocation }
+          : project
+      );
+    }
+    return [
+      ...projects,
+      {
+        projectId: value.projectId,
+        projectName: value.projectName,
+        projectCode: value.projectCode,
+        projectDuration: value.projectDuration,
+        projectBudget: value.projectBudget,
+        projectBudgetCurrency: value.projectBudgetCurrency,
+        currency: value.currency,
+        primaryLocation: value.primaryLocation,
+        startDate: value.startDate,
+        endDate: value.endDate,
+      },
+    ];
+  }, [
+    projects,
+    value.projectId,
+    value.projectName,
+    value.projectCode,
+    value.projectDuration,
+    value.projectBudget,
+    value.projectBudgetCurrency,
+    value.currency,
+    value.primaryLocation,
+    value.startDate,
+    value.endDate,
+  ]);
 
   const projectOptions = useMemo(() => {
     if (!value.clientId) return [];
-    return availableProjects.map((project) => ({ value: String(project.projectId || project.id || ""), label: project.projectName }));
-  }, [availableProjects, value.clientId]);
+    return displayProjects.map((project) => ({ value: String(project.projectId || project.id || ""), label: project.projectName }));
+  }, [displayProjects, value.clientId]);
 
   // Selected enterprise project details
   const matchedProject = useMemo(() => {
     if (!value.projectId) return null;
     return (
-      projects.find((project) => String(project.projectId || project.id || "") === String(value.projectId)) || null
+      displayProjects.find((project) => String(project.projectId || project.id || "") === String(value.projectId)) || null
     );
-  }, [projects, value.projectId]);
+  }, [displayProjects, value.projectId]);
 
   // A Draft billing configuration can come back from the backend without its
   // project-derived fields (e.g. projectCode) persisted — once the client's
@@ -176,6 +169,7 @@ export default function ProjectStep({ value = {}, onChange }) {
       projectBudget: value.projectBudget ?? matchedProject.projectBudget ?? "",
       projectBudgetCurrency:
         value.projectBudgetCurrency || matchedProject.projectBudgetCurrency || matchedProject.currency || "",
+      primaryLocation: value.primaryLocation || matchedProject.primaryLocation || "",
       startDate: value.startDate || matchedProject.startDate,
       endDate: value.endDate || matchedProject.endDate,
     });
@@ -206,7 +200,7 @@ export default function ProjectStep({ value = {}, onChange }) {
     setLoadingProjects(true);
     setProjects([]);
 
-    getBillingConfigurationProjectsByClient(clientId)
+    getAvailableProjectsForBillingConfiguration(clientId)
       .then((projectList) => {
         if (!isMounted.current) return;
         setProjects(Array.isArray(projectList) ? projectList : []);
@@ -232,6 +226,7 @@ export default function ProjectStep({ value = {}, onChange }) {
       currency: "",
       projectBudget: "",
       projectBudgetCurrency: "",
+      primaryLocation: "",
       startDate: "",
       endDate: "",
     });
@@ -253,6 +248,7 @@ export default function ProjectStep({ value = {}, onChange }) {
         currency: project.projectBudgetCurrency || project.currency || "",
         projectBudget: project.projectBudget ?? "",
         projectBudgetCurrency: project.projectBudgetCurrency || project.currency || "",
+        primaryLocation: project.primaryLocation || "",
         startDate: project.startDate,
         endDate: project.endDate,
       });
@@ -266,6 +262,7 @@ export default function ProjectStep({ value = {}, onChange }) {
         currency: "",
         projectBudget: "",
         projectBudgetCurrency: "",
+        primaryLocation: "",
         startDate: "",
         endDate: "",
       });
@@ -284,6 +281,7 @@ export default function ProjectStep({ value = {}, onChange }) {
       currency: "",
       projectBudget: "",
       projectBudgetCurrency: "",
+      primaryLocation: "",
       startDate: "",
       endDate: "",
     });
@@ -302,6 +300,7 @@ export default function ProjectStep({ value = {}, onChange }) {
       currency: "",
       projectBudget: "",
       projectBudgetCurrency: "",
+      primaryLocation: "",
       startDate: "",
       endDate: "",
     });
@@ -512,17 +511,15 @@ export default function ProjectStep({ value = {}, onChange }) {
               wide
             />
             <SummaryField
+              icon={<MapPin className="h-3 w-3" strokeWidth={1.75} />}
+              label="Primary Location"
+              value={value.primaryLocation || matchedProject?.primaryLocation || "—"}
+            />
+            <SummaryField
               icon={<Building2 className="h-3 w-3" strokeWidth={1.75} />}
               label="Project Source"
               value="Enterprise (PMS)"
             />
-            {matchedProject && (
-              <SummaryField
-                icon={<UserRound className="h-3 w-3" strokeWidth={1.75} />}
-                label="Project Manager"
-                value={matchedProject.projectManagerName || matchedProject.projectManagerId || "—"}
-              />
-            )}
           </div>
         </div>
       )}
