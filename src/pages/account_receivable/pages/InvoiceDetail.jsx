@@ -103,10 +103,18 @@ function Field({ label, children, emptyLabel = "Not provided" }) {
 }
 
 export default function InvoiceDetail() {
-  const { snapshotId } = useParams();
+  const { snapshotId, occurrenceId: paramOccurrenceId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+
+  const effectiveId =
+    snapshotId ||
+    paramOccurrenceId ||
+    location.state?.occurrenceId ||
+    location.state?.billingScheduleId ||
+    location.state?.invoiceId ||
+    "";
 
   // Source tracking: determines if invoice is being inspected from Tax Calculation vs Invoice Generation
   const source =
@@ -132,6 +140,22 @@ export default function InvoiceDetail() {
   const [refreshingAfterCorrection, setRefreshingAfterCorrection] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejectError, setRejectError] = useState("");
+
+  const isOccurrenceMode = Boolean(
+    paramOccurrenceId ||
+    invoice?.billingScheduleId ||
+    location.state?.occurrenceId ||
+    location.state?.billingScheduleId ||
+    location.pathname.includes("/occurrence/")
+  );
+
+  const backToTaxUrl = isOccurrenceMode
+    ? (paramOccurrenceId || invoice?.billingScheduleId || location.state?.occurrenceId || location.state?.billingScheduleId
+        ? `/account-receivable/tax-calculation/occurrence/${paramOccurrenceId || invoice?.billingScheduleId || location.state?.occurrenceId || location.state?.billingScheduleId}`
+        : TAX_WORKSPACE_PATH)
+    : (snapshotId
+        ? `/account-receivable/tax-calculation/${snapshotId}`
+        : TAX_WORKSPACE_PATH);
 
   // Phase 2C Non-Financial Correction state
   const [editClientName, setEditClientName] = useState("");
@@ -179,8 +203,8 @@ export default function InvoiceDetail() {
   };
 
   const loadInvoice = async (isManual = false) => {
-    if (!snapshotId) {
-      setErrorMsg("No Billing Snapshot identifier provided.");
+    if (!effectiveId) {
+      setErrorMsg("No invoice identifier provided.");
       setLoading(false);
       return;
     }
@@ -190,7 +214,7 @@ export default function InvoiceDetail() {
     setErrorMsg("");
 
     try {
-      const data = await getInvoice(snapshotId);
+      const data = await getInvoice(effectiveId);
       if (data) {
         setInvoice(data);
         if (data.invoiceId) {
@@ -216,6 +240,10 @@ export default function InvoiceDetail() {
       setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    loadInvoice();
+  }, [effectiveId]);
 
   const handleSubmitForApproval = async () => {
     if (!invoice?.invoiceId || submitting) return;
@@ -536,11 +564,11 @@ export default function InvoiceDetail() {
               >
                 <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back to Tax Workspace
               </Button>
-              {snapshotId && (
+              {effectiveId && (
                 <Button
                   variant="outline"
                   size="small"
-                  onClick={() => navigate(`/account-receivable/tax-calculation/${snapshotId}`)}
+                  onClick={() => navigate(backToTaxUrl)}
                   className="text-xs"
                 >
                   Go to Tax Calculation
@@ -616,16 +644,20 @@ export default function InvoiceDetail() {
         items={
           isFromTaxCalculation
             ? [
-                { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" },
-                { label: "Tax Calculation", to: snapshotId ? `/account-receivable/tax-calculation/${snapshotId}` : TAX_WORKSPACE_PATH },
+                ...(isOccurrenceMode
+                  ? []
+                  : [{ label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" }]),
+                { label: "Tax Calculation", to: backToTaxUrl },
                 { label: "Invoice" },
-                { label: invoice?.invoiceNumber || invoice?.snapshotNumber || snapshotId },
+                { label: invoice?.invoiceNumber || invoice?.snapshotNumber || effectiveId },
               ]
             : [
-                { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" },
+                ...(isOccurrenceMode
+                  ? []
+                  : [{ label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" }]),
                 { label: "Invoice Generation", to: INVOICE_WORKSPACE_PATH },
                 { label: "Invoice" },
-                { label: invoice?.invoiceNumber || invoice?.snapshotNumber || snapshotId },
+                { label: invoice?.invoiceNumber || invoice?.snapshotNumber || effectiveId },
               ]
         }
       />
@@ -770,11 +802,11 @@ export default function InvoiceDetail() {
             Invoice Workspace
           </Button>
 
-          {snapshotId && (
+          {effectiveId && (
             <Button
               variant="outline"
               size="small"
-              onClick={() => navigate(`/account-receivable/tax-calculation/${snapshotId}`)}
+              onClick={() => navigate(backToTaxUrl)}
               className="flex items-center gap-1.5 text-xs text-slate-600"
             >
               Tax Calculation
@@ -933,11 +965,11 @@ export default function InvoiceDetail() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto shrink-0 pt-1 sm:pt-0">
-              {snapshotId && (
+              {effectiveId && (
                 <Button
                   variant="outline"
                   size="small"
-                  onClick={() => navigate(`/account-receivable/tax-calculation/${snapshotId}`)}
+                  onClick={() => navigate(backToTaxUrl)}
                   className="text-xs bg-white text-slate-700 border-slate-300 hover:bg-slate-100/50 font-medium"
                 >
                   Review Tax Calculation

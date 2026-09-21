@@ -805,11 +805,19 @@ const AppRoutes = () => {
               element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><InvoiceGenerationDetail /></ProtectedRoute>}
             />
             <Route
+              path="invoice-generation/occurrence/:occurrenceId"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><InvoiceGenerationDetail /></ProtectedRoute>}
+            />
+            <Route
               path="invoice-approval"
               element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><InvoiceApproval /></ProtectedRoute>}
             />
             <Route
               path="invoices/:snapshotId"
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><InvoiceDetail /></ProtectedRoute>}
+            />
+            <Route
+              path="invoices/occurrence/:occurrenceId"
               element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><InvoiceDetail /></ProtectedRoute>}
             />
             <Route

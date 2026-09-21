@@ -30,9 +30,15 @@ import {
 import {
   getInvoice,
   generateInvoice,
+  generateInvoiceForOccurrence,
   submitInvoiceForApproval,
   getInvoiceErrorMessage,
 } from "../services/invoiceService";
+import {
+  getBillingOccurrence,
+  getOccurrenceTaxCalculation,
+  getOccurrenceErrorMessage,
+} from "../services/billingOccurrenceService";
 import {
   getBillingSnapshotByPeriod,
   fetchActiveBillingConfigurations,
@@ -79,11 +85,27 @@ function Field({
 }
 
 export default function InvoiceGenerationDetail() {
-  const { snapshotId } = useParams();
+  const { snapshotId, occurrenceId: paramOccurrenceId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
 
   const passedState = location.state || {};
+
+  const effectiveOccurrenceId =
+    paramOccurrenceId ||
+    passedState.occurrenceId ||
+    passedState.billingScheduleId ||
+    passedState.occurrence?.billingScheduleId ||
+    null;
+
+  const isOccurrenceMode = Boolean(
+    effectiveOccurrenceId ||
+    (!snapshotId && passedState.occurrence) ||
+    location.pathname.includes("/occurrence/")
+  );
+
+  const effectiveSnapshotId = isOccurrenceMode ? null : (snapshotId || passedState.snapshotId || null);
+  const effectiveId = isOccurrenceMode ? effectiveOccurrenceId : effectiveSnapshotId;
 
   // Loaded states
   const [loading, setLoading] = useState(true);
@@ -96,6 +118,7 @@ export default function InvoiceGenerationDetail() {
   const [taxCalc, setTaxCalc] = useState(passedState.taxCalculation || null);
   const [invoice, setInvoice] = useState(null);
   const [snapshotData, setSnapshotData] = useState(passedState.config || null);
+  const [occurrenceData, setOccurrenceData] = useState(passedState.occurrence || null);
   const [items, setItems] = useState([]);
 
   // Preview Modal & Delivery workflow states
@@ -116,8 +139,8 @@ export default function InvoiceGenerationDetail() {
   }, [invoice?.invoiceId]);
 
   const loadData = async (isManual = false) => {
-    if (!snapshotId) {
-      setErrorMsg("Billing snapshot identifier is required.");
+    if (!effectiveId) {
+      setErrorMsg(isOccurrenceMode ? "Billing occurrence identifier is required." : "Billing snapshot identifier is required.");
       setLoading(false);
       return;
     }
@@ -127,97 +150,159 @@ export default function InvoiceGenerationDetail() {
     setErrorMsg("");
 
     try {
-      // 1. Check if invoice has ALREADY been generated for this snapshot
-      let existingInvoice = null;
-      try {
-        existingInvoice = await getInvoice(snapshotId);
-        if (existingInvoice && (existingInvoice.invoiceId || existingInvoice.invoiceNumber)) {
-          setInvoice(existingInvoice);
-          if (Array.isArray(existingInvoice.items) && existingInvoice.items.length > 0) {
-            setItems(existingInvoice.items);
-          }
-        }
-      } catch (invErr) {
-        // 404 means invoice not yet generated -> expected before generation
-        const isNotFound = invErr?.response?.status === 404;
-        if (!isNotFound) {
-          console.warn("[InvoiceGenerationDetail] Invoice check notice:", invErr?.message);
-        }
-        setInvoice(null);
-      }
-
-      // 2. Fetch completed tax calculation for this snapshot
-      let calc = taxCalc;
-      try {
-        calc = await getTaxCalculation(snapshotId);
-        if (calc) {
-          setTaxCalc(calc);
-        }
-      } catch (calcErr) {
-        console.warn("[InvoiceGenerationDetail] Tax calculation fetch notice:", calcErr?.message);
-      }
-
-      // 3. Hydrate line items if not already loaded from existing invoice
-      if (!existingInvoice || !existingInvoice.items || existingInvoice.items.length === 0) {
-        let loadedItems = [];
-
-        // Check if labor items were passed via location.state
-        const passedLabor = passedState.acquisitionResults?.labor;
-        if (passedLabor && Array.isArray(passedLabor.timesheets) && passedLabor.timesheets.length > 0) {
-          loadedItems = passedLabor.timesheets.map((t, idx) => ({
-            id: t.sourceReferenceId || `item-${idx}`,
-            itemName: t.employee || t.itemName || "Timesheet Entry",
-            role: t.role || "Consultant",
-            workDate: toIsoDateOnly(t.workDate),
-            quantity: t.hours || t.quantity || 0,
-            rate: t.rate || 0,
-            amount: t.amount || 0,
-          }));
-        } else {
-          // Attempt to fetch from billing-snapshots/by-period if projectId and dates are known
-          const pId = calc?.projectId || snapshotData?.projectId || passedState.projectId;
-          const pStart = toIsoDateOnly(calc?.billingPeriodStart || snapshotData?.billingPeriodStart);
-          const pEnd = toIsoDateOnly(calc?.billingPeriodEnd || snapshotData?.billingPeriodEnd);
-
-          if (pId && pStart && pEnd) {
-            try {
-              const snap = await getBillingSnapshotByPeriod(pId, pStart, pEnd);
-              if (snap && Array.isArray(snap.laborRecords) && snap.laborRecords.length > 0) {
-                loadedItems = snap.laborRecords.map((t, idx) => ({
-                  id: t.id || `item-${idx}`,
-                  itemName: t.employee || "Timesheet Entry",
-                  role: t.role || "Consultant",
-                  workDate: t.workDate,
-                  quantity: t.hours || 0,
-                  rate: t.rate || 0,
-                  amount: t.amount || 0,
-                }));
-              }
-            } catch (snapErr) {
-              console.warn("[InvoiceGenerationDetail] Snapshot items fetch notice:", snapErr?.message);
+      if (isOccurrenceMode) {
+        // 1. Check if invoice has ALREADY been generated for this occurrence
+        let existingInvoice = null;
+        try {
+          existingInvoice = await getInvoice(effectiveOccurrenceId);
+          if (existingInvoice && (existingInvoice.invoiceId || existingInvoice.invoiceNumber)) {
+            setInvoice(existingInvoice);
+            if (Array.isArray(existingInvoice.items) && existingInvoice.items.length > 0) {
+              setItems(existingInvoice.items);
             }
           }
-        }
-
-        // Fallback: if no detailed line items, represent the billable labor total from taxCalc/snapshot
-        if (loadedItems.length === 0) {
-          const subtotalAmt = calc?.taxableAmount ?? snapshotData?.totalAmount ?? 0;
-          if (subtotalAmt > 0) {
-            loadedItems = [
-              {
-                id: "labor-summary-1",
-                itemName: `${calc?.projectName || snapshotData?.projectName || "Project"} Billable Services`,
-                role: "Consultant / Engineering",
-                workDate: toIsoDateOnly(calc?.billingPeriodEnd || snapshotData?.billingPeriodEnd),
-                quantity: 1,
-                rate: subtotalAmt,
-                amount: subtotalAmt,
-              },
-            ];
+        } catch (invErr) {
+          const isNotFound = invErr?.response?.status === 404;
+          if (!isNotFound) {
+            console.warn("[InvoiceGenerationDetail] Occurrence invoice check notice:", invErr?.message);
           }
+          setInvoice(null);
         }
 
-        setItems(loadedItems);
+        // 2. Fetch completed tax calculation / occurrence details
+        let occ = occurrenceData || passedState.occurrence;
+        try {
+          const fetchedOcc = await getBillingOccurrence(effectiveOccurrenceId);
+          if (fetchedOcc) occ = fetchedOcc;
+        } catch (occErr) {
+          console.warn("[InvoiceGenerationDetail] Fetch occurrence notice:", occErr?.message);
+        }
+
+        try {
+          const occTax = await getOccurrenceTaxCalculation(effectiveOccurrenceId);
+          if (occTax) {
+            occ = occ ? { ...occ, ...occTax } : occTax;
+          }
+        } catch (taxErr) {
+          console.warn("[InvoiceGenerationDetail] Occurrence tax calculation notice:", taxErr?.message);
+        }
+
+        setOccurrenceData(occ);
+
+        // 3. Hydrate line items if not already loaded from existing invoice
+        if (!existingInvoice || !existingInvoice.items || existingInvoice.items.length === 0) {
+          const rateAmt = occ?.billingAmount ?? occ?.taxableAmount ?? 0;
+          const itemName = occ?.projectName
+            ? `${occ.projectName} - Fixed Price Billing`
+            : "Fixed Price Billing";
+          const role = "Fixed Price Milestone";
+          const workDate = toIsoDateOnly(occ?.billingDate || occ?.periodEndDate);
+
+          const fixedItem = {
+            id: `fixed-price-${effectiveOccurrenceId}`,
+            itemName,
+            role,
+            workDate,
+            quantity: 1,
+            rate: rateAmt,
+            amount: rateAmt,
+            itemType: "FIXED_PRICE",
+          };
+
+          setItems([fixedItem]);
+        }
+      } else {
+        // 1. Check if invoice has ALREADY been generated for this snapshot
+        let existingInvoice = null;
+        try {
+          existingInvoice = await getInvoice(effectiveSnapshotId);
+          if (existingInvoice && (existingInvoice.invoiceId || existingInvoice.invoiceNumber)) {
+            setInvoice(existingInvoice);
+            if (Array.isArray(existingInvoice.items) && existingInvoice.items.length > 0) {
+              setItems(existingInvoice.items);
+            }
+          }
+        } catch (invErr) {
+          const isNotFound = invErr?.response?.status === 404;
+          if (!isNotFound) {
+            console.warn("[InvoiceGenerationDetail] Invoice check notice:", invErr?.message);
+          }
+          setInvoice(null);
+        }
+
+        // 2. Fetch completed tax calculation for this snapshot
+        let calc = taxCalc;
+        try {
+          calc = await getTaxCalculation(effectiveSnapshotId);
+          if (calc) {
+            setTaxCalc(calc);
+          }
+        } catch (calcErr) {
+          console.warn("[InvoiceGenerationDetail] Tax calculation fetch notice:", calcErr?.message);
+        }
+
+        // 3. Hydrate line items if not already loaded from existing invoice
+        if (!existingInvoice || !existingInvoice.items || existingInvoice.items.length === 0) {
+          let loadedItems = [];
+
+          // Check if labor items were passed via location.state
+          const passedLabor = passedState.acquisitionResults?.labor;
+          if (passedLabor && Array.isArray(passedLabor.timesheets) && passedLabor.timesheets.length > 0) {
+            loadedItems = passedLabor.timesheets.map((t, idx) => ({
+              id: t.sourceReferenceId || `item-${idx}`,
+              itemName: t.employee || t.itemName || "Timesheet Entry",
+              role: t.role || "Consultant",
+              workDate: toIsoDateOnly(t.workDate),
+              quantity: t.hours || t.quantity || 0,
+              rate: t.rate || 0,
+              amount: t.amount || 0,
+            }));
+          } else {
+            // Attempt to fetch from billing-snapshots/by-period if projectId and dates are known
+            const pId = calc?.projectId || snapshotData?.projectId || passedState.projectId;
+            const pStart = toIsoDateOnly(calc?.billingPeriodStart || snapshotData?.billingPeriodStart);
+            const pEnd = toIsoDateOnly(calc?.billingPeriodEnd || snapshotData?.billingPeriodEnd);
+
+            if (pId && pStart && pEnd) {
+              try {
+                const snap = await getBillingSnapshotByPeriod(pId, pStart, pEnd);
+                if (snap && Array.isArray(snap.laborRecords) && snap.laborRecords.length > 0) {
+                  loadedItems = snap.laborRecords.map((t, idx) => ({
+                    id: t.id || `item-${idx}`,
+                    itemName: t.employee || "Timesheet Entry",
+                    role: t.role || "Consultant",
+                    workDate: t.workDate,
+                    quantity: t.hours || 0,
+                    rate: t.rate || 0,
+                    amount: t.amount || 0,
+                  }));
+                }
+              } catch (snapErr) {
+                console.warn("[InvoiceGenerationDetail] Snapshot items fetch notice:", snapErr?.message);
+              }
+            }
+          }
+
+          // Fallback: if no detailed line items, represent the billable labor total from taxCalc/snapshot
+          if (loadedItems.length === 0) {
+            const subtotalAmt = calc?.taxableAmount ?? snapshotData?.totalAmount ?? 0;
+            if (subtotalAmt > 0) {
+              loadedItems = [
+                {
+                  id: "labor-summary-1",
+                  itemName: `${calc?.projectName || snapshotData?.projectName || "Project"} Billable Services`,
+                  role: "Consultant / Engineering",
+                  workDate: toIsoDateOnly(calc?.billingPeriodEnd || snapshotData?.billingPeriodEnd),
+                  quantity: 1,
+                  rate: subtotalAmt,
+                  amount: subtotalAmt,
+                },
+              ];
+            }
+          }
+
+          setItems(loadedItems);
+        }
       }
 
       if (isManual) {
@@ -225,7 +310,9 @@ export default function InvoiceGenerationDetail() {
       }
     } catch (err) {
       console.error("[InvoiceGenerationDetail] Error loading data:", err);
-      const msg = getInvoiceErrorMessage(err, "Failed to load snapshot details for invoice generation.");
+      const msg = isOccurrenceMode
+        ? getOccurrenceErrorMessage(err, "Failed to load occurrence details for invoice generation.")
+        : getInvoiceErrorMessage(err, "Failed to load snapshot details for invoice generation.");
       setErrorMsg(msg);
       showStatusToast(msg, "error");
     } finally {
@@ -236,26 +323,35 @@ export default function InvoiceGenerationDetail() {
 
   useEffect(() => {
     loadData();
-  }, [snapshotId]);
+  }, [effectiveId]);
 
   // Primary Action: Generate Invoice
   const handleGenerateInvoice = async () => {
-    if (!snapshotId || generating) return;
+    const targetId = isOccurrenceMode ? effectiveOccurrenceId : effectiveSnapshotId;
+    if (!targetId || generating) return;
 
     setGenerating(true);
     try {
-      const generated = await generateInvoice(snapshotId);
+      let generated = null;
+      if (isOccurrenceMode) {
+        generated = await generateInvoiceForOccurrence(effectiveOccurrenceId);
+      } else {
+        generated = await generateInvoice(effectiveSnapshotId);
+      }
+
       setInvoice(generated);
       if (Array.isArray(generated?.items) && generated.items.length > 0) {
         setItems(generated.items);
       }
 
-      const pId = generated?.projectId || taxCalc?.projectId || snapshotData?.projectId;
-      if (pId) {
-        saveAcquiredSnapshotMetadata(pId, {
-          status: "INVOICED",
-          invoiceNumber: generated.invoiceNumber,
-        });
+      if (!isOccurrenceMode) {
+        const pId = generated?.projectId || taxCalc?.projectId || snapshotData?.projectId;
+        if (pId) {
+          saveAcquiredSnapshotMetadata(pId, {
+            status: "INVOICED",
+            invoiceNumber: generated.invoiceNumber,
+          });
+        }
       }
 
       showStatusToast("Invoice generated successfully.", "success");
@@ -265,9 +361,9 @@ export default function InvoiceGenerationDetail() {
 
       // Handle 409 conflict gracefully: invoice was already generated
       if (status === 409 || msg.includes("already")) {
-        showStatusToast("Invoice already exists for this snapshot.", "info");
+        showStatusToast("Invoice already exists for this record.", "info");
         try {
-          const existing = await getInvoice(snapshotId);
+          const existing = await getInvoice(targetId);
           if (existing) {
             setInvoice(existing);
             if (Array.isArray(existing.items) && existing.items.length > 0) {
@@ -280,7 +376,9 @@ export default function InvoiceGenerationDetail() {
         }
       }
 
-      const errorText = getInvoiceErrorMessage(err, "Failed to generate invoice.");
+      const errorText = isOccurrenceMode
+        ? getOccurrenceErrorMessage(err, "Failed to generate invoice for billing occurrence.")
+        : getInvoiceErrorMessage(err, "Failed to generate invoice.");
       showStatusToast(errorText, "error");
     } finally {
       setGenerating(false);
@@ -298,7 +396,7 @@ export default function InvoiceGenerationDetail() {
 
       // Authoritative reload of invoice from backend
       try {
-        const refreshed = await getInvoice(snapshotId);
+        const refreshed = await getInvoice(effectiveId);
         if (refreshed && (refreshed.invoiceId || refreshed.invoiceNumber)) {
           setInvoice(refreshed);
           if (Array.isArray(refreshed.items) && refreshed.items.length > 0) {
@@ -360,13 +458,14 @@ export default function InvoiceGenerationDetail() {
     );
   }
 
-  // Derived contextual fields (Authoritative from backend tax calculation or invoice)
+  // Derived contextual fields (Authoritative from backend tax calculation, occurrence, or invoice)
   const isInvoiceGenerated = Boolean(invoice && (invoice.invoiceId || invoice.invoiceNumber));
   const invoiceStatus = (invoice?.invoiceStatus || (isInvoiceGenerated ? "GENERATED" : "TAX_COMPLETED")).toUpperCase();
 
   const projectName =
     invoice?.projectName ||
     taxCalc?.projectName ||
+    occurrenceData?.projectName ||
     snapshotData?.projectName ||
     DEMO_PROJECT.name;
 
@@ -374,41 +473,44 @@ export default function InvoiceGenerationDetail() {
     invoice?.projectCode ||
     snapshotData?.projectCode ||
     taxCalc?.projectCode ||
+    occurrenceData?.projectCode ||
     (snapshotData?.projectId ? `PRJ-${snapshotData.projectId}` : null) ||
     (taxCalc?.projectId ? `PRJ-${taxCalc.projectId}` : null) ||
+    (occurrenceData?.billingConfigurationId ? `CFG-${occurrenceData.billingConfigurationId}` : null) ||
     DEMO_PROJECT.code;
 
   const clientName =
     invoice?.clientName ||
     taxCalc?.clientName ||
+    occurrenceData?.clientName ||
     snapshotData?.clientName ||
     DEMO_CLIENT.legalName;
 
-  const snapshotNumber =
-    invoice?.snapshotNumber ||
-    invoice?.billingSnapshotNumber ||
-    taxCalc?.snapshotNumber ||
-    snapshotData?.snapshotNumber ||
-    snapshotId;
+  const recordLabel = isOccurrenceMode
+    ? (occurrenceData?.periodNumber ? `Occurrence #${occurrenceData.periodNumber}` : (effectiveOccurrenceId || "Billing Occurrence"))
+    : (invoice?.snapshotNumber || invoice?.billingSnapshotNumber || taxCalc?.snapshotNumber || snapshotData?.snapshotNumber || snapshotId);
 
   const rawStart =
     invoice?.billingPeriodStart ||
     taxCalc?.billingPeriodStart ||
+    occurrenceData?.periodStartDate ||
     snapshotData?.billingPeriodStart;
 
   const rawEnd =
     invoice?.billingPeriodEnd ||
     taxCalc?.billingPeriodEnd ||
+    occurrenceData?.periodEndDate ||
     snapshotData?.billingPeriodEnd;
 
   const billingPeriod =
     rawStart && rawEnd
       ? formatBillingPeriod(rawStart, rawEnd)
-      : invoice?.billingPeriod || taxCalc?.billingPeriod || snapshotData?.billingPeriod || "—";
+      : invoice?.billingPeriod || taxCalc?.billingPeriod || occurrenceData?.period || snapshotData?.billingPeriod || "—";
 
   const currency =
     invoice?.currency ||
     taxCalc?.currencyCode ||
+    occurrenceData?.currencyCode ||
     snapshotData?.currency ||
     "USD";
 
@@ -418,30 +520,46 @@ export default function InvoiceGenerationDetail() {
   const subtotal =
     invoice?.subtotal ??
     taxCalc?.taxableAmount ??
+    occurrenceData?.taxableAmount ??
+    occurrenceData?.billingAmount ??
     snapshotData?.subtotal ??
     0;
 
   const totalTax =
     invoice?.totalTax ??
     taxCalc?.totalTaxAmount ??
+    occurrenceData?.totalTaxAmount ??
     0;
 
   const grandTotal =
     invoice?.grandTotal ??
     taxCalc?.grandTotal ??
+    occurrenceData?.grandTotal ??
     (subtotal + totalTax);
+
+  const backToTaxUrl = isOccurrenceMode
+    ? `/account-receivable/tax-calculation/occurrence/${effectiveOccurrenceId}`
+    : `/account-receivable/tax-calculation/${snapshotId}`;
 
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
       {/* Breadcrumb */}
       <Breadcrumb
-        items={[
-          { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" },
-          { label: "Tax Calculation", to: `/account-receivable/tax-calculation/${snapshotId}` },
-          { label: "Invoice Generation" },
-          { label: isInvoiceGenerated ? (invoice?.invoiceNumber || snapshotNumber) : snapshotNumber },
-        ]}
+        items={
+          isOccurrenceMode
+            ? [
+                { label: "Tax Calculation", to: backToTaxUrl },
+                { label: "Invoice Generation" },
+                { label: isInvoiceGenerated ? (invoice?.invoiceNumber || recordLabel) : recordLabel },
+              ]
+            : [
+                { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" },
+                { label: "Tax Calculation", to: backToTaxUrl },
+                { label: "Invoice Generation" },
+                { label: isInvoiceGenerated ? (invoice?.invoiceNumber || recordLabel) : recordLabel },
+              ]
+        }
       />
 
       {/* Header Bar */}
@@ -452,7 +570,8 @@ export default function InvoiceGenerationDetail() {
             <StatusBadge label={invoiceStatus} size="sm" />
           </div>
           <p className="text-sm text-slate-600">
-            Snapshot: <span className="font-mono font-bold text-indigo-700">{snapshotNumber}</span>
+            {isOccurrenceMode ? "Occurrence: " : "Snapshot: "}
+            <span className="font-mono font-bold text-indigo-700">{recordLabel}</span>
             {isInvoiceGenerated && invoice?.invoiceNumber && (
               <>
                 <span className="mx-2 text-slate-300">&middot;</span>
@@ -472,7 +591,7 @@ export default function InvoiceGenerationDetail() {
           <Button
             variant="outline"
             size="small"
-            onClick={() => navigate(`/account-receivable/tax-calculation/${snapshotId}`)}
+            onClick={() => navigate(backToTaxUrl)}
             className="flex items-center gap-1.5 text-xs text-slate-600"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Back to Tax Calculation
@@ -733,7 +852,7 @@ export default function InvoiceGenerationDetail() {
             <Button
               variant="outline"
               size="small"
-              onClick={() => navigate(`/account-receivable/tax-calculation/${snapshotId}`)}
+              onClick={() => navigate(backToTaxUrl)}
               className="text-xs text-slate-700"
             >
               <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back to Tax Calculation
@@ -878,10 +997,10 @@ export default function InvoiceGenerationDetail() {
       >
         <InvoiceDocument
           invoice={invoice}
-          snapshotId={snapshotId}
+          snapshotId={effectiveId}
           deliveryState={deliveryState}
-          taxCalc={taxCalc}
-          snapshotData={snapshotData}
+          taxCalc={taxCalc || occurrenceData}
+          snapshotData={snapshotData || occurrenceData}
         />
       </Modal>
     </div>
