@@ -11,27 +11,35 @@ import InvoiceAttachmentList from "../components/InvoiceAttachmentList";
 import InvoiceIssueList from "../components/InvoiceIssueList";
 import InvoiceOcrReviewPanel from "../components/InvoiceOcrReviewPanel";
 import InvoiceReviewEditor from "../components/InvoiceReviewEditor";
+import InvoiceReturnedBanner from "../components/InvoiceReturnedBanner";
 import InvoiceValidationPanel from "../components/InvoiceValidationPanel";
 import InvoiceApprovalPanel from "../components/InvoiceApprovalPanel";
+import InvoicePaymentPanel from "../components/InvoicePaymentPanel";
 import InvoiceAuditHistory from "../components/InvoiceAuditHistory";
 import { useInvoiceDetail } from "../hooks/useInvoiceDetail";
+import { useApPermissions } from "../../hooks/useApPermissions";
 import { AP_ROUTES } from "../../constants/routes";
 import { INVOICE_STATUS } from "../../constants/invoiceStatus";
 import { formatDate } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
 
 /**
- * Single detail route for the whole invoice lifecycle. While an invoice is OCR Review Pending,
- * the OCR/Validation slot renders the editable InvoiceReviewEditor — reviewing and saving here
- * (PATCH .../ocr-review) is what moves it past this stage, per apply_ocr_review always advancing
- * status on a successful save. Once it's moved on, that slot swaps to the read-only
- * InvoiceOcrReviewPanel. Approval is real, live data from its own endpoint; only its action
- * buttons are stage-gated (Send for Approval requires Pending Approval, not OCR Review Pending —
- * the backend's send-for-approval route itself rejects anything still at OCR Review Pending).
+ * Single detail route for the whole invoice lifecycle. The OCR/Validation slot renders the
+ * editable InvoiceReviewEditor for both OCR Review Pending AND Returned for Review (spec section
+ * 13: same edit surface, entered from either stage) — reviewing and saving here (PATCH
+ * .../ocr-review) is what advances it past whichever stage it's in, per apply_ocr_review always
+ * ending at Pending Approval on a successful save. That editor is also gated on canReviewOcr —
+ * the PATCH itself now requires INVOICE_OCR_REVIEW server-side, so a viewer without it would
+ * otherwise see a fully editable form whose Save button just 403s; they get the read-only
+ * InvoiceOcrReviewPanel instead, same as once it's moved past this stage entirely. Approval is
+ * real, live data from its own endpoint; only its action buttons are stage-gated (Send for
+ * Approval requires Pending Approval, not OCR Review Pending — the backend's send-for-approval
+ * route itself rejects anything still at OCR Review Pending or Returned for Review).
  */
 export default function InvoiceDetailPage() {
   const { invoiceId } = useParams();
   const navigate = useNavigate();
+  const { canReviewOcr } = useApPermissions();
   const { data: invoice, isLoading, isError, error } = useInvoiceDetail(invoiceId);
 
   if (isLoading) {
@@ -105,7 +113,12 @@ export default function InvoiceDetailPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Main column */}
         <div className="space-y-4 lg:col-span-2">
-          {invoice.status === INVOICE_STATUS.OCR_REVIEW_PENDING ? (
+          {invoice.status === INVOICE_STATUS.RETURNED_FOR_REVIEW && (
+            <InvoiceReturnedBanner invoiceId={invoice.id} />
+          )}
+          {(invoice.status === INVOICE_STATUS.OCR_REVIEW_PENDING ||
+            invoice.status === INVOICE_STATUS.RETURNED_FOR_REVIEW) &&
+          canReviewOcr ? (
             <InvoiceReviewEditor invoice={invoice} />
           ) : (
             <InvoiceOcrReviewPanel invoice={invoice} />
@@ -127,7 +140,7 @@ export default function InvoiceDetailPage() {
             </PageCardContent>
           </PageCard>
 
-          <InvoiceAuditHistory history={invoice.history} />
+          <InvoiceAuditHistory invoiceId={invoice.id} />
         </div>
 
         {/* Side column */}
@@ -151,14 +164,7 @@ export default function InvoiceDetailPage() {
 
           <InvoiceAmountSummary invoice={invoice} />
 
-          <PageCard>
-            <PageCardContent>
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">Payment Information</h3>
-              <p className="text-sm italic text-gray-500">
-                Payment tracking isn't wired up yet — see the Payments module.
-              </p>
-            </PageCardContent>
-          </PageCard>
+          <InvoicePaymentPanel invoice={invoice} />
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, CheckCircle2, XCircle, ClipboardCheck, Clock, FolderKanban, Building2, Calendar, Receipt, Wallet, Info } from "lucide-react";
+import { Eye, CheckCircle2, XCircle, ClipboardCheck, Clock, FolderKanban, Building2, Calendar, Receipt, Wallet, Info, AlertTriangle } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
@@ -32,6 +32,10 @@ const STATUS_TABS = {
   PENDING: "PENDING_APPROVAL",
   APPROVED: "APPROVED",
   REJECTED: "REJECTED",
+  // Not a real backend approvalStatus — a client-side-only filter derived from
+  // approvalStatus === APPROVED plus effectiveTo/project end date having
+  // already passed (see isBillingSetupExpired below).
+  EXPIRED: "EXPIRED",
   ALL: "ALL",
 };
 
@@ -81,6 +85,24 @@ function formatDate(value) {
   const date = parseTimestamp(value);
   if (!date) return typeof value === "string" && !value.includes(",") ? value : "—";
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+// An Approved billing setup is Expired once its applicable/project duration
+// (config.effectiveTo — already the tighter of the billing effective end date
+// and the project end date, see loadAllApprovals below) has ended. Compares
+// calendar dates only (time-of-day stripped) so "today" always reflects the
+// current date, not a stale snapshot from when the list was last loaded.
+// Applies uniformly to every billing type since effectiveTo is already
+// normalized the same way for Time & Material, Fixed Price, Milestone, and
+// Recurring configurations.
+function isBillingSetupExpired(config) {
+  if (config.approvalStatus !== "APPROVED") return false;
+  const endDate = parseTimestamp(config.effectiveTo);
+  if (!endDate) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  endDate.setHours(0, 0, 0, 0);
+  return endDate < today;
 }
 
 function formatDateTime(value) {
@@ -204,15 +226,17 @@ export default function BillingApprovals() {
       PENDING: configs.filter((c) => c.approvalStatus === "PENDING_APPROVAL").length,
       APPROVED: configs.filter((c) => c.approvalStatus === "APPROVED").length,
       REJECTED: configs.filter((c) => c.approvalStatus === "REJECTED").length,
+      EXPIRED: configs.filter(isBillingSetupExpired).length,
       ALL: configs.length,
     };
   }, [configs]);
 
   const kpiCards = [
-    { label: "Total Requests", value: tabCounts.ALL, icon: FolderKanban, color: "bg-[#0A0082] text-white" },
-    { label: "Pending Approvals", value: tabCounts.PENDING, icon: Clock, color: "bg-amber-500 text-white" },
-    { label: "Approved", value: tabCounts.APPROVED, icon: CheckCircle2, color: "bg-emerald-600 text-white" },
-    { label: "Rejected", value: tabCounts.REJECTED, icon: XCircle, color: "bg-rose-600 text-white" },
+    { key: STATUS_TABS.ALL, label: "Total Requests", value: tabCounts.ALL, icon: FolderKanban, color: "bg-[#0A0082] text-white" },
+    { key: STATUS_TABS.PENDING, label: "Pending Approvals", value: tabCounts.PENDING, icon: Clock, color: "bg-amber-500 text-white" },
+    { key: STATUS_TABS.APPROVED, label: "Approved", value: tabCounts.APPROVED, icon: CheckCircle2, color: "bg-emerald-600 text-white" },
+    { key: STATUS_TABS.REJECTED, label: "Rejected", value: tabCounts.REJECTED, icon: XCircle, color: "bg-rose-600 text-white" },
+    { key: STATUS_TABS.EXPIRED, label: "Expired", value: tabCounts.EXPIRED, icon: AlertTriangle, color: "bg-orange-600 text-white" },
   ];
 
   const handleTabChange = (key) => {
@@ -224,7 +248,9 @@ export default function BillingApprovals() {
     const q = searchQuery.trim().toLowerCase();
     return configs.filter((c) => {
       let matchesTab = true;
-      if (statusTab !== STATUS_TABS.ALL) {
+      if (statusTab === STATUS_TABS.EXPIRED) {
+        matchesTab = isBillingSetupExpired(c);
+      } else if (statusTab !== STATUS_TABS.ALL) {
         matchesTab = c.approvalStatus === statusTab;
       }
       const matchesSearch =
@@ -352,6 +378,7 @@ export default function BillingApprovals() {
     { key: STATUS_TABS.PENDING, label: "Pending Approvals", icon: Clock, count: tabCounts.PENDING },
     { key: STATUS_TABS.APPROVED, label: "Approved", icon: CheckCircle2, count: tabCounts.APPROVED },
     { key: STATUS_TABS.REJECTED, label: "Rejected", icon: XCircle, count: tabCounts.REJECTED },
+    { key: STATUS_TABS.EXPIRED, label: "Expired", icon: AlertTriangle, count: tabCounts.EXPIRED },
     { key: STATUS_TABS.ALL, label: "All Requests", icon: FolderKanban, count: tabCounts.ALL },
   ];
 
@@ -363,18 +390,28 @@ export default function BillingApprovals() {
         subtitle="Review, approve, or reject billing configuration setups submitted by Finance Executives."
       />
 
-      {/* 2. Summary KPI Cards (Total, Pending, Approved, Rejected) */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {kpiCards.map((kpi) => (
-          <KPICard
-            key={kpi.label}
-            label={kpi.label}
-            value={loading ? "…" : kpi.value}
-            icon={<kpi.icon className="h-5 w-5" />}
-            color={kpi.color}
-            className="h-full w-full bg-white shadow-sm"
-          />
-        ))}
+      {/* 2. Summary KPI Cards (Total, Pending, Approved, Rejected, Expired) */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {kpiCards.map((kpi) => {
+          const isActive = statusTab === kpi.key;
+          return (
+            <div
+              key={kpi.key}
+              onClick={() => handleTabChange(kpi.key)}
+              className={`cursor-pointer rounded-xl transition-all duration-150 ${
+                isActive ? "ring-2 ring-[#0A0082] ring-offset-2" : "hover:shadow-sm opacity-90 hover:opacity-100"
+              }`}
+            >
+              <KPICard
+                label={kpi.label}
+                value={loading ? "…" : kpi.value}
+                icon={<kpi.icon className="h-5 w-5" />}
+                color={kpi.color}
+                className="h-full w-full bg-white shadow-sm"
+              />
+            </div>
+          );
+        })}
       </div>
 
       {/* 3. Main Data Card */}
@@ -513,6 +550,28 @@ export default function BillingApprovals() {
               ? "PMS Project Budget"
               : "Manual Input";
 
+          // PMS Project Budget and Contract Value can represent the exact same
+          // amount (when the source is PMS) — showing them as two separate rows
+          // alongside a third "Contract Value Source" row was redundant. Combine
+          // them into a single row whose LABEL carries the source (so the value
+          // stays a plain amount, never "amount / source"): PMS source reads as
+          // "Contract / PMS Project Budget", Manual source reads as "Contract Value".
+          const hasCommercialValue = hasContractVal || hasPmsBudget;
+          const combinedContractValue = hasContractVal ? contractVal : pmsBudgetVal;
+          const isPmsContractSource = sourceLabel === "PMS Project Budget";
+          const contractValueLabelText = isPmsContractSource ? "Contract / PMS Project Budget" : "Contract Value";
+          const contractValueRowLabel = (
+            <span className="flex flex-wrap items-center gap-1.5">
+              <span>{contractValueLabelText}</span>
+              {isDifferentAmount && (
+                <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200">
+                  Billing Amount Used
+                </span>
+              )}
+            </span>
+          );
+          const contractValueRowValue = hasCommercialValue ? formatMoney(combinedContractValue, currency) : null;
+
           const retentionPercent = Number(reviewTarget.retentionPercent) || 0;
           const retentionAmount = Number(reviewTarget.retentionAmount) || 0;
           const hasRetention = retentionAmount > 0 || retentionPercent > 0;
@@ -545,24 +604,8 @@ export default function BillingApprovals() {
                   },
                   { label: "Billing Frequency", value: billingFreqLabel },
                   { label: "Currency", value: currency },
-                  { label: "PMS Project Budget", value: formatMoney(pmsBudgetVal, currency) },
-                  ...(hasContractVal
-                    ? [
-                        {
-                          label: (
-                            <span className="flex flex-wrap items-center gap-1.5">
-                              <span>Contract Value</span>
-                              {isDifferentAmount && (
-                                <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200">
-                                  Billing Amount Used
-                                </span>
-                              )}
-                            </span>
-                          ),
-                          value: formatMoney(contractVal, currency),
-                        },
-                        { label: "Contract Value Source", value: sourceLabel },
-                      ]
+                  ...(hasCommercialValue
+                    ? [{ label: contractValueRowLabel, value: contractValueRowValue }]
                     : []),
                   ...(isTimesheetBased && reviewTarget.pricingModel
                     ? [{ label: "Pricing Model", value: BILLING_MODE_LABELS[reviewTarget.pricingModel] || reviewTarget.pricingModel }]
@@ -626,16 +669,8 @@ export default function BillingApprovals() {
                     {/* Financial Breakdown Table */}
                     <div className="divide-y divide-slate-100 text-xs">
                       <div className="flex justify-between py-2">
-                        <span className="text-slate-500 font-medium">Contract Value (Billing Amount)</span>
-                        <span className="font-bold text-slate-900">{formatMoney(contractVal, currency) || "—"}</span>
-                      </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-slate-500 font-medium">PMS Project Budget</span>
-                        <span className="font-bold text-slate-900">{formatMoney(pmsBudgetVal, currency) || "—"}</span>
-                      </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-slate-500 font-medium">Contract Value Source</span>
-                        <span className="font-bold text-slate-900">{sourceLabel}</span>
+                        <span className="text-slate-500 font-medium">{contractValueLabelText}</span>
+                        <span className="font-bold text-slate-900">{contractValueRowValue || "—"}</span>
                       </div>
                       <div className="flex justify-between py-2">
                         <span className="text-slate-500 font-medium">Retention %</span>
@@ -692,9 +727,7 @@ export default function BillingApprovals() {
                   <ReviewSection
                     title="Recurring Pricing Details"
                     rows={[
-                      { label: "Contract Value (Billing Amount)", value: formatMoney(contractVal, currency) },
-                      { label: "PMS Project Budget", value: formatMoney(pmsBudgetVal, currency) },
-                      { label: "Contract Value Source", value: sourceLabel },
+                      { label: contractValueLabelText, value: contractValueRowValue },
                     ]}
                   />
                 </div>

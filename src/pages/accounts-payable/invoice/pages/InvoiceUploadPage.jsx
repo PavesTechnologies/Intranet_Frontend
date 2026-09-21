@@ -295,46 +295,12 @@ export default function InvoiceUploadPage() {
     }
   };
 
-  /** Re-runs validation against the corrected extraction cache after a Stage 1 field correction. */
-  const handleRevalidate = async (extractionId) => {
-    await runValidation(
-      { extraction_id: extractionId },
-      { fileName: pipeline?.fileName, extractionDurationMs: pipeline?.extraction?.durationMs ?? null },
-    );
-  };
-
-  /**
-   * Called by Stage1ReviewSection after a Vendor/Buyer/Tax/Amounts correction succeeds. Merges the
-   * backend's updated section into local state (the extracted payload itself is never persisted
-   * anywhere else, so this is the only place it can be refreshed from) and re-triggers validation
-   * so the stepper reflects the corrected data.
-   */
-  const handleFieldCorrected = (section, updatedSection) => {
-    setPipeline((prev) => {
-      if (!prev?.extractionResult) return prev;
-      return {
-        ...prev,
-        extractionResult: {
-          ...prev.extractionResult,
-          extracted_invoice: {
-            ...prev.extractionResult.extracted_invoice,
-            [section]: { ...prev.extractionResult.extracted_invoice[section], ...updatedSection },
-          },
-        },
-      };
-    });
-
-    const extractionId = pipeline?.extractionResult?.extraction_id;
-    if (extractionId) handleRevalidate(extractionId);
-  };
-
   /**
    * Called by InvoiceDetailsPanel/InvoiceAmountsSection (Invoice Number/Date/Due Date/PO Number/
-   * Payment Terms/Currency/Amounts) on every field change — unlike handleFieldCorrected, this
-   * never triggers revalidation: none of these fields has a backend validation stage or
-   * correction endpoint of its own, so there's nothing to re-check and no reason to interrupt the
-   * user with a fresh validation run mid-edit. The single page-level Save Invoice button sends
-   * whatever ends up in local state.
+   * Payment Terms/Currency/Amounts) on every field change. None of these fields has a backend
+   * validation stage or correction endpoint of its own, so there's nothing to re-check and no
+   * reason to interrupt the user with a fresh validation run mid-edit. The single page-level Save
+   * Invoice button sends whatever ends up in local state.
    */
   const handleFieldChange = (section, field, value) => {
     setPipeline((prev) =>
@@ -447,10 +413,8 @@ export default function InvoiceUploadPage() {
               <Stage1ReviewSection
                 extractedInvoice={pipeline.extractionResult.extracted_invoice}
                 stages={pipeline.validation?.stages}
-                extractionId={pipeline.extractionResult.extraction_id}
                 fileUrl={fileUrl}
                 originalFilename={pipeline.fileName}
-                onCorrected={handleFieldCorrected}
                 onFieldChange={handleFieldChange}
                 onLineChange={handleLineChange}
               />

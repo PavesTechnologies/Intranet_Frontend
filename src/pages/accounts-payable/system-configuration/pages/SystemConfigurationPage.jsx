@@ -1,25 +1,17 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
-import GeneralConfigurationTab from "../components/GeneralConfigurationTab";
 import FiscalYearTab from "../components/FiscalYearTab";
 import TaxComplianceTab from "../components/TaxComplianceTab";
 import StatusMasterTab from "../components/StatusMasterTab";
-import TaxTypesTab from "../components/TaxTypesTab";
-import TaxRulesTab from "../components/TaxRulesTab";
 import ApprovalPoliciesTab from "../components/ApprovalPoliciesTab";
 import DepartmentApproversTab from "../components/DepartmentApproversTab";
-import PaymentTermsTab from "../components/PaymentTermsTab";
 import DepartmentsAndCategoriesTab from "../components/DepartmentsAndCategoriesTab";
 import { useApPermissions } from "../../hooks/useApPermissions";
 
 const BASE_TABS = [
-  { id: "general", label: "General Configuration" },
   { id: "fiscalYear", label: "Fiscal Years" },
   { id: "taxCompliance", label: "Tax & Compliance" },
-  { id: "tax", label: "Tax Types" },
-  { id: "taxRules", label: "Tax Rules" },
-  { id: "paymentTerms", label: "Payment Terms" },
   { id: "status", label: "Status Master" },
   { id: "departmentsAndCategories", label: "Departments & Categories" },
 ];
@@ -51,7 +43,7 @@ export default function SystemConfigurationPage() {
     <div className="p-6">
       <PageHeader
         title="System Configuration"
-        subtitle="Manage AP master data — general settings, fiscal years, tax compliance, tax rules, approval thresholds, payment terms, and statuses."
+        subtitle="Manage AP master data — fiscal years, tax compliance, approval thresholds, and statuses."
       />
 
       <div className="flex gap-6 border-b border-gray-200">
@@ -72,13 +64,9 @@ export default function SystemConfigurationPage() {
       </div>
 
       <div className="mt-4">
-        {activeTab === "general" && <GeneralConfigurationTab />}
         {activeTab === "fiscalYear" && <FiscalYearTab />}
         {activeTab === "taxCompliance" && <TaxComplianceTab />}
         {activeTab === "status" && <StatusMasterTab />}
-        {activeTab === "tax" && <TaxTypesTab />}
-        {activeTab === "taxRules" && <TaxRulesTab />}
-        {activeTab === "paymentTerms" && <PaymentTermsTab />}
         {activeTab === "departmentsAndCategories" && <DepartmentsAndCategoriesTab />}
         {activeTab === "approvalPolicies" && canManageApprovalPolicy && <ApprovalPoliciesTab />}
         {activeTab === "departmentApprovers" && canManageApprovalPolicy && <DepartmentApproversTab />}
