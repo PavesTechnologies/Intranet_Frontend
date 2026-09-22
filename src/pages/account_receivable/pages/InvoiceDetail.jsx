@@ -884,30 +884,6 @@ export default function InvoiceDetail() {
               )}
             </div>
           </div>
-
-          {deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.NOT_SENT ? (
-            <Button
-              variant="primary"
-              size="small"
-              onClick={() => setIsSendToClientOpen(true)}
-              disabled={sendingToClient || refreshing}
-              className="bg-teal-700 hover:bg-teal-800 text-white flex items-center gap-1.5 text-xs font-semibold shrink-0"
-            >
-              <MailCheck className="h-3.5 w-3.5" />
-              Send to Client
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="small"
-              onClick={() => setIsSendToClientOpen(true)}
-              disabled={sendingToClient || refreshing}
-              className="border-teal-300 text-teal-700 hover:bg-teal-50 flex items-center gap-1.5 text-xs font-semibold shrink-0"
-            >
-              <MailCheck className="h-3.5 w-3.5" />
-              Resend (Demo)
-            </Button>
-          )}
         </div>
       )}
 

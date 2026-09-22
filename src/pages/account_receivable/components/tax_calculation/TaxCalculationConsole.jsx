@@ -409,7 +409,7 @@ export default function TaxCalculationConsole() {
           className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold"
         >
           <FileText className="mr-1.5 h-3.5 w-3.5" />
-          Generate Invoice
+          View Invoice Generation
         </Button>
       );
     }
