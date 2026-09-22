@@ -88,6 +88,27 @@ export const useUploadSignedNda = ({ prId, requestId } = {}) => {
   });
 };
 
+/**
+ * PUT /apm/nda/{nda_id}/content.
+ *
+ * Only the NDA's own detail query is invalidated: saving the body changes neither the NDA's
+ * status nor RFQ eligibility, so the wider NDA graph is deliberately left alone rather than
+ * triggering refetches that cannot have changed.
+ *
+ * A 409 (someone else saved first) is left to the caller — it must not be swallowed here,
+ * because the only safe resolution is to let the user reload rather than overwrite.
+ */
+export const useUpdateNdaContent = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ndaId, content, version }) =>
+      ndaService.updateNdaContent(ndaId, content, version),
+    onSuccess: (_result, { ndaId }) => {
+      qc.invalidateQueries({ queryKey: NDA_DETAIL_KEY(ndaId) });
+    },
+  });
+};
+
 /** PATCH /apm/nda/{nda_id}/status */
 export const useUpdateNdaStatus = ({ prId, requestId } = {}) => {
   const qc = useQueryClient();

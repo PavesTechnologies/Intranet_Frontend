@@ -357,6 +357,23 @@ export default function RfqDetailPage() {
       ])
     );
 
+  /*
+   * Who actually responded. Closing the RFQ is the point where vendor selection opens, and
+   * only vendors with a quotation can be selected from there — so the officer is shown that
+   * split before closing rather than discovering it afterwards. Membership comes from the
+   * quotations the backend returned for this RFQ; nothing is inferred from invitation alone.
+   */
+  const respondedVendors = invitedVendors.filter((invitedVendor) =>
+    quotationByVendorId.has(invitedVendor.vendor_id),
+  );
+
+  const unresponsiveVendors = invitedVendors.filter(
+    (invitedVendor) => !quotationByVendorId.has(invitedVendor.vendor_id),
+  );
+
+  const vendorLabel = (invitedVendor) =>
+    vendorNameById.get(invitedVendor.vendor_id) || `Vendor #${invitedVendor.vendor_id}`;
+
   const hasInvitedVendors =
     invitedVendors.length > 0;
 
@@ -646,6 +663,8 @@ const handleCancelSend = () => {
                           ),
                         email:
                           vendor?.email,
+                        vendorCode:
+                          vendor?.vendor_code,
                       })
                     }
                   >
@@ -1309,7 +1328,37 @@ const handleCancelSend = () => {
       <ConfirmationModal
         isOpen={closeOpen}
         title="Close RFQ"
-        message={`Close ${rfq.rfq_number}? No further quotations can be added once it is closed, and vendor selection will become available.`}
+        message={
+          <span className="block space-y-2">
+            <span className="block">
+              Close {rfq.rfq_number}? No further quotations can be added once it is closed, and
+              vendor selection will become available.
+            </span>
+
+            <span className="block rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs">
+              <span className="block font-semibold text-emerald-700">
+                {respondedVendors.length} vendor(s) submitted a quotation
+              </span>
+              {respondedVendors.length > 0 && (
+                <span className="block text-gray-600">
+                  {respondedVendors.map(vendorLabel).join(", ")}
+                </span>
+              )}
+              <span className="mt-1 block text-gray-500">
+                Only these can be selected for the purchase order.
+              </span>
+            </span>
+
+            {unresponsiveVendors.length > 0 && (
+              <span className="block rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                <span className="block font-semibold">
+                  {unresponsiveVendors.length} invited vendor(s) never responded
+                </span>
+                <span className="block">{unresponsiveVendors.map(vendorLabel).join(", ")}</span>
+              </span>
+            )}
+          </span>
+        }
         confirmText="Close RFQ"
         cancelText="Cancel"
         isLoading={
@@ -1351,21 +1400,6 @@ const handleCancelSend = () => {
         )}
       </Modal>
 
-      {pr && ndaVendor && (
-        <VendorNdaModal
-          isOpen={Boolean(ndaVendor)}
-          onClose={() => setNdaVendor(null)}
-          vendorId={ndaVendor.vendorId}
-          vendorName={ndaVendor.vendorName}
-          prId={pr.id}
-          departmentId={pr.department_id}
-          purchaseCategoryId={pr.purchase_category_id}
-          // An NDA row only offers "Manage NDA" when the backend says one is required.
-          ndaRequired
-          recipientEmail={ndaVendor.email}
-        />
-      )}
-
       {pr && (
         <InviteVendorsModal
           isOpen={inviteOpen}
@@ -1377,6 +1411,32 @@ const handleCancelSend = () => {
           excludeVendorIds={
             invitedVendorIds
           }
+          departmentName={departmentName}
+          categoryName={categoryName}
+          onManageNda={setNdaVendor}
+        />
+      )}
+
+      {/* Rendered after Invite Vendors so the NDA workspace stacks above it when it is
+          opened from a vendor row there. */}
+      {pr && ndaVendor && (
+        <VendorNdaModal
+          isOpen={Boolean(ndaVendor)}
+          onClose={() => setNdaVendor(null)}
+          vendorId={ndaVendor.vendorId}
+          vendorName={ndaVendor.vendorName}
+          vendorCode={ndaVendor.vendorCode}
+          prId={pr.id}
+          prNumber={pr.pr_number}
+          prDate={pr.created_at}
+          departmentId={pr.department_id}
+          purchaseCategoryId={pr.purchase_category_id}
+          departmentName={departmentName}
+          categoryName={categoryName}
+          businessRequirement={pr.justification}
+          // An NDA row only offers an NDA action when the backend says one is required.
+          ndaRequired
+          recipientEmail={ndaVendor.email}
         />
       )}
 
