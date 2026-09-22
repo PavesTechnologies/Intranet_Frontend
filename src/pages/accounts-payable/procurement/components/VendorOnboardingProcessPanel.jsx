@@ -141,12 +141,15 @@ export default function VendorOnboardingProcessPanel({ request, onCompleted }) {
             engagementId={request.engagement_id}
             engagement={engagement}
             intakeResult={null}
-            onRefreshEngagement={refetchEngagement}
             // The onboarding endpoint above already ran and recorded the verdict; this read
             // only fetches the per-check detail for display.
             autoRun
-            // NDA is handled by the Stage 2 NDA APIs below, not the intake-level decision.
-            showNdaDecision={false}
+            // The NDA requirement itself is decided here, exactly as it is in the direct
+            // Register Vendor flow — a request that arrived from an Internal Request must not
+            // lose the ability to set it. Executing the NDA (generate/send/sign) still happens
+            // later through the Stage 2 NDA APIs at the RFQ step.
+            showNdaDecision
+            onRefreshEngagement={refetchEngagement}
           />
 
           <div className="flex justify-end">
@@ -173,21 +176,8 @@ export default function VendorOnboardingProcessPanel({ request, onCompleted }) {
               : "border-emerald-200 bg-emerald-50"
           }`}
         >
-          <div className="flex flex-wrap items-center gap-2">
-            <p
-              className={`text-sm font-semibold ${
-                ndaRequired ? "text-amber-800" : "text-emerald-800"
-              }`}
-            >
-              NDA {ndaRequired ? "Required" : "Not Required"}
-            </p>
-            <StatusPill
-              label={ndaRequired ? "YES" : "NO"}
-              tone={ndaRequired ? "warning" : "success"}
-            />
-          </div>
           <p
-            className={`mt-1 text-xs ${ndaRequired ? "text-amber-700" : "text-emerald-700"}`}
+            className={`text-xs ${ndaRequired ? "text-amber-700" : "text-emerald-700"}`}
           >
             {ndaRequired
               ? "Pre-Screen recorded that this engagement needs an NDA. The NDA is generated, sent, signed and reviewed during the RFQ step - onboarding can still be completed now."
