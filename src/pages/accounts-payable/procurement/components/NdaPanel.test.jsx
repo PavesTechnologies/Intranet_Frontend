@@ -306,3 +306,79 @@ describe("validateSignedNdaFile", () => {
     expect(validateSignedNdaFile(null)).toBe("Select the signed NDA PDF to upload.");
   });
 });
+
+describe("NdaPanel — reusing an NDA the vendor already has", () => {
+  const completed = {
+    nda_id: 41,
+    status_code: "COMPLETED",
+    template_version: "v1",
+    valid_from: "2026-01-01",
+    valid_until: "2099-01-01",
+  };
+
+  /** No NDA for this scope yet, but the vendor has other agreements on file. */
+  const withCandidates = (ndas) =>
+    useVendorNda.mockReturnValue({
+      data: { vendor_id: 9, outcome: "NOT_FOUND", reason: null, nda: null, ndas },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+  it("offers the existing agreement instead of going straight to Generate", () => {
+    withCandidates([completed]);
+    renderPanel();
+
+    expect(screen.getByText(/existing nda available for this vendor/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /use existing nda/i })).toBeInTheDocument();
+    // The bare Generate button would duplicate the choice offered inside the panel.
+    expect(screen.queryByRole("button", { name: /^generate nda$/i })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /generate new nda instead/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("requests reuse through the existing generate call, for this vendor and PR", async () => {
+    const user = userEvent.setup();
+    withCandidates([completed]);
+    generateMutateAsync.mockResolvedValue({ nda_id: 41, reused: true, message: "Reused." });
+
+    renderPanel();
+    await user.click(screen.getByRole("button", { name: /use existing nda/i }));
+
+    // No second NDA record is created — the backend resolves this to the existing one.
+    expect(generateMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ vendor_id: 9, pr_id: 12 }),
+    );
+  });
+
+  it("falls back to the normal Generate flow when nothing on file is reusable", () => {
+    withCandidates([
+      { ...completed, status_code: "EXPIRED" },
+      { ...completed, nda_id: 42, status_code: "REJECTED" },
+      { ...completed, nda_id: 43, status_code: "SIGNED" },
+    ]);
+    renderPanel();
+
+    expect(screen.queryByText(/existing nda available for this vendor/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^generate nda$/i })).toBeInTheDocument();
+  });
+
+  it("stops offering reuse once this engagement has its own NDA", () => {
+    useVendorNda.mockReturnValue({
+      data: {
+        vendor_id: 9,
+        outcome: "VALID",
+        reason: null,
+        nda: nda({ status_code: "PENDING" }),
+        ndas: [completed],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderPanel();
+    expect(screen.queryByText(/existing nda available for this vendor/i)).not.toBeInTheDocument();
+  });
+});

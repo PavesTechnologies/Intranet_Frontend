@@ -19,6 +19,11 @@ export default function ReasonModal({
   variant = "primary",
   placeholder = "Explain why you are making this change…",
   extraContent = null,
+  // Some transitions are allowed without a justification (the endpoint's
+  // per-transition `requires_reason: false`). The minimum still applies to
+  // anything actually typed — an optional reason isn't a shorter one.
+  reasonRequired = true,
+  confirmDisabled = false,
 }) {
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -31,7 +36,10 @@ export default function ReasonModal({
     }
   }, [isOpen]);
 
-  const tooShort = reason.trim().length < MIN_REASON;
+  const trimmed = reason.trim();
+  const tooShort = reasonRequired
+    ? trimmed.length < MIN_REASON
+    : trimmed.length > 0 && trimmed.length < MIN_REASON;
 
   const submit = async () => {
     if (tooShort) return;
@@ -52,7 +60,7 @@ export default function ReasonModal({
         {extraContent}
         <div>
           <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-            Reason <span className="text-red-500">*</span>
+            Reason {reasonRequired ? <span className="text-red-500">*</span> : <span className="text-slate-400 font-medium normal-case">(optional)</span>}
           </label>
           <textarea
             value={reason}
@@ -63,7 +71,7 @@ export default function ReasonModal({
           />
           <p className={`text-[10px] mt-1 ${tooShort ? "text-slate-400" : "text-emerald-600"}`}>
             {tooShort
-              ? `${MIN_REASON - reason.trim().length} more character(s) needed — this is recorded in the audit trail.`
+              ? `${MIN_REASON - trimmed.length} more character(s) needed — this is recorded in the audit trail.`
               : "Recorded in the audit trail."}
           </p>
         </div>
@@ -75,7 +83,7 @@ export default function ReasonModal({
             variant={variant}
             size="small"
             onClick={submit}
-            disabled={tooShort}
+            disabled={tooShort || confirmDisabled}
             loading={submitting}
             loadingText="Saving..."
           >

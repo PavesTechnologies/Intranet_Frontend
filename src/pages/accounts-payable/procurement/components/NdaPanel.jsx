@@ -7,6 +7,9 @@ import FormTextArea from "../../../../components/forms/FormTextArea";
 import FileUpload from "../../../../components/forms/FileUpload";
 import Modal from "../../../../components/Modal/modal";
 import StatusPill from "../../vendor-intake/components/PreScreenStatusBadge";
+import ExistingNdaReusePanel from "./ExistingNdaReusePanel";
+import GenerateNdaModal from "./GenerateNdaModal";
+import SendNdaConfirmModal from "./SendNdaConfirmModal";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { formatDate } from "../../utils/formatters";
 import { useApPermissions } from "../../hooks/useApPermissions";
@@ -26,6 +29,7 @@ import {
   NDA_STATUS_TONE,
   NDA_TRANSITION_ACTION_LABEL,
   SIGNED_NDA_ACCEPT,
+  isReusableNda,
   canUploadSignedNdaFor,
   humanizeCode,
   validateSignedNdaFile,
@@ -46,10 +50,20 @@ const LOOKUP_TONE = {
   [NDA_LOOKUP_OUTCOME.EXPIRED]: "danger",
 };
 
+/**
+ * One metadata cell: label above value.
+ *
+ * Label and value used to sit on one line pushed apart, which made a long recipient email
+ * collide with the label beside it and overflow the card. Stacking them gives the value the
+ * full cell width, and `break-words` wraps a long address inside its own cell rather than
+ * widening the grid.
+ */
 const Row = ({ label, value }) => (
-  <div className="flex justify-between gap-3 border-b border-gray-100 py-1.5 last:border-0">
-    <dt className="text-xs text-gray-500">{label}</dt>
-    <dd className="text-xs font-medium text-gray-900">{value ?? "—"}</dd>
+  <div className="min-w-0 border-b border-gray-100 py-1.5 last:border-0">
+    <dt className="text-[11px] uppercase tracking-wide text-gray-500">{label}</dt>
+    <dd className="mt-0.5 break-words text-xs font-medium text-gray-900">
+      {value === null || value === undefined || value === "" ? "—" : value}
+    </dd>
   </div>
 );
 
@@ -62,8 +76,15 @@ const Row = ({ label, value }) => (
  * and which transitions are legal is re-validated on PATCH. This component renders that
  * state and offers Generate / Send / record-status.
  *
+ * Generate and Send can be suppressed (`showGenerate` / `showSend`) when the panel is
+ * embedded in the NDA editor, which owns those two actions from its own footer so they are
+ * not offered twice. Both default to true, so the panel on its own is unchanged.
+ *
  * @param {{ vendorId:number, departmentId:number, purchaseCategoryId:number, prId?:number,
- *   requestId?:number, ndaRequired:boolean|null, recipientEmail?:string|null }} props
+ *   requestId?:number, ndaRequired:boolean|null, recipientEmail?:string|null,
+ *   vendorName?:string, vendorCode?:string|null, prNumber?:string, departmentName?:string,
+ *   categoryName?:string, businessRequirement?:string|null, showGenerate?:boolean,
+ *   showSend?:boolean, onNdaGenerated?:(result:object)=>void }} props
  */
 export default function NdaPanel({
   vendorId,
@@ -73,6 +94,15 @@ export default function NdaPanel({
   requestId,
   ndaRequired,
   recipientEmail,
+  vendorName,
+  vendorCode,
+  prNumber,
+  departmentName,
+  categoryName,
+  businessRequirement,
+  showGenerate = true,
+  showSend = true,
+  onNdaGenerated,
 }) {
   const { canViewNda, canGenerateNda, canSendNda, canUploadSignedNda } = useApPermissions();
 
@@ -83,6 +113,9 @@ export default function NdaPanel({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [signedFile, setSignedFile] = useState(null);
   const [uploadError, setUploadError] = useState("");
+
+  const [generateOpen, setGenerateOpen] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
 
   const {
     data: lookup,
@@ -151,6 +184,8 @@ export default function NdaPanel({
           ? "Existing valid NDA reused for this engagement."
           : result?.message || "NDA generated.",
       );
+      setGenerateOpen(false);
+      onNdaGenerated?.(result);
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Could not generate the NDA."));
     }
@@ -166,6 +201,7 @@ export default function NdaPanel({
         return;
       }
       toast.success(result?.message || `NDA sent to ${result?.recipient_email || "the vendor"}.`);
+      setSendOpen(false);
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Could not send the NDA."));
     }
@@ -236,6 +272,15 @@ export default function NdaPanel({
     }
   };
 
+  // Agreements already on file for this vendor that a new engagement could run on. Offered
+  // only while this scope has no usable NDA of its own — once one exists, the lifecycle below
+  // is what matters.
+  const reusableNdas = (lookup?.ndas || []).filter(
+    (candidate) => isReusableNda(candidate) && String(candidate.nda_id) !== String(nda?.nda_id ?? ""),
+  );
+
+  const showReuseOffer = !nda && reusableNdas.length > 0 && canGenerateNda;
+
   const allowedTransitions = NDA_MANUAL_TRANSITIONS[statusCode] || [];
   const isRejecting = statusModal?.statusCode === NDA_STATUS.REJECTED;
 
@@ -296,24 +341,38 @@ export default function NdaPanel({
         </dl>
       )}
 
+      {showReuseOffer && (
+        <div className="mt-3">
+          <ExistingNdaReusePanel
+            ndas={reusableNdas}
+            currentNdaId={nda?.nda_id}
+            onReuse={handleGenerate}
+            onGenerateNew={() => setGenerateOpen(true)}
+            isReusing={generateMutation.isPending}
+            canGenerate={canGenerateNda}
+          />
+        </div>
+      )}
+
       <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-4">
-        {!nda && canGenerateNda && (
+        {/* An EXPIRED NDA can no longer be acted on — the way forward is a fresh one. */}
+        {showGenerate && canGenerateNda && !showReuseOffer && (!nda || statusCode === NDA_STATUS.EXPIRED) && (
           <Button
             variant="primary"
             size="small"
-            onClick={handleGenerate}
+            onClick={() => setGenerateOpen(true)}
             loading={generateMutation.isPending}
             loadingText="Generating..."
           >
-            Generate NDA
+            {statusCode === NDA_STATUS.EXPIRED ? "Generate New NDA" : "Generate NDA"}
           </Button>
         )}
 
-        {nda && canSendNda && statusCode === NDA_STATUS.PENDING && (
+        {showSend && nda && canSendNda && statusCode === NDA_STATUS.PENDING && (
           <Button
             variant="primary"
             size="small"
-            onClick={handleSend}
+            onClick={() => setSendOpen(true)}
             loading={sendMutation.isPending}
             loadingText="Sending..."
           >
@@ -388,6 +447,38 @@ export default function NdaPanel({
           ))}
       </div>
 
+      <GenerateNdaModal
+        isOpen={generateOpen}
+        onClose={() => setGenerateOpen(false)}
+        onConfirm={handleGenerate}
+        isGenerating={generateMutation.isPending}
+        isRegenerate={statusCode === NDA_STATUS.EXPIRED}
+        vendorName={vendorName}
+        vendorEmail={recipientEmail}
+        vendorCode={vendorCode}
+        prNumber={prNumber}
+        departmentName={departmentName}
+        categoryName={categoryName}
+        businessRequirement={businessRequirement}
+        templateVersion={nda?.template_version}
+        lookupOutcome={outcome}
+      />
+
+      {nda && (
+        <SendNdaConfirmModal
+          isOpen={sendOpen}
+          onClose={() => setSendOpen(false)}
+          onConfirm={handleSend}
+          isSending={sendMutation.isPending}
+          vendorName={vendorName}
+          recipientEmail={nda.recipient_email || recipientEmail}
+          prNumber={prNumber}
+          ndaId={nda.nda_id}
+          templateVersion={nda.template_version}
+          documentKey={nda.document_key}
+        />
+      )}
+
       <Modal
         isOpen={Boolean(statusModal)}
         onClose={() => setStatusModal(null)}
@@ -398,6 +489,7 @@ export default function NdaPanel({
             : ""
         }
         size="sm"
+        zIndex="z-[10000]"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setStatusModal(null)}>
@@ -438,6 +530,7 @@ export default function NdaPanel({
         title="Upload Signed NDA"
         subtitle="Attach the PDF the vendor signed. The NDA moves to Signed, pending internal review."
         size="sm"
+        zIndex="z-[10000]"
         closeOnBackdrop={false}
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

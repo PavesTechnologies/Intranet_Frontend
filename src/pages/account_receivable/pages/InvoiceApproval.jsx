@@ -200,14 +200,16 @@ export default function InvoiceApproval() {
   );
 
   const handleReviewInvoice = (inv) => {
-    // Fixed Price/Recurring invoices are sourced from a Billing Occurrence,
-    // never a Billing Snapshot — routing these through /invoices/{id} would
-    // make InvoiceDetail.jsx call the Billing Snapshot invoice API with an
-    // occurrence id. There is no occurrence-based invoice detail endpoint
-    // yet, so send these to the occurrence's own Tax Calculation detail
-    // page instead, which already renders its invoiced/read-only state.
     if (inv.billingScheduleId && !inv.billingSnapshotId) {
-      navigate(`/account-receivable/tax-calculation/occurrence/${inv.billingScheduleId}`);
+      navigate(`/account-receivable/invoices/occurrence/${inv.billingScheduleId}`, {
+        state: {
+          from: "invoice-approval",
+          source: "invoice-approval",
+          billingScheduleId: inv.billingScheduleId,
+          occurrenceId: inv.billingScheduleId,
+          invoiceId: inv.invoiceId,
+        },
+      });
       return;
     }
 
@@ -216,7 +218,13 @@ export default function InvoiceApproval() {
       showStatusToast("Identifier is missing for this invoice.", "error");
       return;
     }
-    navigate(`/account-receivable/invoices/${targetSnapshotId}`);
+    navigate(`/account-receivable/invoices/${targetSnapshotId}`, {
+      state: {
+        from: "invoice-approval",
+        source: "invoice-approval",
+        invoiceId: inv.invoiceId,
+      },
+    });
   };
 
   const refreshButton = (label = "Refresh") => (

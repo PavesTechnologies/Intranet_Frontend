@@ -98,6 +98,29 @@ export const ndaService = {
     return res.data;
   },
 
+  /**
+   * PUT /apm/nda/{nda_id}/content — persists the edited NDA body. This is what makes the
+   * editor's content real: POST /send delivers the latest *persisted* content, so unsaved
+   * edits must be saved through here first or they are simply not part of the agreement.
+   *
+   * `version` is the content version the edits were made against. The backend answers 409
+   * when it no longer matches, which means someone else saved in the meantime — the caller
+   * must reload rather than overwrite.
+   *
+   * @param {number|string} ndaId
+   * @param {string} content
+   * @param {number|null} [version]
+   * @returns {Promise<{nda_id:number, version?:number, content?:string, message?:string}>}
+   */
+  updateNdaContent: async (ndaId, content, version = null) => {
+    const res = await api.put(
+      `${BASE}/${ndaId}/content`,
+      { content, version: version ?? undefined },
+      { headers: authHeaders() },
+    );
+    return res.data;
+  },
+
   updateNdaStatus: async (ndaId, { statusCode, signedDocumentKey, reason } = {}) => {
     const res = await api.patch(
       `${BASE}/${ndaId}/status`,
