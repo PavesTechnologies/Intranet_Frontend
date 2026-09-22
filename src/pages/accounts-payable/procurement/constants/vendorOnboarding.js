@@ -157,6 +157,83 @@ export function validateSignedNdaFile(file) {
   return "";
 }
 
+/**
+ * Row-level wording for a vendor's NDA state in the Invite Vendors list, where the label has
+ * to say what the NDA *is* rather than just its status word ("Sent" alone reads ambiguously
+ * next to a vendor name).
+ *
+ * The status itself always comes from the backend — the NDA gate of the RFQ eligibility
+ * verdict (rfq_eligibility_service.py) — and an unrecognised code falls back to the plain
+ * status label rather than being guessed at.
+ */
+export const NDA_ROW_LABEL = {
+  // The requirement stands but no NDA record exists yet — see NDA_NOT_GENERATED_STATUS below.
+  NOT_FOUND: "NDA Required",
+  [NDA_STATUS.NOT_REQUIRED]: "NDA Not Required",
+  [NDA_STATUS.PENDING]: "NDA Generated",
+  [NDA_STATUS.SENT]: "NDA Sent",
+  [NDA_STATUS.SIGNED]: "Signed — Pending Review",
+  [NDA_STATUS.COMPLETED]: "NDA Completed",
+  [NDA_STATUS.REJECTED]: "NDA Rejected",
+  [NDA_STATUS.EXPIRED]: "NDA Expired",
+};
+
+/**
+ * The next NDA action for a vendor row. Each opens the NDA workspace, where the action is
+ * actually carried out (and confirmed) — the label only says what is waiting to be done.
+ *
+ * `null` means no NDA action is offered: COMPLETED and NOT_REQUIRED need none, and an
+ * unrecognised state must not offer Generate, because only the backend knows whether an NDA
+ * is required at all.
+ */
+export const NDA_ROW_ACTION_LABEL = {
+  [NDA_STATUS.PENDING]: "Send NDA",
+  [NDA_STATUS.SENT]: "Upload Signed NDA",
+  [NDA_STATUS.SIGNED]: "Review Signed NDA",
+  [NDA_STATUS.REJECTED]: "Upload Signed NDA",
+  [NDA_STATUS.EXPIRED]: "Generate New NDA",
+};
+
+/**
+ * The NDA gate reports NOT_FOUND when the requirement stands but no NDA record exists yet —
+ * that, and only that, is when the row offers to generate one.
+ */
+export const NDA_NOT_GENERATED_STATUS = "NOT_FOUND";
+
+/**
+ * Badge tone for a row's NDA state. NOT_FOUND is not an NDA status — it is the gate saying no
+ * NDA exists yet — so it has no entry in NDA_STATUS_TONE and is coloured as outstanding work.
+ */
+export const NDA_ROW_TONE = {
+  ...NDA_STATUS_TONE,
+  [NDA_NOT_GENERATED_STATUS]: "warning",
+};
+
+/**
+ * Whether an NDA already on file may be reused for another engagement.
+ *
+ * Only a COMPLETED agreement that has not run out counts. SIGNED is deliberately excluded —
+ * it means "received, pending internal review", so treating it as reusable would let an
+ * unreviewed document clear the RFQ gate. PENDING and SENT have not been agreed at all, and
+ * REJECTED/EXPIRED are spent.
+ *
+ * This decides what the UI offers; the backend still re-checks reuse when the NDA is
+ * requested (nda_service.py), so it is not a second source of truth.
+ *
+ * @param {{status_code?:string, valid_until?:string|null}|null} nda
+ * @param {Date} [now]
+ */
+export const isReusableNda = (nda, now = new Date()) => {
+  if (!nda || nda.status_code !== NDA_STATUS.COMPLETED) return false;
+
+  if (!nda.valid_until) return true;
+
+  const validUntil = new Date(nda.valid_until);
+  if (Number.isNaN(validUntil.getTime())) return false;
+
+  return validUntil >= now;
+};
+
 /** ExistingNdaResponse.outcome (LOOKUP_* in nda_service.py). */
 export const NDA_LOOKUP_OUTCOME = {
   VALID: "VALID",
