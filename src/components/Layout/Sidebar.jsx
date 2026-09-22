@@ -128,10 +128,8 @@ const airsSubmenu = [
   { label: "Campaigns", to: "/ai-screening/campaigns" },
   { label: "Resume Intake", to: "/ai-screening/resume-intake" },
   { label: "Pipeline", to: "/ai-screening/pipeline" },
-  { label: "Candidates", to: "/ai-screening/candidates" },
   { label: "Skill Ontology", to: "/ai-screening/skill-ontology" },
   { label: "Talent Pool", to: "/ai-screening/talent-pool" },
-  { label: "Analytics", to: "/ai-screening/analytics" },
   { label: "Settings", to: "/ai-screening/settings" },
 ];
 
@@ -144,14 +142,8 @@ const interviewCalendarItem = { label: "Interview Calendar", to: "/ai-screening/
 
 // HR_ADMIN gets a trimmed-down AIRS menu — only these items, plus
 // Prompt Templates below (HR_ADMIN-only, not part of the general airsSubmenu).
-// "Candidates" here is deliberately its own entry (not filtered in from
-// airsSubmenu above) — it points at the HR_ADMIN-only Global Candidate
-// Directory (/ai-screening/global-candidates, GET /candidates), NOT the
-// campaign-scoped Candidates & Ranking page airsSubmenu's own "Candidates"
-// entry points to.
 const hrAdminAirsSubmenu = [
   ...airsSubmenu.filter((item) => ["Dashboard", "JD Management", "Campaigns", "Pipeline"].includes(item.label)),
-  { label: "Candidates", to: "/ai-screening/global-candidates" },
   ...airsSubmenu.filter((item) => ["Talent Pool", "Skill Ontology"].includes(item.label)),
   interviewCalendarItem,
   { label: "Prompt Templates", to: "/ai-screening/prompt-templates" },
@@ -163,6 +155,14 @@ const recruiterAirsSubmenu = [
     ["Dashboard", "Campaigns", "Resume Intake", "Pipeline", "Talent Pool"].includes(item.label),
   ),
   interviewCalendarItem,
+];
+
+// HIRING_MANAGER gets a trimmed-down AIRS menu — only these items.
+const hiringManagerAirsSubmenu = [
+  ...airsSubmenu.filter((item) => ["Campaigns", "Pipeline"].includes(item.label)),
+  interviewCalendarItem,
+  // /ai-screening/hm-review is HIRING_MANAGER-only (see App.jsx ProtectedRoute).
+  { label: "HM Review", to: "/ai-screening/hm-review" },
 ];
 
 
@@ -245,14 +245,17 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   const airsRBACAccess = hasRole(["HIRING_MANAGER", "HR", "HR_ADMIN", "RECRUITER"]);
   const isHrAdmin = hasRole(["HR_ADMIN"]);
   const isRecruiter = hasRole(["RECRUITER"]);
-  // Everyone else (HIRING_MANAGER, HR) falls through to the full menu, which
-  // must not offer Dashboard — /ai-screening/dashboard is HR_ADMIN/RECRUITER only, so
+  const isHiringManager = hasRole(["HIRING_MANAGER"]);
+  // Everyone else (plain HR) falls through to the full menu, which must not
+  // offer Dashboard — /ai-screening/dashboard is HR_ADMIN/RECRUITER only, so
   // the link would lead straight to the unauthorized page.
   const filteredAirsSubmenu = isHrAdmin
     ? hrAdminAirsSubmenu
     : isRecruiter
       ? recruiterAirsSubmenu
-      : airsSubmenu.filter((item) => item.label !== "Dashboard");
+      : isHiringManager
+        ? hiringManagerAirsSubmenu
+        : airsSubmenu.filter((item) => item.label !== "Dashboard");
 
   // State for User Management Hover
   const [userHovered, setUserHovered] = useState(false);

@@ -3,8 +3,17 @@ const BASE = "/accounts-payable";
 export const AP_ROUTES = {
   DASHBOARD: `${BASE}/dashboard`,
 
+  // The single vendor onboarding entry point: Register Vendor (intake) followed by
+  // Pre-Screen, both steps on this one route.
   VENDOR_ONBOARD: `${BASE}/vendors/onboard`,
+
   VENDOR_LIST: `${BASE}/vendors`,
+
+  // Internal Vendor Onboarding Requests — the Vendor Intaker's queue. Raised from
+  // Procurement, processed here in Vendor Management.
+  VENDOR_INTERNAL_REQUESTS: `${BASE}/vendors/internal-requests`,
+  VENDOR_INTERNAL_REQUEST_DETAIL: (requestId = ":requestId") =>
+    `${BASE}/vendors/internal-requests/${requestId}`,
   VENDOR_DETAIL: (vendorId = ":vendorId") =>
     `${BASE}/vendors/${vendorId}`,
   VENDOR_UPDATE: (vendorId = ":vendorId") =>

@@ -24,11 +24,11 @@ const RECOMMENDATION_TONE = {
 // status on its own. HR/HM still makes the real call via Select/Reject
 // elsewhere; this is input to that decision, not something that
 // auto-updates anything here.
-export default function InterviewRoundFeedback({ round, feedback, isLoading }) {
+export default function InterviewRoundFeedback({ round, feedback, isLoading, readOnly = false }) {
   const requestMutation = useRequestFeedback(round.id);
 
   const started = hasRoundStarted(round);
-  const canRequest = round.status !== "CANCELLED";
+  const canRequest = !readOnly && round.status !== "CANCELLED";
 
   const handleRequest = () => {
     requestMutation.mutate(undefined, {

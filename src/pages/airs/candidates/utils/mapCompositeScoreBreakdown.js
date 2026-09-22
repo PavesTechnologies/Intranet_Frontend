@@ -1,5 +1,16 @@
 import { formatDateTime, numberOr, textOrDash } from "./candidateDataUtils";
 
+// deterministic_score and ai_evaluation_score come back on a 0-100 scale, but
+// semantic_score is the raw 0-1 cosine similarity (the Relevance tab renders it
+// as `overall_similarity * 100`). Left alone it shows up here as "0.9" next to
+// two scores reading "85" — same card, two different scales. Anything at or
+// below 1 is therefore read as a fraction and scaled up, so all three
+// components are percentages by the time they reach the UI.
+function asPercentScore(value) {
+  const score = numberOr(value, 0);
+  return score > 0 && score <= 1 ? score * 100 : score;
+}
+
 export function mapCompositeScoreBreakdown(raw) {
   const data = raw?.data ?? raw ?? null;
   if (!data) return null;
@@ -23,7 +34,7 @@ export function mapCompositeScoreBreakdown(raw) {
       {
         key: "semantic",
         label: "Relevance",
-        score: numberOr(data.semantic_score, 0),
+        score: asPercentScore(data.semantic_score),
         weight: semanticWeight,
       },
       {

@@ -9,10 +9,12 @@ import Modal from "../../../components/Modal/modal";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import FormTextArea from "../../../components/forms/FormTextArea";
 import SearchInput from "../../../components/filter/Searchbar";
+import FilterListbox from "../../../components/filter/FilterListbox";
 import Pagination from "../../../components/Pagination/pagination";
 import StatusBadge from "../../../components/status/statusbadge";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import ARTable from "../components/common/ARTable";
+import ActionMenu from "../components/common/ActionMenu";
 import {
   approveBillingConfigurationRequest,
   formatApprovalStatusLabel,
@@ -26,7 +28,7 @@ import { formatFrequencyLabel } from "../components/billing-setup/ReviewActivate
 import { BILLING_MODE_LABELS } from "../data/wizardOptions";
 import { getBillingTypeDisplayName } from "../utils/billingType";
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 5;
 
 const STATUS_TABS = {
   PENDING: "PENDING_APPROVAL",
@@ -38,6 +40,15 @@ const STATUS_TABS = {
   EXPIRED: "EXPIRED",
   ALL: "ALL",
 };
+
+// Options for the shared FilterListbox — same {label, value} shape used by every
+// other AR list page's status filter (see Overview.jsx's APPROVAL_STATUS_OPTIONS).
+const STATUS_FILTER_OPTIONS = [
+  { value: STATUS_TABS.PENDING, label: "Pending Approvals" },
+  { value: STATUS_TABS.APPROVED, label: "Approved" },
+  { value: STATUS_TABS.REJECTED, label: "Rejected" },
+  { value: STATUS_TABS.ALL, label: "All Requests" },
+];
 
 const TABLE_HEADERS = [
   "Project",
@@ -236,13 +247,25 @@ export default function BillingApprovals() {
     { key: STATUS_TABS.PENDING, label: "Pending Approvals", value: tabCounts.PENDING, icon: Clock, color: "bg-amber-500 text-white" },
     { key: STATUS_TABS.APPROVED, label: "Approved", value: tabCounts.APPROVED, icon: CheckCircle2, color: "bg-emerald-600 text-white" },
     { key: STATUS_TABS.REJECTED, label: "Rejected", value: tabCounts.REJECTED, icon: XCircle, color: "bg-rose-600 text-white" },
-    { key: STATUS_TABS.EXPIRED, label: "Expired", value: tabCounts.EXPIRED, icon: AlertTriangle, color: "bg-orange-600 text-white" },
   ];
+
+  const handleKpiClick = (kpiKey) => {
+    if (kpiKey === STATUS_TABS.ALL) {
+      setStatusTab(STATUS_TABS.ALL);
+    } else {
+      setStatusTab((prev) => (prev === kpiKey ? STATUS_TABS.ALL : kpiKey));
+    }
+    setCurrentPage(1);
+  };
 
   const handleTabChange = (key) => {
     setStatusTab(key);
     setCurrentPage(1);
   };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusTab, searchQuery]);
 
   const filteredConfigs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -359,28 +382,21 @@ export default function BillingApprovals() {
         effectivePeriod: `${formatDate(config.effectiveFrom)} – ${formatDate(config.effectiveTo) || "Ongoing"}`,
         approvalStatus: <StatusBadge label={formatApprovalStatusLabel(config.approvalStatus)} size="sm" />,
         action: (
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => handleReview(config)}
-            loading={reviewingId === config.billingConfigurationId}
-            loadingText="Loading..."
-          >
-            <Eye className="h-3.5 w-3.5" /> Review
-          </Button>
+          <ActionMenu
+            items={[
+              {
+                label: reviewingId === config.billingConfigurationId ? "Loading..." : "Review",
+                icon: <Eye className="h-4 w-4" />,
+                disabled: reviewingId === config.billingConfigurationId,
+                onClick: () => handleReview(config),
+              },
+            ]}
+          />
         ),
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [paginatedConfigs, reviewingId]
   );
-
-  const tabsList = [
-    { key: STATUS_TABS.PENDING, label: "Pending Approvals", icon: Clock, count: tabCounts.PENDING },
-    { key: STATUS_TABS.APPROVED, label: "Approved", icon: CheckCircle2, count: tabCounts.APPROVED },
-    { key: STATUS_TABS.REJECTED, label: "Rejected", icon: XCircle, count: tabCounts.REJECTED },
-    { key: STATUS_TABS.EXPIRED, label: "Expired", icon: AlertTriangle, count: tabCounts.EXPIRED },
-    { key: STATUS_TABS.ALL, label: "All Requests", icon: FolderKanban, count: tabCounts.ALL },
-  ];
 
   return (
     <div className="space-y-4">
@@ -390,26 +406,30 @@ export default function BillingApprovals() {
         subtitle="Review, approve, or reject billing configuration setups submitted by Finance Executives."
       />
 
-      {/* 2. Summary KPI Cards (Total, Pending, Approved, Rejected, Expired) */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {/* 2. Summary KPI Cards (Total, Pending, Approved, Rejected) */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {kpiCards.map((kpi) => {
-          const isActive = statusTab === kpi.key;
+          const isActive =
+            statusTab === kpi.key ||
+            (statusTab === STATUS_TABS.ALL && kpi.key === STATUS_TABS.ALL);
+
           return (
-            <div
+            <button
               key={kpi.key}
-              onClick={() => handleTabChange(kpi.key)}
-              className={`cursor-pointer rounded-xl transition-all duration-150 ${
-                isActive ? "ring-2 ring-[#0A0082] ring-offset-2" : "hover:shadow-sm opacity-90 hover:opacity-100"
-              }`}
+              type="button"
+              onClick={() => handleKpiClick(kpi.key)}
+              title={`Filter by ${kpi.label}`}
+              className="text-left rounded-xl transition-transform active:scale-[0.99] focus:outline-none"
             >
               <KPICard
                 label={kpi.label}
                 value={loading ? "…" : kpi.value}
                 icon={<kpi.icon className="h-5 w-5" />}
                 color={kpi.color}
-                className="h-full w-full bg-white shadow-sm"
+                active={isActive}
+                className="h-full w-full cursor-pointer bg-white shadow-sm border border-slate-200 transition-all hover:shadow-md"
               />
-            </div>
+            </button>
           );
         })}
       </div>
@@ -417,42 +437,11 @@ export default function BillingApprovals() {
       {/* 3. Main Data Card */}
       <PageCard>
         <PageCardContent className="p-4 sm:p-5 space-y-4">
-          {/* Status Tabs Navigation */}
-          <div className="border-b border-slate-200">
-            <nav className="-mb-px flex space-x-2 overflow-x-auto sm:space-x-4" aria-label="Approval Status Tabs">
-              {tabsList.map((tab) => {
-                const isActive = statusTab === tab.key;
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => handleTabChange(tab.key)}
-                    className={`group inline-flex items-center gap-2 border-b-2 py-2.5 px-3 text-xs font-semibold whitespace-nowrap transition-all ${
-                      isActive
-                        ? "border-[#0A0082] text-[#0A0082]"
-                        : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                    }`}
-                  >
-                    <Icon className={`h-4 w-4 ${isActive ? "text-[#0A0082]" : "text-slate-400 group-hover:text-slate-500"}`} />
-                    <span>{tab.label}</span>
-                    <span
-                      className={`ml-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                        isActive
-                          ? "bg-[#0A0082]/10 text-[#0A0082]"
-                          : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
-                      }`}
-                    >
-                      {loading ? "…" : tab.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="w-full sm:max-w-md">
+          {/* Filter row — shared SearchInput + shared FilterListbox, matching the
+              pattern used on Overview.jsx and other AR list pages. Status counts
+              remain visible via the KPI cards above, so they aren't duplicated here. */}
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="w-full lg:max-w-md">
               <SearchInput
                 value={searchQuery}
                 onChange={handleSearchInputChange}
@@ -460,24 +449,35 @@ export default function BillingApprovals() {
                 placeholder="Search by project, code, or client..."
               />
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="w-48 sm:w-52">
+                <FilterListbox
+                  options={STATUS_FILTER_OPTIONS}
+                  value={statusTab}
+                  onChange={handleTabChange}
+                  placeholder="Filter by Status"
+                />
+              </div>
+            </div>
           </div>
 
-          <ARTable
-            headers={TABLE_HEADERS}
-            columns={TABLE_COLUMNS}
-            rows={tableRows}
-            loading={loading}
-            emptyMessage="No billing configuration requests found for this filter."
-          />
-
-          {!loading && filteredConfigs.length > 0 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
-              onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+          <div className="overflow-x-auto">
+            <ARTable
+              headers={TABLE_HEADERS}
+              columns={TABLE_COLUMNS}
+              rows={tableRows}
+              loading={loading}
+              emptyMessage="No billing configuration requests found for this filter."
             />
-          )}
+            {!loading && filteredConfigs.length > 0 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+                onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+              />
+            )}
+          </div>
         </PageCardContent>
       </PageCard>
 
@@ -543,12 +543,12 @@ export default function BillingApprovals() {
             sourceRaw === "PMS" || sourceRaw === "PMS_BUDGET"
               ? "PMS Project Budget"
               : sourceRaw === "MANUAL"
-              ? "Manual Input"
-              : sourceRaw
-              ? String(sourceRaw)
-              : hasContractVal && isSameAmount
-              ? "PMS Project Budget"
-              : "Manual Input";
+                ? "Manual Input"
+                : sourceRaw
+                  ? String(sourceRaw)
+                  : hasContractVal && isSameAmount
+                    ? "PMS Project Budget"
+                    : "Manual Input";
 
           // PMS Project Budget and Contract Value can represent the exact same
           // amount (when the source is PMS) — showing them as two separate rows
@@ -604,8 +604,24 @@ export default function BillingApprovals() {
                   },
                   { label: "Billing Frequency", value: billingFreqLabel },
                   { label: "Currency", value: currency },
-                  ...(hasCommercialValue
-                    ? [{ label: contractValueRowLabel, value: contractValueRowValue }]
+                  { label: "PMS Project Budget", value: formatMoney(pmsBudgetVal, currency) },
+                  ...(hasContractVal
+                    ? [
+                      {
+                        label: (
+                          <span className="flex flex-wrap items-center gap-1.5">
+                            <span>Contract Value</span>
+                            {isDifferentAmount && (
+                              <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200">
+                                Billing Amount Used
+                              </span>
+                            )}
+                          </span>
+                        ),
+                        value: formatMoney(contractVal, currency),
+                      },
+                      { label: "Contract Value Source", value: sourceLabel },
+                    ]
                     : []),
                   ...(isTimesheetBased && reviewTarget.pricingModel
                     ? [{ label: "Pricing Model", value: BILLING_MODE_LABELS[reviewTarget.pricingModel] || reviewTarget.pricingModel }]
@@ -799,9 +815,8 @@ export default function BillingApprovals() {
       <ConfirmationModal
         isOpen={Boolean(rejectTarget)}
         title="Reject Billing Configuration"
-        message={`Please provide a reason for rejecting the billing setup for ${
-          rejectTarget?.projectName || "this project"
-        } (${rejectTarget?.clientName || "—"}).`}
+        message={`Please provide a reason for rejecting the billing setup for ${rejectTarget?.projectName || "this project"
+          } (${rejectTarget?.clientName || "—"}).`}
         confirmText="Reject Configuration"
         cancelText="Cancel"
         variant="danger"
