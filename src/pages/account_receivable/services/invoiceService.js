@@ -121,7 +121,7 @@ export const getInvoiceErrorMessage = (
 /**
  * Normalizes a single invoice line item without deriving or calculating amounts.
  */
-const normalizeInvoiceItem = (item = {}, index = 0) => {
+export const normalizeInvoiceItem = (item = {}, index = 0) => {
   const source = item && typeof item === "object" ? item : {};
   return {
     id:
@@ -142,6 +142,7 @@ const normalizeInvoiceItem = (item = {}, index = 0) => {
       source.item ||
       source.description ||
       "",
+    resourceName: source.resourceName || source.resource_name || null,
     itemType: source.itemType || source.item_type || "",
     role: source.role || source.designation || "Unknown",
     workDate: toIsoDateOnly(source.workDate || source.work_date || source.date) || "",
@@ -169,7 +170,7 @@ const normalizeInvoiceItem = (item = {}, index = 0) => {
 /**
  * Normalizes a single tax component without recalculating or altering rates/amounts.
  */
-const normalizeTaxComponent = (component = {}, index = 0) => {
+export const normalizeTaxComponent = (component = {}, index = 0) => {
   const source = component && typeof component === "object" ? component : {};
   return {
     id:
@@ -178,15 +179,15 @@ const normalizeTaxComponent = (component = {}, index = 0) => {
       source.id ||
       `${source.taxTypeCode || source.taxComponent || "tax"}-${index}`,
     taxComponent:
-      source.taxComponent ||
       source.taxTypeName ||
+      source.taxComponent ||
       source.taxTypeCode ||
       source.name ||
       "Tax Component",
     taxTypeCode: source.taxTypeCode || source.tax_type_code || "",
     applicability:
-      source.applicability ||
       source.applicabilityType ||
+      source.applicability ||
       source.applicability_type ||
       "Not specified",
     rate:
@@ -318,8 +319,11 @@ export const normalizeInvoice = (payload = {}) => {
     // Client / Bill To (Strictly backend provided; null if not provided)
     clientName: data.clientName || data.client_name || data.client || null,
     billingAddress: formattedAddress,
-    gstin: data.gstin || data.gstNumber || data.taxId || data.tax_id || null,
+    gstin: data.gstinOrTaxId || data.gstin || data.gstNumber || data.taxId || data.tax_id || null,
+    gstinOrTaxId: data.gstinOrTaxId || data.gstin || data.gstNumber || data.taxId || data.tax_id || null,
     contact: data.contact || data.contactPerson || data.contactEmail || data.contactPhone || null,
+    email: data.email || data.clientEmail || null,
+    phone: data.phone || data.clientPhone || null,
 
     // Invoice Context
     projectName: data.projectName || data.project_name || data.project || "",
@@ -328,7 +332,14 @@ export const normalizeInvoice = (payload = {}) => {
     billingPeriodStart: periodStart,
     billingPeriodEnd: periodEnd,
     currency: data.currency || data.currencyCode || "USD",
-    paymentTerms: data.paymentTerms || data.payment_terms || "Net 30",
+    paymentTermCode: data.paymentTermCode || data.payment_term_code || null,
+    paymentTermName: data.paymentTermName || data.payment_term_name || null,
+    paymentTerms:
+      data.paymentTermName ||
+      data.payment_term_name ||
+      (data.paymentTermCode ? `${data.paymentTermCode} Days` : null) ||
+      (data.payment_term_code ? `${data.payment_term_code} Days` : null) ||
+      null,
 
     // Items & Tax Breakdown
     items: rawItems.map(normalizeInvoiceItem),
@@ -474,7 +485,16 @@ export const getInvoice = async (snapshotIdOrInvoiceId) => {
       if (err?.response?.status !== 404) {
         throw err;
       }
-      // If 404, rawId might be an invoiceId instead of billingSnapshotId; proceed to resolve
+      // If 404, rawId might be an invoiceId instead of billingSnapshotId; try GET /api/v1/invoices/{invoiceId}
+      try {
+        const invUrl = `${AR_BASE_URL}/api/v1/invoices/${rawId}`;
+        const invResponse = await api.get(invUrl);
+        return normalizeInvoice(unwrapData(invResponse));
+      } catch (invErr) {
+        if (invErr?.response?.status !== 404) {
+          throw invErr;
+        }
+      }
     }
   }
 
@@ -554,6 +574,17 @@ export const getInvoice = async (snapshotIdOrInvoiceId) => {
   notFoundErr.response = { status: 404, data: { message: "Invoice could not be found." } };
   throw notFoundErr;
 };
+
+/**
+ * GET /api/v1/invoices/{invoiceId}
+ * Retrieves invoice by invoice UUID directly from the invoices controller.
+ */
+export const getInvoiceById = async (invoiceId) => {
+  if (!invoiceId) throw new Error("Invoice ID is required.");
+  const response = await api.get(`${AR_BASE_URL}/api/v1/invoices/${invoiceId}`);
+  return normalizeInvoice(unwrapData(response));
+};
+
 
 /**
  * GET /api/v1/invoices
@@ -758,6 +789,7 @@ export default {
   generateInvoice,
   generateInvoiceForOccurrence,
   getInvoice,
+  getInvoiceById,
   getInvoices,
   getPendingApprovalInvoices,
   getInvoiceApprovalWorkspace,

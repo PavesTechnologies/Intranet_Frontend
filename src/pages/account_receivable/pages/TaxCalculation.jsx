@@ -404,19 +404,9 @@ export default function TaxCalculation() {
               </Button>
             </>
           ) : isTaxCompleted ? (
-            <>
-              <Button variant="outline" size="small" onClick={loadData} className="flex items-center gap-1.5 text-xs">
-                <RefreshCw className="h-3.5 w-3.5" /> Refresh
-              </Button>
-              <Button
-                variant="primary"
-                size="small"
-                onClick={handleGenerateInvoice}
-                className="flex items-center gap-1.5 text-xs font-semibold bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm"
-              >
-                <FileText className="h-3.5 w-3.5" /> Generate Invoice <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            </>
+            <Button variant="outline" size="small" onClick={loadData} className="flex items-center gap-1.5 text-xs">
+              <RefreshCw className="h-3.5 w-3.5" /> Refresh
+            </Button>
           ) : (
             <Button
               variant="primary"
@@ -476,10 +466,10 @@ export default function TaxCalculation() {
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold text-indigo-950">Tax Calculation Completed</h3>
                 <span className="text-xs font-semibold text-indigo-600">&rarr;</span>
-                <span className="text-xs font-bold text-indigo-800">Generate Invoice</span>
+                <span className="text-xs font-bold text-indigo-800">Ready for Invoice</span>
               </div>
               <p className="text-xs text-indigo-700">
-                Tax components and grand total are verified. Click "Generate Invoice" to create the authoritative invoice.
+                Tax components and grand total are verified. Click "View Invoice Generation" to proceed to invoice creation.
               </p>
             </div>
           </div>
@@ -490,7 +480,7 @@ export default function TaxCalculation() {
             disabled={calculating}
             className="flex items-center justify-center gap-1.5 text-xs font-semibold bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm shrink-0"
           >
-            <FileText className="h-3.5 w-3.5" /> Generate Invoice <ArrowRight className="h-3.5 w-3.5" />
+            <FileText className="h-3.5 w-3.5" /> View Invoice Generation <ArrowRight className="h-3.5 w-3.5" />
           </Button>
         </div>
       ) : null}

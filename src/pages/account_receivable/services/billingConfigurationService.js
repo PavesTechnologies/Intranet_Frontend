@@ -1031,6 +1031,11 @@ export const normalizeBillingSchedulePeriod = (record = {}) => ({
   remarks: record.remarks || "",
 });
 
+export const previewBillingSchedule = async (payload) => {
+  const response = await api.post(`${BILLING_CONFIGURATIONS_URL}/preview-schedule`, payload);
+  return asArray(unwrapData(response)).map(normalizeBillingSchedulePeriod);
+};
+
 // Maps a BillingRecurringConfiguration API record (GET /api/billing-recurring/...)
 // onto the wizard's internal Recurring Billing form-state shape (mirrors
 // normalizeFixedPriceConfig above). The normal Recurring flow has no
