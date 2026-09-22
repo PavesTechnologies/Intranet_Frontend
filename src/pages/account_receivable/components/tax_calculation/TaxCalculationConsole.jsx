@@ -437,7 +437,7 @@ export default function TaxCalculationConsole() {
           label: "Snapshot Unavailable",
           icon: <AlertCircle className="h-4 w-4" />,
           disabled: true,
-          onClick: () => {},
+          onClick: () => { },
         },
       ];
     }
@@ -449,7 +449,7 @@ export default function TaxCalculationConsole() {
             label: "Calculation in Progress",
             icon: <Loader2 className="h-4 w-4 animate-spin" />,
             disabled: true,
-            onClick: () => {},
+            onClick: () => { },
           },
         ];
       case STATUS_TABS.TAX_COMPLETED:
@@ -582,7 +582,10 @@ export default function TaxCalculationConsole() {
             type="button"
             onClick={() => handleKpiClick(kpi.key)}
             title={`Filter by ${kpi.label}`}
-            className="text-left rounded-xl transition-transform active:scale-[0.99] focus:outline-none"
+            className="text-left rounded-xl border-0 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 active:ring-0"
+            style={{
+              outline: "none",
+            }}
           >
             <KPICard
               label={kpi.label}
@@ -590,7 +593,7 @@ export default function TaxCalculationConsole() {
               icon={<kpi.icon className="h-5 w-5" />}
               color={kpi.color}
               active={statusTab === kpi.key}
-              className="h-full w-full cursor-pointer bg-white shadow-sm border border-slate-200 transition-all hover:shadow-md"
+              className="h-full w-full cursor-pointer bg-white shadow-sm border border-slate-200 transition-all hover:shadow-md !ring-0 !outline-none focus:!ring-0 focus:!outline-none focus-visible:!ring-0 focus-visible:!outline-none"
             />
           </button>
         ))}
