@@ -9,6 +9,7 @@ import {
   Loader2,
   FileText,
   AlertCircle,
+  Eye,
 } from "lucide-react";
 
 import PageHeader from "../../../../components/ui/PageHeader";
@@ -62,7 +63,7 @@ const TABLE_HEADERS = [
   "Tax Region",
   "Commercial Amount",
   "Status",
-  "Action",
+  "Actions",
 ];
 
 const TABLE_COLUMNS = [
@@ -73,8 +74,19 @@ const TABLE_COLUMNS = [
   "taxRegion",
   "taxableAmount",
   "status",
-  "action",
+  "actions",
 ];
+
+const TABLE_ALIGNMENTS = {
+  client: "left",
+  project: "left",
+  snapshotNumber: "center",
+  billingPeriod: "center",
+  taxRegion: "center",
+  taxableAmount: "right",
+  status: "center",
+  actions: "center",
+};
 
 // Normalises the many raw status strings into one of the STATUS_TABS keys
 function getStatusGroup(status) {
@@ -442,21 +454,32 @@ export default function TaxCalculationConsole() {
       ];
     }
 
-    switch (getStatusGroup(item.status)) {
+    const group = getStatusGroup(item.status);
+    switch (group) {
       case STATUS_TABS.IN_TAX:
         return [
           {
             label: "Calculation in Progress",
-            icon: <Loader2 className="h-4 w-4 animate-spin" />,
+            icon: <Loader2 className="h-4 w-4 animate-spin text-amber-600" />,
             disabled: true,
             onClick: () => { },
+          },
+          {
+            label: "View Details",
+            icon: <Eye className="h-4 w-4 text-slate-600" />,
+            onClick: () => handleAction(item),
           },
         ];
       case STATUS_TABS.TAX_COMPLETED:
         return [
           {
             label: "Generate Invoice",
-            icon: <FileText className="h-4 w-4" />,
+            icon: <FileText className="h-4 w-4 text-indigo-600" />,
+            onClick: () => handleAction(item),
+          },
+          {
+            label: "View Tax Calculation",
+            icon: <Eye className="h-4 w-4 text-slate-600" />,
             onClick: () => handleAction(item),
           },
         ];
@@ -464,15 +487,29 @@ export default function TaxCalculationConsole() {
         return [
           {
             label: "View Invoice",
-            icon: <FileText className="h-4 w-4" />,
+            icon: <FileText className="h-4 w-4 text-indigo-600" />,
             onClick: () => handleAction(item),
+          },
+          {
+            label: "View Tax Calculation",
+            icon: <Eye className="h-4 w-4 text-slate-600" />,
+            onClick: () => {
+              navigate(`/account-receivable/tax-calculation/${item.snapshotId}`, {
+                state: { config: item.config },
+              });
+            },
           },
         ];
       default:
         return [
           {
             label: "Calculate Tax",
-            icon: <Calculator className="h-4 w-4" />,
+            icon: <Calculator className="h-4 w-4 text-indigo-600" />,
+            onClick: () => handleAction(item),
+          },
+          {
+            label: "View Snapshot",
+            icon: <Eye className="h-4 w-4 text-slate-600" />,
             onClick: () => handleAction(item),
           },
         ];
@@ -537,27 +574,51 @@ export default function TaxCalculationConsole() {
 
   const tableRows = paginatedSnapshots.map((item) => ({
     onRowClick: () => handleAction(item),
-    client: <span className="font-semibold text-slate-800">{item.client}</span>,
+    client: <div className="text-left font-semibold text-slate-800">{item.client}</div>,
     project: (
       <div className="text-left">
         <div className="font-bold text-slate-900">{item.projectName}</div>
         <div className="text-xs font-mono text-slate-400">{item.projectCode}</div>
       </div>
     ),
-    snapshotNumber: item.snapshotNumber ? (
-      <span className="font-mono font-semibold text-indigo-700">{item.snapshotNumber}</span>
-    ) : (
-      <span className="text-xs text-slate-400 italic">Not available</span>
+    snapshotNumber: (
+      <div className="flex items-center justify-center">
+        {item.snapshotNumber ? (
+          <span className="font-mono font-semibold text-indigo-700">{item.snapshotNumber}</span>
+        ) : (
+          <span className="text-xs text-slate-400 italic">Not available</span>
+        )}
+      </div>
     ),
-    billingPeriod: <span className="font-medium text-slate-700">{item.billingPeriod}</span>,
-    taxRegion: <span className="font-medium text-slate-800">{item.taxRegion}</span>,
+    billingPeriod: (
+      <div className="flex items-center justify-center font-medium text-slate-700">
+        {item.billingPeriod}
+      </div>
+    ),
+    taxRegion: (
+      <div className="flex items-center justify-center font-medium text-slate-800">
+        {item.taxRegion}
+      </div>
+    ),
     taxableAmount: (
-      <span className="font-mono font-bold text-slate-900">
-        {item.currency} {Number(item.taxableAmount || 0).toLocaleString()}
-      </span>
+      <div className="text-right font-mono font-bold text-slate-900">
+        {item.currency}{" "}
+        {Number(item.taxableAmount || 0).toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}
+      </div>
     ),
-    status: <StatusBadge label={item.status === "CALCULATED" ? "TAX_COMPLETED" : item.status} size="sm" />,
-    action: <ActionMenu items={getActionItems(item)} />,
+    status: (
+      <div className="flex items-center justify-center">
+        <StatusBadge label={item.status === "CALCULATED" ? "TAX_COMPLETED" : item.status} size="sm" />
+      </div>
+    ),
+    actions: (
+      <div className="flex items-center justify-center">
+        <ActionMenu items={getActionItems(item)} />
+      </div>
+    ),
   }));
 
   return (
@@ -639,6 +700,7 @@ export default function TaxCalculationConsole() {
               headers={TABLE_HEADERS}
               columns={TABLE_COLUMNS}
               rows={tableRows}
+              alignments={TABLE_ALIGNMENTS}
               loading={loading}
               emptyMessage="No billing snapshots match your current filters."
             />

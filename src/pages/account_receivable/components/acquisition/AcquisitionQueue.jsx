@@ -26,17 +26,17 @@ const STATUS_DISPLAY_LABELS = {
 
 const PAGE_SIZE = 8;
 
-const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Billing Period", "Status", "Reference", "Action"];
-const TABLE_COLUMNS = ["client", "project", "billingType", "billingPeriod", "status", "reference", "action"];
+const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Billing Period", "Status", "Reference", "Actions"];
+const TABLE_COLUMNS = ["client", "project", "billingType", "billingPeriod", "status", "reference", "actions"];
 
 const TABLE_ALIGNMENTS = {
   client: "left",
   project: "left",
   billingType: "left",
-  billingPeriod: "left",
+  billingPeriod: "center",
   status: "center",
   reference: "left",
-  action: "center",
+  actions: "center",
 };
 
 const FILTER_BUTTON_CLASS =
@@ -184,7 +184,7 @@ export default function AcquisitionQueue({
 
         return {
           onRowClick: () => onViewConfig(cfg),
-          client: <span className="font-medium text-slate-700">{cfg.client}</span>,
+          client: <div className="text-left font-medium text-slate-700">{cfg.client}</div>,
           project: (
             <div className="text-left">
               <div className="font-semibold text-slate-900">{cfg.projectName}</div>
@@ -192,11 +192,17 @@ export default function AcquisitionQueue({
             </div>
           ),
           billingType: (
-            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-              {BILLING_TYPE_LABELS[cfg.billingType] || getBillingTypeDisplayName(cfg.billingType)}
-            </span>
+            <div className="flex items-center justify-start">
+              <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                {BILLING_TYPE_LABELS[cfg.billingType] || getBillingTypeDisplayName(cfg.billingType)}
+              </span>
+            </div>
           ),
-          billingPeriod: <span className="font-mono text-xs text-slate-600">{cfg.billingPeriod}</span>,
+          billingPeriod: (
+            <div className="flex items-center justify-center font-mono text-xs text-slate-600">
+              {cfg.billingPeriod}
+            </div>
+          ),
           status: (
             <div className="flex items-center justify-center">
               <StatusBadge label={cfg.billingStatus} size="sm" />
@@ -210,7 +216,7 @@ export default function AcquisitionQueue({
               ) : null}
             </div>
           ),
-          action: (
+          actions: (
             <div
               className="flex items-center justify-center"
               onClick={(e) => e.stopPropagation()}
@@ -222,8 +228,8 @@ export default function AcquisitionQueue({
                       st === "TAX_COMPLETED"
                         ? "View Tax Calculation"
                         : isPending
-                          ? "Acquire"
-                          : "View",
+                          ? "Acquire Data"
+                          : "View Snapshot",
                     icon:
                       st === "TAX_COMPLETED" ? (
                         <Eye className="h-4 w-4 text-slate-600" />

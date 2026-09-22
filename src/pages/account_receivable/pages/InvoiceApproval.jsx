@@ -21,6 +21,7 @@ import SearchInput from "../../../components/filter/Searchbar";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import Pagination from "../../../components/Pagination/pagination";
 import StatusBadge from "../../../components/status/statusbadge";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import ARTable from "../components/common/ARTable";
 import ActionMenu from "../components/common/ActionMenu";
@@ -28,6 +29,8 @@ import { formatCurrency, formatDisplayDate, formatDisplayDateTime } from "../uti
 import {
   getInvoiceApprovalWorkspace,
   getInvoiceErrorMessage,
+  approveInvoice,
+  rejectInvoice,
 } from "../services/invoiceService";
 
 /* ------------------------------------------------------------------ */
@@ -57,7 +60,7 @@ const TABLE_HEADERS = [
   "Status",
   "Submitted At",
   "Last Action",
-  "Action",
+  "Actions",
 ];
 
 const TABLE_COLUMNS = [
@@ -71,8 +74,22 @@ const TABLE_COLUMNS = [
   "status",
   "submittedAt",
   "lastAction",
-  "action",
+  "actions",
 ];
+
+const TABLE_ALIGNMENTS = {
+  invoiceNumber: "left",
+  client: "left",
+  project: "left",
+  billingPeriod: "center",
+  invoiceDate: "center",
+  dueDate: "center",
+  grandTotal: "right",
+  status: "center",
+  submittedAt: "left",
+  lastAction: "left",
+  actions: "center",
+};
 
 const getInvoiceStatus = (inv) => (inv.status || inv.invoiceStatus || "").toUpperCase();
 
@@ -88,6 +105,52 @@ export default function InvoiceApproval() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusTab, setStatusTab] = useState(STATUS_TABS.ALL);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Confirmation modal states
+  const [approveTarget, setApproveTarget] = useState(null);
+  const [approveLoading, setApproveLoading] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectLoading, setRejectLoading] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+
+  const handleConfirmApprove = async () => {
+    if (!approveTarget) return;
+    const invId = approveTarget.invoiceId || approveTarget.billingSnapshotId || approveTarget.snapshotId;
+    setApproveLoading(true);
+    try {
+      await approveInvoice(invId);
+      showStatusToast("Invoice approved successfully.", "success");
+      setApproveTarget(null);
+      await loadData();
+    } catch (err) {
+      const msg = getInvoiceErrorMessage(err, "Failed to approve invoice.");
+      showStatusToast(msg, "error");
+    } finally {
+      setApproveLoading(false);
+    }
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectTarget) return;
+    const invId = rejectTarget.invoiceId || rejectTarget.billingSnapshotId || rejectTarget.snapshotId;
+    if (!rejectReason.trim()) {
+      showStatusToast("Please provide a reason for rejection.", "error");
+      return;
+    }
+    setRejectLoading(true);
+    try {
+      await rejectInvoice(invId, rejectReason.trim());
+      showStatusToast("Invoice rejected.", "success");
+      setRejectTarget(null);
+      setRejectReason("");
+      await loadData();
+    } catch (err) {
+      const msg = getInvoiceErrorMessage(err, "Failed to reject invoice.");
+      showStatusToast(msg, "error");
+    } finally {
+      setRejectLoading(false);
+    }
+  };
 
   const loadData = async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
@@ -367,30 +430,34 @@ export default function InvoiceApproval() {
           )}
         </div>
       ),
-      client: <span className="font-semibold text-slate-800">{item.clientName || "—"}</span>,
+      client: <div className="text-left font-semibold text-slate-800">{item.clientName || "—"}</div>,
       project: (
         <div className="text-left">
           <div className="font-bold text-slate-900">{item.projectName || "—"}</div>
         </div>
       ),
-      billingPeriod: <span className="font-medium text-slate-700">{item.billingPeriod || "—"}</span>,
+      billingPeriod: (
+        <div className="flex items-center justify-center font-medium text-slate-700">
+          {item.billingPeriod || "—"}
+        </div>
+      ),
       invoiceDate: (
-        <span className="font-medium text-slate-700">
+        <div className="flex items-center justify-center font-medium text-slate-700">
           {item.invoiceDate ? formatDisplayDate(item.invoiceDate) : "—"}
-        </span>
+        </div>
       ),
       dueDate: (
-        <span className="font-medium text-slate-700">
+        <div className="flex items-center justify-center font-medium text-slate-700">
           {item.dueDate ? formatDisplayDate(item.dueDate) : "—"}
-        </span>
+        </div>
       ),
       grandTotal: (
-        <span className="font-mono font-bold text-slate-900">
+        <div className="text-right font-mono font-bold text-slate-900">
           {formatCurrency(item.grandTotal || 0, item.currency || item.currencyCode || "USD")}
-        </span>
+        </div>
       ),
       status: (
-        <div className="flex flex-col items-start gap-1">
+        <div className="flex flex-col items-center justify-center gap-1">
           <StatusBadge label={item.status || item.invoiceStatus || "PENDING_APPROVAL"} size="sm" />
           {isRejected && (
             <span
@@ -422,17 +489,34 @@ export default function InvoiceApproval() {
           )}
         </div>
       ),
-      // Three-dots menu, same as BillingApprovals
-      action: (
-        <ActionMenu
-          items={[
-            {
-              label: isPending || isRejected ? "Review Invoice" : "View Invoice",
-              icon: <Eye className="h-4 w-4" />,
-              onClick: () => handleReviewInvoice(item),
-            },
-          ]}
-        />
+      actions: (
+        <div className="flex items-center justify-center">
+          <ActionMenu
+            items={[
+              {
+                label: isPending ? "Review & Decide" : "View Invoice",
+                icon: <Eye className="h-4 w-4 text-slate-600" />,
+                onClick: () => handleReviewInvoice(item),
+              },
+              {
+                label: "Approve Invoice",
+                icon: <CheckCircle2 className="h-4 w-4 text-emerald-600" />,
+                hidden: !isPending,
+                onClick: () => setApproveTarget(item),
+              },
+              {
+                label: "Reject Invoice",
+                icon: <XCircle className="h-4 w-4 text-rose-600" />,
+                hidden: !isPending,
+                danger: true,
+                onClick: () => {
+                  setRejectReason("");
+                  setRejectTarget(item);
+                },
+              },
+            ]}
+          />
+        </div>
       ),
     };
   });
@@ -478,6 +562,7 @@ export default function InvoiceApproval() {
               headers={TABLE_HEADERS}
               columns={TABLE_COLUMNS}
               rows={tableRows}
+              alignments={TABLE_ALIGNMENTS}
               loading={loading}
               emptyMessage="No matching invoices found for the selected criteria."
             />
@@ -492,6 +577,56 @@ export default function InvoiceApproval() {
           </div>
         </PageCardContent>
       </PageCard>
+
+      {/* Approval Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={Boolean(approveTarget)}
+        title="Approve Invoice"
+        message={
+          approveTarget
+            ? `Are you sure you want to approve invoice ${approveTarget.invoiceNumber || "this invoice"} for ${formatCurrency(approveTarget.grandTotal || 0, approveTarget.currency || approveTarget.currencyCode || "USD")}? Once approved, it can be delivered to the client.`
+            : ""
+        }
+        confirmText="Approve"
+        variant="primary"
+        isLoading={approveLoading}
+        onCancel={() => !approveLoading && setApproveTarget(null)}
+        onConfirm={handleConfirmApprove}
+      />
+
+      {/* Rejection Modal */}
+      <ConfirmationModal
+        isOpen={Boolean(rejectTarget)}
+        title="Reject Invoice"
+        message={
+          rejectTarget
+            ? `Are you sure you want to reject invoice ${rejectTarget.invoiceNumber || "this invoice"}? Please specify the reason for rejection below:`
+            : ""
+        }
+        confirmText="Reject Invoice"
+        variant="danger"
+        isLoading={rejectLoading}
+        onCancel={() => {
+          if (!rejectLoading) {
+            setRejectTarget(null);
+            setRejectReason("");
+          }
+        }}
+        onConfirm={handleConfirmReject}
+      >
+        <div className="mt-3">
+          <label className="block text-xs font-semibold text-slate-700 mb-1">
+            Rejection Reason <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Enter specific reasons why this invoice was rejected..."
+            rows={3}
+            className="w-full rounded-lg border border-slate-200 p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
+          />
+        </div>
+      </ConfirmationModal>
     </div>
   );
 }
