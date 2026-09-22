@@ -3,11 +3,11 @@ import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom"
 import { toast } from "react-toastify";
 import {
   ArrowLeft, Users, Activity, AlertTriangle, Lock, Target,
-  UserCog, FileText, ArrowRight, Filter, ChevronDown, Clock,
+  UserCog, FileText, Filter, ChevronDown, Clock,
   ExternalLink, ListChecks,
-  RotateCcw, Inbox, AlertOctagon, Hourglass, PieChart,
-  Send, Flag, SkipForward, Lightbulb, FileUp,
-  ArrowRightLeft, Ban, Mail, Download
+  RotateCcw, Inbox, Hourglass, PieChart, CheckCircle2, XCircle, ServerCrash,
+  Send, Flag, SkipForward, Lightbulb, FileUp, AlertOctagon,
+  ArrowRightLeft, Ban, Mail, Download, Pencil
 } from "lucide-react";
 import Button from "../../../components/Button/Button";
 import FilterListbox from "../../../components/filter/FilterListbox";
@@ -27,8 +27,8 @@ import { REJECTION_LAYER_LABELS } from "../constants/scoreLabels";
 import useCampaignPermissions from "./hooks/useCampaignPermissions";
 import {
   getCampaignDetails, getPipelineSummary, getCampaignTimeline,
-  getCampaignCandidates, getProcessingStatus, getDeadLetterQueue,
-  getProcessingQueue, replayDeadLetterTasks,
+  getCampaignCandidates,
+  getProcessingQueue, getProcessingStatus, getDeadLetterQueue, replayDeadLetterTasks,
   getStalledCandidates, reprocessStalledCandidate, escalateStalledCandidate,
   overrideCandidateStage, flagCandidateForReview,
   getRejectionAnalytics,
@@ -61,8 +61,7 @@ export default function CampaignDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { canManageCampaigns, canViewPipeline, canViewTimeline, isHiringManager, isHRAdmin } = useCampaignPermissions();
-  const canReviewInterviews = isHiringManager || isHRAdmin;
+  const { canManageCampaigns, canViewPipeline, canViewTimeline, canViewCampaigns, isHiringManager, isRecruiter } = useCampaignPermissions();
 
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -138,18 +137,24 @@ export default function CampaignDetails() {
   const isActive = status === "ACTIVE";
   const canEdit = canManageCampaigns && !isClosed;   // closed = read-only
 
-  // Pipeline/Processing tabs: HR_ADMIN + RECRUITER (matches the backend's
-  // require_roles on pipeline-summary / processing-status / dead-letter-queue).
+  // Uploads/Rejections tabs: HR_ADMIN + RECRUITER (matches the backend's
+  // require_roles on those endpoints).
   // scoring != null is kept as a data-presence AND — the backend also omits
   // the scoring section for roles it hides it from, so both must agree.
   const canSeePipeline = canViewPipeline && scoring != null;
+  // Pipeline tab (funnel/metrics) additionally opened to HIRING_MANAGER —
+  // scoring is always null for that role (hidden independent of pipeline
+  // access), so it can't be used as a data-presence AND here.
+  const canSeePipelineTab = canViewPipeline && (isHiringManager || scoring != null);
   const canSeeTimeline = canViewTimeline;            // HR_ADMIN only
 
   const tabs = [
     { id: "details", label: "Details", icon: FileText, show: true },
     { id: "candidates", label: "Candidates", icon: ListChecks, show: true },
-    { id: "pipeline", label: "Pipeline", icon: Users, show: canSeePipeline },
-    { id: "processing", label: "Processing", icon: Inbox, show: canSeePipeline },
+    { id: "pipeline", label: "Pipeline", icon: Users, show: canSeePipelineTab },
+    // Open to every AIRS role except HIRING_MANAGER; ProcessingTab itself
+    // narrows what a RECRUITER sees down to just the Dead Letter Queue.
+    { id: "processing", label: "Processing", icon: Inbox, show: canViewCampaigns && !isHiringManager },
     { id: "uploads", label: "Uploads", icon: FileUp, show: canSeePipeline },
     { id: "stalled", label: "Stalled", icon: Hourglass, show: canManageCampaigns },
     { id: "rejections", label: "Rejections", icon: PieChart, show: canSeePipeline },
@@ -178,6 +183,15 @@ export default function CampaignDetails() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-slate-900">{info.name}</h1>
+              {canManageCampaigns && !isClosed && (<button
+                  type="button"
+                  onClick={() => setEditOpen(true)}
+                  title="Edit Campaign"
+                  className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+              )}
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${statusStyle}`}>
                 {status}
               </span>
@@ -187,16 +201,12 @@ export default function CampaignDetails() {
             </p>
           </div>
         </div>
-        {canManageCampaigns && (<div className="flex items-start flex-wrap gap-2">
-            {/* Pause/Resume/Close live inside Edit Campaign as a Status dropdown;
-                Reopen stays here since closed campaigns are read-only. */}
-            {isClosed ? (<Button variant="outline" size="medium" onClick={() => setLifecycleModal("reopen")}>
-                <RotateCcw className="h-4 w-4" /> Reopen
-              </Button>
-            ) : (<Button variant="primary" size="medium" onClick={() => setEditOpen(true)}>
-                Edit Campaign
-              </Button>
-            )}
+        {/* Pause/Resume/Close live inside Edit Campaign as a Status dropdown;
+            Reopen stays here since closed campaigns are read-only. */}
+        {canManageCampaigns && isClosed && (<div className="flex items-start flex-wrap gap-2">
+            <Button variant="outline" size="medium" onClick={() => setLifecycleModal("reopen")}>
+              <RotateCcw className="h-4 w-4" /> Reopen
+            </Button>
           </div>
         )}
       </div>
@@ -236,16 +246,13 @@ export default function CampaignDetails() {
           campaignId={id}
           isActive={isActive}
           canViewTiming={canViewTimeline}
-          canReviewInterviews={canReviewInterviews}
-          onViewCandidates={() => navigate(`/ai-screening/candidates?campaign=${id}`)}
-          onReviewInterviews={() => navigate(`/ai-screening/interview-queue?campaign=${id}`)}
           onStageClick={(stage) => {
             setCandidateStageFilter(stage);
             setActiveTab("candidates");
           }}
         />
       )}
-      {activeTab === "processing" && (<ProcessingTab campaignId={id} canManageCampaigns={canManageCampaigns} canReplayDlq={canViewPipeline} />
+      {activeTab === "processing" && !isHiringManager && (<ProcessingTab campaignId={id} canManageCampaigns={canManageCampaigns} canReplayDlq={canViewPipeline} showDlq={isRecruiter} />
       )}
       {activeTab === "uploads" && <UploadsTab campaignId={id} />}
       {activeTab === "stalled" && canManageCampaigns && <StalledTab campaignId={id} />}
@@ -547,6 +554,8 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
   const [sendingBulkRejectionEmail, setSendingBulkRejectionEmail] = useState(false);
   const { hasRole } = useAuth();
   const canAct = hasRole(["HR_ADMIN", "RECRUITER"]);
+  const isHrAdmin = hasRole(["HR_ADMIN"]);
+  const isHiringManager = hasRole(["HIRING_MANAGER"]);
 
   useEffect(() => {
     let cancelled = false;
@@ -746,8 +755,10 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
 
       <CandidateTable
         candidates={pageItems}
-        onView={(c) => navigate(`/ai-screening/candidates/${c.id}`)}
+        onView={(c) => navigate(`/ai-screening/candidates/${c.id}`, { state: { candidate: c, campaignId } })}
+        onDeleted={() => setReloadKey((k) => k + 1)}
         showViewButton={false}
+        showActionsColumn={!isHiringManager}
         selectable={canAct}
         selectedIds={selectedIds}
         noteCounts={noteCounts}
@@ -763,11 +774,15 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
         })}
         renderExtraActions={canAct ? (c) => (
           <>
-            <button type="button" title="Move to another stage"
-              onClick={(e) => { e.stopPropagation(); setAction({ kind: "move", candidate: c }); }}
-              className="h-8 w-8 inline-flex items-center justify-center text-slate-400 hover:text-indigo-600">
-              <ArrowRightLeft className="h-4 w-4" />
-            </button>
+            {/* Stage moves are the recruiter's call — HR_ADMIN administers the
+                campaign but doesn't walk candidates through the pipeline. */}
+            {!isHrAdmin && (
+              <button type="button" title="Move to another stage"
+                onClick={(e) => { e.stopPropagation(); setAction({ kind: "move", candidate: c }); }}
+                className="h-8 w-8 inline-flex items-center justify-center text-slate-400 hover:text-indigo-600">
+                <ArrowRightLeft className="h-4 w-4" />
+              </button>
+            )}
             {(c.stage || "").toUpperCase() !== "REJECTED" && (
               <button type="button" title="Reject with a reason"
                 onClick={(e) => { e.stopPropagation(); setAction({ kind: "reject", candidate: c }); }}
@@ -803,7 +818,7 @@ function CandidatesTab({ campaignId, stageFilter = "", onStageFilterChange }) {
 }
 
 /* ---------------- Pipeline Tab ---------------- */
-function PipelineTab({ campaignId, isActive, onViewCandidates, onReviewInterviews, onStageClick, canViewTiming, canReviewInterviews }) {
+function PipelineTab({ campaignId, isActive, onStageClick, canViewTiming }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   // HR_ADMIN-only overlay, fetched lazily on first toggle so
@@ -862,19 +877,11 @@ function PipelineTab({ campaignId, isActive, onViewCandidates, onReviewInterview
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {canViewTiming && (
+          {/* {canViewTiming && (
             <Button size="small" variant={showTiming ? "secondary" : "outline"} onClick={toggleTiming}>
               <Clock className="h-3.5 w-3.5" /> {showTiming ? "Hide" : "Show"} Timing
             </Button>
-          )}
-          {canReviewInterviews && (
-            <Button size="small" variant="outline" onClick={onReviewInterviews}>
-              Review Interviews <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          <Button size="small" variant="primary" onClick={onViewCandidates}>
-            View All Candidates <ArrowRight className="h-3.5 w-3.5" />
-          </Button>
+          )} */}
         </div>
       </div>
 
@@ -922,40 +929,42 @@ function PipelineTab({ campaignId, isActive, onViewCandidates, onReviewInterview
 }
 
 /* ---------------- Processing Tab ---------------- */
-const TASK_STATUS_TONE = {
-  queued_count: { label: "Queued", dot: "bg-slate-400" },
-  running_count: { label: "Running", dot: "bg-blue-500" },
-  retry_count: { label: "Retry", dot: "bg-amber-500" },
-  dead_count: { label: "Dead", dot: "bg-rose-500" },
-  paused_count: { label: "Paused", dot: "bg-slate-300" },
-};
-
 const BREAKER_TONE = {
-  CLOSED: "bg-emerald-50 text-emerald-700",
-  HALF_OPEN: "bg-amber-50 text-amber-700",
-  OPEN: "bg-rose-50 text-rose-700",
+  CLOSED: { badge: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
+  HALF_OPEN: { badge: "bg-amber-50 text-amber-700", dot: "bg-amber-500" },
+  OPEN: { badge: "bg-rose-50 text-rose-700", dot: "bg-rose-500" },
 };
 
 const QUEUE_STATUS_COLUMNS = ["QUEUED", "RUNNING", "RETRY", "SUCCESS", "FAILURE", "DEAD"];
 
+const QUEUE_STATUS_TILE = {
+  QUEUED: { label: "Queued", icon: Inbox, tone: "text-slate-500 bg-slate-100" },
+  RUNNING: { label: "Running", icon: Activity, tone: "text-blue-600 bg-blue-50" },
+  RETRY: { label: "Retry", icon: RotateCcw, tone: "text-amber-600 bg-amber-50" },
+  SUCCESS: { label: "Success", icon: CheckCircle2, tone: "text-emerald-600 bg-emerald-50" },
+  FAILURE: { label: "Failure", icon: XCircle, tone: "text-rose-600 bg-rose-50" },
+  DEAD: { label: "Dead", icon: ServerCrash, tone: "text-rose-700 bg-rose-100" },
+};
+
 const DLQ_PAGE_SIZE = 50; // matches the backend's default `limit`
 
-function ProcessingTab({ campaignId, canManageCampaigns, canReplayDlq }) {
+function ProcessingTab({ campaignId, canManageCampaigns, canReplayDlq, showDlq = false }) {
   const [status, setStatus] = useState(null);          // overall summary (HR_ADMIN + RECRUITER)
-  const [queue, setQueue] = useState(null);            // per-task-type breakdown (HR_ADMIN only)
+  const [queue, setQueue] = useState(null);            // per-task-type breakdown (HR_ADMIN + RECRUITER)
   const [dlq, setDlq] = useState([]);
   const [dlqTotal, setDlqTotal] = useState(0);
   const [dlqPage, setDlqPage] = useState(1);            // 1-indexed, mirrors the Pagination component's contract
-  const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
   const [replaying, setReplaying] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     const calls = [
       getProcessingStatus(campaignId),
-      getDeadLetterQueue(campaignId, { limit: DLQ_PAGE_SIZE, offset: (dlqPage - 1) * DLQ_PAGE_SIZE }),
+      // only RECRUITER sees the Dead Letter Queue, so skip fetching it otherwise
+      showDlq ? getDeadLetterQueue(campaignId, { limit: DLQ_PAGE_SIZE, offset: (dlqPage - 1) * DLQ_PAGE_SIZE }) : Promise.resolve(null),
     ];
-    if (canManageCampaigns) calls.push(getProcessingQueue(campaignId));
+    if (canManageCampaigns || showDlq) calls.push(getProcessingQueue(campaignId));
     const [statusRes, dlqRes, queueRes] = await Promise.allSettled(calls);
     if (statusRes.status === "fulfilled") setStatus(unwrap(statusRes.value));
     if (dlqRes.status === "fulfilled") {
@@ -965,7 +974,7 @@ function ProcessingTab({ campaignId, canManageCampaigns, canReplayDlq }) {
     }
     if (queueRes?.status === "fulfilled") setQueue(unwrap(queueRes.value));
     setLoading(false);
-  }, [campaignId, canManageCampaigns, dlqPage]);
+  }, [campaignId, canManageCampaigns, showDlq, dlqPage]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -979,24 +988,21 @@ function ProcessingTab({ campaignId, canManageCampaigns, canReplayDlq }) {
     return () => clearInterval(t);
   }, [load]);
 
-  const toggleEntry = (id) =>
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const toggleEntry = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
   const handleReplay = async () => {
-    if (selectedIds.length === 0) return toast.error("Select at least one failed task to replay.");
     setReplaying(true);
     try {
-      const res = await replayDeadLetterTasks(campaignId, selectedIds);
-      const data = unwrap(res);
-      toast.success(`Replayed ${data.replayed_count}, skipped ${data.skipped_count}.`);
-      (data.results || [])
-        .filter((r) => r.status === "SKIPPED" && r.reason)
-        .slice(0, 3)
-        .forEach((r) => toast.info(r.reason));
+      await replayDeadLetterTasks(campaignId, selectedIds);
+      toast.success("Selected tasks queued for replay.");
       setSelectedIds([]);
-      load();
+      await load();
     } catch (err) {
-      toast.error(formatApiError(err, "Failed to replay tasks."));
+      toast.error(formatApiError(err, "Failed to replay selected tasks."));
     } finally {
       setReplaying(false);
     }
@@ -1006,48 +1012,96 @@ function ProcessingTab({ campaignId, canManageCampaigns, canReplayDlq }) {
     return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading processing queue..." /></div>;
   }
 
-  const estimate = queue?.estimated_completion || status?.estimated_completion;
+  const estimate = queue?.estimated_completion;
+
+  // Client-side roll-up of the per-task-type table into a single overview
+  // row — same status_counts data, just summed across task types.
+  const totals = queue?.task_types?.length
+    ? QUEUE_STATUS_COLUMNS.reduce((acc, s) => {
+        acc[s] = queue.task_types.reduce((sum, t) => sum + (t.status_counts[s] || 0), 0);
+        return acc;
+      }, {})
+    : null;
 
   return (<div className="space-y-5">
-      <div>
-        <h3 className="text-sm font-bold text-slate-900">Processing Queue</h3>
-        <p className="text-[11px] text-slate-500">
-          celery_task_log breakdown for this campaign · auto-refreshes every 60s
-        </p>
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">Processing Queue</h3>
+          <p className="text-[11px] text-slate-500">celery_task_log breakdown for this campaign</p>
+        </div>
+        <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+          </span>
+          Auto-refreshes every 60s
+        </span>
       </div>
 
       {/* — completion estimate */}
-      {estimate && (<div className={`px-4 py-3 rounded-xl border text-xs font-semibold ${
+      {estimate && (<div className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-xs ${
           estimate.estimate_available
             ? "bg-indigo-50 border-indigo-100 text-indigo-700"
             : "bg-slate-50 border-slate-200 text-slate-500"
         }`}>
-          <Clock className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
-          {estimate.message}
-          {estimate.remaining_task_count > 0 && ` · ${estimate.remaining_task_count} task(s) remaining`}
+          <span className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-full ${
+            estimate.estimate_available ? "bg-indigo-100" : "bg-slate-200/70"
+          }`}>
+            <Clock className="h-4 w-4" />
+          </span>
+          <span className="font-semibold">
+            {estimate.message}
+            {estimate.remaining_task_count > 0 && ` · ${estimate.remaining_task_count} task(s) remaining`}
+          </span>
         </div>
       )}
 
-      {/* — circuit breaker states (HR_ADMIN) */}
-      {queue?.circuit_breakers && (<div className="flex flex-wrap gap-2">
-          {queue.circuit_breakers.map((b) => (<span
-              key={b.service_name}
-              className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase ${BREAKER_TONE[b.state] || "bg-slate-100 text-slate-600"}`}
-              title={b.state === "OPEN"
-                ? `Open since ${fmtDate(b.opened_at)} — retry after ${fmtDate(b.retry_after)}`
-                : `${b.failure_count} recorded failure(s)`}
-            >
-              {b.service_name}: {b.state}
-            </span>
-          ))}
+      {/* — status overview (aggregated across task types) */}
+      {totals && (<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {QUEUE_STATUS_COLUMNS.map((s) => {
+            const tile = QUEUE_STATUS_TILE[s];
+            const Icon = tile.icon;
+            return (<div key={s} className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                <span className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-lg ${tile.tone}`}>
+                  <Icon className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{tile.label}</p>
+                  <p className="text-lg font-black tabular-nums text-slate-900">{totals[s]}</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* — per-task-type breakdown (HR_ADMIN); overall cards otherwise */}
+      {/* — circuit breaker states (HR_ADMIN + RECRUITER) */}
+      {queue?.circuit_breakers?.length > 0 && (<div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Circuit Breakers</p>
+          <div className="flex flex-wrap gap-2">
+            {queue.circuit_breakers.map((b) => {
+              const tone = BREAKER_TONE[b.state] || { badge: "bg-slate-100 text-slate-600", dot: "bg-slate-400" };
+              return (<span
+                  key={b.service_name}
+                  className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full ${tone.badge}`}
+                  title={b.state === "OPEN"
+                    ? `Open since ${fmtDate(b.opened_at)} — retry after ${fmtDate(b.retry_after)}`
+                    : `${b.failure_count} recorded failure(s)`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />
+                  {b.service_name} <span className="uppercase opacity-70">· {b.state}</span>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* — per-task-type breakdown (HR_ADMIN + RECRUITER) */}
       {queue?.task_types?.length ? (<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
           <table className="min-w-full text-xs">
             <thead>
-              <tr className="border-b border-slate-100">
+              <tr className="border-b border-slate-100 bg-slate-50/60">
                 <th className="text-left p-3 font-bold text-slate-400 uppercase text-[10px]">Task Type</th>
                 {QUEUE_STATUS_COLUMNS.map((s) => (<th key={s} className="text-right p-3 font-bold text-slate-400 uppercase text-[10px]">{s}</th>
                 ))}
@@ -1056,12 +1110,16 @@ function ProcessingTab({ campaignId, canManageCampaigns, canReplayDlq }) {
               </tr>
             </thead>
             <tbody>
-              {queue.task_types.map((t) => (<tr key={t.task_type} className="border-b border-slate-50">
+              {queue.task_types.map((t, i) => (<tr key={t.task_type} className={`border-b border-slate-50 ${i % 2 === 1 ? "bg-slate-50/40" : ""}`}>
                   <td className="p-3 font-bold text-slate-800 whitespace-nowrap">{t.task_type.replace(/_/g, " ")}</td>
-                  {QUEUE_STATUS_COLUMNS.map((s) => (<td key={s} className="p-3 text-right tabular-nums text-slate-600">
-                      {t.status_counts[s] || 0}
-                    </td>
-                  ))}
+                  {QUEUE_STATUS_COLUMNS.map((s) => {
+                    const count = t.status_counts[s] || 0;
+                    const flag = (s === "RETRY" || s === "FAILURE" || s === "DEAD") && count > 0;
+                    return (<td key={s} className="p-3 text-right tabular-nums">
+                        <span className={flag ? "font-bold text-rose-600" : "text-slate-600"}>{count}</span>
+                      </td>
+                    );
+                  })}
                   <td className="p-3 text-right tabular-nums text-slate-600">
                     {t.avg_duration_ms != null ? `${(t.avg_duration_ms / 1000).toFixed(1)}s` : "—"}
                   </td>
@@ -1073,20 +1131,14 @@ function ProcessingTab({ campaignId, canManageCampaigns, canReplayDlq }) {
             </tbody>
           </table>
         </div>
-      ) : (<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {Object.entries(TASK_STATUS_TONE).map(([key, meta]) => (<div key={key} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{meta.label}</p>
-              </div>
-              <p className="text-xl font-black tabular-nums text-slate-900">{status?.[key] ?? 0}</p>
-            </div>
-          ))}
+      ) : (<div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400">
+          <Inbox className="h-10 w-10 mx-auto stroke-1 mb-2" />
+          No processing data available for this campaign.
         </div>
       )}
 
-      {/* — DLQ with multi-select replay (replay = HR_ADMIN + RECRUITER, matches backend require_roles) */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      {/* — DLQ (RECRUITER only sees this section; HR_ADMIN/others get everything above instead) */}
+      {showDlq && (<div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-xs font-bold text-rose-600 flex items-center gap-1.5">
             <AlertOctagon className="h-3.5 w-3.5" /> Dead Letter Queue ({dlqTotal})
@@ -1120,8 +1172,13 @@ function ProcessingTab({ campaignId, canManageCampaigns, canReplayDlq }) {
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center gap-2">
-                      <span className="text-[11px] font-bold text-slate-700 uppercase">{entry.task_type}</span>
-                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="text-[11px] font-bold text-slate-700 uppercase">{entry.task_type}</span>
+                        {entry.candidate_name && (
+                          <span className="text-[11px] font-semibold text-slate-500 truncate">· {entry.candidate_name}</span>
+                        )}
+                      </span>
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1 shrink-0">
                         <Clock className="h-3 w-3" />
                         retried {entry.retry_count}x · last {fmtDate(entry.last_attempted_at || entry.moved_to_dlq_at)}
                       </span>
@@ -1155,6 +1212,7 @@ function ProcessingTab({ campaignId, canManageCampaigns, canReplayDlq }) {
           onNext={() => setDlqPage((p) => p + 1)}
         />
       </div>
+      )}
     </div>
   );
 }
@@ -1551,34 +1609,39 @@ function RejectionsTab({ campaignId, jdId, onAdjustThreshold }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // "refresh in real time" — same 60s cadence as the processing queue
-  useEffect(() => {
-    const t = setInterval(load, 60000);
-    return () => clearInterval(t);
-  }, [load]);
-
   if (loading) {
     return <div className="py-12 flex justify-center"><LoadingSpinner text="Loading rejection analytics..." /></div>;
   }
   if (!analytics) return null;
 
-  const layers = ["DETERMINISTIC", "SEMANTIC", "AI", "MANUAL", "FRAUD"];
-  const maxCount = Math.max(1, ...layers.map((l) => analytics.layer_breakdown[l] || 0));
+  const layers = ["DETERMINISTIC", "SEMANTIC", "AI", "MANUAL", "FRAUD"]
+    .map((layer) => ({ layer, count: analytics.layer_breakdown[layer] || 0 }))
+    .sort((a, b) => b.count - a.count);
+  const maxCount = Math.max(1, ...layers.map((l) => l.count));
+  const maxReasonCount = Math.max(1, ...(analytics.top_reasons || []).map((r) => r.count));
+  const rejectionRate = analytics.total_candidates > 0
+    ? Math.round((analytics.total_rejections / analytics.total_candidates) * 100)
+    : 0;
 
   return (<div className="space-y-5">
-      <div className="flex justify-between items-center flex-wrap gap-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h3 className="text-sm font-bold text-slate-900">Rejection Analytics</h3>
           <p className="text-[11px] text-slate-500">
-            {analytics.total_rejections} rejection(s) across {analytics.total_candidates} candidate(s) · auto-refreshes every 60s
+            {analytics.total_rejections} rejection(s) across {analytics.total_candidates} candidate(s)
           </p>
         </div>
+        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700">
+          {rejectionRate}% rejection rate
+        </span>
       </div>
 
       {/* recommendations panel */}
       {analytics.recommendations?.length > 0 && (<div className="space-y-2">
-          {analytics.recommendations.map((rec) => (<div key={rec.condition} className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-100">
-              <Lightbulb className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          {analytics.recommendations.map((rec) => (<div key={rec.condition} className="flex items-start gap-3 p-3 rounded-xl bg-amber-50 border border-amber-100">
+              <span className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                <Lightbulb className="h-4 w-4" />
+              </span>
               <div className="flex-1 text-[11.5px] text-amber-800">
                 <span className="font-bold">{REJECTION_LAYER_LABELS[rec.layer] || rec.layer} rejection rate {rec.rate_pct}%</span>
                 {" "}(threshold {rec.threshold_pct}%) — {rec.recommendation}
@@ -1618,12 +1681,17 @@ function RejectionsTab({ campaignId, jdId, onAdjustThreshold }) {
       {/* layer breakdown chart */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
         <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Rejections by Layer</h4>
-        {layers.map((layer) => {
-          const count = analytics.layer_breakdown[layer] || 0;
+        {layers.map(({ layer, count }) => {
+          const pct = analytics.total_rejections > 0 ? Math.round((count / analytics.total_rejections) * 100) : 0;
           return (<div key={layer}>
               <div className="flex justify-between items-center text-xs mb-1">
-                <span className="font-bold text-slate-700">{REJECTION_LAYER_LABELS[layer] || layer}</span>
-                <span className="font-black text-slate-900 tabular-nums">{count}</span>
+                <span className="inline-flex items-center gap-1.5 font-bold text-slate-700">
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: REJECTION_LAYER_COLOR[layer] }} />
+                  {REJECTION_LAYER_LABELS[layer] || layer}
+                </span>
+                <span className="tabular-nums text-slate-500">
+                  <span className="font-black text-slate-900">{count}</span> · {pct}%
+                </span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
                 <div
@@ -1637,8 +1705,10 @@ function RejectionsTab({ campaignId, jdId, onAdjustThreshold }) {
       </div>
 
       {/* top missing mandatory skill highlight */}
-      {analytics.top_missing_skill && (<div className="flex items-start gap-2.5 p-3 rounded-xl bg-indigo-50 border border-indigo-100">
-          <Target className="h-4 w-4 text-indigo-600 mt-0.5 shrink-0" />
+      {analytics.top_missing_skill && (<div className="flex items-start gap-3 p-3 rounded-xl bg-indigo-50 border border-indigo-100">
+          <span className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">
+            <Target className="h-4 w-4" />
+          </span>
           <p className="text-[11.5px] text-indigo-800">
             Most common missing mandatory skill: <b>{analytics.top_missing_skill.canonical_name}</b> — missing for{" "}
             {analytics.top_missing_skill.count} candidate(s) ({analytics.top_missing_skill.percentage_of_deterministic}% of
@@ -1651,18 +1721,28 @@ function RejectionsTab({ campaignId, jdId, onAdjustThreshold }) {
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
         <table className="min-w-full text-xs">
           <thead>
-            <tr className="border-b border-slate-100">
+            <tr className="border-b border-slate-100 bg-slate-50/60">
               <th className="text-left p-3 font-bold text-slate-400 uppercase text-[10px]">Rejection Reason</th>
               <th className="text-right p-3 font-bold text-slate-400 uppercase text-[10px]">Count</th>
-              <th className="text-right p-3 font-bold text-slate-400 uppercase text-[10px]">% of Rejections</th>
+              <th className="text-right p-3 font-bold text-slate-400 uppercase text-[10px] w-40">% of Rejections</th>
             </tr>
           </thead>
           <tbody>
             {analytics.top_reasons.length === 0 ? (<tr><td colSpan={3} className="p-6 text-center text-slate-400 text-xs">No rejections recorded yet.</td></tr>
-            ) : (analytics.top_reasons.map((r) => (<tr key={r.reason} className="border-b border-slate-50">
+            ) : (analytics.top_reasons.map((r, i) => (<tr key={r.reason} className={`border-b border-slate-50 ${i % 2 === 1 ? "bg-slate-50/40" : ""}`}>
                   <td className="p-3 font-semibold text-slate-700">{r.reason}</td>
                   <td className="p-3 text-right tabular-nums text-slate-600">{r.count}</td>
-                  <td className="p-3 text-right tabular-nums text-slate-600">{r.percentage}%</td>
+                  <td className="p-3">
+                    <div className="flex items-center justify-end gap-2">
+                      <div className="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="h-1.5 rounded-full bg-rose-400"
+                          style={{ width: `${(r.count / maxReasonCount) * 100}%` }}
+                        />
+                      </div>
+                      <span className="tabular-nums text-slate-600 w-9 text-right">{r.percentage}%</span>
+                    </div>
+                  </td>
                 </tr>
               ))
             )}

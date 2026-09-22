@@ -65,10 +65,9 @@ export default function FilterListbox({
           <Listbox.Options
             className={`absolute left-0 z-[9999] ${
               openUp ? "bottom-full mb-1" : "top-full mt-1"
-            } min-w-full ${
+            } w-full ${
               optionsClassName
             } max-h-60 overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5 border border-gray-100 focus:outline-none text-sm`}
-            style={{ minWidth: "max-content" }}
           >
             {options.map((option, idx) => (
               <Listbox.Option
@@ -85,7 +84,7 @@ export default function FilterListbox({
                 {({ selected }) => (
                   <>
                     <span
-                      className={`block truncate ${
+                      className={`block line-clamp-2 pr-5 ${
                         selected
                           ? "font-medium text-blue-700"
                           : "font-normal"

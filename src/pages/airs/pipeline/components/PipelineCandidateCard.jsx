@@ -15,7 +15,7 @@ export default function PipelineCandidateCard({ card, onDragStart, onClick, onVi
       draggable
       onDragStart={onDragStart}
       onClick={onClick}
-      className="bg-white rounded-xl p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow border border-slate-200"
+      className="bg-white p-3 cursor-grab active:cursor-grabbing hover:bg-slate-50 transition-colors"
     >
       <div className="flex items-center gap-2 mb-2">
         <div className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 bg-gradient-to-br from-blue-600 to-indigo-600">

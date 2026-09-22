@@ -13,43 +13,18 @@ export const overallStatusMeta = (status) => {
   return { label: status || "Unknown", className: "bg-slate-100 text-slate-700 border-slate-200", pulse: false };
 };
 
-// Dedupes a raw stages[] array (as returned by the backend, which may carry
-// more than one entry per stage across retries) down to one entry per stage,
-// preferring a SUCCESS entry over a later non-success one for that stage.
+// Keys a stages[] array by stage name. The list endpoints now return exactly
+// one row per stage, already in pipeline order, so this is a straight
+// projection with no de-duplication — later entries win, which is what we want
+// for the live socket patches appended on top of the REST seed. (Only the
+// debug/audit `?include_attempts=true` view returns several rows per stage, and
+// nothing here requests it.)
 export function buildStageMap(stagesArray) {
   const stageMap = new Map();
   (stagesArray || []).forEach((s) => {
-    const existing = stageMap.get(s.stage);
-    const existingStatus = String(existing?.status || "").toUpperCase();
-    const incomingStatus = String(s.status || "").toUpperCase();
-    if (!existing || existingStatus === "SUCCESS") {
-      if (!existing || incomingStatus === "SUCCESS") {
-        stageMap.set(s.stage, s);
-      }
-      // existing already SUCCESS and incoming isn't: keep existing success
-    } else {
-      stageMap.set(s.stage, s);
-    }
+    stageMap.set(s.stage, { ...stageMap.get(s.stage), ...s });
   });
   return stageMap;
-}
-
-// The backend's stage.completed event (see app/websocket/events.py) carries
-// only a per-stage status — task_id/document_type/stage/status/error_message
-// /duration_ms — with no overall_status field. Overall status has to be
-// derived client-side from the accumulated stage map instead.
-export function deriveOverallStatus(stageMap, stagesOrder, fallback) {
-  const hasFailure = stagesOrder.some((stage) => {
-    const s = String(stageMap.get(stage)?.status || "").toUpperCase();
-    return s === "FAILED" || s === "FAILURE";
-  });
-  if (hasFailure) return "FAILED";
-
-  const lastStage = stagesOrder[stagesOrder.length - 1];
-  if (String(stageMap.get(lastStage)?.status || "").toUpperCase() === "SUCCESS") return "SUCCESS";
-
-  if (stageMap.size > 0) return "RUNNING";
-  return fallback;
 }
 
 const formatStageLabel = (stage, stageLabels) =>
@@ -59,7 +34,7 @@ const formatStageLabel = (stage, stageLabels) =>
     .map((w) => w.charAt(0) + w.slice(1).toLowerCase())
     .join(" ");
 
-function StageStep({ stage, status, errorMessage, isLast, isUpcoming, stageLabels }) {
+function StageStep({ stage, status, isLast, isUpcoming, stageLabels }) {
   const s = String(status || "").toUpperCase();
   let icon = <Circle className={`h-3.5 w-3.5 ${isUpcoming ? "text-blue-300" : "text-slate-300"}`} />;
   let ring = isUpcoming ? "border-blue-200 bg-blue-50 ring-4 ring-blue-100 animate-pulse" : "border-slate-200 bg-white";
@@ -91,11 +66,6 @@ function StageStep({ stage, status, errorMessage, isLast, isUpcoming, stageLabel
         >
           {formatStageLabel(stage, stageLabels)}
         </span>
-        {isFailed && errorMessage && (
-          <span className="text-[9px] text-rose-600 font-medium text-center leading-tight">
-            {errorMessage}
-          </span>
-        )}
       </div>
       {!isLast && (
         <div className={`flex-1 h-0.5 mx-1 mt-3.5 rounded-full ${lineDone ? "bg-emerald-400" : "bg-slate-200"}`} />
@@ -134,7 +104,6 @@ export default function StageStepper({ stages, stageLabels, stageMap }) {
             key={stage}
             stage={stage}
             status={stageData?.status}
-            errorMessage={stageData?.error_message}
             isLast={idx === stages.length - 1}
             isUpcoming={idx === upcomingIndex}
             stageLabels={stageLabels}

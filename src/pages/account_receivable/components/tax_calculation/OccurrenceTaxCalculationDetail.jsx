@@ -8,6 +8,7 @@ import {
   Loader2,
   AlertTriangle,
   ArrowLeft,
+  CheckCircle2,
 } from "lucide-react";
 
 import { PageCard } from "../../../../components/Cards/PageCard";
@@ -190,6 +191,30 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
     }
   };
 
+  const handleGenerateInvoice = () => {
+    if (!occurrenceId || !isTaxCompleted) return;
+    navigate(`/account-receivable/invoice-generation/occurrence/${occurrence?.billingScheduleId || occurrenceId}`, {
+      state: {
+        from: "tax-calculation",
+        source: "tax-calculation",
+        occurrenceId: occurrence?.billingScheduleId || occurrenceId,
+        billingScheduleId: occurrence?.billingScheduleId || occurrenceId,
+        occurrence,
+      },
+    });
+  };
+
+  const handleViewInvoice = () => {
+    navigate(`/account-receivable/invoices/occurrence/${occurrence?.billingScheduleId || occurrenceId}`, {
+      state: {
+        from: "tax-calculation",
+        source: "tax-calculation",
+        occurrenceId: occurrence?.billingScheduleId || occurrenceId,
+        occurrence,
+      },
+    });
+  };
+
   if (loading && !occurrence) {
     return (
       <div className="flex h-80 items-center justify-center">
@@ -297,10 +322,34 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
             <ArrowLeft className="h-3.5 w-3.5" /> Back to Tax Workspace
           </Button>
 
-          {isTaxCompleted ? (
-            <Button variant="outline" size="small" onClick={loadOccurrenceDetail} className="flex items-center gap-1.5 text-xs">
-              <RefreshCw className="h-3.5 w-3.5" /> Refresh
-            </Button>
+          {occurrence.isInvoiced ? (
+            <>
+              <Button
+                variant="primary"
+                size="small"
+                onClick={handleViewInvoice}
+                className="flex items-center gap-1.5 text-xs font-semibold bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm"
+              >
+                <FileText className="h-3.5 w-3.5" /> View Invoice Details
+              </Button>
+              <Button variant="outline" size="small" onClick={loadOccurrenceDetail} className="flex items-center gap-1.5 text-xs">
+                <RefreshCw className="h-3.5 w-3.5" /> Refresh
+              </Button>
+            </>
+          ) : isTaxCompleted ? (
+            <>
+              <Button
+                variant="primary"
+                size="small"
+                onClick={handleGenerateInvoice}
+                className="flex items-center gap-1.5 text-xs font-semibold bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm"
+              >
+                <FileText className="h-3.5 w-3.5" /> Generate Invoice
+              </Button>
+              <Button variant="outline" size="small" onClick={loadOccurrenceDetail} className="flex items-center gap-1.5 text-xs">
+                <RefreshCw className="h-3.5 w-3.5" /> Refresh
+              </Button>
+            </>
           ) : isReady ? (
             <Button
               variant="primary"
@@ -322,6 +371,62 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
           ) : null}
         </div>
       </div>
+
+      {/* Workflow Guidance Banner */}
+      {occurrence.isInvoiced ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-emerald-950">Invoice Generated</h3>
+                <span className="inline-block rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                  INVOICED
+                </span>
+              </div>
+              <p className="text-xs text-emerald-800 mt-0.5">
+                Authoritative invoice has been generated for this billing occurrence.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="primary"
+            size="small"
+            onClick={handleViewInvoice}
+            className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold shadow-sm shrink-0"
+          >
+            <FileText className="h-3.5 w-3.5" /> View Invoice Details
+          </Button>
+        </div>
+      ) : isTaxCompleted ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50/70 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-indigo-950">Tax Calculation Verified</h3>
+                <span className="text-xs font-semibold text-indigo-600">&rarr;</span>
+                <span className="text-xs font-bold text-indigo-800">Ready to Generate Invoice</span>
+              </div>
+              <p className="text-xs text-indigo-700 mt-0.5">
+                Authoritative tax calculation completed. Review context, components, and summary below, then proceed to Invoice Generation.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="primary"
+            size="small"
+            onClick={handleGenerateInvoice}
+            className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center justify-center gap-1.5 text-xs font-semibold shadow-sm shrink-0"
+          >
+            <FileText className="h-3.5 w-3.5" /> Generate Invoice
+          </Button>
+        </div>
+      ) : null}
 
       {calcError && (
         <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 shadow-sm">

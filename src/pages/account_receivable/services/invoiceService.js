@@ -371,6 +371,20 @@ export const generateInvoice = async (snapshotId) => {
 };
 
 /**
+ * POST /api/billing-occurrences/{occurrenceId}/invoice
+ * Generates an invoice on the backend for the given Fixed Price / Recurring billing occurrence.
+ * Uses the real BillingOccurrence UUID.
+ */
+export const generateInvoiceForOccurrence = async (occurrenceId) => {
+  if (!occurrenceId) {
+    throw new Error("Billing occurrence UUID is required to generate an invoice.");
+  }
+  const url = `${AR_BASE_URL}/api/billing-occurrences/${occurrenceId}/invoice`;
+  const response = await api.post(url);
+  return normalizeInvoice(unwrapData(response));
+};
+
+/**
  * Normalizes an item returned by GET /api/v1/invoices/approval-workspace.
  * Uses backend-provided fields directly.
  */
@@ -473,6 +487,7 @@ export const getInvoice = async (snapshotIdOrInvoiceId) => {
       (w) =>
         w.invoiceId === rawId ||
         w.billingSnapshotId === rawId ||
+        w.billingScheduleId === rawId ||
         (w.invoiceNumber && w.invoiceNumber.toLowerCase() === rawId.toLowerCase()) ||
         (w.billingSnapshotNumber && w.billingSnapshotNumber.toLowerCase() === rawId.toLowerCase())
     );
@@ -490,11 +505,14 @@ export const getInvoice = async (snapshotIdOrInvoiceId) => {
         (i) =>
           i.invoiceId === rawId ||
           i.billingSnapshotId === rawId ||
+          i.billingScheduleId === rawId ||
           (i.invoiceNumber && i.invoiceNumber.toLowerCase() === rawId.toLowerCase()) ||
           (i.snapshotNumber && i.snapshotNumber.toLowerCase() === rawId.toLowerCase())
       );
       if (matched?.billingSnapshotId) {
         targetSnapshotId = matched.billingSnapshotId;
+      } else if (matched && (matched.billingScheduleId === rawId || matched.invoiceId === rawId)) {
+        return matched;
       }
     } catch (iErr) {
       console.warn("[invoiceService] Lookup in invoices list skipped:", iErr?.message);
@@ -738,6 +756,7 @@ export const financialCorrectionReacquire = async (invoiceId) => {
 
 export default {
   generateInvoice,
+  generateInvoiceForOccurrence,
   getInvoice,
   getInvoices,
   getPendingApprovalInvoices,
