@@ -1,28 +1,29 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Calculator,
   RefreshCw,
-  Search,
-  Eye,
   CheckCircle2,
   Clock,
   Layers,
-  Inbox,
   Loader2,
-  Filter,
   FileText,
+  AlertCircle,
+  Eye,
 } from "lucide-react";
 
 import PageHeader from "../../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import { KPICard } from "../../../../components/kpi/KPI";
-import SearchInput from "../../../../components/filter/Searchbar";
 import Button from "../../../../components/Button/Button";
 import Loader from "../../../../components/ui/Loader";
+import SearchInput from "../../../../components/filter/Searchbar";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import Pagination from "../../../../components/Pagination/pagination";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import ARTable from "../common/ARTable";
+import ActionMenu from "../common/ActionMenu";
 
 import {
   fetchActiveBillingConfigurations,
@@ -30,54 +31,138 @@ import {
   getAcquiredSnapshotMetadata,
   formatBillingPeriod,
 } from "../../services/billingDataAcquisitionService";
-import {
-  calculateTax,
-  getTaxCalculation,
-  getTaxCalculationErrorMessage,
-} from "../../services/taxCalculationService";
+import { getTaxCalculation } from "../../services/taxCalculationService";
 import { getInvoice } from "../../services/invoiceService";
 import { getActiveTaxRegions } from "../../services/taxRateConfigurationService";
-import {
-  getBillingOccurrences,
-} from "../../services/billingOccurrenceService";
+import { getBillingOccurrences } from "../../services/billingOccurrenceService";
 import BillingOccurrenceCard from "./BillingOccurrenceCard";
+
+/* ------------------------------------------------------------------ */
+/* Global constants                                                    */
+/* ------------------------------------------------------------------ */
 
 const ACQUISITION_PATH = "/account-receivable/billing-data-acquisition";
 const OCCURRENCE_DETAIL_BASE = "/account-receivable/tax-calculation/occurrence";
+
+// Same page size as the other AR list pages (e.g. BillingApprovals)
+const PAGE_SIZE = 5;
+
+const STATUS_TABS = {
+  ALL: "ALL",
+  READY_TO_TAX: "READY_TO_TAX",
+  IN_TAX: "IN_TAX",
+  TAX_COMPLETED: "TAX_COMPLETED",
+  INVOICED: "INVOICED",
+};
+
+const TABLE_HEADERS = [
+  "Client",
+  "Project",
+  "Snapshot Number",
+  "Billing Period",
+  "Tax Region",
+  "Commercial Amount",
+  "Status",
+  "Actions",
+];
+
+const TABLE_COLUMNS = [
+  "client",
+  "project",
+  "snapshotNumber",
+  "billingPeriod",
+  "taxRegion",
+  "taxableAmount",
+  "status",
+  "actions",
+];
+
+const TABLE_ALIGNMENTS = {
+  client: "left",
+  project: "left",
+  snapshotNumber: "center",
+  billingPeriod: "center",
+  taxRegion: "center",
+  taxableAmount: "right",
+  status: "center",
+  actions: "center",
+};
+
+// Normalises the many raw status strings into one of the STATUS_TABS keys
+function getStatusGroup(status) {
+  const st = (status || "").toUpperCase();
+  if (st === "READY_TO_TAX" || st === "READY_FOR_TAX" || st === "READY") return STATUS_TABS.READY_TO_TAX;
+  if (st === "IN_TAX") return STATUS_TABS.IN_TAX;
+  if (st === "TAX_COMPLETED" || st === "CALCULATED") return STATUS_TABS.TAX_COMPLETED;
+  if (st === "INVOICED") return STATUS_TABS.INVOICED;
+  return null;
+}
 
 export default function TaxCalculationConsole() {
   const navigate = useNavigate();
 
   const [snapshots, setSnapshots] = useState([]);
-  const [taxRegions, setTaxRegions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [calculatingIds, setCalculatingIds] = useState({});
 
-  // Filter states
+  // Filters + pagination
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [statusTab, setStatusTab] = useState(STATUS_TABS.ALL);
   const [regionFilter, setRegionFilter] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // KPI card definitions (mirrors BillingApprovals pattern)
-  const kpiCardDefs = [
-    { key: "ALL", label: "Total Snapshots", icon: Layers, color: "bg-[#0A0082] text-white" },
-    { key: "READY_TO_TAX", label: "Ready for Tax", icon: CheckCircle2, color: "bg-emerald-600 text-white" },
-    { key: "IN_TAX", label: "In Tax", icon: Clock, color: "bg-amber-500 text-white" },
-    { key: "TAX_COMPLETED", label: "Tax Completed", icon: CheckCircle2, color: "bg-blue-600 text-white" },
-    { key: "INVOICED", label: "Invoiced", icon: FileText, color: "bg-indigo-600 text-white" },
-  ];
+  // Billing Occurrences — Fixed Price / Recurring records feeding this same
+  // Tax Calculation workspace. Each section is fetched by the exact backend
+  // status it represents; the frontend never re-derives eligibility.
+  const [occLoading, setOccLoading] = useState(true);
+  const [readyOccurrences, setReadyOccurrences] = useState([]);
+  const [upcomingOccurrences, setUpcomingOccurrences] = useState([]);
+  const [processedOccurrences, setProcessedOccurrences] = useState([]);
+  const [invoicedOccurrences, setInvoicedOccurrences] = useState([]);
 
-  const handleKpiClick = (kpiKey) => {
-    if (kpiKey === "ALL") {
-      setStatusFilter("ALL");
-    } else {
-      setStatusFilter((prev) => (prev === kpiKey ? "ALL" : kpiKey));
+  const loadOccurrences = async () => {
+    setOccLoading(true);
+    try {
+      // periodStatus and taxStatus are two separate backend fields (never
+      // assume they're the same) -- periodStatus is the occurrence's own
+      // lifecycle (SCHEDULED -> TAX_PENDING -> TAX_CALCULATED, advanced only
+      // by the backend scheduler) and is what both bucket membership here
+      // and calculate-tax eligibility are keyed on; taxStatus/
+      // taxCalculationStatus are informational fields shown on the card/
+      // detail view only.
+      const [ready, upcoming, processed] = await Promise.all([
+        getBillingOccurrences({ periodStatus: "TAX_PENDING" }).catch(() => []),
+        getBillingOccurrences({ periodStatus: "SCHEDULED" }).catch(() => []),
+        getBillingOccurrences({ periodStatus: "TAX_CALCULATED" }).catch(() => []),
+      ]);
+      setReadyOccurrences(ready);
+      setUpcomingOccurrences(upcoming);
+      // Invoiced is not its own periodStatus/taxStatus value — it's the
+      // backend's isInvoiced flag on an already-tax-calculated occurrence,
+      // so it's split out here rather than queried separately.
+      setProcessedOccurrences(processed.filter((o) => !o.isInvoiced));
+      setInvoicedOccurrences(processed.filter((o) => o.isInvoiced));
+    } catch (err) {
+      console.error("[TaxCalculationConsole] Error loading billing occurrences:", err);
+    } finally {
+      setOccLoading(false);
     }
   };
 
-  const handleSearchInputChange = (e) => {
-    setSearchQuery(e.target.value);
+  useEffect(() => {
+    loadOccurrences();
+  }, []);
+
+  const handleViewOccurrence = (occurrence) => {
+    navigate(`${OCCURRENCE_DETAIL_BASE}/${occurrence.billingScheduleId}`, {
+      state: { occurrence },
+    });
+  };
+
+  const handleOpenOccurrenceTaxCalculation = (occurrence) => {
+    navigate(`${OCCURRENCE_DETAIL_BASE}/${occurrence.billingScheduleId}`, {
+      state: { occurrence },
+    });
   };
 
   const loadData = async (isManualRefresh = false) => {
@@ -86,7 +171,7 @@ export default function TaxCalculationConsole() {
 
     try {
       // This table is the Time & Material billing-snapshot queue only --
-      // Fixed Price/Recurring occurrences are loaded separately below via
+      // Fixed Price/Recurring occurrences are loaded separately via
       // getBillingOccurrences(). fetchActiveBillingConfigurations() returns
       // every active configuration regardless of billing type, so it must
       // be filtered down here the same way Data Acquisition does.
@@ -136,7 +221,13 @@ export default function TaxCalculationConsole() {
 
             let taxRegionName = cfg.taxRegionName || cfg.taxRegionLabel || "India";
 
-            if (snapshotId && (snapshotStatus === "TAX_COMPLETED" || snapshotStatus === "IN_TAX" || snapshotStatus === "INVOICED" || existingSnapshot)) {
+            if (
+              snapshotId &&
+              (snapshotStatus === "TAX_COMPLETED" ||
+                snapshotStatus === "IN_TAX" ||
+                snapshotStatus === "INVOICED" ||
+                existingSnapshot)
+            ) {
               const taxCalcData = await getTaxCalculation(snapshotId).catch(() => null);
               if (taxCalcData) {
                 const tStatus = (taxCalcData.snapshotStatus || taxCalcData.status || "").toUpperCase();
@@ -209,8 +300,8 @@ export default function TaxCalculationConsole() {
           })
         )
       ).filter(Boolean);
+
       setSnapshots(loadedSnapshots);
-      setTaxRegions(regionsList);
 
       if (isManualRefresh) {
         showStatusToast("Tax calculation queue refreshed.", "success");
@@ -227,99 +318,108 @@ export default function TaxCalculationConsole() {
     loadData();
   }, []);
 
-  // Filter population down to relevant tax snapshot candidates (persistent workspace)
-  const relevantSnapshots = useMemo(() => {
-    return snapshots.filter((s) => {
-      const st = (s.status || "").toUpperCase();
-      return (
-        st === "READY_TO_TAX" ||
-        st === "READY_FOR_TAX" ||
-        st === "READY" ||
-        st === "IN_TAX" ||
-        st === "TAX_COMPLETED" ||
-        st === "CALCULATED" ||
-        st === "INVOICED"
-      );
-    });
-  }, [snapshots]);
+  const handleRefresh = () => {
+    loadData(true);
+    loadOccurrences();
+  };
 
-  // Executive KPI Card Counts
-  const kpis = useMemo(() => {
-    let readyToTax = 0;
-    let inTax = 0;
-    let taxCompleted = 0;
-    let invoiced = 0;
+  // Only snapshots that belong in the tax workspace
+  const relevantSnapshots = useMemo(
+    () => snapshots.filter((s) => getStatusGroup(s.status) !== null),
+    [snapshots]
+  );
 
-    relevantSnapshots.forEach((s) => {
-      const st = (s.status || "").toUpperCase();
-      if (st === "READY_TO_TAX" || st === "READY_FOR_TAX" || st === "READY") readyToTax++;
-      else if (st === "IN_TAX") inTax++;
-      else if (st === "TAX_COMPLETED" || st === "CALCULATED") taxCompleted++;
-      else if (st === "INVOICED") invoiced++;
-    });
-
-    return {
-      totalSnapshots: relevantSnapshots.length,
-      readyToTax,
-      inTax,
-      taxCompleted,
-      invoiced,
+  const tabCounts = useMemo(() => {
+    const counts = {
+      [STATUS_TABS.ALL]: relevantSnapshots.length,
+      [STATUS_TABS.READY_TO_TAX]: 0,
+      [STATUS_TABS.IN_TAX]: 0,
+      [STATUS_TABS.TAX_COMPLETED]: 0,
+      [STATUS_TABS.INVOICED]: 0,
     };
+    relevantSnapshots.forEach((s) => {
+      counts[getStatusGroup(s.status)] += 1;
+    });
+    return counts;
   }, [relevantSnapshots]);
 
-  // Filtered Queue
+  // KPI cards double as status filters
+  const kpiCards = [
+    { key: STATUS_TABS.ALL, label: "Total Snapshots", icon: Layers, color: "bg-[#0A0082] text-white" },
+    { key: STATUS_TABS.READY_TO_TAX, label: "Ready for Tax", icon: CheckCircle2, color: "bg-emerald-600 text-white" },
+    { key: STATUS_TABS.IN_TAX, label: "In Tax", icon: Clock, color: "bg-amber-500 text-white" },
+    { key: STATUS_TABS.TAX_COMPLETED, label: "Tax Completed", icon: CheckCircle2, color: "bg-blue-600 text-white" },
+    { key: STATUS_TABS.INVOICED, label: "Invoiced", icon: FileText, color: "bg-indigo-600 text-white" },
+  ];
+
+  const statusFilterOptions = [
+    { value: STATUS_TABS.ALL, label: `All Statuses (${tabCounts.ALL})` },
+    { value: STATUS_TABS.READY_TO_TAX, label: `Ready for Tax (${tabCounts.READY_TO_TAX})` },
+    { value: STATUS_TABS.IN_TAX, label: `In Tax (${tabCounts.IN_TAX})` },
+    { value: STATUS_TABS.TAX_COMPLETED, label: `Tax Completed (${tabCounts.TAX_COMPLETED})` },
+    { value: STATUS_TABS.INVOICED, label: `Invoiced (${tabCounts.INVOICED})` },
+  ];
+
+  const regionFilterOptions = useMemo(() => {
+    const regions = Array.from(
+      new Set(relevantSnapshots.map((s) => s.taxRegion).filter(Boolean))
+    );
+    return [
+      { value: "ALL", label: "All Tax Regions" },
+      ...regions.map((r) => ({ value: r, label: r })),
+    ];
+  }, [relevantSnapshots]);
+
+  const handleKpiClick = (key) => {
+    if (key === STATUS_TABS.ALL) {
+      setStatusTab(STATUS_TABS.ALL);
+    } else {
+      setStatusTab((prev) => (prev === key ? STATUS_TABS.ALL : key));
+    }
+    setCurrentPage(1);
+  };
+
+  const handleStatusChange = (value) => {
+    setStatusTab(value);
+    setCurrentPage(1);
+  };
+
+  const handleRegionChange = (value) => {
+    setRegionFilter(value);
+    setCurrentPage(1);
+  };
+
+  const handleSearchInputChange = (e) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1);
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusTab, regionFilter, searchQuery]);
+
   const filteredSnapshots = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
     return relevantSnapshots.filter((s) => {
-      const st = (s.status || "").toUpperCase();
+      if (statusTab !== STATUS_TABS.ALL && getStatusGroup(s.status) !== statusTab) return false;
+      if (regionFilter !== "ALL" && s.taxRegion !== regionFilter) return false;
 
-      // Status filter
-      if (statusFilter === "READY_TO_TAX") {
-        if (st !== "READY_TO_TAX" && st !== "READY_FOR_TAX" && st !== "READY") return false;
-      } else if (statusFilter === "IN_TAX") {
-        if (st !== "IN_TAX") return false;
-      } else if (statusFilter === "TAX_COMPLETED") {
-        if (st !== "TAX_COMPLETED" && st !== "CALCULATED") return false;
-      } else if (statusFilter === "INVOICED") {
-        if (st !== "INVOICED") return false;
+      if (q) {
+        const haystack = [s.projectName, s.projectCode, s.client, s.snapshotNumber]
+          .map((v) => (v || "").toLowerCase());
+        if (!haystack.some((v) => v.includes(q))) return false;
       }
-
-      // Region filter
-      if (regionFilter !== "ALL") {
-        if (s.taxRegion !== regionFilter) return false;
-      }
-
-      // Search query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const pName = (s.projectName || "").toLowerCase();
-        const pCode = (s.projectCode || "").toLowerCase();
-        const client = (s.client || "").toLowerCase();
-        const snapNum = (s.snapshotNumber || "").toLowerCase();
-
-        if (
-          !pName.includes(q) &&
-          !pCode.includes(q) &&
-          !client.includes(q) &&
-          !snapNum.includes(q)
-        ) {
-          return false;
-        }
-      }
-
       return true;
     });
-  }, [relevantSnapshots, statusFilter, regionFilter, searchQuery]);
+  }, [relevantSnapshots, statusTab, regionFilter, searchQuery]);
 
-  // Unique Tax Regions for Filter list
-  const uniqueRegions = useMemo(() => {
-    const set = new Set();
-    relevantSnapshots.forEach((s) => {
-      if (s.taxRegion) set.add(s.taxRegion);
-    });
-    return Array.from(set);
-  }, [relevantSnapshots]);
+  const totalPages = Math.ceil(filteredSnapshots.length / PAGE_SIZE) || 1;
+  const paginatedSnapshots = useMemo(
+    () => filteredSnapshots.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filteredSnapshots, currentPage]
+  );
 
-  // Action button handler
+  // Action handler
   const handleAction = (item) => {
     const snapId = item.snapshotId;
 
@@ -328,106 +428,92 @@ export default function TaxCalculationConsole() {
       return;
     }
 
-    const st = (item.status || "").toUpperCase();
-    if (st === "INVOICED") {
+    if (getStatusGroup(item.status) === STATUS_TABS.INVOICED) {
       navigate(`/account-receivable/invoices/${snapId}`, {
         state: { config: item.config },
       });
       return;
     }
 
-    // Always navigate to the Tax Calculation detail page where calculation is reviewed and executed
+    // Tax Calculation detail page is where calculation is reviewed and executed
     navigate(`/account-receivable/tax-calculation/${snapId}`, {
       state: { config: item.config },
     });
   };
 
-  const renderActionButton = (item) => {
-    const st = (item.status || "").toUpperCase();
-    const snapId = item.snapshotId;
-    const isCalculating = calculatingIds[snapId];
-
-    if (!snapId) {
-      return (
-        <Button
-          size="sm"
-          variant="outline"
-          disabled
-          className="text-xs text-slate-400 bg-slate-50 border-slate-200 cursor-not-allowed"
-          title="Billing snapshot information is unavailable. Please refresh the billing data."
-        >
-          <Calculator className="mr-1.5 h-3.5 w-3.5" />
-          Snapshot Unavailable
-        </Button>
-      );
+  // Three-dots menu items, one primary action per status
+  const getActionItems = (item) => {
+    if (!item.snapshotId) {
+      return [
+        {
+          label: "Snapshot Unavailable",
+          icon: <AlertCircle className="h-4 w-4" />,
+          disabled: true,
+          onClick: () => { },
+        },
+      ];
     }
 
-    if (isCalculating) {
-      return (
-        <Button size="sm" variant="primary" disabled className="bg-amber-600 border-amber-600 text-white text-xs">
-          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-          Calculating Tax...
-        </Button>
-      );
+    const group = getStatusGroup(item.status);
+    switch (group) {
+      case STATUS_TABS.IN_TAX:
+        return [
+          {
+            label: "Calculation in Progress",
+            icon: <Loader2 className="h-4 w-4 animate-spin text-amber-600" />,
+            disabled: true,
+            onClick: () => { },
+          },
+          {
+            label: "View Details",
+            icon: <Eye className="h-4 w-4 text-slate-600" />,
+            onClick: () => handleAction(item),
+          },
+        ];
+      case STATUS_TABS.TAX_COMPLETED:
+        return [
+          {
+            label: "Generate Invoice",
+            icon: <FileText className="h-4 w-4 text-indigo-600" />,
+            onClick: () => handleAction(item),
+          },
+          {
+            label: "View Tax Calculation",
+            icon: <Eye className="h-4 w-4 text-slate-600" />,
+            onClick: () => handleAction(item),
+          },
+        ];
+      case STATUS_TABS.INVOICED:
+        return [
+          {
+            label: "View Invoice",
+            icon: <FileText className="h-4 w-4 text-indigo-600" />,
+            onClick: () => handleAction(item),
+          },
+          {
+            label: "View Tax Calculation",
+            icon: <Eye className="h-4 w-4 text-slate-600" />,
+            onClick: () => {
+              navigate(`/account-receivable/tax-calculation/${item.snapshotId}`, {
+                state: { config: item.config },
+              });
+            },
+          },
+        ];
+      default:
+        return [
+          {
+            label: "Calculate Tax",
+            icon: <Calculator className="h-4 w-4 text-indigo-600" />,
+            onClick: () => handleAction(item),
+          },
+          {
+            label: "View Snapshot",
+            icon: <Eye className="h-4 w-4 text-slate-600" />,
+            onClick: () => handleAction(item),
+          },
+        ];
     }
-
-    if (st === "IN_TAX") {
-      return (
-        <Button size="sm" variant="outline" disabled className="text-xs text-amber-700 bg-amber-50 border-amber-200">
-          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-          Calculation in Progress
-        </Button>
-      );
-    }
-
-    if (st === "INVOICED") {
-      return (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleAction(item);
-          }}
-          className="text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-semibold"
-        >
-          <FileText className="mr-1.5 h-3.5 w-3.5" />
-          View Invoice
-        </Button>
-      );
-    }
-
-    if (st === "TAX_COMPLETED" || st === "CALCULATED") {
-      return (
-        <Button
-          size="sm"
-          variant="primary"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleAction(item);
-          }}
-          className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold"
-        >
-          <FileText className="mr-1.5 h-3.5 w-3.5" />
-          View Invoice Generation
-        </Button>
-      );
-    }
-
-    return (
-      <Button
-        size="sm"
-        variant="primary"
-        onClick={(e) => {
-          e.stopPropagation();
-          handleAction(item);
-        }}
-        className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold"
-      >
-        <Calculator className="mr-1.5 h-3.5 w-3.5" />
-        Calculate Tax
-      </Button>
-    );
   };
 
   if (loading && !refreshing) {
@@ -444,7 +530,7 @@ export default function TaxCalculationConsole() {
     processedOccurrences.length > 0 ||
     invoicedOccurrences.length > 0;
 
-  // Genuine Empty State (when zero relevant snapshots AND zero billing occurrences exist)
+  // Genuine empty state: zero relevant snapshots AND zero billing occurrences
   if (!loading && relevantSnapshots.length === 0 && !occLoading && !hasAnyOccurrences) {
     return (
       <div className="w-full space-y-6">
@@ -452,15 +538,7 @@ export default function TaxCalculationConsole() {
           title="Tax Calculation"
           subtitle="Calculate and review tax for acquired billing snapshots."
           action={
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                loadData(true);
-                loadOccurrences();
-              }}
-              disabled={refreshing}
-            >
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
               <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
               Refresh
             </Button>
@@ -494,178 +572,151 @@ export default function TaxCalculationConsole() {
     );
   }
 
-  const tableHeaders = [
-    "Client",
-    "Project",
-    "Snapshot Number",
-    "Billing Period",
-    "Tax Region",
-    "Commercial Amount",
-    "Status",
-    "Action",
-  ];
-
-  const tableColumns = [
-    "client",
-    "project",
-    "snapshotNumber",
-    "billingPeriod",
-    "taxRegion",
-    "taxableAmount",
-    "status",
-    "action",
-  ];
-
-  const tableRows = filteredSnapshots.map((item) => ({
-    onRowClick: () => {
-      if (!item.snapshotId) {
-        showStatusToast("Billing snapshot information is unavailable. Please refresh the billing data.", "error");
-        return;
-      }
-      handleAction(item);
-    },
-    client: <span className="font-semibold text-slate-800">{item.client}</span>,
+  const tableRows = paginatedSnapshots.map((item) => ({
+    onRowClick: () => handleAction(item),
+    client: <div className="text-left font-semibold text-slate-800">{item.client}</div>,
     project: (
       <div className="text-left">
         <div className="font-bold text-slate-900">{item.projectName}</div>
         <div className="text-xs font-mono text-slate-400">{item.projectCode}</div>
       </div>
     ),
-    snapshotNumber: item.snapshotNumber ? (
-      <span className="font-mono font-semibold text-indigo-700">{item.snapshotNumber}</span>
-    ) : (
-      <span className="text-xs text-slate-400 italic">Not available</span>
+    snapshotNumber: (
+      <div className="flex items-center justify-center">
+        {item.snapshotNumber ? (
+          <span className="font-mono font-semibold text-indigo-700">{item.snapshotNumber}</span>
+        ) : (
+          <span className="text-xs text-slate-400 italic">Not available</span>
+        )}
+      </div>
     ),
-    billingPeriod: <span className="font-medium text-slate-700">{item.billingPeriod}</span>,
-    taxRegion: <span className="font-medium text-slate-800">{item.taxRegion}</span>,
+    billingPeriod: (
+      <div className="flex items-center justify-center font-medium text-slate-700">
+        {item.billingPeriod}
+      </div>
+    ),
+    taxRegion: (
+      <div className="flex items-center justify-center font-medium text-slate-800">
+        {item.taxRegion}
+      </div>
+    ),
     taxableAmount: (
-      <span className="font-mono font-bold text-slate-900">
-        {item.currency} {Number(item.taxableAmount || 0).toLocaleString()}
-      </span>
+      <div className="text-right font-mono font-bold text-slate-900">
+        {item.currency}{" "}
+        {Number(item.taxableAmount || 0).toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}
+      </div>
     ),
-    status: <StatusBadge label={item.status === "CALCULATED" ? "TAX_COMPLETED" : item.status} size="sm" />,
-    action: renderActionButton(item),
+    status: (
+      <div className="flex items-center justify-center">
+        <StatusBadge label={item.status === "CALCULATED" ? "TAX_COMPLETED" : item.status} size="sm" />
+      </div>
+    ),
+    actions: (
+      <div className="flex items-center justify-center">
+        <ActionMenu items={getActionItems(item)} />
+      </div>
+    ),
   }));
 
   return (
     <div className="w-full space-y-6">
-      {/* Header */}
+      {/* 1. Page Header */}
       <PageHeader
         title="Tax Calculation"
         subtitle="Calculate and review tax for acquired billing snapshots and billing occurrences."
         action={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              loadData(true);
-              loadOccurrences();
-            }}
-            disabled={refreshing}
-          >
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
           </Button>
         }
       />
 
-      {/* KPI Summary Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
-        {kpiCardDefs.map((kpi) => {
-          const isActive =
-            statusFilter === kpi.key ||
-            (statusFilter === "ALL" && kpi.key === "ALL");
-
-          const kpiValue =
-            kpi.key === "ALL" ? kpis.totalSnapshots
-            : kpi.key === "READY_TO_TAX" ? kpis.readyToTax
-            : kpi.key === "IN_TAX" ? kpis.inTax
-            : kpi.key === "TAX_COMPLETED" ? kpis.taxCompleted
-            : kpis.invoiced;
-
-          return (
-            <button
-              key={kpi.key}
-              type="button"
-              onClick={() => handleKpiClick(kpi.key)}
-              title={`Filter by ${kpi.label}`}
-              className="text-left rounded-xl transition-transform active:scale-[0.99] focus:outline-none"
-            >
-              <KPICard
-                label={kpi.label}
-                value={loading ? "…" : kpiValue}
-                icon={<kpi.icon className="h-5 w-5" />}
-                color={kpi.color}
-                active={isActive}
-                className="h-full w-full cursor-pointer bg-white shadow-sm border border-slate-200 transition-all hover:shadow-md"
-              />
-            </button>
-          );
-        })}
+      {/* 2. KPI Cards — click to filter, click the active card again to clear */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {kpiCards.map((kpi) => (
+          <button
+            key={kpi.key}
+            type="button"
+            onClick={() => handleKpiClick(kpi.key)}
+            title={`Filter by ${kpi.label}`}
+            className="text-left rounded-xl border-0 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 active:ring-0"
+            style={{
+              outline: "none",
+            }}
+          >
+            <KPICard
+              label={kpi.label}
+              value={loading ? "…" : tabCounts[kpi.key]}
+              icon={<kpi.icon className="h-5 w-5" />}
+              color={kpi.color}
+              active={statusTab === kpi.key}
+              className="h-full w-full cursor-pointer bg-white shadow-sm border border-slate-200 transition-all hover:shadow-md !ring-0 !outline-none focus:!ring-0 focus:!outline-none focus-visible:!ring-0 focus-visible:!outline-none"
+            />
+          </button>
+        ))}
       </div>
 
-      {/* Time & Material — Billing Snapshot Queue & Filters */}
+      {/* 3. Time & Material — Billing Snapshot Queue */}
       <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
         Time &amp; Material — Billing Snapshots
       </h2>
       <PageCard>
-        <PageCardContent className="space-y-4 p-5">
+        <PageCardContent className="p-4 sm:p-5 space-y-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="w-full lg:max-w-md">
-                <SearchInput
+            <div className="w-full lg:max-w-md">
+              <SearchInput
                 value={searchQuery}
                 onChange={handleSearchInputChange}
                 onSearch={(val) => setSearchQuery(val)}
-                placeholder="Search by project, code, or client..."
-                />
-          </div>
-
+                placeholder="Search by project, client, or snapshot number..."
+              />
+            </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                <Filter className="h-3.5 w-3.5" /> Filter:
+              <div className="w-48 sm:w-52">
+                <FilterListbox
+                  options={statusFilterOptions}
+                  value={statusTab}
+                  onChange={handleStatusChange}
+                  placeholder="Filter by Status"
+                />
               </div>
-
-              {/* Status Filter */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"
-              >
-                <option value="ALL">All Statuses ({relevantSnapshots.length})</option>
-                <option value="READY_TO_TAX">Ready for Tax ({kpis.readyToTax})</option>
-                <option value="IN_TAX">In Tax ({kpis.inTax})</option>
-                <option value="TAX_COMPLETED">Tax Completed ({kpis.taxCompleted})</option>
-                <option value="INVOICED">Invoiced ({kpis.invoiced})</option>
-              </select>
-
-              {/* Region Filter */}
-              <select
-                value={regionFilter}
-                onChange={(e) => setRegionFilter(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"
-              >
-                <option value="ALL">All Tax Regions</option>
-                {uniqueRegions.map((region) => (
-                  <option key={region} value={region}>
-                    {region}
-                  </option>
-                ))}
-              </select>
+              <div className="w-48 sm:w-52">
+                <FilterListbox
+                  options={regionFilterOptions}
+                  value={regionFilter}
+                  onChange={handleRegionChange}
+                  placeholder="Filter by Tax Region"
+                />
+              </div>
             </div>
           </div>
 
-          {/* AR Table */}
-          <ARTable
-            headers={tableHeaders}
-            columns={tableColumns}
-            rows={tableRows}
-            loading={loading}
-            emptyMessage="No billing snapshots match your current filters."
-          />
+          <div className="overflow-x-auto">
+            <ARTable
+              headers={TABLE_HEADERS}
+              columns={TABLE_COLUMNS}
+              rows={tableRows}
+              alignments={TABLE_ALIGNMENTS}
+              loading={loading}
+              emptyMessage="No billing snapshots match your current filters."
+            />
+            {!loading && filteredSnapshots.length > 0 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+                onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+              />
+            )}
+          </div>
         </PageCardContent>
       </PageCard>
 
-      {/* Fixed Price / Recurring — Billing Occurrences */}
+      {/* 4. Fixed Price / Recurring — Billing Occurrences */}
       <div className="space-y-3">
         <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
           Ready for Tax Calculation — Fixed Price &amp; Recurring

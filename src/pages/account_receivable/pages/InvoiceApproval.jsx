@@ -1,12 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Clock,
   CheckCircle2,
   XCircle,
   DollarSign,
-  Search,
-  Filter,
   RefreshCw,
   Eye,
   ArrowRight,
@@ -16,18 +14,84 @@ import {
 
 import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+import { KPICard } from "../../../components/kpi/KPI";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
+import SearchInput from "../../../components/filter/Searchbar";
+import FilterListbox from "../../../components/filter/FilterListbox";
+import Pagination from "../../../components/Pagination/pagination";
 import StatusBadge from "../../../components/status/statusbadge";
+import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import ARTable from "../components/common/ARTable";
+import ActionMenu from "../components/common/ActionMenu";
 import { formatCurrency, formatDisplayDate, formatDisplayDateTime } from "../utils/format";
 import {
   getInvoiceApprovalWorkspace,
   getInvoiceErrorMessage,
+  approveInvoice,
+  rejectInvoice,
 } from "../services/invoiceService";
 
+/* ------------------------------------------------------------------ */
+/* Global constants                                                    */
+/* ------------------------------------------------------------------ */
+
 const INVOICE_GENERATION_PATH = "/account-receivable/invoice-generation";
+
+// Same page size as the other AR list pages (e.g. BillingApprovals)
+const PAGE_SIZE = 5;
+
+const STATUS_TABS = {
+  ALL: "ALL",
+  PENDING: "PENDING_APPROVAL",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+};
+
+const TABLE_HEADERS = [
+  "Invoice Number",
+  "Client",
+  "Project",
+  "Billing Period",
+  "Invoice Date",
+  "Due Date",
+  "Grand Total",
+  "Status",
+  "Submitted At",
+  "Last Action",
+  "Actions",
+];
+
+const TABLE_COLUMNS = [
+  "invoiceNumber",
+  "client",
+  "project",
+  "billingPeriod",
+  "invoiceDate",
+  "dueDate",
+  "grandTotal",
+  "status",
+  "submittedAt",
+  "lastAction",
+  "actions",
+];
+
+const TABLE_ALIGNMENTS = {
+  invoiceNumber: "left",
+  client: "left",
+  project: "left",
+  billingPeriod: "center",
+  invoiceDate: "center",
+  dueDate: "center",
+  grandTotal: "right",
+  status: "center",
+  submittedAt: "left",
+  lastAction: "left",
+  actions: "center",
+};
+
+const getInvoiceStatus = (inv) => (inv.status || inv.invoiceStatus || "").toUpperCase();
 
 export default function InvoiceApproval() {
   const navigate = useNavigate();
@@ -37,9 +101,56 @@ export default function InvoiceApproval() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  // Filters
+  // Filters + pagination
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [statusTab, setStatusTab] = useState(STATUS_TABS.ALL);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Confirmation modal states
+  const [approveTarget, setApproveTarget] = useState(null);
+  const [approveLoading, setApproveLoading] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectLoading, setRejectLoading] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+
+  const handleConfirmApprove = async () => {
+    if (!approveTarget) return;
+    const invId = approveTarget.invoiceId || approveTarget.billingSnapshotId || approveTarget.snapshotId;
+    setApproveLoading(true);
+    try {
+      await approveInvoice(invId);
+      showStatusToast("Invoice approved successfully.", "success");
+      setApproveTarget(null);
+      await loadData();
+    } catch (err) {
+      const msg = getInvoiceErrorMessage(err, "Failed to approve invoice.");
+      showStatusToast(msg, "error");
+    } finally {
+      setApproveLoading(false);
+    }
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectTarget) return;
+    const invId = rejectTarget.invoiceId || rejectTarget.billingSnapshotId || rejectTarget.snapshotId;
+    if (!rejectReason.trim()) {
+      showStatusToast("Please provide a reason for rejection.", "error");
+      return;
+    }
+    setRejectLoading(true);
+    try {
+      await rejectInvoice(invId, rejectReason.trim());
+      showStatusToast("Invoice rejected.", "success");
+      setRejectTarget(null);
+      setRejectReason("");
+      await loadData();
+    } catch (err) {
+      const msg = getInvoiceErrorMessage(err, "Failed to reject invoice.");
+      showStatusToast(msg, "error");
+    } finally {
+      setRejectLoading(false);
+    }
+  };
 
   const loadData = async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
@@ -69,70 +180,87 @@ export default function InvoiceApproval() {
     loadData();
   }, []);
 
-  // Filtered invoices
-  const filteredInvoices = useMemo(() => {
-    return invoices.filter((inv) => {
-      const st = (inv.status || inv.invoiceStatus || "").toUpperCase();
-
-      // Status filter
-      if (statusFilter !== "ALL") {
-        if (st !== statusFilter) return false;
-      }
-
-      // Search query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const num = (inv.invoiceNumber || "").toLowerCase();
-        const client = (inv.clientName || "").toLowerCase();
-        const project = (inv.projectName || "").toLowerCase();
-        const snapNum = (inv.billingSnapshotNumber || inv.snapshotNumber || "").toLowerCase();
-
-        const matches =
-          num.includes(q) ||
-          client.includes(q) ||
-          project.includes(q) ||
-          snapNum.includes(q);
-
-        if (!matches) return false;
-      }
-
-      return true;
-    });
-  }, [invoices, statusFilter, searchQuery]);
-
   // Persistent KPIs calculated directly from workspace records
   const kpis = useMemo(() => {
-    const totalInvoices = invoices.length;
+    const count = (status) => invoices.filter((inv) => getInvoiceStatus(inv) === status).length;
 
-    const pendingApproval = invoices.filter(
-      (inv) => (inv.status || inv.invoiceStatus || "").toUpperCase() === "PENDING_APPROVAL"
-    ).length;
-
-    const approved = invoices.filter(
-      (inv) => (inv.status || inv.invoiceStatus || "").toUpperCase() === "APPROVED"
-    ).length;
-
-    const rejected = invoices.filter(
-      (inv) => (inv.status || inv.invoiceStatus || "").toUpperCase() === "REJECTED"
-    ).length;
-
-    // Total Approval Value calculated strictly by summing persisted grandTotal values
+    // Total Approval Value is strictly the sum of persisted grandTotal values
     const totalApprovalValue = invoices.reduce(
       (sum, inv) => sum + (Number(inv.grandTotal) || 0),
       0
     );
 
-    const primaryCurrency = invoices[0]?.currency || invoices[0]?.currencyCode || "USD";
-
     return {
-      totalInvoices,
-      pendingApproval,
-      approved,
-      rejected,
+      [STATUS_TABS.ALL]: invoices.length,
+      [STATUS_TABS.PENDING]: count(STATUS_TABS.PENDING),
+      [STATUS_TABS.APPROVED]: count(STATUS_TABS.APPROVED),
+      [STATUS_TABS.REJECTED]: count(STATUS_TABS.REJECTED),
       totalApprovalValue,
-      currency: primaryCurrency,
+      currency: invoices[0]?.currency || invoices[0]?.currencyCode || "USD",
     };
   }, [invoices]);
+
+  // KPI cards double as status filters (Total Approval Value is display-only)
+  const kpiCards = [
+    { key: STATUS_TABS.ALL, label: "Total Invoices", icon: FileText, color: "bg-[#0A0082] text-white" },
+    { key: STATUS_TABS.PENDING, label: "Pending Approval", icon: Clock, color: "bg-amber-500 text-white" },
+    { key: STATUS_TABS.APPROVED, label: "Approved", icon: CheckCircle2, color: "bg-emerald-600 text-white" },
+    { key: STATUS_TABS.REJECTED, label: "Rejected", icon: XCircle, color: "bg-rose-600 text-white" },
+  ];
+
+  const statusFilterOptions = [
+    { value: STATUS_TABS.ALL, label: `All Statuses (${kpis.ALL})` },
+    { value: STATUS_TABS.PENDING, label: `Pending Approval (${kpis.PENDING_APPROVAL})` },
+    { value: STATUS_TABS.APPROVED, label: `Approved (${kpis.APPROVED})` },
+    { value: STATUS_TABS.REJECTED, label: `Rejected (${kpis.REJECTED})` },
+  ];
+
+  const handleKpiClick = (key) => {
+    if (key === STATUS_TABS.ALL) {
+      setStatusTab(STATUS_TABS.ALL);
+    } else {
+      setStatusTab((prev) => (prev === key ? STATUS_TABS.ALL : key));
+    }
+    setCurrentPage(1);
+  };
+
+  const handleStatusChange = (value) => {
+    setStatusTab(value);
+    setCurrentPage(1);
+  };
+
+  const handleSearchInputChange = (e) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1);
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusTab, searchQuery]);
+
+  const filteredInvoices = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return invoices.filter((inv) => {
+      if (statusTab !== STATUS_TABS.ALL && getInvoiceStatus(inv) !== statusTab) return false;
+
+      if (q) {
+        const haystack = [
+          inv.invoiceNumber,
+          inv.clientName,
+          inv.projectName,
+          inv.billingSnapshotNumber || inv.snapshotNumber,
+        ].map((v) => (v || "").toLowerCase());
+        if (!haystack.some((v) => v.includes(q))) return false;
+      }
+      return true;
+    });
+  }, [invoices, statusTab, searchQuery]);
+
+  const totalPages = Math.ceil(filteredInvoices.length / PAGE_SIZE) || 1;
+  const paginatedInvoices = useMemo(
+    () => filteredInvoices.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filteredInvoices, currentPage]
+  );
 
   const handleReviewInvoice = (inv) => {
     if (inv.billingScheduleId && !inv.billingSnapshotId) {
@@ -162,6 +290,45 @@ export default function InvoiceApproval() {
     });
   };
 
+  const refreshButton = (label = "Refresh") => (
+    <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={refreshing}>
+      <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+      {label}
+    </Button>
+  );
+
+  const kpiSection = (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {kpiCards.map((kpi) => (
+        <button
+          key={kpi.key}
+          type="button"
+          onClick={() => handleKpiClick(kpi.key)}
+          title={`Filter by ${kpi.label}`}
+          className="text-left rounded-xl transition-transform active:scale-[0.99] focus:outline-none"
+        >
+          <KPICard
+            label={kpi.label}
+            value={loading ? "…" : kpis[kpi.key]}
+            icon={<kpi.icon className="h-5 w-5" />}
+            color={kpi.color}
+            className="h-full w-full cursor-pointer bg-white shadow-sm border border-slate-200 transition-all hover:shadow-md"
+          />
+        </button>
+      ))}
+
+      <div className="col-span-2 sm:col-span-1">
+        <KPICard
+          label="Total Approval Value"
+          value={loading ? "…" : formatCurrency(kpis.totalApprovalValue, kpis.currency)}
+          icon={<DollarSign className="h-5 w-5" />}
+          color="bg-indigo-600 text-white"
+          className="h-full w-full bg-white shadow-sm border border-slate-200"
+        />
+      </div>
+    </div>
+  );
+
   if (loading && !refreshing) {
     return (
       <div className="flex h-80 items-center justify-center">
@@ -170,26 +337,14 @@ export default function InvoiceApproval() {
     );
   }
 
-  // Error State with Retry
+  // Error state with retry
   if (error && !loading && invoices.length === 0) {
     return (
-      <div className="w-full space-y-6">
+      <div className="space-y-4">
         <PageHeader
           title="Invoice Approval"
           subtitle="Review, approve, and track invoices through the invoice approval lifecycle."
-          action={
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => loadData(true)}
-              disabled={refreshing}
-            >
-              <RefreshCw
-                className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
-              />
-              Retry
-            </Button>
-          }
+          actions={refreshButton("Retry")}
         />
 
         <PageCard>
@@ -218,72 +373,17 @@ export default function InvoiceApproval() {
     );
   }
 
-  // Genuine Empty State: zero workflow records exist
+  // Genuine empty state: zero workflow records exist
   if (!loading && invoices.length === 0) {
     return (
-      <div className="w-full space-y-6">
+      <div className="space-y-4">
         <PageHeader
           title="Invoice Approval"
           subtitle="Review, approve, and track invoices through the invoice approval lifecycle."
-          action={
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => loadData(true)}
-              disabled={refreshing}
-            >
-              <RefreshCw
-                className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </Button>
-          }
+          actions={refreshButton()}
         />
 
-        {/* Persistent Zero State KPIs */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm">
-            <div className="flex items-center justify-between text-slate-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Total Invoices</span>
-              <FileText className="h-4 w-4 text-slate-500" />
-            </div>
-            <div className="mt-2 text-2xl font-extrabold text-slate-900">0</div>
-          </div>
-
-          <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 shadow-sm">
-            <div className="flex items-center justify-between text-amber-700">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Pending Approval</span>
-              <Clock className="h-4 w-4 text-amber-600" />
-            </div>
-            <div className="mt-2 text-2xl font-extrabold text-amber-900">0</div>
-          </div>
-
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-sm">
-            <div className="flex items-center justify-between text-emerald-700">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Approved</span>
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            </div>
-            <div className="mt-2 text-2xl font-extrabold text-emerald-900">0</div>
-          </div>
-
-          <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4 shadow-sm">
-            <div className="flex items-center justify-between text-rose-700">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Rejected</span>
-              <XCircle className="h-4 w-4 text-rose-600" />
-            </div>
-            <div className="mt-2 text-2xl font-extrabold text-rose-900">0</div>
-          </div>
-
-          <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 shadow-sm col-span-2 sm:col-span-1 lg:col-span-1">
-            <div className="flex items-center justify-between text-indigo-700">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Total Approval Value</span>
-              <DollarSign className="h-4 w-4 text-indigo-600" />
-            </div>
-            <div className="mt-2 text-2xl font-extrabold font-mono text-indigo-950">
-              {formatCurrency(0, "USD")}
-            </div>
-          </div>
-        </div>
+        {kpiSection}
 
         <PageCard>
           <PageCardContent className="p-12 text-center space-y-4">
@@ -313,46 +413,16 @@ export default function InvoiceApproval() {
     );
   }
 
-  const tableHeaders = [
-    "Invoice Number",
-    "Client",
-    "Project",
-    "Billing Period",
-    "Invoice Date",
-    "Due Date",
-    "Grand Total",
-    "Status",
-    "Submitted At",
-    "Last Action",
-    "Action",
-  ];
-
-  const tableColumns = [
-    "invoiceNumber",
-    "client",
-    "project",
-    "billingPeriod",
-    "invoiceDate",
-    "dueDate",
-    "grandTotal",
-    "status",
-    "submittedAt",
-    "lastAction",
-    "action",
-  ];
-
-  const tableRows = filteredInvoices.map((item) => {
-    const rawStatus = (item.status || item.invoiceStatus || "").toUpperCase();
-    const isPending = rawStatus === "PENDING_APPROVAL";
-    const isRejected = rawStatus === "REJECTED";
+  const tableRows = paginatedInvoices.map((item) => {
+    const rawStatus = getInvoiceStatus(item);
+    const isPending = rawStatus === STATUS_TABS.PENDING;
+    const isRejected = rawStatus === STATUS_TABS.REJECTED;
 
     return {
       onRowClick: () => handleReviewInvoice(item),
       invoiceNumber: (
         <div className="text-left">
-          <span className="font-mono font-bold text-indigo-700">
-            {item.invoiceNumber || "—"}
-          </span>
+          <span className="font-mono font-bold text-indigo-700">{item.invoiceNumber || "—"}</span>
           {(item.billingSnapshotNumber || item.snapshotNumber) && (
             <div className="text-xs font-mono text-slate-400">
               {item.billingSnapshotNumber || item.snapshotNumber}
@@ -360,51 +430,41 @@ export default function InvoiceApproval() {
           )}
         </div>
       ),
-      client: (
-        <span className="font-semibold text-slate-800">
-          {item.clientName || "—"}
-        </span>
-      ),
+      client: <div className="text-left font-semibold text-slate-800">{item.clientName || "—"}</div>,
       project: (
         <div className="text-left">
-          <div className="font-bold text-slate-900">
-            {item.projectName || "—"}
-          </div>
+          <div className="font-bold text-slate-900">{item.projectName || "—"}</div>
         </div>
       ),
       billingPeriod: (
-        <span className="font-medium text-slate-700">
+        <div className="flex items-center justify-center font-medium text-slate-700">
           {item.billingPeriod || "—"}
-        </span>
+        </div>
       ),
       invoiceDate: (
-        <span className="font-medium text-slate-700">
+        <div className="flex items-center justify-center font-medium text-slate-700">
           {item.invoiceDate ? formatDisplayDate(item.invoiceDate) : "—"}
-        </span>
+        </div>
       ),
       dueDate: (
-        <span className="font-medium text-slate-700">
+        <div className="flex items-center justify-center font-medium text-slate-700">
           {item.dueDate ? formatDisplayDate(item.dueDate) : "—"}
-        </span>
+        </div>
       ),
       grandTotal: (
-        <span className="font-mono font-bold text-slate-900">
+        <div className="text-right font-mono font-bold text-slate-900">
           {formatCurrency(item.grandTotal || 0, item.currency || item.currencyCode || "USD")}
-        </span>
+        </div>
       ),
       status: (
-        <div className="flex flex-col items-start gap-1">
-          <StatusBadge
-            label={item.status || item.invoiceStatus || "PENDING_APPROVAL"}
-            size="sm"
-          />
+        <div className="flex flex-col items-center justify-center gap-1">
+          <StatusBadge label={item.status || item.invoiceStatus || "PENDING_APPROVAL"} size="sm" />
           {isRejected && (
             <span
-              className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${
-                item.correctionRequired
+              className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${item.correctionRequired
                   ? "bg-rose-50 text-rose-700 border-rose-200"
                   : "bg-emerald-50 text-emerald-700 border-emerald-200"
-              }`}
+                }`}
             >
               {item.correctionRequired ? "Correction Required" : "Ready to Resubmit"}
             </span>
@@ -423,189 +483,150 @@ export default function InvoiceApproval() {
       ),
       lastAction: (
         <div className="text-left text-xs">
-          <span className="font-semibold text-slate-800">
-            {item.lastAction || "—"}
-          </span>
+          <span className="font-semibold text-slate-800">{item.lastAction || "—"}</span>
           {item.lastActionAt && (
-            <div className="text-[11px] text-slate-400">
-              {formatDisplayDateTime(item.lastActionAt)}
-            </div>
+            <div className="text-[11px] text-slate-400">{formatDisplayDateTime(item.lastActionAt)}</div>
           )}
         </div>
       ),
-      action: isPending ? (
-        <Button
-          size="sm"
-          variant="primary"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleReviewInvoice(item);
-          }}
-          className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold"
-        >
-          <Eye className="mr-1.5 h-3.5 w-3.5" />
-          Review Invoice
-        </Button>
-      ) : isRejected ? (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleReviewInvoice(item);
-          }}
-          className="text-xs text-rose-700 border-rose-300 hover:bg-rose-50 font-semibold"
-        >
-          <Eye className="mr-1.5 h-3.5 w-3.5" />
-          Review Invoice
-        </Button>
-      ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleReviewInvoice(item);
-          }}
-          className="text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-semibold"
-        >
-          <Eye className="mr-1.5 h-3.5 w-3.5" />
-          View Invoice
-        </Button>
+      actions: (
+        <div className="flex items-center justify-center">
+          <ActionMenu
+            items={[
+              {
+                label: isPending ? "Review & Decide" : "View Invoice",
+                icon: <Eye className="h-4 w-4 text-slate-600" />,
+                onClick: () => handleReviewInvoice(item),
+              },
+              {
+                label: "Approve Invoice",
+                icon: <CheckCircle2 className="h-4 w-4 text-emerald-600" />,
+                hidden: !isPending,
+                onClick: () => setApproveTarget(item),
+              },
+              {
+                label: "Reject Invoice",
+                icon: <XCircle className="h-4 w-4 text-rose-600" />,
+                hidden: !isPending,
+                danger: true,
+                onClick: () => {
+                  setRejectReason("");
+                  setRejectTarget(item);
+                },
+              },
+            ]}
+          />
+        </div>
       ),
     };
   });
 
   return (
-    <div className="w-full space-y-6">
-      {/* Page Header */}
+    <div className="space-y-4">
+      {/* 1. Page Header */}
       <PageHeader
         title="Invoice Approval"
         subtitle="Review, approve, and track invoices through the invoice approval lifecycle."
-        action={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => loadData(true)}
-            disabled={refreshing}
-          >
-            <RefreshCw
-              className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </Button>
-        }
+        actions={refreshButton()}
       />
 
-      {/* Persistent KPI Section */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {/* 1. Total Invoices */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm">
-          <div className="flex items-center justify-between text-slate-600">
-            <span className="text-[11px] font-bold uppercase tracking-wider">
-              Total Invoices
-            </span>
-            <FileText className="h-4 w-4 text-slate-500" />
-          </div>
-          <div className="mt-2 text-2xl font-extrabold text-slate-900">
-            {kpis.totalInvoices}
-          </div>
-        </div>
+      {/* 2. KPI Cards — click to filter, click the active card again to clear */}
+      {kpiSection}
 
-        {/* 2. Pending Approval */}
-        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 shadow-sm">
-          <div className="flex items-center justify-between text-amber-700">
-            <span className="text-[11px] font-bold uppercase tracking-wider">
-              Pending Approval
-            </span>
-            <Clock className="h-4 w-4 text-amber-600" />
-          </div>
-          <div className="mt-2 text-2xl font-extrabold text-amber-900">
-            {kpis.pendingApproval}
-          </div>
-        </div>
-
-        {/* 3. Approved */}
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-sm">
-          <div className="flex items-center justify-between text-emerald-700">
-            <span className="text-[11px] font-bold uppercase tracking-wider">
-              Approved
-            </span>
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-          </div>
-          <div className="mt-2 text-2xl font-extrabold text-emerald-900">
-            {kpis.approved}
-          </div>
-        </div>
-
-        {/* 4. Rejected */}
-        <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4 shadow-sm">
-          <div className="flex items-center justify-between text-rose-700">
-            <span className="text-[11px] font-bold uppercase tracking-wider">
-              Rejected
-            </span>
-            <XCircle className="h-4 w-4 text-rose-600" />
-          </div>
-          <div className="mt-2 text-2xl font-extrabold text-rose-900">
-            {kpis.rejected}
-          </div>
-        </div>
-
-        {/* 5. Total Approval Value */}
-        <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 shadow-sm col-span-2 sm:col-span-1 lg:col-span-1">
-          <div className="flex items-center justify-between text-indigo-700">
-            <span className="text-[11px] font-bold uppercase tracking-wider">
-              Total Approval Value
-            </span>
-            <DollarSign className="h-4 w-4 text-indigo-600" />
-          </div>
-          <div className="mt-2 text-2xl font-extrabold text-indigo-950 font-mono">
-            {formatCurrency(kpis.totalApprovalValue, kpis.currency)}
-          </div>
-        </div>
-      </div>
-
-      {/* Controls & Dashboard Table */}
+      {/* 3. Main Data Card */}
       <PageCard>
-        <PageCardContent className="space-y-4 p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search by invoice number, project, client, or snapshot..."
+        <PageCardContent className="p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="w-full lg:max-w-md">
+              <SearchInput
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 pl-9 pr-4 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                onChange={handleSearchInputChange}
+                onSearch={(val) => setSearchQuery(val)}
+                placeholder="Search by invoice number, project, client, or snapshot..."
               />
             </div>
-
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                <Filter className="h-3.5 w-3.5" /> Status:
+              <div className="w-48 sm:w-52">
+                <FilterListbox
+                  options={statusFilterOptions}
+                  value={statusTab}
+                  onChange={handleStatusChange}
+                  placeholder="Filter by Status"
+                />
               </div>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="PENDING_APPROVAL">Pending Approval</option>
-                <option value="APPROVED">Approved</option>
-                <option value="REJECTED">Rejected</option>
-              </select>
             </div>
           </div>
 
-          <ARTable
-            headers={tableHeaders}
-            columns={tableColumns}
-            rows={tableRows}
-            emptyMessage="No matching invoices found for the selected criteria."
-          />
+          <div className="overflow-x-auto">
+            <ARTable
+              headers={TABLE_HEADERS}
+              columns={TABLE_COLUMNS}
+              rows={tableRows}
+              alignments={TABLE_ALIGNMENTS}
+              loading={loading}
+              emptyMessage="No matching invoices found for the selected criteria."
+            />
+            {!loading && filteredInvoices.length > 0 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+                onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+              />
+            )}
+          </div>
         </PageCardContent>
       </PageCard>
+
+      {/* Approval Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={Boolean(approveTarget)}
+        title="Approve Invoice"
+        message={
+          approveTarget
+            ? `Are you sure you want to approve invoice ${approveTarget.invoiceNumber || "this invoice"} for ${formatCurrency(approveTarget.grandTotal || 0, approveTarget.currency || approveTarget.currencyCode || "USD")}? Once approved, it can be delivered to the client.`
+            : ""
+        }
+        confirmText="Approve"
+        variant="primary"
+        isLoading={approveLoading}
+        onCancel={() => !approveLoading && setApproveTarget(null)}
+        onConfirm={handleConfirmApprove}
+      />
+
+      {/* Rejection Modal */}
+      <ConfirmationModal
+        isOpen={Boolean(rejectTarget)}
+        title="Reject Invoice"
+        message={
+          rejectTarget
+            ? `Are you sure you want to reject invoice ${rejectTarget.invoiceNumber || "this invoice"}? Please specify the reason for rejection below:`
+            : ""
+        }
+        confirmText="Reject Invoice"
+        variant="danger"
+        isLoading={rejectLoading}
+        onCancel={() => {
+          if (!rejectLoading) {
+            setRejectTarget(null);
+            setRejectReason("");
+          }
+        }}
+        onConfirm={handleConfirmReject}
+      >
+        <div className="mt-3">
+          <label className="block text-xs font-semibold text-slate-700 mb-1">
+            Rejection Reason <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Enter specific reasons why this invoice was rejected..."
+            rows={3}
+            className="w-full rounded-lg border border-slate-200 p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
+          />
+        </div>
+      </ConfirmationModal>
     </div>
   );
 }
