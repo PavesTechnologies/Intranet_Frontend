@@ -10,7 +10,6 @@ import {
   RefreshCw,
   Send,
   Eye,
-  MailCheck,
 } from "lucide-react";
 
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
@@ -22,6 +21,7 @@ import Modal from "../../../components/Modal/modal";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { formatCurrency, formatDisplayDate } from "../utils/format";
 import InvoiceDocument from "../components/invoice/InvoiceDocument";
+import { getActiveCompanyProfile } from "../services/companyProfileService";
 
 import {
   getTaxCalculation,
@@ -47,17 +47,6 @@ import {
   toIsoDateOnly,
 } from "../services/billingDataAcquisitionService";
 
-import {
-  DEMO_SELLER,
-  DEMO_CLIENT,
-  DEMO_PROJECT,
-  DEMO_TAX_CONTEXT,
-  DEMO_TERMS,
-  DEMO_DELIVERY_STATUS,
-  DEMO_SENT_BY,
-  getDemoDelivery,
-  saveDemoDelivery,
-} from "../utils/invoiceDemoData";
 
 const INVOICE_WORKSPACE_PATH = "/account-receivable/invoice-generation";
 const INVOICE_APPROVAL_PATH = "/account-receivable/invoice-approval";
@@ -121,22 +110,9 @@ export default function InvoiceGenerationDetail() {
   const [occurrenceData, setOccurrenceData] = useState(passedState.occurrence || null);
   const [items, setItems] = useState([]);
 
-  // Preview Modal & Delivery workflow states
+  // Preview Modal state
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
-  const [deliveryState, setDeliveryState] = useState(() => ({
-    deliveryStatus: DEMO_DELIVERY_STATUS.NOT_SENT,
-    sentAt: null,
-    sentBy: null,
-  }));
-  const [sendingToClient, setSendingToClient] = useState(false);
-
-  // Sync demo delivery status whenever invoiceId is known
-  useEffect(() => {
-    if (invoice?.invoiceId) {
-      const stored = getDemoDelivery(invoice.invoiceId);
-      setDeliveryState(stored);
-    }
-  }, [invoice?.invoiceId]);
+  const [companyProfile, setCompanyProfile] = useState(null);
 
   const loadData = async (isManual = false) => {
     if (!effectiveId) {
@@ -148,6 +124,14 @@ export default function InvoiceGenerationDetail() {
     if (isManual) setRefreshing(true);
     else setLoading(true);
     setErrorMsg("");
+
+    // Fetch active seller company profile for Invoice Preview
+    try {
+      const profile = await getActiveCompanyProfile();
+      setCompanyProfile(profile);
+    } catch (profErr) {
+      console.warn("[InvoiceGenerationDetail] Company profile notice:", profErr?.message);
+    }
 
     try {
       if (isOccurrenceMode) {
@@ -430,25 +414,6 @@ export default function InvoiceGenerationDetail() {
     }
   };
 
-  // Demo Send to Client action (when invoice is APPROVED)
-  const handleSendToClient = () => {
-    if (!invoice?.invoiceId || sendingToClient) return;
-    setSendingToClient(true);
-    setTimeout(() => {
-      const entry = {
-        deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT,
-        sentAt: new Date().toISOString(),
-        sentBy: DEMO_SENT_BY,
-      };
-      saveDemoDelivery(invoice.invoiceId, entry);
-      setDeliveryState(entry);
-      setSendingToClient(false);
-      showStatusToast(
-        `Invoice ${invoice.invoiceNumber || invoice.invoiceId} marked as sent to client.`,
-        "success"
-      );
-    }, 600);
-  };
 
   if (loading && !refreshing) {
     return (
@@ -467,24 +432,21 @@ export default function InvoiceGenerationDetail() {
     taxCalc?.projectName ||
     occurrenceData?.projectName ||
     snapshotData?.projectName ||
-    DEMO_PROJECT.name;
+    "Not provided";
 
   const projectCode =
     invoice?.projectCode ||
     snapshotData?.projectCode ||
     taxCalc?.projectCode ||
     occurrenceData?.projectCode ||
-    (snapshotData?.projectId ? `PRJ-${snapshotData.projectId}` : null) ||
-    (taxCalc?.projectId ? `PRJ-${taxCalc.projectId}` : null) ||
-    (occurrenceData?.billingConfigurationId ? `CFG-${occurrenceData.billingConfigurationId}` : null) ||
-    DEMO_PROJECT.code;
+    "Not provided";
 
   const clientName =
     invoice?.clientName ||
     taxCalc?.clientName ||
     occurrenceData?.clientName ||
     snapshotData?.clientName ||
-    DEMO_CLIENT.legalName;
+    "Not provided";
 
   const recordLabel = isOccurrenceMode
     ? (occurrenceData?.periodNumber ? `Occurrence #${occurrenceData.periodNumber}` : (effectiveOccurrenceId || "Billing Occurrence"))
@@ -514,7 +476,14 @@ export default function InvoiceGenerationDetail() {
     snapshotData?.currency ||
     "USD";
 
-  const paymentTerms = invoice?.paymentTerms || "Net 30";
+  const paymentTerms =
+    invoice?.paymentTermName ||
+    snapshotData?.paymentTermName ||
+    taxCalc?.paymentTermName ||
+    (invoice?.paymentTermCode ? `${invoice.paymentTermCode} Days` : null) ||
+    (snapshotData?.paymentTermCode ? `${snapshotData.paymentTermCode} Days` : null) ||
+    (taxCalc?.paymentTermCode ? `${taxCalc.paymentTermCode} Days` : null) ||
+    "Not provided";
 
   // Financial Totals: Strictly backend authoritative
   const subtotal =
@@ -639,6 +608,15 @@ export default function InvoiceGenerationDetail() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="small"
+              onClick={() => setIsPreviewModalOpen(true)}
+              className="bg-white text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 text-xs"
+            >
+              <Eye className="h-3.5 w-3.5" /> Preview Invoice
+            </Button>
+
             {invoiceStatus === "GENERATED" && (
               <Button
                 variant="primary"
@@ -669,15 +647,6 @@ export default function InvoiceGenerationDetail() {
                 View in Invoice Approval <ArrowRight className="h-3.5 w-3.5" />
               </Button>
             )}
-
-            <Button
-              variant="outline"
-              size="small"
-              onClick={() => setIsPreviewModalOpen(true)}
-              className="bg-white text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 text-xs"
-            >
-              <Eye className="h-3.5 w-3.5" /> Preview Invoice
-            </Button>
           </div>
         </div>
       ) : (
@@ -859,65 +828,7 @@ export default function InvoiceGenerationDetail() {
             </Button>
           </div>
 
-          <div className="flex items-center gap-2">
-            {isInvoiceGenerated && (
-              <Button
-                variant="outline"
-                size="small"
-                onClick={() => setIsPreviewModalOpen(true)}
-                className="bg-white text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 text-xs font-semibold px-4 py-2"
-              >
-                <Eye className="h-3.5 w-3.5" /> Preview Invoice
-              </Button>
-            )}
 
-            {!isInvoiceGenerated ? (
-              <Button
-                variant="primary"
-                size="small"
-                onClick={handleGenerateInvoice}
-                disabled={generating}
-                className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold px-5 py-2.5 shadow-sm"
-              >
-                {generating ? (
-                  <span className="flex items-center gap-1.5">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating Invoice...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5">
-                    <FileText className="h-3.5 w-3.5" /> Generate Invoice
-                  </span>
-                )}
-              </Button>
-            ) : invoiceStatus === "GENERATED" ? (
-              <Button
-                variant="primary"
-                size="small"
-                onClick={handleSubmitForApproval}
-                disabled={submitting}
-                className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold px-5 py-2.5 shadow-sm"
-              >
-                {submitting ? (
-                  <span className="flex items-center gap-1.5">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Submitting...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5">
-                    <Send className="h-3.5 w-3.5" /> Submit for Approval
-                  </span>
-                )}
-              </Button>
-            ) : invoiceStatus === "PENDING_APPROVAL" ? (
-              <Button
-                variant="primary"
-                size="small"
-                onClick={() => navigate(INVOICE_APPROVAL_PATH)}
-                className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold px-4 py-2"
-              >
-                View in Invoice Approval <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-              </Button>
-            ) : null}
-          </div>
         </div>
       </PageCard>
 
@@ -962,45 +873,15 @@ export default function InvoiceGenerationDetail() {
                   )}
                 </Button>
               )}
-
-              {invoiceStatus === "APPROVED" && (
-                <Button
-                  variant="primary"
-                  size="small"
-                  onClick={handleSendToClient}
-                  disabled={
-                    sendingToClient ||
-                    deliveryState?.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
-                  }
-                  className={`${
-                    deliveryState?.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
-                      ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
-                      : "bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm"
-                  } flex items-center gap-1.5 text-xs font-semibold px-4 py-2`}
-                >
-                  {sendingToClient ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending...
-                    </>
-                  ) : (
-                    <>
-                      <MailCheck className="h-3.5 w-3.5" />
-                      {deliveryState?.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
-                        ? "Sent to Client"
-                        : "Send to Client"}
-                    </>
-                  )}
-                </Button>
-              )}
           </div>
         }
       >
         <InvoiceDocument
           invoice={invoice}
           snapshotId={effectiveId}
-          deliveryState={deliveryState}
           taxCalc={taxCalc || occurrenceData}
           snapshotData={snapshotData || occurrenceData}
+          companyProfile={companyProfile}
         />
       </Modal>
     </div>
