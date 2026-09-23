@@ -106,6 +106,16 @@ const accountReceivableSubmenu = [
   {
     label: "Configurations",
     to: "/account-receivable/master-data",
+    children: [
+      {
+        label: "Configurations Overview",
+        to: "/account-receivable/master-data",
+      },
+      {
+        label: "Seller Information / Company Profile",
+        to: "/account-receivable/master-data/company-profile",
+      },
+    ],
   },
 ];
 

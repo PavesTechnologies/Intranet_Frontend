@@ -39,6 +39,7 @@ import {
   financialCorrectionReacquire,
   getInvoiceApprovalHistory,
   getInvoiceErrorMessage,
+  sendInvoiceToClient,
 } from "../services/invoiceService";
 import { formatBillingPeriod } from "../services/billingDataAcquisitionService";
 import {
@@ -502,29 +503,52 @@ export default function InvoiceDetail() {
   }, [invoice?.invoiceId]);
 
   /**
-   * Demo Send to Client action.
-   * No email is sent. No backend API is called.
-   * Only the localStorage-based delivery state is updated.
+   * Send to Client action.
+   * Calls POST /api/v1/invoices/{invoiceId}/send.
+   * Backend resolves recipient either from invoice.email or falls back to
+   * invoice.clientId -> Client -> Client.email for legacy invoices.
    */
-  const handleSendToClient = () => {
+  const handleSendToClient = async () => {
     if (!invoice?.invoiceId || sendingToClient) return;
     setSendingToClient(true);
-    // Simulate a brief async handoff
-    setTimeout(() => {
+    try {
+      let backendResult = null;
+      try {
+        backendResult = await sendInvoiceToClient(invoice.invoiceId);
+      } catch (apiErr) {
+        console.error("[InvoiceDetail] Error sending invoice to client:", apiErr);
+        const msg = getInvoiceErrorMessage(apiErr, "Failed to send invoice to client.");
+        showStatusToast(msg, "error");
+        setSendingToClient(false);
+        return;
+      }
+
+      const resolvedEmail =
+        backendResult?.recipientEmail ||
+        backendResult?.email ||
+        invoice.email ||
+        null;
+
       const entry = {
         deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT,
         sentAt: new Date().toISOString(),
         sentBy: DEMO_SENT_BY,
+        recipientEmail: resolvedEmail,
       };
       saveDemoDelivery(invoice.invoiceId, entry);
       setDeliveryState(entry);
       setIsSendToClientOpen(false);
-      setSendingToClient(false);
       showStatusToast(
-        `Invoice ${invoice.invoiceNumber || invoice.invoiceId} marked as sent to client.`,
+        backendResult?.message ||
+          `Invoice ${invoice.invoiceNumber || invoice.invoiceId} marked as sent${resolvedEmail ? ` to ${resolvedEmail}` : " to client"}.`,
         "success"
       );
-    }, 800);
+    } catch (err) {
+      const msg = getInvoiceErrorMessage(err, "Failed to send invoice to client.");
+      showStatusToast(msg, "error");
+    } finally {
+      setSendingToClient(false);
+    }
   };
 
   if (loading) {
@@ -611,7 +635,7 @@ export default function InvoiceDetail() {
 
   const clientName =
     invoice?.clientName ||
-    DEMO_CLIENT.legalName;
+    "Not provided";
 
   const effectiveTaxBreakdown =
     taxBreakdown.length > 0
@@ -695,7 +719,7 @@ export default function InvoiceDetail() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Action: Send to Client (for APPROVED invoices — demo delivery action) */}
+          {/* Action: Send to Client (for APPROVED invoices) */}
           {invoice?.invoiceStatus === "APPROVED" && (
             <Button
               variant="primary"
@@ -1663,11 +1687,13 @@ export default function InvoiceDetail() {
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500 font-medium">Client:</span>
-              <span className="font-semibold text-slate-800">{invoice?.clientName || "Account Management"}</span>
+              <span className="font-semibold text-slate-800">{invoice?.clientName || "Not provided"}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500 font-medium">Recipient:</span>
-              <span className="text-slate-400 italic">Not provided</span>
+              <span className={invoice?.email ? "font-semibold text-slate-800" : "text-slate-500 italic"}>
+                {invoice?.email || "Will be resolved from client information"}
+              </span>
             </div>
             <div className="flex justify-between border-t border-slate-200 pt-1.5">
               <span className="text-slate-700 font-bold">Grand Total:</span>
@@ -1676,8 +1702,8 @@ export default function InvoiceDetail() {
           </div>
 
           <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-800 space-y-1">
-            <p className="font-bold">Demo delivery action</p>
-            <p>This is currently a demo delivery action. No actual email will be sent. The invoice will be marked as sent to the client for demonstration purposes.</p>
+            <p className="font-bold">Send to Client Delivery</p>
+            <p>The invoice will be delivered to the client's email address. If this is a legacy invoice, the recipient will be resolved from the synchronized client record.</p>
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -1698,7 +1724,7 @@ export default function InvoiceDetail() {
               className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold flex items-center gap-1.5"
             >
               <MailCheck className="h-3.5 w-3.5" />
-              {sendingToClient ? "Marking as Sent..." : "Send Invoice"}
+              {sendingToClient ? "Sending..." : "Send Invoice"}
             </Button>
           </div>
         </div>

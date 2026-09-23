@@ -312,6 +312,7 @@ import BillingFrequencyMasterPage from "./pages/account_receivable/pages/master-
 import PaymentTermsMasterPage from "./pages/account_receivable/pages/master-data/PaymentTermsMasterPage.jsx";
 import TaxConfigurationMasterPage from "./pages/account_receivable/pages/master-data/TaxConfigurationMasterPage.jsx";
 import TaxConfigurationRegionDetailPage from "./pages/account_receivable/pages/master-data/TaxConfigurationRegionDetailPage.jsx";
+import CompanyProfilePage from "./pages/account_receivable/pages/master-data/CompanyProfilePage.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -866,6 +867,14 @@ const AppRoutes = () => {
             <Route
               path="master-data/tax-configuration/:taxRegionId"
               element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxConfigurationRegionDetailPage /></ProtectedRoute>}
+            />
+            <Route
+              path="master-data/company-profile"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><CompanyProfilePage /></ProtectedRoute>}
+            />
+            <Route
+              path="configurations/company-profile"
+              element={<Navigate to="/account-receivable/master-data/company-profile" replace />}
             />
           </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />
