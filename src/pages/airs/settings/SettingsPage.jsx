@@ -2,17 +2,13 @@ import React, { useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Settings as SettingsIcon } from "lucide-react";
-import Button from "../../../components/Button/Button";
-import useAirsSettings from "./hooks/useAirsSettings";
-import SettingsSystemInfo from "./components/SettingsSystemInfo";
 import SettingsWeightConfig from "./components/SettingsWeightConfig";
-import SettingsToggles from "./components/SettingsToggles";
+import SettingsAIProviders from "./components/SettingsAIProviders";
 import SettingsIntegrations from "./components/SettingsIntegrations";
 
 const PROVIDER_LABEL = { microsoft: "Microsoft Calendar", google: "Google Calendar" };
 
 export default function SettingsPage() {
-  const { settings, setField, isDirty, save, reset } = useAirsSettings();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,33 +49,26 @@ export default function SettingsPage() {
 
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans">
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
-            <div className="p-2 bg-white rounded-lg border border-slate-200">
-              <SettingsIcon className="h-5 w-5 text-slate-600" />
-            </div>
-            AIRS Platform Settings
-          </h1>
-          <p className="text-xs text-slate-500 mt-2 max-w-xl">
-            Configure canonical mappings, customize weight coefficients, manage OCR engines, and check compliance.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="small" onClick={reset}>
-            Reset to defaults
-          </Button>
-          <Button variant="primary" size="small" onClick={save} disabled={!isDirty}>
-            Save changes
-          </Button>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
+          <div className="p-2 bg-white rounded-lg border border-slate-200">
+            <SettingsIcon className="h-5 w-5 text-slate-600" />
+          </div>
+          AIRS Platform Settings
+        </h1>
+        <p className="text-xs text-slate-500 mt-2 max-w-xl">
+          Configure campaign scoring defaults, the AI model used for processing, and calendar integrations.
+        </p>
       </div>
 
-      <SettingsSystemInfo />
-
-      <div className="grid md:grid-cols-2 gap-5">
-        <SettingsWeightConfig />
-        <SettingsToggles settings={settings} onChange={setField} />
+      {/* Scoring defaults 40%, AI providers table 60%; stacks below lg. */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 items-stretch">
+        <div className="lg:col-span-2 min-w-0">
+          <SettingsWeightConfig />
+        </div>
+        <div className="lg:col-span-3 min-w-0">
+          <SettingsAIProviders />
+        </div>
       </div>
 
       <div className="mt-5">
