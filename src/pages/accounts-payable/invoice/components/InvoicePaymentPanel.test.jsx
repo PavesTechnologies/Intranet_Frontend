@@ -4,10 +4,15 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import InvoicePaymentPanel from "./InvoicePaymentPanel";
 import { useMarkReadyForPaymentMutation } from "../../payment/hooks/usePaymentMutations";
+import { useInvoiceTds } from "../hooks/useInvoiceTds";
 import { useApPermissions } from "../../hooks/useApPermissions";
 
 vi.mock("../../payment/hooks/usePaymentMutations", () => ({
   useMarkReadyForPaymentMutation: vi.fn(),
+}));
+
+vi.mock("../hooks/useInvoiceTds", () => ({
+  useInvoiceTds: vi.fn(),
 }));
 
 vi.mock("../../hooks/useApPermissions", () => ({
@@ -27,6 +32,10 @@ const baseInvoice = {
 beforeEach(() => {
   vi.clearAllMocks();
   useMarkReadyForPaymentMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
+  // Default to already-verified so the pre-existing tests below (written before TDS gating
+  // existed) keep exercising Mark Ready for Payment as before — the TDS-specific describe block
+  // overrides this per case.
+  useInvoiceTds.mockReturnValue({ data: { determination_status: "VERIFIED" }, isLoading: false, error: null });
 });
 
 describe("InvoicePaymentPanel", () => {
@@ -80,5 +89,48 @@ describe("InvoicePaymentPanel", () => {
     expect(screen.getByText("₹1,000.00")).toBeInTheDocument();
     expect(screen.getByText("₹400.00")).toBeInTheDocument();
     expect(screen.getByText("₹600.00")).toBeInTheDocument();
+  });
+});
+
+describe("InvoicePaymentPanel — TDS gate (Phase 1 frontend-only sequencing)", () => {
+  it("hides Mark Ready for Payment when Approved but TDS is only DETERMINED, not VERIFIED", () => {
+    useApPermissions.mockReturnValue({ canMarkPaid: true });
+    useInvoiceTds.mockReturnValue({ data: { determination_status: "DETERMINED" }, isLoading: false, error: null });
+    renderPanel({ ...baseInvoice, status: "Approved" });
+    expect(screen.queryByRole("button", { name: /mark ready for payment/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/TDS must be verified/i)).toBeInTheDocument();
+  });
+
+  it("hides Mark Ready for Payment when Approved and TDS hasn't been determined at all (404)", () => {
+    useApPermissions.mockReturnValue({ canMarkPaid: true });
+    useInvoiceTds.mockReturnValue({ data: undefined, isLoading: false, error: { status: 404 } });
+    renderPanel({ ...baseInvoice, status: "Approved" });
+    expect(screen.queryByRole("button", { name: /mark ready for payment/i })).not.toBeInTheDocument();
+  });
+
+  it("offers Mark Ready for Payment once TDS is VERIFIED", () => {
+    useApPermissions.mockReturnValue({ canMarkPaid: true });
+    useInvoiceTds.mockReturnValue({ data: { determination_status: "VERIFIED" }, isLoading: false, error: null });
+    renderPanel({ ...baseInvoice, status: "Approved" });
+    expect(screen.getByRole("button", { name: /mark ready for payment/i })).toBeInTheDocument();
+  });
+
+  it("shows Net Vendor Payable as Net Amount minus TDS once a tds_amount exists", () => {
+    useApPermissions.mockReturnValue({ canMarkPaid: false });
+    useInvoiceTds.mockReturnValue({
+      data: { determination_status: "VERIFIED", tds_amount: 100 },
+      isLoading: false,
+      error: null,
+    });
+    renderPanel({ ...baseInvoice, status: "Approved", netAmount: 1000, amountPaid: 0 });
+    expect(screen.getByText("Net Vendor Payable")).toBeInTheDocument();
+    expect(screen.getByText("₹900.00")).toBeInTheDocument();
+  });
+
+  it("does not show Net Vendor Payable before TDS has any amount (not yet determined)", () => {
+    useApPermissions.mockReturnValue({ canMarkPaid: false });
+    useInvoiceTds.mockReturnValue({ data: undefined, isLoading: false, error: { status: 404 } });
+    renderPanel({ ...baseInvoice, status: "Approved" });
+    expect(screen.queryByText("Net Vendor Payable")).not.toBeInTheDocument();
   });
 });
