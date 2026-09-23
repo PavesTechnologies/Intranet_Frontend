@@ -723,6 +723,11 @@ export const normalizeProject = (project = {}) => {
     projectDuration,
     projectBudget,
     projectBudgetCurrency,
+    // RMS-sourced client contact fields carried straight through from the
+    // available-projects response — never re-derived or hardcoded here.
+    countryCode: project.countryCode || "",
+    email: project.email || "",
+    phoneNumber: project.phoneNumber || "",
     // Normalized to a plain yyyy-mm-dd (never a raw datetime/timestamp string) —
     // every date-range check downstream (Recurring's Billing Start/End Date
     // validation, Fixed Price's Effective From/To) does lexical string
