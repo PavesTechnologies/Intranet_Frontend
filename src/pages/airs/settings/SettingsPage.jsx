@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Settings as SettingsIcon } from "lucide-react";
 import SettingsWeightConfig from "./components/SettingsWeightConfig";
-import SettingsAIProvider from "./components/SettingsAIProvider";
+import SettingsAIProviders from "./components/SettingsAIProviders";
 import SettingsIntegrations from "./components/SettingsIntegrations";
 
 const PROVIDER_LABEL = { microsoft: "Microsoft Calendar", google: "Google Calendar" };
@@ -61,9 +61,14 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-5">
-        <SettingsWeightConfig />
-        <SettingsAIProvider />
+      {/* Scoring defaults 40%, AI providers table 60%; stacks below lg. */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 items-stretch">
+        <div className="lg:col-span-2 min-w-0">
+          <SettingsWeightConfig />
+        </div>
+        <div className="lg:col-span-3 min-w-0">
+          <SettingsAIProviders />
+        </div>
       </div>
 
       <div className="mt-5">

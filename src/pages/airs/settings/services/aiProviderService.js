@@ -1,7 +1,6 @@
-// Settings -> AI model provider (GET/PUT/DELETE /ai-provider-config, plus
-// /providers, /models and /verify). Same conventions as oauthService.js.
-// The API key only ever travels in request bodies (never a URL), and the
-// backend never sends it back - only a masked last-4.
+// Settings -> AI model providers (/ai-providers). Same conventions as
+// oauthService.js. The API key only ever travels in request bodies (never
+// a URL), and the backend never sends it back - only a masked last-4.
 import api from "@/api/axiosInstance";
 
 const BASE_URL = window.__APP_CONFIG__.AIRS_BASE_URL;
@@ -44,21 +43,28 @@ export const apiErrorMessage = (error, fallback) => {
   return fallback;
 };
 
-export const getProviders = async () => {
-  const response = await api.get(`${BASE_URL}/ai-provider-config/providers`, { headers: authHeaders() });
+export const getProviderOptions = async () => {
+  const response = await api.get(`${BASE_URL}/ai-providers/options`, { headers: authHeaders() });
   return unwrap(response.data) || [];
 };
 
-export const getAiProviderConfig = async () => {
-  const response = await api.get(`${BASE_URL}/ai-provider-config`, { headers: authHeaders() });
+export const listProviders = async ({ page, pageSize }) => {
+  const response = await api.get(`${BASE_URL}/ai-providers`, {
+    headers: authHeaders(),
+    params: { page, page_size: pageSize },
+  });
   return unwrap(response.data);
 };
 
-// apiKey may be blank - the backend then reuses the saved key, but only
-// for the provider it was saved for.
+export const getActiveProvider = async () => {
+  const response = await api.get(`${BASE_URL}/ai-providers/active`, { headers: authHeaders() });
+  return unwrap(response.data);
+};
+
+// apiKey may be blank - the backend then reuses the key saved for that provider.
 export const listModels = async ({ provider, apiKey }) => {
   const response = await api.post(
-    `${BASE_URL}/ai-provider-config/models`,
+    `${BASE_URL}/ai-providers/models`,
     { provider, api_key: apiKey || null },
     { headers: authHeaders() },
   );
@@ -67,23 +73,37 @@ export const listModels = async ({ provider, apiKey }) => {
 
 export const verifyAiProvider = async ({ provider, modelName, apiKey }) => {
   const response = await api.post(
-    `${BASE_URL}/ai-provider-config/verify`,
+    `${BASE_URL}/ai-providers/verify`,
     { provider, model_name: modelName, api_key: apiKey || null },
     { headers: authHeaders() },
   );
   return unwrap(response.data);
 };
 
-export const saveAiProviderConfig = async ({ provider, modelName, apiKey }) => {
+export const createProvider = async ({ provider, modelName, apiKey }) => {
+  const response = await api.post(
+    `${BASE_URL}/ai-providers`,
+    { provider, model_name: modelName, api_key: apiKey },
+    { headers: authHeaders() },
+  );
+  return { row: unwrap(response.data), message: response.data?.message };
+};
+
+export const updateProvider = async (id, { modelName, apiKey }) => {
   const response = await api.put(
-    `${BASE_URL}/ai-provider-config`,
-    { provider, model_name: modelName, api_key: apiKey || null },
+    `${BASE_URL}/ai-providers/${id}`,
+    { model_name: modelName, api_key: apiKey || null },
     { headers: authHeaders() },
   );
-  return unwrap(response.data);
+  return { row: unwrap(response.data), message: response.data?.message };
 };
 
-export const resetAiProviderConfig = async () => {
-  const response = await api.delete(`${BASE_URL}/ai-provider-config`, { headers: authHeaders() });
-  return unwrap(response.data);
+export const activateProvider = async (id) => {
+  const response = await api.post(`${BASE_URL}/ai-providers/${id}/activate`, null, { headers: authHeaders() });
+  return { row: unwrap(response.data), message: response.data?.message };
+};
+
+export const deleteProvider = async (id) => {
+  const response = await api.delete(`${BASE_URL}/ai-providers/${id}`, { headers: authHeaders() });
+  return { message: response.data?.message };
 };
