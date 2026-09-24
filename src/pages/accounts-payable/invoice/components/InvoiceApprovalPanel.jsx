@@ -11,6 +11,7 @@ import ApproverLabel from "../../system-configuration/components/ApproverLabel";
 import useDepartments from "../../system-configuration/hooks/useDepartments";
 import usePurchaseCategories from "../../system-configuration/hooks/usePurchaseCategories";
 import { useApprovalPolicyDetail } from "../../system-configuration/hooks/useApprovalPolicies";
+import { useInvoiceTds } from "../hooks/useInvoiceTds";
 import {
   useInvoiceApproval,
   useSendForApprovalMutation,
@@ -56,6 +57,11 @@ export default function InvoiceApprovalPanel({ invoice }) {
   const { canSendForApproval, canApproveInvoice, canRejectInvoice, canSendBackInvoice } = useApPermissions();
   const { user } = useAuth();
   const { data: approval, isLoading, error } = useInvoiceApproval(invoice.id);
+  // TDS Phase 1: the backend does not itself enforce "TDS determined before send-for-approval" —
+  // that sequencing is a frontend-only guard for now, layered onto the existing OCR_REVIEWED
+  // status gate below (see InvoiceTdsPanel for the actual determine/correct/verify UI). A 404
+  // here just means "not yet determined" — same non-error convention as the approval 404 above.
+  const { data: tds } = useInvoiceTds(invoice.id);
   const sendForApproval = useSendForApprovalMutation();
   const approveInvoice = useApproveInvoiceMutation();
   const rejectInvoice = useRejectInvoiceMutation();
@@ -97,7 +103,13 @@ export default function InvoiceApprovalPanel({ invoice }) {
   // advances it to OCR Reviewed. Status alone is enough here now — OCR_REVIEWED unambiguously
   // means "not yet sent" (see invoice_process_service.apply_ocr_review's docstring), so this no
   // longer needs to also check whether an approval instance already exists.
-  const canOfferSend = invoice.status === INVOICE_STATUS.OCR_REVIEWED && canSendForApproval;
+  const isAtOcrReviewed = invoice.status === INVOICE_STATUS.OCR_REVIEWED;
+  // TDS must be determined first (frontend-only sequencing, see the useInvoiceTds note above) —
+  // Boolean(tds) is true once a real determination exists, regardless of PENDING/DETERMINED/
+  // VERIFIED, since any of those means "the backend has a record," which is all Send for Approval
+  // needs; verification is a separate, later gate (see InvoicePaymentPanel).
+  const tdsBlocksSend = isAtOcrReviewed && !tds;
+  const canOfferSend = isAtOcrReviewed && canSendForApproval && Boolean(tds);
 
   const decidedApprovers = steps
     .flatMap((step) =>
@@ -217,7 +229,11 @@ export default function InvoiceApprovalPanel({ invoice }) {
           </div>
         ) : !approval ? (
           <div className="mb-4 flex flex-col items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-4 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
-            <span>This invoice has not been sent for approval yet.</span>
+            <span>
+              {tdsBlocksSend && canSendForApproval
+                ? "This invoice must have TDS determined before it can be sent for approval — see TDS Determination above."
+                : "This invoice has not been sent for approval yet."}
+            </span>
             {canOfferSend && (
               <Button variant="primary" size="small" onClick={() => setSendConfirmOpen(true)}>
                 <Send size={14} /> Send for Approval
@@ -226,6 +242,12 @@ export default function InvoiceApprovalPanel({ invoice }) {
           </div>
         ) : (
           <>
+            {tdsBlocksSend && canSendForApproval && !canOfferSend && (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+                This invoice was resubmitted and must have TDS determined again before it can be sent for approval —
+                see TDS Determination above.
+              </div>
+            )}
             {canOfferSend && (
               <div className="mb-4 flex flex-col items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800 sm:flex-row sm:items-center sm:justify-between">
                 <span>

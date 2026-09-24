@@ -12,6 +12,7 @@ import {
 } from "../constants/approvalPermissions";
 import { PAYMENT_PERMISSIONS } from "../constants/paymentPermissions";
 import { INVOICE_PERMISSIONS } from "../constants/invoicePermissions";
+import { TDS_PERMISSIONS, TDS_ANY_VIEW_PERMISSIONS } from "../constants/tdsPermissions";
 
 /**
  * One boolean flag per capability, consumed by pages/buttons instead of calling
@@ -56,6 +57,20 @@ export function useApPermissions() {
     // a frontend role guess.
     canMarkPaid: hasPermission(PAYMENT_PERMISSIONS.PAYMENT_PROCESS),
     canViewPayment: hasPermission(PAYMENT_PERMISSIONS.PAYMENT_VIEW),
+
+    // ── Invoice TDS (tax deducted at source) ───────────────────────────────
+    // GET .../tds accepts INVOICE_TDS_VIEW OR plain INVOICE_VIEW per the backend contract — so
+    // any role that can see the invoice at all (e.g. Approver) can also see its TDS
+    // determination, without holding determine/edit/verify.
+    canViewTds: hasAnyPermission(TDS_ANY_VIEW_PERMISSIONS),
+    // Runs the initial determination (AP Executive, right after OCR review).
+    canDetermineTds: hasPermission(TDS_PERMISSIONS.INVOICE_TDS_DETERMINE),
+    // Corrects the payment nature on an already-determined record (AP Executive only — Finance
+    // can see it but not change it).
+    canEditTds: hasPermission(TDS_PERMISSIONS.INVOICE_TDS_EDIT),
+    // Locks the determination in (Finance) — required before Mark Ready for Payment, see
+    // InvoicePaymentPanel.
+    canVerifyTds: hasPermission(TDS_PERMISSIONS.INVOICE_TDS_VERIFY),
 
     // ── PR Request ─────────────────────────────────────────────────────────
     canViewPR: hasPermission(PROCUREMENT_PERMISSIONS.PR_VIEW),

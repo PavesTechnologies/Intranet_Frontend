@@ -9,6 +9,7 @@ import {
   useRejectInvoiceMutation,
   useSendBackInvoiceMutation,
 } from "../hooks/useInvoiceApprovals";
+import { useInvoiceTds } from "../hooks/useInvoiceTds";
 import { useApPermissions } from "../../hooks/useApPermissions";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { useApprovalPolicyDetail } from "../../system-configuration/hooks/useApprovalPolicies";
@@ -19,6 +20,10 @@ vi.mock("../hooks/useInvoiceApprovals", () => ({
   useApproveInvoiceMutation: vi.fn(),
   useRejectInvoiceMutation: vi.fn(),
   useSendBackInvoiceMutation: vi.fn(),
+}));
+
+vi.mock("../hooks/useInvoiceTds", () => ({
+  useInvoiceTds: vi.fn(),
 }));
 
 vi.mock("../../hooks/useApPermissions", () => ({
@@ -83,6 +88,10 @@ beforeEach(() => {
   useApprovalPolicyDetail.mockReturnValue({
     data: { id: 5, name: "IT Hardware Policy", department_id: 1, purchase_category_id: 10, is_default: false },
   });
+  // Default to already-determined so the pre-existing tests below (written before TDS gating
+  // existed) keep exercising Send for Approval as before — the TDS-specific describe block
+  // overrides this per case.
+  useInvoiceTds.mockReturnValue({ data: { determination_status: "DETERMINED" }, isLoading: false, error: null });
   setPermissions();
   // Every fixture below that expects Approve/Reject/Send Back to be visible uses "user-1" as
   // the active step's pending approver's user_uuid — default the signed-in user's obs_user_uuid
@@ -650,5 +659,47 @@ describe("InvoiceApprovalPanel — Send Back", () => {
     });
     render(<InvoiceApprovalPanel invoice={invoice} />);
     expect(screen.queryByRole("button", { name: /send back/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("InvoiceApprovalPanel — TDS gate (Phase 1 frontend-only sequencing)", () => {
+  it("blocks Send for Approval at OCR Reviewed when TDS hasn't been determined yet (404)", () => {
+    useInvoiceTds.mockReturnValue({ data: undefined, isLoading: false, error: { status: 404 } });
+    setApproval({ data: undefined, isLoading: false, error: { status: 404 } });
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    expect(screen.queryByRole("button", { name: /send for approval/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/must have TDS determined/i)).toBeInTheDocument();
+  });
+
+  it("offers Send for Approval at OCR Reviewed once TDS is determined", () => {
+    useInvoiceTds.mockReturnValue({ data: { determination_status: "DETERMINED" }, isLoading: false, error: null });
+    setApproval({ data: undefined, isLoading: false, error: { status: 404 } });
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    expect(screen.getByRole("button", { name: /send for approval/i })).toBeInTheDocument();
+  });
+
+  it("blocks the resend-after-send-back banner too when TDS isn't determined on the resubmitted invoice", () => {
+    useInvoiceTds.mockReturnValue({ data: undefined, isLoading: false, error: { status: 404 } });
+    setApproval({
+      data: {
+        status: "CANCELLED",
+        steps: [
+          {
+            id: 1,
+            level_number: 1,
+            approver_type: "ROLE",
+            role_code: "AP_MANAGER",
+            approval_rule: "ANY_ONE",
+            status: "CANCELLED",
+            approvers: [{ id: 100, user_uuid: "user-1", status: "REJECTED", decided_at: "2026-01-01T00:00:00Z" }],
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    expect(screen.queryByRole("button", { name: /send for approval/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/must have TDS determined again/i)).toBeInTheDocument();
   });
 });
