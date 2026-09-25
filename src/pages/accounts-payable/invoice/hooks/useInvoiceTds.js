@@ -3,7 +3,8 @@ import { tdsService } from "../services/tdsService";
 import { INVOICE_DETAIL_KEY } from "./useInvoiceDetail";
 import { INVOICE_HISTORY_KEY } from "./useInvoiceHistory";
 
-export const INVOICE_TDS_KEY = (invoiceId) => ["accountsPayable", "invoiceTds", invoiceId];
+// Normalized to a number — see useInvoiceDetail.js's INVOICE_DETAIL_KEY for why this matters.
+export const INVOICE_TDS_KEY = (invoiceId) => ["accountsPayable", "invoiceTds", Number(invoiceId)];
 
 function invalidateTds(queryClient, invoiceId) {
   queryClient.invalidateQueries({ queryKey: INVOICE_DETAIL_KEY(invoiceId) });

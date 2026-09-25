@@ -35,7 +35,16 @@ export default function PaymentReadyPage() {
       invoiceNumber: invoice.invoiceNumber,
       vendor: invoice.vendor?.name || "—",
       dueDate: formatDate(invoice.dueDate),
-      netAmount: formatCurrency(invoice.netAmount, symbol),
+      netAmount: (
+        <div>
+          <div>{formatCurrency(invoice.netAmount, symbol)}</div>
+          {invoice.tdsApplicable && invoice.payableAmount != null && (
+            <div className="text-xs font-normal text-gray-500">
+              Payable: {formatCurrency(invoice.payableAmount, symbol)}
+            </div>
+          )}
+        </div>
+      ),
       balance: formatCurrency(balance, symbol),
       actions: (
         <Button variant="primary" size="small" onClick={() => navigate(AP_ROUTES.PAYMENT_MARK_PAID(invoice.id))}>

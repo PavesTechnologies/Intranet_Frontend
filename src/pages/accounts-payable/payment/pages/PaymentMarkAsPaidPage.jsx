@@ -48,7 +48,11 @@ export default function PaymentMarkAsPaidPage() {
     if (invoice) {
       setForm((f) => ({
         ...f,
-        allocated_amount: calculateBalance(invoice.netAmount, invoice.amountPaid),
+        // payableAmount (net_amount - tds_amount) once TDS has been determined — the backend
+        // caps allocation there and rejects anything over it, so defaulting to it avoids Finance
+        // hitting that rejection after typing the untouched net amount. Falls back to netAmount
+        // when TDS hasn't been determined yet (payableAmount is null).
+        allocated_amount: calculateBalance(invoice.payableAmount ?? invoice.netAmount, invoice.amountPaid),
       }));
     }
   }, [invoice]);
@@ -79,7 +83,9 @@ export default function PaymentMarkAsPaidPage() {
     );
   }
 
-  const balance = calculateBalance(invoice.netAmount, invoice.amountPaid);
+  // Same payableAmount-first fallback as the effect above, so the subtitle and the form's
+  // default never show two different "what's left to pay" figures on the same page.
+  const balance = calculateBalance(invoice.payableAmount ?? invoice.netAmount, invoice.amountPaid);
   const symbol = invoice.currency?.symbol || "₹";
 
   const handleSubmit = () => {
