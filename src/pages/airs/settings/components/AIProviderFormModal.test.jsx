@@ -115,6 +115,52 @@ describe("AIProviderFormModal", () => {
     expect(await screen.findByText("Couldn't load models. The API key is invalid. Check the key and try again.")).toBeInTheDocument();
   });
 
+  it("drops a model that the key can't use from the dropdown", async () => {
+    listModels.mockResolvedValue([
+      { id: "gemini-x", display_name: "Gemini X" },
+      { id: "gemini-y", display_name: "Gemini Y" },
+    ]);
+    verifyAiProvider.mockResolvedValue({
+      verified: false,
+      error_code: "MODEL_NOT_FOUND",
+      message: "This model isn't available for this API key. Pick another model.",
+    });
+    renderCreate();
+    const keyInput = screen.getByPlaceholderText("Paste the provider API key");
+    await userEvent.type(keyInput, "AIza-key");
+    await userEvent.tab();
+    await waitFor(() => expect(screen.queryByText("Loading models...")).toBeNull());
+
+    await userEvent.click(screen.getByRole("button", { name: /Select a model/ }));
+    await userEvent.click(await screen.findByRole("option", { name: /Gemini X/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Check" }));
+
+    expect(await screen.findByText(/gemini-x has been removed from the model list/)).toBeInTheDocument();
+    expect(screen.getByText("Error code: MODEL_NOT_FOUND")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Select a model/ }));
+    expect(await screen.findByRole("option", { name: /Gemini Y/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Gemini X/ })).toBeNull();
+  });
+
+  it("keeps a model in the list when the failure is about the key, not the model", async () => {
+    listModels.mockResolvedValue([{ id: "gemini-x", display_name: "Gemini X" }]);
+    verifyAiProvider.mockResolvedValue({
+      verified: false, error_code: "RATE_LIMITED", message: "Google Gemini is limiting how often this key can be used.",
+    });
+    renderCreate();
+    const keyInput = screen.getByPlaceholderText("Paste the provider API key");
+    await userEvent.type(keyInput, "AIza-key");
+    await userEvent.tab();
+    await waitFor(() => expect(screen.queryByText("Loading models...")).toBeNull());
+    await userEvent.click(screen.getByRole("button", { name: /Select a model/ }));
+    await userEvent.click(await screen.findByRole("option", { name: /Gemini X/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Check" }));
+
+    expect(await screen.findByText("Error code: RATE_LIMITED")).toBeInTheDocument();
+    expect(screen.queryByText(/has been removed from the model list/)).toBeNull();
+    expect(screen.getByRole("button", { name: /Gemini X/ })).toBeInTheDocument();
+  });
+
   it("edit mode fixes the provider, allows a blank key, and saves model changes", async () => {
     const row = { id: "r1", provider: "OPENAI", provider_label: "OpenAI", model_name: "gpt-5", api_key_masked: "••••9999" };
     verifyAiProvider.mockResolvedValue({ verified: true, message: "ok" });
