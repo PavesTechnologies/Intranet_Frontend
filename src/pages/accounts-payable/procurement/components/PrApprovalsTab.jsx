@@ -12,9 +12,11 @@ import { getApiErrorMessage } from "../../utils/apiError";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { AP_ROUTES } from "../../constants/routes";
 import { useAuth } from "../../../../contexts/AuthContext";
+import { useApPermissions } from "../../hooks/useApPermissions";
 import usePendingApprovals from "../hooks/usePendingApprovals";
 import RequesterLabel from "./RequesterLabel";
 import EmptyState from "./EmptyState";
+import { isPrRequester } from "../utils/prAuthorization";
 import useDepartments from "../../system-configuration/hooks/useDepartments";
 import usePurchaseCategories from "../../system-configuration/hooks/usePurchaseCategories";
 import {
@@ -32,6 +34,7 @@ const ALL = "";
 export default function PrApprovalsTab() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { canApprovePR, canRejectPR, canReturnPR } = useApPermissions();
   const [departmentId, setDepartmentId] = useState(ALL);
   const [decisionTarget, setDecisionTarget] = useState(null); // { pr, action: "approve" | "reject" | "return" }
   const [comment, setComment] = useState("");
@@ -111,10 +114,7 @@ export default function PrApprovalsTab() {
       </button>
     ),
     requester: (
-      <RequesterLabel
-        createdBy={pr.created_by}
-        isRequester={pr.created_by != null && user?.user_id != null && String(pr.created_by) === String(user.user_id)}
-      />
+      <RequesterLabel createdBy={pr.created_by} isRequester={isPrRequester(pr, user)} />
     ),
     department: departmentNameById.get(pr.department_id) || "—",
     category: categoryNameById.get(pr.purchase_category_id) || "—",
@@ -125,15 +125,21 @@ export default function PrApprovalsTab() {
     estimatedTotal: formatCurrency(Number(pr.estimated_total) || 0),
     actions: (
       <div className="flex items-center gap-2 justify-center">
-        <Button variant="outline" size="small" onClick={() => setDecisionTarget({ pr, action: "return" })}>
-          Return
-        </Button>
-        <Button variant="outline" size="small" onClick={() => setDecisionTarget({ pr, action: "reject" })}>
-          Reject
-        </Button>
-        <Button variant="primary" size="small" onClick={() => setDecisionTarget({ pr, action: "approve" })}>
-          Approve
-        </Button>
+        {canReturnPR && (
+          <Button variant="outline" size="small" onClick={() => setDecisionTarget({ pr, action: "return" })}>
+            Return
+          </Button>
+        )}
+        {canRejectPR && (
+          <Button variant="outline" size="small" onClick={() => setDecisionTarget({ pr, action: "reject" })}>
+            Reject
+          </Button>
+        )}
+        {canApprovePR && (
+          <Button variant="primary" size="small" onClick={() => setDecisionTarget({ pr, action: "approve" })}>
+            Approve
+          </Button>
+        )}
       </div>
     ),
   }));

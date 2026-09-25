@@ -18,6 +18,12 @@ export const PAYMENT_STATUSES_KEY = ["accountsPayable", "lookups", "paymentStatu
 export const PR_STATUSES_KEY = ["accountsPayable", "lookups", "prStatuses"];
 export const QUOTATION_STATUSES_KEY = ["accountsPayable", "lookups", "quotationStatuses"];
 export const RFQ_STATUSES_KEY = ["accountsPayable", "lookups", "rfqStatuses"];
+export const UOM_MASTER_KEY = ["accountsPayable", "lookups", "uoms"];
+export const VENDOR_ONBOARDING_STATUSES_KEY = [
+  "accountsPayable",
+  "lookups",
+  "vendorOnboardingStatuses",
+];
 
 export const useCountries = () =>
   useQuery({
@@ -83,6 +89,23 @@ export const useRfqStatuses = () =>
   useQuery({
     queryKey: RFQ_STATUSES_KEY,
     queryFn: apLookupService.getRfqStatuses,
+    ...MASTER_DATA_OPTIONS,
+  });
+
+/** Vendor onboarding request statuses (module_name "VENDOR_ONBOARDING"). */
+export const useVendorOnboardingStatuses = () =>
+  useQuery({
+    queryKey: VENDOR_ONBOARDING_STATUSES_KEY,
+    queryFn: apLookupService.getVendorOnboardingStatuses,
+    ...MASTER_DATA_OPTIONS,
+  });
+
+/** Active units of measure (module master, GET /apm/master/uoms) — replaces the old hardcoded
+ *  procurement UOM_OPTIONS list; row shape is {id, code, name, category, allows_decimal, is_active}. */
+export const useUoms = () =>
+  useQuery({
+    queryKey: UOM_MASTER_KEY,
+    queryFn: () => apLookupService.getUoms(),
     ...MASTER_DATA_OPTIONS,
   });
 

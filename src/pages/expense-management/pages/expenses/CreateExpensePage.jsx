@@ -32,6 +32,7 @@ import WizardStepper from "@/pages/account_receivable/components/common/WizardSt
 import GenericTable from "@/components/Table/table";
 import SearchInput from "@/components/filter/Searchbar";
 import PolicyStatusBadge from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
+import { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
 import SummaryPanel from "@/pages/expense-management/components/expense-reports/SummaryPanel";
 import { useSubmitReport } from "@/pages/expense-management/approval-engine/hooks/useApprovalWorkflow";
 import api from "@/api/axiosInstance";
@@ -347,6 +348,8 @@ useEffect(() => {
     }
     if (!formData.costCenterId) errors.costCenterId = "Cost center is required.";
     if (!formData.currencyId) errors.currencyId = "Report currency is required.";
+    const businessPurposeError = validateBusinessPurpose(formData.businessPurpose);
+    if (businessPurposeError) errors.businessPurpose = businessPurposeError;
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -700,6 +703,8 @@ useEffect(() => {
               value={formData.businessPurpose}
               onChange={handleInputChange}
               disabled={submitting}
+              requiredMark
+              error={formErrors.businessPurpose}
             />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

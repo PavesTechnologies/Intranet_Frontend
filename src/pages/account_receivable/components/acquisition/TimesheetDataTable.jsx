@@ -37,6 +37,12 @@ export default function TimesheetDataTable({
       let valA = a[sortField];
       let valB = b[sortField];
 
+      if (sortField === "hours" || sortField === "amount") {
+        const numA = Number(valA) || 0;
+        const numB = Number(valB) || 0;
+        return sortAsc ? numA - numB : numB - numA;
+      }
+
       if (typeof valA === "string") valA = valA.toLowerCase();
       if (typeof valB === "string") valB = valB.toLowerCase();
 
@@ -96,39 +102,65 @@ export default function TimesheetDataTable({
             <tr className="text-slate-600">
               <th
                 onClick={() => handleSort("employee")}
-                className="cursor-pointer px-4 py-3 text-left font-semibold transition-colors hover:bg-slate-100"
+                className="cursor-pointer select-none px-4 py-3 text-left font-semibold transition-colors hover:bg-slate-100"
               >
-                <div className="flex items-center gap-1">
-                  Employee <ArrowUpDown className="h-3 w-3 text-slate-400" />
-                </div>
+                <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                  <span>Employee</span>
+                  <ArrowUpDown
+                    className={`h-3.5 w-3.5 flex-shrink-0 ${
+                      sortField === "employee" ? "text-indigo-600" : "text-slate-400"
+                    }`}
+                  />
+                </span>
               </th>
               <th
                 onClick={() => handleSort("workDate")}
-                className="cursor-pointer px-4 py-3 text-left font-semibold transition-colors hover:bg-slate-100"
+                className="cursor-pointer select-none px-4 py-3 text-left font-semibold transition-colors hover:bg-slate-100"
               >
-                <div className="flex items-center gap-1">
-                  Work Date <ArrowUpDown className="h-3 w-3 text-slate-400" />
-                </div>
+                <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                  <span>Work Date</span>
+                  <ArrowUpDown
+                    className={`h-3.5 w-3.5 flex-shrink-0 ${
+                      sortField === "workDate" ? "text-indigo-600" : "text-slate-400"
+                    }`}
+                  />
+                </span>
               </th>
-              <th className="px-4 py-3 text-left font-semibold">Role</th>
+              <th className="px-4 py-3 text-left font-semibold">
+                <span className="whitespace-nowrap">Role</span>
+              </th>
               <th
                 onClick={() => handleSort("hours")}
-                className="cursor-pointer px-4 py-3 text-center font-semibold transition-colors hover:bg-slate-100"
+                className="cursor-pointer select-none px-4 py-3 text-center font-semibold transition-colors hover:bg-slate-100"
               >
-                <div className="flex items-center justify-center gap-1">
-                  Hours <ArrowUpDown className="h-3 w-3 text-slate-400" />
-                </div>
+                <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+                  <span>Hours</span>
+                  <ArrowUpDown
+                    className={`h-3.5 w-3.5 flex-shrink-0 ${
+                      sortField === "hours" ? "text-indigo-600" : "text-slate-400"
+                    }`}
+                  />
+                </span>
               </th>
-              <th className="px-4 py-3 text-right font-semibold">Hourly Rate</th>
+              <th className="px-4 py-3 text-right font-semibold">
+                <span className="whitespace-nowrap">Hourly Rate</span>
+              </th>
               <th
                 onClick={() => handleSort("amount")}
-                className="cursor-pointer px-4 py-3 text-right font-semibold transition-colors hover:bg-slate-100"
+                className="cursor-pointer select-none px-4 py-3 text-right font-semibold transition-colors hover:bg-slate-100"
               >
-                <div className="flex items-center justify-end gap-1">
-                  Commercial Amount <ArrowUpDown className="h-3 w-3 text-slate-400" />
-                </div>
+                <span className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+                  <span>Commercial Amount</span>
+                  <ArrowUpDown
+                    className={`h-3.5 w-3.5 flex-shrink-0 ${
+                      sortField === "amount" ? "text-indigo-600" : "text-slate-400"
+                    }`}
+                  />
+                </span>
               </th>
-              <th className="px-4 py-3 text-center font-semibold">Approval Status</th>
+              <th className="px-4 py-3 text-center font-semibold">
+                <span className="whitespace-nowrap">Approval Status</span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">

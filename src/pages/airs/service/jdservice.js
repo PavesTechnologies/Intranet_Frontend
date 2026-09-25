@@ -219,6 +219,51 @@ export const getMyJDUploads = async () => {
     }
 };
 
+// Replays a failed/dead upload from its last checkpoint. Returns 202 with no
+// useful body — the UI is driven by the task.reset event that follows on the
+// my-uploads socket, so callers should NOT refetch the list here.
+// 409 = the task isn't actually failed, or there's no checkpoint to replay
+// from (the user has to re-upload); 403 = not the caller's upload.
+export const retryJDProcessingTask = async (taskId) => {
+    try {
+        const response = await api.post(`${BASE_URL}/job-descriptions/my-uploads/${taskId}/retry`, null, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        toast.info(response.data?.message || "Retry queued.");
+        return response.data;
+    } catch (error) {
+        console.error("Error retrying JD processing task:", error);
+        const status = error?.response?.status;
+        if (status === 409) {
+            toast.error(getErrorMessage(error, "This upload can't be retried — please upload the file again."));
+        } else if (status === 403) {
+            toast.error(getErrorMessage(error, "You can only retry your own uploads."));
+        } else {
+            toast.error(getErrorMessage(error, "Failed to retry processing."));
+        }
+        throw error;
+    }
+};
+
+// Single-row status poll. Deliberately silent (no toasts) — it backfills the
+// terminal state the socket can't deliver yet (there's no task.completed /
+// task.failed event), so it runs without the user asking for it.
+export const getJDProcessingStatus = async (taskId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/job-descriptions/processing-status/${taskId}`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching JD processing status:", error);
+        throw error;
+    }
+};
+
 export const deleteJDProcessingTask = async (taskId) => {
     try {
         const response = await api.delete(`${BASE_URL}/dead-letter-queue/${taskId}`, {

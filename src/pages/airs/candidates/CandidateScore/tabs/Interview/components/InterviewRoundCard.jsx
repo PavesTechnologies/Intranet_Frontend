@@ -3,7 +3,7 @@ import { toast } from "react-toastify";
 import { Copy, CheckCircle2, ChevronDown } from "lucide-react";
 import Button from "@/components/Button/Button";
 import { textOrDash } from "../../../../utils/candidateDataUtils";
-import { INTERVIEW_TYPE_LABEL, PLATFORM_LABEL, formatDateLabel, formatTimeLabel, hasRoundEnded } from "../interviewMock";
+import { INTERVIEW_TYPE_LABEL, PLATFORM_LABEL, formatInterviewDate, formatInterviewTime, hasRoundEnded } from "../interviewMock";
 import useRoundFeedback from "../hooks/useRoundFeedback";
 import InterviewStatusBadge from "./InterviewStatusBadge";
 import InterviewHistoryTimeline from "./InterviewHistoryTimeline";
@@ -63,6 +63,7 @@ export default function InterviewRoundCard({
   onComplete,
   isCompleting,
   onEditInterviewers,
+  readOnly = false,
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
@@ -99,7 +100,7 @@ export default function InterviewRoundCard({
             Round {roundNumber} <span className="text-slate-400 font-normal">· {INTERVIEW_TYPE_LABEL[round.interview_type] || round.interview_type}</span>
           </span>
           <span className="text-[11.5px] text-slate-400 whitespace-nowrap">
-            {formatDateLabel(round.date)} · {formatTimeLabel(round.start_time)}-{formatTimeLabel(round.end_time)}
+            {formatInterviewDate(round.start_at)} · {formatInterviewTime(round.start_at)}-{formatInterviewTime(round.end_at)}
           </span>
         </span>
         <span className="flex items-center gap-2 shrink-0">
@@ -112,9 +113,9 @@ export default function InterviewRoundCard({
       {isExpanded && (
         <div className="p-4 space-y-4 border-t border-slate-100">
           <div className="grid grid-cols-2 gap-3">
-            <DetailRow label="Date">{formatDateLabel(round.date)}</DetailRow>
+            <DetailRow label="Date">{formatInterviewDate(round.start_at)}</DetailRow>
             <DetailRow label="Time">
-              {formatTimeLabel(round.start_time)} - {formatTimeLabel(round.end_time)}
+              {formatInterviewTime(round.start_at)} - {formatInterviewTime(round.end_at)}
             </DetailRow>
             <DetailRow label="Platform">{PLATFORM_LABEL[round.platform]}</DetailRow>
             <DetailRow label="Duration">{round.duration_minutes ? `${round.duration_minutes} minutes` : "-"}</DetailRow>
@@ -184,7 +185,7 @@ export default function InterviewRoundCard({
             </div>
           )}
 
-          {canReschedule && (
+          {!readOnly && canReschedule && (
             <div className="flex items-center gap-2 pt-2 border-t border-slate-100 flex-wrap">
               {canCancel && round.meeting_link && (
                 <Button variant="outline" size="small" onClick={handleCopyLink}>
@@ -212,7 +213,7 @@ export default function InterviewRoundCard({
             </div>
           )}
 
-          <InterviewRoundFeedback round={round} feedback={feedback} isLoading={feedbackLoading} />
+          <InterviewRoundFeedback round={round} feedback={feedback} isLoading={feedbackLoading} readOnly={readOnly} />
         </div>
       )}
     </div>

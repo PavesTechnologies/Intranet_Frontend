@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Plus, Pencil, Trash2, Loader2, Landmark } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
@@ -21,7 +21,11 @@ import {
 } from "../../data/wizardOptions";
 import { formatCurrency, formatDisplayDate } from "../../utils/format";
 import { getBillingTypeDisplayName } from "../../utils/billingType";
-import { getRecurringDateErrors, hasRecurringDateErrors, toDateOnly } from "../../utils/recurringBillingSchedule";
+import {
+  getRecurringDateErrors,
+  hasRecurringDateErrors,
+  toDateOnly,
+} from "../../utils/recurringBillingSchedule";
 import {
   getActiveBillingTypes,
   getActiveBillingFrequencies,
@@ -43,6 +47,7 @@ import {
   buildRecurringRequestPayload,
   getBillingRecurringSchedule,
   getBillingRecurringScheduleByBillingConfigurationId,
+  previewBillingSchedule,
 } from "../../services/billingConfigurationService";
 
 let milestoneSeq = 0;
@@ -198,6 +203,23 @@ const EMPTY_RATE_CARD = {
   isSaved: false,
 };
 
+// TM rate card dates come back from the backend as Java LocalDate arrays
+// ([year, month, day], e.g. [2026, 9, 11]) rather than "yyyy-mm-dd" strings.
+// Left as-is, that array is truthy so it flows straight into the native date
+// input's value (which silently renders blank) and into string date
+// comparisons (where "2026,9,11" sorts lexically differently than
+// "2026-09-11", producing bogus before/after-project-date errors even for a
+// date equal to the boundary). Normalize to the zero-padded string every
+// other date field already uses; strings pass through unchanged.
+function normalizeRateCardDate(date) {
+  if (Array.isArray(date)) {
+    const [year, month, day] = date;
+    if (!year || !month || !day) return "";
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+  return date || "";
+}
+
 const mapRateCard = (card = {}, includeRole = true) => ({
   ...(includeRole
     ? { role: card.roleName || card.role || card.name || "" }
@@ -205,8 +227,8 @@ const mapRateCard = (card = {}, includeRole = true) => ({
   roleName: card.roleName || card.role || card.name || "",
   rate: card.rate ?? card.amount ?? "",
   ratePeriod: card.ratePeriod || card.period || "HOURLY",
-  effectiveFrom: card.effectiveFrom || card.validFrom || "",
-  effectiveTo: card.effectiveTo || card.validTo || "",
+  effectiveFrom: normalizeRateCardDate(card.effectiveFrom || card.validFrom),
+  effectiveTo: normalizeRateCardDate(card.effectiveTo || card.validTo),
   rateCardId: card.id || card.rateCardId || card.tmRateCardId || null,
   isSaved: Boolean(card.id || card.rateCardId || card.tmRateCardId),
 });
@@ -341,6 +363,12 @@ function TimeAndMaterialForm({
 }) {
   const update = (patch) => onChange({ ...value, ...patch });
   const isOneTime = isOneTimeFrequency(billingFrequency);
+  // Project dates can arrive as a full timestamp depending on which backend
+  // lookup supplied them; the date input's min/max (and every comparison
+  // below) need a plain yyyy-mm-dd, same normalization FixedPriceForm/
+  // RecurringBillingForm already apply to these same props.
+  const projectStartDateOnly = toDateOnly(projectStartDate);
+  const projectEndDateOnly = toDateOnly(projectEndDate);
   const standardRate = {
     ...EMPTY_RATE_CARD,
     rate: value.rate || "",
@@ -350,16 +378,15 @@ function TimeAndMaterialForm({
     rateCardId: value.rateCardId || null,
     isSaved: Boolean(value.rateCardId),
   };
-  // Effective From/To on Timesheet-based (Time & Material) rates are never
-  // bound to the project's own start/end date — that constraint only applies
-  // to Recurring billing (see RecurringBillingForm). projectStartDate/
-  // projectEndDate are intentionally omitted here so getEffectiveDateErrors
-  // only enforces From <= To, not the project date range.
+  // Effective From/To on Timesheet-based (Time & Material) rates must fall
+  // within the project's own start/end date, same as Fixed Price/Recurring.
   const standardDateErrors = isOneTime
     ? { effectiveFrom: "", effectiveTo: "" }
     : getEffectiveDateErrors({
         effectiveFrom: standardRate.effectiveFrom,
         effectiveTo: standardRate.effectiveTo,
+        projectStartDate: projectStartDateOnly,
+        projectEndDate: projectEndDateOnly,
       });
 
   const [rows, setRows] = useState(() =>
@@ -456,6 +483,36 @@ function TimeAndMaterialForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOneTime]);
 
+  // If the project duration shrinks, a previously valid Effective From/To can
+  // fall outside the new range — clear it (not just show the inline error)
+  // rather than let a now-invalid date sit in state or reach the payload.
+  useEffect(() => {
+    if (isOneTime) return;
+    const isOutOfRange = (date) =>
+      Boolean(
+        date &&
+          ((projectStartDateOnly && date < projectStartDateOnly) ||
+            (projectEndDateOnly && date > projectEndDateOnly)),
+      );
+
+    if (isOutOfRange(standardRate.effectiveFrom) || isOutOfRange(standardRate.effectiveTo)) {
+      update({
+        effectiveFrom: isOutOfRange(standardRate.effectiveFrom) ? "" : standardRate.effectiveFrom,
+        effectiveTo: isOutOfRange(standardRate.effectiveTo) ? "" : standardRate.effectiveTo,
+      });
+    }
+    if (rows.some((row) => isOutOfRange(row.effectiveFrom) || isOutOfRange(row.effectiveTo))) {
+      syncParent(
+        rows.map((row) => ({
+          ...row,
+          effectiveFrom: isOutOfRange(row.effectiveFrom) ? "" : row.effectiveFrom,
+          effectiveTo: isOutOfRange(row.effectiveTo) ? "" : row.effectiveTo,
+        })),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOneTime, projectStartDateOnly, projectEndDateOnly]);
+
   useEffect(() => {
     let mounted = true;
 
@@ -543,7 +600,18 @@ function TimeAndMaterialForm({
       const payload = buildTmRateCardPayload(standardRate, resolvedConfigId);
       const saved = await saveTmRateCard(resolvedConfigId, payload);
 
-      update(mapRateCard(saved, false));
+      const mappedSaved = mapRateCard(saved, false);
+      update({
+        ...mappedSaved,
+        // The save response doesn't always echo back effectiveFrom/effectiveTo,
+        // so mapRateCard would otherwise blank out the dates the user just
+        // entered (and that were just persisted) — fall back to what's already
+        // in state. mappedSaved's dates are already normalized to "yyyy-mm-dd"
+        // (see normalizeRateCardDate), so this must not read saved.effectiveFrom/
+        // effectiveTo directly — those are still raw LocalDate arrays.
+        effectiveFrom: mappedSaved.effectiveFrom || standardRate.effectiveFrom,
+        effectiveTo: mappedSaved.effectiveTo || standardRate.effectiveTo,
+      });
       showStatusToast("Rate card saved", "success");
     } catch (error) {
       showStatusToast(
@@ -672,6 +740,8 @@ function TimeAndMaterialForm({
                   onChange={(event) =>
                     update({ effectiveFrom: event.target.value })
                   }
+                  min={projectStartDateOnly || undefined}
+                  max={projectEndDateOnly || undefined}
                   error={standardDateErrors.effectiveFrom}
                 />
                 <FormDatePicker
@@ -679,6 +749,8 @@ function TimeAndMaterialForm({
                   name="effectiveTo"
                   value={standardRate.effectiveTo}
                   onChange={(event) => update({ effectiveTo: event.target.value })}
+                  min={standardRate.effectiveFrom || projectStartDateOnly || undefined}
+                  max={projectEndDateOnly || undefined}
                   error={standardDateErrors.effectiveTo}
                 />
               </>
@@ -746,6 +818,8 @@ function TimeAndMaterialForm({
                         : getEffectiveDateErrors({
                             effectiveFrom: item.effectiveFrom,
                             effectiveTo: item.effectiveTo,
+                            projectStartDate: projectStartDateOnly,
+                            projectEndDate: projectEndDateOnly,
                           });
                       return (
                       <tr
@@ -799,6 +873,8 @@ function TimeAndMaterialForm({
                                     e.target.value,
                                   )
                                 }
+                                min={projectStartDateOnly || undefined}
+                                max={projectEndDateOnly || undefined}
                                 error={roleDateErrors.effectiveFrom}
                               />
                             </td>
@@ -812,6 +888,8 @@ function TimeAndMaterialForm({
                                     e.target.value,
                                   )
                                 }
+                                min={item.effectiveFrom || projectStartDateOnly || undefined}
+                                max={projectEndDateOnly || undefined}
                                 error={roleDateErrors.effectiveTo}
                               />
                             </td>
@@ -927,8 +1005,11 @@ function FixedPriceForm({
   currency,
   projectBudget,
   billingFrequency,
+  billingFrequencyId,
   billingFrequencyLabel,
+  billingFrequencyOption,
   billingConfigurationId,
+  ensureBillingConfigurationId,
   projectStartDate,
   projectEndDate,
 }) {
@@ -937,8 +1018,50 @@ function FixedPriceForm({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [schedulePreview, setSchedulePreview] = useState([]);
+  const [loadingSchedule, setLoadingSchedule] = useState(false);
+  const [scheduleError, setScheduleError] = useState("");
   const fetchedRef = useRef(false);
   const isOneTime = isOneTimeFrequency(billingFrequency);
+
+  // Fetches backend-calculated schedule preview for Fixed Price via
+  // POST /api/billing-configurations/preview-schedule.
+  const loadSchedulePreview = async (overrideValues) => {
+    const current = overrideValues || value;
+    const freqId =
+      billingFrequencyId ||
+      billingFrequencyOption?.billingFrequencyId ||
+      billingFrequencyOption?.id;
+    const rawContractValue = current.totalContractValue ?? current.contractValue;
+    const contractValueNum = Number(rawContractValue);
+    const effFrom =
+      toDateOnly(current.effectiveFrom) || (isOneTime ? toDateOnly(projectStartDate) : "") || "";
+    const effTo =
+      toDateOnly(current.effectiveTo) || (isOneTime ? toDateOnly(projectEndDate) : "") || "";
+
+    if (!freqId || !contractValueNum || (!isOneTime && (!effFrom || !effTo))) {
+      return;
+    }
+
+    setLoadingSchedule(true);
+    setScheduleError("");
+    try {
+      const periods = await previewBillingSchedule({
+        billingType: "FIXED_PRICE",
+        billingFrequencyId: freqId,
+        effectiveFrom: effFrom,
+        effectiveTo: effTo,
+        contractValue: contractValueNum,
+      });
+      setSchedulePreview(periods);
+    } catch (error) {
+      const errorMsg = getApiErrorMessage(error, "Unable to generate billing schedule preview.");
+      setScheduleError(errorMsg);
+      setSchedulePreview([]);
+    } finally {
+      setLoadingSchedule(false);
+    }
+  };
 
   // [6] billingConfigurationId received by FixedPriceForm.
   useEffect(() => {
@@ -976,7 +1099,7 @@ function FixedPriceForm({
       try {
         const record = await getFixedPriceByBillingConfiguration(billingConfigurationId);
         if (!mounted || !record) return;
-        update({
+        const loadedRecord = {
           fixedPriceConfigurationId: record.fixedPriceConfigurationId || record.id || null,
           totalContractValue:
             record.totalContractValue ?? record.contractValue ?? value.totalContractValue ?? "",
@@ -992,7 +1115,11 @@ function FixedPriceForm({
           billableAmount: record.billableAmount ?? "",
           // remainingReceivable is the canonical backend field name — check it first.
           remainingAmount: record.remainingReceivable ?? record.remainingAmount ?? "",
-        });
+        };
+        update(loadedRecord);
+        if (loadedRecord.totalContractValue) {
+          loadSchedulePreview(loadedRecord);
+        }
       } catch (error) {
         showStatusToast(
           getApiErrorMessage(error, "Unable to load fixed price configuration."),
@@ -1110,10 +1237,6 @@ function FixedPriceForm({
       return;
     }
 
-    // This button only ever reads billingConfigurationId — it never creates the
-    // parent draft itself. The draft is created once, up front, when the wizard is
-    // first entered (see ensureBillingConfigurationId in NewConfigurationWizard), so
-    // by the time the user reaches this step the id is already in state.
     if (!billingConfigurationId) {
       showStatusToast(
         "Unable to save fixed price configuration: billing configuration id is missing. Please reload and try again.",
@@ -1124,6 +1247,17 @@ function FixedPriceForm({
 
     setSaving(true);
     try {
+      // The parent billing configuration's draft may have been created before
+      // Billing Frequency was selected (it's auto-created as soon as Billing
+      // Type is known), so it can still be missing billingFrequencyId here.
+      // Re-sync the parent with the current selection first — the Fixed
+      // Price API requires billingFrequencyId to already be set on it.
+      let resolvedConfigId = billingConfigurationId;
+      if (ensureBillingConfigurationId) {
+        const syncedId = await ensureBillingConfigurationId();
+        if (syncedId) resolvedConfigId = syncedId;
+      }
+
       const payload = buildFixedPricePayload();
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
@@ -1134,14 +1268,14 @@ function FixedPriceForm({
       // load effect (above) hasn't resolved yet — re-check the backend directly so a
       // record that already exists is updated, never re-created as a duplicate.
       let existingId = value.fixedPriceConfigurationId;
-      if (!existingId && billingConfigurationId) {
-        const existingRecord = await getFixedPriceByBillingConfiguration(billingConfigurationId);
+      if (!existingId && resolvedConfigId) {
+        const existingRecord = await getFixedPriceByBillingConfiguration(resolvedConfigId);
         existingId = existingRecord?.fixedPriceConfigurationId || existingRecord?.id || null;
       }
 
       const saved = existingId
         ? await updateFixedPriceConfiguration(existingId, payload)
-        : await createFixedPriceConfiguration(billingConfigurationId, payload);
+        : await createFixedPriceConfiguration(resolvedConfigId, payload);
 
       update({
         fixedPriceConfigurationId:
@@ -1158,6 +1292,7 @@ function FixedPriceForm({
         remainingAmount: saved?.remainingReceivable ?? saved?.remainingAmount ?? value.remainingAmount ?? "",
       });
       showStatusToast("Fixed price configuration saved", "success");
+      await loadSchedulePreview();
     } catch (error) {
       showStatusToast(
         getApiErrorMessage(error, "Unable to save fixed price configuration."),
@@ -1180,6 +1315,8 @@ function FixedPriceForm({
         effectiveTo: "",
         remarks: "",
       });
+      setSchedulePreview([]);
+      setScheduleError("");
       return;
     }
     setConfirmingDelete(true);
@@ -1209,6 +1346,8 @@ function FixedPriceForm({
         billableAmount: "",
         remainingAmount: "",
       });
+      setSchedulePreview([]);
+      setScheduleError("");
       showStatusToast("Rate deleted successfully.", "success");
       setConfirmingDelete(false);
     } catch (error) {
@@ -1378,6 +1517,71 @@ function FixedPriceForm({
             )}
           </div>
         )}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-slate-900">Billing Schedule (Preview)</h3>
+          <span className="text-xs text-slate-400">Generated by the system — not editable.</span>
+        </div>
+
+        {loadingSchedule ? (
+          <p className="text-sm text-slate-500">Loading billing schedule…</p>
+        ) : scheduleError ? (
+          <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-center text-sm text-red-600">
+            {scheduleError}
+          </p>
+        ) : schedulePreview.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-slate-200 py-6 text-center text-sm text-slate-500">
+            No billing schedule has been generated yet.
+          </p>
+        ) : (
+          <div className="max-h-96 w-full overflow-y-auto overflow-x-auto rounded-lg border border-slate-100">
+            <table className="w-full table-fixed divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="w-1/5 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Period</th>
+                  <th className="w-1/5 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">From</th>
+                  <th className="w-1/5 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">To</th>
+                  <th className="w-1/5 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Amount</th>
+                  <th className="w-1/5 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Partial Period</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {schedulePreview.map((period, index) => (
+                  <tr key={period.periodNumber ?? index}>
+                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                      Period {period.periodNumber ?? index + 1}
+                    </td>
+                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                      {formatDisplayDate(period.periodStartDate)}
+                    </td>
+                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                      {formatDisplayDate(period.periodEndDate)}
+                    </td>
+                    <td className="px-3 py-2.5 text-center align-middle font-medium text-slate-900">
+                      {period.billingAmount || period.billingAmount === 0
+                        ? formatCurrency(period.billingAmount, currency)
+                        : "—"}
+                    </td>
+                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                      {period.isPartialPeriod ? "Yes" : "No"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+          <span className="text-sm font-semibold text-slate-900">Total Contract Value</span>
+          <span className="text-sm font-semibold text-slate-900">
+            {value.totalContractValue || value.totalContractValue === 0
+              ? formatCurrency(value.totalContractValue, currency)
+              : "—"}
+          </span>
+        </div>
       </div>
 
       <ConfirmationModal
@@ -1620,8 +1824,10 @@ function RecurringBillingForm({
   onChange,
   currency,
   projectBudget,
+  billingFrequencyId,
   billingFrequencyOption,
   billingConfigurationId,
+  ensureBillingConfigurationId,
   projectStartDate,
   projectEndDate,
 }) {
@@ -1632,7 +1838,47 @@ function RecurringBillingForm({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [schedule, setSchedule] = useState([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
+  const [scheduleError, setScheduleError] = useState("");
   const fetchedRef = useRef(false);
+
+  // Fetches backend-calculated schedule preview for Recurring via
+  // POST /api/billing-configurations/preview-schedule.
+  const loadSchedulePreview = async (overrideValues) => {
+    const current = overrideValues || value;
+    const freqId =
+      billingFrequencyId ||
+      billingFrequencyOption?.billingFrequencyId ||
+      billingFrequencyOption?.id;
+    const contractVal = Number(current.contractValue);
+    const effFrom =
+      toDateOnly(current.recurringStartDate || current.effectiveFrom) || "";
+    const effTo =
+      toDateOnly(current.recurringEndDate || current.effectiveTo) || "";
+
+    if (!freqId || !contractVal || !effFrom || !effTo) {
+      return;
+    }
+
+    setLoadingSchedule(true);
+    setScheduleError("");
+    try {
+      const periods = await previewBillingSchedule({
+        billingType: "RECURRING",
+        billingFrequencyId: freqId,
+        effectiveFrom: effFrom,
+        effectiveTo: effTo,
+        contractValue: contractVal,
+      });
+      setSchedule(periods);
+    } catch (error) {
+      const errorMsg = getApiErrorMessage(error, "Unable to generate billing schedule preview.");
+      setScheduleError(errorMsg);
+      showStatusToast(errorMsg, "error");
+      setSchedule([]);
+    } finally {
+      setLoadingSchedule(false);
+    }
+  };
 
   const contractValueSource = value.contractValueSource || "";
   const isPmsSource = contractValueSource === "PMS_BUDGET";
@@ -1737,6 +1983,8 @@ function RecurringBillingForm({
     projectEndDate: projectEndDateOnly,
   });
 
+  const displaySchedule = schedule;
+
   // Fires only when the user actually picks a complete date (native <input
   // type="date"> onChange never fires while browsing calendar months, only
   // once a full date is selected) — so no error ever appears mid-navigation.
@@ -1816,6 +2064,17 @@ function RecurringBillingForm({
 
     setSaving(true);
     try {
+      // The parent billing configuration's draft may have been created before
+      // Billing Frequency was selected (it's auto-created as soon as Billing
+      // Type is known), so it can still be missing billingFrequencyId here.
+      // Re-sync the parent with the current selection first — the Recurring
+      // API requires billingFrequencyId to already be set on it.
+      let resolvedConfigId = billingConfigurationId;
+      if (ensureBillingConfigurationId) {
+        const syncedId = await ensureBillingConfigurationId();
+        if (syncedId) resolvedConfigId = syncedId;
+      }
+
       const payload = buildRecurringRequestPayload(value, billingFrequencyOption.billingFrequencyId);
 
       // value.recurringConfigurationId can still be unset here if the
@@ -1823,18 +2082,18 @@ function RecurringBillingForm({
       // backend directly so an existing record is updated, never duplicated.
       let existingId = value.recurringConfigurationId;
       if (!existingId) {
-        const existingRecord = await getBillingRecurringByBillingConfigurationId(billingConfigurationId);
+        const existingRecord = await getBillingRecurringByBillingConfigurationId(resolvedConfigId);
         existingId = existingRecord?.recurringConfigurationId || existingRecord?.subscriptionConfigurationId || existingRecord?.id || null;
       }
 
       const saved = existingId
         ? await updateBillingRecurring(existingId, payload)
-        : await createBillingRecurring(billingConfigurationId, payload);
+        : await createBillingRecurring(resolvedConfigId, payload);
       const savedId = saved?.recurringConfigurationId || saved?.subscriptionConfigurationId || saved?.id || existingId;
 
       update({ recurringConfigurationId: savedId || value.recurringConfigurationId || null });
       showStatusToast("Recurring configuration saved.", "success");
-      await loadSchedule(savedId, billingConfigurationId);
+      await loadSchedulePreview();
     } catch (error) {
       showStatusToast(
         getApiErrorMessage(error, "Unable to save recurring configuration."),
@@ -1849,6 +2108,7 @@ function RecurringBillingForm({
     if (!value.recurringConfigurationId) {
       onChange({});
       setSchedule([]);
+      setScheduleError("");
       return;
     }
     setConfirmingDelete(true);
@@ -1860,6 +2120,7 @@ function RecurringBillingForm({
       await deleteBillingRecurring(value.recurringConfigurationId);
       onChange({});
       setSchedule([]);
+      setScheduleError("");
       showStatusToast("Recurring configuration removed.", "success");
       setConfirmingDelete(false);
     } catch (error) {
@@ -1905,58 +2166,82 @@ function RecurringBillingForm({
               }
               name="contractValue"
               type="number"
+              min="0"
               value={value.contractValue ?? ""}
-              onChange={(event) => update({ contractValue: event.target.value })}
-              placeholder={`e.g. 25000 (${currency})`}
-              disabled={isPmsSource}
+              onChange={(e) =>
+                update({
+                  contractValue: e.target.value,
+                  contractValueSource: "MANUAL",
+                })
+              }
+              placeholder={`e.g. 45678 (${currency})`}
               error={contractValueError}
             />
-            {isPmsSource && (
-              <p className="mt-1 text-xs text-slate-500">
-                Synced from the current project budget. Switch to Manual to enter a different value.
-              </p>
-            )}
           </div>
 
-          <ReadOnlyField label="Billing Frequency" value={billingFrequencyLabel || "—"} />
+          <div>
+            <FormInput
+              label="Billing Frequency"
+              name="recurringBillingFrequencyDisplay"
+              value={billingFrequencyLabel || "—"}
+              readOnly
+            />
+          </div>
 
-          <FormDatePicker
-            label="Billing Start Date *"
-            name="recurringStartDate"
-            value={value.recurringStartDate || ""}
-            onChange={(event) =>
-              handleDateFieldChange("recurringStartDate", "Billing Start Date", event.target.value)
-            }
-            min={projectStartDateOnly || undefined}
-            max={projectEndDateOnly || undefined}
-            error={dateErrors.recurringStartDate}
-          />
-          <FormDatePicker
-            label="Billing End Date *"
-            name="recurringEndDate"
-            value={value.recurringEndDate || ""}
-            onChange={(event) =>
-              handleDateFieldChange("recurringEndDate", "Billing End Date", event.target.value)
-            }
-            min={projectStartDateOnly || undefined}
-            max={projectEndDateOnly || undefined}
-            error={dateErrors.recurringEndDate}
-          />
+          <div>
+            <FormDatePicker
+              label="Billing Start Date"
+              requiredMark
+              name="recurringStartDate"
+              value={value.recurringStartDate || ""}
+              onChange={(e) =>
+                handleDateFieldChange(
+                  "recurringStartDate",
+                  "Billing Start Date",
+                  e.target.value,
+                )
+              }
+              min={projectStartDateOnly || undefined}
+              max={projectEndDateOnly || undefined}
+              error={dateErrors.recurringStartDate}
+            />
+          </div>
+
+          <div>
+            <FormDatePicker
+              label="Billing End Date"
+              requiredMark
+              name="recurringEndDate"
+              value={value.recurringEndDate || ""}
+              onChange={(e) =>
+                handleDateFieldChange(
+                  "recurringEndDate",
+                  "Billing End Date",
+                  e.target.value,
+                )
+              }
+              min={projectStartDateOnly || undefined}
+              max={projectEndDateOnly || undefined}
+              error={dateErrors.recurringEndDate}
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <FormTextArea
+              label="Remarks"
+              name="recurringRemarks"
+              value={value.remarks || ""}
+              onChange={(e) => update({ remarks: e.target.value })}
+              placeholder="Any additional notes about this recurring billing setup"
+              rows={3}
+            />
+          </div>
         </div>
-
-        <FormTextArea
-          label="Remarks"
-          name="recurringRemarks"
-          value={value.remarks || ""}
-          onChange={(event) => update({ remarks: event.target.value })}
-          placeholder="Any additional notes about this recurring arrangement"
-          rows={3}
-        />
 
         {loadingConfig ? (
           <p className="text-sm text-slate-500">Loading saved recurring configuration…</p>
         ) : (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="small"
@@ -1965,7 +2250,9 @@ function RecurringBillingForm({
               loadingText="Saving..."
             >
               <Check className="h-4 w-4" />
-              {value.recurringConfigurationId ? "Update Recurring Configuration" : "Save Recurring Configuration"}
+              {value.recurringConfigurationId
+                ? "Update Recurring Configuration"
+                : "Save Recurring Configuration"}
             </Button>
             {value.recurringConfigurationId && (
               <Button
@@ -1990,11 +2277,13 @@ function RecurringBillingForm({
 
         {loadingSchedule ? (
           <p className="text-sm text-slate-500">Loading billing schedule…</p>
-        ) : schedule.length === 0 ? (
+        ) : scheduleError ? (
+          <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-center text-sm text-red-600">
+            {scheduleError}
+          </p>
+        ) : displaySchedule.length === 0 ? (
           <p className="rounded-lg border border-dashed border-slate-200 py-6 text-center text-sm text-slate-500">
-            {value.recurringConfigurationId
-              ? "No billing schedule has been generated yet."
-              : "Save the recurring configuration to generate the billing schedule."}
+            No billing schedule has been generated yet.
           </p>
         ) : (
           <div className="max-h-96 w-full overflow-y-auto overflow-x-auto rounded-lg border border-slate-100">
@@ -2010,7 +2299,7 @@ function RecurringBillingForm({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {schedule.map((period, index) => (
+                {displaySchedule.map((period, index) => (
                   <tr key={period.periodNumber ?? index}>
                     <td className="px-3 py-2.5 text-center align-middle text-slate-700">
                       Period {period.periodNumber ?? index + 1}
@@ -2389,8 +2678,13 @@ export default function BillingConfigurationStep({
                 currency={currency}
                 projectBudget={projectInfo.projectBudget}
                 billingFrequency={billingFrequency}
+                billingFrequencyId={billingFrequencyId}
                 billingFrequencyLabel={frequencyLabel(billingFrequency)}
+                billingFrequencyOption={activeBillingFrequencyOptions.find(
+                  (option) => String(option.billingFrequencyId) === String(billingFrequencyId),
+                )}
                 billingConfigurationId={value.billingConfigurationId || value.id}
+                ensureBillingConfigurationId={ensureBillingConfigurationId}
                 projectStartDate={projectInfo.startDate}
                 projectEndDate={projectInfo.endDate}
               />
@@ -2411,10 +2705,12 @@ export default function BillingConfigurationStep({
                 onChange={(next) => updateSection("recurring", next)}
                 currency={currency}
                 projectBudget={projectInfo.projectBudget}
+                billingFrequencyId={billingFrequencyId}
                 billingFrequencyOption={activeBillingFrequencyOptions.find(
                   (option) => String(option.billingFrequencyId) === String(billingFrequencyId),
                 )}
                 billingConfigurationId={value.billingConfigurationId || value.id}
+                ensureBillingConfigurationId={ensureBillingConfigurationId}
                 projectStartDate={projectInfo.startDate}
                 projectEndDate={projectInfo.endDate}
               />

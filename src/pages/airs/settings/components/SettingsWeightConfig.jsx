@@ -4,6 +4,7 @@ import { RotateCcw } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { getPlatformScoringDefaults, updatePlatformDefaultWeights } from "../../campaigns/services/campaignservice";
+import { apiErrorMessage } from "../services/aiProviderService";
 
 const FIELDS = [
   { key: "weight_deterministic", label: "Requirements weight", suffix: "%" },
@@ -64,7 +65,7 @@ export default function SettingsWeightConfig() {
       toast.success("Platform default scoring weights updated. New campaigns will use these values.");
       setSeeded(true);
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to update platform defaults.");
+      toast.error(apiErrorMessage(err, "Failed to update platform defaults."));
     } finally {
       setSaving(false);
     }

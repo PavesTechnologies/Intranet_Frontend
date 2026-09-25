@@ -4,16 +4,19 @@ import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard
 import Button from "../../../../components/Button/Button";
 import { invoiceService } from "../services/invoiceService";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { INVOICE_STATUS } from "../../constants/invoiceStatus";
 
 /**
- * Read-only OCR/processing summary for an already-persisted invoice. Field-level correction now
- * happens in the OCR Review Queue (InvoiceOcrReviewQueuePage + OcrReviewModal), which operates on
- * inbound_document_id — a queue item may not have an invoice_id at all yet (Path B: extracted,
- * no vendor match), so that flow can't live on this invoice-keyed detail page. There's also no
- * endpoint that returns the original extracted field set or a confidence score for a persisted
- * invoice, so this card only shows what InvoiceDetailsResponse actually carries.
+ * Read-only OCR/processing summary. InvoiceDetailPage renders this instead of the editable
+ * InvoiceReviewEditor in two distinct cases — an invoice past the OCR Review Pending stage
+ * entirely, or one still pending review but viewed by someone without canReviewOcr — so the
+ * caption below is worded to fit either. There's also no endpoint that returns the original
+ * extracted field set or a confidence score for a persisted invoice, so this card only shows
+ * what InvoiceDetailsResponse actually carries.
  */
 export default function InvoiceOcrReviewPanel({ invoice }) {
+  const stillPendingReview =
+    invoice.status === INVOICE_STATUS.OCR_REVIEW_PENDING || invoice.status === INVOICE_STATUS.RETURNED_FOR_REVIEW;
   const handleView = async () => {
     if (!invoice.inboundDocumentId) {
       toast.info("Source document is not available for this invoice.");
@@ -39,8 +42,10 @@ export default function InvoiceOcrReviewPanel({ invoice }) {
           </Button>
         </div>
         <p className="text-xs text-gray-500">
-          Inbound document #{invoice.inboundDocumentId ?? "—"}. Field-level OCR corrections happen
-          in the OCR Review Queue before an invoice reaches this stage.
+          Inbound document #{invoice.inboundDocumentId ?? "—"}.{" "}
+          {stillPendingReview
+            ? "This invoice is awaiting OCR review — you don't have permission to edit it."
+            : "Field-level OCR corrections happen in the OCR Review Queue before an invoice reaches this stage."}
         </p>
       </PageCardContent>
     </PageCard>

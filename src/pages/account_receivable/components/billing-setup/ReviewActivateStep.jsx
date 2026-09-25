@@ -305,7 +305,6 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
     (roleRate) => roleRate.role || roleRate.rate
   );
   const standardRate = billingConfig.timeAndMaterial || {};
-  const standardRateDateRange = rateDateRange(standardRate);
   const commercialEffectiveDates = getCommercialEffectiveDates(billingConfig);
 
   const hasSchedule = Boolean(
@@ -335,6 +334,9 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
               </h2>
               <p className="text-xs font-medium text-slate-500">
                 Project Code: <span className="font-bold text-slate-800">{projectInfo.projectCode || "—"}</span>
+              </p>
+              <p className="text-xs font-medium text-slate-500">
+                Primary Location: <span className="font-bold text-slate-800">{projectInfo.primaryLocation || "—"}</span>
               </p>
             </div>
           </div>
@@ -545,7 +547,6 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
                       label: "Standard Rate",
                       value: `${formatMoney(standardRate.rate, currency) || "—"} ${ratePeriodSuffix(standardRate.ratePeriod)}`,
                     },
-                    { label: "Effective Period", value: standardRateDateRange },
                   ]}
                 />
               )}
@@ -623,15 +624,6 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
                   rows={[
                     ...contractBudgetRows,
                     { label: "Billing Frequency", value: billingFrequencyLabel },
-                    {
-                      label: "Billing Period",
-                      value:
-                        recurring.recurringStartDate || recurring.recurringEndDate
-                          ? `${formatDisplayDate(recurring.recurringStartDate) || "—"} – ${
-                              formatDisplayDate(recurring.recurringEndDate) || "Ongoing"
-                            }`
-                          : null,
-                    },
                     ...(recurring.remarks ? [{ label: "Remarks", value: recurring.remarks }] : []),
                   ]}
                 />
@@ -651,24 +643,20 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
           <div className="space-y-1">
             <DataRow label="Billing Frequency" value={billingFrequencyLabel} />
             <DataRow
-              label="Effective From"
-              value={
-                commercialEffectiveDates.from
+              label="Effective Period"
+              value={(() => {
+                const from = commercialEffectiveDates.from
                   ? formatDisplayDate(commercialEffectiveDates.from)
                   : projectInfo.startDate
                   ? formatDisplayDate(projectInfo.startDate)
-                  : "—"
-              }
-            />
-            <DataRow
-              label="Effective To"
-              value={
-                commercialEffectiveDates.to
+                  : "—";
+                const to = commercialEffectiveDates.to
                   ? formatDisplayDate(commercialEffectiveDates.to) || "Ongoing"
                   : projectInfo.endDate
                   ? formatDisplayDate(projectInfo.endDate) || "Ongoing"
-                  : "Ongoing"
-              }
+                  : "Ongoing";
+                return `${from} – ${to}`;
+              })()}
             />
             <DataRow
               label="Project Duration"

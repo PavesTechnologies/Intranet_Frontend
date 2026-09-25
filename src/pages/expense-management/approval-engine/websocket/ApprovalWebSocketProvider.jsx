@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
+import { notifySessionExpired } from "../../../../api/sessionExpiry";
 
 /**
  * Same shape as the existing Leave Management WebSocketProvider
@@ -86,10 +87,13 @@ export default function ApprovalWebSocketProvider({ children }) {
 
       onStompError: (frame) => {
         const msg = frame.headers?.message || "";
-        const isAuthFailure = ["expired", "JWT", "Invalid", "Missing", "Unauthenticated"].some((k) => msg.includes(k));
+        const isAuthFailure = ["expired", "JWT", "Invalid token", "Missing token", "Unauthenticated"].some((k) => msg.includes(k));
         if (isAuthFailure) {
           client.deactivate();
           updateToken(null);
+          // Same session-expiry path as the HTTP layer, so the user is
+          // actually logged out instead of left half-signed-in.
+          notifySessionExpired();
         }
         // Authorization-only failures (not authentication) are left alone - the session is
         // still valid, this specific destination just wasn't permitted.

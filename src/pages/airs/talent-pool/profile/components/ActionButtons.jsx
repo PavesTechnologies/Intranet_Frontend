@@ -48,7 +48,7 @@ export default function ActionButtons({ candidateId, candidateName, resumeId, on
   };
 
   return (
-    <div className="flex items-center gap-2 shrink-0">
+    <div className="flex items-center gap-2 shrink-0 ml-auto">
       <Button variant="outline" size="small" onClick={() => setPickerOpen(true)}>
         <UserPlus className="h-4 w-4" /> Add To Campaign
       </Button>

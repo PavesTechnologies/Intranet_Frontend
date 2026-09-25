@@ -16,30 +16,10 @@ export const AP_ALL_ROLES = Object.values(AP_ROLES);
 /** Can onboard/edit vendors. */
 export const AP_VENDOR_MANAGER_ROLES = [AP_ROLES.ADMIN, AP_ROLES.VENDOR_INTAKE];
 
-/** Can upload invoices and act on the OCR Review / Validation queues. */
-export const AP_INVOICE_PROCESSOR_ROLES = [AP_ROLES.ADMIN, AP_ROLES.AP_EXECUTIVE];
-
-/** Can view (not necessarily act on) invoices — All Invoices list, read-only Validation view. */
-export const AP_INVOICE_VIEWER_ROLES = [
-  AP_ROLES.ADMIN,
-  AP_ROLES.AP_EXECUTIVE,
-  AP_ROLES.FINANCE_EXECUTIVE,
-];
-
-/** Can mark invoices as paid. */
-export const AP_PAYMENT_ACTION_ROLES = [AP_ROLES.ADMIN, AP_ROLES.FINANCE_EXECUTIVE];
-
-/** Can view payment queue/history without acting. */
-export const AP_PAYMENT_VIEWER_ROLES = [
-  AP_ROLES.ADMIN,
-  AP_ROLES.AP_EXECUTIVE,
-  AP_ROLES.FINANCE_EXECUTIVE,
-];
-
-/**
- * Can create/manage purchase requisitions, approve/reject them, manage quotations,
- * select vendors, and generate purchase orders. There is no separate Requester/Approver
- * role in this app yet, so procurement — like invoice processing — is one operational
- * role plus Admin.
- */
-export const AP_PROCUREMENT_ROLES = [AP_ROLES.ADMIN, AP_ROLES.AP_EXECUTIVE];
+// Invoice intake/OCR/view/approval and payment are all authorized entirely by UMS JWT
+// permission codes now, not by a role array here — see constants/invoicePermissions.js,
+// approvalPermissions.js, paymentPermissions.js, and useApPermissions.js. Same reasoning as
+// procurement (PR_Creator / PR_Approver / Procurement_Officer), which never had a role array to
+// begin with. There is deliberately no AP_INVOICE_PROCESSOR_ROLES / AP_PAYMENT_ACTION_ROLES /
+// etc. — a pure Approver or Finance user need not hold AP_Executive/Finance_Executive/Admin at
+// all, so a role array could never correctly gate these.

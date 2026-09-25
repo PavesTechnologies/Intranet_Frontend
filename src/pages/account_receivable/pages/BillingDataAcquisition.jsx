@@ -8,6 +8,11 @@ import { showStatusToast } from "../../../components/toastfy/toast";
 import {
   fetchActiveBillingConfigurations,
   getBillingSnapshotByPeriod,
+  getAcquiredSnapshotMetadata,
+  clearAcquiredSnapshotMetadata,
+  formatBillingPeriod,
+  toIsoDateOnly,
+  normalizeAcquisitionStatus,
 } from "../services/billingDataAcquisitionService";
 
 import AcquisitionHeader from "../components/acquisition/AcquisitionHeader";
@@ -44,28 +49,74 @@ export default function BillingDataAcquisition() {
     setLastSyncTime(formatted);
 
     try {
-      const configs = await fetchActiveBillingConfigurations();
+      // Fixed Price and Recurring billing configurations flow through
+      // Billing Occurrence -> Tax Calculation, never through Data
+      // Acquisition -- fetchActiveBillingConfigurations() returns every
+      // active configuration regardless of billing type, so this console
+      // (Timesheet/T&M only) must filter down to TIME_MATERIAL itself.
+      const allConfigs = await fetchActiveBillingConfigurations();
+      const configs = allConfigs.filter((cfg) => cfg.billingTypeCode === "TIME_MATERIAL");
 
-      // Batch query existing snapshots for configurations
+      // Batch query existing snapshots using the actual acquired snapshot period
       const updatedConfigs = await Promise.all(
         configs.map(async (cfg) => {
-          if (cfg.projectId && cfg.periodStart && cfg.periodEnd) {
+          if (!cfg.projectId) return cfg;
+
+          const isNotAcquired = String(cfg.billingStatus || "").trim().toUpperCase() === "NOT_ACQUIRED";
+          if (isNotAcquired) {
+            // Authoritative backend rule: NOT_ACQUIRED configurations must never query or populate acquired snapshot data
+            clearAcquiredSnapshotMetadata(cfg.projectId);
+            return {
+              ...cfg,
+              billingStatus: "NOT_ACQUIRED",
+              billingPeriodStart: null,
+              billingPeriodEnd: null,
+              billingPeriod: "—",
+              periodStart: "",
+              periodEnd: "",
+              snapshotId: null,
+              snapshotNumber: null,
+              existingSnapshot: null,
+            };
+          }
+
+          // Check if there is an acquired snapshot period for this genuinely acquired project
+          const savedMeta = getAcquiredSnapshotMetadata(cfg.projectId);
+          const snapStart = cfg.billingPeriodStart || savedMeta?.billingPeriodStart || null;
+          const snapEnd = cfg.billingPeriodEnd || savedMeta?.billingPeriodEnd || null;
+
+          // CRITICAL: Only query by-period if we have the actual acquired snapshot period.
+          // Do NOT call by-period using the project configuration period.
+          if (snapStart && snapEnd) {
             const existingSnapshot = await getBillingSnapshotByPeriod(
               cfg.projectId,
-              cfg.periodStart,
-              cfg.periodEnd
+              snapStart,
+              snapEnd
             );
-            if (existingSnapshot) {
+            if (existingSnapshot && existingSnapshot.snapshotId) {
+              const effectiveStatus = existingSnapshot.status || savedMeta?.status || cfg.billingStatus || "READY_FOR_TAX";
+              const actualStart = existingSnapshot.billingPeriodStart || snapStart;
+              const actualEnd = existingSnapshot.billingPeriodEnd || snapEnd;
+              const actualPeriod = existingSnapshot.billingPeriod || formatBillingPeriod(actualStart, actualEnd);
+
               return {
                 ...cfg,
-                billingStatus: "READY",
+                billingStatus: effectiveStatus,
                 snapshotNumber: existingSnapshot.snapshotNumber,
                 snapshotId: existingSnapshot.snapshotId,
+                snapshotPeriodStart: actualStart,
+                snapshotPeriodEnd: actualEnd,
+                billingPeriodStart: actualStart,
+                billingPeriodEnd: actualEnd,
+                billingPeriod: actualPeriod,
                 existingSnapshot,
               };
             }
           }
-          return cfg;
+          return {
+            ...cfg,
+            billingStatus: normalizeAcquisitionStatus(cfg.billingStatus, false),
+          };
         })
       );
 

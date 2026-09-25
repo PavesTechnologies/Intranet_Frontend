@@ -580,6 +580,11 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
       projectId: firstPresent(rawProjectInfo.projectId, config.projectId, rawProjectInfo.id) || "",
       projectName: firstPresent(rawProjectInfo.projectName, config.projectName, rawProjectInfo.name, normalized.projectName) || "",
       projectCode: firstPresent(rawProjectInfo.projectCode, config.projectCode, rawProjectInfo.code, normalized.projectCode) || "",
+      // The flat GET .../{id} DTO carries this at the top level (config.primaryLocation),
+      // not nested under projectInfo/project — without this fallback, editing an existing
+      // configuration always showed a blank Primary Location even though the backend
+      // returned it, since the spread above only pulls from rawProjectInfo.
+      primaryLocation: firstPresent(rawProjectInfo.primaryLocation, config.primaryLocation, rawProjectInfo.location, config.location) || "",
       projectBudget: firstPresent(rawProjectInfo.projectBudget, config.projectBudget, rawProjectInfo.budget, rawProjectInfo.budgetAmount) || "",
       projectBudgetCurrency: currency,
       currency,
@@ -718,6 +723,11 @@ export const normalizeProject = (project = {}) => {
     projectDuration,
     projectBudget,
     projectBudgetCurrency,
+    // RMS-sourced client contact fields carried straight through from the
+    // available-projects response — never re-derived or hardcoded here.
+    countryCode: project.countryCode || "",
+    email: project.email || "",
+    phoneNumber: project.phoneNumber || "",
     // Normalized to a plain yyyy-mm-dd (never a raw datetime/timestamp string) —
     // every date-range check downstream (Recurring's Billing Start/End Date
     // validation, Fixed Price's Effective From/To) does lexical string
@@ -1026,6 +1036,11 @@ export const normalizeBillingSchedulePeriod = (record = {}) => ({
   remarks: record.remarks || "",
 });
 
+export const previewBillingSchedule = async (payload) => {
+  const response = await api.post(`${BILLING_CONFIGURATIONS_URL}/preview-schedule`, payload);
+  return asArray(unwrapData(response)).map(normalizeBillingSchedulePeriod);
+};
+
 // Maps a BillingRecurringConfiguration API record (GET /api/billing-recurring/...)
 // onto the wizard's internal Recurring Billing form-state shape (mirrors
 // normalizeFixedPriceConfig above). The normal Recurring flow has no
@@ -1052,6 +1067,19 @@ export const normalizeRecurringConfig = (record = {}) => ({
 
 export const getBillingConfigurationProjectsByClient = async (clientId) => {
   const response = await api.get(`${BILLING_CONFIGURATIONS_URL}/projects/${clientId}`);
+  return asArray(unwrapData(response)).map(normalizeProject);
+};
+
+// Returns only the projects eligible for a NEW billing configuration for this
+// client — the backend already excludes projects that are Draft, Pending
+// Approval, or Active (Approved + billingStatus ACTIVE), and includes
+// Rejected/Expired/never-configured projects. The frontend must not
+// re-implement or layer any of that eligibility logic on top of this list.
+export const getAvailableProjectsForBillingConfiguration = async (clientId) => {
+  if (!clientId) return [];
+  const response = await api.get(`${BILLING_CONFIGURATIONS_URL}/available-projects`, {
+    params: { clientId },
+  });
   return asArray(unwrapData(response)).map(normalizeProject);
 };
 
@@ -1378,6 +1406,22 @@ export const ensureBillingConfigurationDraft = async (payload) => {
   return extractedId;
 };
 
+// Re-syncs the parent billing configuration's own fields (billingTypeId,
+// billingFrequencyId, etc.) onto a DRAFT record that already exists, via PUT
+// .../draft. The initial draft is created (ensureBillingConfigurationDraft,
+// above) as soon as billingTypeId alone is known — typically before the user
+// has picked a Billing Frequency — so billingFrequencyId can still be empty
+// on the parent record afterward. Sub-configuration create calls (Fixed
+// Price, Recurring) require billingFrequencyId to already be set on the
+// parent, so callers should await this immediately before them to push the
+// current wizard selection first.
+export const syncBillingConfigurationDraft = async (payload, billingConfigurationId) => {
+  const requestPayload = buildBillingConfigurationRequestPayload(payload);
+  assertBillingConfigurationPayload(requestPayload);
+  const configResponse = await updateBillingConfigurationDraft(billingConfigurationId, requestPayload);
+  return extractBillingConfigurationId(configResponse) || billingConfigurationId;
+};
+
 const buildTmRateCardRequestPayload = (card = {}, pricingModel, billingConfigurationId) => ({
   billingConfigurationId,
   roleName: pricingModel === "ROLE_BASED" ? String(card.roleName || card.role || "").trim() : null,
@@ -1546,8 +1590,12 @@ export const getBillingConfigurationStats = async () => {
   return {
     total: configurations.length,
     active: configurations.filter(
-      (config) => config.approvalStatus === "APPROVED" && config.billingStatus === "ACTIVE",
+      (config) => config.billingStatus === "ACTIVE",
     ).length,
+    inactive: configurations.filter(
+      (config) => config.billingStatus === "INACTIVE",
+    ).length,
+    approved: configurations.filter((config) => config.approvalStatus === "APPROVED").length,
     draft: configurations.filter((config) => config.approvalStatus === "DRAFT").length,
     pending: configurations.filter((config) => config.approvalStatus === "PENDING_APPROVAL").length,
     rejected: configurations.filter((config) => config.approvalStatus === "REJECTED").length,
