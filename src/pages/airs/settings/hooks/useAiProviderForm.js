@@ -13,6 +13,13 @@ import {
 // checkStatus: "idle" | "checking" | "passed" | "failed". Any edit drops it
 // back to "idle", so Save is only enabled for exactly the values that were
 // just checked. (The backend re-verifies on save regardless.)
+
+// Check results that mean "this model can't be used with this key" - such a
+// model is dropped from the dropdown for the rest of the session instead of
+// staying there to be picked again. (Rate limits, outages and credit
+// problems are about the key/account, not the model, so they don't count.)
+const UNUSABLE_MODEL_CODES = new Set(["MODEL_NOT_FOUND", "NO_ACCESS", "BAD_REQUEST", "BAD_OUTPUT", "REFUSED"]);
+
 export default function useAiProviderForm({ mode, row, defaultProvider, isOpen }) {
   const isEdit = mode === "edit";
 
@@ -22,8 +29,13 @@ export default function useAiProviderForm({ mode, row, defaultProvider, isOpen }
   const [models, setModels] = useState([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsError, setModelsError] = useState("");
+  // Models a Check showed can't be used with this key; hidden from the dropdown.
+  const [unavailableModels, setUnavailableModels] = useState([]);
+  const [removedModel, setRemovedModel] = useState("");
   const [checkStatus, setCheckStatus] = useState("idle");
   const [checkMessage, setCheckMessage] = useState("");
+  // Stable backend code for a failed check (RATE_LIMITED, DAILY_LIMIT, ...).
+  const [checkCode, setCheckCode] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -34,7 +46,9 @@ export default function useAiProviderForm({ mode, row, defaultProvider, isOpen }
   const resetCheck = () => {
     setCheckStatus("idle");
     setCheckMessage("");
+    setCheckCode("");
     setSaveError("");
+    setRemovedModel("");
   };
 
   const loadModels = useCallback(async (p, key) => {
@@ -46,6 +60,9 @@ export default function useAiProviderForm({ mode, row, defaultProvider, isOpen }
       const list = await listModels({ provider: p, apiKey: key.trim() });
       if (requestId !== modelsRequestId.current) return;
       setModels(list);
+      // A fresh list (e.g. a different key) may grant access to models that
+      // failed before, so start clean.
+      setUnavailableModels([]);
     } catch (error) {
       if (requestId !== modelsRequestId.current) return;
       setModels([]);
@@ -63,6 +80,7 @@ export default function useAiProviderForm({ mode, row, defaultProvider, isOpen }
     setModels([]);
     setModelsError("");
     setModelsLoading(false);
+    setUnavailableModels([]);
     setSaving(false);
     resetCheck();
     if (isEdit && row) {
@@ -103,11 +121,20 @@ export default function useAiProviderForm({ mode, row, defaultProvider, isOpen }
   const check = async () => {
     setCheckStatus("checking");
     setCheckMessage("");
+    setCheckCode("");
     setSaveError("");
     try {
       const result = await verifyAiProvider({ provider, modelName: modelName.trim(), apiKey: apiKey.trim() });
       setCheckStatus(result.verified ? "passed" : "failed");
       setCheckMessage(result.message);
+      setCheckCode(result.verified ? "" : result.error_code || "");
+      if (!result.verified && UNUSABLE_MODEL_CODES.has(result.error_code)) {
+        const failedModel = modelName.trim();
+        setUnavailableModels((prev) => (prev.includes(failedModel) ? prev : [...prev, failedModel]));
+        setRemovedModel(failedModel);
+        // Cleared directly (not via changeModel) so the failure message stays visible.
+        setModelName("");
+      }
     } catch (error) {
       setCheckStatus("failed");
       setCheckMessage(apiErrorMessage(error, "The check couldn't be completed. Please try again."));
@@ -136,8 +163,10 @@ export default function useAiProviderForm({ mode, row, defaultProvider, isOpen }
 
   return {
     isEdit,
-    provider, apiKey, modelName, models, modelsLoading, modelsError,
-    checkStatus, checkMessage, saving, saveError,
+    provider, apiKey, modelName, modelsLoading, modelsError, removedModel,
+    // Only models not already shown to be unusable with this key.
+    models: models.filter((m) => !unavailableModels.includes(m.id)),
+    checkStatus, checkMessage, checkCode, saving, saveError,
     canCheck: !!provider && !!modelName.trim() && keyReady && checkStatus !== "checking" && !saving,
     canSave: checkStatus === "passed" && !saving,
     changeProvider, changeApiKey, commitApiKey, changeModel, check, submit,
