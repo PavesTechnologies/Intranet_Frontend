@@ -1,9 +1,16 @@
 import FormInput from "../../../../../components/forms/FormInput";
 
 const FIELDS = [
-  { name: "invoice_number", label: "Invoice Number", section: "document" },
-  { name: "invoice_date", label: "Invoice Date", section: "document", type: "date" },
-  { name: "due_date", label: "Due Date", section: "document", type: "date" },
+  // required: true means the field's label gets a red * for as long as it's empty (not a
+  // permanent "this field is required" marker — see the requiredMark prop below). invoice_number
+  // and invoice_date are hard-required by InvoiceExtractionService.create_invoice; due_date isn't
+  // (it silently falls back to invoice_date there), but OCR missing it is exactly the case this
+  // exists to surface — the fallback shouldn't happen unnoticed. po_number/payment_terms are
+  // genuinely optional (PO vs Non-PO is derived from whether po_number is filled in at all), so
+  // they're never flagged.
+  { name: "invoice_number", label: "Invoice Number", section: "document", required: true },
+  { name: "invoice_date", label: "Invoice Date", section: "document", type: "date", required: true },
+  { name: "due_date", label: "Due Date", section: "document", type: "date", required: true },
   { name: "currency", label: "Currency", section: "document" },
   { name: "po_number", label: "PO Number", section: "reference" },
   { name: "payment_terms", label: "Payment Terms", section: "payment" },
@@ -41,16 +48,20 @@ export default function InvoiceDetailsPanel({ extractedInvoice, onFieldChange })
         </span>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {FIELDS.map((field) => (
-          <FormInput
-            key={field.name}
-            type={field.type || "text"}
-            label={field.label}
-            name={field.name}
-            value={sourceBySection[field.section]?.[field.name] ?? ""}
-            onChange={(e) => onFieldChange(field.section, field.name, e.target.value)}
-          />
-        ))}
+        {FIELDS.map((field) => {
+          const value = sourceBySection[field.section]?.[field.name] ?? "";
+          return (
+            <FormInput
+              key={field.name}
+              type={field.type || "text"}
+              label={field.label}
+              name={field.name}
+              value={value}
+              onChange={(e) => onFieldChange(field.section, field.name, e.target.value)}
+              requiredMark={Boolean(field.required) && !value}
+            />
+          );
+        })}
       </div>
     </div>
   );

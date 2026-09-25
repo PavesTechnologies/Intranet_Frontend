@@ -9,6 +9,7 @@ import {
   useRejectInvoiceMutation,
   useSendBackInvoiceMutation,
 } from "../hooks/useInvoiceApprovals";
+import { useInvoiceTds } from "../hooks/useInvoiceTds";
 import { useApPermissions } from "../../hooks/useApPermissions";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { useApprovalPolicyDetail } from "../../system-configuration/hooks/useApprovalPolicies";
@@ -19,6 +20,10 @@ vi.mock("../hooks/useInvoiceApprovals", () => ({
   useApproveInvoiceMutation: vi.fn(),
   useRejectInvoiceMutation: vi.fn(),
   useSendBackInvoiceMutation: vi.fn(),
+}));
+
+vi.mock("../hooks/useInvoiceTds", () => ({
+  useInvoiceTds: vi.fn(),
 }));
 
 vi.mock("../../hooks/useApPermissions", () => ({
@@ -83,11 +88,17 @@ beforeEach(() => {
   useApprovalPolicyDetail.mockReturnValue({
     data: { id: 5, name: "IT Hardware Policy", department_id: 1, purchase_category_id: 10, is_default: false },
   });
+  // Default to already-determined so the pre-existing tests below (written before TDS gating
+  // existed) keep exercising Send for Approval as before — the TDS-specific describe block
+  // overrides this per case.
+  useInvoiceTds.mockReturnValue({ data: { determination_status: "DETERMINED" }, isLoading: false, error: null });
   setPermissions();
   // Every fixture below that expects Approve/Reject/Send Back to be visible uses "user-1" as
-  // the active step's pending approver — default the signed-in user to match it, so tests that
-  // aren't specifically about assignment don't each have to set this up themselves.
-  useAuth.mockReturnValue({ user: { user_id: "user-1" } });
+  // the active step's pending approver's user_uuid — default the signed-in user's obs_user_uuid
+  // (NOT user_id — a different identifier space, see invoiceApprovalAuthorization.js) to match
+  // it, so tests that aren't specifically about assignment don't each have to set this up
+  // themselves.
+  useAuth.mockReturnValue({ user: { obs_user_uuid: "user-1" } });
 });
 
 describe("InvoiceApprovalPanel — approval timeline", () => {
@@ -119,6 +130,33 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
     setApproval({ data: undefined, isLoading: false, error: { status: 404 } });
     render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "Pending Approval" }} />);
     expect(screen.queryByRole("button", { name: /send for approval/i })).not.toBeInTheDocument();
+  });
+
+  // Regression: after a send-back cycle, the invoice's approval instance still exists (now
+  // CANCELLED) even though the invoice itself is back at OCR Reviewed post-resubmission — so
+  // `approval` is truthy and this used to fall into the "already has an approval" branch, which
+  // never rendered the Send for Approval button, leaving no way to resubmit.
+  it("offers Send for Approval again once resubmitted, even though a prior (cancelled) approval instance still exists", () => {
+    setApproval({
+      data: {
+        status: "CANCELLED",
+        steps: [
+          {
+            id: 1,
+            level_number: 1,
+            approver_type: "ROLE",
+            role_code: "AP_MANAGER",
+            approval_rule: "ANY_ONE",
+            status: "CANCELLED",
+            approvers: [{ id: 100, user_uuid: "user-1", status: "REJECTED", decided_at: "2026-01-01T00:00:00Z", comments: "check and resubmit" }],
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    expect(screen.getByRole("button", { name: /send for approval/i })).toBeInTheDocument();
   });
 
   it("surfaces the backend's error message on a real API failure (not a 404)", () => {
@@ -292,7 +330,7 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
   });
 
   it("hides Approve/Reject when the signed-in user is not the assigned approver for the active step, even with permission", () => {
-    useAuth.mockReturnValue({ user: { user_id: "someone-else" } });
+    useAuth.mockReturnValue({ user: { obs_user_uuid: "someone-else" } });
     setApproval({
       data: {
         status: "IN_PROGRESS",
@@ -342,6 +380,41 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
     render(<InvoiceApprovalPanel invoice={invoice} />);
     expect(screen.getByText("IT Hardware Policy")).toBeInTheDocument();
     expect(screen.getByText("Finance · Hardware")).toBeInTheDocument();
+  });
+
+  // Regression: the policy-detail fetch used to require APPROVAL_POLICY_MANAGE (a config-admin
+  // permission), so any normal AP Executive/Approver/Finance user viewing an invoice got a 403
+  // here — and this panel showed "Loading policy details…" forever, since it never distinguished
+  // "still loading" from "failed", both rendered by the same falsy-`policy` branch.
+  it("shows an error instead of 'Loading policy details' forever when the policy fetch fails", () => {
+    useApprovalPolicyDetail.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: { response: { data: { detail: "Forbidden" } } },
+    });
+    setApproval({
+      data: {
+        status: "IN_PROGRESS",
+        approval_policy_id: 5,
+        steps: [
+          {
+            id: 1,
+            level_number: 1,
+            approver_type: "ROLE",
+            role_code: "AP_MANAGER",
+            approval_rule: "ANY_ONE",
+            status: "PENDING",
+            approvers: [{ id: 100, user_uuid: "user-1", status: "PENDING" }],
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+    render(<InvoiceApprovalPanel invoice={invoice} />);
+    expect(screen.queryByText("Loading policy details…")).not.toBeInTheDocument();
+    expect(screen.getByText("Forbidden")).toBeInTheDocument();
   });
 
   it("labels the fallback clearly when the matched policy is the default policy", () => {
@@ -439,6 +512,58 @@ describe("InvoiceApprovalPanel — approval timeline", () => {
   });
 });
 
+describe("InvoiceApprovalPanel — Approver's trimmed view", () => {
+  const inFlightApproval = {
+    status: "IN_PROGRESS",
+    approval_policy_id: 5,
+    steps: [
+      {
+        id: 1,
+        level_number: 1,
+        approver_type: "ROLE",
+        role_code: "AP_MANAGER",
+        approval_rule: "ANY_ONE",
+        status: "PENDING",
+        approvers: [{ id: 100, user_uuid: "user-1", status: "PENDING" }],
+      },
+    ],
+  };
+
+  it("hides Applied Policy, Waiting On, and the Approval Timeline for a pure Approver (can decide, but can't send for approval)", () => {
+    setPermissions({ canSendForApproval: false, canApproveInvoice: true, canRejectInvoice: true, canSendBackInvoice: true });
+    setApproval({ data: inFlightApproval, isLoading: false, error: null });
+    render(<InvoiceApprovalPanel invoice={invoice} />);
+
+    expect(screen.queryByText("Applied Policy")).not.toBeInTheDocument();
+    expect(screen.queryByText("Waiting On")).not.toBeInTheDocument();
+    expect(screen.queryByText("Approval Timeline")).not.toBeInTheDocument();
+    // The trim is informational-context only — the actual decision buttons and Approval History
+    // stay, since those are what an Approver needs to act and see past decisions.
+    expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(screen.getByText("Approval History")).toBeInTheDocument();
+  });
+
+  it("keeps Applied Policy, Waiting On, and the Approval Timeline for an AP Executive, even if they also happen to hold decision permissions", () => {
+    setPermissions({ canSendForApproval: true, canApproveInvoice: true, canRejectInvoice: true, canSendBackInvoice: true });
+    setApproval({ data: inFlightApproval, isLoading: false, error: null });
+    render(<InvoiceApprovalPanel invoice={invoice} />);
+
+    expect(screen.getByText("Applied Policy")).toBeInTheDocument();
+    expect(screen.getByText("Waiting On")).toBeInTheDocument();
+    expect(screen.getByText("Approval Timeline")).toBeInTheDocument();
+  });
+
+  it("keeps Applied Policy, Waiting On, and the Approval Timeline for a user with neither send nor decide permission (e.g. Finance, just viewing)", () => {
+    setPermissions({ canSendForApproval: false, canApproveInvoice: false, canRejectInvoice: false, canSendBackInvoice: false });
+    setApproval({ data: inFlightApproval, isLoading: false, error: null });
+    render(<InvoiceApprovalPanel invoice={invoice} />);
+
+    expect(screen.getByText("Applied Policy")).toBeInTheDocument();
+    expect(screen.getByText("Waiting On")).toBeInTheDocument();
+    expect(screen.getByText("Approval Timeline")).toBeInTheDocument();
+  });
+});
+
 describe("InvoiceApprovalPanel — Send Back", () => {
   const inFlightApproval = {
     status: "IN_PROGRESS",
@@ -506,7 +631,7 @@ describe("InvoiceApprovalPanel — Send Back", () => {
   });
 
   it("hides Send Back when the signed-in user is not the assigned approver, even with the permission", () => {
-    useAuth.mockReturnValue({ user: { user_id: "someone-else" } });
+    useAuth.mockReturnValue({ user: { obs_user_uuid: "someone-else" } });
     setApproval({ data: inFlightApproval, isLoading: false, error: null });
     render(<InvoiceApprovalPanel invoice={invoice} />);
     expect(screen.queryByRole("button", { name: /send back/i })).not.toBeInTheDocument();
@@ -534,5 +659,47 @@ describe("InvoiceApprovalPanel — Send Back", () => {
     });
     render(<InvoiceApprovalPanel invoice={invoice} />);
     expect(screen.queryByRole("button", { name: /send back/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("InvoiceApprovalPanel — TDS gate (Phase 1 frontend-only sequencing)", () => {
+  it("blocks Send for Approval at OCR Reviewed when TDS hasn't been determined yet (404)", () => {
+    useInvoiceTds.mockReturnValue({ data: undefined, isLoading: false, error: { status: 404 } });
+    setApproval({ data: undefined, isLoading: false, error: { status: 404 } });
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    expect(screen.queryByRole("button", { name: /send for approval/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/must have TDS determined/i)).toBeInTheDocument();
+  });
+
+  it("offers Send for Approval at OCR Reviewed once TDS is determined", () => {
+    useInvoiceTds.mockReturnValue({ data: { determination_status: "DETERMINED" }, isLoading: false, error: null });
+    setApproval({ data: undefined, isLoading: false, error: { status: 404 } });
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    expect(screen.getByRole("button", { name: /send for approval/i })).toBeInTheDocument();
+  });
+
+  it("blocks the resend-after-send-back banner too when TDS isn't determined on the resubmitted invoice", () => {
+    useInvoiceTds.mockReturnValue({ data: undefined, isLoading: false, error: { status: 404 } });
+    setApproval({
+      data: {
+        status: "CANCELLED",
+        steps: [
+          {
+            id: 1,
+            level_number: 1,
+            approver_type: "ROLE",
+            role_code: "AP_MANAGER",
+            approval_rule: "ANY_ONE",
+            status: "CANCELLED",
+            approvers: [{ id: 100, user_uuid: "user-1", status: "REJECTED", decided_at: "2026-01-01T00:00:00Z" }],
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+    render(<InvoiceApprovalPanel invoice={{ ...invoice, status: "OCR Reviewed" }} />);
+    expect(screen.queryByRole("button", { name: /send for approval/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/must have TDS determined again/i)).toBeInTheDocument();
   });
 });

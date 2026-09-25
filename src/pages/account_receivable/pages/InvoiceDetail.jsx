@@ -39,6 +39,7 @@ import {
   financialCorrectionReacquire,
   getInvoiceApprovalHistory,
   getInvoiceErrorMessage,
+  sendInvoiceToClient,
 } from "../services/invoiceService";
 import { formatBillingPeriod } from "../services/billingDataAcquisitionService";
 import {
@@ -52,6 +53,7 @@ import {
   getDemoDelivery,
   saveDemoDelivery,
 } from "../utils/invoiceDemoData";
+import InvoiceDocument from "../components/invoice/InvoiceDocument";
 
 const TAX_WORKSPACE_PATH = "/account-receivable/tax-calculation";
 const INVOICE_WORKSPACE_PATH = "/account-receivable/invoice-generation";
@@ -102,10 +104,18 @@ function Field({ label, children, emptyLabel = "Not provided" }) {
 }
 
 export default function InvoiceDetail() {
-  const { snapshotId } = useParams();
+  const { snapshotId, occurrenceId: paramOccurrenceId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+
+  const effectiveId =
+    snapshotId ||
+    paramOccurrenceId ||
+    location.state?.occurrenceId ||
+    location.state?.billingScheduleId ||
+    location.state?.invoiceId ||
+    "";
 
   // Source tracking: determines if invoice is being inspected from Tax Calculation vs Invoice Generation
   const source =
@@ -131,6 +141,22 @@ export default function InvoiceDetail() {
   const [refreshingAfterCorrection, setRefreshingAfterCorrection] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejectError, setRejectError] = useState("");
+
+  const isOccurrenceMode = Boolean(
+    paramOccurrenceId ||
+    invoice?.billingScheduleId ||
+    location.state?.occurrenceId ||
+    location.state?.billingScheduleId ||
+    location.pathname.includes("/occurrence/")
+  );
+
+  const backToTaxUrl = isOccurrenceMode
+    ? (paramOccurrenceId || invoice?.billingScheduleId || location.state?.occurrenceId || location.state?.billingScheduleId
+        ? `/account-receivable/tax-calculation/occurrence/${paramOccurrenceId || invoice?.billingScheduleId || location.state?.occurrenceId || location.state?.billingScheduleId}`
+        : TAX_WORKSPACE_PATH)
+    : (snapshotId
+        ? `/account-receivable/tax-calculation/${snapshotId}`
+        : TAX_WORKSPACE_PATH);
 
   // Phase 2C Non-Financial Correction state
   const [editClientName, setEditClientName] = useState("");
@@ -178,8 +204,8 @@ export default function InvoiceDetail() {
   };
 
   const loadInvoice = async (isManual = false) => {
-    if (!snapshotId) {
-      setErrorMsg("No Billing Snapshot identifier provided.");
+    if (!effectiveId) {
+      setErrorMsg("No invoice identifier provided.");
       setLoading(false);
       return;
     }
@@ -189,7 +215,7 @@ export default function InvoiceDetail() {
     setErrorMsg("");
 
     try {
-      const data = await getInvoice(snapshotId);
+      const data = await getInvoice(effectiveId);
       if (data) {
         setInvoice(data);
         if (data.invoiceId) {
@@ -215,6 +241,10 @@ export default function InvoiceDetail() {
       setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    loadInvoice();
+  }, [effectiveId]);
 
   const handleSubmitForApproval = async () => {
     if (!invoice?.invoiceId || submitting) return;
@@ -473,29 +503,52 @@ export default function InvoiceDetail() {
   }, [invoice?.invoiceId]);
 
   /**
-   * Demo Send to Client action.
-   * No email is sent. No backend API is called.
-   * Only the localStorage-based delivery state is updated.
+   * Send to Client action.
+   * Calls POST /api/v1/invoices/{invoiceId}/send.
+   * Backend resolves recipient either from invoice.email or falls back to
+   * invoice.clientId -> Client -> Client.email for legacy invoices.
    */
-  const handleSendToClient = () => {
+  const handleSendToClient = async () => {
     if (!invoice?.invoiceId || sendingToClient) return;
     setSendingToClient(true);
-    // Simulate a brief async handoff
-    setTimeout(() => {
+    try {
+      let backendResult = null;
+      try {
+        backendResult = await sendInvoiceToClient(invoice.invoiceId);
+      } catch (apiErr) {
+        console.error("[InvoiceDetail] Error sending invoice to client:", apiErr);
+        const msg = getInvoiceErrorMessage(apiErr, "Failed to send invoice to client.");
+        showStatusToast(msg, "error");
+        setSendingToClient(false);
+        return;
+      }
+
+      const resolvedEmail =
+        backendResult?.recipientEmail ||
+        backendResult?.email ||
+        invoice.email ||
+        null;
+
       const entry = {
         deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT,
         sentAt: new Date().toISOString(),
         sentBy: DEMO_SENT_BY,
+        recipientEmail: resolvedEmail,
       };
       saveDemoDelivery(invoice.invoiceId, entry);
       setDeliveryState(entry);
       setIsSendToClientOpen(false);
-      setSendingToClient(false);
       showStatusToast(
-        `Invoice ${invoice.invoiceNumber || invoice.invoiceId} marked as sent to client.`,
+        backendResult?.message ||
+          `Invoice ${invoice.invoiceNumber || invoice.invoiceId} marked as sent${resolvedEmail ? ` to ${resolvedEmail}` : " to client"}.`,
         "success"
       );
-    }, 800);
+    } catch (err) {
+      const msg = getInvoiceErrorMessage(err, "Failed to send invoice to client.");
+      showStatusToast(msg, "error");
+    } finally {
+      setSendingToClient(false);
+    }
   };
 
   if (loading) {
@@ -535,11 +588,11 @@ export default function InvoiceDetail() {
               >
                 <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back to Tax Workspace
               </Button>
-              {snapshotId && (
+              {effectiveId && (
                 <Button
                   variant="outline"
                   size="small"
-                  onClick={() => navigate(`/account-receivable/tax-calculation/${snapshotId}`)}
+                  onClick={() => navigate(backToTaxUrl)}
                   className="text-xs"
                 >
                   Go to Tax Calculation
@@ -582,7 +635,7 @@ export default function InvoiceDetail() {
 
   const clientName =
     invoice?.clientName ||
-    DEMO_CLIENT.legalName;
+    "Not provided";
 
   const effectiveTaxBreakdown =
     taxBreakdown.length > 0
@@ -615,16 +668,20 @@ export default function InvoiceDetail() {
         items={
           isFromTaxCalculation
             ? [
-                { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" },
-                { label: "Tax Calculation", to: snapshotId ? `/account-receivable/tax-calculation/${snapshotId}` : TAX_WORKSPACE_PATH },
+                ...(isOccurrenceMode
+                  ? []
+                  : [{ label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" }]),
+                { label: "Tax Calculation", to: backToTaxUrl },
                 { label: "Invoice" },
-                { label: invoice?.invoiceNumber || invoice?.snapshotNumber || snapshotId },
+                { label: invoice?.invoiceNumber || invoice?.snapshotNumber || effectiveId },
               ]
             : [
-                { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" },
+                ...(isOccurrenceMode
+                  ? []
+                  : [{ label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" }]),
                 { label: "Invoice Generation", to: INVOICE_WORKSPACE_PATH },
                 { label: "Invoice" },
-                { label: invoice?.invoiceNumber || invoice?.snapshotNumber || snapshotId },
+                { label: invoice?.invoiceNumber || invoice?.snapshotNumber || effectiveId },
               ]
         }
       />
@@ -662,7 +719,7 @@ export default function InvoiceDetail() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Action: Send to Client (for APPROVED invoices — demo delivery action) */}
+          {/* Action: Send to Client (for APPROVED invoices) */}
           {invoice?.invoiceStatus === "APPROVED" && (
             <Button
               variant="primary"
@@ -769,11 +826,11 @@ export default function InvoiceDetail() {
             Invoice Workspace
           </Button>
 
-          {snapshotId && (
+          {effectiveId && (
             <Button
               variant="outline"
               size="small"
-              onClick={() => navigate(`/account-receivable/tax-calculation/${snapshotId}`)}
+              onClick={() => navigate(backToTaxUrl)}
               className="flex items-center gap-1.5 text-xs text-slate-600"
             >
               Tax Calculation
@@ -851,30 +908,6 @@ export default function InvoiceDetail() {
               )}
             </div>
           </div>
-
-          {deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.NOT_SENT ? (
-            <Button
-              variant="primary"
-              size="small"
-              onClick={() => setIsSendToClientOpen(true)}
-              disabled={sendingToClient || refreshing}
-              className="bg-teal-700 hover:bg-teal-800 text-white flex items-center gap-1.5 text-xs font-semibold shrink-0"
-            >
-              <MailCheck className="h-3.5 w-3.5" />
-              Send to Client
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="small"
-              onClick={() => setIsSendToClientOpen(true)}
-              disabled={sendingToClient || refreshing}
-              className="border-teal-300 text-teal-700 hover:bg-teal-50 flex items-center gap-1.5 text-xs font-semibold shrink-0"
-            >
-              <MailCheck className="h-3.5 w-3.5" />
-              Resend (Demo)
-            </Button>
-          )}
         </div>
       )}
 
@@ -932,11 +965,11 @@ export default function InvoiceDetail() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto shrink-0 pt-1 sm:pt-0">
-              {snapshotId && (
+              {effectiveId && (
                 <Button
                   variant="outline"
                   size="small"
-                  onClick={() => navigate(`/account-receivable/tax-calculation/${snapshotId}`)}
+                  onClick={() => navigate(backToTaxUrl)}
                   className="text-xs bg-white text-slate-700 border-slate-300 hover:bg-slate-100/50 font-medium"
                 >
                   Review Tax Calculation
@@ -1304,366 +1337,12 @@ export default function InvoiceDetail() {
         </div>
       )}
 
-      {/* Main Invoice Card */}
-      <PageCard className="divide-y divide-slate-100 overflow-hidden shadow-sm border border-slate-200">
-        {/* Section 1: INVOICE HEADER */}
-        <div className="border-b border-slate-200 bg-slate-50/70 px-7 py-6">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-            {/* Document title */}
-            <div className="space-y-0.5 shrink-0">
-              <span className="block text-[11px] font-semibold uppercase tracking-widest text-indigo-600">
-                Tax Invoice
-              </span>
-              {invoice?.snapshotNumber && (
-                <p className="text-[11px] text-slate-400">Snapshot: {invoice.snapshotNumber}</p>
-              )}
-            </div>
-
-            {/* Invoice meta grid */}
-            <div className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-3 lg:grid-cols-5 text-xs">
-              <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Invoice Number</span>
-                <span className="font-mono font-bold text-base text-indigo-800 leading-tight">
-                  {invoice?.invoiceNumber || "—"}
-                </span>
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Invoice Date</span>
-                <span className="font-semibold text-slate-800">
-                  {invoice?.invoiceDate ? formatDisplayDate(invoice.invoiceDate) : "—"}
-                </span>
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Due Date</span>
-                <span className="font-semibold text-slate-800">
-                  {invoice?.dueDate ? formatDisplayDate(invoice.dueDate) : "—"}
-                </span>
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Status</span>
-                <StatusBadge label={invoice?.invoiceStatus || "GENERATED"} size="sm" />
-              </div>
-              {invoice?.invoiceStatus === "APPROVED" && (
-                <div>
-                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Delivery</span>
-                  <span
-                    className={`inline-flex items-center gap-1 text-xs font-semibold ${
-                      deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
-                        ? "text-teal-700"
-                        : "text-amber-700"
-                    }`}
-                  >
-                    <MailCheck className="h-3 w-3" />
-                    {deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
-                      ? "Sent to Client"
-                      : "Not Sent"}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Section 2: FROM / BILL TO */}
-        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 bg-white">
-          {/* FROM */}
-          <div className="px-7 py-6 space-y-4">
-            <span className="block text-[10px] font-bold uppercase tracking-widest text-indigo-600">
-              From
-            </span>
-            <div className="space-y-0.5 text-sm">
-              <p className="font-bold text-slate-900">{DEMO_SELLER.legalName}</p>
-              <div className="mt-1.5 space-y-0.5 text-xs text-slate-500 leading-relaxed">
-                {DEMO_SELLER.addressLines.map((line, i) => (
-                  <p key={i}>{line}</p>
-                ))}
-                <p>{DEMO_SELLER.city}, {DEMO_SELLER.state} - {DEMO_SELLER.postalCode}</p>
-                <p>{DEMO_SELLER.country}</p>
-              </div>
-            </div>
-            <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-x-6 gap-y-2.5 text-xs">
-              <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">GSTIN</span>
-                <span className="font-mono font-semibold text-slate-700 mt-0.5 block">{DEMO_SELLER.gstin}</span>
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Phone</span>
-                <span className="font-semibold text-slate-700 mt-0.5 block">{DEMO_SELLER.phone}</span>
-              </div>
-              <div className="col-span-2">
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Email</span>
-                <span className="font-semibold text-slate-700 mt-0.5 block">{DEMO_SELLER.email}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* BILL TO */}
-          <div className="px-7 py-6 space-y-4">
-            <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-500">
-              Bill To
-            </span>
-            <div className="space-y-0.5 text-sm">
-              <p className="font-bold text-slate-900">{clientName}</p>
-              <p className="text-xs text-slate-400 italic mt-1">{invoice?.billingAddress || DEMO_CLIENT.billingAddress}</p>
-            </div>
-            <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-x-6 gap-y-2.5 text-xs">
-              <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">GSTIN / Tax ID</span>
-                <span className="font-semibold text-slate-400 italic mt-0.5 block">{invoice?.gstin || DEMO_CLIENT.gstin}</span>
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Contact</span>
-                <span className="font-semibold text-slate-400 italic mt-0.5 block">{invoice?.contact || DEMO_CLIENT.contact}</span>
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Email</span>
-                <span className="font-semibold text-slate-400 italic mt-0.5 block">{invoice?.email || DEMO_CLIENT.email}</span>
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Phone</span>
-                <span className="font-semibold text-slate-400 italic mt-0.5 block">{invoice?.phone || DEMO_CLIENT.phone}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 3: INVOICE CONTEXT */}
-        <div className="px-7 py-6 bg-slate-50/40 space-y-5">
-          <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            Invoice Context
-          </span>
-
-          {/* Row 1: Project, Code, Client, Billing Period */}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 text-xs">
-            <div>
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Project</span>
-              <span className="font-semibold text-slate-800">{projectName}</span>
-            </div>
-            <div>
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Project Code</span>
-              <span className="font-mono font-semibold text-slate-700">{projectCode}</span>
-            </div>
-            <div>
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Client</span>
-              <span className="font-semibold text-slate-800">{clientName}</span>
-            </div>
-            <div>
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Billing Period</span>
-              <span className="font-semibold text-slate-800">{billingPeriod}</span>
-            </div>
-          </div>
-
-          {/* Row 2: Currency, Payment Terms, Snapshot */}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 text-xs pt-3 border-t border-slate-200/60">
-            <div>
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Currency</span>
-              <span className="font-mono font-bold text-slate-800">{currency}</span>
-            </div>
-            <div>
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Payment Terms</span>
-              <span className="font-semibold text-slate-700">{invoice?.paymentTerms || DEMO_TERMS.paymentTerms}</span>
-            </div>
-            <div>
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Snapshot Number</span>
-              <span className="font-mono text-slate-600">{invoice?.snapshotNumber || snapshotId || "—"}</span>
-            </div>
-          </div>
-
-          {/* Tax Context sub-section — Place of Supply appears ONLY here */}
-          <div className="pt-4 border-t border-slate-200/60 space-y-2.5">
-            <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Tax Context
-            </span>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 text-xs">
-              <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Supplier State</span>
-                <span className="font-semibold text-slate-700">{DEMO_TAX_CONTEXT.supplierState}</span>
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Customer State</span>
-                <span className="font-semibold text-slate-400 italic">{DEMO_TAX_CONTEXT.customerState}</span>
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Place of Supply</span>
-                <span className="font-semibold text-slate-700">{DEMO_TAX_CONTEXT.placeOfSupply}</span>
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Tax Region</span>
-                <span className="font-semibold text-slate-700">{DEMO_TAX_CONTEXT.taxRegion}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 4: INVOICE ITEMS */}
-        <div className="px-7 py-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Invoice Line Items
-            </span>
-            <span className="text-[11px] text-slate-400">
-              {items.length} {items.length === 1 ? "item" : "items"}
-            </span>
-          </div>
-
-          {items.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 py-5 text-center text-xs text-slate-400">
-              No individual invoice items returned by the backend.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    <th className="pb-2.5 pr-4 text-left font-bold w-[30%]">Resource / Item</th>
-                    <th className="pb-2.5 px-3 text-left font-bold w-[18%]">Role</th>
-                    <th className="pb-2.5 px-3 text-left font-bold w-[14%]">Work Date</th>
-                    <th className="pb-2.5 px-3 text-right font-bold w-[10%]">Hrs / Qty</th>
-                    <th className="pb-2.5 px-3 text-right font-bold w-[14%]">Rate</th>
-                    <th className="pb-2.5 pl-3 text-right font-bold w-[14%]">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {items.map((it) => (
-                    <tr key={it.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3 pr-4 align-top font-semibold text-slate-800">
-                        {it.itemName || it.item || "—"}
-                      </td>
-                      <td className="py-3 px-3 align-top text-slate-600 text-xs">
-                        {it.role || "—"}
-                      </td>
-                      <td className="py-3 px-3 align-top font-mono text-xs text-slate-500">
-                        {it.workDate ? formatDisplayDate(it.workDate) : "—"}
-                      </td>
-                      <td className="py-3 px-3 align-top text-right font-mono text-xs text-slate-700">
-                        {it.quantity !== undefined && it.quantity !== null ? Number(it.quantity).toFixed(2) : "—"}
-                      </td>
-                      <td className="py-3 px-3 align-top text-right font-mono text-xs text-slate-700">
-                        {formatCurrency(it.rate, currency)}
-                      </td>
-                      <td className="py-3 pl-3 align-top text-right font-mono font-semibold text-slate-900">
-                        {formatCurrency(it.amount, currency)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Section 5: TAX BREAKDOWN */}
-        <div className="px-7 py-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Tax Breakdown
-            </span>
-            <span className="text-[11px] text-slate-400">
-              {effectiveTaxBreakdown.length} {effectiveTaxBreakdown.length === 1 ? "component" : "components"}
-            </span>
-          </div>
-
-          {effectiveTaxBreakdown.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 py-4 text-center text-xs text-slate-400">
-              No tax components applicable for this invoice.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    <th className="pb-2.5 pr-4 text-left font-bold w-[40%]">Tax Component</th>
-                    <th className="pb-2.5 px-3 text-left font-bold w-[25%]">Applicability</th>
-                    <th className="pb-2.5 px-3 text-right font-bold w-[15%]">Rate</th>
-                    <th className="pb-2.5 pl-3 text-right font-bold w-[20%]">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {effectiveTaxBreakdown.map((comp) => (
-                    <tr key={comp.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3 pr-4 align-top">
-                        <span className="font-semibold text-slate-800">{comp.taxComponent}</span>
-                        {comp.taxTypeCode && (
-                          <span className="ml-2 inline-block rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
-                            {comp.taxTypeCode}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 align-top text-xs text-slate-500">
-                        {humanizeApplicability(comp.applicability)}
-                      </td>
-                      <td className="py-3 px-3 align-top text-right font-mono text-xs font-semibold text-slate-700">
-                        {formatRatePercentage(comp.rate) ?? "—"}
-                      </td>
-                      <td className="py-3 pl-3 align-top text-right font-mono font-semibold text-slate-900">
-                        {formatCurrency(comp.amount, currency)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Section 6: FINANCIAL SUMMARY */}
-        <div className="px-7 py-6 bg-slate-50/40">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
-            <div className="space-y-1">
-              <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                Financial Summary
-              </span>
-              <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
-                Authoritative totals from the billing engine. All values are read-only.
-              </p>
-            </div>
-
-            <div className="w-full sm:w-72 space-y-2 text-sm">
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-200">
-                <span className="text-slate-600">Subtotal</span>
-                <span className="font-mono font-semibold text-slate-800">
-                  {formatCurrency(invoice?.subtotal, currency)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-200">
-                <span className="text-slate-600">Tax</span>
-                <span className="font-mono font-semibold text-slate-800">
-                  {formatCurrency(invoice?.totalTax, currency)}
-                </span>
-              </div>
-              <div className="rounded-lg border border-indigo-200 bg-indigo-50/70 px-4 py-3 mt-2 flex items-center justify-between">
-                <div>
-                  <span className="block text-[10px] font-bold uppercase tracking-wider text-indigo-700">Grand Total</span>
-                  <span className="text-xs text-indigo-500">Amount Due</span>
-                </div>
-                <span className="font-mono text-xl font-extrabold text-indigo-950">
-                  {formatCurrency(invoice?.grandTotal, currency)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 7: TERMS / NOTES */}
-        <div className="px-7 py-5 bg-white">
-          <div className="space-y-3">
-            <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">Terms & Notes</span>
-            <div className="flex flex-wrap gap-x-8 gap-y-1.5 text-xs text-slate-600">
-              <div>
-                <span className="font-semibold text-slate-700">Payment Terms: </span>
-                {invoice?.paymentTerms || DEMO_TERMS.paymentTerms}
-              </div>
-              <div>
-                <span className="font-semibold text-slate-700">Billing Period: </span>
-                {billingPeriod}
-              </div>
-            </div>
-            <p className="text-[11px] text-slate-400 italic border-t border-slate-100 pt-3">
-              Tax calculated and verified in Tax Calculation. All financial amounts and line items are authoritative values from the billing engine.
-            </p>
-          </div>
-        </div>
-      </PageCard>
+      {/* Customer-Facing Invoice Document */}
+      <InvoiceDocument
+        invoice={invoice}
+        snapshotId={snapshotId}
+        deliveryState={deliveryState}
+      />
 
       {/* Authoritative Record Notice */}
       <div className="flex items-start gap-2.5 px-1 py-2 text-xs text-slate-400">
@@ -2008,11 +1687,13 @@ export default function InvoiceDetail() {
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500 font-medium">Client:</span>
-              <span className="font-semibold text-slate-800">{invoice?.clientName || "Account Management"}</span>
+              <span className="font-semibold text-slate-800">{invoice?.clientName || "Not provided"}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500 font-medium">Recipient:</span>
-              <span className="text-slate-400 italic">Not provided</span>
+              <span className={invoice?.email ? "font-semibold text-slate-800" : "text-slate-500 italic"}>
+                {invoice?.email || "Will be resolved from client information"}
+              </span>
             </div>
             <div className="flex justify-between border-t border-slate-200 pt-1.5">
               <span className="text-slate-700 font-bold">Grand Total:</span>
@@ -2021,8 +1702,8 @@ export default function InvoiceDetail() {
           </div>
 
           <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-800 space-y-1">
-            <p className="font-bold">Demo delivery action</p>
-            <p>This is currently a demo delivery action. No actual email will be sent. The invoice will be marked as sent to the client for demonstration purposes.</p>
+            <p className="font-bold">Send to Client Delivery</p>
+            <p>The invoice will be delivered to the client's email address. If this is a legacy invoice, the recipient will be resolved from the synchronized client record.</p>
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -2043,7 +1724,7 @@ export default function InvoiceDetail() {
               className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold flex items-center gap-1.5"
             >
               <MailCheck className="h-3.5 w-3.5" />
-              {sendingToClient ? "Marking as Sent..." : "Send Invoice"}
+              {sendingToClient ? "Sending..." : "Send Invoice"}
             </Button>
           </div>
         </div>

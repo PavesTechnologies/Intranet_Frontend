@@ -22,6 +22,7 @@ import { useUpdateVendorStatus } from "../hooks/useVendorMutations";
 import { AP_ROUTES } from "../../constants/routes";
 
 import VendorAddressList from "../components/VendorAddressList";
+import VendorEngagementsSection from "../components/VendorEngagementsSection";
 import VendorBankList from "../components/VendorBankList";
 import VendorTaxTab from "../components/VendorTaxTab";
 import VendorPoTab from "../components/VendorPoTab";
@@ -316,6 +317,12 @@ export default function VendorDetailPage() {
                     vendor.updated_at
                   )}
                 />
+              </div>
+
+              {/* Department / Purchase Category are engagement attributes
+                  (vendor_category_mapping), not Vendor Master columns. */}
+              <div className="mt-6 border-t border-gray-100 pt-4">
+                <VendorEngagementsSection vendorId={vendorId} />
               </div>
             </PageCardContent>
           </PageCard>

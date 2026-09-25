@@ -6,6 +6,7 @@ import FilterListbox from "../../../../components/filter/FilterListbox";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Pagination from "../../../../components/Pagination/pagination";
 import ARTable from "../common/ARTable";
+import ActionMenu from "../common/ActionMenu";
 import { normalizeAcquisitionStatus } from "../../services/billingDataAcquisitionService";
 import { getBillingTypeDisplayName } from "../../utils/billingType";
 
@@ -25,8 +26,18 @@ const STATUS_DISPLAY_LABELS = {
 
 const PAGE_SIZE = 8;
 
-const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Billing Period", "Status", "Action"];
-const TABLE_COLUMNS = ["client", "project", "billingType", "billingPeriod", "status", "action"];
+const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Billing Period", "Status", "Reference", "Actions"];
+const TABLE_COLUMNS = ["client", "project", "billingType", "billingPeriod", "status", "reference", "actions"];
+
+const TABLE_ALIGNMENTS = {
+  client: "left",
+  project: "left",
+  billingType: "left",
+  billingPeriod: "center",
+  status: "center",
+  reference: "left",
+  actions: "center",
+};
 
 const FILTER_BUTTON_CLASS =
   "flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-left text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/30";
@@ -173,7 +184,7 @@ export default function AcquisitionQueue({
 
         return {
           onRowClick: () => onViewConfig(cfg),
-          client: <span className="font-medium text-slate-700">{cfg.client}</span>,
+          client: <div className="text-left font-medium text-slate-700">{cfg.client}</div>,
           project: (
             <div className="text-left">
               <div className="font-semibold text-slate-900">{cfg.projectName}</div>
@@ -181,44 +192,57 @@ export default function AcquisitionQueue({
             </div>
           ),
           billingType: (
-            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-              {BILLING_TYPE_LABELS[cfg.billingType] || getBillingTypeDisplayName(cfg.billingType)}
-            </span>
+            <div className="flex items-center justify-start">
+              <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                {BILLING_TYPE_LABELS[cfg.billingType] || getBillingTypeDisplayName(cfg.billingType)}
+              </span>
+            </div>
           ),
-          billingPeriod: <span className="font-mono text-xs text-slate-600">{cfg.billingPeriod}</span>,
-          status: <StatusBadge label={displayStatus} size="sm" />,
-          action: (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewConfig(cfg);
-              }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
-              title={isTaxInProgress ? "Tax calculation in progress" : undefined}
+          billingPeriod: (
+            <div className="flex items-center justify-center font-mono text-xs text-slate-600">
+              {cfg.billingPeriod}
+            </div>
+          ),
+          status: (
+            <div className="flex items-center justify-center">
+              <StatusBadge label={cfg.billingStatus} size="sm" />
+            </div>
+          ),
+          reference: (
+            <div className="flex flex-col items-start gap-0.5 text-left">
+              <span className="font-mono text-xs font-medium text-slate-700">{cfg.id}</span>
+              {(st === "READY_TO_TAX" || st === "IN_TAX" || st === "TAX_COMPLETED") && cfg.snapshotNumber ? (
+                <span className="font-mono text-[11px] font-semibold text-emerald-600">{cfg.snapshotNumber}</span>
+              ) : null}
+            </div>
+          ),
+          actions: (
+            <div
+              className="flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
             >
-              {st === "TAX_COMPLETED" ? (
-                <>
-                  <Eye className="h-3 w-3" /> View Tax Calculation
-                </>
-              ) : st === "INVOICED" ? (
-                <>
-                  <Eye className="h-3 w-3" /> View Invoice
-                </>
-              ) : isPending ? (
-                <>
-                  <Play className="h-3 w-3" /> Acquire
-                </>
-              ) : isTaxInProgress ? (
-                <>
-                  <Eye className="h-3 w-3 text-amber-600" /> View Status
-                </>
-              ) : (
-                <>
-                  <Eye className="h-3 w-3" /> View
-                </>
-              )}
-            </button>
+              <ActionMenu
+                items={[
+                  {
+                    label:
+                      st === "TAX_COMPLETED"
+                        ? "View Tax Calculation"
+                        : isPending
+                          ? "Acquire Data"
+                          : "View Snapshot",
+                    icon:
+                      st === "TAX_COMPLETED" ? (
+                        <Eye className="h-4 w-4 text-slate-600" />
+                      ) : isPending ? (
+                        <Play className="h-4 w-4 text-slate-600" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-slate-600" />
+                      ),
+                    onClick: () => onViewConfig(cfg),
+                  },
+                ]}
+              />
+            </div>
           ),
         };
       }),
@@ -229,7 +253,7 @@ export default function AcquisitionQueue({
   return (
     <PageCard>
       <PageCardContent className="space-y-4 p-4 sm:p-5">
-        {/* Header Title & Result Counter */}
+        {/* Header Title & Result Counter — "Acquisition Queue" preserved */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Layers className="h-4 w-4 text-indigo-600" />
@@ -242,7 +266,7 @@ export default function AcquisitionQueue({
           </div>
         </div>
 
-        {/* Controls Bar: Search Input + Global FilterListbox + Clear Button */}
+        {/* Controls Bar: Search Input + FilterListbox + Clear Button */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex-1">
             <SearchInput
@@ -289,8 +313,8 @@ export default function AcquisitionQueue({
                 {activeSearch && activeStatusFilter !== "ALL"
                   ? `No projects matching "${activeSearch}" found under status "${getStatusLabelText(activeStatusFilter)}".`
                   : activeSearch
-                  ? `No active billing setup projects match "${activeSearch}".`
-                  : `No projects currently in status "${getStatusLabelText(activeStatusFilter)}".`}
+                    ? `No active billing setup projects match "${activeSearch}".`
+                    : `No projects currently in status "${getStatusLabelText(activeStatusFilter)}".`}
               </p>
             </div>
             {isFilterActive && (
@@ -309,6 +333,7 @@ export default function AcquisitionQueue({
               headers={TABLE_HEADERS}
               columns={TABLE_COLUMNS}
               rows={tableRows}
+              alignments={TABLE_ALIGNMENTS}
               loading={loading}
               emptyMessage="No matching projects. Adjust your search or status filter."
             />

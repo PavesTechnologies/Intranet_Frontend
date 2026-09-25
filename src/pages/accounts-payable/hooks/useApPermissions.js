@@ -1,13 +1,18 @@
 import { useAuth } from "../../../contexts/AuthContext";
 import { AP_PERMISSIONS, rolesForPermission } from "../constants/permissions";
-import { PROCUREMENT_PERMISSIONS } from "../constants/procurementPermissions";
 import {
-  APPROVAL_PERMISSIONS,
-  APPROVAL_ANY_VIEW_PERMISSIONS,
+  PROCUREMENT_PERMISSIONS,
+  ONBOARDING_ANY,
+  NDA_ANY,
+  VENDOR_AVAILABILITY_ANY,
+} from "../constants/procurementPermissions";
+import { APPROVAL_PERMISSIONS, APPROVAL_ANY_VIEW_PERMISSIONS } from "../constants/approvalPermissions";
+import {
   INVOICE_HISTORY_VIEW_PERMISSIONS,
 } from "../constants/approvalPermissions";
 import { PAYMENT_PERMISSIONS } from "../constants/paymentPermissions";
 import { INVOICE_PERMISSIONS } from "../constants/invoicePermissions";
+import { TDS_PERMISSIONS, TDS_ANY_VIEW_PERMISSIONS } from "../constants/tdsPermissions";
 
 /**
  * One boolean flag per capability, consumed by pages/buttons instead of calling
@@ -53,6 +58,20 @@ export function useApPermissions() {
     canMarkPaid: hasPermission(PAYMENT_PERMISSIONS.PAYMENT_PROCESS),
     canViewPayment: hasPermission(PAYMENT_PERMISSIONS.PAYMENT_VIEW),
 
+    // ── Invoice TDS (tax deducted at source) ───────────────────────────────
+    // GET .../tds accepts INVOICE_TDS_VIEW OR plain INVOICE_VIEW per the backend contract — so
+    // any role that can see the invoice at all (e.g. Approver) can also see its TDS
+    // determination, without holding determine/edit/verify.
+    canViewTds: hasAnyPermission(TDS_ANY_VIEW_PERMISSIONS),
+    // Runs the initial determination (AP Executive, right after OCR review).
+    canDetermineTds: hasPermission(TDS_PERMISSIONS.INVOICE_TDS_DETERMINE),
+    // Corrects the payment nature on an already-determined record (AP Executive only — Finance
+    // can see it but not change it).
+    canEditTds: hasPermission(TDS_PERMISSIONS.INVOICE_TDS_EDIT),
+    // Locks the determination in (Finance) — required before Mark Ready for Payment, see
+    // InvoicePaymentPanel.
+    canVerifyTds: hasPermission(TDS_PERMISSIONS.INVOICE_TDS_VERIFY),
+
     // ── PR Request ─────────────────────────────────────────────────────────
     canViewPR: hasPermission(PROCUREMENT_PERMISSIONS.PR_VIEW),
     canCreatePR: hasPermission(PROCUREMENT_PERMISSIONS.PR_CREATE),
@@ -90,6 +109,25 @@ export function useApPermissions() {
     // ── Vendor Selection ───────────────────────────────────────────────────
     canViewVendorSelection: hasPermission(PROCUREMENT_PERMISSIONS.VENDOR_SELECTION_VIEW),
     canSelectVendor: hasPermission(PROCUREMENT_PERMISSIONS.VENDOR_SELECT),
+
+    // ── Vendor Availability / Vendor Onboarding branch ─────────────────────
+    // Each of these backend routes accepts any-of a permission list, so hasAnyPermission
+    // mirrors the server check exactly — a Procurement Officer carrying QUOTATION_* passes
+    // without a dedicated onboarding code, which is how the backend is configured today.
+    canCheckVendorAvailability: hasAnyPermission(VENDOR_AVAILABILITY_ANY),
+    canViewOnboarding: hasAnyPermission(ONBOARDING_ANY.VIEW),
+    canCreateOnboarding: hasAnyPermission(ONBOARDING_ANY.CREATE),
+    canAssignOnboarding: hasAnyPermission(ONBOARDING_ANY.ASSIGN),
+    // The Vendor Intaker's capability: run intake, pre-screen and complete the request.
+    canProcessOnboarding: hasAnyPermission(ONBOARDING_ANY.PROCESS),
+
+    // ── NDA lifecycle (Stage 2) ────────────────────────────────────────────
+    canViewNda: hasAnyPermission(NDA_ANY.VIEW),
+    canGenerateNda: hasAnyPermission(NDA_ANY.GENERATE),
+    // Sending and recording a status transition are the same backend permission (NDA_SEND).
+    canSendNda: hasAnyPermission(NDA_ANY.SEND),
+    // Uploading the vendor-signed PDF (POST /apm/nda/{id}/signed-document).
+    canUploadSignedNda: hasAnyPermission(NDA_ANY.UPLOAD_SIGNED),
 
     // ── Purchase Orders ────────────────────────────────────────────────────
     // purchase_order_route.py doesn't have permission_based_access wired up yet (known

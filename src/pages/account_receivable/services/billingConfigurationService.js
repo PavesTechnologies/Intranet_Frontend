@@ -580,6 +580,11 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
       projectId: firstPresent(rawProjectInfo.projectId, config.projectId, rawProjectInfo.id) || "",
       projectName: firstPresent(rawProjectInfo.projectName, config.projectName, rawProjectInfo.name, normalized.projectName) || "",
       projectCode: firstPresent(rawProjectInfo.projectCode, config.projectCode, rawProjectInfo.code, normalized.projectCode) || "",
+      // The flat GET .../{id} DTO carries this at the top level (config.primaryLocation),
+      // not nested under projectInfo/project — without this fallback, editing an existing
+      // configuration always showed a blank Primary Location even though the backend
+      // returned it, since the spread above only pulls from rawProjectInfo.
+      primaryLocation: firstPresent(rawProjectInfo.primaryLocation, config.primaryLocation, rawProjectInfo.location, config.location) || "",
       projectBudget: firstPresent(rawProjectInfo.projectBudget, config.projectBudget, rawProjectInfo.budget, rawProjectInfo.budgetAmount) || "",
       projectBudgetCurrency: currency,
       currency,
@@ -718,6 +723,11 @@ export const normalizeProject = (project = {}) => {
     projectDuration,
     projectBudget,
     projectBudgetCurrency,
+    // RMS-sourced client contact fields carried straight through from the
+    // available-projects response — never re-derived or hardcoded here.
+    countryCode: project.countryCode || "",
+    email: project.email || "",
+    phoneNumber: project.phoneNumber || "",
     // Normalized to a plain yyyy-mm-dd (never a raw datetime/timestamp string) —
     // every date-range check downstream (Recurring's Billing Start/End Date
     // validation, Fixed Price's Effective From/To) does lexical string
@@ -1025,6 +1035,11 @@ export const normalizeBillingSchedulePeriod = (record = {}) => ({
   invoiceDate: toLocalDateString(record.invoiceDate) || "",
   remarks: record.remarks || "",
 });
+
+export const previewBillingSchedule = async (payload) => {
+  const response = await api.post(`${BILLING_CONFIGURATIONS_URL}/preview-schedule`, payload);
+  return asArray(unwrapData(response)).map(normalizeBillingSchedulePeriod);
+};
 
 // Maps a BillingRecurringConfiguration API record (GET /api/billing-recurring/...)
 // onto the wizard's internal Recurring Billing form-state shape (mirrors
