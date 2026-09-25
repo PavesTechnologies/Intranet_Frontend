@@ -58,9 +58,13 @@ export const useLineItemReviews = (reportId) =>
 const invalidateApprovalCaches = (qc, reportId) => {
   qc.invalidateQueries({ queryKey: ["approvalMyQueue"] });
   qc.invalidateQueries({ queryKey: ["approvalMyHistory"] });
+  qc.invalidateQueries({ queryKey: ["financeQueue"] });
   if (reportId) {
     qc.invalidateQueries({ queryKey: APPROVAL_STATUS_KEY(reportId) });
     qc.invalidateQueries({ queryKey: LINE_ITEM_REVIEWS_KEY(reportId) });
+    qc.invalidateQueries({ queryKey: ["reportLineItems", reportId] });
+    qc.invalidateQueries({ queryKey: ["reportReviews", reportId] });
+    qc.invalidateQueries({ queryKey: ["financeReviews", reportId] });
   }
 };
 

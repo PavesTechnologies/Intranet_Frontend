@@ -196,7 +196,7 @@ export const XMS_SUBMENU = [
   {
     label: "Cash Advance",
     to: "/expense-management/cash-advance/my",
-    allowedRoles: XMS_EMPLOYEE,
+    allowedRoles: XMS_EVERYONE,
     children: [
       { label: "Request Advance", to: "/expense-management/cash-advance/request" },
       { label: "My Advances",     to: "/expense-management/cash-advance/my" },

@@ -13,6 +13,7 @@ import {
   Receipt,
   Layers,
   Calendar,
+  DollarSign,
 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
@@ -23,6 +24,7 @@ import {
   lineItemService,
   receiptService,
 } from "@/pages/expense-management/api/expenseReportsApi";
+import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import Select from "react-select";
 import FormInput from "@/components/forms/FormInput";
 import FormTextArea from "@/components/forms/FormTextArea";
@@ -110,6 +112,7 @@ export default function CreateExpensePage() {
   const [currencies, setCurrencies] = useState([]);
   const [categories, setCategories] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [cashAdvances, setCashAdvances] = useState([]);
   const [lookupsLoading, setLookupsLoading] = useState(true);
 
   const [formData, setFormData] = useState({
@@ -117,9 +120,19 @@ export default function CreateExpensePage() {
     businessPurpose: "",
     costCenterId: "",
     currencyId: "",
+    cashAdvanceId: "",
   });
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+
+  // Check URL query parameters for pre-selected cash advance
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const prefilledAdvId = searchParams.get("cashAdvanceId");
+    if (prefilledAdvId) {
+      setFormData((prev) => ({ ...prev, cashAdvanceId: prefilledAdvId }));
+    }
+  }, []);
 
   // Line item modal & drawer states
   const [isLineItemDrawerOpen, setIsLineItemDrawerOpen] = useState(false);
@@ -150,16 +163,105 @@ export default function CreateExpensePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("date_desc");
 
-  useEffect(() => {
+const ELIGIBLE_ADVANCE_STATUSES = [
+  "DISBURSED",
+  "PARTIALLY_SETTLED",
+  "PARTIALLY_ADJUSTED",
+  "EXPENSE_SUBMITTED",
+  "EXPENSE_VERIFIED",
+  "IN_PROGRESS",
+  "ACTIVE",
+  "SETTLEMENT_PENDING",
+  "RECONCILIATION_PENDING",
+  "UNDER_REVIEW",
+  "SUBMITTED_FOR_REVIEW",
+  "APPROVED",
+];
+
+const INELIGIBLE_ADVANCE_STATUSES = [
+  "DRAFT",
+  "SUBMITTED",
+  "PENDING",
+  "REJECTED",
+  "CANCELLED",
+  "CLOSED",
+  "SETTLED",
+];
+
+const extractAdvList = (res) => {
+  if (!res) return [];
+  const raw = res.data?.data ?? res.data ?? res;
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.content)) return raw.content;
+  if (Array.isArray(raw?.items)) return raw.items;
+  if (Array.isArray(res.data?.content)) return res.data.content;
+  if (Array.isArray(res.data?.items)) return res.data.items;
+  return [];
+};
+
+useEffect(() => {
     const loadLookups = async () => {
       try {
         setLookupsLoading(true);
-        const [costCenterList, currencyList] = await Promise.all([
+
+        const fetchAdvances = async () => {
+          let res;
+          try {
+            res = await cashAdvanceApi.getMyAdvances();
+          } catch {
+            res = await cashAdvanceApi.getAll();
+          }
+          let list = extractAdvList(res);
+          if (list.length === 0) {
+            try {
+              const allRes = await cashAdvanceApi.getAll();
+              const allList = extractAdvList(allRes);
+              if (allList.length > 0) list = allList;
+            } catch {
+              // ignore
+            }
+          }
+          return list;
+        };
+
+        const [costCenterList, currencyList, advList] = await Promise.all([
           lookupService.getActiveCostCenters(),
           lookupService.getActiveCurrencies(),
+          fetchAdvances(),
         ]);
         setCostCenters(costCenterList);
         setCurrencies(currencyList);
+
+        const searchParams = new URLSearchParams(window.location.search);
+        const prefilledAdvId = searchParams.get("cashAdvanceId") || formData.cashAdvanceId;
+
+        const activeAdv = advList.filter((a) => {
+          const advId = String(a.advanceId || a.id || a.cashAdvanceId || "");
+          if (prefilledAdvId && String(prefilledAdvId) === advId) {
+            return true;
+          }
+
+          const statusUpper = (a.status || "").toUpperCase().trim().replace(/\s+/g, "_");
+
+          const isEligibleStatus =
+            ELIGIBLE_ADVANCE_STATUSES.includes(statusUpper) ||
+            (!INELIGIBLE_ADVANCE_STATUSES.includes(statusUpper) &&
+              (statusUpper.includes("DISBURSE") ||
+                statusUpper.includes("SETTLE") ||
+                statusUpper.includes("EXPENSE") ||
+                statusUpper.includes("PROGRESS")));
+
+          const amountVal = Number(a.amount ?? a.advanceAmount ?? a.disbursedAmount ?? 0);
+          const outstandingVal = Number(
+            a.outstandingBalance ?? a.remainingBalance ?? a.balance ?? amountVal
+          );
+
+          const hasBalance = outstandingVal > 0 || (a.outstandingBalance == null && amountVal >= 0);
+
+          return isEligibleStatus && hasBalance;
+        });
+
+        setCashAdvances(activeAdv);
       } catch (err) {
         console.error("Failed to load lookups:", err);
         showStatusToast("Failed to load cost centers / currencies.", "error");
@@ -208,6 +310,23 @@ export default function CreateExpensePage() {
     label: `${c.categoryCode} - ${c.categoryName}`,
   }));
 
+  const cashAdvanceOptions = useMemo(() => {
+    return cashAdvances.map((a) => {
+      const rawId = String(a.advanceId || a.id || a.cashAdvanceId || "");
+      const formattedId = rawId.startsWith("ADV-") ? rawId : `ADV-${rawId.slice(0, 8)}`;
+      const title = a.title || a.purpose || a.businessPurpose || "Cash Advance";
+      const amount = Number(a.amount ?? a.advanceAmount ?? a.disbursedAmount ?? 0);
+      const currency = a.currencyCode || a.currency || "INR";
+      const outstanding = Number(a.outstandingBalance ?? a.remainingBalance ?? a.balance ?? amount);
+
+      return {
+        value: rawId,
+        label: `${formattedId} (${title}) - Amount: ${amount} ${currency} (Outstanding: ${outstanding} ${currency})`,
+        advance: a,
+      };
+    });
+  }, [cashAdvances]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -243,6 +362,7 @@ export default function CreateExpensePage() {
       businessPurpose: formData.businessPurpose.trim(),
       costCenterId: formData.costCenterId,
       currencyId: formData.currencyId,
+      ...(formData.cashAdvanceId ? { cashAdvanceId: formData.cashAdvanceId } : {}),
     };
 
     try {
@@ -628,6 +748,33 @@ export default function CreateExpensePage() {
                 />
                 {formErrors.currencyId && <span className="text-xs text-red-600 block mt-1">{formErrors.currencyId}</span>}
               </div>
+            </div>
+
+            {/* Stage 4: Link Disbursed Cash Advance */}
+            <div className="space-y-1 bg-indigo-50/40 p-3 rounded-lg border border-indigo-100">
+              <label className="flex items-center gap-1.5 text-sm font-medium text-indigo-900">
+                <DollarSign size={14} className="text-indigo-600" />
+                Link Disbursed Cash Advance (Optional)
+              </label>
+              <p className="text-[11px] text-gray-500 mb-1">
+                Link this expense report to an active disbursed cash advance to adjust outstanding balances.
+              </p>
+              <Select
+                options={cashAdvanceOptions}
+                value={cashAdvanceOptions.find((o) => String(o.value) === String(formData.cashAdvanceId)) || null}
+                onChange={(opt) => handleSelectChange("cashAdvanceId", opt ? opt.value : "")}
+                placeholder="Search and select active cash advance..."
+                isClearable
+                isSearchable
+                isLoading={lookupsLoading}
+                menuPortalTarget={document.body}
+                menuPosition="fixed"
+                styles={{
+                  ...customSelectStyles,
+                  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                }}
+                isDisabled={submitting}
+              />
             </div>
 
             <div className="flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-100 p-3">

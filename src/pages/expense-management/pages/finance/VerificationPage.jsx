@@ -64,8 +64,12 @@ export default function VerificationPage() {
     queries: items.map((item) => ({
       queryKey: ["financeReviews", item.reportId],
       queryFn: async () => {
-        const res = await financeVerificationApi.getReviews(item.reportId);
-        return res.data?.data || [];
+        try {
+          const res = await financeVerificationApi.getReviews(item.reportId);
+          return res.data?.data || [];
+        } catch {
+          return [];
+        }
       },
       staleTime: 15_000,
     })),

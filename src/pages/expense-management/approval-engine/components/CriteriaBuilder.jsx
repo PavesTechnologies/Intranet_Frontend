@@ -17,17 +17,17 @@ const FIELD_OPTIONS = [
 const OPERATORS_FOR_FIELD = (field) =>
   field === "AMOUNT"
     ? [
-        { value: "EQUALS", label: "=" },
-        { value: "NOT_EQUALS", label: "≠" },
-        { value: "GREATER_THAN", label: ">" },
-        { value: "GREATER_THAN_OR_EQUAL", label: "≥" },
-        { value: "LESS_THAN", label: "<" },
-        { value: "LESS_THAN_OR_EQUAL", label: "≤" },
-      ]
+      { value: "EQUALS", label: "=" },
+      { value: "NOT_EQUALS", label: "≠" },
+      { value: "GREATER_THAN", label: ">" },
+      { value: "GREATER_THAN_OR_EQUAL", label: "≥" },
+      { value: "LESS_THAN", label: "<" },
+      { value: "LESS_THAN_OR_EQUAL", label: "≤" },
+    ]
     : [
-        { value: "EQUALS", label: "=" },
-        { value: "NOT_EQUALS", label: "≠" },
-      ];
+      { value: "EQUALS", label: "=" },
+      { value: "NOT_EQUALS", label: "≠" },
+    ];
 
 function CriterionRow({ id, criterion, onChange, onRemove }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
