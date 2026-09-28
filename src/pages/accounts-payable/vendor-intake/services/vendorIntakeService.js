@@ -32,6 +32,28 @@ export const vendorIntakeService = {
     return res.data;
   },
 
+  /**
+   * PUT /apm/vendor-intake/{engagement_id} - edits an engagement's department, category and
+   * onboarding purpose.
+   *
+   * PARTIAL update: a key left OUT of `payload` keeps its current value, while an explicit
+   * `purpose_of_onboarding: null` clears it. Callers must therefore send only the fields that
+   * actually changed - see buildEngagementUpdatePayload in constants/vendorIntake.js.
+   *
+   * NDA fields are deliberately not accepted here; the NDA decision has its own endpoint
+   * (updateNdaDecision below), which is the only place that logic lives.
+   *
+   * @param {number|string} engagementId
+   * @param {{department_id?:number, category_id?:number, purpose_of_onboarding?:string|null}} payload
+   * @returns {Promise<object>} the updated VendorEngagementDTO
+   */
+  updateVendorEngagement: async (engagementId, payload) => {
+    const res = await api.put(`${BASE}/vendor-intake/${engagementId}`, payload, {
+      headers: authHeaders(),
+    });
+    return res.data;
+  },
+
   /** GET /apm/vendor-intake/vendor/{vendor_id} — every engagement already on file for a vendor. */
   getVendorEngagementsByVendor: async (vendorId) => {
     const res = await api.get(`${BASE}/vendor-intake/vendor/${vendorId}`, {

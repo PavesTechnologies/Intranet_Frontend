@@ -1,7 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { invoiceService } from "../services/invoiceService";
 
-export const INVOICE_HISTORY_KEY = (invoiceId) => ["accountsPayable", "invoiceHistory", invoiceId];
+// Normalized to a number — see useInvoiceDetail.js's INVOICE_DETAIL_KEY for why this matters:
+// a string/number id mismatch between where a query is fetched and where it's invalidated
+// silently breaks invalidateQueries.
+export const INVOICE_HISTORY_KEY = (invoiceId) => ["accountsPayable", "invoiceHistory", Number(invoiceId)];
 
 /** @param {string|number} invoiceId */
 export function useInvoiceHistory(invoiceId) {

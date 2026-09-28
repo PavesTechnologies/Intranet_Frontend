@@ -14,6 +14,8 @@ const MasterModuleCard = ({
   lastUpdated,
   pending = false,
   pendingLabel = "Pending Integration",
+  badgeLabel,
+  badgeTone = "neutral",
   onManage,
 }) => {
   return (
@@ -34,11 +36,23 @@ const MasterModuleCard = ({
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#0A0082]/10 text-[#0A0082]">
             {icon}
           </div>
-          {pending && (
+          {badgeLabel ? (
+            <span
+              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                badgeTone === "success"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : badgeTone === "warning"
+                    ? "bg-amber-50 text-amber-700 border border-amber-200"
+                    : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {badgeLabel}
+            </span>
+          ) : pending ? (
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">
               {pendingLabel}
             </span>
-          )}
+          ) : null}
         </div>
 
         <h3 className="mt-3 text-base font-bold text-slate-800">{title}</h3>

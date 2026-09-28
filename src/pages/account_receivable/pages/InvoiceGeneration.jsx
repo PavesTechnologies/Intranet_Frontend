@@ -29,6 +29,7 @@ import {
   getInvoices,
   getInvoiceErrorMessage,
   submitInvoiceForApproval,
+  sendInvoiceToClient,
 } from "../services/invoiceService";
 import {
   loadDemoDeliveryMap,
@@ -282,18 +283,47 @@ export default function InvoiceGeneration() {
   const handleConfirmSend = async () => {
     if (!sendTarget) return;
     const invId = sendTarget.invoiceId || sendTarget.billingSnapshotId || sendTarget.snapshotId;
+    if (!invId) {
+      showStatusToast("Invoice identifier is missing.", "error");
+      setSendTarget(null);
+      return;
+    }
     setSendLoading(true);
     try {
+      let backendResult = null;
+      try {
+        backendResult = await sendInvoiceToClient(invId);
+      } catch (apiErr) {
+        console.error("[InvoiceGeneration] Error sending invoice to client:", apiErr);
+        const msg = getInvoiceErrorMessage(apiErr, "Failed to send invoice to client.");
+        showStatusToast(msg, "error");
+        setSendTarget(null);
+        return;
+      }
+
+      const clientEmail =
+        backendResult?.recipientEmail ||
+        backendResult?.email ||
+        sendTarget.email ||
+        sendTarget.clientEmail ||
+        null;
+
       saveDemoDelivery(invId, {
         deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT,
         sentAt: new Date().toISOString(),
         sentBy: DEMO_SENT_BY,
+        recipientEmail: clientEmail,
       });
       setDemoDeliveryMap(loadDemoDeliveryMap());
-      showStatusToast("Invoice sent to client successfully.", "success");
+      showStatusToast(
+        backendResult?.message ||
+          `Invoice ${sendTarget.invoiceNumber || invId} sent${clientEmail ? ` to ${clientEmail}` : ""} successfully.`,
+        "success"
+      );
       setSendTarget(null);
     } catch (err) {
-      showStatusToast("Failed to send invoice to client.", "error");
+      const msg = getInvoiceErrorMessage(err, "Failed to send invoice to client.");
+      showStatusToast(msg, "error");
     } finally {
       setSendLoading(false);
     }
@@ -486,7 +516,9 @@ export default function InvoiceGeneration() {
                   : "Send to Client",
                 icon: <MailCheck className="h-4 w-4 text-emerald-600" />,
                 hidden: st !== "APPROVED",
-                onClick: () => setSendTarget(item),
+                onClick: () => {
+                  setSendTarget(item);
+                },
               },
 
               {
@@ -729,7 +761,7 @@ export default function InvoiceGeneration() {
         title="Send Invoice to Client"
         message={
           sendTarget
-            ? `Are you sure you want to deliver invoice ${sendTarget.invoiceNumber || "this invoice"} to ${sendTarget.clientName || "the client"}?`
+            ? `Are you sure you want to deliver invoice ${sendTarget.invoiceNumber || "this invoice"} to ${sendTarget.clientName || "the client"}${sendTarget.email || sendTarget.clientEmail ? ` (${sendTarget.email || sendTarget.clientEmail})` : " (recipient email will be resolved from client information)"}?`
             : ""
         }
         confirmText="Send to Client"
