@@ -7,9 +7,14 @@ import { useVendorAvailability, useOnboardingRequestsForPr } from "../hooks/useV
 
 const PR = { id: 12, pr_number: "PR-0012", justification: "Replace laptops" };
 
-const renderPanel = () =>
+const renderPanel = (prStatusCode = "APPROVED") =>
   render(
-    <VendorAvailabilityPanel pr={PR} departmentName="IT" categoryName="Hardware" />,
+    <VendorAvailabilityPanel
+      pr={PR}
+      prStatusCode={prStatusCode}
+      departmentName="IT"
+      categoryName="Hardware"
+    />,
     { wrapper: MemoryRouter },
   );
 
@@ -146,5 +151,38 @@ describe("VendorAvailabilityPanel", () => {
     expect(
       screen.queryByRole("button", { name: /open internal request/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("does not offer a new onboarding request once the PR has left APPROVED", async () => {
+    useVendorAvailability.mockReturnValue(
+      idleAvailability({ pr_id: 12, available: false, vendors: [] }),
+    );
+
+    const user = userEvent.setup();
+    renderPanel("VENDOR_SELECTION");
+    await user.click(screen.getByRole("button", { name: /check vendor availability/i }));
+
+    expect(
+      screen.queryByRole("button", { name: /create vendor onboarding request/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/only be requested while the requisition is approved/i)).toBeInTheDocument();
+  });
+
+  it("lets an onboarding viewer without the availability permission see and open the request", () => {
+    permissions = { canCheckVendorAvailability: false, canViewOnboarding: true };
+    useOnboardingRequestsForPr.mockReturnValue({
+      data: [{ id: 3, pr_id: 12, status_code: "COMPLETED", assigned_to: "intaker-1", vendor_id: 9 }],
+      isLoading: false,
+    });
+
+    renderPanel();
+
+    expect(screen.getByText("Request #3")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /view onboarding request/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /check vendor availability/i }),
+    ).not.toBeInTheDocument();
+    // The availability endpoint is never queried without its permission.
+    expect(useVendorAvailability).toHaveBeenCalledWith(12, { enabled: false });
   });
 });

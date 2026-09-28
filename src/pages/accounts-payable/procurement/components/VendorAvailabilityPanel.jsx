@@ -30,10 +30,13 @@ const onboardingWorkspaceLink = (requestId) =>
  * read from the API — this panel never decides any of them. It only shows the state and
  * offers the action that matches it.
  *
- * @param {{ pr:object, departmentName:string, categoryName:string }} props
+ * The PR itself stays APPROVED while onboarding runs — onboarding progress is tracked on the
+ * onboarding request, never as a PR status.
+ *
+ * @param {{ pr:object, prStatusCode?:string, departmentName:string, categoryName:string }} props
  */
-export default function VendorAvailabilityPanel({ pr, departmentName, categoryName }) {
-  const { canCheckVendorAvailability, canCreateOnboarding, canProcessOnboarding } =
+export default function VendorAvailabilityPanel({ pr, prStatusCode, departmentName, categoryName }) {
+  const { canCheckVendorAvailability, canCreateOnboarding, canProcessOnboarding, canViewOnboarding } =
     useApPermissions();
 
   const [hasChecked, setHasChecked] = useState(false);
@@ -58,9 +61,16 @@ export default function VendorAvailabilityPanel({ pr, departmentName, categoryNa
     isError: availabilityError,
     error: availabilityErrorObj,
     refetch: refetchAvailability,
-  } = useVendorAvailability(pr?.id, { enabled: shouldCheck });
+  } = useVendorAvailability(pr?.id, { enabled: shouldCheck && Boolean(canCheckVendorAvailability) });
 
-  if (!canCheckVendorAvailability) return null;
+  // Someone who can see onboarding requests (ONBOARDING_VIEW) but not run the availability
+  // check still gets the request status below — only the availability section is hidden.
+  const showOnboardingOnly = !canCheckVendorAvailability && canViewOnboarding && onboardingRequests.length > 0;
+  if (!canCheckVendorAvailability && !showOnboardingOnly) return null;
+
+  // Mirrors VendorOnboardingService.create_request: a request can only be raised for an
+  // APPROVED PR, one open request at a time.
+  const canStartOnboarding = canCreateOnboarding && prStatusCode === "APPROVED";
 
   const vendors = availability?.vendors || [];
   const isAvailable = availability?.available === true;
@@ -69,38 +79,40 @@ export default function VendorAvailabilityPanel({ pr, departmentName, categoryNa
   return (
     <PageCard className="mb-4">
       <PageCardContent>
-        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700">Vendor Availability</h3>
-            <p className="mt-0.5 text-xs text-gray-500">
-              Checks whether an onboarded vendor already exists for {departmentName} ·{" "}
-              {categoryName}.
-            </p>
+        {!showOnboardingOnly && (
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700">Vendor Availability</h3>
+              <p className="mt-0.5 text-xs text-gray-500">
+                Checks whether an onboarded vendor already exists for {departmentName} ·{" "}
+                {categoryName}.
+              </p>
+            </div>
+            <Button
+              variant={shouldCheck ? "outline" : "primary"}
+              size="small"
+              className="w-full sm:w-auto"
+              onClick={() => {
+                setHasChecked(true);
+                if (shouldCheck) refetchAvailability();
+              }}
+              loading={availabilityLoading || availabilityFetching}
+              loadingText="Checking..."
+            >
+              {shouldCheck ? (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5" /> Re-check
+                </>
+              ) : (
+                <>
+                  <Search className="h-3.5 w-3.5" /> Check Vendor Availability
+                </>
+              )}
+            </Button>
           </div>
-          <Button
-            variant={shouldCheck ? "outline" : "primary"}
-            size="small"
-            className="w-full sm:w-auto"
-            onClick={() => {
-              setHasChecked(true);
-              if (shouldCheck) refetchAvailability();
-            }}
-            loading={availabilityLoading || availabilityFetching}
-            loadingText="Checking..."
-          >
-            {shouldCheck ? (
-              <>
-                <RefreshCw className="h-3.5 w-3.5" /> Re-check
-              </>
-            ) : (
-              <>
-                <Search className="h-3.5 w-3.5" /> Check Vendor Availability
-              </>
-            )}
-          </Button>
-        </div>
+        )}
 
-        {!shouldCheck && !requestsLoading && !openRequest && (
+        {!showOnboardingOnly && !shouldCheck && !requestsLoading && !openRequest && (
           <p className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-4 text-center text-xs text-gray-500">
             Run the availability check to see whether this requisition can go straight to RFQ.
           </p>
@@ -176,7 +188,7 @@ export default function VendorAvailabilityPanel({ pr, departmentName, categoryNa
                   onboarding request — a Vendor Intaker will complete the intake, Pre-Screen and
                   any NDA, and this requisition will resume at RFQ afterwards.
                 </p>
-                {canCreateOnboarding ? (
+                {canStartOnboarding ? (
                   <Button
                     variant="primary"
                     size="small"
@@ -187,7 +199,9 @@ export default function VendorAvailabilityPanel({ pr, departmentName, categoryNa
                   </Button>
                 ) : (
                   <p className="mt-2 text-xs text-amber-700">
-                    You don't have permission to raise an onboarding request.
+                    {canCreateOnboarding
+                      ? "Onboarding can only be requested while the requisition is Approved."
+                      : "You don't have permission to raise an onboarding request."}
                   </p>
                 )}
               </div>
@@ -243,12 +257,20 @@ export default function VendorAvailabilityPanel({ pr, departmentName, categoryNa
                   </p>
                 )}
 
-                {isOnboardingOpen(request.status_code) && canProcessOnboarding && (
+                {isOnboardingOpen(request.status_code) && canProcessOnboarding ? (
                   <Link to={onboardingWorkspaceLink(request.id)}>
                     <Button variant="outline" size="small" className="mt-3">
                       Open Internal Request <ArrowRight className="h-3.5 w-3.5" />
                     </Button>
                   </Link>
+                ) : (
+                  canViewOnboarding && (
+                    <Link to={onboardingWorkspaceLink(request.id)}>
+                      <Button variant="outline" size="small" className="mt-3">
+                        View Onboarding Request <ArrowRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </Link>
+                  )
                 )}
               </div>
             ))}

@@ -140,7 +140,7 @@ export default function VendorSelectionTab() {
     "Vendor",
     "RFQ",
     "Quotation No.",
-    "Amount",
+    "Grand Total",
     "Delivery Days",
     "Payment Terms",
     "Valid Until",
@@ -152,7 +152,7 @@ export default function VendorSelectionTab() {
     "vendor",
     "rfq",
     "quotationNumber",
-    "amount",
+    "grandTotal",
     "deliveryDays",
     "paymentTerms",
     "validUntil",
@@ -182,7 +182,9 @@ export default function VendorSelectionTab() {
           <span className="text-gray-400">Manual</span>
         ),
       quotationNumber: q.quotation_number || "—",
-      amount: q.total_amount != null ? formatCurrency(Number(q.total_amount)) : "—",
+      // quotation.total_amount is the vendor's overall/grand total — the same value the backend
+      // carries onto the PO at generation. The quotation header has no subtotal/tax breakdown.
+      grandTotal: q.total_amount != null ? formatCurrency(Number(q.total_amount)) : "—",
       deliveryDays: q.delivery_days != null ? q.delivery_days : "—",
       paymentTerms: q.payment_terms || "—",
       validUntil: formatDate(q.valid_until),
