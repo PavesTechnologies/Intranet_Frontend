@@ -13,6 +13,7 @@ import InvoiceOcrReviewPanel from "../components/InvoiceOcrReviewPanel";
 import InvoiceReviewEditor from "../components/InvoiceReviewEditor";
 import InvoiceReturnedBanner from "../components/InvoiceReturnedBanner";
 import InvoiceValidationPanel from "../components/InvoiceValidationPanel";
+import InvoiceTdsPanel from "../components/InvoiceTdsPanel";
 import InvoiceApprovalPanel from "../components/InvoiceApprovalPanel";
 import InvoicePaymentPanel from "../components/InvoicePaymentPanel";
 import InvoiceAuditHistory from "../components/InvoiceAuditHistory";
@@ -123,6 +124,7 @@ export default function InvoiceDetailPage() {
           ) : (
             <InvoiceOcrReviewPanel invoice={invoice} />
           )}
+          <InvoiceTdsPanel invoice={invoice} />
           <InvoiceApprovalPanel invoice={invoice} />
           <InvoiceValidationPanel />
 

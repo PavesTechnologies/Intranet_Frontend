@@ -723,6 +723,11 @@ export const normalizeProject = (project = {}) => {
     projectDuration,
     projectBudget,
     projectBudgetCurrency,
+    // RMS-sourced client contact fields carried straight through from the
+    // available-projects response — never re-derived or hardcoded here.
+    countryCode: project.countryCode || "",
+    email: project.email || "",
+    phoneNumber: project.phoneNumber || "",
     // Normalized to a plain yyyy-mm-dd (never a raw datetime/timestamp string) —
     // every date-range check downstream (Recurring's Billing Start/End Date
     // validation, Fixed Price's Effective From/To) does lexical string
@@ -1030,6 +1035,11 @@ export const normalizeBillingSchedulePeriod = (record = {}) => ({
   invoiceDate: toLocalDateString(record.invoiceDate) || "",
   remarks: record.remarks || "",
 });
+
+export const previewBillingSchedule = async (payload) => {
+  const response = await api.post(`${BILLING_CONFIGURATIONS_URL}/preview-schedule`, payload);
+  return asArray(unwrapData(response)).map(normalizeBillingSchedulePeriod);
+};
 
 // Maps a BillingRecurringConfiguration API record (GET /api/billing-recurring/...)
 // onto the wizard's internal Recurring Billing form-state shape (mirrors

@@ -337,19 +337,9 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
               </Button>
             </>
           ) : isTaxCompleted ? (
-            <>
-              <Button
-                variant="primary"
-                size="small"
-                onClick={handleGenerateInvoice}
-                className="flex items-center gap-1.5 text-xs font-semibold bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm"
-              >
-                <FileText className="h-3.5 w-3.5" /> Generate Invoice
-              </Button>
-              <Button variant="outline" size="small" onClick={loadOccurrenceDetail} className="flex items-center gap-1.5 text-xs">
-                <RefreshCw className="h-3.5 w-3.5" /> Refresh
-              </Button>
-            </>
+            <Button variant="outline" size="small" onClick={loadOccurrenceDetail} className="flex items-center gap-1.5 text-xs">
+              <RefreshCw className="h-3.5 w-3.5" /> Refresh
+            </Button>
           ) : isReady ? (
             <Button
               variant="primary"
@@ -423,7 +413,7 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
             onClick={handleGenerateInvoice}
             className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center justify-center gap-1.5 text-xs font-semibold shadow-sm shrink-0"
           >
-            <FileText className="h-3.5 w-3.5" /> Generate Invoice
+            <FileText className="h-3.5 w-3.5" /> View Invoice Generation
           </Button>
         </div>
       ) : null}

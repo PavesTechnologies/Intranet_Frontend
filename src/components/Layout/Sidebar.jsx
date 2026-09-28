@@ -106,6 +106,16 @@ const accountReceivableSubmenu = [
   {
     label: "Configurations",
     to: "/account-receivable/master-data",
+    children: [
+      {
+        label: "Configurations Overview",
+        to: "/account-receivable/master-data",
+      },
+      {
+        label: "Seller Information / Company Profile",
+        to: "/account-receivable/master-data/company-profile",
+      },
+    ],
   },
 ];
 
@@ -130,7 +140,10 @@ const airsSubmenu = [
   { label: "Pipeline", to: "/ai-screening/pipeline" },
   { label: "Skill Ontology", to: "/ai-screening/skill-ontology" },
   { label: "Talent Pool", to: "/ai-screening/talent-pool" },
-  { label: "Settings", to: "/ai-screening/settings" },
+  // `roles` = only shown to users with one of these roles, whichever
+  // per-role menu below they get (enforced by the final filter in the
+  // component). /ai-screening/settings is HR_ADMIN-only in App.jsx.
+  { label: "Settings", to: "/ai-screening/settings", roles: ["HR_ADMIN"] },
 ];
 
 // Interview Calendar (/ai-screening/interview-calendar) is HR_ADMIN/RECRUITER only
@@ -141,12 +154,14 @@ const airsSubmenu = [
 const interviewCalendarItem = { label: "Interview Calendar", to: "/ai-screening/interview-calendar" };
 
 // HR_ADMIN gets a trimmed-down AIRS menu — only these items, plus
-// Prompt Templates below (HR_ADMIN-only, not part of the general airsSubmenu).
+// Prompt Templates below (HR_ADMIN-only, not part of the general airsSubmenu)
+// and Settings (/ai-screening/settings is HR_ADMIN-only in App.jsx).
 const hrAdminAirsSubmenu = [
   ...airsSubmenu.filter((item) => ["Dashboard", "JD Management", "Campaigns", "Pipeline"].includes(item.label)),
   ...airsSubmenu.filter((item) => ["Talent Pool", "Skill Ontology"].includes(item.label)),
   interviewCalendarItem,
   { label: "Prompt Templates", to: "/ai-screening/prompt-templates" },
+  ...airsSubmenu.filter((item) => item.label === "Settings"),
 ];
 
 // RECRUITER gets a trimmed-down AIRS menu — only these items.
@@ -247,15 +262,20 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   const isRecruiter = hasRole(["RECRUITER"]);
   const isHiringManager = hasRole(["HIRING_MANAGER"]);
   // Everyone else (plain HR) falls through to the full menu, which must not
-  // offer Dashboard — /ai-screening/dashboard is HR_ADMIN/RECRUITER only, so
-  // the link would lead straight to the unauthorized page.
-  const filteredAirsSubmenu = isHrAdmin
+  // offer Dashboard or Settings — /ai-screening/dashboard is HR_ADMIN/RECRUITER
+  // only and /ai-screening/settings is HR_ADMIN only, so either link would
+  // lead straight to the unauthorized page.
+  const roleAirsSubmenu = isHrAdmin
     ? hrAdminAirsSubmenu
     : isRecruiter
       ? recruiterAirsSubmenu
       : isHiringManager
         ? hiringManagerAirsSubmenu
         : airsSubmenu.filter((item) => item.label !== "Dashboard");
+  // Final guard: an item that declares `roles` (e.g. Settings -> HR_ADMIN)
+  // never appears for anyone without one of them, even if a per-role list
+  // above is edited to include it.
+  const filteredAirsSubmenu = roleAirsSubmenu.filter((item) => !item.roles || hasRole(item.roles));
 
   // State for User Management Hover
   const [userHovered, setUserHovered] = useState(false);
