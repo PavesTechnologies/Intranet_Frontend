@@ -85,7 +85,9 @@ export function getDocumentAvailability(record = {}, localOverride = null) {
       record.document_available ||
       record.document_uploaded ||
       record.document_path ||
-      record.document_url,
+      record.document_url ||
+      // GoodsReceiptDTO stores its uploaded document as `file_path`.
+      record.file_path,
   );
 
   return { available, fileName };
