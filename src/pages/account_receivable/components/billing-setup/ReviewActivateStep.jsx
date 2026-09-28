@@ -275,6 +275,9 @@ function RoleRatesList({ roles, currency }) {
 export default function ReviewActivateStep({ wizardData, onEditStep }) {
   const { projectInfo = {}, billingConfig = {}, controls = {}, approvalStatus, billingStatus } = wizardData;
 
+  const billingContext = projectInfo.billingContext || "PROJECT";
+  const isProductService = billingContext === "PRODUCT_SERVICE";
+
   const currency = projectInfo.projectBudgetCurrency || projectInfo.currency || "";
 
   const frequencyNameCode = String(
@@ -330,14 +333,23 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
                 </span>
               </div>
               <h2 className="text-lg font-bold text-slate-900 sm:text-xl">
-                {projectInfo.projectName || "Billing Setup"}
+                {isProductService ? projectInfo.productName || "Billing Setup" : projectInfo.projectName || "Billing Setup"}
               </h2>
-              <p className="text-xs font-medium text-slate-500">
-                Project Code: <span className="font-bold text-slate-800">{projectInfo.projectCode || "—"}</span>
-              </p>
-              <p className="text-xs font-medium text-slate-500">
-                Primary Location: <span className="font-bold text-slate-800">{projectInfo.primaryLocation || "—"}</span>
-              </p>
+              {isProductService ? (
+                <p className="text-xs font-medium text-slate-500">
+                  Product / Service Description:{" "}
+                  <span className="font-bold text-slate-800">{projectInfo.productDescription || "—"}</span>
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs font-medium text-slate-500">
+                    Project Code: <span className="font-bold text-slate-800">{projectInfo.projectCode || "—"}</span>
+                  </p>
+                  <p className="text-xs font-medium text-slate-500">
+                    Primary Location: <span className="font-bold text-slate-800">{projectInfo.primaryLocation || "—"}</span>
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
@@ -557,73 +569,20 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
 
           {billingConfig.billingType === "RECURRING" && (() => {
             const recurring = billingConfig.recurring || {};
-            const totalVal = Number(recurring.contractValue) || 0;
-            const pmsBudgetVal =
-              recurring.pmsProjectBudget !== "" && recurring.pmsProjectBudget !== null && recurring.pmsProjectBudget !== undefined
-                ? Number(recurring.pmsProjectBudget)
-                : projectInfo.projectBudget !== "" && projectInfo.projectBudget !== null && projectInfo.projectBudget !== undefined
-                ? Number(projectInfo.projectBudget)
-                : null;
-
-            const hasPmsBudget = pmsBudgetVal !== null && pmsBudgetVal !== undefined && !isNaN(pmsBudgetVal) && pmsBudgetVal > 0;
-            const isSameAmount = hasPmsBudget && totalVal === pmsBudgetVal;
-            const isDifferentAmount = hasPmsBudget && totalVal !== pmsBudgetVal;
-
-            let contractBudgetRows = [];
-            if (isSameAmount) {
-              contractBudgetRows = [
-                {
-                  label: "Contract / Project Budget",
-                  value: totalVal ? formatMoney(totalVal, currency) : "—",
-                },
-              ];
-            } else if (isDifferentAmount) {
-              contractBudgetRows = [
-                {
-                  label: (
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <span>Contract Value</span>
-                      <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200">
-                        Billing Amount Used
-                      </span>
-                    </span>
-                  ),
-                  value: totalVal ? formatMoney(totalVal, currency) : "—",
-                },
-                {
-                  label: "PMS Project Budget",
-                  value: formatMoney(pmsBudgetVal, currency),
-                },
-              ];
-            } else {
-              contractBudgetRows = [
-                {
-                  label: "Contract Value",
-                  value: totalVal ? formatMoney(totalVal, currency) : "—",
-                },
-              ];
-            }
+            const amount = Number(recurring.contractValue) || 0;
+            const isPmsSource = recurring.contractValueSource === "PMS";
+            const budgetSourceLabel = isProductService ? "Manual" : isPmsSource ? "Project Budget" : "Manual";
+            const renewalModeLabel = recurring.renewalMode === "CUSTOM" ? "Custom" : recurring.renewalMode === "SAME_AS_PREVIOUS" ? "Same as Previous" : "Not configured";
 
             return (
               <div className="space-y-3">
-                {isSameAmount && (
-                  <div className="flex items-center gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/70 px-3.5 py-2 text-xs font-medium text-emerald-900">
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                    <span>Contract Value and PMS Project Budget are the same ({formatMoney(totalVal, currency)}).</span>
-                  </div>
-                )}
-                {isDifferentAmount && (
-                  <div className="flex items-center gap-2 rounded-lg border border-amber-200/80 bg-amber-50/70 px-3.5 py-2 text-xs font-medium text-amber-900">
-                    <Info className="h-4 w-4 shrink-0 text-amber-600" />
-                    <span>
-                      Contract Value ({formatMoney(totalVal, currency)}) is used for billing because it differs from the PMS Project Budget ({formatMoney(pmsBudgetVal, currency)}).
-                    </span>
-                  </div>
-                )}
                 <PricingTable
                   rows={[
-                    ...contractBudgetRows,
+                    { label: "Billing Context", value: isProductService ? "Product / Service" : "Project" },
+                    { label: "Budget Source", value: budgetSourceLabel },
+                    { label: "Total Budget", value: amount ? formatMoney(amount, currency) : "—" },
                     { label: "Billing Frequency", value: billingFrequencyLabel },
+                    { label: "Renewal", value: renewalModeLabel },
                     ...(recurring.remarks ? [{ label: "Remarks", value: recurring.remarks }] : []),
                   ]}
                 />
@@ -658,14 +617,16 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
                 return `${from} – ${to}`;
               })()}
             />
-            <DataRow
-              label="Project Duration"
-              value={
-                projectInfo.startDate
-                  ? `${formatDisplayDate(projectInfo.startDate)} – ${formatDisplayDate(projectInfo.endDate) || "Ongoing"}`
-                  : "—"
-              }
-            />
+            {!isProductService && (
+              <DataRow
+                label="Project Duration"
+                value={
+                  projectInfo.startDate
+                    ? `${formatDisplayDate(projectInfo.startDate)} – ${formatDisplayDate(projectInfo.endDate) || "Ongoing"}`
+                    : "—"
+                }
+              />
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 py-6 text-center">
