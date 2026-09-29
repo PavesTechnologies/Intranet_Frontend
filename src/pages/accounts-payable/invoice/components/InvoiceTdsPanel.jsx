@@ -60,6 +60,12 @@ export default function InvoiceTdsPanel({ invoice }) {
     canDetermineTds &&
     invoice.status !== INVOICE_STATUS.OCR_REVIEW_PENDING &&
     invoice.status !== INVOICE_STATUS.OCR_FAILED;
+  // Once the invoice has actually been sent for approval, the payment nature is what the
+  // approvers are reviewing against — correcting it out from under an in-flight (or completed)
+  // approval would silently invalidate a decision already made. OCR_REVIEWED is specifically
+  // "reviewed, not yet sent" (see InvoiceApprovalPanel's tdsBlocksSend), so correction stays open
+  // only through that window, same as Determine's own status gate above.
+  const canCorrectNature = isDetermined && canEditTds && invoice.status === INVOICE_STATUS.OCR_REVIEWED;
 
   const handleDetermine = () => {
     determineTds.mutate(invoice.id, {
@@ -130,7 +136,7 @@ export default function InvoiceTdsPanel({ invoice }) {
             <dl className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               <Field label="TDS Applicable" value={tds.tds_applicable ? "Yes" : "No"} />
               <div>
-                {isCorrecting ? (
+                {canCorrectNature && isCorrecting ? (
                   <FormSelect
                     label="Payment Nature"
                     name="paymentNature"
@@ -200,12 +206,12 @@ export default function InvoiceTdsPanel({ invoice }) {
             )}
 
             <div className="flex flex-wrap justify-end gap-2">
-              {isDetermined && canEditTds && !isCorrecting && (
+              {canCorrectNature && !isCorrecting && (
                 <Button variant="outline" size="small" onClick={startCorrecting}>
                   <PencilLine size={14} /> Correct Payment Nature
                 </Button>
               )}
-              {isDetermined && isCorrecting && (
+              {canCorrectNature && isCorrecting && (
                 <>
                   <Button variant="outline" size="small" onClick={() => setIsCorrecting(false)}>
                     Cancel

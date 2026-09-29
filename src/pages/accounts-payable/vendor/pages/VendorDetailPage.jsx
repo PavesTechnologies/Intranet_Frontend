@@ -27,6 +27,9 @@ import VendorBankList from "../components/VendorBankList";
 import VendorTaxTab from "../components/VendorTaxTab";
 import VendorPoTab from "../components/VendorPoTab";
 import VendorGrnTab from "../components/VendorGrnTab";
+import VendorNdaTab from "../components/VendorNdaTab";
+import VendorDocumentsTab from "../components/VendorDocumentsTab";
+import VendorActivityCards from "../components/VendorActivityCards";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -35,6 +38,8 @@ const TABS = [
   { id: "tax", label: "Tax" },
   { id: "po", label: "PO" },
   { id: "grn", label: "GRN" },
+  { id: "nda", label: "NDA" },
+  { id: "documents", label: "Documents" },
 ];
 
 const DetailRow = ({ label, value }) => (
@@ -319,6 +324,13 @@ export default function VendorDetailPage() {
                 />
               </div>
 
+              {/* Counts and the PO total come from the vendor-scoped collection endpoints;
+                  nothing on these cards is hardcoded. */}
+              <div className="mt-6 border-t border-gray-100 pt-4">
+                <h2 className={`${Fonts.subheading} mb-3`}>Vendor Activity</h2>
+                <VendorActivityCards vendorId={vendorId} />
+              </div>
+
               {/* Department / Purchase Category are engagement attributes
                   (vendor_category_mapping), not Vendor Master columns. */}
               <div className="mt-6 border-t border-gray-100 pt-4">
@@ -364,6 +376,18 @@ export default function VendorDetailPage() {
           <VendorGrnTab
             vendorId={vendorId}
             vendorName={vendor.vendor_name}
+          />
+        )}
+
+        {activeTab === "nda" && (
+          <VendorNdaTab
+            vendorId={vendorId}
+          />
+        )}
+
+        {activeTab === "documents" && (
+          <VendorDocumentsTab
+            vendorId={vendorId}
           />
         )}
       </div>

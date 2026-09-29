@@ -48,6 +48,14 @@ export function mapInvoiceRecord(raw = {}) {
     taxAmount: toNumber(raw.tax_amount),
     netAmount: toNumber(raw.net_amount),
     amountPaid: toNumber(raw.amount_paid),
+    // TDS-adjusted payable figure — present once TDS has been determined for this invoice, on
+    // both the list and detail responses (same shape, see this file's own header comment).
+    // tds_applicable is genuinely tri-state on the wire (true/false/absent-until-determined) —
+    // preserved as-is rather than coerced to a boolean, so "not yet determined" stays
+    // distinguishable from "determined, not applicable" wherever that matters.
+    tdsApplicable: raw.tds_applicable ?? null,
+    tdsAmount: raw.tds_amount != null ? toNumber(raw.tds_amount) : null,
+    payableAmount: raw.payable_amount != null ? toNumber(raw.payable_amount) : null,
     poId: raw.po_id ?? null,
     paymentTermId: raw.payment_term_id ?? null,
     departmentId: raw.department_id ?? null,
