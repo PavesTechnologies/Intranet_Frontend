@@ -33,11 +33,22 @@ const TABLE_ALIGNMENTS = {
   client: "left",
   project: "left",
   billingType: "left",
-  billingPeriod: "center",
+  billingPeriod: "left",
   status: "center",
   reference: "left",
   actions: "center",
 };
+
+const TABLE_HEADER_ALIGNMENTS = {
+  client: "center",
+  project: "center",
+  billingType: "center",
+  billingPeriod: "center",
+  status: "center",
+  reference: "center",
+  actions: "center",
+};
+
 
 const FILTER_BUTTON_CLASS =
   "flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-left text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/30";
@@ -267,8 +278,8 @@ export default function AcquisitionQueue({
         </div>
 
         {/* Controls Bar: Search Input + FilterListbox + Clear Button */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex-1">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex-1 w-full lg:max-w-md">
             <SearchInput
               value={activeSearch}
               onSearch={handleSearchChange}
@@ -334,6 +345,7 @@ export default function AcquisitionQueue({
               columns={TABLE_COLUMNS}
               rows={tableRows}
               alignments={TABLE_ALIGNMENTS}
+              headerAlignments={TABLE_HEADER_ALIGNMENTS}
               loading={loading}
               emptyMessage="No matching projects. Adjust your search or status filter."
             />

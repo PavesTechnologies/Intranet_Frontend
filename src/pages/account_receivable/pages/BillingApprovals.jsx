@@ -31,6 +31,7 @@ import { getBillingTypeDisplayName } from "../utils/billingType";
 const PAGE_SIZE = 5;
 
 const STATUS_TABS = {
+  ALL: "ALL",
   PENDING: "PENDING_APPROVAL",
   APPROVED: "APPROVED",
   REJECTED: "REJECTED",
@@ -38,16 +39,15 @@ const STATUS_TABS = {
   // approvalStatus === APPROVED plus effectiveTo/project end date having
   // already passed (see isBillingSetupExpired below).
   EXPIRED: "EXPIRED",
-  ALL: "ALL",
 };
 
 // Options for the shared FilterListbox — same {label, value} shape used by every
 // other AR list page's status filter (see Overview.jsx's APPROVAL_STATUS_OPTIONS).
 const STATUS_FILTER_OPTIONS = [
+  { value: STATUS_TABS.ALL, label: "All Requests" },
   { value: STATUS_TABS.PENDING, label: "Pending Approvals" },
   { value: STATUS_TABS.APPROVED, label: "Approved" },
   { value: STATUS_TABS.REJECTED, label: "Rejected" },
-  { value: STATUS_TABS.ALL, label: "All Requests" },
 ];
 
 const TABLE_HEADERS = [
@@ -73,6 +73,31 @@ const TABLE_COLUMNS = [
   "approvalStatus",
   "action",
 ];
+
+const TABLE_ALIGNMENTS = {
+  project: "left",
+  client: "left",
+  billingType: "left",
+  billingFrequency: "left",
+  paymentTerms: "left",
+  taxRegion: "left",
+  effectivePeriod: "left",
+  approvalStatus: "center",
+  action: "center",
+};
+
+
+const TABLE_HEADER_ALIGNMENTS = {
+  client: "center",
+  project: "center",
+  billingType: "center",
+  billingFrequency: "center",
+  paymentTerms: "center",
+  taxRegion: "center",
+  effectivePeriod: "center",
+  approvalStatus: "center",
+  action: "center",
+}
 
 function parseTimestamp(val) {
   if (!val) return null;
@@ -168,7 +193,7 @@ export default function BillingApprovals() {
   const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusTab, setStatusTab] = useState(STATUS_TABS.PENDING);
+  const [statusTab, setStatusTab] = useState(STATUS_TABS.ALL);
   const [currentPage, setCurrentPage] = useState(1);
 
   const [reviewingId, setReviewingId] = useState(null);
@@ -220,7 +245,14 @@ export default function BillingApprovals() {
         }
       });
 
-      setConfigs(Array.from(combinedMap.values()));
+      const approvalConfigs = Array.from(combinedMap.values()).filter(
+        (config) =>
+          config.approvalStatus === STATUS_TABS.PENDING ||
+          config.approvalStatus === STATUS_TABS.APPROVED ||
+          config.approvalStatus === STATUS_TABS.REJECTED
+      );
+
+      setConfigs(approvalConfigs);
     } catch (error) {
       showStatusToast(getApiErrorMessage(error, "Failed to load billing configuration approvals."), "error");
     } finally {
@@ -234,11 +266,11 @@ export default function BillingApprovals() {
 
   const tabCounts = useMemo(() => {
     return {
-      PENDING: configs.filter((c) => c.approvalStatus === "PENDING_APPROVAL").length,
-      APPROVED: configs.filter((c) => c.approvalStatus === "APPROVED").length,
-      REJECTED: configs.filter((c) => c.approvalStatus === "REJECTED").length,
-      EXPIRED: configs.filter(isBillingSetupExpired).length,
       ALL: configs.length,
+      PENDING: configs.filter((c) => c.approvalStatus === STATUS_TABS.PENDING).length,
+      APPROVED: configs.filter((c) => c.approvalStatus === STATUS_TABS.APPROVED).length,
+      REJECTED: configs.filter((c) => c.approvalStatus === STATUS_TABS.REJECTED).length,
+      EXPIRED: configs.filter(isBillingSetupExpired).length,
     };
   }, [configs]);
 
@@ -508,6 +540,8 @@ export default function BillingApprovals() {
               columns={TABLE_COLUMNS}
               rows={tableRows}
               loading={loading}
+              alignments={TABLE_ALIGNMENTS}
+              headerAlignments={TABLE_HEADER_ALIGNMENTS}
               emptyMessage="No billing configuration requests found for this filter."
             />
             {!loading && filteredConfigs.length > 0 && (

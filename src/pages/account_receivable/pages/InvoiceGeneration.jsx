@@ -449,11 +449,10 @@ export default function InvoiceGeneration() {
 
           {st === "REJECTED" && (
             <span
-              className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${
-                item.correctionRequired
+              className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${item.correctionRequired
                   ? "bg-rose-50 text-rose-700 border-rose-200"
                   : "bg-emerald-50 text-emerald-700 border-emerald-200"
-              }`}
+                }`}
             >
               {item.correctionRequired
                 ? "Correction Required"
@@ -517,9 +516,8 @@ export default function InvoiceGeneration() {
             disabled={refreshing}
           >
             <RefreshCw
-              className={`mr-1.5 h-3.5 w-3.5 ${
-                refreshing ? "animate-spin" : ""
-              }`}
+              className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""
+                }`}
             />
             Refresh
           </Button>
@@ -617,8 +615,8 @@ export default function InvoiceGeneration() {
       {/* Controls & Invoice Queue Table */}
       <PageCard>
         <PageCardContent className="space-y-4 p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative flex-1">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex-1 w-full lg:max-w-md">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
 
               <input
@@ -689,7 +687,7 @@ export default function InvoiceGeneration() {
               alignments={tableAlignments}
               emptyMessage={
                 searchQuery ||
-                statusFilter !== "ALL"
+                  statusFilter !== "ALL"
                   ? "No invoices match your search or filter."
                   : "No invoices generated yet"
               }
