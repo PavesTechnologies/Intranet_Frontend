@@ -6,6 +6,7 @@ const asNumber = (v) => (isEmpty(v) ? "-" : v);
 
 const FIELDS = [
   { key: "skills_weight", label: "Skills Weight", format: asPct },
+  { key: "functional_weight", label: "Functional Weight", format: asPct },
   { key: "experience_weight", label: "Experience Weight", format: asPct },
   { key: "education_weight", label: "Education Weight", format: asPct },
   { key: "deterministic_threshold", label: "Requirements Threshold", format: asNumber },

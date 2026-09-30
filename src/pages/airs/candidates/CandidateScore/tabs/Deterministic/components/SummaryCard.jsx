@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertTriangle, Target, Layers, CheckCircle2, Clock } from "lucide-react";
+import { AlertTriangle, Target, Layers, CheckCircle2, Clock, ShieldCheck } from "lucide-react";
 import ScoreRing from "../../../../components/ScoreRing";
 import { renderDeterministicStatusBadge } from "../../../../utils/scoreBreakdownUtils.jsx";
 import { textOrDash, numberOr, isEmpty, formatDateTime, arr } from "../../../../utils/candidateDataUtils";
@@ -31,6 +31,18 @@ export default function SummaryCard({ summary }) {
 
   const failureReasons = arr(summary.failure_reasons);
 
+  // Coverage the hard gate actually checks: core skills only, or every
+  // mandatory skill on legacy JDs whose skills were never classified.
+  // Absent on breakdowns scored before the core-only gate existed.
+  const hasGateCoverage = !isEmpty(summary.core_coverage_pct);
+  const isLegacyGate = summary.gate_skill_scope === "ALL_MANDATORY";
+  const gateCoverageValue = hasGateCoverage
+    ? `${numberOr(summary.core_coverage_pct).toFixed(1)}%` +
+      (isLegacyGate || isEmpty(summary.missing_core_skill_count)
+        ? ""
+        : ` · ${numberOr(summary.missing_core_skill_count)} missing`)
+    : null;
+
   return (
     <div className={`bg-white border rounded-2xl shadow-sm overflow-hidden ${passed ? "border-emerald-100" : "border-rose-100"}`}>
       <div className={`h-1 w-full ${passed ? "bg-emerald-500" : "bg-rose-500"}`} />
@@ -51,6 +63,13 @@ export default function SummaryCard({ summary }) {
           </div>
 
           <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {hasGateCoverage && (
+              <StatTile
+                icon={ShieldCheck}
+                label={isLegacyGate ? "Gate Coverage (all mandatory)" : "Core Coverage"}
+                value={gateCoverageValue}
+              />
+            )}
             <StatTile
               icon={Target}
               label="Mandatory Coverage"

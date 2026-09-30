@@ -103,6 +103,9 @@ export function mapParsedResumeToCandidate(raw, fallback = {}) {
     // AI evaluation's recommendation below.
     summary: parsed.summary || "",
     aiCandidateSummary: aiSummary,
+    // Scoring layers whose task dead-lettered and still have no result -
+    // [{ dlq_id, layer, task_type, error_message, retry_count, can_retry, ... }].
+    failedLayers: arr(data.failed_layers),
 
     // No score-breakdown endpoint backs this record directly — the
     // Deterministic tab fetches its own breakdown by `id` — these just keep
