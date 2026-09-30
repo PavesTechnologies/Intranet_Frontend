@@ -1,18 +1,32 @@
+import { useState } from "react";
+import { Pencil } from "lucide-react";
+
 import GenericTable from "../../../../components/Table/table";
+import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import StatusPill from "../../vendor-intake/components/PreScreenStatusBadge";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 import { getApiErrorMessage } from "../../utils/apiError";
 import useDepartments from "../../system-configuration/hooks/useDepartments";
 import usePurchaseCategories from "../../system-configuration/hooks/usePurchaseCategories";
+import { useApPermissions } from "../../hooks/useApPermissions";
 import { useVendorEngagementsByVendor } from "../../vendor-intake/hooks/useVendorIntake";
 import {
+  effectiveNdaRequired,
   PRE_SCREEN_RESULT_LABEL,
   PRE_SCREEN_RESULT_TONE,
 } from "../../vendor-intake/constants/vendorIntake";
+import EditEngagementModal from "./EditEngagementModal";
 
-const HEADERS = ["Department", "Purchase Category", "Purpose", "Pre-Screen", "NDA Required"];
-const COLUMNS = ["department", "category", "purpose", "preScreen", "nda"];
+const HEADERS = [
+  "Department",
+  "Purchase Category",
+  "Purpose",
+  "Pre-Screen",
+  "NDA Required",
+  "Action",
+];
+const COLUMNS = ["department", "category", "purpose", "preScreen", "nda", "action"];
 
 /**
  * Vendor Engagements for one vendor.
@@ -26,11 +40,18 @@ const COLUMNS = ["department", "category", "purpose", "preScreen", "nda"];
  * @param {{ vendorId: string|number }} props
  */
 export default function VendorEngagementsSection({ vendorId }) {
+  // The engagement row being edited, or null. Held here (not inside the modal) so the modal
+  // always opens seeded from the row's current server values.
+  const [editingEngagement, setEditingEngagement] = useState(null);
+
+  const { canEditVendor } = useApPermissions();
+
   const {
     data: engagements = [],
     isLoading,
     isError,
     error,
+    refetch,
   } = useVendorEngagementsByVendor(vendorId);
 
   const { data: departments = [] } = useDepartments();
@@ -40,11 +61,6 @@ export default function VendorEngagementsSection({ vendorId }) {
     departments.find((d) => d.id === id)?.name || (id ? `Department #${id}` : "—");
   const categoryName = (id) =>
     categories.find((c) => c.id === id)?.name || (id ? `Category #${id}` : "—");
-
-  // The recorded decision wins over the screening-rule recommendation — the same precedence
-  // the backend itself applies; neither value is computed here.
-  const ndaRequired = (engagement) =>
-    engagement.nda_final_required ?? engagement.nda_recommended ?? null;
 
   const rows = engagements.map((engagement) => ({
     department: departmentName(engagement.department_id),
@@ -61,7 +77,7 @@ export default function VendorEngagementsSection({ vendorId }) {
       "—"
     ),
     nda: (() => {
-      const required = ndaRequired(engagement);
+      const required = effectiveNdaRequired(engagement);
       if (required === null) return "—";
       return (
         <StatusPill
@@ -70,6 +86,18 @@ export default function VendorEngagementsSection({ vendorId }) {
         />
       );
     })(),
+    action: canEditVendor ? (
+      <Button
+        size="small"
+        variant="outline"
+        onClick={() => setEditingEngagement(engagement)}
+        aria-label={`Edit engagement ${engagement.engagement_id}`}
+      >
+        <Pencil className="h-3.5 w-3.5" /> Edit
+      </Button>
+    ) : (
+      "-"
+    ),
   }));
 
   return (
@@ -96,6 +124,16 @@ export default function VendorEngagementsSection({ vendorId }) {
       ) : (
         <GenericTable headers={HEADERS} columns={COLUMNS} rows={rows} />
       )}
+
+      <EditEngagementModal
+        isOpen={!!editingEngagement}
+        engagement={editingEngagement}
+        vendorId={vendorId}
+        onClose={() => setEditingEngagement(null)}
+        // The mutation already invalidates this query; the explicit refetch makes the refresh
+        // immediate even where the list is being rendered from a still-fresh cache.
+        onSaved={refetch}
+      />
     </div>
   );
 }

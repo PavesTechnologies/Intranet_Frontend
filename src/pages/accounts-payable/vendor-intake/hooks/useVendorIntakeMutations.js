@@ -37,14 +37,40 @@ export const useRunPreScreen = (engagementId) => {
   });
 };
 
+/**
+ * PUT /apm/vendor-intake/{engagement_id} - the Edit Engagement save.
+ *
+ * `vendorId` is taken as an argument so the vendor's engagement list (which is what Vendor
+ * Details renders) is refreshed alongside the engagement itself; without it the table would
+ * keep showing the pre-edit department/category until a full reload.
+ *
+ * Only department/category/purpose travel here. A changed NDA decision is a SEPARATE call
+ * through useUpdateNdaDecision below - the existing endpoint - so no NDA logic is duplicated.
+ */
+export const useUpdateVendorEngagement = (engagementId, vendorId) => {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => vendorIntakeService.updateVendorEngagement(engagementId, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: VENDOR_ENGAGEMENT_KEY(engagementId) });
+      qc.invalidateQueries({ queryKey: VENDOR_ENGAGEMENTS_BY_VENDOR_KEY(vendorId) });
+    },
+  });
+};
+
 /** PATCH /apm/vendor-intake/{engagement_id}/nda-decision. */
-export const useUpdateNdaDecision = (engagementId) => {
+export const useUpdateNdaDecision = (engagementId, vendorId) => {
   const qc = useQueryClient();
 
   return useMutation({
     mutationFn: (decision) => vendorIntakeService.updateNdaDecision(engagementId, decision),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: VENDOR_ENGAGEMENT_KEY(engagementId) });
+      // Optional: only the Vendor Details caller knows which vendor's list is on screen.
+      if (vendorId) {
+        qc.invalidateQueries({ queryKey: VENDOR_ENGAGEMENTS_BY_VENDOR_KEY(vendorId) });
+      }
     },
   });
 };
