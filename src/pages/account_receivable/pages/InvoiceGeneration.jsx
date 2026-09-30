@@ -11,6 +11,7 @@ import {
   Eye,
   AlertCircle,
   MailCheck,
+  FilterX,
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
@@ -20,6 +21,7 @@ import Loader from "../../../components/ui/Loader";
 import StatusBadge from "../../../components/status/statusbadge";
 import Pagination from "../../../components/Pagination/pagination";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
+import SearchInput from "../../../components/filter/Searchbar";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import ARTable from "../components/common/ARTable";
 import ActionMenu from "../components/common/ActionMenu";
@@ -450,8 +452,8 @@ export default function InvoiceGeneration() {
           {st === "REJECTED" && (
             <span
               className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${item.correctionRequired
-                  ? "bg-rose-50 text-rose-700 border-rose-200"
-                  : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                ? "bg-rose-50 text-rose-700 border-rose-200"
+                : "bg-emerald-50 text-emerald-700 border-emerald-200"
                 }`}
             >
               {item.correctionRequired
@@ -617,52 +619,46 @@ export default function InvoiceGeneration() {
         <PageCardContent className="space-y-4 p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex-1 w-full lg:max-w-md">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-
-              <input
-                type="text"
-                placeholder="Search by invoice number, project, client, or snapshot..."
+              <SearchInput
                 value={searchQuery}
-                onChange={(e) =>
-                  setSearchQuery(e.target.value)
-                }
-                className="w-full rounded-lg border border-slate-200 pl-9 pr-4 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onSearch={(val) => setSearchQuery(val)}
+                placeholder="Search by invoice number, project, client, or snapshot..."
               />
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                <Filter className="h-3.5 w-3.5" />
-                Status:
+              <div className="w-48 sm:w-52">
+                <select
+                  value={statusFilter}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value)
+                  }
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="GENERATED">Invoice Generated</option>
+                  <option value="PENDING_APPROVAL">Pending Approval</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                </select>
               </div>
 
-              <select
-                value={statusFilter}
-                onChange={(e) =>
-                  setStatusFilter(e.target.value)
-                }
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value="ALL">
-                  All Statuses
-                </option>
-
-                <option value="GENERATED">
-                  Invoice Generated
-                </option>
-
-                <option value="PENDING_APPROVAL">
-                  Pending Approval
-                </option>
-
-                <option value="APPROVED">
-                  Approved
-                </option>
-
-                <option value="REJECTED">
-                  Rejected
-                </option>
-              </select>
+              {(statusFilter !== "ALL" || searchQuery) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter("ALL");
+                    setSearchQuery("");
+                    setCurrentPage(1);
+                  }}
+                  title="Clear all search and status filters"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
+                >
+                  <FilterX className="h-3.5 w-3.5 text-slate-500" />
+                  <span>Clear</span>
+                </button>
+              )}
             </div>
           </div>
 

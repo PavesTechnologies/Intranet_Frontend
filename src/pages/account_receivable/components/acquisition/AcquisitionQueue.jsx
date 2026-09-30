@@ -264,18 +264,7 @@ export default function AcquisitionQueue({
   return (
     <PageCard>
       <PageCardContent className="space-y-4 p-4 sm:p-5">
-        {/* Header Title & Result Counter — "Acquisition Queue" preserved */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Layers className="h-4 w-4 text-indigo-600" />
-            <h2 className="text-sm font-semibold text-slate-900">Acquisition Queue</h2>
-          </div>
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-            <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 font-mono font-semibold text-slate-700">
-              {filteredConfigs.length} {filteredConfigs.length === 1 ? "project" : "projects"}
-            </span>
-          </div>
-        </div>
+
 
         {/* Controls Bar: Search Input + FilterListbox + Clear Button */}
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
