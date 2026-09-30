@@ -6,6 +6,7 @@ import Modal from "../../../../components/Modal/modal";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { BILLING_MODE_LABELS } from "../../data/wizardOptions";
 import { getBillingTypeDisplayName } from "../../utils/billingType";
+import { formatCurrency } from "../../utils/format";
 
 const labelizeStatus = (value) => {
   if (!value) return "";
@@ -57,10 +58,8 @@ function formatDisplayDate(isoValue) {
 
 function formatMoney(value, currency) {
   if (value === "" || value === null || value === undefined) return null;
-  const num = Number(value);
-  if (Number.isNaN(num)) return String(value);
-  const formatted = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(num);
-  return currency ? `${currency} ${formatted}` : formatted;
+  if (Number.isNaN(Number(value))) return String(value);
+  return formatCurrency(value, currency);
 }
 
 function ratePeriodSuffix(period) {
@@ -582,7 +581,9 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
                     { label: "Budget Source", value: budgetSourceLabel },
                     { label: "Total Budget", value: amount ? formatMoney(amount, currency) : "—" },
                     { label: "Billing Frequency", value: billingFrequencyLabel },
-                    { label: "Renewal", value: renewalModeLabel },
+                    // Renewal is a Subscription (Product/Service) concept only —
+                    // a project-based Recurring configuration is never renewed.
+                    ...(isProductService ? [{ label: "Renewal", value: renewalModeLabel }] : []),
                     ...(recurring.remarks ? [{ label: "Remarks", value: recurring.remarks }] : []),
                   ]}
                 />

@@ -235,7 +235,14 @@ export default function ProjectStep({ value = {}, onChange }) {
     onChange({
       ...value,
       projectName: value.projectName || matchedProject.projectName,
-      projectCode: value.projectCode || matchedProject.projectCode,
+      // available-projects can return a null projectCode (e.g. no PMS code
+      // assigned yet) — fall back to the projectId so this required field is
+      // never blocked on a value the user has no way to enter (it's read-only
+      // Synced Information for enterprise projects).
+      projectCode:
+        value.projectCode ||
+        matchedProject.projectCode ||
+        (matchedProject.projectId ? String(matchedProject.projectId) : ""),
       projectDuration: value.projectDuration || matchedProject.projectDuration,
       currency: value.currency || matchedProject.projectBudgetCurrency || matchedProject.currency || "",
       projectBudget: value.projectBudget ?? matchedProject.projectBudget ?? "",
@@ -283,7 +290,7 @@ export default function ProjectStep({ value = {}, onChange }) {
         clientName: value.clientName,
         projectId,
         projectName: project.projectName,
-        projectCode: project.projectCode,
+        projectCode: project.projectCode || String(projectId),
         projectDuration: project.projectDuration,
         currency: project.projectBudgetCurrency || project.currency || "",
         projectBudget: project.projectBudget ?? "",

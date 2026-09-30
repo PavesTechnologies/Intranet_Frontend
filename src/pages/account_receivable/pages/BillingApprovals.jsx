@@ -800,22 +800,26 @@ export default function BillingApprovals() {
                         { label: "Billing Frequency", value: billingFreqLabel },
                       ]}
                     />
-                    <ReviewSection
-                      title="Renewal Configuration"
-                      rows={
-                        renewalConfigured
-                          ? [
-                              { label: "Renewal Mode", value: renewalModeLabel },
-                              ...(renewalModeLabel === "Custom"
-                                ? [
-                                    { label: "Renewal Amount", value: formatMoney(reviewTarget.renewalContractValue, currency) },
-                                    { label: "Renewal Effective From", value: formatDate(reviewTarget.renewalEffectiveFrom) },
-                                  ]
-                                : []),
-                            ]
-                          : [{ label: "Renewal Mode", value: "Not configured" }]
-                      }
-                    />
+                    {/* Renewal is a Subscription (Product/Service) concept only —
+                        a project-based Recurring configuration is never renewed. */}
+                    {isProductServiceContext && (
+                      <ReviewSection
+                        title="Renewal Configuration"
+                        rows={
+                          renewalConfigured
+                            ? [
+                                { label: "Renewal Mode", value: renewalModeLabel },
+                                ...(renewalModeLabel === "Custom"
+                                  ? [
+                                      { label: "Renewal Amount", value: formatMoney(reviewTarget.renewalContractValue, currency) },
+                                      { label: "Renewal Effective From", value: formatDate(reviewTarget.renewalEffectiveFrom) },
+                                    ]
+                                  : []),
+                              ]
+                            : [{ label: "Renewal Mode", value: "Not configured" }]
+                        }
+                      />
+                    )}
                   </div>
                 );
               })()}

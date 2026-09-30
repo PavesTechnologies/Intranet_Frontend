@@ -20,7 +20,7 @@ import {
   CONTRACT_VALUE_SOURCE_OPTIONS,
   RECURRING_RENEWAL_MODE_OPTIONS,
 } from "../../data/wizardOptions";
-import { formatCurrency, formatDisplayDate } from "../../utils/format";
+import { formatCurrency, formatDisplayDate, formatIndianNumber } from "../../utils/format";
 import { getBillingTypeDisplayName } from "../../utils/billingType";
 import {
   getRecurringDateErrors,
@@ -963,12 +963,19 @@ function ContractValueSourceBadge({ source }) {
   return null;
 }
 
-function EnterpriseBudgetSourceSelector({ value, onChange, projectBudget, currency }) {
+function EnterpriseBudgetSourceSelector({
+  value,
+  onChange,
+  projectBudget,
+  currency,
+  sourceLabel = "Contract Value Source:",
+  manualLabel = "Manual Input",
+}) {
   const isPms = value === "PMS" || value === "PMS_BUDGET";
 
   return (
     <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2">
-      <span className="text-xs font-semibold text-slate-700">Contract Value Source:</span>
+      <span className="text-xs font-semibold text-slate-700">{sourceLabel}</span>
       <div className="flex items-center gap-1 rounded-lg bg-slate-200/60 p-0.5">
         <button
           type="button"
@@ -980,7 +987,7 @@ function EnterpriseBudgetSourceSelector({ value, onChange, projectBudget, curren
           }`}
         >
           <Landmark className="h-3.5 w-3.5" />
-          <span>Project Budget {projectBudget ? `(${currency || ""} ${projectBudget})` : ""}</span>
+          <span>Project Budget {projectBudget ? `(${formatCurrency(projectBudget, currency)})` : ""}</span>
         </button>
 
         <button
@@ -993,10 +1000,46 @@ function EnterpriseBudgetSourceSelector({ value, onChange, projectBudget, curren
           }`}
         >
           <Pencil className="h-3.5 w-3.5" />
-          <span>Manual Input</span>
+          <span>{manualLabel}</span>
         </button>
       </div>
     </div>
+  );
+}
+
+// Shows the raw editable number while focused (so typing isn't disrupted by
+// commas being inserted under the cursor) and the Indian-grouped, 2-decimal
+// display once the field blurs. The underlying value passed to onChange is
+// always the plain numeric string — only the on-screen text is formatted.
+function IndianAmountInput({ value, onChange, ...rest }) {
+  const [isFocused, setIsFocused] = useState(false);
+  const raw = value ?? "";
+  const displayValue = isFocused ? raw : formatIndianNumber(raw) || raw;
+
+  return (
+    <FormInput
+      {...rest}
+      type="text"
+      inputMode="decimal"
+      value={displayValue}
+      onFocus={(event) => {
+        setIsFocused(true);
+        rest.onFocus?.(event);
+      }}
+      onBlur={(event) => {
+        setIsFocused(false);
+        rest.onBlur?.(event);
+      }}
+      onChange={(event) => {
+        const cleaned = event.target.value.replace(/[^0-9.]/g, "");
+        const dotIndex = cleaned.indexOf(".");
+        const sanitized =
+          dotIndex === -1
+            ? cleaned
+            : cleaned.slice(0, dotIndex + 1) + cleaned.slice(dotIndex + 1).replace(/\./g, "");
+        onChange(sanitized);
+      }}
+    />
   );
 }
 
@@ -1141,6 +1184,9 @@ function FixedPriceForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [billingConfigurationId]);
 
+  const contractValueSource =
+    value.contractValueSource || (value.totalContractValue === projectBudget ? "PMS" : "MANUAL");
+  const isPmsSource = contractValueSource === "PMS";
   const contractValue = Number(value.totalContractValue) || 0;
   const retentionPercentNum = Number(value.retentionPercent);
   const hasRetention =
@@ -1370,7 +1416,7 @@ function FixedPriceForm({
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
         <EnterpriseBudgetSourceSelector
-          value={value.contractValueSource || (value.totalContractValue === projectBudget ? "PMS" : "MANUAL")}
+          value={contractValueSource}
           onChange={(nextSource) => {
             if (nextSource === "PMS") {
               update({
@@ -1384,25 +1430,40 @@ function FixedPriceForm({
           }}
           projectBudget={projectBudget}
           currency={currency}
+          sourceLabel="Budget Source:"
+          manualLabel="Manual Budget"
         />
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="md:col-span-2">
-            <FormInput
-              label={
-                <span className="flex flex-wrap items-center gap-2">
+            {isPmsSource ? (
+              <>
+                <label className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700">
                   Contract Value <span className="text-red-500">*</span>
-                  <ContractValueSourceBadge source={value.contractValueSource} />
-                </span>
-              }
-              name="totalContractValue"
-              type="number"
-              value={value.totalContractValue || ""}
-              onChange={(event) =>
-                update({ totalContractValue: event.target.value, contractValueSource: "MANUAL" })
-              }
-              placeholder={`e.g. 120000 (${currency})`}
-            />
+                  <ContractValueSourceBadge source="PMS" />
+                </label>
+                <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-900">
+                  {value.totalContractValue || value.totalContractValue === 0
+                    ? formatCurrency(value.totalContractValue, currency)
+                    : "Not available"}
+                </div>
+              </>
+            ) : (
+              <IndianAmountInput
+                label={
+                  <span className="flex flex-wrap items-center gap-2">
+                    Contract Value <span className="text-red-500">*</span>
+                    <ContractValueSourceBadge source={contractValueSource} />
+                  </span>
+                }
+                name="totalContractValue"
+                value={value.totalContractValue || ""}
+                onChange={(nextValue) =>
+                  update({ totalContractValue: nextValue, contractValueSource: "MANUAL" })
+                }
+                placeholder={`e.g. 120000 (${currency})`}
+              />
+            )}
           </div>
           <FormInput
             label="Retention % (optional)"
@@ -1614,6 +1675,7 @@ function MilestoneForm({
   settings = {},
   onMilestonesChange,
   onSettingsChange,
+  currency,
 }) {
   const [modalState, setModalState] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -1664,7 +1726,7 @@ function MilestoneForm({
 
   const tableRows = milestones.map((milestone) => ({
     name: milestone.name,
-    amount: milestone.amount,
+    amount: formatCurrency(milestone.amount, currency),
     dueDate: milestone.dueDate,
     status: (
       <StatusBadge
@@ -2306,6 +2368,8 @@ function RecurringBillingForm({
             }}
             projectBudget={projectBudget}
             currency={currency}
+            sourceLabel="Budget Source:"
+            manualLabel="Manual Budget"
           />
         )}
 
@@ -2328,14 +2392,12 @@ function RecurringBillingForm({
               </>
             ) : (
               <>
-                <FormInput
+                <IndianAmountInput
                   label="Manual Budget"
                   requiredMark
                   name="contractValue"
-                  type="number"
-                  min="0"
                   value={value.contractValue ?? ""}
-                  onChange={(e) => update({ contractValue: e.target.value, contractValueSource: "MANUAL" })}
+                  onChange={(nextValue) => update({ contractValue: nextValue, contractValueSource: "MANUAL" })}
                   placeholder={`e.g. 300000 (${currency})`}
                   error={contractValueError}
                 />
@@ -2503,7 +2565,11 @@ function RecurringBillingForm({
         </div>
       </div>
 
-      {value.recurringConfigurationId && (
+      {/* Renewal is a Subscription (Product/Service) concept only — a
+          project-based Recurring configuration runs for the project's own
+          duration and is never "renewed" the way a standalone subscription
+          is, so this entire section is hidden for billingContext PROJECT. */}
+      {isProductService && value.recurringConfigurationId && (
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-slate-900">Renewal</h3>
@@ -2882,18 +2948,15 @@ export default function BillingConfigurationStep({
           )}
 
           {/* Project Budget is a project-level figure — it never applies to
-              Product/Service billing (no project at all), and it never
-              applies to Recurring (whose commercial value is the per-
-              occurrence Recurring Amount, entirely independent of the
-              project budget — see RecurringBillingForm). It reappears
-              immediately if the user switches away from Recurring back to
-              T&M/Fixed Price/Milestone; the underlying projectBudget value
-              in state/payloads is never cleared, only its visibility here
-              changes. */}
+              Product/Service billing (no project at all). It is shown for
+              every project billing type, including Recurring, so Project
+              Financials looks the same regardless of billing type. */}
           {!isProductService &&
-            billingType !== "RECURRING" &&
             (hasPmsBudget ? (
-              <ReadOnlyField label="Project Budget" value={projectInfo.projectBudget} />
+              <ReadOnlyField
+                label="Project Budget"
+                value={formatCurrency(projectInfo.projectBudget, currency)}
+              />
             ) : (
               <FormInput
                 label="Project Budget"
@@ -3031,6 +3094,7 @@ export default function BillingConfigurationStep({
                 settings={value.milestoneSettings}
                 onMilestonesChange={(next) => update({ milestones: next })}
                 onSettingsChange={(next) => update({ milestoneSettings: next })}
+                currency={currency}
               />
             )}
 
