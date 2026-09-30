@@ -13,6 +13,7 @@ import {
 import { PAYMENT_PERMISSIONS } from "../constants/paymentPermissions";
 import { INVOICE_PERMISSIONS } from "../constants/invoicePermissions";
 import { TDS_PERMISSIONS, TDS_ANY_VIEW_PERMISSIONS } from "../constants/tdsPermissions";
+import { TDS_CONFIG_PERMISSIONS } from "../constants/tdsConfigPermissions";
 
 /**
  * One boolean flag per capability, consumed by pages/buttons instead of calling
@@ -41,6 +42,22 @@ export function useApPermissions() {
     canOnboardVendor: hasRole(rolesForPermission(AP_PERMISSIONS.ONBOARD_VENDOR)),
     canEditVendor: hasRole(rolesForPermission(AP_PERMISSIONS.EDIT_VENDOR)),
     canViewVendor: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_VENDOR)),
+    // System Configuration's base tabs vs. the TDS Configuration tab are mutually exclusive by
+    // design (Admin never sees TDS Configuration, Finance_Executive never sees the base tabs) —
+    // see constants/permissions.js's comment on MANAGE_SYSTEM_CONFIG/MANAGE_TDS_CONFIG.
+    canManageSystemConfig: hasRole(rolesForPermission(AP_PERMISSIONS.MANAGE_SYSTEM_CONFIG)),
+    // Role alone is necessary but not sufficient — the TDS Configuration backend enforces its
+    // own real UMS permissions (TDS_CONFIG_VIEW/CREATE/EDIT/DELETE/IMPORT) independently of role,
+    // so canManageTdsConfig (Finance_Executive-only, the access-model decision) is combined with
+    // canViewTdsConfig (the actual granted permission) for the tab to show functioning content —
+    // see SystemConfigurationPage.jsx. The four action-level flags below gate individual buttons;
+    // the backend remains authoritative regardless (a 401/403 is still handled at the call site).
+    canManageTdsConfig: hasRole(rolesForPermission(AP_PERMISSIONS.MANAGE_TDS_CONFIG)),
+    canViewTdsConfig: hasPermission(TDS_CONFIG_PERMISSIONS.TDS_CONFIG_VIEW),
+    canCreateTdsConfig: hasPermission(TDS_CONFIG_PERMISSIONS.TDS_CONFIG_CREATE),
+    canEditTdsConfig: hasPermission(TDS_CONFIG_PERMISSIONS.TDS_CONFIG_EDIT),
+    canDeleteTdsConfig: hasPermission(TDS_CONFIG_PERMISSIONS.TDS_CONFIG_DELETE),
+    canImportTdsConfig: hasPermission(TDS_CONFIG_PERMISSIONS.TDS_CONFIG_IMPORT),
     // Invoice intake/OCR/view now carry real UMS permissions (invoice_extraction_route.py,
     // invoice_process_route.py, invoice_details_route.py) — migrated off the frontend
     // role -> permission guess the same way canMarkPaid/canViewPayment already were.

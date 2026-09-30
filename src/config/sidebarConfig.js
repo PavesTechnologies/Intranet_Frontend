@@ -342,5 +342,12 @@ export const AP_SUBMENU = [
   { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
   { label: "Payments", to: AP_ROUTES.PAYMENT_READY, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
   { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
-  { label: "System Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: AP_ALL_ROLES },
+  // Split into two role-exclusive entries (both pointing at the same route) rather than one
+  // AP_ALL_ROLES item — System Configuration's tabs are now Admin-only/Finance_Executive-only
+  // (see SystemConfigurationPage.jsx's canManageSystemConfig/canManageTdsConfig split), so
+  // Vendor_Intake/AP_Executive shouldn't see either nav entry at all, and Finance_Executive
+  // should see it labeled for what they'll actually land on (just the TDS tab), not the generic
+  // label that implies access to Fiscal Years/Tax Compliance/etc. they don't have.
+  { label: "System Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: [AP_ROLES.ADMIN] },
+  { label: "TDS Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: [AP_ROLES.FINANCE_EXECUTIVE] },
 ];
