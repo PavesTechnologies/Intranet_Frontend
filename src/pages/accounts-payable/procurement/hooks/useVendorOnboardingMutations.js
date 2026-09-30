@@ -8,6 +8,7 @@ import {
 } from "./useVendorOnboarding";
 import { RFQ_ELIGIBILITY_KEY } from "./useRfqEligibility";
 import { VENDOR_ENGAGEMENT_KEY } from "../../vendor-intake/hooks/useVendorIntake";
+import { VENDOR_DETAIL_KEY } from "../../vendor/hooks/useVendorDetail";
 
 /**
  * Everything an onboarding state change can invalidate. Onboarding drives the PR's own
@@ -15,7 +16,7 @@ import { VENDOR_ENGAGEMENT_KEY } from "../../vendor-intake/hooks/useVendorIntake
  * transition has to refresh the PR, its timeline, the availability answer, the engagement
  * behind the intake and every RFQ-eligibility verdict — not just the request row.
  */
-const invalidateOnboardingGraph = (qc, { prId, requestId, engagementId } = {}) => {
+const invalidateOnboardingGraph = (qc, { prId, requestId, engagementId, vendorId } = {}) => {
   qc.invalidateQueries({ queryKey: ONBOARDING_REQUESTS_KEY });
 
   if (requestId) qc.invalidateQueries({ queryKey: ONBOARDING_REQUEST_KEY(requestId) });
@@ -27,6 +28,9 @@ const invalidateOnboardingGraph = (qc, { prId, requestId, engagementId } = {}) =
   }
 
   if (engagementId) qc.invalidateQueries({ queryKey: VENDOR_ENGAGEMENT_KEY(engagementId) });
+
+  // The vendor record behind the request (intake creates it; completion activates it).
+  if (vendorId) qc.invalidateQueries({ queryKey: VENDOR_DETAIL_KEY(vendorId) });
 
   // Eligibility depends on onboarding/pre-screen/NDA state — always re-ask the backend.
   qc.invalidateQueries({ queryKey: RFQ_ELIGIBILITY_KEY });
@@ -69,7 +73,12 @@ export const useStartOnboarding = (requestId, prId) => {
   return useMutation({
     mutationFn: (payload) => vendorOnboardingService.startOnboarding(requestId, payload),
     onSuccess: (data) =>
-      invalidateOnboardingGraph(qc, { prId, requestId, engagementId: data?.engagement_id }),
+      invalidateOnboardingGraph(qc, {
+        prId,
+        requestId,
+        engagementId: data?.engagement_id,
+        vendorId: data?.vendor_id,
+      }),
   });
 };
 
@@ -83,11 +92,16 @@ export const useRunOnboardingPreScreen = (requestId, prId) => {
   });
 };
 
-/** POST /{request_id}/complete — the vendor becomes available to the waiting PR. */
-export const useCompleteOnboarding = (requestId, prId) => {
+/**
+ * POST /{request_id}/complete — the vendor becomes available to the waiting PR. The backend
+ * activates the vendor as part of completion, so there is no separate status call here; the
+ * vendor's own queries are refreshed so it shows as ACTIVE. The completion response carries
+ * no vendor_id, hence it is passed in from the request.
+ */
+export const useCompleteOnboarding = (requestId, prId, vendorId) => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => vendorOnboardingService.completeOnboarding(requestId),
-    onSuccess: () => invalidateOnboardingGraph(qc, { prId, requestId }),
+    onSuccess: () => invalidateOnboardingGraph(qc, { prId, requestId, vendorId }),
   });
 };

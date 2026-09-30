@@ -7,6 +7,17 @@ vi.mock("../../vendor-intake/hooks/useVendorIntake", () => ({
   useVendorEngagementsByVendor: vi.fn(),
 }));
 
+vi.mock("../../hooks/useApPermissions", () => ({
+  useApPermissions: () => ({ canEditVendor: true }),
+}));
+
+// The Edit modal has its own test; stubbing it here keeps this file focused on the table and
+// avoids pulling a QueryClientProvider into every case.
+vi.mock("./EditEngagementModal", () => ({
+  default: ({ isOpen, engagement }) =>
+    isOpen ? <div data-testid="edit-modal">{engagement?.engagement_id}</div> : null,
+}));
+
 vi.mock("../../system-configuration/hooks/useDepartments", () => ({
   default: () => ({
     data: [

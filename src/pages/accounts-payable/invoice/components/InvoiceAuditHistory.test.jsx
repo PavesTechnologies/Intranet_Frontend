@@ -64,6 +64,56 @@ describe("InvoiceAuditHistory — payment lifecycle events", () => {
   });
 });
 
+describe("InvoiceAuditHistory — TDS Phase 1 events", () => {
+  it("labels a TDS determination with rate, amount, and payment nature", () => {
+    useInvoiceHistory.mockReturnValue({
+      data: [
+        event("INVOICE_TDS_DETERMINED", {
+          new_values: {
+            tds_applicable: true,
+            payment_nature_code: "PROFESSIONAL_SERVICE",
+            tds_rule_id: 1,
+            tds_rate: 10,
+            tds_amount: 17700,
+            gstin_status: "VALID",
+            determination_reason: "TDS - Professional or Technical Services applies.",
+          },
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+    render(<InvoiceAuditHistory invoiceId={1} />);
+    expect(screen.getByText("TDS determined")).toBeInTheDocument();
+    expect(screen.getByText(/10% · ₹17,700.00 \(PROFESSIONAL_SERVICE\)/)).toBeInTheDocument();
+  });
+
+  it("labels a not-applicable TDS determination distinctly", () => {
+    useInvoiceHistory.mockReturnValue({
+      data: [event("INVOICE_TDS_DETERMINED", { new_values: { tds_applicable: false } })],
+      isLoading: false,
+      error: null,
+    });
+    render(<InvoiceAuditHistory invoiceId={1} />);
+    expect(screen.getByText("Not applicable to this invoice")).toBeInTheDocument();
+  });
+
+  it("labels a TDS verification with amount and remarks", () => {
+    useInvoiceHistory.mockReturnValue({
+      data: [
+        event("INVOICE_TDS_VERIFIED", {
+          new_values: { tds_applicable: true, tds_amount: 17700, remarks: "Confirmed against Finance review" },
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+    render(<InvoiceAuditHistory invoiceId={1} />);
+    expect(screen.getByText("TDS verified")).toBeInTheDocument();
+    expect(screen.getByText(/₹17,700.00 verified: "Confirmed against Finance review"/)).toBeInTheDocument();
+  });
+});
+
 describe("InvoiceAuditHistory — who did it", () => {
   it("resolves changed_by (a numeric employee id) to a real name via the employee directory", () => {
     useInvoiceHistory.mockReturnValue({

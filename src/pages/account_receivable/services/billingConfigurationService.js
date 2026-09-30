@@ -804,9 +804,22 @@ export const getBillingConfigurationById = async (billingConfigurationId) => {
     try {
       const recurringRecord = await getBillingRecurringByBillingConfigurationId(configId);
       if (recurringRecord) {
+        const normalizedRecurring = normalizeRecurringConfig(recurringRecord);
         detail.billingConfig.recurring = {
           ...detail.billingConfig.recurring,
-          ...normalizeRecurringConfig(recurringRecord),
+          ...normalizedRecurring,
+        };
+        // billingContext/productName/productDescription live on the Recurring
+        // sub-record (see buildRecurringRequestPayload), but ProjectStep (and
+        // the parent BillingConfigurationRequestDto) key off projectInfo — so
+        // a PRODUCT_SERVICE configuration must mirror them back onto
+        // projectInfo here, otherwise re-opening it for edit would show empty
+        // project fields with no indication of why (see ProjectStep).
+        detail.projectInfo = {
+          ...detail.projectInfo,
+          billingContext: normalizedRecurring.billingContext,
+          productName: normalizedRecurring.productName,
+          productDescription: normalizedRecurring.productDescription,
         };
       }
     } catch (error) {
@@ -994,6 +1007,30 @@ export const deleteBillingRecurring = async (recurringConfigurationId) => {
   return unwrapData(response);
 };
 
+// POST /api/billing-recurring/{recurringConfigurationId}/renew — records a
+// manual renewal of an existing Recurring configuration. renewalMode is
+// SAME_AS_PREVIOUS (reuse the current amount/frequency, just extend the
+// effective period) or CUSTOM (override amount/frequency/effective period).
+// There is no automatic renewal — this is always a deliberate Maker action.
+export const renewBillingRecurring = async (recurringConfigurationId, payload) => {
+  if (!recurringConfigurationId) throw new Error("Missing recurringConfigurationId");
+  const response = await api.post(`${BILLING_RECURRING_URL}/${recurringConfigurationId}/renew`, payload);
+  return unwrapData(response);
+};
+
+// GET /api/billing-recurring/{recurringConfigurationId}/renewal-history —
+// the audit trail of every renewal recorded against this configuration.
+export const getBillingRecurringRenewalHistory = async (recurringConfigurationId) => {
+  if (!recurringConfigurationId) return [];
+  try {
+    const response = await api.get(`${BILLING_RECURRING_URL}/${recurringConfigurationId}/renewal-history`);
+    return asArray(unwrapData(response)).map(normalizeRenewalHistoryEntry);
+  } catch (error) {
+    if (isRecurringNotFoundError(error)) return [];
+    throw error;
+  }
+};
+
 // The backend-generated BillingSchedule is the sole source of truth for
 // recurring billing periods and amounts — the frontend never computes these
 // itself (see normalizeBillingSchedulePeriod below).
@@ -1043,19 +1080,25 @@ export const previewBillingSchedule = async (payload) => {
 
 // Maps a BillingRecurringConfiguration API record (GET /api/billing-recurring/...)
 // onto the wizard's internal Recurring Billing form-state shape (mirrors
-// normalizeFixedPriceConfig above). The normal Recurring flow has no
-// subscription/renewal concept — only the contract value, billing frequency,
-// and effective dates that describe the recurring schedule — so those fields
-// are never read into wizard state here.
+// normalizeFixedPriceConfig above).
 //
 // Field names mirror the backend's RecurringBillingRequestDto exactly
 // (recurringConfigurationId/recurringStartDate/recurringEndDate) — the legacy
 // subscriptionConfigurationId/subscriptionStartDate/subscriptionEndDate names
 // are kept only as a fallback in case a record hasn't been migrated yet.
+//
+// contractValue now holds the TOTAL recurring budget (never a per-occurrence
+// amount) — see buildRecurringRequestPayload. billingContext/productName/
+// productDescription and the renewal fields are read back here (never
+// dropped) so editing an existing configuration always reflects what was
+// actually saved.
 export const normalizeRecurringConfig = (record = {}) => ({
   recurringConfigurationId:
     firstPresent(record.recurringConfigurationId, record.subscriptionConfigurationId, record.id) || null,
-  contractValueSource: record.contractValueSource || "",
+  billingContext: record.billingContext || "PROJECT",
+  productName: record.productName || "",
+  productDescription: record.productDescription || "",
+  contractValueSource: fromApiContractValueSource(record.contractValueSource),
   contractValue: firstPresent(record.contractValue, record.pmsProjectBudget) ?? "",
   pmsProjectBudget: firstPresent(record.pmsProjectBudget) ?? "",
   recurringStartDate:
@@ -1063,6 +1106,40 @@ export const normalizeRecurringConfig = (record = {}) => ({
   recurringEndDate:
     toLocalDateString(firstPresent(record.recurringEndDate, record.subscriptionEndDate, record.endDate)) || "",
   remarks: record.remarks || "",
+  renewalType: record.renewalType || "",
+  renewalMode: firstPresent(
+    record.renewalMode,
+    record.renewalDurationType === "SAME_DURATION" && record.renewalPricingType === "SAME_PRICE"
+      ? "SAME_AS_PREVIOUS"
+      : record.renewalDurationType || record.renewalPricingType
+      ? "CUSTOM"
+      : null,
+  ) || "",
+  renewalDurationType: record.renewalDurationType || "",
+  renewalDurationValue: record.renewalDurationValue ?? "",
+  renewalDurationUnit: record.renewalDurationUnit || "",
+  renewalPricingType: record.renewalPricingType || "",
+  renewalContractValue: record.renewalContractValue ?? "",
+  renewalBillingFrequencyId: record.renewalBillingFrequencyId || "",
+  renewalEffectiveFrom: toLocalDateString(record.renewalEffectiveFrom) || "",
+});
+
+// Normalizes one entry of GET /api/billing-recurring/{id}/renewal-history.
+// Field names are a best-effort mapping (see renewBillingRecurring/
+// getBillingRecurringRenewalHistory) — pending confirmation against the
+// actual backend response shape.
+export const normalizeRenewalHistoryEntry = (record = {}) => ({
+  renewalId: firstPresent(record.renewalId, record.id) || null,
+  renewalMode: record.renewalMode || (record.renewalDurationType === "CUSTOM" ? "CUSTOM" : "SAME_AS_PREVIOUS"),
+  previousEffectiveFrom: toLocalDateString(firstPresent(record.previousEffectiveFrom, record.previousRecurringStartDate)) || "",
+  previousEffectiveTo: toLocalDateString(firstPresent(record.previousEffectiveTo, record.previousRecurringEndDate)) || "",
+  newEffectiveFrom: toLocalDateString(firstPresent(record.newEffectiveFrom, record.recurringStartDate, record.effectiveFrom)) || "",
+  newEffectiveTo: toLocalDateString(firstPresent(record.newEffectiveTo, record.recurringEndDate, record.effectiveTo)) || "",
+  contractValue: firstPresent(record.contractValue, record.renewalContractValue) ?? "",
+  billingFrequencyName: record.billingFrequencyName || record.renewalBillingFrequencyName || "",
+  remarks: record.remarks || "",
+  renewedAt: firstPresent(record.renewedAt, record.createdAt) || "",
+  renewedBy: record.renewedBy || record.createdBy || "",
 });
 
 export const getBillingConfigurationProjectsByClient = async (clientId) => {
@@ -1183,25 +1260,51 @@ export const deleteFixedPriceConfiguration = async (fixedPriceConfigurationId) =
 // is fully described by contract value/source, billing frequency, and
 // effective dates, so recurringName and every renewal field are sent as null
 // (optional/unset) rather than a value nothing in the UI ever collects.
+// Maps the renewal mode presented in the UI (SAME_AS_PREVIOUS / CUSTOM — see
+// RECURRING_RENEWAL_MODE_OPTIONS) onto the backend's finer-grained
+// RenewalDurationType/RenewalPricingType enums. There is no automatic
+// renewal, so renewalType is always MANUAL once any renewal mode is chosen.
+const RENEWAL_MODE_TO_API = {
+  SAME_AS_PREVIOUS: { renewalType: "MANUAL", renewalDurationType: "SAME_DURATION", renewalPricingType: "SAME_PRICE" },
+  CUSTOM: { renewalType: "MANUAL", renewalDurationType: "CUSTOM", renewalPricingType: "REVISED_PRICE" },
+};
+
+// contractValue is the TOTAL recurring budget for the effective period (never
+// a per-occurrence amount, never split by the frontend). When
+// contractValueSource is PMS_BUDGET the backend resolves the project budget
+// itself, so contractValue is always sent as null in that case — the
+// frontend only sends a numeric contractValue when the source is MANUAL.
 export const buildRecurringRequestPayload = (recurring = {}, billingFrequencyId) => {
-  const isPmsBudgetSource = recurring.contractValueSource === "PMS_BUDGET";
+  const isProductService = recurring.billingContext === "PRODUCT_SERVICE";
+  const renewalDefaults = RENEWAL_MODE_TO_API[recurring.renewalMode] || {};
+  const apiContractValueSource = toApiContractValueSource(recurring.contractValueSource) || "MANUAL";
 
   return {
-    contractValueSource: recurring.contractValueSource || null,
-    contractValue: isBlank(recurring.contractValue) ? null : Number(recurring.contractValue),
-    pmsProjectBudget: isPmsBudgetSource && !isBlank(recurring.pmsProjectBudget) ? Number(recurring.pmsProjectBudget) : null,
+    // BillingContext/ProductName/ProductDescription are the Recurring-specific
+    // fields added by the Billing Context redesign — a PROJECT-context
+    // configuration never sends product fields.
+    billingContext: recurring.billingContext || "PROJECT",
+    productName: isProductService ? recurring.productName || null : null,
+    productDescription: isProductService ? recurring.productDescription || null : null,
+    contractValueSource: apiContractValueSource,
+    contractValue:
+      apiContractValueSource === "PMS_BUDGET"
+        ? null
+        : isBlank(recurring.contractValue)
+        ? null
+        : Number(recurring.contractValue),
     billingFrequencyId: billingFrequencyId || null,
     recurringName: null,
     recurringStartDate: toLocalDateString(recurring.recurringStartDate) || "",
     recurringEndDate: toLocalDateString(recurring.recurringEndDate) || "",
-    renewalType: null,
-    renewalDurationType: null,
-    renewalDurationValue: null,
-    renewalDurationUnit: null,
-    renewalPricingType: null,
-    renewalContractValue: null,
-    renewalBillingFrequencyId: null,
-    renewalEffectiveFrom: null,
+    renewalType: recurring.renewalMode ? renewalDefaults.renewalType : recurring.renewalType || null,
+    renewalDurationType: recurring.renewalMode ? renewalDefaults.renewalDurationType : recurring.renewalDurationType || null,
+    renewalDurationValue: isBlank(recurring.renewalDurationValue) ? null : Number(recurring.renewalDurationValue),
+    renewalDurationUnit: recurring.renewalDurationUnit || null,
+    renewalPricingType: recurring.renewalMode ? renewalDefaults.renewalPricingType : recurring.renewalPricingType || null,
+    renewalContractValue: isBlank(recurring.renewalContractValue) ? null : Number(recurring.renewalContractValue),
+    renewalBillingFrequencyId: recurring.renewalBillingFrequencyId || null,
+    renewalEffectiveFrom: recurring.renewalEffectiveFrom ? toLocalDateString(recurring.renewalEffectiveFrom) : null,
     remarks: recurring.remarks || "",
   };
 };
@@ -1359,10 +1462,17 @@ export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
       ? billingConfig.billingMode || billingConfig.pricingModel || wizardPayload.pricingModel || ""
       : "";
 
+  // BillingContext is only ever PRODUCT_SERVICE for a standalone Recurring
+  // configuration (see ProjectStep) — in that case there is no project at
+  // all, so projectId/projectCode must never be sent, even if a stale value
+  // is still sitting in wizard state from a previous PROJECT-context choice.
+  const billingContext = projectInfo.billingContext || wizardPayload.billingContext || "PROJECT";
+  const isProductService = billingContext === "PRODUCT_SERVICE";
+
   const requestPayload = {
     clientId: projectInfo.clientId || wizardPayload.clientId || "",
-    projectId: projectInfo.projectId || wizardPayload.projectId || "",
-    projectCode: projectInfo.projectCode || wizardPayload.projectCode || "",
+    projectId: isProductService ? null : projectInfo.projectId || wizardPayload.projectId || "",
+    projectCode: isProductService ? null : projectInfo.projectCode || wizardPayload.projectCode || "",
     billingTypeId: billingConfig.billingTypeId || wizardPayload.billingTypeId || "",
     billingFrequencyId: billingConfig.billingFrequencyId || wizardPayload.billingFrequencyId || "",
     paymentTermId: controls.paymentTermId || wizardPayload.paymentTermId || "",

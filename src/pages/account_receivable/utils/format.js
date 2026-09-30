@@ -1,7 +1,25 @@
+/**
+ * Indian digit grouping (lakh/crore) with 2 decimal places, no currency
+ * symbol — e.g. 145000 -> "1,45,000.00". Returns "" for blank/non-numeric
+ * input so callers can fall back to their own placeholder.
+ */
+export function formatIndianNumber(amount) {
+  if (amount === "" || amount === null || amount === undefined) return "";
+  const value = Number(amount);
+  if (Number.isNaN(value)) return "";
+  return new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 export function formatCurrency(amount, currency = "INR") {
   const value = Number(amount) || 0;
-  const symbol = currency === "INR" ? "₹" : `${currency} `;
-  return `${symbol}${new Intl.NumberFormat("en-IN", {
+  const normalizedCurrency = String(currency || "INR").toUpperCase();
+  const isInr = normalizedCurrency === "INR";
+  const symbol = isInr ? "₹" : `${normalizedCurrency} `;
+  const locale = isInr ? "en-IN" : "en-US";
+  return `${symbol}${new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value)}`;
