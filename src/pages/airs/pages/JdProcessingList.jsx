@@ -59,6 +59,8 @@ const STAGE_LABELS = {
 // REST poll: immediately when PERSISTENCE lands, and otherwise after this much
 // silence on a task that's still mid-flight.
 const SILENCE_BACKFILL_MS = 30000;
+// Re-check cadence after a backfill still saw the task mid-flight.
+const FOLLOW_UP_BACKFILL_MS = 4000;
 
 // /my-uploads excludes SUCCESS, so a row vanishes the moment it succeeds. Rows
 // that completed in this session are held on screen this long afterwards so the
@@ -79,8 +81,12 @@ const formatDate = (iso) => {
   });
 };
 
-export default function JdProcessingList() {
+export default function JdProcessingList({ onTaskCompleted } = {}) {
   const [uploads, setUploads] = useState([]);
+  // Read at call time (backfills run from timers/socket callbacks), so the
+  // latest parent callback is always the one invoked.
+  const onTaskCompletedRef = useRef(onTaskCompleted);
+  onTaskCompletedRef.current = onTaskCompleted;
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [deletingTaskId, setDeletingTaskId] = useState(null);
@@ -142,20 +148,37 @@ export default function JdProcessingList() {
       const res = await getJDProcessingStatus(taskId);
       const row = res?.data;
       if (!row) return;
-      if (isFailureStatus(row.status) || String(row.status).toUpperCase() === "SUCCESS") {
+      // processing-status names the task state overall_status; the list rows
+      // (/my-uploads) call it status. Reading row.status here never saw the
+      // terminal state, so a finished upload kept its old Queued/Processing badge.
+      const status = row.overall_status ?? row.status;
+      const succeeded = String(status).toUpperCase() === "SUCCESS";
+      if (isFailureStatus(status) || succeeded) {
         completedAtRef.current.set(taskId, Date.now());
       }
-      setUploads((prev) => prev.map((u) => (u.task_id === taskId ? { ...u, ...row } : u)));
+      setUploads((prev) => prev.map((u) => (u.task_id === taskId ? { ...u, ...row, status: status ?? u.status } : u)));
+      // Failures stay here (they can be retried); a success moves the user to
+      // the Processed tab, where the new JD now lives.
+      if (succeeded) onTaskCompletedRef.current?.(taskId);
+      // The last stage event lands moments before the task itself is marked
+      // SUCCESS - once the final stage is done, re-check shortly instead of
+      // settling on a stale RUNNING.
+      else if (!isFailureStatus(status)) {
+        const finalStageDone = (row.stages || []).some(
+          (s) => s.stage === TERMINAL_STAGE && String(s.status).toUpperCase() === "SUCCESS"
+        );
+        if (finalStageDone) scheduleSilenceBackfill(taskId, FOLLOW_UP_BACKFILL_MS);
+      }
     } catch {
       // Silent — the row keeps whatever the socket last gave it.
     }
   };
 
-  const scheduleSilenceBackfill = (taskId) => {
+  const scheduleSilenceBackfill = (taskId, delayMs = SILENCE_BACKFILL_MS) => {
     clearBackfillTimer(taskId);
     backfillTimersRef.current.set(
       taskId,
-      setTimeout(() => backfillRow(taskId), SILENCE_BACKFILL_MS)
+      setTimeout(() => backfillRow(taskId), delayMs)
     );
   };
 

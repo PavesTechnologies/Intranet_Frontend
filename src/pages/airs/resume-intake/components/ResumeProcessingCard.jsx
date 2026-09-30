@@ -65,11 +65,27 @@ export default function ResumeProcessingCard({ file, onTerminal }) {
   // The socket carries no terminal event, so the final state (and the
   // task-level retry counters) is pulled once the last stage lands or a stage
   // fails. Silent by design — the user didn't ask for this fetch.
+  const followUpTimer = useRef(null);
+  useEffect(() => () => clearTimeout(followUpTimer.current), []);
+
   const backfillDetail = async (id) => {
     if (!id) return;
+    clearTimeout(followUpTimer.current);
     try {
       const res = await pipelineStatus(id);
-      if (res?.data) setTaskDetail(res.data);
+      const detail = res?.data;
+      if (!detail) return;
+      setTaskDetail(detail);
+      // The last stage event lands moments before the task itself is marked
+      // done - once the final stage has succeeded, re-check shortly instead of
+      // settling on a stale "Processing".
+      const overall = String(detail.overall_status || "").toUpperCase();
+      const finalStageDone = (detail.stages || []).some(
+        (s) => s.stage === TERMINAL_STAGE && String(s.status).toUpperCase() === "SUCCESS"
+      );
+      if (finalStageDone && !["SUCCESS", "FAILURE", "FAILED", "DEAD"].includes(overall)) {
+        followUpTimer.current = setTimeout(() => backfillDetail(id), 4000);
+      }
     } catch {
       // Keep whatever the socket last gave us.
     }
@@ -127,22 +143,36 @@ export default function ResumeProcessingCard({ file, onTerminal }) {
   const stageMap = buildStageMap(stages);
   const failedStage = stages.find((s) => isFailureStatus(s.status));
 
-  // The card's overall status comes from the TASK (parse_status), never from
-  // the stage rows. A failed stage only paints that one step red in the
-  // stepper — the pipeline may still have retries left in its budget, and only
-  // the backend knows. Deriving "Failed" from a stage row is what made the card
-  // offer a Retry the backend then rejected with a 409.
-  const restStatus = String(taskDetail?.parse_status || file.parse_status || "").toUpperCase();
-  const taskStatus = PARSE_STATUS_TO_OVERALL[restStatus] || "QUEUED";
+  // The card's overall status comes from the TASK, never from the stage rows.
+  // A failed stage only paints that one step red in the stepper — the pipeline
+  // may still have retries left in its budget, and only the backend knows.
+  // Deriving "Failed" from a stage row is what made the card offer a Retry the
+  // backend then rejected with a 409.
+  // processing-status reports the task state as overall_status (the same
+  // QUEUED/RUNNING/SUCCESS/FAILURE/DEAD vocabulary as JD) - it wins over the
+  // list row's parse_status, which is only as fresh as the list fetch. Reading
+  // a non-existent parse_status here left finished cards showing "Queued".
+  const taskStatus = taskDetail?.overall_status
+    ? String(taskDetail.overall_status).toUpperCase()
+    : PARSE_STATUS_TO_OVERALL[String(file.parse_status || "").toUpperCase()] || "QUEUED";
   // Only ever nudges QUEUED -> RUNNING once stages start landing; never to a
   // terminal state.
   const displayStatus = taskStatus === "QUEUED" && stages.length > 0 ? "RUNNING" : taskStatus;
 
+  // A card (re)mounted after its task already moved on - e.g. the pipeline
+  // finished before the socket subscribed, or the list re-rendered - gets the
+  // authoritative task state once instead of trusting the list row.
   useEffect(() => {
-    const isTerminal = ["SUCCESS", "FAILED", "FAILURE"].includes(displayStatus);
+    const listStatus = String(file.parse_status || "").toUpperCase();
+    if (taskId && !["PARSED", "FAILED"].includes(listStatus)) backfillDetail(taskId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskId]);
+
+  useEffect(() => {
+    const isTerminal = ["SUCCESS", "FAILED", "FAILURE", "DEAD"].includes(displayStatus);
     if (isTerminal && !hasNotifiedTerminal.current) {
       hasNotifiedTerminal.current = true;
-      onTerminal?.();
+      onTerminal?.(displayStatus);
     }
   }, [displayStatus, onTerminal]);
 
