@@ -116,10 +116,13 @@ function addDays(date, days) {
 }
 
 // Derives the "Billing Schedule (Preview)" periods/amounts entirely on the
-// frontend, from the current (possibly unsaved) form state — used by both
-// the Fixed Price and Recurring billing forms in BillingConfigurationStep.jsx
-// so this logic exists in exactly one place. No billing_schedule record is
-// created or read here; this is purely a display calculation.
+// frontend, from the current (possibly unsaved) form state — used by the
+// Fixed Price billing form in BillingConfigurationStep.jsx, where the
+// Contract Value genuinely is a single total split across the schedule.
+//
+// NOT for Recurring: a Recurring amount is billed in full on every
+// occurrence (never divided — see countRecurringOccurrences below), so this
+// function must never be called from RecurringBillingForm.
 //
 // Periods step forward from effectiveFrom by durationValue/durationUnit
 // until effectiveTo is reached, with the final period's end date capped at
@@ -179,4 +182,33 @@ export function computeBillingSchedulePreview({
     isPartialPeriod: period.isPartialPeriod,
     isInvoiced: false,
   }));
+}
+
+// Derives just the occurrence COUNT for Recurring billing from Effective
+// From/To and the Billing Frequency's durationValue/durationUnit — the same
+// period-stepping rule as computeBillingSchedulePreview above, but with no
+// amount math at all, since a Recurring amount is billed in full on every
+// occurrence rather than split across them. Purely a client-side display
+// estimate (e.g. "~6 occurrences") shown alongside the backend-generated
+// schedule preview; it never drives what gets saved or billed.
+export function countRecurringOccurrences({ effectiveFrom, effectiveTo, durationValue, durationUnit } = {}) {
+  const startDate = parseDateOnly(effectiveFrom);
+  const endDate = parseDateOnly(effectiveTo);
+  const stepValue = Number(durationValue);
+
+  if (!startDate || !endDate || startDate > endDate) return 0;
+  if (!Number.isFinite(stepValue) || stepValue <= 0 || !durationUnit) return 0;
+
+  let cursorStart = startDate;
+  let count = 0;
+  let guard = 0;
+  while (cursorStart <= endDate && guard < 1000) {
+    guard += 1;
+    const naturalNextStart = addDuration(cursorStart, stepValue, durationUnit);
+    if (!naturalNextStart) return count;
+    count += 1;
+    cursorStart = naturalNextStart;
+  }
+
+  return count;
 }
