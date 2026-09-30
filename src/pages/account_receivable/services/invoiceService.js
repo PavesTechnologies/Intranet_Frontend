@@ -21,6 +21,34 @@ const unwrapData = (response) => {
 };
 
 /**
+ * Formats client country code and phone number according to enterprise AR display rules:
+ * - If both available: "<country code> <phone number>" (e.g. "+91 9876543210")
+ * - If country code missing: "<phone number>" (e.g. "9876543210")
+ * - If phone missing: "Not provided"
+ * - If both missing: "Not provided"
+ */
+export const formatClientPhone = (countryCode, phone) => {
+  const p = phone !== null && phone !== undefined ? String(phone).trim() : "";
+  const cc = countryCode !== null && countryCode !== undefined ? String(countryCode).trim() : "";
+
+  if (!p) {
+    return "Not provided";
+  }
+
+  // If phone already starts with "+", it already includes dial code
+  if (p.startsWith("+")) {
+    return p;
+  }
+
+  if (cc) {
+    const formattedCc = cc.startsWith("+") ? cc : `+${cc}`;
+    return `${formattedCc} ${p}`;
+  }
+
+  return p;
+};
+
+/**
  * Maps backend errors to meaningful user-facing messages.
  * Does not expose raw database/SQL exception messages to the user.
  */
@@ -317,13 +345,47 @@ export const normalizeInvoice = (payload = {}) => {
       "",
 
     // Client / Bill To (Strictly backend provided; null if not provided)
-    clientName: data.clientName || data.client_name || data.client || null,
+    clientId:
+      data.clientId ||
+      data.client_id ||
+      data.client?.clientId ||
+      data.client?.id ||
+      null,
+    clientName:
+      data.clientName ||
+      data.client_name ||
+      (typeof data.client === "string" ? data.client : null) ||
+      data.client?.clientName ||
+      data.client?.name ||
+      null,
     billingAddress: formattedAddress,
     gstin: data.gstinOrTaxId || data.gstin || data.gstNumber || data.taxId || data.tax_id || null,
     gstinOrTaxId: data.gstinOrTaxId || data.gstin || data.gstNumber || data.taxId || data.tax_id || null,
     contact: data.contact || data.contactPerson || data.contactEmail || data.contactPhone || null,
-    email: data.email || data.clientEmail || null,
-    phone: data.phone || data.clientPhone || null,
+    countryCode:
+      data.countryCode ||
+      data.country_code ||
+      data.clientCountryCode ||
+      data.client_country_code ||
+      data.client?.countryCode ||
+      data.client?.country_code ||
+      null,
+    email:
+      data.email ||
+      data.clientEmail ||
+      data.client_email ||
+      data.client?.email ||
+      null,
+    phone:
+      data.phone ||
+      data.clientPhone ||
+      data.phoneNumber ||
+      data.phone_number ||
+      data.clientPhoneNumber ||
+      data.client_phone_number ||
+      data.client?.phone ||
+      data.client?.phoneNumber ||
+      null,
 
     // Invoice Context
     projectName: data.projectName || data.project_name || data.project || "",
@@ -416,7 +478,34 @@ export const normalizeApprovalWorkspaceItem = (item = {}) => {
     // Fixed Price/Recurring workspace entries carry this instead of a
     // billingSnapshotId — see normalizeInvoice above.
     billingScheduleId: source.billingScheduleId || source.billing_schedule_id || source.occurrenceId || source.occurrence_id || "",
+    clientId:
+      source.clientId ||
+      source.client_id ||
+      source.client?.clientId ||
+      source.client?.id ||
+      null,
     clientName: source.clientName || "—",
+    countryCode:
+      source.countryCode ||
+      source.country_code ||
+      source.clientCountryCode ||
+      source.client_country_code ||
+      source.client?.countryCode ||
+      null,
+    email:
+      source.email ||
+      source.clientEmail ||
+      source.client_email ||
+      source.client?.email ||
+      null,
+    phone:
+      source.phone ||
+      source.clientPhone ||
+      source.phoneNumber ||
+      source.phone_number ||
+      source.clientPhoneNumber ||
+      source.client?.phone ||
+      null,
     projectName: source.projectName || "—",
     billingPeriod: displayPeriod,
     billingPeriodStart: periodStart,
@@ -785,6 +874,21 @@ export const financialCorrectionReacquire = async (invoiceId) => {
   return normalizeInvoice(unwrapData(response));
 };
 
+/**
+ * POST /api/v1/invoices/{invoiceId}/send
+ * Sends an approved invoice to the client.
+ * The backend delivery service resolves recipient email either from invoice.email
+ * or falls back to invoice.clientId -> Client -> Client.email for legacy invoices.
+ */
+export const sendInvoiceToClient = async (invoiceId) => {
+  if (!invoiceId) {
+    throw new Error("Invoice ID is required to send the invoice to client.");
+  }
+  const url = `${AR_BASE_URL}/api/v1/invoices/${invoiceId}/send`;
+  const response = await api.post(url);
+  return unwrapData(response);
+};
+
 export default {
   generateInvoice,
   generateInvoiceForOccurrence,
@@ -799,9 +903,11 @@ export default {
   refreshInvoiceAfterCorrection,
   correctNonFinancialInvoice,
   financialCorrectionReacquire,
+  sendInvoiceToClient,
   getInvoiceApprovalHistory,
   getInvoiceErrorMessage,
   normalizeInvoice,
 };
+
 
 

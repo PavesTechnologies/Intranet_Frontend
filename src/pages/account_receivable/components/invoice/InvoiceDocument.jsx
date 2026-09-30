@@ -2,6 +2,7 @@ import React from "react";
 
 import { formatCurrency, formatDisplayDate } from "../../utils/format";
 import { formatBillingPeriod } from "../../services/billingDataAcquisitionService";
+import { formatClientPhone } from "../../services/invoiceService";
 import pavesLogo from "../../assets/paves-logo.png";
 
 const formatRatePercentage = (rate) => {
@@ -80,7 +81,17 @@ export default function InvoiceDocument({
   const clientGstin = invoice?.gstinOrTaxId || invoice?.gstin || "Not provided";
   const clientContact = invoice?.contact || "Not provided";
   const clientEmail = invoice?.email || "Not provided";
-  const clientPhone = invoice?.phone || "Not provided";
+  const clientCountryCode =
+    invoice?.countryCode ||
+    taxCalc?.countryCode ||
+    snapshotData?.countryCode ||
+    null;
+  const rawClientPhone =
+    invoice?.phone ||
+    taxCalc?.phone ||
+    snapshotData?.phone ||
+    null;
+  const clientPhone = formatClientPhone(clientCountryCode, rawClientPhone);
 
   // Seller information from authoritative CompanyProfile API
   const sellerName = companyProfile?.legalName || invoice?.sellerName || "Not provided";

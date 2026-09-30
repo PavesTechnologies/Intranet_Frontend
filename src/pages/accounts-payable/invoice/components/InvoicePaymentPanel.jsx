@@ -6,6 +6,7 @@ import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { useMarkReadyForPaymentMutation } from "../../payment/hooks/usePaymentMutations";
+import { useInvoiceTds } from "../hooks/useInvoiceTds";
 import { useApPermissions } from "../../hooks/useApPermissions";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { formatCurrency, calculateBalance } from "../../utils/formatters";
@@ -24,11 +25,24 @@ import { Link } from "react-router-dom";
 export default function InvoicePaymentPanel({ invoice }) {
   const { canMarkPaid } = useApPermissions();
   const markReady = useMarkReadyForPaymentMutation();
+  // TDS Phase 1: the backend does not itself enforce "TDS verified before ready-for-payment" —
+  // same frontend-only sequencing as InvoiceApprovalPanel's send-for-approval gate (see
+  // InvoiceTdsPanel for the actual verify UI). A 404 here just means "not yet determined."
+  const { data: tds } = useInvoiceTds(invoice.id);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const symbol = invoice.currency?.symbol || "₹";
   const balance = calculateBalance(invoice.netAmount, invoice.amountPaid);
-  const canOfferMarkReady = invoice.status === INVOICE_STATUS.APPROVED && canMarkPaid;
+  const isApproved = invoice.status === INVOICE_STATUS.APPROVED;
+  const tdsVerified = tds?.determination_status === "VERIFIED";
+  const tdsBlocksMarkReady = isApproved && !tdsVerified;
+  const canOfferMarkReady = isApproved && canMarkPaid && tdsVerified;
+  // Phase 1 display only — the backend's PaymentService does not yet subtract TDS from what it
+  // actually allocates as payable (see spec section 11); invoice.netAmount still drives real
+  // payment creation. Shown once a determination exists so Finance isn't surprised by the gap
+  // between this figure and what payment actually processes.
+  const netVendorPayable =
+    tds?.tds_amount != null ? Number(invoice.netAmount || 0) - Number(tds.tds_amount) : null;
   const isPayable =
     invoice.status === INVOICE_STATUS.READY_FOR_PAYMENT ||
     invoice.status === INVOICE_STATUS.PARTIALLY_PAID;
@@ -64,11 +78,25 @@ export default function InvoicePaymentPanel({ invoice }) {
             <dt className="text-gray-500">Balance</dt>
             <dd className="font-semibold text-gray-900">{formatCurrency(balance, symbol)}</dd>
           </div>
+          {netVendorPayable != null && (
+            <div className="flex items-center justify-between border-t border-gray-100 pt-1">
+              <dt className="text-gray-500">Net Vendor Payable</dt>
+              <dd className="font-semibold text-gray-900">{formatCurrency(netVendorPayable, symbol)}</dd>
+            </div>
+          )}
         </dl>
-
-        {invoice.status === INVOICE_STATUS.APPROVED && (
+        {netVendorPayable != null && (
           <p className="mb-3 text-xs italic text-gray-500">
-            Approved, but not yet payable — Finance must mark it ready for payment first.
+            Net Amount minus TDS — a Phase 1 display figure only; payment is still processed against
+            the Net Amount above.
+          </p>
+        )}
+
+        {isApproved && (
+          <p className="mb-3 text-xs italic text-gray-500">
+            {tdsBlocksMarkReady
+              ? "Approved, but not yet payable — TDS must be verified before this invoice can be marked ready for payment."
+              : "Approved, but not yet payable — Finance must mark it ready for payment first."}
           </p>
         )}
 

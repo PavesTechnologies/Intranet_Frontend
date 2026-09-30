@@ -75,8 +75,60 @@ export const getCompanyProfileById = async (companyProfileId) => {
   }
 };
 
+/**
+ * POST /api/v1/company-profile
+ * Creates the authoritative seller company profile.
+ * Newly created company profiles are automatically saved as ACTIVE by the backend.
+ */
+export const createCompanyProfile = async (payload) => {
+  const response = await api.post(COMPANY_PROFILE_URL, payload);
+  const data = unwrapData(response);
+  return normalizeCompanyProfile(data);
+};
+
+/**
+ * PUT /api/v1/company-profile/{id}
+ * Updates the existing company profile.
+ */
+export const updateCompanyProfile = async (companyProfileId, payload) => {
+  if (!companyProfileId) {
+    throw new Error("Company profile ID is required for update.");
+  }
+  const response = await api.put(`${COMPANY_PROFILE_URL}/${companyProfileId}`, payload);
+  const data = unwrapData(response);
+  return normalizeCompanyProfile(data);
+};
+
+/**
+ * Extracts backend or network error messages consistently.
+ */
+export const getCompanyProfileErrorMessage = (
+  error,
+  defaultFallback = "An error occurred with the company profile."
+) => {
+  const respData = error?.response?.data;
+  if (typeof respData === "string" && respData.trim()) {
+    return respData.trim();
+  }
+  if (respData && typeof respData === "object") {
+    if (respData.message && typeof respData.message === "string" && respData.message.trim()) {
+      return respData.message.trim();
+    }
+    if (respData.error && typeof respData.error === "string" && respData.error.trim()) {
+      return respData.error.trim();
+    }
+  }
+  if (error?.message && typeof error.message === "string" && error.message.trim()) {
+    return error.message.trim();
+  }
+  return defaultFallback;
+};
+
 export default {
   getActiveCompanyProfile,
   getCompanyProfileById,
+  createCompanyProfile,
+  updateCompanyProfile,
   normalizeCompanyProfile,
+  getCompanyProfileErrorMessage,
 };
