@@ -948,6 +948,14 @@ const QUEUE_STATUS_TILE = {
 
 const DLQ_PAGE_SIZE = 50; // matches the backend's default `limit`
 
+// Chain status from GET /campaigns/{id}/dead-letter-queue. OPEN has no chip -
+// it's the default, replayable state.
+const DLQ_STATUS_CHIP = {
+  REPLAYING: { label: "Replay in progress", tone: "bg-blue-50 text-blue-600" },
+  LIMIT_REACHED: { label: "Replay limit reached", tone: "bg-slate-200 text-slate-600" },
+  RESOLVED: { label: "Resolved", tone: "bg-emerald-50 text-emerald-600" },
+};
+
 function ProcessingTab({ campaignId, canManageCampaigns, canReplayDlq, showDlq = false }) {
   const [status, setStatus] = useState(null);          // overall summary (HR_ADMIN + RECRUITER)
   const [queue, setQueue] = useState(null);            // per-task-type breakdown (HR_ADMIN + RECRUITER)
@@ -957,6 +965,7 @@ function ProcessingTab({ campaignId, canManageCampaigns, canReplayDlq, showDlq =
   const [selectedIds, setSelectedIds] = useState([]);
   const [replaying, setReplaying] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [expandedChains, setExpandedChains] = useState([]);   // DLQ entries with their attempt history open
 
   const load = useCallback(async () => {
     const calls = [
@@ -987,6 +996,10 @@ function ProcessingTab({ campaignId, canManageCampaigns, canReplayDlq, showDlq =
     const t = setInterval(load, 60000);
     return () => clearInterval(t);
   }, [load]);
+
+  const toggleChain = (id) => {
+    setExpandedChains((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
 
   const toggleEntry = (id) => {
     setSelectedIds((prev) =>
@@ -1155,13 +1168,17 @@ function ProcessingTab({ campaignId, canManageCampaigns, canReplayDlq, showDlq =
         {dlq.length === 0 ? (<p className="text-xs text-slate-400 text-center py-6">No dead-lettered tasks for this campaign.</p>
         ) : (<div className="space-y-2">
             {dlq.map((entry) => {
-              // the backend now only ever returns task types its replay
-              // endpoint can actually re-enqueue — every entry here is
-              // replayable unless it already has been.
-              const replayable = canReplayDlq && !entry.replayed_at;
-              return (<label
+              // One entry per chain (task + candidate): its newest failed
+              // attempt. Only an OPEN chain can be replayed - REPLAYING is
+              // in flight, LIMIT_REACHED has used MAX_DLQ_REPLAYS_PER_TASK.
+              const chainStatus = entry.status || (entry.replayed_at ? "REPLAYING" : "OPEN");
+              const replayable = canReplayDlq && chainStatus === "OPEN";
+              const chip = DLQ_STATUS_CHIP[chainStatus];
+              const history = entry.history || [];
+              const historyOpen = expandedChains.includes(entry.id);
+              return (<div
                   key={entry.id}
-                  className={`flex gap-3 p-2.5 rounded-xl border ${replayable ? "cursor-pointer bg-rose-50/50 border-rose-100" : "bg-slate-50 border-slate-100"}`}
+                  className={`flex gap-3 p-2.5 rounded-xl border ${replayable ? "bg-rose-50/50 border-rose-100" : "bg-slate-50 border-slate-100"}`}
                 >
                   {canReplayDlq && (<input
                       type="checkbox" className="mt-1 accent-rose-600"
@@ -1177,30 +1194,35 @@ function ProcessingTab({ campaignId, canManageCampaigns, canReplayDlq, showDlq =
                         {entry.candidate_name && (
                           <span className="text-[11px] font-semibold text-slate-500 truncate">· {entry.candidate_name}</span>
                         )}
+                        {chip && (<span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${chip.tone}`}>{chip.label}</span>)}
                       </span>
                       <span className="text-[10px] text-slate-400 flex items-center gap-1 shrink-0">
                         <Clock className="h-3 w-3" />
-                        retried {entry.retry_count}x · last {fmtDate(entry.last_attempted_at || entry.moved_to_dlq_at)}
+                        {entry.replay_limit != null && `replays ${entry.replays_used ?? 0}/${entry.replay_limit} · `}
+                        {fmtDate(entry.last_attempted_at || entry.moved_to_dlq_at)}
                       </span>
                     </div>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <p className="text-xs text-rose-700 mt-1 break-words cursor-pointer underline decoration-dotted decoration-rose-300 underline-offset-2">
-                            {extractErrorMessage(entry.final_error_message)}
-                          </p>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-xs whitespace-pre-wrap break-words bg-slate-900 text-slate-50 border-slate-800">
-                          {extractErrorMessage(entry.final_error_message)}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    {entry.replayed_at && (<p className="text-[10px] text-emerald-600 mt-0.5">Replayed {fmtDate(entry.replayed_at)}</p>
+                    <p className="text-xs text-rose-700 mt-1 truncate">
+                      {entry.error_summary || extractErrorMessage(entry.final_error_message)}
+                    </p>
+                    {history.length > 0 && (<button
+                        type="button"
+                        onClick={() => toggleChain(entry.id)}
+                        className="text-[10px] text-slate-500 hover:text-slate-700 mt-1 flex items-center gap-0.5"
+                      >
+                        <ChevronDown className={`h-3 w-3 transition-transform ${historyOpen ? "rotate-180" : ""}`} />
+                        {history.length} earlier attempt{history.length === 1 ? "" : "s"}
+                      </button>
                     )}
-                    {entry.resolution_notes && (<p className="text-[10px] text-slate-500 mt-0.5">{entry.resolution_notes}</p>
+                    {historyOpen && (<ul className="mt-1 pl-3 border-l border-slate-200 space-y-0.5">
+                        {history.map((h) => (<li key={h.id} className="text-[10px] text-slate-500 truncate">
+                            {fmtDate(h.moved_to_dlq_at)} · {h.error_summary}
+                          </li>
+                        ))}
+                      </ul>
                     )}
                   </div>
-                </label>
+                </div>
               );
             })}
           </div>

@@ -469,7 +469,7 @@ export default function TaxCalculation() {
                 <span className="text-xs font-bold text-indigo-800">Ready for Invoice</span>
               </div>
               <p className="text-xs text-indigo-700">
-                Tax components and grand total are verified. Click "View Invoice Generation" to proceed to invoice creation.
+                Tax components and grand total are verified. Click "Proceed to Invoice Generation" to proceed to invoice creation.
               </p>
             </div>
           </div>
@@ -480,7 +480,7 @@ export default function TaxCalculation() {
             disabled={calculating}
             className="flex items-center justify-center gap-1.5 text-xs font-semibold bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm shrink-0"
           >
-            <FileText className="h-3.5 w-3.5" /> View Invoice Generation <ArrowRight className="h-3.5 w-3.5" />
+            <FileText className="h-3.5 w-3.5" /> Proceed to Invoice Generation <ArrowRight className="h-3.5 w-3.5" />
           </Button>
         </div>
       ) : null}

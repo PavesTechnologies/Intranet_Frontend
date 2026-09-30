@@ -127,6 +127,19 @@ export const normalizeApprovalConfiguration = (record = {}) => {
     effectiveFrom: firstPresent(billingDetails?.effectiveFrom, record.effectiveFrom, record.startDate) || "",
     effectiveTo: firstPresent(billingDetails?.effectiveTo, record.effectiveTo, record.endDate) || "",
     hourlyRate: record.hourlyRate ?? "",
+    // Recurring-only fields (see buildRecurringRequestPayload/normalizeRecurringConfig)
+    // — read from the resolved billingDetails section (recurringDetails for a
+    // RECURRING record), falling back to a top-level field in case the
+    // backend also flattens it there.
+    billingContext: firstPresent(billingDetails?.billingContext, record.billingContext) || "PROJECT",
+    productName: firstPresent(billingDetails?.productName, record.productName) || "",
+    productDescription: firstPresent(billingDetails?.productDescription, record.productDescription) || "",
+    renewalType: firstPresent(billingDetails?.renewalType, record.renewalType) || "",
+    renewalDurationType: firstPresent(billingDetails?.renewalDurationType, record.renewalDurationType) || "",
+    renewalPricingType: firstPresent(billingDetails?.renewalPricingType, record.renewalPricingType) || "",
+    renewalContractValue: firstPresent(billingDetails?.renewalContractValue, record.renewalContractValue),
+    renewalBillingFrequencyId: firstPresent(billingDetails?.renewalBillingFrequencyId, record.renewalBillingFrequencyId) || "",
+    renewalEffectiveFrom: firstPresent(billingDetails?.renewalEffectiveFrom, record.renewalEffectiveFrom) || "",
     // contractValue/pmsProjectBudget/contractValueSource and every commercial
     // figure below are read from the resolved billingDetails section first —
     // that's the backend's source of truth — falling back to the legacy flat

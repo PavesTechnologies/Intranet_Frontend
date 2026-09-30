@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { CheckCircle2, XCircle, Tags, Sparkles } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorState from "@/pages/airs/skill-ontology/components/ErrorState";
@@ -9,8 +9,14 @@ import SkillChipGroup from "./components/SkillChipGroup";
 import { textOrDash } from "../../../utils/candidateDataUtils";
 
 // Relevance Score tab — GET /airs/campaign-candidates/{campaign_candidate_id}/semantic.
-export default function SemanticScoreTab({ candidate }) {
-  const { breakdown, loading, error, refetch } = useSemanticScore(candidate?.id);
+export default function SemanticScoreTab({ candidate, onLayerFailure }) {
+  const { breakdown, failure, loading, error, refetch } = useSemanticScore(candidate?.id);
+
+  // Optional: lets a host page (PipelineCandidateScorecardPage) flag/retry a
+  // dead-lettered layer from this tab's own fresh response.
+  useEffect(() => {
+    if (!loading && !error) onLayerFailure?.("semantic", failure);
+  }, [loading, error, failure, onLayerFailure]);
 
   if (loading) {
     return (

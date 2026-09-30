@@ -3,8 +3,10 @@ import { RefreshCw, AlertCircle, FolderKanban, Hash, CalendarRange, MapPin, Mail
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
+import FormTextArea from "../../../../components/forms/FormTextArea";
 import SearchableSelect from "../common/SearchableSelect";
 import { showStatusToast } from "../../../../components/toastfy/toast";
+import { BILLING_CONTEXT_OPTIONS } from "../../data/wizardOptions";
 import {
   getBillingConfigurationClients,
   getAvailableProjectsForBillingConfiguration,
@@ -42,6 +44,15 @@ const EMPTY_PROJECT_FIELDS = {
   phoneNumber: "",
   startDate: "",
   endDate: "",
+};
+
+// Product/Application/Service billing has no project at all — projectId must
+// stay null/absent (see buildBillingConfigurationRequestPayload), so switching
+// into PRODUCT_SERVICE clears every project-specific field a prior PROJECT
+// selection may have left behind.
+const EMPTY_PRODUCT_SERVICE_FIELDS = {
+  productName: "",
+  productDescription: "",
 };
 
 export default function ProjectStep({ value = {}, onChange }) {
@@ -118,6 +129,15 @@ export default function ProjectStep({ value = {}, onChange }) {
 
   // Internal projectSource defaults to ENTERPRISE if not set
   const projectSource = value.projectSource || "ENTERPRISE";
+
+  // Billing Context: PROJECT (default — every existing T&M/Fixed Price/
+  // Milestone/Recurring flow) vs PRODUCT_SERVICE (Recurring only — a
+  // standalone product/application/service with no project at all). This is
+  // a distinct concept from projectSource's ENTERPRISE/STANDALONE, which is
+  // still about a *project* (synced vs manually-entered) — a PRODUCT_SERVICE
+  // configuration never has a project, manually-entered or otherwise.
+  const billingContext = value.billingContext || "PROJECT";
+  const isProductService = billingContext === "PRODUCT_SERVICE";
 
   // `projects` is already exactly the set of projects eligible for a new
   // Billing Configuration (see getAvailableProjectsForBillingConfiguration) —
@@ -215,7 +235,14 @@ export default function ProjectStep({ value = {}, onChange }) {
     onChange({
       ...value,
       projectName: value.projectName || matchedProject.projectName,
-      projectCode: value.projectCode || matchedProject.projectCode,
+      // available-projects can return a null projectCode (e.g. no PMS code
+      // assigned yet) — fall back to the projectId so this required field is
+      // never blocked on a value the user has no way to enter (it's read-only
+      // Synced Information for enterprise projects).
+      projectCode:
+        value.projectCode ||
+        matchedProject.projectCode ||
+        (matchedProject.projectId ? String(matchedProject.projectId) : ""),
       projectDuration: value.projectDuration || matchedProject.projectDuration,
       currency: value.currency || matchedProject.projectBudgetCurrency || matchedProject.currency || "",
       projectBudget: value.projectBudget ?? matchedProject.projectBudget ?? "",
@@ -263,7 +290,7 @@ export default function ProjectStep({ value = {}, onChange }) {
         clientName: value.clientName,
         projectId,
         projectName: project.projectName,
-        projectCode: project.projectCode,
+        projectCode: project.projectCode || String(projectId),
         projectDuration: project.projectDuration,
         currency: project.projectBudgetCurrency || project.currency || "",
         projectBudget: project.projectBudget ?? "",
@@ -282,6 +309,35 @@ export default function ProjectStep({ value = {}, onChange }) {
         projectId: "",
       });
     }
+  };
+
+  const handleBillingContextChange = (nextContext) => {
+    if (nextContext === billingContext) return;
+    if (nextContext === "PRODUCT_SERVICE") {
+      onChange({
+        ...value,
+        billingContext: "PRODUCT_SERVICE",
+        ...EMPTY_PROJECT_FIELDS,
+      });
+    } else {
+      onChange({
+        ...value,
+        billingContext: "PROJECT",
+        ...EMPTY_PRODUCT_SERVICE_FIELDS,
+      });
+    }
+  };
+
+  // Client search for Product/Service billing — the same enterprise client
+  // list as the PROJECT flow (a client is still required), but never touches
+  // projectSource/switchToStandalone: there is no project to fall back to.
+  const handleProductServiceClientSelect = (clientId) => {
+    const clientName = clientOptions.find((opt) => opt.value === clientId)?.label || "";
+    onChange({ ...value, clientId, clientName });
+  };
+
+  const useManualClientForProductService = (queryText = "") => {
+    onChange({ ...value, clientId: "", clientName: queryText });
   };
 
   const switchToStandalone = (queryText = "") => {
@@ -325,7 +381,32 @@ export default function ProjectStep({ value = {}, onChange }) {
 
   return (
     <div className="space-y-5">
-      {projectSource === "STANDALONE" && (
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">Billing Context</label>
+        <div className="inline-flex items-center gap-1 rounded-lg bg-slate-200/60 p-0.5">
+          {BILLING_CONTEXT_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => handleBillingContextChange(option.value)}
+              className={`rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                billingContext === option.value
+                  ? "bg-white text-[#0A0082] shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {isProductService && (
+          <p className="text-xs text-slate-500">
+            Bill a standalone product, application, or service — no project is required.
+          </p>
+        )}
+      </div>
+
+      {!isProductService && projectSource === "STANDALONE" && (
         <div className="flex justify-end">
           <button
             type="button"
@@ -341,7 +422,72 @@ export default function ProjectStep({ value = {}, onChange }) {
       {/* Inputs Section */}
       <div className="space-y-5">
 
-        {projectSource === "ENTERPRISE" ? (
+        {isProductService ? (
+          /* PRODUCT / SERVICE FLOW — client is still required, but there is
+             no project at all: projectId/projectCode/dates stay absent (see
+             buildBillingConfigurationRequestPayload). */
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <SearchableSelect
+                label="Client Name"
+                requiredMark
+                name="clientId"
+                options={clientOptions}
+                value={value.clientId || ""}
+                onChange={(event) => handleProductServiceClientSelect(event.target.value)}
+                placeholder={loadingClients ? "Loading clients..." : "Search client..."}
+                disabled={loadingClients}
+                anchor
+                emptyState={(query) =>
+                  query ? (
+                    <div className="p-4 text-center">
+                      <p className="text-sm text-slate-500 mb-2">No matching client found.</p>
+                      <button
+                        type="button"
+                        onClick={() => useManualClientForProductService(query)}
+                        className="w-full inline-flex justify-center items-center gap-1.5 rounded-md bg-[#0A0082] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#080066]"
+                      >
+                        Use &quot;{query}&quot; as client name
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="px-4 py-2 text-sm text-slate-500">No clients available.</div>
+                  )
+                }
+              />
+              {value.clientId === "" && value.clientName && (
+                <FormInput
+                  label="Client Name"
+                  requiredMark
+                  name="clientName"
+                  value={value.clientName || ""}
+                  onChange={handleFieldChange}
+                  placeholder="e.g. Meridian Financial Group"
+                />
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <FormInput
+                label="Product / Application / Service Name"
+                requiredMark
+                name="productName"
+                value={value.productName || ""}
+                onChange={handleFieldChange}
+                placeholder="e.g. Customer Support Portal"
+              />
+            </div>
+
+            <FormTextArea
+              label="Product / Service Description *"
+              name="productDescription"
+              value={value.productDescription || ""}
+              onChange={handleFieldChange}
+              placeholder="Briefly describe what is being billed"
+              rows={3}
+            />
+          </div>
+        ) : projectSource === "ENTERPRISE" ? (
           /* ENTERPRISE FLOW */
           <div className="space-y-5">
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
