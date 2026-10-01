@@ -10,7 +10,8 @@ import { APPROVAL_PERMISSIONS, APPROVAL_ANY_VIEW_PERMISSIONS } from "../constant
 import {
   INVOICE_HISTORY_VIEW_PERMISSIONS,
 } from "../constants/approvalPermissions";
-import { PAYMENT_PERMISSIONS } from "../constants/paymentPermissions";
+import { PAYMENT_PERMISSIONS, PAYMENT_ANY_VIEW_PERMISSIONS } from "../constants/paymentPermissions";
+import { TDS_TRACKING_PERMISSIONS, TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "../constants/tdsTrackingPermissions";
 import { INVOICE_PERMISSIONS } from "../constants/invoicePermissions";
 import { TDS_PERMISSIONS, TDS_ANY_VIEW_PERMISSIONS } from "../constants/tdsPermissions";
 import { TDS_CONFIG_PERMISSIONS } from "../constants/tdsConfigPermissions";
@@ -74,6 +75,15 @@ export function useApPermissions() {
     // a frontend role guess.
     canMarkPaid: hasPermission(PAYMENT_PERMISSIONS.PAYMENT_PROCESS),
     canViewPayment: hasPermission(PAYMENT_PERMISSIONS.PAYMENT_VIEW),
+    // Payment Management pages (Ready for Payment / Payment History / payment detail) — the
+    // backend's read endpoints accept PAYMENT_VIEW or PAYMENT_PROCESS.
+    canViewPaymentManagement: hasAnyPermission(PAYMENT_ANY_VIEW_PERMISSIONS),
+    // Record Payment + upload receipt (POST /payment/invoice/{id}/record, /payment/{id}/documents).
+    canRecordPayment: hasPermission(PAYMENT_PERMISSIONS.PAYMENT_PROCESS),
+
+    // ── TDS Tracking (deduction / deposit / filing recorded from outside systems) ──
+    canViewTdsTracking: hasAnyPermission(TDS_TRACKING_ANY_VIEW_PERMISSIONS),
+    canUpdateTdsTracking: hasPermission(TDS_TRACKING_PERMISSIONS.TDS_TRACKING_UPDATE),
 
     // ── Invoice TDS (tax deducted at source) ───────────────────────────────
     // GET .../tds accepts INVOICE_TDS_VIEW OR plain INVOICE_VIEW per the backend contract — so
