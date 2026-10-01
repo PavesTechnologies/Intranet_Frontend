@@ -60,6 +60,7 @@ import ProcurementPage from "./pages/accounts-payable/procurement/pages/Procurem
 import PrDetailPage from "./pages/accounts-payable/procurement/pages/PrDetailPage.jsx";
 import PurchaseOrderDetailPage from "./pages/accounts-payable/procurement/pages/PurchaseOrderDetailPage.jsx";
 import RfqDetailPage from "./pages/accounts-payable/procurement/pages/RfqDetailPage.jsx";
+import NotificationCenterPage from "./pages/accounts-payable/notifications/pages/NotificationCenterPage.jsx";
 
 
 // Resource Management
@@ -673,6 +674,16 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={AP_ALL_ROLES} permission={APPROVAL_PERMISSIONS.APPROVAL_POLICY_MANAGE}>
                 <ApprovalPolicyFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.NOTIFICATIONS}
+            element={
+              // Every AP user may read their own notifications - the backend derives the
+              // recipient from the JWT, so there is nothing finer to gate on here.
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <NotificationCenterPage />
               </ProtectedRoute>
             }
           />
