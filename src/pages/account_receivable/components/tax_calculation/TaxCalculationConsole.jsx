@@ -79,13 +79,27 @@ const TABLE_COLUMNS = [
 const TABLE_ALIGNMENTS = {
   client: "left",
   project: "left",
-  snapshotNumber: "center",
-  billingPeriod: "center",
-  taxRegion: "center",
-  taxableAmount: "right",
+  snapshotNumber: "left",
+  billingPeriod: "left",
+  taxRegion: "left",
+  taxableAmount: "left",
   status: "center",
   actions: "center",
 };
+
+
+const TABLE_HEADER_ALIGNMENTS = {
+  client: "center",
+  project: "center",
+  snapshotNumber: "center",
+  billingPeriod: "center",
+  taxRegion: "center",
+  taxableAmount: "center",
+  status: "center",
+  actions: "center",
+};
+
+
 
 // Normalises the many raw status strings into one of the STATUS_TABS keys
 function getStatusGroup(status) {
@@ -656,6 +670,7 @@ export default function TaxCalculationConsole() {
               columns={TABLE_COLUMNS}
               rows={tableRows}
               alignments={TABLE_ALIGNMENTS}
+              headerAlignments={TABLE_HEADER_ALIGNMENTS}
               loading={loading}
               emptyMessage={relevantSnapshots.length === 0 ? "No billing snapshots in tax calculation workspace." : "No billing snapshots match your current filters."}
             />

@@ -68,6 +68,16 @@ const TABLE_ALIGNMENTS = {
   actions: "center",
 };
 
+const TABLE_HEADER_ALIGNMENTS = {
+  client: "center",
+  project: "center",
+  billingType: "center",
+  approvalStatus: "center",
+  configurationStatus: "center",
+  actions: "center",
+}
+
+
 export default function Overview() {
   const navigate = useNavigate();
 
@@ -553,6 +563,7 @@ export default function Overview() {
                 columns={TABLE_COLUMNS}
                 rows={tableRows}
                 alignments={TABLE_ALIGNMENTS}
+                headerAlignments={TABLE_HEADER_ALIGNMENTS}
                 loading={loadingConfigs}
               />
               <Pagination

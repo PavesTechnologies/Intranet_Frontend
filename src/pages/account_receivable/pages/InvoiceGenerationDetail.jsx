@@ -968,14 +968,6 @@ export default function InvoiceGenerationDetail() {
         {/* Section 4: Action Footer */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white p-5">
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="small"
-              onClick={() => navigate(backToTaxUrl)}
-              className="text-xs text-slate-700"
-            >
-              <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back to Tax Calculation
-            </Button>
           </div>
 
 
