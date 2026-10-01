@@ -567,7 +567,12 @@ export default function BillingApprovals() {
           const isTimesheetBased = typeUpper.includes("TIMESHEET") || typeUpper.includes("TIME") || typeUpper.includes("MATERIAL");
           const isFixedPrice = typeUpper.includes("FIXED");
           const isRecurring = typeUpper.includes("RECURRING");
-          const isMilestone = typeUpper.includes("MILESTONE");
+          // No separate "Milestone Plan" master-data record exists — the raw
+          // billing type name is still literally "Milestone Based" (no "PLAN"
+          // substring), and it now drives the Milestone Plan flow rather than
+          // any legacy bare Milestone one — so any "MILESTONE" name resolves
+          // to Milestone Plan.
+          const isMilestonePlan = typeUpper.includes("MILESTONE");
 
           const currency = reviewTarget.currencyCode || reviewTarget.currency || "";
 
@@ -820,6 +825,61 @@ export default function BillingApprovals() {
                         }
                       />
                     )}
+                  </div>
+                );
+              })()}
+
+              {isMilestonePlan && (() => {
+                const paymentStructure = reviewTarget.paymentStructure || "FULL_PAYMENT";
+                const isFullPayment = paymentStructure === "FULL_PAYMENT";
+                const entries = reviewTarget.paymentEntries || [];
+
+                return (
+                  <div className="space-y-3">
+                    <ReviewSection
+                      title="Milestone Plan Details"
+                      rows={[
+                        { label: "Payment Structure", value: isFullPayment ? "Full Payment" : "Installments" },
+                        { label: "Total Contract Value", value: formatMoney(contractVal, currency) },
+                      ]}
+                    />
+                    <PageCard className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+                      <PageCardContent className="p-0">
+                        <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                            {isFullPayment ? "Payment" : "Installments"}
+                          </h3>
+                        </div>
+                        <div className="overflow-x-auto p-2">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr>
+                                <th className="px-3 py-2 text-left font-semibold text-slate-500">
+                                  {isFullPayment ? "Payment" : "Installment"}
+                                </th>
+                                <th className="px-3 py-2 text-left font-semibold text-slate-500">Percentage</th>
+                                <th className="px-3 py-2 text-left font-semibold text-slate-500">Amount</th>
+                                <th className="px-3 py-2 text-left font-semibold text-slate-500">Billing Date</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {entries.map((entry, index) => (
+                                <tr key={entry.paymentEntryId || index}>
+                                  <td className="px-3 py-2 font-medium text-slate-700">
+                                    {isFullPayment ? "Full Payment" : `Installment ${index + 1}`}
+                                  </td>
+                                  <td className="px-3 py-2 text-slate-700">{Number(entry.percentage) || 0}%</td>
+                                  <td className="px-3 py-2 font-semibold text-slate-900">
+                                    {formatMoney(entry.amount, currency) || "—"}
+                                  </td>
+                                  <td className="px-3 py-2 text-slate-700">{formatDate(entry.billingDate)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </PageCardContent>
+                    </PageCard>
                   </div>
                 );
               })()}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Plus, Pencil, Trash2, Loader2, Landmark } from "lucide-react";
+import { Check, Plus, Pencil, Trash2, Loader2, Landmark, Wallet, Layers, Lock, AlertCircle } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
@@ -19,6 +19,7 @@ import {
   CURRENCY_OPTIONS,
   CONTRACT_VALUE_SOURCE_OPTIONS,
   RECURRING_RENEWAL_MODE_OPTIONS,
+  PAYMENT_STRUCTURE_OPTIONS,
 } from "../../data/wizardOptions";
 import { formatCurrency, formatDisplayDate, formatIndianNumber } from "../../utils/format";
 import { getBillingTypeDisplayName } from "../../utils/billingType";
@@ -39,6 +40,13 @@ import {
   createFixedPriceConfiguration,
   updateFixedPriceConfiguration,
   deleteFixedPriceConfiguration,
+  isMilestonePlanNotFoundError,
+  getMilestonePlanByBillingConfiguration,
+  createMilestonePlanConfiguration,
+  updateMilestonePlanConfiguration,
+  deleteMilestonePlanConfiguration,
+  buildMilestonePlanRequestPayload,
+  normalizeMilestonePaymentEntry,
   toApiContractValueSource,
   formatBillingFrequencyLabel,
   getBillingRecurringByBillingConfigurationId,
@@ -97,11 +105,15 @@ const FIXED_PRICE_FREQUENCY_ORDER = [
   "HALF_YEARLY",
   "ANNUALLY",
 ];
+// Featured order for new configurations is Time & Material, Milestone Plan,
+// Recurring — Fixed Price and the legacy bare Milestone type are kept after
+// them only for backward compatibility with existing configurations.
 const BILLING_TYPE_ORDER = [
   "TIME_MATERIAL",
-  "MILESTONE",
-  "FIXED_PRICE",
+  "MILESTONE_PLAN",
   "RECURRING",
+  "FIXED_PRICE",
+  "MILESTONE",
 ];
 
 function sortByOrder(options, order, key = "value") {
@@ -144,6 +156,14 @@ function getBillingFrequencyOptions(billingType, frequencies = []) {
 
   if (billingType === "FIXED_PRICE") {
     return sortByOrder(frequencies, FIXED_PRICE_FREQUENCY_ORDER, frequencyCode);
+  }
+
+  // Milestone Plan is driven by payment/installment dates, not a recurring
+  // cadence — it is always billed One-Time and the picker is never shown
+  // interactively for it (see the Billing Frequency render block below), but
+  // this keeps frequencyOptions consistent in case anything else reads it.
+  if (billingType === "MILESTONE_PLAN") {
+    return frequencies.filter((option) => frequencyCode(option) === "ONE_TIME");
   }
 
   // One-Time and Half-Yearly only make sense against Fixed Price/Recurring, so
@@ -253,8 +273,15 @@ function normalizeBillingType(type) {
       value = "TIME_MATERIAL";
       break;
 
+    // The billing_type_master record is still literally named "Milestone Based"
+    // (no separate master-data row exists for "Milestone Plan") — this billing
+    // type is now the Milestone Plan flow (Full Payment / Installments today,
+    // Milestones via PMS to follow later) and routes to MilestonePlanForm, not
+    // the legacy bare MilestoneForm. getBillingTypeDisplayName below relabels
+    // the raw "Milestone Based" master-data name to "Milestone Plan" for display.
     case "milestone based":
-      value = "MILESTONE";
+    case "milestone plan":
+      value = "MILESTONE_PLAN";
       break;
 
     case "subscription":
@@ -1663,6 +1690,694 @@ function FixedPriceForm({
   );
 }
 
+const EMPTY_FULL_PAYMENT_ENTRY = { sequence: 1, percentage: 100, billingDate: "", remarks: "" };
+const DEFAULT_MILESTONE_PLAN_STATE = {
+  paymentStructure: "FULL_PAYMENT",
+  entries: [
+    {
+      sequence: 1,
+      percentage: 100,
+      billingDate: "",
+      remarks: "",
+    },
+  ],
+  remarks: "",
+};
+// An installment plan normally requires multiple payments, so Installments
+// starts with two evenly-split entries rather than one — see
+// buildDefaultInstallmentEntries.
+const DEFAULT_INSTALLMENT_SPLIT = [50, 50];
+function buildDefaultInstallmentEntries() {
+  return DEFAULT_INSTALLMENT_SPLIT.map((percentage, index) => ({
+    sequence: index + 1,
+    percentage,
+    billingDate: "",
+    remarks: "",
+  }));
+}
+
+// Payment Plan cards shown in the UI — Milestones is a disabled "coming soon"
+// card only (PMS-managed, no lifecycle/name/status owned by AR). The
+// backend's PaymentStructure enum currently supports only FULL_PAYMENT and
+// INSTALLMENTS, so MILESTONES must never be selectable or sent to the API.
+const PAYMENT_PLAN_CARDS = [
+  {
+    ...PAYMENT_STRUCTURE_OPTIONS.find((option) => option.value === "FULL_PAYMENT"),
+    description: "One complete payment for the full contract value.",
+    icon: Wallet,
+  },
+  {
+    ...PAYMENT_STRUCTURE_OPTIONS.find((option) => option.value === "INSTALLMENTS"),
+    description: "Split the contract value into multiple scheduled payments.",
+    icon: Layers,
+  },
+  {
+    value: "MILESTONES",
+    label: "Milestones",
+    description: "Managed by PMS",
+    icon: Lock,
+    disabled: true,
+    badge: "Coming Soon",
+  },
+];
+
+// Enterprise-grade Payment Plan selector — a visually distinct card group
+// (icon, selected-state ring, disabled "coming soon" badge) rather than the
+// generic RadioCardGroup used elsewhere in this wizard.
+function PaymentPlanSelector({ value, onChange }) {
+  return (
+    <div role="radiogroup" aria-label="Payment Plan" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {PAYMENT_PLAN_CARDS.map((card) => {
+        const isSelected = value === card.value;
+        const Icon = card.icon;
+        return (
+          <button
+            key={card.value}
+            type="button"
+            role="radio"
+            aria-checked={isSelected}
+            disabled={card.disabled}
+            onClick={() => !card.disabled && onChange(card.value)}
+            className={`relative flex flex-col gap-2.5 rounded-xl border p-4 text-left transition-all focus:outline-none focus:ring-2 focus:ring-[#0A0082]/30 ${
+              isSelected
+                ? "border-[#0A0082] bg-[#0A0082]/[0.04] shadow-[0_0_0_1px_rgba(10,0,130,0.35)]"
+                : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
+            } ${card.disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+          >
+            {card.badge ? (
+              <span className="absolute right-3 top-3 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600 ring-1 ring-inset ring-amber-200">
+                {card.badge}
+              </span>
+            ) : isSelected ? (
+              <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-[#0A0082] text-white">
+                <Check className="h-3 w-3" />
+              </span>
+            ) : null}
+            <span
+              className={`flex h-9 w-9 items-center justify-center rounded-lg ${
+                isSelected ? "bg-[#0A0082] text-white" : "bg-slate-100 text-slate-500"
+              }`}
+            >
+              <Icon className="h-4.5 w-4.5" />
+            </span>
+            <span>
+              <span className="block text-sm font-semibold text-slate-900">{card.label}</span>
+              <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">{card.description}</span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PercentBadge({ value }) {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-full bg-[#0A0082]/10 px-2.5 py-0.5 text-xs font-bold text-[#0A0082]">
+      {value || 0}%
+    </span>
+  );
+}
+
+// Shared bottom summary for both Full Payment and Installments — Project
+// Budget (via totalContractValue) is always the single source of truth, so
+// there is never a separate "Total Contract Value" input anywhere in this form.
+function PaymentSummaryPanel({ totalContractValue, allocated, remaining, totalPercentage, currency, showPercentage, isComplete }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
+      <h3 className="mb-3 text-sm font-semibold text-slate-900">Payment Allocation</h3>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-slate-500">Total Contract Value</span>
+          <span className="font-semibold text-slate-900">{formatCurrency(totalContractValue, currency)}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-slate-500">Allocated Amount</span>
+          <span className="font-semibold text-slate-900">{formatCurrency(allocated, currency)}</span>
+        </div>
+        <div className="flex items-center justify-between border-t border-slate-200 pt-2 text-sm">
+          <span className="font-semibold text-slate-700">Remaining Amount</span>
+          <span className={`font-bold ${isComplete ? "text-[#0A0082]" : "text-amber-600"}`}>
+            {formatCurrency(remaining, currency)}
+          </span>
+        </div>
+        {showPercentage && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-500">Total Percentage</span>
+            <span className={`font-semibold ${isComplete ? "text-slate-900" : "text-red-600"}`}>
+              {totalPercentage}%
+            </span>
+          </div>
+        )}
+      </div>
+      {!isComplete && (
+        <p className="mt-3 flex items-start gap-1.5 text-xs font-medium text-amber-700">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          Payment plan is incomplete — allocate the remaining amount before saving.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Milestone Plan billing (PaymentStructure FULL_PAYMENT / INSTALLMENTS today —
+// MILESTONES will follow later via PMS and must not be offered here yet). This
+// is a distinct concept from the legacy MilestoneForm below (bare "MILESTONE"
+// billing type, project milestones) — "Installment" is the correct term for a
+// payment entry here, never "Milestone".
+function MilestonePlanForm({
+  value = {},
+  onChange,
+  currency,
+  projectBudget,
+  billingConfigurationId,
+  ensureBillingConfigurationId,
+}) {
+  const update = (patch) => onChange({ ...value, ...patch });
+  const [loadingConfig, setLoadingConfig] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const fetchedRef = useRef(null);
+  const seededRef = useRef(false);
+
+  const paymentStructure = value.paymentStructure || "FULL_PAYMENT";
+  const isFullPayment = paymentStructure === "FULL_PAYMENT";
+  const entries = value.entries || [];
+
+  // Seeds a sensible default shape the first time this form mounts for a
+  // brand-new Milestone Plan (nothing saved/loaded yet) — Full Payment with a
+  // single 100% entry — so the "100%" amount is visible immediately.
+  useEffect(() => {
+    if (seededRef.current) return;
+    seededRef.current = true;
+    if (value.paymentStructure || (value.entries || []).length > 0) return;
+    update({ ...DEFAULT_MILESTONE_PLAN_STATE });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Project Budget (shown once already, under Project Financials) is the
+  // single source of truth for the contract value here — there is no
+  // separate "Total Contract Value" input. Keep it synced onto form state so
+  // validation/payload always have it, and so a stale value loaded from a
+  // previously-saved record (from before the budget changed) is corrected.
+  useEffect(() => {
+    if (projectBudget === "" || projectBudget === null || projectBudget === undefined) return;
+    const cleanBudget =
+      typeof projectBudget === "number"
+        ? projectBudget
+        : Number(String(projectBudget).replace(/,/g, "").replace(/[^0-9.-]+/g, ""));
+    if (Number.isNaN(cleanBudget) || cleanBudget <= 0) return;
+    if (Number(value.totalContractValue) === cleanBudget) return;
+    update({ totalContractValue: cleanBudget });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectBudget, value.totalContractValue]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const load = async () => {
+      if (!billingConfigurationId) return;
+      if (fetchedRef.current === billingConfigurationId) return;
+      fetchedRef.current = billingConfigurationId;
+
+      setLoadingConfig(true);
+      try {
+        const record = await getMilestonePlanByBillingConfiguration(billingConfigurationId);
+        if (!mounted) return;
+        if (!record) {
+          update({
+            milestonePlanId: null,
+            ...DEFAULT_MILESTONE_PLAN_STATE,
+          });
+          return;
+        }
+        const loadedEntries = Array.isArray(record.entries)
+          ? record.entries.map((entry, index) => {
+              const normalized = normalizeMilestonePaymentEntry(entry);
+              return {
+                ...normalized,
+                sequence: normalized.sequence ?? index + 1,
+              };
+            })
+          : [];
+        update({
+          milestonePlanId: record.milestonePlanId || record.id || null,
+          totalContractValue: record.totalContractValue ?? value.totalContractValue ?? "",
+          paymentStructure: record.paymentStructure || "FULL_PAYMENT",
+          entries: loadedEntries,
+          remarks: record.remarks || "",
+        });
+      } catch (error) {
+        if (isMilestonePlanNotFoundError(error)) {
+          if (!mounted) return;
+          update({
+            milestonePlanId: null,
+            ...DEFAULT_MILESTONE_PLAN_STATE,
+          });
+          return;
+        }
+        showStatusToast(
+          getApiErrorMessage(error, "Unable to load milestone plan configuration."),
+          "error",
+        );
+      } finally {
+        if (mounted) setLoadingConfig(false);
+      }
+    };
+
+    load();
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [billingConfigurationId]);
+
+  // Switching Payment Structure must never leave stale entries from the other
+  // structure behind (e.g. a 60/40 installment split lingering after switching
+  // to Full Payment) — always start the newly selected structure fresh.
+  const handlePaymentStructureChange = (next) => {
+    if (next === paymentStructure) return;
+    update({
+      paymentStructure: next,
+      // An installment plan normally requires multiple payments, so it
+      // starts with two evenly-split entries, not one.
+      entries: next === "FULL_PAYMENT" ? [{ ...EMPTY_FULL_PAYMENT_ENTRY }] : buildDefaultInstallmentEntries(),
+    });
+  };
+
+  const updateFullPaymentEntry = (patch) => {
+    const current = entries[0] || EMPTY_FULL_PAYMENT_ENTRY;
+    update({ entries: [{ ...current, ...patch, sequence: 1, percentage: 100 }] });
+  };
+
+  // Prefills the new row with whatever percentage is left unallocated (never
+  // negative) so reaching 100% usually takes less manual arithmetic — still
+  // freely editable.
+  const addInstallment = () => {
+    const allocated = entries.reduce((sum, entry) => sum + (Number(entry.percentage) || 0), 0);
+    const remaining = Math.max(0, Math.round((100 - allocated) * 100) / 100);
+    update({
+      entries: [
+        ...entries,
+        { sequence: entries.length + 1, percentage: remaining > 0 ? remaining : "", billingDate: "", remarks: "" },
+      ],
+    });
+  };
+
+  const removeInstallment = (index) => {
+    if (entries.length <= 1) return;
+    const next = entries.filter((_, i) => i !== index).map((entry, i) => ({ ...entry, sequence: i + 1 }));
+    update({ entries: next });
+  };
+
+  const updateInstallment = (index, patch) => {
+    const next = entries.map((entry, i) => (i === index ? { ...entry, ...patch } : entry));
+    update({ entries: next });
+  };
+
+  // Project Budget drives every amount shown here — fall back to the stored
+  // value only for the brief window before the sync effect above runs.
+  const cleanProjectBudget =
+    projectBudget !== "" && projectBudget !== null && projectBudget !== undefined
+      ? typeof projectBudget === "number"
+        ? projectBudget
+        : Number(String(projectBudget).replace(/,/g, "").replace(/[^0-9.-]+/g, ""))
+      : null;
+  const cleanValueContractValue =
+    value.totalContractValue !== "" && value.totalContractValue !== null && value.totalContractValue !== undefined
+      ? typeof value.totalContractValue === "number"
+        ? value.totalContractValue
+        : Number(String(value.totalContractValue).replace(/,/g, "").replace(/[^0-9.-]+/g, ""))
+      : null;
+
+  const totalContractValueNum =
+    cleanProjectBudget !== null && !Number.isNaN(cleanProjectBudget) && cleanProjectBudget > 0
+      ? cleanProjectBudget
+      : cleanValueContractValue !== null && !Number.isNaN(cleanValueContractValue) && cleanValueContractValue > 0
+      ? cleanValueContractValue
+      : 0;
+
+  const entryErrors = entries.map((entry) => {
+    const errors = {};
+    const percentNum = Number(entry.percentage);
+    if (entry.percentage === "" || entry.percentage === null || entry.percentage === undefined) {
+      errors.percentage = "Percentage is required.";
+    } else if (Number.isNaN(percentNum) || percentNum <= 0) {
+      errors.percentage = "Percentage must be greater than 0.";
+    } else if (percentNum > 100) {
+      errors.percentage = "Percentage cannot exceed 100%.";
+    }
+    if (!entry.billingDate) {
+      errors.billingDate = "Billing date is required.";
+    }
+    return errors;
+  });
+  const hasEntryErrors = entryErrors.some((error) => error.percentage || error.billingDate);
+
+  const totalPercentage = entries.reduce((sum, entry) => sum + (Number(entry.percentage) || 0), 0);
+  const totalPercentageValid = entries.length > 0 && Math.abs(totalPercentage - 100) < 0.01;
+  const totalAllocated = entries.reduce(
+    (sum, entry) => sum + ((Number(entry.percentage) || 0) / 100) * totalContractValueNum,
+    0,
+  );
+  const remainingAmount = totalContractValueNum - totalAllocated;
+
+  const contractValueValid = totalContractValueNum > 0;
+  const isInstallmentsValid = entries.length > 0 && !hasEntryErrors && totalPercentageValid;
+  const isFullPaymentValid = Boolean(entries[0]?.billingDate) && !entryErrors[0]?.billingDate;
+  const isFormValid = contractValueValid && (isFullPayment ? isFullPaymentValid : isInstallmentsValid);
+
+  const saveMilestonePlanConfig = async () => {
+    if (!contractValueValid) {
+      showStatusToast("Total Contract Value is required and must be greater than zero.", "error");
+      return;
+    }
+    if (isFullPayment) {
+      if (!entries[0]?.billingDate) {
+        showStatusToast("Billing date is required.", "error");
+        return;
+      }
+    } else {
+      if (entries.length === 0) {
+        showStatusToast("At least one installment is required.", "error");
+        return;
+      }
+      if (hasEntryErrors) {
+        showStatusToast("Please fix the highlighted installment errors before saving.", "error");
+        return;
+      }
+      if (!totalPercentageValid) {
+        showStatusToast("Total installment percentage must equal 100%.", "error");
+        return;
+      }
+    }
+
+    if (!billingConfigurationId) {
+      showStatusToast(
+        "Unable to save milestone plan configuration: billing configuration id is missing. Please reload and try again.",
+        "error",
+      );
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // The parent billing configuration's draft may have been created before
+      // Billing Frequency was selected — re-sync it first, mirroring
+      // FixedPriceForm's saveFixedPriceConfig.
+      let resolvedConfigId = billingConfigurationId;
+      if (ensureBillingConfigurationId) {
+        const syncedId = await ensureBillingConfigurationId();
+        if (syncedId) resolvedConfigId = syncedId;
+      }
+
+      // totalContractValue is sourced from Project Budget (totalContractValueNum,
+      // same value already driving the Payment/Allocated/Remaining amounts above),
+      // never from value.totalContractValue directly — that field is only kept in
+      // sync by the effect above and can still be stale/blank at the moment Save
+      // is clicked (e.g. right after the budget first loads). There is no separate
+      // Total Contract Value input in this form.
+      const payload = buildMilestonePlanRequestPayload({
+        ...value,
+        totalContractValue: totalContractValueNum,
+      });
+
+      // value.milestonePlanId can still be unset here if the wizard's own load
+      // effect (above) hasn't resolved yet — re-check the backend directly so
+      // an existing record is updated, never re-created as a duplicate.
+      let existingId = value.milestonePlanId;
+      if (!existingId && resolvedConfigId) {
+        const existingRecord = await getMilestonePlanByBillingConfiguration(resolvedConfigId);
+        existingId = existingRecord?.milestonePlanId || existingRecord?.id || null;
+      }
+
+      const saved = existingId
+        ? await updateMilestonePlanConfiguration(existingId, payload)
+        : await createMilestonePlanConfiguration(resolvedConfigId, payload);
+
+      const savedMilestonePlanId =
+        saved?.milestonePlanId ||
+        saved?.id ||
+        saved?.data?.milestonePlanId ||
+        saved?.data?.id ||
+        existingId ||
+        value.milestonePlanId ||
+        null;
+
+      update({
+        milestonePlanId: savedMilestonePlanId,
+        totalContractValue: saved?.totalContractValue ?? totalContractValueNum,
+        paymentStructure: saved?.paymentStructure || value.paymentStructure || "FULL_PAYMENT",
+        remarks: saved?.remarks ?? value.remarks ?? "",
+        // Reconcile with the backend-calculated amounts so the display reflects
+        // exactly what was persisted, falling back to what was just entered.
+        entries:
+          Array.isArray(saved?.entries) && saved.entries.length > 0
+            ? saved.entries.map((entry, index) => {
+                const normalized = normalizeMilestonePaymentEntry(entry);
+                return {
+                  ...normalized,
+                  sequence: normalized.sequence ?? index + 1,
+                  percentage: normalized.percentage ?? entries[index]?.percentage ?? "",
+                  remarks: normalized.remarks || entries[index]?.remarks || "",
+                };
+              })
+            : entries.map(normalizeMilestonePaymentEntry),
+      });
+      showStatusToast("Milestone plan configuration saved", "success");
+    } catch (error) {
+      showStatusToast(
+        getApiErrorMessage(error, "Unable to save milestone plan configuration."),
+        "error",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const requestRemoveMilestonePlanConfig = () => {
+    if (!value.milestonePlanId) {
+      update({
+        milestonePlanId: null,
+        totalContractValue: "",
+        ...DEFAULT_MILESTONE_PLAN_STATE,
+      });
+      return;
+    }
+    setConfirmingDelete(true);
+  };
+
+  const removeMilestonePlanConfig = async () => {
+    const milestonePlanId = value.milestonePlanId;
+    if (!milestonePlanId) {
+      setConfirmingDelete(false);
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await deleteMilestonePlanConfiguration(milestonePlanId);
+      update({
+        milestonePlanId: null,
+        totalContractValue: "",
+        ...DEFAULT_MILESTONE_PLAN_STATE,
+      });
+      showStatusToast("Milestone plan configuration deleted.", "success");
+      setConfirmingDelete(false);
+    } catch (error) {
+      showStatusToast(
+        getApiErrorMessage(error, "Unable to delete milestone plan configuration."),
+        "error",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <h2 className={Fonts.heading4}>Milestone Plan</h2>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-slate-700">
+            Payment Plan <span className="text-red-500">*</span>
+          </label>
+          <PaymentPlanSelector value={paymentStructure} onChange={handlePaymentStructureChange} />
+        </div>
+
+        <div className="space-y-3 border-t border-slate-100 pt-5">
+          <h3 className="text-sm font-semibold text-slate-900">
+            {isFullPayment ? "Payment Schedule" : "Installment Schedule"}
+          </h3>
+
+          {isFullPayment ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-900">Payment 1</span>
+                <PercentBadge value={100} />
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <ReadOnlyField label="Payment Amount" value={formatCurrency(totalContractValueNum, currency)} />
+                <FormDatePicker
+                  label="Billing Date *"
+                  name="milestonePlanBillingDate"
+                  value={entries[0]?.billingDate || ""}
+                  onChange={(event) => updateFullPaymentEntry({ billingDate: event.target.value })}
+                />
+                <div className="md:col-span-2">
+                  <FormInput
+                    label="Payment Notes"
+                    name="milestonePlanFullPaymentRemarks"
+                    value={entries[0]?.remarks || ""}
+                    onChange={(event) => updateFullPaymentEntry({ remarks: event.target.value })}
+                    placeholder="Optional notes about this payment"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-6 text-center">
+              <p className="text-sm text-slate-500">No installments yet. Add one to get started.</p>
+              <div className="mt-3 flex justify-center">
+                <Button variant="outline" size="small" onClick={addInstallment}>
+                  <Plus className="h-4 w-4" /> Add Installment
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {entries.map((entry, index) => {
+                const percentNum = Number(entry.percentage) || 0;
+                const amount = (percentNum / 100) * totalContractValueNum;
+                const errors = entryErrors[index] || {};
+                return (
+                  <div key={index} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
+                          {index + 1}
+                        </span>
+                        <span className="text-sm font-semibold text-slate-900">Installment {index + 1}</span>
+                        <PercentBadge value={percentNum} />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeInstallment(index)}
+                        disabled={entries.length <= 1}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Remove
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                      <FormInput
+                        label="Payment Percentage *"
+                        name={`installmentPercentage-${index}`}
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={entry.percentage ?? ""}
+                        onChange={(event) => updateInstallment(index, { percentage: event.target.value })}
+                        placeholder="e.g. 50"
+                        error={errors.percentage}
+                      />
+                      <ReadOnlyField label="Payment Amount" value={formatCurrency(amount, currency)} />
+                      <FormDatePicker
+                        label="Billing Date *"
+                        name={`installmentBillingDate-${index}`}
+                        value={entry.billingDate || ""}
+                        onChange={(event) => updateInstallment(index, { billingDate: event.target.value })}
+                        error={errors.billingDate}
+                      />
+                      <FormInput
+                        label="Payment Notes"
+                        name={`installmentRemarks-${index}`}
+                        value={entry.remarks || ""}
+                        onChange={(event) => updateInstallment(index, { remarks: event.target.value })}
+                        placeholder="Optional"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="flex justify-center">
+                <Button variant="outline" size="small" onClick={addInstallment}>
+                  <Plus className="h-4 w-4" /> Add Installment
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <PaymentSummaryPanel
+          totalContractValue={totalContractValueNum}
+          allocated={isFullPayment ? totalContractValueNum : totalAllocated}
+          remaining={isFullPayment ? 0 : remainingAmount}
+          totalPercentage={isFullPayment ? 100 : totalPercentage}
+          currency={currency}
+          showPercentage={!isFullPayment}
+          isComplete={isFullPayment ? true : totalPercentageValid}
+        />
+
+        <div className="border-t border-slate-100 pt-4">
+          <FormTextArea
+            label="Plan Remarks"
+            name="milestonePlanRemarks"
+            value={value.remarks || ""}
+            onChange={(event) => update({ remarks: event.target.value })}
+            placeholder="Any additional notes about this milestone plan"
+            rows={3}
+          />
+        </div>
+
+        {loadingConfig ? (
+          <p className="text-sm text-slate-500">Loading saved milestone plan configuration…</p>
+        ) : (
+          <div className="flex items-center gap-2 border-t border-slate-100 pt-4">
+            <Button
+              variant="outline"
+              size="small"
+              onClick={saveMilestonePlanConfig}
+              loading={saving}
+              loadingText="Saving..."
+              disabled={!isFormValid}
+            >
+              <Check className="h-4 w-4" />
+              {value.milestonePlanId ? "Update Milestone Plan" : "Save Milestone Plan"}
+            </Button>
+            {value.milestonePlanId && (
+              <Button
+                variant="ghost"
+                size="small"
+                onClick={requestRemoveMilestonePlanConfig}
+                loading={deleting}
+                loadingText="Removing..."
+              >
+                <Trash2 className="h-4 w-4 text-red-500" /> Remove
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <ConfirmationModal
+        isOpen={confirmingDelete}
+        title="Delete Milestone Plan"
+        message="Remove this milestone plan configuration? This cannot be undone."
+        confirmText="Delete"
+        variant="danger"
+        isLoading={deleting}
+        onCancel={() => !deleting && setConfirmingDelete(false)}
+        onConfirm={removeMilestonePlanConfig}
+      />
+    </div>
+  );
+}
+
 const EMPTY_MILESTONE_FORM = {
   name: "",
   amount: "",
@@ -2831,11 +3546,21 @@ export default function BillingConfigurationStep({
     billingType,
     activeBillingFrequencyOptions,
   );
+  // Milestone Plan has no recurring frequency at all — Installments is
+  // billed on each entry's own date, not a single system-derived one, so the
+  // Billing Frequency field relabels itself to "Billing Schedule" for it.
+  const milestonePlanIsInstallments = (value.milestonePlan?.paymentStructure || "FULL_PAYMENT") === "INSTALLMENTS";
   // Product/Application/Service billing has no project, so T&M/Fixed
   // Price/Milestone (all project-scoped) never apply — only Recurring does.
+  // Fixed Price is also hidden from the picker for every other context — it is
+  // no longer offered for new configurations (superseded by Milestone Plan),
+  // but an existing configuration already saved as Fixed Price must keep
+  // showing/allowing it here so it stays viewable/editable.
   const billingTypeOptionsForContext = isProductService
     ? activeBillingTypeOptions.filter((type) => type.value === "RECURRING")
-    : activeBillingTypeOptions;
+    : activeBillingTypeOptions.filter(
+        (type) => type.value !== "FIXED_PRICE" || billingType === "FIXED_PRICE",
+      );
 
   // Guards against a stale non-Recurring billing type left over from before
   // the user switched Billing Context to Product/Service on Step 1 (e.g. they
@@ -2846,10 +3571,32 @@ export default function BillingConfigurationStep({
         "Product/Service billing only supports Recurring billing — please choose a Billing Type again.",
         "warning",
       );
-      update({ billingType: "", billingTypeId: "", billingMode: "", timeAndMaterial: {}, fixedPrice: {}, milestones: [], milestoneSettings: {} });
+      update({ billingType: "", billingTypeId: "", billingMode: "", timeAndMaterial: {}, fixedPrice: {}, milestones: [], milestoneSettings: {}, milestonePlan: {} });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isProductService, billingType]);
+
+  // Milestone Plan is billed against explicit payment/installment dates, not a
+  // recurring cadence — always force it to the master data's One-Time Billing
+  // Frequency and never let the user pick Weekly/Monthly/etc. Re-runs (and
+  // self-corrects) whenever billingType, the loaded frequency list, or the
+  // current selection changes, so it also fixes a stale/incorrect value on an
+  // existing loaded configuration, not just a fresh pill selection.
+  useEffect(() => {
+    if (billingType !== "MILESTONE_PLAN") return;
+    const oneTimeFrequency = activeBillingFrequencyOptions.find(
+      (option) => frequencyCode(option) === "ONE_TIME",
+    );
+    if (!oneTimeFrequency) return;
+    const oneTimeId = oneTimeFrequency.billingFrequencyId || oneTimeFrequency.id;
+    if (!oneTimeId || String(billingFrequencyId) === String(oneTimeId)) return;
+    update({
+      billingFrequency: oneTimeFrequency.value || "ONE_TIME",
+      billingFrequencyId: oneTimeId,
+      billingFrequencyName: oneTimeFrequency.label || oneTimeFrequency.billingFrequencyName || "One-Time",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [billingType, activeBillingFrequencyOptions, billingFrequencyId]);
 
   const handleBillingTypeChange = (nextId) => {
     const selectedOption = activeBillingTypeOptions.find(
@@ -2872,6 +3619,19 @@ export default function BillingConfigurationStep({
     ) {
       deleteFixedPriceConfiguration(staleFixedPriceId).catch((error) => {
         console.warn("Unable to remove previous fixed price configuration", error);
+      });
+    }
+
+    // Same cleanup for Milestone Plan: switching away after it was already
+    // saved would otherwise leave an orphaned milestone plan record.
+    const staleMilestonePlanId = value.milestonePlan?.milestonePlanId;
+    if (
+      billingType === "MILESTONE_PLAN" &&
+      normalizedBillingType !== "MILESTONE_PLAN" &&
+      staleMilestonePlanId
+    ) {
+      deleteMilestonePlanConfiguration(staleMilestonePlanId).catch((error) => {
+        console.warn("Unable to remove previous milestone plan configuration", error);
       });
     }
 
@@ -2914,6 +3674,8 @@ export default function BillingConfigurationStep({
         normalizedBillingType === "MILESTONE"
           ? value.milestoneSettings || {}
           : {},
+      milestonePlan:
+        normalizedBillingType === "MILESTONE_PLAN" ? value.milestonePlan || {} : {},
       recurring:
         normalizedBillingType === "RECURRING" ? value.recurring || {} : {},
     });
@@ -2999,33 +3761,55 @@ export default function BillingConfigurationStep({
 
         <div className="space-y-2">
           <label className="block text-sm font-medium text-slate-700">
-            Billing Frequency <span className="text-red-500">*</span>
+            {billingType === "MILESTONE_PLAN"
+              ? milestonePlanIsInstallments
+                ? "Billing Schedule"
+                : "Billing Frequency"
+              : (
+                <>
+                  Billing Frequency <span className="text-red-500">*</span>
+                </>
+              )}
           </label>
-          <PillSelectGroup
-            name="billingFrequencyId"
-            options={frequencyOptions.map((f) => ({
-              value: f.billingFrequencyId,
-              label: f.label,
-            }))}
-            value={billingFrequencyId}
-            onChange={(next) => {
-              const selectedFrequency = activeBillingFrequencyOptions.find(
-                (option) =>
-                  String(option.billingFrequencyId) === String(next),
-              );
-              update({
-                billingFrequency: selectedFrequency?.value || "",
-                billingFrequencyId:
-                  selectedFrequency?.billingFrequencyId ||
-                  selectedFrequency?.id ||
-                  "",
-                billingFrequencyName:
-                  selectedFrequency?.label ||
-                  selectedFrequency?.billingFrequencyName ||
-                  "",
-              });
-            }}
-          />
+          {billingType === "MILESTONE_PLAN" ? (
+            <div>
+              <ReadOnlyField
+                label=""
+                value={milestonePlanIsInstallments ? "Custom Payment Dates" : value.billingFrequencyName || "One-Time"}
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                {milestonePlanIsInstallments
+                  ? "Each installment carries its own billing date, set individually in the Milestone Plan below."
+                  : "Milestone Plan billing is driven by the payment date, not a recurring frequency."}
+              </p>
+            </div>
+          ) : (
+            <PillSelectGroup
+              name="billingFrequencyId"
+              options={frequencyOptions.map((f) => ({
+                value: f.billingFrequencyId,
+                label: f.label,
+              }))}
+              value={billingFrequencyId}
+              onChange={(next) => {
+                const selectedFrequency = activeBillingFrequencyOptions.find(
+                  (option) =>
+                    String(option.billingFrequencyId) === String(next),
+                );
+                update({
+                  billingFrequency: selectedFrequency?.value || "",
+                  billingFrequencyId:
+                    selectedFrequency?.billingFrequencyId ||
+                    selectedFrequency?.id ||
+                    "",
+                  billingFrequencyName:
+                    selectedFrequency?.label ||
+                    selectedFrequency?.billingFrequencyName ||
+                    "",
+                });
+              }}
+            />
+          )}
         </div>
       </div>
 
@@ -3095,6 +3879,17 @@ export default function BillingConfigurationStep({
                 onMilestonesChange={(next) => update({ milestones: next })}
                 onSettingsChange={(next) => update({ milestoneSettings: next })}
                 currency={currency}
+              />
+            )}
+
+            {billingType === "MILESTONE_PLAN" && (
+              <MilestonePlanForm
+                value={value.milestonePlan}
+                onChange={(next) => updateSection("milestonePlan", next)}
+                currency={currency}
+                projectBudget={projectInfo.projectBudget}
+                billingConfigurationId={value.billingConfigurationId || value.id}
+                ensureBillingConfigurationId={ensureBillingConfigurationId}
               />
             )}
 
