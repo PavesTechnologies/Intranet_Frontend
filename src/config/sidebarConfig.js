@@ -340,6 +340,10 @@ const _INVOICE_VIEW_PERMISSIONS = [INVOICE_PERMISSIONS.INVOICE_VIEW];
 
 export const AP_SUBMENU = [
   { label: "Dashboard", to: AP_ROUTES.DASHBOARD, allowedRoles: AP_ALL_ROLES },
+  // Same gate as the route itself: every AP user has their own notifications, and which ones
+  // they see is decided by the backend from the JWT, so there is nothing finer to filter on.
+  { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
+  { label: "Notifications", to: AP_ROUTES.NOTIFICATIONS, allowedRoles: AP_ALL_ROLES },
   { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
   { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
   // Payment Management (Ready for Payment ⇄ Payment History, cross-linked from each page) and
@@ -348,7 +352,7 @@ export const AP_SUBMENU = [
   // would only 403.
   { label: "Payment Management", to: AP_ROUTES.PAYMENT_READY, requiredPermissions: PAYMENT_ANY_VIEW_PERMISSIONS },
   { label: "TDS Tracking", to: AP_ROUTES.TDS_TRACKING, requiredPermissions: TDS_TRACKING_ANY_VIEW_PERMISSIONS },
-  { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
+  // { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
   // Split into two role-exclusive entries (both pointing at the same route) rather than one
   // AP_ALL_ROLES item — System Configuration's tabs are now Admin-only/Finance_Executive-only
   // (see SystemConfigurationPage.jsx's canManageSystemConfig/canManageTdsConfig split), so

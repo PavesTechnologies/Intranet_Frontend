@@ -53,6 +53,9 @@ export const AP_ROUTES = {
   SYSTEM_CONFIG_APPROVAL_POLICY_EDIT: (policyId = ":policyId") =>
     `${BASE}/system-configuration/approval-policies/${policyId}/edit`,
 
+  // Notification Center — the authenticated user's own AP notifications.
+  NOTIFICATIONS: `${BASE}/notifications`,
+
   PROCUREMENT: `${BASE}/procurement`,
   PROCUREMENT_PR_DETAIL: (prId = ":prId") => `${BASE}/procurement/requisitions/${prId}`,
   PROCUREMENT_PO_DETAIL: (poId = ":poId") => `${BASE}/procurement/purchase-orders/${poId}`,
