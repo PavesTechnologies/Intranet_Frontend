@@ -44,6 +44,11 @@ import InvoiceDetailPage from "./pages/accounts-payable/invoice/pages/InvoiceDet
 import PaymentReadyPage from "./pages/accounts-payable/payment/pages/PaymentReadyPage.jsx";
 import PaymentHistoryPage from "./pages/accounts-payable/payment/pages/PaymentHistoryPage.jsx";
 import PaymentMarkAsPaidPage from "./pages/accounts-payable/payment/pages/PaymentMarkAsPaidPage.jsx";
+import PaymentInvoiceDetailPage from "./pages/accounts-payable/payment/pages/PaymentInvoiceDetailPage.jsx";
+import TdsTrackingPage from "./pages/accounts-payable/tds-tracking/pages/TdsTrackingPage.jsx";
+import TdsTrackingDetailPage from "./pages/accounts-payable/tds-tracking/pages/TdsTrackingDetailPage.jsx";
+import { PAYMENT_ANY_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/paymentPermissions";
+import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/tdsTrackingPermissions";
 import PaymentQueuePage from "./pages/accounts-payable/payment/pages/PaymentQueuePage.jsx";
 import PaymentDetailsPage from "./pages/accounts-payable/payment/pages/PaymentDetailsPage.jsx";
 import APReportsPage from "./pages/accounts-payable/reports/pages/APReportsPage.jsx";
@@ -60,6 +65,7 @@ import ProcurementPage from "./pages/accounts-payable/procurement/pages/Procurem
 import PrDetailPage from "./pages/accounts-payable/procurement/pages/PrDetailPage.jsx";
 import PurchaseOrderDetailPage from "./pages/accounts-payable/procurement/pages/PurchaseOrderDetailPage.jsx";
 import RfqDetailPage from "./pages/accounts-payable/procurement/pages/RfqDetailPage.jsx";
+import NotificationCenterPage from "./pages/accounts-payable/notifications/pages/NotificationCenterPage.jsx";
 
 
 // Resource Management
@@ -612,10 +618,12 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           /> */}
+          {/* Payment Management / TDS Tracking — gated on the same permissions their backend
+              endpoints enforce (payment_route.py / tds_tracking_route.py), not INVOICE_VIEW. */}
           <Route
             path={AP_ROUTES.PAYMENT_READY}
             element={
-              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
+              <ProtectedRoute requiredPermissions={PAYMENT_ANY_VIEW_PERMISSIONS}>
                 <PaymentReadyPage />
               </ProtectedRoute>
             }
@@ -623,8 +631,32 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.PAYMENT_HISTORY}
             element={
-              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
+              <ProtectedRoute requiredPermissions={PAYMENT_ANY_VIEW_PERMISSIONS}>
                 <PaymentHistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.PAYMENT_DETAIL()}
+            element={
+              <ProtectedRoute requiredPermissions={PAYMENT_ANY_VIEW_PERMISSIONS}>
+                <PaymentInvoiceDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.TDS_TRACKING}
+            element={
+              <ProtectedRoute requiredPermissions={TDS_TRACKING_ANY_VIEW_PERMISSIONS}>
+                <TdsTrackingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.TDS_TRACKING_DETAIL()}
+            element={
+              <ProtectedRoute requiredPermissions={TDS_TRACKING_ANY_VIEW_PERMISSIONS}>
+                <TdsTrackingDetailPage />
               </ProtectedRoute>
             }
           />
@@ -673,6 +705,16 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={AP_ALL_ROLES} permission={APPROVAL_PERMISSIONS.APPROVAL_POLICY_MANAGE}>
                 <ApprovalPolicyFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.NOTIFICATIONS}
+            element={
+              // Every AP user may read their own notifications - the backend derives the
+              // recipient from the JWT, so there is nothing finer to gate on here.
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <NotificationCenterPage />
               </ProtectedRoute>
             }
           />

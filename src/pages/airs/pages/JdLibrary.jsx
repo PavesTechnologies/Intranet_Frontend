@@ -613,7 +613,14 @@ export default function JdLibrary() {
         </TabsContent>
 
         <TabsContent value="processing" className="mt-0">
-          <JdProcessingList key={processingRefreshToken} />
+          <JdProcessingList
+            key={processingRefreshToken}
+            onTaskCompleted={() => {
+              // A finished JD belongs in the Processed list - show it there, freshly fetched.
+              setActiveTab("processed");
+              fetchJds();
+            }}
+          />
         </TabsContent>
       </Tabs>
 

@@ -7,8 +7,33 @@ const formatPct = (v) => (isEmpty(v) ? "-" : `${v}%`);
 const formatConfidence = (v) => (isEmpty(v) ? "-" : `${Math.round(v * 100)}%`);
 const formatBonus = (v) => (isEmpty(v) ? "-" : Number(v).toFixed(2));
 
-const MANDATORY_HEADERS = ["JD Skill", "Candidate Skill", "Match Type", "Contribution %", "Confidence", "Match Reason", "Status"];
-const MANDATORY_COLUMNS = ["jdSkill", "candidateSkill", "matchType", "contribution", "confidence", "matchReason", "status"];
+const MANDATORY_HEADERS = ["JD Skill", "Importance", "Candidate Skill", "Match Type", "Contribution %", "Confidence", "Match Reason", "Status"];
+const MANDATORY_COLUMNS = ["jdSkill", "importance", "candidateSkill", "matchType", "contribution", "confidence", "matchReason", "status"];
+
+// core = hard requirement (gated); supporting = scored only. Null on
+// breakdowns scored before skills were classified.
+const IMPORTANCE_STYLES = {
+  core: "bg-indigo-50 text-indigo-700 border-indigo-100",
+  supporting: "bg-sky-50 text-sky-700 border-sky-100",
+};
+
+function ImportanceBadge({ importance }) {
+  if (!importance) return <span className="text-slate-400">-</span>;
+  return (
+    <span className={`text-[10.5px] px-2 py-0.5 rounded-md font-semibold border capitalize ${IMPORTANCE_STYLES[importance] || "bg-slate-100 text-slate-600 border-slate-200"}`}>
+      {importance}
+    </span>
+  );
+}
+
+function CandidateSkillCell({ row }) {
+  return (
+    <span>
+      {textOrDash(row.candidate_skill)}
+      {row.matched_via_alias && <span className="ml-1.5 text-[10.5px] text-slate-400 italic">via alias</span>}
+    </span>
+  );
+}
 
 const PREFERRED_HEADERS = ["JD Skill", "Candidate Skill", "Match Type", "Bonus", "Contribution %", "Match Reason"];
 const PREFERRED_COLUMNS = ["jdSkill", "candidateSkill", "matchType", "bonus", "contribution", "matchReason"];
@@ -26,7 +51,8 @@ export default function SkillsTable({ items, variant }) {
   const rows = items.map((r, i) => ({
     id: i,
     jdSkill: <span className="font-semibold text-slate-900">{textOrDash(r.jd_skill)}</span>,
-    candidateSkill: textOrDash(r.candidate_skill),
+    importance: <ImportanceBadge importance={r.importance} />,
+    candidateSkill: <CandidateSkillCell row={r} />,
     matchType: renderMatchTypeBadge(r.match_type),
     contribution: <span className="font-semibold text-slate-900">{formatPct(r.contribution_percentage)}</span>,
     confidence: formatConfidence(r.confidence),
@@ -49,9 +75,12 @@ export default function SkillsTable({ items, variant }) {
           <div key={i} className="rounded-xl border border-slate-200 bg-white p-3 space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <span className="font-semibold text-[12.5px] text-slate-900 truncate">{textOrDash(r.jd_skill)}</span>
-              {renderMatchTypeBadge(r.match_type)}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {isMandatory && r.importance && <ImportanceBadge importance={r.importance} />}
+                {renderMatchTypeBadge(r.match_type)}
+              </div>
             </div>
-            <div className="text-[11.5px] text-slate-500">Candidate skill: {textOrDash(r.candidate_skill)}</div>
+            <div className="text-[11.5px] text-slate-500">Candidate skill: <CandidateSkillCell row={r} /></div>
             <div className="grid grid-cols-2 gap-1.5 text-[11.5px] text-slate-500">
               <span>
                 Contribution: <span className="font-semibold text-slate-900">{formatPct(r.contribution_percentage)}</span>

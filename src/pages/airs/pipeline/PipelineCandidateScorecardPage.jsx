@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import React, { useCallback, useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import CandidateHeader from "../candidates/CandidateScore/components/CandidateHeader";
@@ -9,10 +9,13 @@ import CandidateOverridePanel from "../campaigns/components/CandidateOverridePan
 import CandidateNotesPanel from "../campaigns/components/CandidateNotesPanel";
 import { exportScorecard } from "../campaigns/services/exportService";
 import Button from "../../../components/Button/Button";
-import { Download } from "lucide-react";
+import { Download, RotateCcw } from "lucide-react";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../contexts/AuthContext";
 import { SCORE_LABELS } from "../constants/scoreLabels";
+import useCampaignPermissions from "../campaigns/hooks/useCampaignPermissions";
+import { replayDeadLetterTasks, formatApiError } from "../campaigns/services/campaignservice";
+import LayerDeadLetterBanner from "./components/LayerDeadLetterBanner";
 // import { MOCK_CANDIDATES } from "../candidates/mock/candidateMockData";
 // import { mapMockCandidateForScorecard } from "./utils/mapMockCandidateForScorecard";
 
@@ -123,6 +126,77 @@ export default function PipelineCandidateScorecardPage({
   const isHrAdmin = hasRole(["HR_ADMIN"]);
   const [exporting, setExporting] = useState(false);
 
+  // Scoring layers stopped mid-pipeline (dead-lettered task, no result) -
+  // RECRUITER only, same audience as the Dead Letter Queue on
+  // CampaignDetails' Processing tab. Seeded from parsed-json's
+  // `failed_layers` (so the header flags it before any tab is opened), then
+  // kept current by each layer tab's own `failure` via onLayerFailure.
+  const { isRecruiter } = useCampaignPermissions();
+  const [layerFailures, setLayerFailures] = useState({});
+  const [replayingIds, setReplayingIds] = useState([]);
+  useEffect(() => {
+    const seeded = {};
+    for (const f of fetchedCandidate?.failedLayers || []) seeded[f.layer] = f;
+    setLayerFailures(seeded);
+  }, [fetchedCandidate]);
+  const handleLayerFailure = useCallback((layer, failure) => {
+    setLayerFailures((prev) => {
+      if ((prev[layer]?.dlq_id ?? null) === (failure?.dlq_id ?? null)) return prev;
+      const next = { ...prev };
+      if (failure) next[layer] = failure;
+      else delete next[layer];
+      return next;
+    });
+  }, []);
+  const retryLayers = useCallback(
+    async (failures) => {
+      const ids = failures.filter((f) => f.can_retry).map((f) => f.dlq_id);
+      if (!ids.length || !candidate?.campaignId) return;
+      setReplayingIds((prev) => [...prev, ...ids]);
+      try {
+        const res = await replayDeadLetterTasks(candidate.campaignId, ids);
+        const results = (res?.data ?? res)?.results || [];
+        const replayed = new Set(results.filter((r) => r.status === "REPLAYED").map((r) => String(r.dlq_id)));
+        const skipped = results.filter((r) => r.status !== "REPLAYED");
+        if (replayed.size) {
+          toast.success("Retry queued. Results will appear here once processing finishes.");
+          setLayerFailures((prev) => {
+            const next = { ...prev };
+            for (const [layer, f] of Object.entries(prev)) if (replayed.has(String(f.dlq_id))) delete next[layer];
+            return next;
+          });
+        }
+        if (skipped.length) {
+          toast.warn(skipped.map((r) => r.reason).filter(Boolean).join(" · ") || "Some steps could not be retried.");
+        }
+      } catch (err) {
+        toast.error(formatApiError(err, "Failed to retry the step."));
+      } finally {
+        setReplayingIds((prev) => prev.filter((id) => !ids.includes(id)));
+      }
+    },
+    [candidate?.campaignId]
+  );
+  const failedTabs = isRecruiter ? TABS.filter((t) => layerFailures[t.id]) : [];
+  const retryableFailures = failedTabs.map((t) => layerFailures[t.id]).filter((f) => f.can_retry);
+  const tabsWithFailureMarker = TABS.map((t) =>
+    failedTabs.includes(t)
+      ? {
+          ...t,
+          label: (
+            <span className="flex items-center gap-1.5">
+              {t.label}
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-600" title="This step failed" />
+            </span>
+          ),
+        }
+      : t
+  );
+  const retryableTabs = failedTabs.filter((t) => layerFailures[t.id].can_retry);
+  const headerRetryLabel =
+    retryableTabs.length === 1 ? `Retry ${retryableTabs[0].label}` : `Retry failed steps (${retryableTabs.length})`;
+  const headerRetrying = retryableFailures.some((f) => replayingIds.includes(f.dlq_id));
+
   // Prefer real browser "back" so this returns to wherever the user actually
   // came from — a specific Resume Intake tab (history/processing/bulk-batches),
   // the Pipeline Board, etc. — rather than a single hardcoded guess. Only fall
@@ -165,6 +239,7 @@ export default function PipelineCandidateScorecardPage({
   }
 
   const ActiveTabComponent = TABS.find((t) => t.id === activeTab).Component;
+  const activeTabLabel = TABS.find((t) => t.id === activeTab).label;
 
   return (
     <div className={isModal ? "text-slate-900 font-sans" : "p-8 bg-[#F8FAFC] min-h-screen text-slate-900 font-sans"}>
@@ -172,7 +247,24 @@ export default function PipelineCandidateScorecardPage({
         candidate={candidate}
         onBack={handleBack}
         actions={
-          !isModal && isHrAdmin && candidate.campaignId && (
+          (retryableFailures.length > 0 || (!isModal && isHrAdmin && candidate.campaignId)) && (
+          <>
+          {retryableFailures.length > 0 && (
+            <Button
+              variant="danger"
+              size="small"
+              loading={headerRetrying}
+              loadingText="Retrying..."
+              title={`Failed: ${retryableTabs.map((t) => t.label).join(", ")}`}
+              onClick={() => {
+                if (retryableTabs.length === 1) setActiveTab(retryableTabs[0].id);
+                retryLayers(retryableFailures);
+              }}
+            >
+              <RotateCcw className="h-3.5 w-3.5 mr-1" /> {headerRetryLabel}
+            </Button>
+          )}
+          {!isModal && isHrAdmin && candidate.campaignId && (
             <Button
               variant="outline"
               size="small"
@@ -192,16 +284,26 @@ export default function PipelineCandidateScorecardPage({
             >
               <Download className="h-3.5 w-3.5 mr-1" /> Export scorecard
             </Button>
+          )}
+          </>
           )
         }
       />
 
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
-        <CandidateTabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
+        <CandidateTabs tabs={tabsWithFailureMarker} activeTab={activeTab} onChange={setActiveTab} />
 
         <div className="p-5">
+          {isRecruiter && (
+            <LayerDeadLetterBanner
+              layerLabel={activeTabLabel}
+              failure={layerFailures[activeTab]}
+              onRetry={(f) => retryLayers([f])}
+              retrying={replayingIds.includes(layerFailures[activeTab]?.dlq_id)}
+            />
+          )}
           <Suspense fallback={<LoadingSpinner text="Loading tab..." />}>
-            <ActiveTabComponent candidate={candidate} onExpired={refetch} />
+            <ActiveTabComponent candidate={candidate} onExpired={refetch} onLayerFailure={handleLayerFailure} />
           </Suspense>
         </div>
       </div>
