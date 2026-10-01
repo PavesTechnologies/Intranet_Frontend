@@ -18,10 +18,23 @@ export const BILLING_TYPES = [
     description: "Bill against completion of agreed project milestones.",
   },
   {
+    value: "MILESTONE_PLAN",
+    label: "Milestone Plan",
+    description: "Bill a fixed total contract value as a single full payment or a series of installments.",
+  },
+  {
     value: "RECURRING",
     label: "Recurring",
     description: "Bill a fixed recurring amount as a monthly retainer or subscription.",
   },
+];
+
+// Milestone Plan payment structure (backend: PaymentStructure). Only FULL_PAYMENT
+// and INSTALLMENTS are offered today — MILESTONES (project-milestone-driven,
+// sourced from PMS) is a future addition and must never be shown in the UI yet.
+export const PAYMENT_STRUCTURE_OPTIONS = [
+  { value: "FULL_PAYMENT", label: "Full Payment", description: "Bill the entire contract value in a single payment." },
+  { value: "INSTALLMENTS", label: "Installments", description: "Split the contract value across multiple percentage-based installments." },
 ];
 
 export const BILLING_TYPE_LABELS = BILLING_TYPES.reduce((acc, type) => {

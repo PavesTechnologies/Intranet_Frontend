@@ -75,6 +75,18 @@ const INITIAL_WIZARD_DATA = {
     },
     milestones: [],
     milestoneSettings: { billOnlyCompletedMilestones: false, allowPartialMilestoneBilling: false },
+    // Milestone Plan billing (BillingMilestonePlanConfiguration, via
+    // /api/billing-milestone-plan) — distinct from the legacy milestones/
+    // milestoneSettings above. Supports FULL_PAYMENT / INSTALLMENTS today;
+    // MILESTONES (PMS-driven) will be added later without changing this shape.
+    // Amounts on each entry are backend-calculated, populated after save/fetch.
+    milestonePlan: {
+      milestonePlanId: null,
+      totalContractValue: "",
+      paymentStructure: "FULL_PAYMENT",
+      entries: [{ sequence: 1, percentage: 100, billingDate: "" }],
+      remarks: "",
+    },
     // Recurring billing (BillingRecurringConfiguration, via
     // /api/billing-recurring) — Billing Frequency itself (chosen above via
     // billingFrequency/billingFrequencyId) determines the recurring period;
@@ -276,6 +288,60 @@ function getMissingFields(step, data) {
         }
       } else if (config.billingType === "MILESTONE") {
         if ((config.milestones || []).length === 0) missing.push("At least one Milestone");
+      } else if (config.billingType === "MILESTONE_PLAN") {
+        const milestonePlan = config.milestonePlan || {};
+        const paymentStructure = milestonePlan.paymentStructure || "FULL_PAYMENT";
+        const entries = milestonePlan.entries || [];
+
+        // Milestone Plan has no separate Total Contract Value input — Project
+        // Budget (already shown in Project Financials, same `project` object
+        // used by the Recurring/PMS check above) is the single source of
+        // truth for the contract amount. Validate that instead of
+        // milestonePlan.totalContractValue, which is just a derived mirror of
+        // it (see MilestonePlanForm's totalContractValueNum) and must never
+        // gate Next on its own.
+        const projectBudgetNum = Number(project.projectBudget);
+        const projectBudgetIsBlank =
+          project.projectBudget === "" ||
+          project.projectBudget === null ||
+          project.projectBudget === undefined ||
+          Number.isNaN(projectBudgetNum) ||
+          projectBudgetNum <= 0;
+        if (projectBudgetIsBlank) {
+          missing.push("Project Budget is not available for the selected project");
+        }
+        // Milestone Plan details are persisted immediately by their own "Save
+        // Milestone Plan Details" button, not by the final Create/Submit — so
+        // the user must have successfully saved before this step lets them
+        // continue (mirrors Fixed Price's fixedPriceConfigurationId check).
+        else if (!milestonePlan.milestonePlanId) missing.push("Save Milestone Plan Details before continuing");
+
+        if (paymentStructure === "FULL_PAYMENT") {
+          if (!entries[0]?.billingDate) missing.push("Billing Date");
+        } else if (entries.length === 0) {
+          missing.push("At least one Installment");
+        } else {
+          const hasInvalidPercentage = entries.some((entry) => {
+            const percentNum = Number(entry.percentage);
+            return (
+              entry.percentage === "" ||
+              entry.percentage === null ||
+              entry.percentage === undefined ||
+              Number.isNaN(percentNum) ||
+              percentNum <= 0 ||
+              percentNum > 100
+            );
+          });
+          if (hasInvalidPercentage) missing.push("Percentage (greater than 0 and up to 100) for every installment");
+
+          const hasMissingDate = entries.some((entry) => !entry.billingDate);
+          if (hasMissingDate) missing.push("Billing Date for every installment");
+
+          const totalPercentage = entries.reduce((sum, entry) => sum + (Number(entry.percentage) || 0), 0);
+          if (!hasInvalidPercentage && Math.abs(totalPercentage - 100) > 0.01) {
+            missing.push("Total installment percentage must equal 100%");
+          }
+        }
       }
       break;
     }
@@ -352,18 +418,18 @@ export default function NewConfigurationWizard() {
 
         const { summary, detail } = result;
         if (detail) {
-          // The existing project may be excluded from the available-projects
-          // list (it's already configured), so its projectCode isn't always
-          // present on the raw detail response. Some backends key the PMS
-          // project by its projectId with no separate code — fall back to the
-          // existing projectId so Project Summary/validation never see a
-          // blank code for a project that's already selected.
-          const projectInfo = detail.projectInfo || {};
-          const projectCode = projectInfo.projectCode || (projectInfo.projectId ? String(projectInfo.projectId) : "");
+          // getBillingConfigurationById already resolves the full project
+          // master data (projectName, projectCode, primaryLocation, email,
+          // phoneNumber, ...) against the client's unfiltered project list
+          // keyed by projectId — see the "resolve project master data for
+          // edit mode" block there. No further lookup needed here; redoing it
+          // against getAvailableProjectsForBillingConfiguration would be wrong
+          // for edit mode anyway, since that endpoint deliberately excludes
+          // any project that already has a billing configuration (i.e. it can
+          // never contain the very project this draft is bound to).
           setWizardData((prev) => ({
             ...prev,
             ...detail,
-            projectInfo: { ...projectInfo, projectCode },
           }));
         }
         setSavedConfigId(summary.id || configId);
@@ -651,10 +717,15 @@ export default function NewConfigurationWizard() {
     // Editing an already-submitted config (isEditingExisting) just persists the
     // update in place — it never re-submits for approval.
     const isFixedPriceCreate = wizardData.billingConfig?.billingType === "FIXED_PRICE" && !isEditingExisting;
+    // Same story for Milestone Plan: its record is already saved immediately via
+    // the "Save Milestone Plan Details" button — see the milestonePlanId check
+    // in getMissingFields. Final submit here must never call the Milestone Plan
+    // API a second time.
+    const isMilestonePlanCreate = wizardData.billingConfig?.billingType === "MILESTONE_PLAN" && !isEditingExisting;
 
     setSubmitting(true);
     try {
-      if (isFixedPriceCreate) {
+      if (isFixedPriceCreate || isMilestonePlanCreate) {
         // isDraftSave: false persists via the plain PUT .../{id} (not
         // .../draft) — this is the final save before submitting for approval.
         const { configResponse, configId } = await saveBillingConfigurationRecord(wizardData, savedConfigId, {

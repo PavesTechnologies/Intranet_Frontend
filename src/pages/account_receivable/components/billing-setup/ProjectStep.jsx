@@ -30,6 +30,18 @@ function formatPhoneNumber(countryCode, phoneNumber) {
   return [countryCode, phoneNumber].filter(Boolean).join(" ") || "—";
 }
 
+// Display-time safety net: a Project Code must never be the project's own
+// internal id. A legacy record can have that value persisted (saved before
+// this mapping was fixed) or a lookup can fall through to it — either way,
+// never show it as the code, here in the dropdown label or in the Synced
+// Information card below.
+function sanitizeProjectCode(code, projectId) {
+  const codeStr = code === null || code === undefined ? "" : String(code).trim();
+  if (!codeStr) return "";
+  if (projectId === null || projectId === undefined || projectId === "") return codeStr;
+  return codeStr === String(projectId).trim() ? "" : codeStr;
+}
+
 const EMPTY_PROJECT_FIELDS = {
   projectId: "",
   projectName: "",
@@ -211,7 +223,8 @@ export default function ProjectStep({ value = {}, onChange }) {
     if (!value.clientId) return [];
     return displayProjects.map((project) => {
       const id = String(project.projectId || project.id || "");
-      const label = project.projectCode ? `${project.projectCode} — ${project.projectName}` : project.projectName;
+      const code = sanitizeProjectCode(project.projectCode, project.projectId || project.id);
+      const label = code ? `${code} — ${project.projectName}` : project.projectName;
       return { value: id, label };
     });
   }, [displayProjects, value.clientId]);
@@ -224,39 +237,47 @@ export default function ProjectStep({ value = {}, onChange }) {
     );
   }, [displayProjects, value.projectId]);
 
-  // A Draft billing configuration can come back from the backend without its
-  // project-derived fields (e.g. projectCode) persisted — once the client's
-  // project list loads, backfill anything missing from the matched project so
-  // the summary card and step validation don't see a false "missing" field.
+  // A Draft billing configuration can come back from the backend with only
+  // SOME of its project-derived fields persisted (e.g. projectCode present
+  // but projectBudget/primaryLocation/email missing — the flat
+  // BillingConfigurationResponseDto is inconsistent about this; see
+  // billingConfigurationService.js). Once the matching project is resolved
+  // (from the client's project list, or synthesized from `value` itself while
+  // that list is still loading — see displayProjects above), backfill every
+  // field independently rather than gating the whole patch behind just two of
+  // them — otherwise a config that already has projectCode+projectDuration
+  // but not projectBudget would stay permanently blank on those other fields.
+  // This also makes hydration order-independent: it re-evaluates on every
+  // render where matchedProject or value changes, and is a no-op (no onChange
+  // call, so no update loop) as soon as nothing is actually missing.
   useEffect(() => {
     if (!matchedProject) return;
-    if (value.projectCode && value.projectDuration) return;
 
-    onChange({
-      ...value,
-      projectName: value.projectName || matchedProject.projectName,
-      // available-projects can return a null projectCode (e.g. no PMS code
-      // assigned yet) — fall back to the projectId so this required field is
-      // never blocked on a value the user has no way to enter (it's read-only
-      // Synced Information for enterprise projects).
-      projectCode:
-        value.projectCode ||
-        matchedProject.projectCode ||
-        (matchedProject.projectId ? String(matchedProject.projectId) : ""),
-      projectDuration: value.projectDuration || matchedProject.projectDuration,
-      currency: value.currency || matchedProject.projectBudgetCurrency || matchedProject.currency || "",
-      projectBudget: value.projectBudget ?? matchedProject.projectBudget ?? "",
-      projectBudgetCurrency:
-        value.projectBudgetCurrency || matchedProject.projectBudgetCurrency || matchedProject.currency || "",
-      primaryLocation: value.primaryLocation || matchedProject.primaryLocation || "",
-      countryCode: value.countryCode || matchedProject.countryCode || "",
-      email: value.email || matchedProject.email || "",
-      phoneNumber: value.phoneNumber || matchedProject.phoneNumber || "",
-      startDate: value.startDate || matchedProject.startDate,
-      endDate: value.endDate || matchedProject.endDate,
-    });
+    const patch = {};
+    const take = (field, source = matchedProject[field]) => {
+      const current = value[field];
+      const hasCurrent = current !== undefined && current !== null && current !== "";
+      const hasSource = source !== undefined && source !== null && source !== "";
+      if (!hasCurrent && hasSource) patch[field] = source;
+    };
+
+    take("projectName");
+    take("projectCode", sanitizeProjectCode(matchedProject.projectCode, matchedProject.projectId || matchedProject.id));
+    take("projectDuration");
+    take("projectBudget");
+    take("projectBudgetCurrency", matchedProject.projectBudgetCurrency || matchedProject.currency);
+    take("currency", matchedProject.projectBudgetCurrency || matchedProject.currency);
+    take("primaryLocation");
+    take("countryCode");
+    take("email");
+    take("phoneNumber");
+    take("startDate");
+    take("endDate");
+
+    if (Object.keys(patch).length === 0) return;
+    onChange({ ...value, ...patch });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchedProject]);
+  }, [matchedProject, value]);
 
   const getProjectDurationLabel = (projectData) => {
     if (projectData?.projectDuration) return projectData.projectDuration;
@@ -290,7 +311,7 @@ export default function ProjectStep({ value = {}, onChange }) {
         clientName: value.clientName,
         projectId,
         projectName: project.projectName,
-        projectCode: project.projectCode || String(projectId),
+        projectCode: project.projectCode || "",
         projectDuration: project.projectDuration,
         currency: project.projectBudgetCurrency || project.currency || "",
         projectBudget: project.projectBudget ?? "",
@@ -527,7 +548,15 @@ export default function ProjectStep({ value = {}, onChange }) {
                   requiredMark
                   name="projectId"
                   options={projectOptions}
-                  value={value.projectId || ""}
+                  // SearchableSelect matches this against option.value with
+                  // strict === (option.value is always String(projectId) — see
+                  // projectOptions below). A Draft loaded from the backend can
+                  // carry projectId as a number (e.g. 38), which would never
+                  // strictly equal the string "38" in projectOptions, leaving
+                  // the dropdown stuck on its placeholder even though the
+                  // correct project was selected. Stringify here so it always
+                  // matches regardless of where projectId came from.
+                  value={value.projectId ? String(value.projectId) : ""}
                   onChange={handleProjectSelect}
                   placeholder={projectSelectorPlaceholder}
                   disabled={loadingClients || !value.clientId || loadingProjects}
@@ -618,7 +647,7 @@ export default function ProjectStep({ value = {}, onChange }) {
               <FieldCell
                 icon={<Hash className="h-3 w-3" strokeWidth={1.75} />}
                 label="Project Code"
-                value={value.projectCode || "—"}
+                value={sanitizeProjectCode(value.projectCode, value.projectId) || "—"}
               />
             </div>
             <div className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-2 sm:divide-y-0 sm:divide-x">
