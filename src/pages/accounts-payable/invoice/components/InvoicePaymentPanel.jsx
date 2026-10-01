@@ -32,12 +32,11 @@ function buildTdsBasisLine(tds, symbol) {
  * Payment readiness/status for this invoice. "Mark Ready for Payment" is the one manual gate
  * between Approved and payable (Backend/Business_Layer/services/payment_service.py:
  * mark_ready_for_payment) — never automatic just because the invoice was approved. Individual
- * payment transactions aren't listed here: GET /apm/payment has no invoice_id filter (only
- * vendor_id/status_id), so per-invoice payment history isn't fetchable without pulling every
- * payment in the system — see the Payment History page (filtered by vendor/status) instead.
+ * payments (and their receipts) are listed on the invoice's payment detail page
+ * (GET /apm/payment/invoice/{id}, AP_ROUTES.PAYMENT_DETAIL), where Record Payment also lives.
  */
 export default function InvoicePaymentPanel({ invoice }) {
-  const { canMarkPaid } = useApPermissions();
+  const { canMarkPaid, canViewPaymentManagement, canViewTdsTracking } = useApPermissions();
   const markReady = useMarkReadyForPaymentMutation();
   // TDS Phase 1: the backend does not itself enforce "TDS verified before ready-for-payment" —
   // same frontend-only sequencing as InvoiceApprovalPanel's send-for-approval gate (see
@@ -154,7 +153,7 @@ export default function InvoicePaymentPanel({ invoice }) {
 
         {isPayable && balance > 0 && canMarkPaid && (
           <Link
-            to={AP_ROUTES.PAYMENT_MARK_PAID(invoice.id)}
+            to={AP_ROUTES.PAYMENT_DETAIL(invoice.id)}
             className="mt-2 block w-full rounded-lg border border-[#0A0082] px-3 py-2 text-center text-sm font-medium text-[#0A0082] hover:bg-[#0A0082]/5"
           >
             Pay Invoice
@@ -162,6 +161,24 @@ export default function InvoicePaymentPanel({ invoice }) {
         )}
 
         {invoice.status === INVOICE_STATUS.PAID && <StatusBadge label="Paid" size="sm" />}
+
+        {/* Every recorded payment (with receipts) and the separate TDS tracking lifecycle live
+            on their own pages — linked here rather than duplicated. */}
+        {(canViewPaymentManagement && (isPayable || invoice.status === INVOICE_STATUS.PAID)) ||
+        (canViewTdsTracking && tds?.tds_applicable) ? (
+          <div className="mt-3 flex flex-col gap-1 border-t border-gray-100 pt-2 text-sm">
+            {canViewPaymentManagement && (isPayable || invoice.status === INVOICE_STATUS.PAID) && (
+              <Link to={AP_ROUTES.PAYMENT_DETAIL(invoice.id)} className="text-[#0A0082] hover:underline">
+                Payment history & receipts →
+              </Link>
+            )}
+            {canViewTdsTracking && tds?.tds_applicable && (
+              <Link to={AP_ROUTES.TDS_TRACKING_DETAIL(invoice.id)} className="text-[#0A0082] hover:underline">
+                TDS tracking (deduction / challan / filing) →
+              </Link>
+            )}
+          </div>
+        ) : null}
       </PageCardContent>
 
       <Modal

@@ -10,8 +10,13 @@
 export const PAYMENT_PERMISSIONS = {
   // GET /payment, GET /payment/{id} — also accepted (any-of) by GET /invoice/{id}/history.
   PAYMENT_VIEW: "PAYMENT_VIEW",
-  // POST /payment (create), PATCH /payment/{id}/status, POST /invoice/{id}/ready-for-payment.
+  // POST /payment (create), PATCH /payment/{id}/status, POST /invoice/{id}/ready-for-payment,
+  // POST /payment/invoice/{id}/record (Record Payment), POST /payment/{id}/documents (receipt).
   PAYMENT_PROCESS: "PAYMENT_PROCESS",
 };
+
+// Payment Management read endpoints (GET /payment/ready-for-payment, /history, /invoice/{id},
+// /metadata, receipt view) accept either permission server-side.
+export const PAYMENT_ANY_VIEW_PERMISSIONS = [PAYMENT_PERMISSIONS.PAYMENT_VIEW, PAYMENT_PERMISSIONS.PAYMENT_PROCESS];
 
 export default PAYMENT_PERMISSIONS;

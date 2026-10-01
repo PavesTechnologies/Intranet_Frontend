@@ -7,7 +7,6 @@ import {
   DollarSign,
   RefreshCw,
   Eye,
-  ArrowRight,
   FileText,
   FileCheck,
 } from "lucide-react";
@@ -36,8 +35,6 @@ import {
 /* ------------------------------------------------------------------ */
 /* Global constants                                                    */
 /* ------------------------------------------------------------------ */
-
-const INVOICE_GENERATION_PATH = "/account-receivable/invoice-generation";
 
 // Same page size as the other AR list pages (e.g. BillingApprovals)
 const PAGE_SIZE = 5;
@@ -397,15 +394,6 @@ export default function InvoiceApproval() {
               <p className="text-sm text-slate-500">
                 Generated invoices submitted for approval will appear here for review and historical auditing.
               </p>
-            </div>
-            <div className="pt-3">
-              <Button
-                onClick={() => navigate(INVOICE_GENERATION_PATH)}
-                className="bg-[#0A0082] text-white hover:bg-[#0A0082]/90 font-semibold px-6 py-2.5"
-              >
-                Go to Invoice Generation
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
             </div>
           </PageCardContent>
         </PageCard>

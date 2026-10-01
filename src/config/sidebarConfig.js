@@ -1,6 +1,8 @@
 import { AP_ALL_ROLES, AP_ROLES } from "../pages/accounts-payable/constants/apRoles";
 import { AP_ROUTES } from "../pages/accounts-payable/constants/routes";
 import { INVOICE_PERMISSIONS } from "../pages/accounts-payable/constants/invoicePermissions";
+import { PAYMENT_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/paymentPermissions";
+import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/tdsTrackingPermissions";
 
 /**
  * Canonical role identifiers.
@@ -344,7 +346,19 @@ export const AP_SUBMENU = [
   { label: "Notifications", to: AP_ROUTES.NOTIFICATIONS, allowedRoles: AP_ALL_ROLES },
   { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
   { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
-  { label: "Payments", to: AP_ROUTES.PAYMENT_READY, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
+  // Payment Management (Ready for Payment ⇄ Payment History, cross-linked from each page) and
+  // TDS Tracking are flat entries: the AP flyout doesn't open nested children. Gated on the
+  // permissions their backend endpoints enforce, so a user without them never sees a page that
+  // would only 403.
+  { label: "Payment Management", to: AP_ROUTES.PAYMENT_READY, requiredPermissions: PAYMENT_ANY_VIEW_PERMISSIONS },
+  { label: "TDS Tracking", to: AP_ROUTES.TDS_TRACKING, requiredPermissions: TDS_TRACKING_ANY_VIEW_PERMISSIONS },
   // { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
-  { label: "System Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: AP_ALL_ROLES },
+  // Split into two role-exclusive entries (both pointing at the same route) rather than one
+  // AP_ALL_ROLES item — System Configuration's tabs are now Admin-only/Finance_Executive-only
+  // (see SystemConfigurationPage.jsx's canManageSystemConfig/canManageTdsConfig split), so
+  // Vendor_Intake/AP_Executive shouldn't see either nav entry at all, and Finance_Executive
+  // should see it labeled for what they'll actually land on (just the TDS tab), not the generic
+  // label that implies access to Fiscal Years/Tax Compliance/etc. they don't have.
+  { label: "System Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: [AP_ROLES.ADMIN] },
+  { label: "TDS Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: [AP_ROLES.FINANCE_EXECUTIVE] },
 ];

@@ -29,6 +29,11 @@ const INITIAL_WIZARD_DATA = {
   setupMode: "EXISTING",
   projectInfo: {
     projectSource: "ENTERPRISE",
+    // PROJECT (default) vs PRODUCT_SERVICE (Recurring-only — a standalone
+    // product/application/service with no project at all). See ProjectStep.
+    billingContext: "PROJECT",
+    productName: "",
+    productDescription: "",
   },
   billingConfig: {
     billingType: "",
@@ -78,12 +83,21 @@ const INITIAL_WIZARD_DATA = {
     // value/source and effective dates.
     recurring: {
       recurringConfigurationId: null,
+      // Mirrors projectInfo.billingContext (kept in sync by RecurringBillingForm)
+      // so the payload builder always has it alongside the rest of this record.
+      billingContext: "PROJECT",
+      productName: "",
+      productDescription: "",
       contractValueSource: "",
       contractValue: "",
       pmsProjectBudget: "",
       recurringStartDate: "",
       recurringEndDate: "",
       remarks: "",
+      renewalMode: "",
+      renewalEffectiveFrom: "",
+      renewalContractValue: "",
+      renewalBillingFrequencyId: "",
     },
   },
   controls: {
@@ -118,6 +132,17 @@ function getMissingFields(step, data) {
   switch (step) {
     case 1: {
       const project = data.projectInfo || {};
+      const billingContext = project.billingContext || "PROJECT";
+
+      if (billingContext === "PRODUCT_SERVICE") {
+        // Standalone Product/Application/Service billing — no project at
+        // all, but a client is still required (see ProjectStep).
+        if (!project.clientId && !project.clientName) missing.push("Client Name");
+        if (!project.productName) missing.push("Product / Application / Service Name");
+        if (!project.productDescription) missing.push("Product / Service Description");
+        break;
+      }
+
       const source = project.projectSource || "ENTERPRISE";
       if (source === "ENTERPRISE") {
         if (!project.clientId) missing.push("Client Name");
@@ -140,7 +165,7 @@ function getMissingFields(step, data) {
     case 2: {
       const config = data.billingConfig || {};
       const project = data.projectInfo || {};
-      if (!(project.projectBudgetCurrency || project.currency)) missing.push("Billing Currency (select a project with a currency)");
+      if (!(project.projectBudgetCurrency || project.currency)) missing.push("Billing Currency");
       if (!config.billingType) missing.push("Billing Type");
       // billingFrequencyId is the value the frequency PillSelectGroup actually
       // selects on (BillingConfigurationStep.jsx) and what RecurringBillingForm
@@ -163,39 +188,56 @@ function getMissingFields(step, data) {
         }
       } else if (config.billingType === "RECURRING") {
         const recurring = config.recurring || {};
-        const projectStartDate = project.startDate;
-        const projectEndDate = project.endDate;
+        const billingContext = project.billingContext || "PROJECT";
+        const isProductService = billingContext === "PRODUCT_SERVICE";
+        const projectStartDate = isProductService ? null : project.startDate;
+        const projectEndDate = isProductService ? null : project.endDate;
 
-        if (!recurring.contractValueSource) missing.push("Contract Value Source");
-        const contractValue = Number(recurring.contractValue);
-        if (recurring.contractValue === "" || recurring.contractValue === null || recurring.contractValue === undefined) {
-          missing.push("Contract Value");
-        } else if (Number.isNaN(contractValue) || contractValue <= 0) {
-          missing.push("Contract Value must be greater than 0");
+        const contractValueSource = recurring.contractValueSource || (isProductService ? "MANUAL" : "PMS");
+        const isPmsSource = contractValueSource === "PMS";
+
+        if (isPmsSource) {
+          const projectBudgetNum = Number(project.projectBudget);
+          const projectBudgetIsBlank =
+            project.projectBudget === "" ||
+            project.projectBudget === null ||
+            project.projectBudget === undefined ||
+            Number.isNaN(projectBudgetNum) ||
+            projectBudgetNum <= 0;
+          if (projectBudgetIsBlank) {
+            missing.push("Project Budget is not available for the selected project");
+          }
+        } else {
+          const contractValue = Number(recurring.contractValue);
+          if (recurring.contractValue === "" || recurring.contractValue === null || recurring.contractValue === undefined) {
+            missing.push("Manual Budget");
+          } else if (Number.isNaN(contractValue) || contractValue <= 0) {
+            missing.push("Manual Budget must be greater than 0");
+          }
         }
 
-        if (!recurring.recurringStartDate) missing.push("Billing Start Date");
-        if (!recurring.recurringEndDate) missing.push("Billing End Date");
+        if (!recurring.recurringStartDate) missing.push("Effective From");
+        if (!recurring.recurringEndDate) missing.push("Effective To");
         if (
           recurring.recurringStartDate &&
           projectStartDate &&
           recurring.recurringStartDate < projectStartDate
         ) {
-          missing.push("Billing Start Date must be on or after the Project Start Date");
+          missing.push("Effective From must be on or after the Project Start Date");
         }
         if (
           recurring.recurringEndDate &&
           projectEndDate &&
           recurring.recurringEndDate > projectEndDate
         ) {
-          missing.push("Billing End Date must be on or before the Project End Date");
+          missing.push("Effective To must be on or before the Project End Date");
         }
         if (
           recurring.recurringStartDate &&
           recurring.recurringEndDate &&
           recurring.recurringEndDate < recurring.recurringStartDate
         ) {
-          missing.push("Billing End Date must be on or after the Billing Start Date");
+          missing.push("Effective To must be on or after Effective From");
         }
       } else if (config.billingType === "FIXED_PRICE") {
         const fixedPrice = config.fixedPrice || {};
@@ -269,8 +311,9 @@ function getStepValidationMessage(step, data) {
 function getDraftGuardMessage(wizardData) {
   const projectInfo = wizardData.projectInfo || {};
   const billingConfig = wizardData.billingConfig || {};
-  if (!projectInfo.clientId) return "Please select a Client before continuing.";
-  if (!projectInfo.projectId) return "Please select a Project before continuing.";
+  const isProductService = projectInfo.billingContext === "PRODUCT_SERVICE";
+  if (!projectInfo.clientId && !projectInfo.clientName) return "Please select a Client before continuing.";
+  if (!isProductService && !projectInfo.projectId) return "Please select a Project before continuing.";
   if (!billingConfig.billingTypeId) return "Please select a Billing Type before continuing.";
   return null;
 }
@@ -536,11 +579,14 @@ export default function NewConfigurationWizard() {
 
     const projectInfo = wizardData.projectInfo || {};
     const billingConfig = wizardData.billingConfig || {};
-    const clientId = projectInfo.clientId;
+    const clientId = projectInfo.clientId || projectInfo.clientName;
     const projectId = projectInfo.projectId;
     const billingTypeId = billingConfig.billingTypeId;
+    // PRODUCT_SERVICE never has a projectId (see getDraftGuardMessage) — only
+    // clientId/billingTypeId gate draft creation in that case.
+    const isProductService = projectInfo.billingContext === "PRODUCT_SERVICE";
 
-    if (!clientId || !projectId || !billingTypeId) return;
+    if (!clientId || (!isProductService && !projectId) || !billingTypeId) return;
 
     // [1] clientId/projectId/billingTypeId available — draft creation can proceed.
     console.log("[NewConfigurationWizard] draft-required fields ready:", {
@@ -575,7 +621,9 @@ export default function NewConfigurationWizard() {
     configId,
     savedConfigId,
     wizardData.projectInfo?.clientId,
+    wizardData.projectInfo?.clientName,
     wizardData.projectInfo?.projectId,
+    wizardData.projectInfo?.billingContext,
     wizardData.billingConfig?.billingTypeId,
   ]);
 

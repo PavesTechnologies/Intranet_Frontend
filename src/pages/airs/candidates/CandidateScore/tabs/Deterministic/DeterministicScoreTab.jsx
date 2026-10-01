@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ShieldCheck, Calculator, SlidersHorizontal } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorState from "@/pages/airs/skill-ontology/components/ErrorState";
@@ -15,8 +15,14 @@ import ScoreCalculation from "./components/ScoreCalculation";
 import ConfigurationCard from "./components/ConfigurationCard";
 
 // Requirements Score tab — GET /airs/campaign-candidates/{campaign_candidate_id}/deterministic.
-export default function DeterministicScoreTab({ candidate }) {
-  const { breakdown, loading, error, refetch } = useDeterministicScore(candidate?.id);
+export default function DeterministicScoreTab({ candidate, onLayerFailure }) {
+  const { breakdown, failure, loading, error, refetch } = useDeterministicScore(candidate?.id);
+
+  // Optional: lets a host page (PipelineCandidateScorecardPage) flag/retry a
+  // dead-lettered layer from this tab's own fresh response.
+  useEffect(() => {
+    if (!loading && !error) onLayerFailure?.("deterministic", failure);
+  }, [loading, error, failure, onLayerFailure]);
   const [skillsTab, setSkillsTab] = useState("mandatory");
 
   if (loading) {

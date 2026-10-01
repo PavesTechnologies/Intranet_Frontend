@@ -197,8 +197,9 @@ export default function BillingApprovals() {
         if (!id) return;
         combinedMap.set(id, {
           billingConfigurationId: id,
-          projectName: item.projectName || "—",
-          projectCode: item.projectCode || "—",
+          billingContext: item.billingContext || "PROJECT",
+          projectName: item.projectName || item.productName || "—",
+          projectCode: item.projectCode || (item.billingContext === "PRODUCT_SERVICE" ? "Product/Service" : "—"),
           clientName: item.client || item.clientName || "—",
           billingTypeName: item.billingType || item.billingTypeName || "—",
           billingFrequencyName: item.billingFrequency || item.billingFrequencyName || "—",
@@ -527,7 +528,11 @@ export default function BillingApprovals() {
         isOpen={Boolean(reviewTarget)}
         onClose={closeReview}
         title="Review Billing Configuration Request"
-        subtitle={reviewTarget ? `${reviewTarget.projectName || "—"} (${reviewTarget.clientName || "—"})` : ""}
+        subtitle={
+          reviewTarget
+            ? `${reviewTarget.projectName || reviewTarget.productName || "—"} (${reviewTarget.clientName || "—"})`
+            : ""
+        }
         titleIcon={<ClipboardCheck className="h-5 w-5 text-[#0A0082]" />}
         size="3xl"
         footer={
@@ -765,30 +770,59 @@ export default function BillingApprovals() {
                 />
               )}
 
-              {isRecurring && (
-                <div className="space-y-3">
-                  {isSameAmount && (
-                    <div className="flex items-center gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/70 px-3.5 py-2 text-xs font-medium text-emerald-900">
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                      <span>Contract Value and PMS Project Budget are the same ({formatMoney(contractVal, currency)}).</span>
-                    </div>
-                  )}
-                  {isDifferentAmount && (
-                    <div className="flex items-center gap-2 rounded-lg border border-amber-200/80 bg-amber-50/70 px-3.5 py-2 text-xs font-medium text-amber-900">
-                      <Info className="h-4 w-4 shrink-0 text-amber-600" />
-                      <span>
-                        Contract Value ({formatMoney(contractVal, currency)}) is used for billing calculation because it differs from PMS Project Budget ({formatMoney(pmsBudgetVal, currency)}).
-                      </span>
-                    </div>
-                  )}
-                  <ReviewSection
-                    title="Recurring Pricing Details"
-                    rows={[
-                      { label: contractValueLabelText, value: contractValueRowValue },
-                    ]}
-                  />
-                </div>
-              )}
+              {isRecurring && (() => {
+                const isProductServiceContext = reviewTarget.billingContext === "PRODUCT_SERVICE";
+                const renewalConfigured = Boolean(reviewTarget.renewalType);
+                const renewalModeLabel =
+                  reviewTarget.renewalDurationType === "CUSTOM" || reviewTarget.renewalPricingType === "REVISED_PRICE"
+                    ? "Custom"
+                    : "Same as Previous";
+
+                return (
+                  <div className="space-y-3">
+                    <ReviewSection
+                      title="Billing Context"
+                      rows={[
+                        { label: "Billing Context", value: isProductServiceContext ? "Product / Service" : "Project" },
+                        ...(isProductServiceContext
+                          ? [
+                              { label: "Product / Application / Service", value: reviewTarget.productName },
+                              { label: "Description", value: reviewTarget.productDescription },
+                            ]
+                          : []),
+                      ]}
+                    />
+                    <ReviewSection
+                      title="Recurring Pricing Details"
+                      rows={[
+                        { label: "Budget Source", value: sourceLabel },
+                        { label: "Total Budget", value: contractValueRowValue },
+                        { label: "Billing Frequency", value: billingFreqLabel },
+                      ]}
+                    />
+                    {/* Renewal is a Subscription (Product/Service) concept only —
+                        a project-based Recurring configuration is never renewed. */}
+                    {isProductServiceContext && (
+                      <ReviewSection
+                        title="Renewal Configuration"
+                        rows={
+                          renewalConfigured
+                            ? [
+                                { label: "Renewal Mode", value: renewalModeLabel },
+                                ...(renewalModeLabel === "Custom"
+                                  ? [
+                                      { label: "Renewal Amount", value: formatMoney(reviewTarget.renewalContractValue, currency) },
+                                      { label: "Renewal Effective From", value: formatDate(reviewTarget.renewalEffectiveFrom) },
+                                    ]
+                                  : []),
+                              ]
+                            : [{ label: "Renewal Mode", value: "Not configured" }]
+                        }
+                      />
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* 3. Billing Schedule */}
               <PageCard className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">

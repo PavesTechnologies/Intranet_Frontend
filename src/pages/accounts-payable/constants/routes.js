@@ -34,6 +34,13 @@ export const AP_ROUTES = {
   PAYMENT_HISTORY: `${BASE}/payments/history`,
   PAYMENT_MARK_PAID: (invoiceId = ":invoiceId") =>
     `${BASE}/payments/mark-paid/${invoiceId}`,
+  // Invoice-level payment detail: summary + every recorded payment and its receipts.
+  PAYMENT_DETAIL: (invoiceId = ":invoiceId") =>
+    `${BASE}/payments/invoice/${invoiceId}`,
+
+  TDS_TRACKING: `${BASE}/tds/tracking`,
+  TDS_TRACKING_DETAIL: (invoiceId = ":invoiceId") =>
+    `${BASE}/tds/tracking/${invoiceId}`,
 
   PAYMENT_QUEUE: `${BASE}/payment-queue`,
   PAYMENT_QUEUE_DETAIL: (reportId = ":reportId") =>
