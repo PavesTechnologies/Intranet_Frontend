@@ -695,18 +695,7 @@ export default function InvoiceGeneration() {
           </div>
 
           <div className="border-t border-slate-100 pt-3 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-800">
-                Invoice Queue
-              </h3>
-
-              <span className="text-xs text-slate-400 font-medium">
-                {filteredInvoices.length}{" "}
-                {filteredInvoices.length === 1
-                  ? "Invoice"
-                  : "Invoices"}
-              </span>
-            </div>
+            
 
             <ARTable
               headers={tableHeaders}

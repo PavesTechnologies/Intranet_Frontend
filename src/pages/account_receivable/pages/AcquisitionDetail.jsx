@@ -245,16 +245,16 @@ export default function AcquisitionDetail() {
             setConfig((prev) =>
               prev
                 ? {
-                    ...prev,
-                    billingStatus: resolvedStatus,
-                    snapshotNumber: snapshotData.snapshotNumber,
-                    snapshotId: snapshotData.snapshotId,
-                    billingPeriodStart: snapStart,
-                    billingPeriodEnd: snapEnd,
-                    snapshotPeriodStart: snapStart,
-                    snapshotPeriodEnd: snapEnd,
-                    billingPeriod: snapPeriod,
-                  }
+                  ...prev,
+                  billingStatus: resolvedStatus,
+                  snapshotNumber: snapshotData.snapshotNumber,
+                  snapshotId: snapshotData.snapshotId,
+                  billingPeriodStart: snapStart,
+                  billingPeriodEnd: snapEnd,
+                  snapshotPeriodStart: snapStart,
+                  snapshotPeriodEnd: snapEnd,
+                  billingPeriod: snapPeriod,
+                }
                 : prev
             );
             setPeriodStart(snapStart);
@@ -297,15 +297,15 @@ export default function AcquisitionDetail() {
               billingPeriod: actualPeriod,
               ...((!isNotAcquired && savedMeta)
                 ? {
-                    snapshotId: savedMeta.snapshotId || match.snapshotId,
-                    snapshotNumber: savedMeta.snapshotNumber || match.snapshotNumber,
-                    billingStatus: savedMeta.status || match.billingStatus,
-                  }
+                  snapshotId: savedMeta.snapshotId || match.snapshotId,
+                  snapshotNumber: savedMeta.snapshotNumber || match.snapshotNumber,
+                  billingStatus: savedMeta.status || match.billingStatus,
+                }
                 : {
-                    snapshotId: isNotAcquired ? null : match.snapshotId,
-                    snapshotNumber: isNotAcquired ? null : match.snapshotNumber,
-                    billingStatus: match.billingStatus,
-                  }),
+                  snapshotId: isNotAcquired ? null : match.snapshotId,
+                  snapshotNumber: isNotAcquired ? null : match.snapshotNumber,
+                  billingStatus: match.billingStatus,
+                }),
             };
             setConfig(enrichedMatch);
             setPeriodStart(actualStart || "");
@@ -466,16 +466,16 @@ export default function AcquisitionDetail() {
           setConfig((prev) =>
             prev
               ? {
-                  ...prev,
-                  billingStatus: finalBillingStatus,
-                  snapshotNumber: snapshotNum || prev.snapshotNumber,
-                  snapshotId: snapshotId || prev.snapshotId,
-                  billingPeriodStart: finalStart,
-                  billingPeriodEnd: finalEnd,
-                  snapshotPeriodStart: finalStart,
-                  snapshotPeriodEnd: finalEnd,
-                  billingPeriod: finalPeriod,
-                }
+                ...prev,
+                billingStatus: finalBillingStatus,
+                snapshotNumber: snapshotNum || prev.snapshotNumber,
+                snapshotId: snapshotId || prev.snapshotId,
+                billingPeriodStart: finalStart,
+                billingPeriodEnd: finalEnd,
+                snapshotPeriodStart: finalStart,
+                snapshotPeriodEnd: finalEnd,
+                billingPeriod: finalPeriod,
+              }
               : prev
           );
 
@@ -487,11 +487,11 @@ export default function AcquisitionDetail() {
           setConfig((prev) =>
             prev
               ? {
-                  ...prev,
-                  billingStatus: "PARTIALLY_READY",
-                  snapshotNumber: null,
-                  snapshotId: null,
-                }
+                ...prev,
+                billingStatus: "PARTIALLY_READY",
+                snapshotNumber: null,
+                snapshotId: null,
+              }
               : prev
           );
           showStatusToast(
@@ -502,11 +502,11 @@ export default function AcquisitionDetail() {
           setConfig((prev) =>
             prev
               ? {
-                  ...prev,
-                  billingStatus: "PENDING_APPROVAL",
-                  snapshotNumber: null,
-                  snapshotId: null,
-                }
+                ...prev,
+                billingStatus: "PENDING_APPROVAL",
+                snapshotNumber: null,
+                snapshotId: null,
+              }
               : prev
           );
           showStatusToast(
@@ -517,11 +517,11 @@ export default function AcquisitionDetail() {
           setConfig((prev) =>
             prev
               ? {
-                  ...prev,
-                  billingStatus: "NO_BILLABLE_DATA",
-                  snapshotNumber: null,
-                  snapshotId: null,
-                }
+                ...prev,
+                billingStatus: "NO_BILLABLE_DATA",
+                snapshotNumber: null,
+                snapshotId: null,
+              }
               : prev
           );
           showStatusToast(
@@ -532,11 +532,11 @@ export default function AcquisitionDetail() {
           setConfig((prev) =>
             prev
               ? {
-                  ...prev,
-                  billingStatus: "ACQUISITION_FAILED",
-                  snapshotNumber: null,
-                  snapshotId: null,
-                }
+                ...prev,
+                billingStatus: "ACQUISITION_FAILED",
+                snapshotNumber: null,
+                snapshotId: null,
+              }
               : prev
           );
           showStatusToast(
@@ -550,11 +550,11 @@ export default function AcquisitionDetail() {
         setConfig((prev) =>
           prev
             ? {
-                ...prev,
-                billingStatus: "ACQUISITION_FAILED",
-                snapshotNumber: null,
-                snapshotId: null,
-              }
+              ...prev,
+              billingStatus: "ACQUISITION_FAILED",
+              snapshotNumber: null,
+              snapshotId: null,
+            }
             : prev
         );
         showStatusToast(
@@ -614,7 +614,7 @@ export default function AcquisitionDetail() {
 
     // Navigate to the Tax Calculation page where the user can review and calculate tax
     navigate(`/account-receivable/tax-calculation/${realSnapshotId}`, {
-      state: { config, acquisitionResults },
+      state: { source: "billing-data-acquisition", config, acquisitionResults },
     });
   };
 

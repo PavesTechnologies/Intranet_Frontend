@@ -323,7 +323,7 @@ export default function AcquisitionQueue({
                 onClick={handleResetFilters}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 transition-colors hover:text-indigo-800"
               >
-                <RotateCcw className="h-3 w-3" /> Clear filters to show all projects
+                <RotateCcw className="h-3 w-3" /> clear to show all projects
               </button>
             )}
           </div>

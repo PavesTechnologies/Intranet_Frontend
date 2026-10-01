@@ -98,7 +98,10 @@ export default function TaxCalculation() {
   const [hasInvoice, setHasInvoice] = useState(false);
   const [existingInvoice, setExistingInvoice] = useState(null);
 
-  const effectiveSnapshotId = snapshotId || taxCalc?.billingSnapshotId || snapshotData?.snapshotId || null;
+  const isTaxCalculationConsole = location.pathname === CONSOLE_PATH;
+  const effectiveSnapshotId = isTaxCalculationConsole
+    ? null
+    : snapshotId || taxCalc?.billingSnapshotId || snapshotData?.snapshotId || null;
 
   const loadData = async () => {
     if (!effectiveSnapshotId) {
@@ -240,7 +243,9 @@ export default function TaxCalculation() {
     navigate(`/account-receivable/invoice-generation/${effectiveSnapshotId}`, {
       state: {
         from: "tax-calculation",
-        source: "tax-calculation",
+        source: passedState.source === "billing-data-acquisition"
+          ? "billing-data-acquisition"
+          : "tax-calculation",
         snapshotId: effectiveSnapshotId,
         projectId: snapshotData?.projectId || null,
         config: snapshotData,
@@ -343,7 +348,9 @@ export default function TaxCalculation() {
     <div className="mx-auto w-full max-w-5xl space-y-5">
       <Breadcrumb
         items={[
-          { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" },
+          ...(passedState.source === "billing-data-acquisition"
+            ? [{ label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" }]
+            : []),
           { label: "Tax Calculation", to: CONSOLE_PATH },
           { label: snapshotNum },
         ]}

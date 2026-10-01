@@ -518,16 +518,18 @@ export default function InvoiceGenerationDetail() {
         items={
           isOccurrenceMode
             ? [
-                { label: "Tax Calculation", to: backToTaxUrl },
-                { label: "Invoice Generation" },
-                { label: isInvoiceGenerated ? (invoice?.invoiceNumber || recordLabel) : recordLabel },
-              ]
+              { label: "Tax Calculation", to: backToTaxUrl },
+              { label: "Invoice Generation" },
+              { label: isInvoiceGenerated ? (invoice?.invoiceNumber || recordLabel) : recordLabel },
+            ]
             : [
-                { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" },
-                { label: "Tax Calculation", to: backToTaxUrl },
-                { label: "Invoice Generation" },
-                { label: isInvoiceGenerated ? (invoice?.invoiceNumber || recordLabel) : recordLabel },
-              ]
+              ...(passedState.source === "billing-data-acquisition"
+                ? [{ label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" }]
+                : []),
+              { label: "Tax Calculation", to: backToTaxUrl },
+              { label: "Invoice Generation" },
+              { label: isInvoiceGenerated ? (invoice?.invoiceNumber || recordLabel) : recordLabel },
+            ]
         }
       />
 
@@ -837,34 +839,34 @@ export default function InvoiceGenerationDetail() {
         footerClassName="p-4 sm:p-5 bg-white border-t border-slate-200"
         footer={
           <div className="flex flex-wrap items-center justify-end gap-3 w-full">
-              <Button
-                variant="outline"
-                size="small"
-                onClick={() => setIsPreviewModalOpen(false)}
-                className="text-xs text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 px-4 py-2"
-              >
-                Close
-              </Button>
+            <Button
+              variant="outline"
+              size="small"
+              onClick={() => setIsPreviewModalOpen(false)}
+              className="text-xs text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 px-4 py-2"
+            >
+              Close
+            </Button>
 
-              {invoiceStatus === "GENERATED" && (
-                <Button
-                  variant="primary"
-                  size="small"
-                  onClick={handleSubmitForApproval}
-                  disabled={submitting}
-                  className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold shadow-sm px-4 py-2"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Submitting...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-3.5 w-3.5" /> Submit for Approval
-                    </>
-                  )}
-                </Button>
-              )}
+            {invoiceStatus === "GENERATED" && (
+              <Button
+                variant="primary"
+                size="small"
+                onClick={handleSubmitForApproval}
+                disabled={submitting}
+                className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold shadow-sm px-4 py-2"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-3.5 w-3.5" /> Submit for Approval
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         }
       >
