@@ -7,6 +7,9 @@ import CurrencyLimitEditor, { newLimitRow } from "@/pages/expense-management/com
 import RulePreviewCard from "@/pages/expense-management/components/policy/RuleBuilder/RulePreviewCard";
 import { RULE_TYPES, RULE_TYPE_META } from "@/pages/expense-management/components/policy/common/policyEnums";
 
+/** Both duplicate-detection rule types default to INFO severity - they're advisory signals, not policy limits. */
+const isDuplicateRuleType = (ruleType) => ruleType === "DUPLICATE_EXPENSE" || ruleType === "CROSS_EMPLOYEE_DUPLICATE_EXPENSE";
+
 export const customSelectStyles = {
   control: (base, state) => ({
     ...base,
@@ -70,7 +73,7 @@ export function useRuleBuilder({ open = true, fixedBundle, bundleOptions = [], r
         effectiveFrom: rule.effectiveFrom || "",
         effectiveTo: rule.effectiveTo || "",
         enforcementType: rule.enforcementType || "WARN",
-        severity: rule.severity || (rule.ruleType === "DUPLICATE_EXPENSE" ? "INFO" : "WARN"),
+        severity: rule.severity || (isDuplicateRuleType(rule.ruleType) ? "INFO" : "WARN"),
       });
     } else {
       setState({ ...emptyState(), bundleId: fixedBundle ? fixedBundle.policyId : "" });
@@ -84,7 +87,7 @@ export function useRuleBuilder({ open = true, fixedBundle, bundleOptions = [], r
       conditionsMode: "flat",
       ruleValue: "",
       limits: [newLimitRow()],
-      severity: ruleType === "DUPLICATE_EXPENSE" ? "INFO" : "WARN",
+      severity: isDuplicateRuleType(ruleType) ? "INFO" : "WARN",
     });
   };
 

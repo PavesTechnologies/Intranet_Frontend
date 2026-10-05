@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, Image as ImageIcon, Maximize2, Minimize2, Receipt, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertTriangle, FileText, Image as ImageIcon, Maximize2, Minimize2, Receipt, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
 import { receiptService } from "@/pages/expense-management/api/expenseReportsApi";
 
 const isImageFile = (fileName = "") => /\.(png|jpe?g|gif|webp|heic)$/i.test(fileName);
@@ -152,10 +152,20 @@ export default function ReceiptViewer({ lineItemId }) {
       <div className="flex items-center justify-between border-b border-gray-200 bg-white px-3 py-2">
         <div className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-gray-600">
           {activeReceipt && (isImageFile(activeReceipt.fileName) ? <ImageIcon className="h-3.5 w-3.5 shrink-0" /> : <FileText className="h-3.5 w-3.5 shrink-0" />)}
-          <span className="truncate">{activeReceipt?.fileName || "Receipt"}</span>
+          <span className="truncate">{activeReceipt?.fileName || activeReceipt?.originalFileName || "Receipt"}</span>
         </div>
         {controls}
       </div>
+
+      {activeReceipt?.possibleDuplicateFileReuse && (
+        <div
+          className="flex items-center gap-1.5 border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-medium text-amber-700"
+          title="Advisory only — this exact file was already uploaded as a different receipt. Verify this isn't an accidental or intentional duplicate claim before approving."
+        >
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          Possible duplicate — this exact file matches another uploaded receipt
+        </div>
+      )}
 
       <div className="min-h-0 flex-1">{body}</div>
 

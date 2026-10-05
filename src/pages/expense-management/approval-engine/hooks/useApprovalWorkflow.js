@@ -58,9 +58,13 @@ export const useLineItemReviews = (reportId) =>
 const invalidateApprovalCaches = (qc, reportId) => {
   qc.invalidateQueries({ queryKey: ["approvalMyQueue"] });
   qc.invalidateQueries({ queryKey: ["approvalMyHistory"] });
+  qc.invalidateQueries({ queryKey: ["financeQueue"] });
   if (reportId) {
     qc.invalidateQueries({ queryKey: APPROVAL_STATUS_KEY(reportId) });
     qc.invalidateQueries({ queryKey: LINE_ITEM_REVIEWS_KEY(reportId) });
+    qc.invalidateQueries({ queryKey: ["reportLineItems", reportId] });
+    qc.invalidateQueries({ queryKey: ["reportReviews", reportId] });
+    qc.invalidateQueries({ queryKey: ["financeReviews", reportId] });
   }
 };
 
@@ -115,6 +119,20 @@ export const useRejectReport = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ reportId, comment }) => approvalWorkflowApi.rejectReport(reportId, comment).then(unwrap),
+    onSettled: (_data, _err, { reportId }) => invalidateApprovalCaches(qc, reportId),
+  });
+};
+
+/**
+ * A SEPARATE, approver-side authorization of a policy exception - distinct from the employee's own
+ * justify() (policyApi.js). Invalidates the same caches as reviewLineItem, since the queue's
+ * pendingLineItems[].policyViolations[] entry needs to reflect the newly-set approverJustification.
+ */
+export const useApproveException = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reportId, lineItemId, violationId, justification }) =>
+      approvalWorkflowApi.approveException(reportId, lineItemId, violationId, justification).then(unwrap),
     onSettled: (_data, _err, { reportId }) => invalidateApprovalCaches(qc, reportId),
   });
 };

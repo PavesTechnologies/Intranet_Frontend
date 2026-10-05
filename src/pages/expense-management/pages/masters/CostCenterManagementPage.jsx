@@ -23,7 +23,6 @@ import Select from "react-select";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import { PageCard, PageCardContent } from "@/components/Cards/PageCard";
 import GenericTable from "@/components/Table/table";
-import Pagination from "@/components/Pagination/pagination";
 import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
 import Modal from "@/components/Modal/modal";
@@ -36,6 +35,7 @@ import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
 import { showStatusToast } from "@/components/toastfy/toast";
 import api from "@/api/axiosInstance";
+import Pagination from "@/components/Pagination/pagination";
 
 const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
 const EMPLOYEE_ONBOARDING_URL = window.__APP_CONFIG__?.EMPLOYEE_ONBOARDING_URL || "";
@@ -1400,16 +1400,14 @@ export default function CostCenterManagementPage() {
                 <GenericTable headers={ccHeaders} rows={ccTableRows} columns={ccColumns} />
               </div>
 
-              {ccTotalPages > 1 && (
-                <div className="mt-4 flex justify-center">
-                  <Pagination
-                    currentPage={ccCurrentPage}
-                    totalPages={ccTotalPages}
-                    onPrevious={() => setCcCurrentPage((p) => Math.max(p - 1, 1))}
-                    onNext={() => setCcCurrentPage((p) => Math.min(p + 1, ccTotalPages))}
-                  />
-                </div>
-              )}
+              <div className="mt-4 flex justify-center">
+                <Pagination
+                  currentPage={ccCurrentPage}
+                  totalPages={ccTotalPages}
+                  onPrevious={() => setCcCurrentPage((p) => Math.max(p - 1, 1))}
+                  onNext={() => setCcCurrentPage((p) => Math.min(p + 1, ccTotalPages))}
+                />
+              </div>
             </>
           )
         ) : budgetLoading ? (
@@ -1458,16 +1456,14 @@ export default function CostCenterManagementPage() {
               <GenericTable headers={budgetHeaders} rows={budgetTableRows} columns={budgetColumns} />
             </div>
 
-            {budgetTotalPages > 1 && (
-              <div className="mt-4 flex justify-center">
-                <Pagination
-                  currentPage={budgetCurrentPage}
-                  totalPages={budgetTotalPages}
-                  onPrevious={() => setBudgetCurrentPage((p) => Math.max(p - 1, 1))}
-                  onNext={() => setBudgetCurrentPage((p) => Math.min(p + 1, budgetTotalPages))}
-                />
-              </div>
-            )}
+            <div className="mt-4 flex justify-center">
+              <Pagination
+                currentPage={budgetCurrentPage}
+                totalPages={budgetTotalPages}
+                onPrevious={() => setBudgetCurrentPage((p) => Math.max(p - 1, 1))}
+                onNext={() => setBudgetCurrentPage((p) => Math.min(p + 1, budgetTotalPages))}
+              />
+            </div>
           </>
         )}
       </div>
