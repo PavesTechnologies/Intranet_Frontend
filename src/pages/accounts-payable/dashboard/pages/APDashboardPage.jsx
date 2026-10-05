@@ -1,532 +1,162 @@
+import { useEffect, useState } from "react";
+import { RefreshCw, AlertTriangle } from "lucide-react";
+import PageHeader from "../../../../components/ui/PageHeader";
+import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
+import Button from "../../../../components/Button/Button";
+import FormDatePicker from "../../../../components/forms/FormDatePicker";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
 import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+  ChartCard,
+  KpiGrid,
+  ActionRequiredList,
+  StatusSummaryChart,
+  FinancialSummaryCards,
+  DashboardTrendChart,
+  RecentActivityList,
+} from "../components/DashboardWidgets";
+import { useDashboardSummary } from "../hooks/useDashboardSummary";
+import { getApiErrorMessage } from "../../utils/apiError";
+import { formatPeriodRange, prettifyKey } from "../utils/dashboardFormatters";
 
-import { useNavigate } from "react-router-dom";
-
-import {
-  APKpiGrid,
-  AttentionQueue,
-  DashboardHeader,
-  InvoiceProcessingTube,
-  FinancialHealthTube,
-  InvoiceIntakeHealth,
-} from "../components/APDashboardComponents";
-
-import { AP_ROUTES } from "../../constants/routes";
-import { formatDate } from "../../utils/formatters";
-import {
-  DEFAULT_NOTIFICATION_FILTERS,
-  useNotifications,
-} from "../../notifications/hooks/useNotifications";
-import {
-  PRIORITY_LABEL,
-  PRIORITY_ORDER,
-  entityReference,
-  isActionRequired,
-  resolveNotificationRoute,
-} from "../../notifications/constants/notifications";
-
-/* -------------------------------------------------------------------------- */
-/* Requires Attention                                                         */
-/*                                                                            */
-/* Fed by the SAME notification query - and the same cache entry - as the      */
-/* header bell and the Notification Center: no second API, no fabricated rows. */
-/* It is a shortcut into the Center (the card links straight through), not a   */
-/* copy of it: only the few highest-priority items that still need an action   */
-/* are shown, from every AP module. "Still needs an action" is backend state - */
-/* unresolved and action-oriented - so a read item the user has not dealt with */
-/* stays, and resolved work never resurfaces.                                 */
-/* -------------------------------------------------------------------------- */
-
-const ATTENTION_LIMIT = 4;
-
-function toAttentionItems(notifications) {
-  const priorityRank = (priority) => {
-    const index = PRIORITY_ORDER.indexOf(priority);
-    return index === -1 ? PRIORITY_ORDER.length : index;
-  };
-
-  return [...notifications]
-    .filter(isActionRequired)
-    .sort((a, b) => {
-      const byPriority = priorityRank(a.priority) - priorityRank(b.priority);
-      if (byPriority !== 0) return byPriority;
-      // Newest first within a priority.
-      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-    })
-    .slice(0, ATTENTION_LIMIT)
-    .map((notification) => ({
-      id: notification.id,
-      reference: entityReference(notification) || notification.title,
-      module: notification.module,
-      priority: notification.priority,
-      priorityLabel: PRIORITY_LABEL[notification.priority] || notification.priority,
-      title: notification.title,
-      message: notification.message,
-      timestamp: formatDate(notification.created_at),
-      route: resolveNotificationRoute(notification),
-    }));
-}
-
-/* -------------------------------------------------------------------------- */
-/* Dashboard Sections                                                         */
-/* -------------------------------------------------------------------------- */
-
-function useDashboardSections() {
-  const [autoActiveSection, setAutoActiveSection] =
-    useState("processing");
-
-  const [manualSection, setManualSection] =
-    useState(null);
-
-  const [manuallyClosedSection, setManuallyClosedSection] =
-    useState(null);
-
-  const sectionRefs = useRef({});
-
-  const viewportTimer = useRef(null);
-
-  const scrollTimer = useRef(null);
-
-  /* ---------------------------------------------------------------------- */
-  /* Register section                                                       */
-  /* ---------------------------------------------------------------------- */
-
-  const registerSection = useCallback(
-    (id) => (element) => {
-      sectionRefs.current[id] = element;
-    },
-    []
-  );
-
-  /* ---------------------------------------------------------------------- */
-  /* Automatic viewport navigation                                         */
-  /* ---------------------------------------------------------------------- */
-
-  useEffect(() => {
-    /*
-     * Manual mode takes priority.
-     */
-    if (manualSection) {
-      return;
-    }
-
-    const observer =
-      new IntersectionObserver(
-        (entries) => {
-          const visibleSections =
-            entries
-              .filter(
-                (entry) =>
-                  entry.isIntersecting
-              )
-              .sort(
-                (a, b) =>
-                  b.intersectionRatio -
-                  a.intersectionRatio
-              );
-
-          if (
-            !visibleSections.length
-          ) {
-            return;
-          }
-
-          /*
-           * Don't automatically reopen a section
-           * that the user explicitly closed.
-           */
-          const nextEntry =
-            visibleSections.find(
-              (entry) =>
-                entry.target.dataset
-                  .section !==
-                manuallyClosedSection
-            );
-
-          if (!nextEntry) {
-            return;
-          }
-
-          const nextSection =
-            nextEntry.target.dataset
-              .section;
-
-          if (!nextSection) {
-            return;
-          }
-
-          if (
-            nextSection ===
-            autoActiveSection
-          ) {
-            return;
-          }
-
-          if (viewportTimer.current) {
-            clearTimeout(
-              viewportTimer.current
-            );
-          }
-
-          /*
-           * Small delay prevents aggressive
-           * open/close while scrolling.
-           */
-          viewportTimer.current =
-            window.setTimeout(() => {
-              setAutoActiveSection(
-                nextSection
-              );
-
-              /*
-               * Once user reaches another section,
-               * release the old manual-close state.
-               */
-              if (
-                manuallyClosedSection &&
-                manuallyClosedSection !==
-                  nextSection
-              ) {
-                setManuallyClosedSection(
-                  null
-                );
-              }
-            }, 180);
-        },
-        {
-          /*
-           * Central viewport zone.
-           */
-          rootMargin:
-            "-35% 0px -45% 0px",
-
-          threshold: [
-            0.25,
-            0.5,
-            0.75,
-          ],
-        }
-      );
-
-    Object.values(
-      sectionRefs.current
-    ).forEach((element) => {
-      if (element) {
-        observer.observe(element);
-      }
-    });
-
-    return () => {
-      observer.disconnect();
-
-      if (viewportTimer.current) {
-        clearTimeout(
-          viewportTimer.current
-        );
-      }
-    };
-  }, [
-    manualSection,
-    manuallyClosedSection,
-    autoActiveSection,
-  ]);
-
-  /* ---------------------------------------------------------------------- */
-  /* Scroll expanded card into view                                        */
-  /* ---------------------------------------------------------------------- */
-
-  const scrollSectionIntoView =
-    useCallback((id) => {
-      if (scrollTimer.current) {
-        clearTimeout(
-          scrollTimer.current
-        );
-      }
-
-      scrollTimer.current =
-        window.setTimeout(() => {
-          const element =
-            sectionRefs.current[id];
-
-          if (!element) {
-            return;
-          }
-
-          element.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
-        }, 220);
-    }, []);
-
-  /* ---------------------------------------------------------------------- */
-  /* Manual open / close                                                    */
-  /* ---------------------------------------------------------------------- */
-
-  const toggleManualSection =
-    useCallback(
-      (id) => {
-        /*
-         * Clicking the currently open manual card
-         * closes it.
-         */
-        if (manualSection === id) {
-          setManualSection(null);
-
-          /*
-           * Prevent viewport observer from immediately
-           * opening the same card again.
-           */
-          setManuallyClosedSection(id);
-
-          return;
-        }
-
-        /*
-         * Open selected card manually.
-         */
-        setManualSection(id);
-
-        setManuallyClosedSection(null);
-
-        setAutoActiveSection(id);
-
-        scrollSectionIntoView(id);
-      },
-      [
-        manualSection,
-        scrollSectionIntoView,
-      ]
-    );
-
-  /* ---------------------------------------------------------------------- */
-  /* Determine active section                                               */
-  /* ---------------------------------------------------------------------- */
-
-  let activeSection = null;
-
-  /*
-   * Manual open has highest priority.
-   */
-  if (manualSection) {
-    activeSection = manualSection;
-  }
-
-  /*
-   * User manually closed currently active section.
-   */
-  else if (
-    manuallyClosedSection ===
-    autoActiveSection
-  ) {
-    activeSection = null;
-  }
-
-  /*
-   * Normal automatic mode.
-   */
-  else {
-    activeSection =
-      autoActiveSection;
-  }
-
-  /* ---------------------------------------------------------------------- */
-  /* Cleanup                                                                 */
-  /* ---------------------------------------------------------------------- */
-
-  useEffect(() => {
-    return () => {
-      if (viewportTimer.current) {
-        clearTimeout(
-          viewportTimer.current
-        );
-      }
-
-      if (scrollTimer.current) {
-        clearTimeout(
-          scrollTimer.current
-        );
-      }
-    };
-  }, []);
-
-  return {
-    activeSection,
-    manualSection,
-    registerSection,
-    toggleManualSection,
-  };
-}
-
-/* -------------------------------------------------------------------------- */
-/* Dashboard Page                                                             */
-/* -------------------------------------------------------------------------- */
-
+/**
+ * ONE reusable AP Dashboard, driven entirely by GET /apm/dashboard/summary — no role-specific
+ * variants. The backend decides what this user is authorized to see (the `sections` array); this
+ * page only renders whichever of kpis/action_required/status_summary/financial_summary/trends/
+ * recent_activity actually came back non-empty. Date range affects trends/recent activity/
+ * "paid in period" on the backend — it does NOT change current counts/outstanding amounts, per
+ * the backend's own documented behavior; this page never recomputes that distinction itself.
+ */
 export default function APDashboardPage() {
-  const navigate = useNavigate();
+  // Seeded empty on first load — sending no from_date/to_date lets the backend apply its own
+  // default (last 30 days) and return the resolved period, which then seeds the date pickers.
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [appliedRange, setAppliedRange] = useState({ fromDate: "", toDate: "" });
+  const [dateError, setDateError] = useState("");
 
-  const [isLoading, setIsLoading] =
-    useState(true);
+  const { data, isLoading, isFetching, isError, error, refetch } = useDashboardSummary(appliedRange);
 
-  /*
-   * The signed-in user's unified notification stream - the same query the
-   * header bell and Notification Center use, so this adds no request of its own.
-   */
-  const {
-    notifications,
-    isLoading: notificationsLoading,
-    isError: notificationsError,
-    refetch: refetchNotifications,
-  } = useNotifications(DEFAULT_NOTIFICATION_FILTERS);
-
-  const attentionItems = toAttentionItems(notifications);
-
-  const {
-    activeSection,
-    manualSection,
-    registerSection,
-    toggleManualSection,
-  } =
-    useDashboardSections();
-
-  /* ---------------------------------------------------------------------- */
-  /* Refresh                                                                 */
-  /* ---------------------------------------------------------------------- */
-
-  const handleRefresh = useCallback(() => {
-    setIsLoading(true);
-
-    refetchNotifications();
-
-    window.setTimeout(() => {
-      setIsLoading(false);
-    }, 900);
-  }, [refetchNotifications]);
-
-  /* ---------------------------------------------------------------------- */
-  /* Initial loading                                                         */
-  /* ---------------------------------------------------------------------- */
-
+  // Seed the pickers from the backend's resolved period the first time data arrives, so the UI
+  // reflects the actual range in effect rather than a client-guessed one.
   useEffect(() => {
-    const timer =
-      window.setTimeout(() => {
-        setIsLoading(false);
-      }, 900);
+    if (data?.period && !fromDate && !toDate) {
+      setFromDate(data.period.from_date || "");
+      setToDate(data.period.to_date || "");
+    }
+  }, [data, fromDate, toDate]);
 
-    return () =>
-      window.clearTimeout(timer);
-  }, []);
+  const applyRange = () => {
+    if (fromDate && toDate) {
+      if (fromDate > toDate) {
+        setDateError("From date must be on or before the To date.");
+        return;
+      }
+      const spanDays = (new Date(toDate) - new Date(fromDate)) / (1000 * 60 * 60 * 24);
+      if (spanDays > 366) {
+        setDateError("Date range cannot exceed 366 days.");
+        return;
+      }
+    }
+    setDateError("");
+    setAppliedRange({ fromDate, toDate });
+  };
 
-  /* ---------------------------------------------------------------------- */
-  /* Render                                                                  */
-  /* ---------------------------------------------------------------------- */
+  const is422 = error?.status === 422;
+  const hasAnyData =
+    (data?.kpis?.length ?? 0) > 0 ||
+    (data?.action_required?.length ?? 0) > 0 ||
+    (data?.status_summary?.length ?? 0) > 0 ||
+    (data?.financial_summary?.length ?? 0) > 0 ||
+    (data?.trends?.length ?? 0) > 0 ||
+    (data?.recent_activity?.length ?? 0) > 0;
 
   return (
-    <div className="min-h-full bg-slate-50/60 p-4 sm:p-5 lg:p-6">
-      <div className="mx-auto max-w-[1800px] space-y-4">
+    <div className="p-6">
+      <PageHeader
+        title="Accounts Payable Dashboard"
+        subtitle={data?.period ? formatPeriodRange(data.period.from_date, data.period.to_date) : "Here's what's happening across AP"}
+        actions={
+          <>
+            <FormDatePicker label="From" name="dashboardFrom" value={fromDate} onChange={(e) => setFromDate(e.target.value)} max={toDate || undefined} />
+            <FormDatePicker label="To" name="dashboardTo" value={toDate} onChange={(e) => setToDate(e.target.value)} min={fromDate || undefined} />
+            <Button variant="outline" size="small" onClick={applyRange} className="self-end">
+              Apply
+            </Button>
+            <Button variant="outline" size="small" onClick={() => refetch()} loading={isFetching} className="self-end">
+              <RefreshCw size={14} /> Refresh
+            </Button>
+          </>
+        }
+      />
 
-        {/* ================================================================ */}
-        {/* HEADER                                                           */}
-        {/* ================================================================ */}
+      {dateError && (
+        <p className="mb-4 flex items-center gap-1.5 text-sm text-red-600">
+          <AlertTriangle size={14} /> {dateError}
+        </p>
+      )}
 
-        <DashboardHeader
-          onRefresh={handleRefresh}
-          isLoading={isLoading}
-        />
-
-        {/* ================================================================ */}
-        {/* COMPACT KPI SUMMARY                                              */}
-        {/* ================================================================ */}
-
-        <APKpiGrid
-          isLoading={isLoading}
-        />
-
-        {/* ================================================================ */}
-        {/* REQUIRES ATTENTION                                               */}
-        {/* ================================================================ */}
-
-        <AttentionQueue
-          isLoading={isLoading || notificationsLoading}
-          isError={notificationsError}
-          items={attentionItems}
-          onRetry={refetchNotifications}
-          onViewAll={() => navigate(AP_ROUTES.NOTIFICATIONS)}
-          onSelect={(item) =>
-            navigate(item.route || AP_ROUTES.NOTIFICATIONS)
-          }
-        />
-
-        {/* ================================================================ */}
-        {/* PROCESSING HEALTH                                                */}
-        {/* ================================================================ */}
-
-        <div
-          ref={registerSection(
-            "processing"
-          )}
-          data-section="processing"
-        >
-          <InvoiceProcessingTube
-            isLoading={isLoading}
-            isActive={
-              activeSection ===
-              "processing"
-            }
-            isManual={
-              manualSection ===
-              "processing"
-            }
-            onToggle={() =>
-              toggleManualSection(
-                "processing"
-              )
-            }
-          />
+      {isLoading ? (
+        <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-24">
+          <LoadingSpinner text="Loading dashboard..." />
         </div>
-
-        {/* ================================================================ */}
-        {/* CASH & PAYMENT HEALTH                                            */}
-        {/* ================================================================ */}
-
-        <div
-          ref={registerSection(
-            "financial"
-          )}
-          data-section="financial"
-        >
-          <FinancialHealthTube
-            isLoading={isLoading}
-            isActive={
-              activeSection ===
-              "financial"
-            }
-            isManual={
-              manualSection ===
-              "financial"
-            }
-            onToggle={() =>
-              toggleManualSection(
-                "financial"
-              )
-            }
-          />
+      ) : isError ? (
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-12 text-center">
+          <AlertTriangle className="h-6 w-6 text-red-500" />
+          <p className="text-sm font-semibold text-red-700">
+            {is422 ? "That date range isn't valid." : "Unable to load dashboard data."}
+          </p>
+          <p className="max-w-md text-xs text-red-600">
+            {getApiErrorMessage(error, is422 ? "Check the From/To dates and try again." : "Something went wrong — please try again.")}
+          </p>
+          <Button size="small" variant="outline" className="mt-2" onClick={() => refetch()}>
+            Retry
+          </Button>
         </div>
+      ) : !hasAnyData ? (
+        <PageCard>
+          <PageCardContent>
+            <p className="py-10 text-center text-sm text-gray-500">
+              No dashboard information is available for your current access.
+            </p>
+          </PageCardContent>
+        </PageCard>
+      ) : (
+        <div className="space-y-4">
+          <KpiGrid kpis={data.kpis} />
 
-        {/* ================================================================ */}
-        {/* INVOICE INTAKE HEALTH                                            */}
-        {/* ================================================================ */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {data.action_required?.length > 0 && (
+              <ChartCard title="Action Required" subtitle="Things that need your decision">
+                <ActionRequiredList items={data.action_required} />
+              </ChartCard>
+            )}
+            {data.status_summary?.map((summary) => (
+              <ChartCard key={summary.key} title={prettifyKey(summary.key)}>
+                <StatusSummaryChart items={summary.items} />
+              </ChartCard>
+            ))}
+          </div>
 
-        <InvoiceIntakeHealth
-          isLoading={isLoading}
-        />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {data.financial_summary?.length > 0 && (
+              <ChartCard title="Financial Summary">
+                <FinancialSummaryCards items={data.financial_summary} />
+              </ChartCard>
+            )}
+            {data.trends?.map((trend) => (
+              <ChartCard key={trend.key} title={prettifyKey(trend.key)} subtitle="Over the selected period">
+                <DashboardTrendChart trend={trend} />
+              </ChartCard>
+            ))}
+          </div>
 
-      </div>
+          {data.recent_activity?.length > 0 && (
+            <ChartCard title="Recent Activity">
+              <RecentActivityList items={data.recent_activity} />
+            </ChartCard>
+          )}
+        </div>
+      )}
     </div>
   );
 }

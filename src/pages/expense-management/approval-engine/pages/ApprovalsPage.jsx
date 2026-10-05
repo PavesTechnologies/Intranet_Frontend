@@ -6,15 +6,8 @@ import ApprovalHistoryPage from "./ApprovalHistoryPage";
 import CashAdvanceApprovalsList from "../components/CashAdvanceApprovalsList";
 import { useMyQueue, useMyHistory } from "../hooks/useApprovalWorkflow";
 import SearchInput from "@/components/filter/Searchbar";
-<<<<<<< HEAD
 import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
-
-export default function ApprovalsPage() {
-  const { hasRole } = useAuth();
-  const [activeTab, setActiveTab] = useState("pending"); // "pending" | "approved" | "rejected"
-  const [approvalCategory, setApprovalCategory] = useState("EXPENSE_REPORTS"); // "EXPENSE_REPORTS" | "CASH_ADVANCES"
-=======
 
 // Shared with PendingApprovalsPage/ApprovalHistoryPage's own content fetch: same (page, size) means
 // react-query serves both the summary-card count here AND the active tab's content from the exact
@@ -22,8 +15,9 @@ export default function ApprovalsPage() {
 const QUEUE_PAGE_SIZE = 20;
 
 export default function ApprovalsPage() {
-  const [activeTab, setActiveTab] = useState("pending"); // "pending" | "approved" | "history"
->>>>>>> 6a1e43b2b17d8368043b7d5982e4776d74ad1373
+  const { hasRole } = useAuth();
+  const [activeTab, setActiveTab] = useState("pending"); // "pending" | "approved" | "rejected"
+  const [approvalCategory, setApprovalCategory] = useState("EXPENSE_REPORTS"); // "EXPENSE_REPORTS" | "CASH_ADVANCES"
   const [reloadKey, setReloadKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -69,7 +63,6 @@ export default function ApprovalsPage() {
     rejectedQuery.refetch();
   };
 
-<<<<<<< HEAD
   const handleSearch = (value) => {
     setSearchTerm(value || "");
   };
@@ -85,16 +78,23 @@ export default function ApprovalsPage() {
     { label: "Pending", value: "pending" },
     { label: "Approved", value: "approved" },
     { label: "Rejected", value: "rejected" },
-=======
-  const tabs = [
-    { key: "pending", label: "Pending", icon: Clock },
-    { key: "approved", label: "Approved", icon: CheckCircle2 },
-    { key: "history", label: "History", icon: Layers },
->>>>>>> 6a1e43b2b17d8368043b7d5982e4776d74ad1373
   ];
 
   return (
     <div className="space-y-3 p-4 sm:p-6">
+      {/* Scope custom styles to hide child component breadcrumbs & headers, and remove child outer padding */}
+      <style>{`
+        .approvals-tab-container nav[aria-label="Breadcrumb"] {
+          display: none !important;
+        }
+        .approvals-tab-container h1 {
+          display: none !important;
+        }
+        .approvals-tab-container > div {
+          padding: 0 !important;
+        }
+      `}</style>
+
       <Breadcrumb items={breadcrumbs} />
 
       {/* Page Header */}
@@ -156,37 +156,13 @@ export default function ApprovalsPage() {
         </div>
       </div>
 
-      {/* Tabs + Search */}
+      {/* Filter and Search Card */}
       <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex space-x-1 rounded-lg bg-gray-50 p-1">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition ${
-                    isActive ? "bg-white text-blue-600 shadow-sm" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  }`}
-                >
-                  <Icon size={16} />
-                  {tab.label}
-                  {tab.key === "pending" && pendingCount > 0 && (
-                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isActive ? "bg-blue-100 text-blue-700" : "bg-gray-200 text-gray-600"}`}>
-                      {pendingCount}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="w-full lg:w-72">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+          <div className="lg:col-span-2">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
             <SearchInput
               value={searchTerm}
-<<<<<<< HEAD
               onSearch={handleSearch}
               placeholder="Search by report/advance number or title/category..."
               className="!py-1.5 !px-3 !text-xs"
@@ -225,40 +201,6 @@ export default function ApprovalsPage() {
           <ApprovalHistoryPage key={`rejected-${reloadKey}`} outcome="REJECTED" title="Rejected" breadcrumbLabel="Rejected" searchTerm={searchTerm} />
         )}
       </div>
-=======
-              onSearch={(value) => setSearchTerm(value || "")}
-              placeholder="Search by report number or merchant/category..."
-              className="!py-1.5 !px-3 !text-xs"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === "pending" ? (
-        <PendingApprovalsPage key={`pending-${reloadKey}`} searchTerm={searchTerm} hideHeader noPadding />
-      ) : activeTab === "approved" ? (
-        <ApprovalHistoryPage
-          key={`approved-${reloadKey}`}
-          outcome="APPROVED"
-          title="Approved"
-          breadcrumbLabel="Approved"
-          searchTerm={searchTerm}
-          hideHeader
-          noPadding
-        />
-      ) : (
-        <ApprovalHistoryPage
-          key={`history-${reloadKey}`}
-          title="History"
-          breadcrumbLabel="History"
-          searchTerm={searchTerm}
-          hideHeader
-          noPadding
-          allowOutcomeFilter
-        />
-      )}
->>>>>>> 6a1e43b2b17d8368043b7d5982e4776d74ad1373
     </div>
   );
 }
