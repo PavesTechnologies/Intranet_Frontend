@@ -116,3 +116,36 @@ describe("useApPermissions — Payment permission flags", () => {
     expect(result.current.canViewPayment).toBe(false);
   });
 });
+
+describe("useApPermissions — Payment Management / TDS Tracking flags", () => {
+  it("PAYMENT_VIEW can open Payment Management but not record payments", () => {
+    mockAuth(["PAYMENT_VIEW"]);
+    const { result } = renderHook(() => useApPermissions());
+    expect(result.current.canViewPaymentManagement).toBe(true);
+    expect(result.current.canRecordPayment).toBe(false);
+  });
+
+  it("PAYMENT_PROCESS can view and record payments", () => {
+    mockAuth(["PAYMENT_PROCESS"]);
+    const { result } = renderHook(() => useApPermissions());
+    expect(result.current.canViewPaymentManagement).toBe(true);
+    expect(result.current.canRecordPayment).toBe(true);
+  });
+
+  it("TDS tracking: VIEW reads only, UPDATE reads and records, invoice-TDS permissions grant neither", () => {
+    mockAuth(["TDS_TRACKING_VIEW"]);
+    let result = renderHook(() => useApPermissions()).result;
+    expect(result.current.canViewTdsTracking).toBe(true);
+    expect(result.current.canUpdateTdsTracking).toBe(false);
+
+    mockAuth(["TDS_TRACKING_UPDATE"]);
+    result = renderHook(() => useApPermissions()).result;
+    expect(result.current.canViewTdsTracking).toBe(true);
+    expect(result.current.canUpdateTdsTracking).toBe(true);
+
+    mockAuth(["INVOICE_TDS_VERIFY", "PAYMENT_PROCESS"]);
+    result = renderHook(() => useApPermissions()).result;
+    expect(result.current.canViewTdsTracking).toBe(false);
+    expect(result.current.canUpdateTdsTracking).toBe(false);
+  });
+});

@@ -14,6 +14,8 @@ import {
 } from "../hooks/useApprovalDelegations";
 import EmployeeLabel from "../components/EmployeeLabel";
 import { formatDate } from "../constants/approvalLabels";
+import { useClientPagination } from "@/pages/expense-management/components/common/pagination";
+import Pagination from "@/components/Pagination/pagination";
 
 const emptyForm = { delegationId: null, delegatorId: "", delegateId: "", startDate: "", endDate: "", status: "ACTIVE" };
 
@@ -25,6 +27,7 @@ const emptyForm = { delegationId: null, delegatorId: "", delegateId: "", startDa
  */
 export default function DelegationsPage() {
   const { data: delegations, isLoading, isError, refetch } = useApprovalDelegations();
+  const { pageItems: pageDelegations, paginationProps } = useClientPagination(delegations || []);
   const saveDelegation = useSaveApprovalDelegation();
   const deleteDelegation = useDeleteApprovalDelegation();
 
@@ -129,7 +132,7 @@ export default function DelegationsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {delegations.map((row) => (
+              {pageDelegations.map((row) => (
                 <tr key={row.delegationId} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-900">
                     <EmployeeLabel employeeId={row.delegatorId} />
@@ -158,6 +161,11 @@ export default function DelegationsPage() {
               ))}
             </tbody>
           </table>
+          <div className="px-4 pb-3">
+            <div className="mt-4 flex justify-center">
+              <Pagination {...paginationProps} />
+            </div>
+          </div>
         </div>
       )}
 

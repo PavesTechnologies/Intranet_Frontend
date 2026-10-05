@@ -150,6 +150,14 @@ const StatusBadge = ({ label, size = "md" }) => {
     textColor = "text-green-700";
   }
 
+  // Finance Verification's "sent back for correction" outcome (§Query vs Reject - there is no
+  // terminal "rejected" state at this level).
+  if (raw === "queried") {
+    displayLabel = "Query Raised";
+    bgColor = "bg-amber-100 border border-amber-300";
+    textColor = "text-amber-800 font-bold";
+  }
+
   if (raw === "accepted") {
     bgColor = "bg-orange-100";
     textColor = "text-orange-700";

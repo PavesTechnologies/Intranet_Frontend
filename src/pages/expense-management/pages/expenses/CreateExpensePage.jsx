@@ -27,9 +27,7 @@ import {
   lineItemService,
   receiptService,
 } from "@/pages/expense-management/api/expenseReportsApi";
-
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
-
 import Select from "react-select";
 import FormInput from "@/components/forms/FormInput";
 import FormTextArea from "@/components/forms/FormTextArea";
@@ -49,7 +47,6 @@ import { useSubmitReport } from "@/pages/expense-management/approval-engine/hook
 import api from "@/api/axiosInstance";
 
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
-
 
 const breadcrumbs = [
   {
@@ -317,13 +314,12 @@ export default function CreateExpensePage() {
     description: "",
     amount: "",
     currencyId: "",
-    taxAmount: "0",
+    tax: emptyTaxValue,
     clientBillable: false,
     projectId: "",
   });
 
   const [lineItemErrors, setLineItemErrors] = useState({});
-
   const [receiptFile, setReceiptFile] = useState(null);
 
   const [savingLineItem, setSavingLineItem] = useState(false);
@@ -609,52 +605,18 @@ export default function CreateExpensePage() {
     ) {
       const loadStep2Lookups = async () => {
         try {
-          const [
-            catList,
-            projListResponse,
-          ] = await Promise.all([
+          const [catList, projListResponse] = await Promise.all([
             lookupService.getActiveCategories(),
-
-            api
-              .get("/xms/admin/projects", {
-                baseURL:
-                  window.__APP_CONFIG__
-                    ?.EXPENSE_MANAGEMENT_URL ||
-                  "",
-                headers: {
-                  Authorization: `Bearer ${localStorage.getItem(
-                    "token"
-                  )}`,
-                },
-              })
-              .catch(() => ({
-                data: {
-                  data: [],
-                },
-              })),
+            api.get("/xms/admin/projects", {
+              baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            }).catch(() => ({ data: { data: [] } })),
           ]);
-
-
-          setCategories(
-            Array.isArray(catList)
-              ? catList
-              : []
-          );
-
-
-          const pList =
-            projListResponse?.data?.data ||
-            projListResponse?.data ||
-            [];
-
-
-          setProjects(
-            Array.isArray(pList)
-              ? pList
-              : []
-          );
-
-
+          setCategories(catList);
+          const pList = projListResponse?.data?.data || projListResponse?.data || [];
+          setProjects(Array.isArray(pList) ? pList : []);
         } catch (err) {
           console.error(
             "Failed to load categories/projects:",
@@ -1449,28 +1411,9 @@ export default function CreateExpensePage() {
   };
 
 
-  const handleLineItemSelectChange = (
-    name,
-    value
-  ) => {
-    setLineItemFormData(
-      (prev) => ({
-        ...prev,
-        [name]: value,
-      })
-    );
-
-
-    if (
-      lineItemErrors[name]
-    ) {
-      setLineItemErrors(
-        (prev) => ({
-          ...prev,
-          [name]: "",
-        })
-      );
-    }
+  const handleLineItemSelectChange = (name, value) => {
+    setLineItemFormData((prev) => ({ ...prev, [name]: value }));
+    if (lineItemErrors[name]) setLineItemErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
 
@@ -1513,44 +1456,14 @@ export default function CreateExpensePage() {
       errors.amount =
         "Amount must be greater than 0.";
     }
-
-
-    if (
-      !lineItemFormData.currencyId
-    ) {
-      errors.currencyId =
-        "Currency is required.";
+    if (!lineItemFormData.currencyId) errors.currencyId = "Currency is required.";
+    if (Number(lineItemFormData.taxAmount) < 0) {
+      errors.taxAmount = "GST cannot be negative.";
+    } else if (Number(lineItemFormData.taxAmount) > (Number(lineItemFormData.amount) || 0)) {
+      errors.taxAmount = "GST cannot exceed total amount.";
     }
-
-
-    if (
-      Number(
-        lineItemFormData.taxAmount
-      ) < 0
-    ) {
-      errors.taxAmount =
-        "GST cannot be negative.";
-    } else if (
-      Number(
-        lineItemFormData.taxAmount
-      ) >
-      (
-        Number(
-          lineItemFormData.amount
-        ) || 0
-      )
-    ) {
-      errors.taxAmount =
-        "GST cannot exceed total amount.";
-    }
-
-
-    if (
-      lineItemFormData.clientBillable &&
-      !lineItemFormData.projectId
-    ) {
-      errors.projectId =
-        "Project is required for billable expenses.";
+    if (lineItemFormData.clientBillable && !lineItemFormData.projectId) {
+      errors.projectId = "Project is required for billable expenses.";
     }
 
 
@@ -1595,42 +1508,16 @@ export default function CreateExpensePage() {
 
 
       const payload = {
-        categoryId:
-          lineItemFormData.categoryId,
-
-        expenseDate:
-          lineItemFormData.expenseDate,
-
-        merchantName:
-          lineItemFormData.merchantName.trim(),
-
-        description:
-          lineItemFormData.description.trim(),
-
-        amount:
-          Number(
-            lineItemFormData.amount
-          ),
-
-        currencyId:
-          lineItemFormData.currencyId,
-
-        taxAmount:
-          Number(
-            lineItemFormData.taxAmount
-          ) || 0,
-
-        costCenterId:
-          createdReport?.costCenterId ||
-          formData.costCenterId,
-
-        clientBillable:
-          !!lineItemFormData.clientBillable,
-
-        projectId:
-          lineItemFormData.clientBillable
-            ? lineItemFormData.projectId
-            : "",
+        categoryId: lineItemFormData.categoryId,
+        expenseDate: lineItemFormData.expenseDate,
+        merchantName: lineItemFormData.merchantName.trim(),
+        description: lineItemFormData.description.trim(),
+        amount: Number(lineItemFormData.amount),
+        currencyId: lineItemFormData.currencyId,
+        taxAmount: Number(lineItemFormData.taxAmount) || 0,
+        costCenterId: createdReport?.costCenterId || formData.costCenterId,
+        clientBillable: !!lineItemFormData.clientBillable,
+        projectId: lineItemFormData.clientBillable ? lineItemFormData.projectId : "",
       };
 
 
@@ -1781,426 +1668,136 @@ export default function CreateExpensePage() {
     }
   };
 
+  const handleDeleteLineItemConfirm = async () => {
+    if (!lineItemToDelete || !reportId) return;
+    try {
+      setDeletingLineItem(true);
+      await lineItemService.delete(reportId, lineItemToDelete.lineItemId);
+      showStatusToast("Line item deleted successfully!", "success");
+      setLineItemToDelete(null);
+      
+      // Refresh list
+      const itemsRes = await lineItemService.getAll(reportId);
+      const payloadItems = itemsRes.data?.data;
+      const list = Array.isArray(payloadItems) ? payloadItems : payloadItems?.lineItems || payloadItems?.content || payloadItems?.data || [];
+      setLineItems(list);
+    } catch (err) {
+      console.error("Error deleting line item:", err);
+      const errMsg = err.response?.data?.message || err.response?.data?.detail || "Failed to delete line item.";
+      showStatusToast(errMsg, "error");
+    } finally {
+      setDeletingLineItem(false);
+    }
+  };
 
-  // ============================================================
-  // DELETE LINE ITEM
-  // ============================================================
+  // Step 3: Handle Final Submission for Approval
+  const handleSubmitReport = async () => {
+    if (!reportId) return;
+    try {
+      submitMutation.mutate(reportId, {
+        onSuccess: () => {
+          showStatusToast("Expense report submitted for approval successfully!", "success");
+          navigate(`/expense-management/expenses/reports/${reportId}`);
+        },
+        onError: (err) => {
+          const errMsg = err.response?.data?.message || err.response?.data?.detail || "Failed to submit expense report.";
+          showStatusToast(errMsg, "error", 4000);
+        },
+      });
+    } catch (err) {
+      console.error("Error final submitting report:", err);
+    }
+  };
 
-  const handleDeleteLineItemConfirm =
-    async () => {
-      if (
-        !lineItemToDelete ||
-        !reportId
-      ) {
-        return;
-      }
-
-
-      try {
-        setDeletingLineItem(
-          true
-        );
-
-
-        await lineItemService.delete(
-          reportId,
-          lineItemToDelete.lineItemId
-        );
-
-
-        showStatusToast(
-          "Line item deleted successfully!",
-          "success"
-        );
-
-
-        setLineItemToDelete(
-          null
-        );
-
-
-        const itemsRes =
-          await lineItemService.getAll(
-            reportId
-          );
-
-
-        const payloadItems =
-          itemsRes?.data?.data;
-
-
-        const list =
-          Array.isArray(payloadItems)
-            ? payloadItems
-            : payloadItems?.lineItems ||
-              payloadItems?.content ||
-              payloadItems?.data ||
-              [];
-
-
-        setLineItems(
-          Array.isArray(list)
-            ? list
-            : []
-        );
-
-
-      } catch (err) {
-        console.error(
-          "Error deleting line item:",
-          err
-        );
-
-
-        const errMsg =
-          err?.response?.data?.message ||
-          err?.response?.data?.detail ||
-          err?.message ||
-          "Failed to delete line item.";
-
-
-        showStatusToast(
-          errMsg,
-          "error"
-        );
-      } finally {
-        setDeletingLineItem(
-          false
-        );
-      }
+  // Setup GenericTable configurations for Step 2
+  const headers = ["Category", "Merchant", "Date", "Amount", "Policy", "GST", "Net Amount", "Base Amount", "Billable", "Actions"];
+  const columns = ["category", "merchant", "date", "amount", "policy", "gst", "net", "base", "billable", "actions"];
+  const tableRows = filteredLineItems.map((li) => {
+    const showCurrency = li.currencyCode && (li.currencyCode === "EUR" || li.currencyCode !== li.baseCurrencyCode);
+    return {
+      category: <span className="font-medium text-gray-800 text-xs">{li.categoryName || "—"}</span>,
+      merchant: (
+        <div className="text-left text-xs">
+          <p className="font-medium text-gray-900">{li.merchantName || "—"}</p>
+          {li.description && <p className="text-[10px] text-gray-400 truncate max-w-[150px]">{li.description}</p>}
+        </div>
+      ),
+      date: <span className="text-xs">{formatDate(li.expenseDate)}</span>,
+      amount: (
+        <span className="font-mono font-semibold text-xs text-gray-900">
+          {formatAmount(li.amount)} <span className="text-[10px] text-gray-400">{li.currencyCode}</span>
+        </span>
+      ),
+      policy: <PolicyStatusBadge lineStatus={li.lineStatus} policyWarnings={li.policyWarnings} />,
+      gst: (
+        <span className="font-mono text-xs text-amber-600">
+          {formatAmount(li.taxAmount)} {showCurrency && <span className="text-[10px] text-gray-400">{li.currencyCode}</span>}
+        </span>
+      ),
+      net: (
+        <span className="font-mono font-semibold text-xs text-emerald-700">
+          {formatAmount(li.netAmount)} {showCurrency && <span className="text-[10px] text-gray-400">{li.currencyCode}</span>}
+        </span>
+      ),
+      base: (
+        <span className="font-mono text-[#0A0082] font-semibold text-xs">
+          {formatAmount(li.baseAmount)} <span className="text-[10px] text-gray-400">{li.baseCurrencyCode}</span>
+        </span>
+      ),
+      billable: li.clientBillable ? (
+        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">Yes</span>
+      ) : (
+        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200">No</span>
+      ),
+      actions: (
+        <div className="flex items-center gap-1 justify-center">
+          <Button
+            type="button"
+            variant="link"
+            size="icon"
+            className="h-7 w-7 p-0 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-800 transition rounded-md"
+            onClick={() => setLineItemToView(li)}
+          >
+            <Eye size={13} />
+          </Button>
+          <Button
+            type="button"
+            variant="link"
+            size="icon"
+            className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800 transition rounded-md"
+            onClick={() => {
+              setEditingLineItem(li);
+              setLineItemFormData({
+                categoryId: li.categoryId || "",
+                expenseDate: li.expenseDate || new Date().toISOString().split("T")[0],
+                merchantName: li.merchantName || "",
+                description: li.description || "",
+                amount: li.amount || "",
+                currencyId: li.currencyId || "",
+                taxAmount: li.taxAmount || "0",
+                clientBillable: !!li.clientBillable,
+                projectId: li.projectId || "",
+              });
+              setReceiptFile(null);
+              setLineItemErrors({});
+              setIsLineItemDrawerOpen(true);
+            }}
+          >
+            <Pencil size={13} />
+          </Button>
+          <Button
+            type="button"
+            variant="link"
+            size="icon"
+            className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 hover:text-red-800 transition rounded-md"
+            onClick={() => setLineItemToDelete(li)}
+          >
+            <Trash2 size={13} />
+          </Button>
+        </div>
+      ),
     };
-
-
-  // ============================================================
-  // SUBMIT REPORT
-  // ============================================================
-
-  const handleSubmitReport =
-    async () => {
-      if (!reportId) {
-        showStatusToast(
-          "Please create the expense report first.",
-          "error"
-        );
-
-        return;
-      }
-
-
-      if (
-        lineItems.length === 0
-      ) {
-        showStatusToast(
-          "Please add at least one actual expense before submitting.",
-          "error",
-          5000
-        );
-
-        return;
-      }
-
-
-      try {
-        submitMutation.mutate(
-          reportId,
-          {
-            onSuccess: () => {
-              showStatusToast(
-                "Expense report submitted for approval successfully!",
-                "success"
-              );
-
-
-              navigate(
-                `/expense-management/expenses/reports/${reportId}`
-              );
-            },
-
-
-            onError: (err) => {
-              const errMsg =
-                err?.response?.data?.message ||
-                err?.response?.data?.detail ||
-                err?.message ||
-                "Failed to submit expense report.";
-
-
-              showStatusToast(
-                errMsg,
-                "error",
-                5000
-              );
-            },
-          }
-        );
-      } catch (err) {
-        console.error(
-          "Error submitting report:",
-          err
-        );
-      }
-    };
-
-
-  // ============================================================
-  // TABLE
-  // ============================================================
-
-  const headers = [
-    "Category",
-    "Merchant",
-    "Date",
-    "Amount",
-    "Policy",
-    "GST",
-    "Net Amount",
-    "Base Amount",
-    "Billable",
-    "Actions",
-  ];
-
-
-  const columns = [
-    "category",
-    "merchant",
-    "date",
-    "amount",
-    "policy",
-    "gst",
-    "net",
-    "base",
-    "billable",
-    "actions",
-  ];
-
-
-  const tableRows =
-    filteredLineItems.map(
-      (li) => {
-        const showCurrency =
-          li.currencyCode &&
-          (
-            li.currencyCode === "EUR" ||
-            li.currencyCode !==
-              li.baseCurrencyCode
-          );
-
-
-        return {
-          category: (
-            <span className="font-medium text-gray-800 text-xs">
-              {li.categoryName || "—"}
-            </span>
-          ),
-
-
-          merchant: (
-            <div className="text-left text-xs">
-              <p className="font-medium text-gray-900">
-                {li.merchantName || "—"}
-              </p>
-
-              {li.description && (
-                <p className="text-[10px] text-gray-400 truncate max-w-[150px]">
-                  {li.description}
-                </p>
-              )}
-            </div>
-          ),
-
-
-          date: (
-            <span className="text-xs">
-              {formatDate(
-                li.expenseDate
-              )}
-            </span>
-          ),
-
-
-          amount: (
-            <span className="font-mono font-semibold text-xs text-gray-900">
-              {formatAmount(li.amount)}{" "}
-              <span className="text-[10px] text-gray-400">
-                {li.currencyCode}
-              </span>
-            </span>
-          ),
-
-
-          policy: (
-            <PolicyStatusBadge
-              lineStatus={
-                li.lineStatus
-              }
-              policyWarnings={
-                li.policyWarnings
-              }
-            />
-          ),
-
-
-          gst: (
-            <span className="font-mono text-xs text-amber-600">
-              {formatAmount(
-                li.taxAmount
-              )}{" "}
-              {showCurrency && (
-                <span className="text-[10px] text-gray-400">
-                  {li.currencyCode}
-                </span>
-              )}
-            </span>
-          ),
-
-
-          net: (
-            <span className="font-mono font-semibold text-xs text-emerald-700">
-              {formatAmount(
-                li.netAmount
-              )}{" "}
-              {showCurrency && (
-                <span className="text-[10px] text-gray-400">
-                  {li.currencyCode}
-                </span>
-              )}
-            </span>
-          ),
-
-
-          base: (
-            <span className="font-mono text-[#0A0082] font-semibold text-xs">
-              {formatAmount(
-                li.baseAmount
-              )}{" "}
-              <span className="text-[10px] text-gray-400">
-                {li.baseCurrencyCode}
-              </span>
-            </span>
-          ),
-
-
-          billable: li.clientBillable ? (
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-              Yes
-            </span>
-          ) : (
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200">
-              No
-            </span>
-          ),
-
-
-          actions: (
-            <div className="flex items-center gap-1 justify-center">
-              <Button
-                type="button"
-                variant="link"
-                size="icon"
-                className="h-7 w-7 p-0 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-800 transition rounded-md"
-                onClick={() =>
-                  setLineItemToView(
-                    li
-                  )
-                }
-              >
-                <Eye size={13} />
-              </Button>
-
-
-              <Button
-                type="button"
-                variant="link"
-                size="icon"
-                className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800 transition rounded-md"
-                onClick={() => {
-                  setEditingLineItem(
-                    li
-                  );
-
-
-                  setLineItemFormData(
-                    {
-                      categoryId:
-                        li.categoryId ||
-                        "",
-
-                      expenseDate:
-                        li.expenseDate ||
-                        new Date()
-                          .toISOString()
-                          .split(
-                            "T"
-                          )[0],
-
-                      merchantName:
-                        li.merchantName ||
-                        "",
-
-                      description:
-                        li.description ||
-                        "",
-
-                      amount:
-                        li.amount ||
-                        "",
-
-                      currencyId:
-                        li.currencyId ||
-                        "",
-
-                      taxAmount:
-                        li.taxAmount ||
-                        "0",
-
-                      clientBillable:
-                        !!li.clientBillable,
-
-                      projectId:
-                        li.projectId ||
-                        "",
-                    }
-                  );
-
-
-                  setReceiptFile(
-                    null
-                  );
-
-
-                  setLineItemErrors(
-                    {}
-                  );
-
-
-                  setIsLineItemDrawerOpen(
-                    true
-                  );
-                }}
-              >
-                <Pencil size={13} />
-              </Button>
-
-
-              <Button
-                type="button"
-                variant="link"
-                size="icon"
-                className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 hover:text-red-800 transition rounded-md"
-                onClick={() =>
-                  setLineItemToDelete(
-                    li
-                  )
-                }
-              >
-                <Trash2 size={13} />
-              </Button>
-            </div>
-          ),
-        };
-      }
-    );
-
+  });
 
   const sortOptions = [
     {
@@ -2710,32 +2307,14 @@ export default function CreateExpensePage() {
                     description:
                       "",
                     amount: "",
-                    currencyId:
-                      createdReport?.currencyId ||
-                      formData.currencyId ||
-                      "",
-                    taxAmount:
-                      "0",
-                    clientBillable:
-                      false,
-                    projectId:
-                      "",
+                    currencyId: createdReport?.currencyId || formData.currencyId || "",
+                    taxAmount: "0",
+                    clientBillable: false,
+                    projectId: "",
                   });
-
-
-                  setReceiptFile(
-                    null
-                  );
-
-
-                  setLineItemErrors(
-                    {}
-                  );
-
-
-                  setIsLineItemDrawerOpen(
-                    true
-                  );
+                  setReceiptFile(null);
+                  setLineItemErrors({});
+                  setIsLineItemDrawerOpen(true);
                 }}
                 className="shadow-sm"
               >
@@ -2828,19 +2407,7 @@ export default function CreateExpensePage() {
               </div>
             ) : (
               <div className="w-full overflow-x-auto rounded-lg">
-
-                <GenericTable
-                  headers={
-                    headers
-                  }
-                  rows={
-                    tableRows
-                  }
-                  columns={
-                    columns
-                  }
-                />
-
+                <GenericTable headers={headers} rows={tableRows} columns={columns} />
               </div>
             )}
 
@@ -3393,11 +2960,8 @@ export default function CreateExpensePage() {
 
                 </div>
 
-
-                {/* AMOUNT / CURRENCY / GST */}
-
+                {/* Amount, Currency & GST */}
                 <div className="grid grid-cols-3 gap-3">
-
                   <div className="space-y-1">
 
                     <label className="block text-xs font-semibold text-gray-700">
@@ -3506,51 +3070,28 @@ export default function CreateExpensePage() {
 
 
                   <div className="space-y-1">
-
                     <label className="block text-xs font-semibold text-gray-700">
-
-                      GST (Tax){" "}
-
-                      <span className="text-red-500">
-                        *
-                      </span>
-
+                      GST (Tax) <span className="text-red-500">*</span>
                     </label>
-
-
                     <input
                       type="number"
                       name="taxAmount"
                       step="0.01"
                       min="0"
                       placeholder="0.00"
-                      value={
-                        lineItemFormData.taxAmount
-                      }
-                      onChange={
-                        handleLineItemInputChange
-                      }
-                      disabled={
-                        savingLineItem
-                      }
+                      value={lineItemFormData.taxAmount}
+                      onChange={handleLineItemInputChange}
+                      disabled={savingLineItem}
                       className={`w-full px-2.5 py-1.5 h-[38px] rounded-md border text-xs focus:outline-none focus:ring-2 ${
                         lineItemErrors.taxAmount
                           ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
                           : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/20"
                       }`}
                     />
-
-
                     {lineItemErrors.taxAmount && (
-                      <span className="text-[11px] text-red-600 block mt-0.5">
-                        {
-                          lineItemErrors.taxAmount
-                        }
-                      </span>
+                      <span className="text-[11px] text-red-600 block mt-0.5">{lineItemErrors.taxAmount}</span>
                     )}
-
                   </div>
-
                 </div>
 
 
@@ -3613,27 +3154,14 @@ export default function CreateExpensePage() {
 
 
                     <Select
-                      options={
-                        projectOptions
-                      }
-
-                      value={
-                        projectOptions.find(
-                          (o) =>
-                            o.value ===
-                            lineItemFormData.projectId
-                        ) || null
-                      }
-
-                      onChange={(opt) =>
-                        handleLineItemSelectChange(
-                          "projectId",
-                          opt
-                            ? opt.value
-                            : ""
-                        )
-                      }
-
+                      options={projects
+                        .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
+                        .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))}
+                      value={projects
+                        .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
+                        .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))
+                        .find((o) => o.value === lineItemFormData.projectId) || null}
+                      onChange={(opt) => handleLineItemSelectChange("projectId", opt ? opt.value : "")}
                       placeholder="Select project..."
 
                       isSearchable

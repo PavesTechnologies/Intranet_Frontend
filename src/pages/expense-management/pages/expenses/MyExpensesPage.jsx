@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
+
 import {
   Plus,
   Pencil,
@@ -17,13 +18,13 @@ import {
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import { PageCard, PageCardContent } from "@/components/Cards/PageCard";
 import GenericTable from "@/components/Table/table";
-import Pagination from "@/components/Pagination/pagination";
 import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import StatusBadge from "@/components/status/statusbadge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
+import Pagination from "@/components/Pagination/pagination";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { showStatusToast } from "@/components/toastfy/toast";
@@ -86,7 +87,6 @@ const emptyReportForm = {
 
 export default function MyExpensesPage() {
   const navigate = useNavigate();
-
   const [searchParams] = useSearchParams();
 
   /*
@@ -107,41 +107,28 @@ export default function MyExpensesPage() {
   const canManage = hasRole(["General"]);
 
   const [reports, setReports] = useState([]);
-
   const [isServerPaginated, setIsServerPaginated] = useState(false);
-
   const [totalItems, setTotalItems] = useState(0);
-
   const [loading, setLoading] = useState(true);
-
   const [loadError, setLoadError] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-
   const [searchTerm, setSearchTerm] = useState("");
-
   const [statusFilter, setStatusFilter] = useState("");
 
   const [costCenters, setCostCenters] = useState([]);
-
   const [currencies, setCurrencies] = useState([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-
   const [drawerMode, setDrawerMode] = useState("create");
-
   const [currentReport, setCurrentReport] = useState(null);
 
   const [formData, setFormData] = useState(emptyReportForm);
-
   const [formErrors, setFormErrors] = useState({});
-
   const [submitting, setSubmitting] = useState(false);
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-
   const [reportToDelete, setReportToDelete] = useState(null);
-
   const [deleting, setDeleting] = useState(false);
 
   /*
@@ -154,9 +141,13 @@ export default function MyExpensesPage() {
         lookupService.getActiveCurrencies(),
       ]);
 
-      setCostCenters(Array.isArray(costCenterList) ? costCenterList : []);
+      setCostCenters(
+        Array.isArray(costCenterList) ? costCenterList : []
+      );
 
-      setCurrencies(Array.isArray(currencyList) ? currencyList : []);
+      setCurrencies(
+        Array.isArray(currencyList) ? currencyList : []
+      );
     } catch (err) {
       console.error("Failed to load lookups:", err);
 
@@ -175,7 +166,6 @@ export default function MyExpensesPage() {
   const fetchReports = useCallback(async () => {
     try {
       setLoading(true);
-
       setLoadError(false);
 
       const params = {
@@ -189,10 +179,13 @@ export default function MyExpensesPage() {
       };
 
       const res = await expenseReportService.getAll(params);
-
       const payload = res.data?.data;
 
-      if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+      if (
+        payload &&
+        typeof payload === "object" &&
+        !Array.isArray(payload)
+      ) {
         const items =
           payload.reports ||
           payload.expenseReports ||
@@ -218,9 +211,7 @@ export default function MyExpensesPage() {
         });
 
         setReports(sortedItems);
-
         setTotalItems(total);
-
         setIsServerPaginated(true);
       } else if (Array.isArray(payload)) {
         const sortedItems = [...payload].sort((a, b) => {
@@ -236,13 +227,10 @@ export default function MyExpensesPage() {
         });
 
         setReports(sortedItems);
-
         setIsServerPaginated(false);
       } else {
         setReports([]);
-
         setTotalItems(0);
-
         setIsServerPaginated(false);
       }
     } catch (err) {
@@ -256,9 +244,7 @@ export default function MyExpensesPage() {
       showStatusToast(errMsg, "error");
 
       setReports([]);
-
       setTotalItems(0);
-
       setLoadError(true);
     } finally {
       setLoading(false);
@@ -280,13 +266,8 @@ export default function MyExpensesPage() {
   }, [fetchReports]);
 
   /*
-   * IMPORTANT:
-   *
    * When Stage 4 opens this page with cashAdvanceId,
    * automatically open the Create Expense Report form.
-   *
-   * This prevents the user from having to click another
-   * Create button manually.
    */
   useEffect(() => {
     if (!cashAdvanceId) {
@@ -298,32 +279,22 @@ export default function MyExpensesPage() {
         "You do not have permission to create an expense report.",
         "error"
       );
-
       return;
     }
 
     setDrawerMode("create");
-
     setCurrentReport(null);
-
     setFormData({
       ...emptyReportForm,
     });
-
     setFormErrors({});
-
     setIsModalOpen(true);
   }, [cashAdvanceId, canManage]);
 
-  /*
-   * Search/filter helper.
-   */
   const matchesFilters = useCallback(
     (r) => {
       const title = (r.title || "").toLowerCase();
-
       const number = (r.reportNumber || "").toLowerCase();
-
       const q = searchTerm.toLowerCase();
 
       const matchesSearch =
@@ -342,7 +313,6 @@ export default function MyExpensesPage() {
     ? reports
     : (() => {
         const filtered = reports.filter(matchesFilters);
-
         const start = (currentPage - 1) * ITEMS_PER_PAGE;
 
         return filtered.slice(start, start + ITEMS_PER_PAGE);
@@ -373,13 +343,11 @@ export default function MyExpensesPage() {
 
   const handleSearch = useCallback((value) => {
     setSearchTerm(value || "");
-
     setCurrentPage(1);
   }, []);
 
   const handleStatusFilterChange = (e) => {
     setStatusFilter(e.target.value);
-
     setCurrentPage(1);
   };
 
@@ -392,82 +360,8 @@ export default function MyExpensesPage() {
     () => setCurrentPage((p) => Math.min(p + 1, totalPages)),
     [totalPages]
   );
-
-  /*
-   * Normal text input.
-   */
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    if (formErrors[name]) {
-      setFormErrors((prev) => ({
-        ...prev,
-        [name]: "",
-      }));
-    }
-  };
-
-  /*
-   * Custom select handler.
-   */
-  const handleSelectChange = (name, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    if (formErrors[name]) {
-      setFormErrors((prev) => ({
-        ...prev,
-        [name]: "",
-      }));
-    }
-  };
-
-  /*
-   * Validate form.
-   */
-  const validateForm = () => {
-    const errors = {};
-
-    if (!formData.title.trim()) {
-      errors.title = "Report title is required.";
-    } else if (formData.title.trim().length < 3) {
-      errors.title = "Title must be at least 3 characters.";
-    }
-
-    if (!formData.costCenterId) {
-      errors.costCenterId = "Cost center is required.";
-    }
-
-    if (!formData.currencyId) {
-      errors.currencyId = "Report currency is required.";
-    }
-
-    const businessPurposeError = validateBusinessPurpose(
-      formData.businessPurpose
-    );
-
-    if (businessPurposeError) {
-      errors.businessPurpose = businessPurposeError;
-    }
-
-    setFormErrors(errors);
-
-    return Object.keys(errors).length === 0;
-  };
-
-  /*
-   * Manual Create Expense Report button.
-   */
-  const handleCreateClick = () => {
+    const openCreateModal = () => {
     setDrawerMode("create");
-
     setCurrentReport(null);
 
     setFormData({
@@ -475,16 +369,23 @@ export default function MyExpensesPage() {
     });
 
     setFormErrors({});
-
     setIsModalOpen(true);
   };
 
-  /*
-   * Edit existing report.
-   */
-  const handleEditClick = (report) => {
-    setDrawerMode("edit");
+  const openEditModal = (report) => {
+    if (
+      !REPORT_EDITABLE_STATUSES.includes(
+        (report.reportStatus || "").toUpperCase()
+      )
+    ) {
+      showStatusToast(
+        "This expense report cannot be edited in its current status.",
+        "error"
+      );
+      return;
+    }
 
+    setDrawerMode("edit");
     setCurrentReport(report);
 
     setFormData({
@@ -495,365 +396,397 @@ export default function MyExpensesPage() {
     });
 
     setFormErrors({});
-
     setIsModalOpen(true);
   };
 
-  /*
-   * CREATE / UPDATE EXPENSE REPORT
-   *
-   * IMPORTANT FIXES:
-   *
-   * 1. cashAdvanceId is included when the page was opened
-   *    from Cash Advance Stage 4.
-   *
-   * 2. We no longer rely on the custom Button's HTML
-   *    "form" attribute.
-   *
-   * 3. The footer button directly calls handleFormSubmit.
-   */
-  const handleFormSubmit = async (e) => {
-    if (e) {
-      e.preventDefault();
+  const closeModal = () => {
+    if (submitting) return;
 
-      if (e.stopPropagation) {
-        e.stopPropagation();
+    setIsModalOpen(false);
+    setCurrentReport(null);
+    setFormErrors({});
+
+    setFormData({
+      ...emptyReportForm,
+    });
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    setFormErrors((prev) => ({
+      ...prev,
+      [name]: "",
+    }));
+  };
+
+  const validateForm = () => {
+    const errors = {};
+
+    if (!formData.title?.trim()) {
+      errors.title = "Title is required.";
+    }
+
+    if (!formData.businessPurpose?.trim()) {
+      errors.businessPurpose = "Business purpose is required.";
+    } else {
+      const purposeError = validateBusinessPurpose(
+        formData.businessPurpose
+      );
+
+      if (purposeError) {
+        errors.businessPurpose = purposeError;
       }
     }
 
-    if (submitting) {
-      return;
+    if (!formData.costCenterId) {
+      errors.costCenterId = "Cost Center is required.";
     }
 
-    const isValid = validateForm();
-
-    if (!isValid) {
-      showStatusToast(
-        "Please complete all required expense report fields.",
-        "error"
-      );
-
-      return;
+    if (!formData.currencyId) {
+      errors.currencyId = "Currency is required.";
     }
 
-    const payload = {
-      title: formData.title.trim(),
+    setFormErrors(errors);
 
-      businessPurpose: formData.businessPurpose
-        ? formData.businessPurpose.trim()
-        : "",
+    return Object.keys(errors).length === 0;
+  };
 
-      costCenterId: formData.costCenterId,
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-      currencyId: formData.currencyId,
-
-      /*
-       * This is the critical Cash Advance link.
-       *
-       * For normal expense reports this is null/omitted.
-       *
-       * For Cash Advance Stage 4:
-       * ?cashAdvanceId=<UUID>
-       *
-       * this value is sent to backend.
-       */
-      ...(cashAdvanceId
-        ? {
-            cashAdvanceId: cashAdvanceId,
-          }
-        : {}),
-    };
-
-    console.log(
-      "Creating/updating expense report payload:",
-      payload
-    );
+    if (!validateForm()) {
+      return;
+    }
 
     try {
       setSubmitting(true);
 
-      if (drawerMode === "create") {
-        const res = await expenseReportService.create(payload);
+      /*
+       * Cash Advance integration:
+       *
+       * When the page was opened using:
+       * ?cashAdvanceId=<UUID>
+       *
+       * send that ID along with the Expense Report request.
+       */
+      const payload = {
+        title: formData.title.trim(),
+        businessPurpose: formData.businessPurpose.trim(),
+        costCenterId: formData.costCenterId,
+        currencyId: formData.currencyId,
+      };
 
-        showStatusToast(
-          cashAdvanceId
-            ? "Expense report linked to the Cash Advance successfully!"
-            : "Expense report details saved successfully!",
-          "success"
-        );
+      if (cashAdvanceId) {
+        payload.cashAdvanceId = cashAdvanceId;
+      }
 
-        setIsModalOpen(false);
-
-        const newReportId =
-          res.data?.data?.reportId ||
-          res.data?.reportId ||
-          res.data?.data?.id ||
-          res.data?.id;
-
-        if (newReportId) {
-          /*
-           * After creating the report, go directly to the
-           * report details page where individual expense
-           * lines and receipts can be added.
-           */
-          navigate(
-            `/expense-management/expenses/reports/${newReportId}`
-          );
-        } else {
-          showStatusToast(
-            "Expense report was created but the report ID was not returned.",
-            "error"
-          );
-        }
-      } else {
+      if (drawerMode === "edit" && currentReport?.id) {
         await expenseReportService.update(
-          currentReport.reportId,
+          currentReport.id,
           payload
         );
 
         showStatusToast(
-          "Expense report updated successfully!",
+          "Expense report updated successfully.",
           "success"
         );
+      } else {
+        await expenseReportService.create(payload);
 
-        setIsModalOpen(false);
-
-        fetchReports();
+        showStatusToast(
+          cashAdvanceId
+            ? "Expense report created successfully with the Cash Advance."
+            : "Expense report created successfully.",
+          "success"
+        );
       }
-    } catch (err) {
-      console.error(
-        `Error ${
-          drawerMode === "create" ? "creating" : "updating"
-        } expense report:`,
-        err
-      );
 
-      const errMsg =
+      closeModal();
+
+      await fetchReports();
+    } catch (err) {
+      console.error("Failed to save expense report:", err);
+
+      const message =
         err.response?.data?.message ||
         err.response?.data?.detail ||
-        err.message ||
-        `Failed to ${
-          drawerMode === "create" ? "create" : "update"
-        } expense report.`;
+        "Failed to save expense report.";
 
-      showStatusToast(errMsg, "error");
+      showStatusToast(message, "error");
     } finally {
       setSubmitting(false);
     }
   };
 
-  /*
-   * Delete.
-   */
   const handleDeleteClick = (report) => {
-    setReportToDelete(report);
+    const status = (report.reportStatus || "").toUpperCase();
 
+    if (!REPORT_DELETABLE_STATUSES.includes(status)) {
+      showStatusToast(
+        "This expense report cannot be deleted in its current status.",
+        "error"
+      );
+      return;
+    }
+
+    setReportToDelete(report);
     setIsConfirmOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
-    if (!reportToDelete) {
+    if (!reportToDelete?.id) {
       return;
     }
 
     try {
       setDeleting(true);
 
-      await expenseReportService.delete(
-        reportToDelete.reportId
-      );
+      await expenseReportService.delete(reportToDelete.id);
 
       showStatusToast(
-        "Expense report deleted successfully!",
+        "Expense report deleted successfully.",
         "success"
       );
 
       setIsConfirmOpen(false);
-
       setReportToDelete(null);
 
-      if (displayedReports.length === 1 && currentPage > 1) {
+      /*
+       * If the deleted report was the last item on the current page,
+       * move back one page where appropriate.
+       */
+      if (
+        displayedReports.length === 1 &&
+        currentPage > 1
+      ) {
         setCurrentPage((p) => p - 1);
       } else {
-        fetchReports();
+        await fetchReports();
       }
     } catch (err) {
-      console.error(
-        "Error deleting expense report:",
-        err
-      );
+      console.error("Failed to delete expense report:", err);
 
-      const errMsg =
+      const message =
         err.response?.data?.message ||
         err.response?.data?.detail ||
         "Failed to delete expense report.";
 
-      showStatusToast(errMsg, "error");
+      showStatusToast(message, "error");
     } finally {
       setDeleting(false);
     }
   };
 
-  /*
-   * Cost Center options.
-   */
-  const costCenterOptions = costCenters.map((c) => ({
-    value: c.costCenterId,
-    label: `${c.costCenterCode} - ${c.costCenterName}`,
-  }));
+  const closeDeleteModal = () => {
+    if (deleting) return;
 
-  /*
-   * Currency options.
-   */
-  const currencyOptions = currencies.map((c) => ({
-    value: c.currencyId,
-    label: `${c.currencyCode} - ${c.currencyName}`,
-  }));
+    setIsConfirmOpen(false);
+    setReportToDelete(null);
+  };
 
-  const headers = [
-    "S.No",
-    "Report #",
-    "Title",
-    "Cost Center",
-    "Currency",
-    "Total Amount",
-    "Status",
-    "Created",
-    "Actions",
-  ];
+  const handleView = (report) => {
+    if (!report?.id) return;
+
+    navigate(
+      `/expense-management/expenses/reports/${report.id}`
+    );
+  };
+
+  const handleCreateExpense = (report) => {
+    if (!report?.id) return;
+
+    navigate(
+      `/expense-management/expenses/create?reportId=${report.id}${
+        cashAdvanceId
+          ? `&cashAdvanceId=${cashAdvanceId}`
+          : ""
+      }`
+    );
+  };
+
+  const getStatus = (report) =>
+    (report?.reportStatus || "DRAFT").toUpperCase();
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case "DRAFT":
+        return "Draft";
+
+      case "SUBMITTED":
+        return "Submitted";
+
+      case "IN_REVIEW":
+        return "In Review";
+
+      case "APPROVED":
+        return "Approved";
+
+      case "REJECTED":
+        return "Rejected";
+
+      case "PAID":
+        return "Paid";
+
+      case "CANCELLED":
+        return "Cancelled";
+
+      default:
+        return status || "—";
+    }
+  };
 
   const columns = [
-    "serial_no",
-    "reportNumber",
-    "title",
-    "costCenter",
-    "currency",
-    "totalAmount",
-    "status",
-    "created",
-    "actions",
+    {
+      header: "Report Number",
+      accessor: "reportNumber",
+      cell: (row) => (
+        <span className="font-medium text-gray-900">
+          {row.reportNumber || "—"}
+        </span>
+      ),
+    },
+
+    {
+      header: "Title",
+      accessor: "title",
+      cell: (row) => (
+        <span
+          className="block max-w-[240px] truncate"
+          title={row.title || ""}
+        >
+          {row.title || "—"}
+        </span>
+      ),
+    },
+
+    {
+      header: "Business Purpose",
+      accessor: "businessPurpose",
+      cell: (row) => (
+        <span
+          className="block max-w-[280px] truncate"
+          title={row.businessPurpose || ""}
+        >
+          {row.businessPurpose || "—"}
+        </span>
+      ),
+    },
+
+    {
+      header: "Cost Center",
+      accessor: "costCenter",
+      cell: (row) =>
+        row.costCenterName ||
+        row.costCenter?.name ||
+        row.costCenter?.code ||
+        "—",
+    },
+
+    {
+      header: "Currency",
+      accessor: "currency",
+      cell: (row) =>
+        row.currencyCode ||
+        row.currency?.code ||
+        "—",
+    },
+
+    {
+      header: "Amount",
+      accessor: "reimbursableAmount",
+      cell: (row) => (
+        <span className="font-medium">
+          {formatAmount(row.reimbursableAmount)}
+        </span>
+      ),
+    },
+
+    {
+      header: "Created Date",
+      accessor: "createdAt",
+      cell: (row) => formatDate(row.createdAt),
+    },
+
+    {
+      header: "Status",
+      accessor: "reportStatus",
+      cell: (row) => (
+        <StatusBadge status={getStatus(row)}>
+          {getStatusLabel(getStatus(row))}
+        </StatusBadge>
+      ),
+    },
+
+    {
+      header: "Actions",
+      accessor: "actions",
+      cell: (row) => {
+        const status = getStatus(row);
+
+        const canEdit =
+          canManage &&
+          REPORT_EDITABLE_STATUSES.includes(status);
+
+        const canDelete =
+          canManage &&
+          REPORT_DELETABLE_STATUSES.includes(status);
+
+        return (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleView(row)}
+              className="rounded p-1.5 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              title="View"
+            >
+              <Eye size={17} />
+            </button>
+
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => openEditModal(row)}
+                className="rounded p-1.5 text-blue-600 hover:bg-blue-50"
+                title="Edit"
+              >
+                <Pencil size={17} />
+              </button>
+            )}
+
+            {canDelete && (
+              <button
+                type="button"
+                onClick={() => handleDeleteClick(row)}
+                className="rounded p-1.5 text-red-600 hover:bg-red-50"
+                title="Delete"
+              >
+                <Trash2 size={17} />
+              </button>
+            )}
+
+            {status === "DRAFT" && canManage && (
+              <button
+                type="button"
+                onClick={() => handleCreateExpense(row)}
+                className="rounded p-1.5 text-green-600 hover:bg-green-50"
+                title="Add Expense"
+              >
+                <FilePlus2 size={17} />
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
   ];
 
-  /*
-   * Table rows.
-   */
-  const tableRows = displayedReports.map((r, index) => ({
-    serial_no: (
-      <span className="text-xs">
-        {(
-          (currentPage - 1) * ITEMS_PER_PAGE +
-          index +
-          1
-        ).toString()}
-      </span>
-    ),
-
-    reportNumber: (
-      <span className="font-mono text-[11px] font-semibold text-gray-700">
-        {r.reportNumber || "—"}
-      </span>
-    ),
-
-    title: (
-      <span className="font-medium text-xs text-gray-900">
-        {r.title || "Untitled Report"}
-      </span>
-    ),
-
-    costCenter: (
-      <span className="text-xs">
-        {r.costCenterName || "—"}
-      </span>
-    ),
-
-    currency: (
-      <span className="font-semibold text-xs text-gray-600">
-        {r.currencyCode || "—"}
-      </span>
-    ),
-
-    totalAmount: (
-      <span className="font-mono font-semibold text-xs text-gray-900">
-        {formatAmount(r.totalAmount)}
-      </span>
-    ),
-
-    status: (
-      <StatusBadge
-        label={r.reportStatus || "DRAFT"}
-        size="sm"
-      />
-    ),
-
-    created: (
-      <span className="text-xs">
-        {formatDate(r.createdAt)}
-      </span>
-    ),
-
-    actions: (
-      <div className="flex items-center gap-1 justify-center">
-        <Button
-          type="button"
-          variant="link"
-          size="icon"
-          title="View Report"
-          className="h-7 w-7 p-0 text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition rounded-md"
-          onClick={(e) => {
-            e.stopPropagation();
-
-            navigate(
-              `/expense-management/expenses/reports/${r.reportId}`
-            );
-          }}
-        >
-          <Eye size={14} />
-        </Button>
-
-        {canManage &&
-          REPORT_EDITABLE_STATUSES.includes(
-            r.reportStatus
-          ) && (
-            <Button
-              type="button"
-              variant="link"
-              size="icon"
-              title="Edit Report"
-              className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800 transition rounded-md"
-              onClick={(e) => {
-                e.stopPropagation();
-
-                handleEditClick(r);
-              }}
-            >
-              <Pencil size={14} />
-            </Button>
-          )}
-
-        {canManage &&
-          REPORT_DELETABLE_STATUSES.includes(
-            r.reportStatus
-          ) && (
-            <Button
-              type="button"
-              variant="link"
-              size="icon"
-              title="Delete Report"
-              className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 hover:text-red-800 transition rounded-md"
-              onClick={(e) => {
-                e.stopPropagation();
-
-                handleDeleteClick(r);
-              }}
-            >
-              <Trash2 size={14} />
-            </Button>
-          )}
-      </div>
-    ),
-  }));
-
-  const statusFilterOptions = [
+  const statusOptions = [
     {
       label: "All Statuses",
       value: "",
@@ -863,20 +796,12 @@ export default function MyExpensesPage() {
       value: "DRAFT",
     },
     {
-      label: "Pending Approval",
-      value: "PENDING_APPROVAL",
+      label: "Submitted",
+      value: "SUBMITTED",
     },
     {
-      label: "Pending Finance Verification",
-      value: "PENDING_FINANCE_VERIFICATION",
-    },
-    {
-      label: "Awaiting Correction",
-      value: "AWAITING_CORRECTION",
-    },
-    {
-      label: "Query Raised",
-      value: "QUERY_RAISED",
+      label: "In Review",
+      value: "IN_REVIEW",
     },
     {
       label: "Approved",
@@ -887,383 +812,338 @@ export default function MyExpensesPage() {
       value: "REJECTED",
     },
     {
-      label: "Cancelled",
-      value: "CANCELLED",
-    },
-    {
-      label: "Policy Rejected",
-      value: "POLICY_REJECTED",
-    },
-    {
-      label: "Reimbursed",
-      value: "REIMBURSED",
-    },
-    {
-      label: "Closed",
-      value: "CLOSED",
+      label: "Paid",
+      value: "PAID",
     },
   ];
 
-  return (
-    <div className="space-y-3">
-      <Breadcrumb items={breadcrumbs} />
+  const costCenterOptions = costCenters.map((item) => ({
+    label:
+      item.name && item.code
+        ? `${item.code} - ${item.name}`
+        : item.name || item.code || String(item.id),
+    value: item.id,
+  }));
 
-      {/* Header */}
-      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm sm:p-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-lg font-bold text-[#0a174e]">
-            My Expense Reports
-          </h1>
+  const currencyOptions = currencies.map((item) => ({
+    label:
+      item.name && item.code
+        ? `${item.code} - ${item.name}`
+        : item.code || item.name || String(item.id),
+    value: item.id,
+  }));
+    return (
+    <>
+      <div className="w-full">
+        <Breadcrumb items={breadcrumbs} />
 
-          <p className="text-xs text-gray-500 mt-0.5">
-            Track and manage the expense reports you've created.
-          </p>
-        </div>
-
-        {canManage && (
-          <Button
-            type="button"
-            onClick={handleCreateClick}
-            variant="primary"
-            size="small"
-            className="w-full whitespace-nowrap sm:w-auto shadow-sm !py-1.5 !text-xs"
-          >
-            <Plus size={14} />
-
-            Create Expense Report
-          </Button>
-        )}
-      </div>
-
-      {/* Cash Advance indicator */}
-      {cashAdvanceId && (
-        <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
-          <p className="text-xs font-semibold text-indigo-900">
-            Cash Advance Expense Submission
-          </p>
-
-          <p className="text-xs text-indigo-700 mt-1">
-            This expense report is being created for Cash
-            Advance:
-          </p>
-
-          <p className="text-xs font-mono font-semibold text-indigo-900 mt-1 break-all">
-            {cashAdvanceId}
-          </p>
-
-          <p className="text-[11px] text-indigo-600 mt-1">
-            Add the actual expenses and upload their receipts
-            after creating this report.
-          </p>
-        </div>
-      )}
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
-            <FileStack size={18} />
-          </div>
-
+        {/* Page Header */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-              Total Reports
-            </p>
+            <h1 className="text-2xl font-semibold text-gray-900">
+              My Expenses
+            </h1>
 
-            <p className="text-xl font-bold text-gray-900 mt-0.5">
-              {totalReportsCount}
+            <p className="mt-1 text-sm text-gray-500">
+              Manage your expense reports and expenses.
             </p>
           </div>
+
+          {canManage && (
+            <Button
+              type="button"
+              onClick={openCreateModal}
+              className="inline-flex items-center gap-2"
+            >
+              <Plus size={18} />
+              Create Expense Report
+            </Button>
+          )}
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
-            <FilePlus2 size={18} />
-          </div>
-
-          <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-              Draft Reports
-            </p>
-
-            <p className="text-xl font-bold text-amber-600 mt-0.5">
-              {draftCount}
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-green-50 text-green-600 rounded-lg">
-            <Landmark size={18} />
-          </div>
-
-          <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-              Total Reimbursable
-            </p>
-
-            <p className="text-xl font-bold text-green-600 mt-0.5">
-              {formatAmount(totalReimbursable)}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Search/filter */}
-      <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-          <div className="lg:col-span-2">
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Search
-            </label>
-
-            <SearchInput
-              value={searchTerm}
-              onSearch={handleSearch}
-              placeholder="Search by title or report number..."
-              className="!py-1.5 !px-3 !text-xs"
-            />
-          </div>
-
-          <FormSelect
-            label="Status"
-            name="statusFilter"
-            value={statusFilter}
-            onChange={handleStatusFilterChange}
-            options={statusFilterOptions}
-            className="[&>label]:text-xs [&>label]:mb-1"
-            buttonClassName="!py-1.5 !px-3 !text-xs"
-          />
-        </div>
-      </div>
-
-      {/* Reports table */}
-      <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-        {loading ? (
-          <div className="py-16">
-            <LoadingSpinner text="Loading Expense Reports..." />
-          </div>
-        ) : loadError ? (
+        {/* Summary Cards */}
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <PageCard>
-            <PageCardContent className="flex flex-col items-center justify-center text-center py-16">
-              <AlertCircle className="h-10 w-10 text-red-300 mb-3" />
+            <PageCardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">
+                    Total Reports
+                  </p>
 
-              <h2 className="text-sm font-semibold text-gray-700">
-                Failed to load Expense Reports
-              </h2>
+                  <p className="mt-2 text-2xl font-semibold text-gray-900">
+                    {totalReportsCount}
+                  </p>
+                </div>
 
-              <p className="text-xs text-gray-400 mt-1 max-w-sm">
-                Something went wrong while fetching data.
-                Please try again.
-              </p>
-
-              <Button
-                variant="outline"
-                size="small"
-                className="mt-4"
-                onClick={fetchReports}
-              >
-                Retry
-              </Button>
+                <div className="rounded-lg bg-blue-50 p-3 text-blue-600">
+                  <FileStack size={22} />
+                </div>
+              </div>
             </PageCardContent>
           </PageCard>
-        ) : displayedReports.length === 0 ? (
+
           <PageCard>
-            <PageCardContent className="flex flex-col items-center justify-center text-center py-16">
-              <Layers className="h-10 w-10 text-gray-300 mb-3" />
+            <PageCardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">
+                    Draft Reports
+                  </p>
 
-              <h2 className="text-sm font-semibold text-gray-700">
-                No Expense Reports Found
-              </h2>
+                  <p className="mt-2 text-2xl font-semibold text-gray-900">
+                    {draftCount}
+                  </p>
+                </div>
 
-              <p className="text-xs text-gray-400 mt-1 max-w-sm">
-                {searchTerm || statusFilter
-                  ? "No expense reports match the selected search and filters."
-                  : "Create your first expense report to get started."}
-              </p>
+                <div className="rounded-lg bg-yellow-50 p-3 text-yellow-600">
+                  <FilePlus2 size={22} />
+                </div>
+              </div>
             </PageCardContent>
           </PageCard>
-        ) : (
-          <>
-            <div className="w-full overflow-x-auto rounded-lg [&_td]:!py-1.5 [&_td]:!px-2.5 [&_td]:!text-xs [&_th]:!py-1.5 [&_th]:!px-2.5 [&_th]:!text-xs [&_table]:!text-xs [&_.rounded-full]:!text-[10px] [&_.rounded-full]:!px-1.5 [&_.rounded-full]:!py-0">
-              <GenericTable
-                headers={headers}
-                rows={tableRows.map((row, i) => ({
-                  ...row,
-                  onRowClick: () =>
-                    navigate(
-                      `/expense-management/expenses/reports/${displayedReports[i].reportId}`
-                    ),
-                }))}
-                columns={columns}
-              />
-            </div>
 
-            {totalPages > 1 && (
-              <div className="mt-4 flex justify-center">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPrevious={handlePreviousPage}
-                  onNext={handleNextPage}
+          <PageCard>
+            <PageCardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">
+                    Reimbursable Amount
+                  </p>
+
+                  <p className="mt-2 text-2xl font-semibold text-gray-900">
+                    {formatAmount(totalReimbursable)}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-green-50 p-3 text-green-600">
+                  <Landmark size={22} />
+                </div>
+              </div>
+            </PageCardContent>
+          </PageCard>
+        </div>
+
+        {/* Main Card */}
+        <PageCard>
+          <PageCardContent className="p-5">
+            {/* Filters */}
+            <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="w-full lg:max-w-md">
+                <SearchInput
+                  value={searchTerm}
+                  onChange={handleSearch}
+                  placeholder="Search by report number or title..."
                 />
               </div>
+
+              <div className="w-full lg:w-56">
+                <FormSelect
+                  name="status"
+                  value={statusFilter}
+                  onChange={handleStatusFilterChange}
+                  options={statusOptions}
+                  placeholder="Filter by status"
+                />
+              </div>
+            </div>
+
+            {/* Error State */}
+            {loadError && !loading && (
+              <div className="mb-5 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+                <AlertCircle
+                  size={20}
+                  className="mt-0.5 flex-shrink-0"
+                />
+
+                <div>
+                  <p className="font-medium">
+                    Unable to load expense reports
+                  </p>
+
+                  <p className="mt-1 text-sm">
+                    Please try again.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={fetchReports}
+                    className="mt-2 text-sm font-medium underline"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
             )}
-          </>
-        )}
+
+            {/* Loading */}
+            {loading ? (
+              <div className="flex min-h-[300px] items-center justify-center">
+                <LoadingSpinner />
+              </div>
+            ) : (
+              <>
+                {/* Table */}
+                <div className="overflow-x-auto">
+                  <GenericTable
+                    columns={columns}
+                    data={displayedReports}
+                    emptyMessage={
+                      searchTerm || statusFilter
+                        ? "No expense reports match your filters."
+                        : "No expense reports found."
+                    }
+                  />
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="mt-5 flex items-center justify-center">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPrevious={handlePreviousPage}
+                      onNext={handleNextPage}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </PageCardContent>
+        </PageCard>
       </div>
 
-      {/* CREATE / EDIT DRAWER */}
+      {/* ============================================================
+          CREATE / EDIT EXPENSE REPORT MODAL
+         ============================================================ */}
+
       {isModalOpen &&
         createPortal(
-          <>
-            {/* Backdrop */}
-            <div
-              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] animate-in fade-in duration-200"
-              onClick={() => {
-                if (!submitting) {
-                  setIsModalOpen(false);
-                }
-              }}
-            />
-
-            {/* Drawer */}
-            <div
-              className="fixed inset-y-0 right-0 z-[10000] w-full max-w-lg bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-xl">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between border-b px-6 py-4">
                 <div>
-                  <h2 className="text-base font-bold text-gray-900">
-                    {drawerMode === "create"
-                      ? "Create Expense Report"
-                      : "Edit Expense Report"}
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {drawerMode === "edit"
+                      ? "Edit Expense Report"
+                      : "Create Expense Report"}
                   </h2>
 
-                  <p className="text-xs text-gray-500 font-medium mt-0.5">
-                    {drawerMode === "create"
-                      ? "Start a new expense report, then add individual line items with receipts."
-                      : "Modify the selected expense report's properties."}
+                  <p className="mt-1 text-sm text-gray-500">
+                    {drawerMode === "edit"
+                      ? "Update the expense report details."
+                      : "Enter the details to create a new expense report."}
                   </p>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => {
-                    if (!submitting) {
-                      setIsModalOpen(false);
-                    }
-                  }}
+                  onClick={closeModal}
                   disabled={submitting}
-                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition disabled:opacity-50"
+                  className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Close"
                 >
-                  <X size={18} />
+                  <X size={20} />
                 </button>
               </div>
 
-              {/* Form */}
-              <div className="flex-1 overflow-y-auto px-6 py-4">
-                <form
-                  id="report-edit-form"
-                  onSubmit={handleFormSubmit}
-                  className="py-2"
-                >
-                  <ReportFormFields
-                    formData={formData}
-                    formErrors={formErrors}
-                    onInputChange={handleInputChange}
-                    onSelectChange={handleSelectChange}
-                    costCenterOptions={costCenterOptions}
-                    currencyOptions={currencyOptions}
-                    disabled={submitting}
-                  />
-
-                  {/* Cash Advance information */}
+              {/* Modal Body */}
+              <form onSubmit={handleSubmit}>
+                <div className="space-y-5 px-6 py-6">
                   {cashAdvanceId && drawerMode === "create" && (
-                    <div className="mt-4 rounded-lg border border-indigo-200 bg-indigo-50 p-3">
-                      <p className="text-xs font-semibold text-indigo-900">
-                        Linked Cash Advance
-                      </p>
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                      <div className="flex items-start gap-3">
+                        <Landmark
+                          size={20}
+                          className="mt-0.5 flex-shrink-0 text-blue-600"
+                        />
 
-                      <p className="text-[11px] text-indigo-700 mt-1">
-                        This expense report will be linked to
-                        the disbursed Cash Advance selected in
-                        Stage 4.
-                      </p>
+                        <div>
+                          <p className="font-medium text-blue-900">
+                            Cash Advance linked
+                          </p>
 
-                      <p className="text-[11px] font-mono font-semibold text-indigo-900 mt-1 break-all">
-                        {cashAdvanceId}
-                      </p>
+                          <p className="mt-1 text-sm text-blue-700">
+                            This expense report will be associated
+                            with the selected Cash Advance.
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
-                </form>
-              </div>
 
-              {/* Footer */}
-              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end px-6 py-4 border-t border-gray-100 bg-gray-50 shrink-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    if (!submitting) {
-                      setIsModalOpen(false);
-                    }
-                  }}
-                  disabled={submitting}
-                  className="w-full sm:w-auto"
-                >
-                  Cancel
-                </Button>
+                  <ReportFormFields
+                    formData={formData}
+                    errors={formErrors}
+                    onChange={handleFormChange}
+                    costCenterOptions={costCenterOptions}
+                    currencyOptions={currencyOptions}
+                  />
+                </div>
 
-                {/*
-                 * IMPORTANT:
-                 *
-                 * Do NOT use:
-                 *
-                 * type="submit"
-                 * form="report-edit-form"
-                 *
-                 * here.
-                 *
-                 * We directly call handleFormSubmit so the custom
-                 * Button component cannot interfere with submission.
-                 */}
-                <Button
-                  type="button"
-                  variant="primary"
-                  loading={submitting}
-                  loadingText="Saving..."
-                  disabled={submitting}
-                  onClick={handleFormSubmit}
-                  className="w-full sm:w-auto"
-                >
-                  {drawerMode === "create"
-                    ? "Create Expense Report"
-                    : "Save Changes"}
-                </Button>
-              </div>
+                {/* Modal Footer */}
+                <div className="flex justify-end gap-3 border-t bg-gray-50 px-6 py-4">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={closeModal}
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </Button>
+
+                  <Button
+                    type="submit"
+                    disabled={submitting}
+                    className="inline-flex items-center gap-2"
+                  >
+                    {submitting ? (
+                      <>
+                        <LoadingSpinner />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        {drawerMode === "edit"
+                          ? "Update Report"
+                          : "Create Report"}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
             </div>
-          </>,
+          </div>,
           document.body
         )}
 
-      {/* Delete confirmation */}
-      <ConfirmationModal
-        isOpen={isConfirmOpen}
-        title="Delete Expense Report"
-        message={`Are you sure you want to delete the expense report "${reportToDelete?.title}"? This action cannot be undone.`}
-        confirmText="Delete Report"
-        cancelText="Cancel"
-        onConfirm={handleDeleteConfirm}
-        onCancel={() => {
-          setIsConfirmOpen(false);
+      {/* ============================================================
+          DELETE CONFIRMATION MODAL
+         ============================================================ */}
 
-          setReportToDelete(null);
-        }}
-        isLoading={deleting}
-        variant="danger"
-      />
-    </div>
+      {isConfirmOpen &&
+        createPortal(
+          <ConfirmationModal
+            isOpen={isConfirmOpen}
+            onClose={closeDeleteModal}
+            onConfirm={handleDeleteConfirm}
+            title="Delete Expense Report"
+            message={
+              reportToDelete
+                ? `Are you sure you want to delete expense report ${
+                    reportToDelete.reportNumber ||
+                    reportToDelete.title ||
+                    ""
+                  }? This action cannot be undone.`
+                : "Are you sure you want to delete this expense report?"
+            }
+            confirmText={deleting ? "Deleting..." : "Delete"}
+            cancelText="Cancel"
+            loading={deleting}
+          />,
+          document.body
+        )}
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AlertTriangle, Check, Layers, MessageSquareWarning } from "lucide-react";
+import { AlertTriangle, Check, Layers, MessageSquareWarning, ShieldCheck } from "lucide-react";
 import Button from "@/components/Button/Button";
 import CommentPromptModal from "./CommentPromptModal";
 import { formatMoney } from "../constants/approvalLabels";
@@ -10,9 +10,15 @@ import { formatMoney } from "../constants/approvalLabels";
  * violations) so an approver never has to tab-switch to decide. Approve and Needs Correction are
  * per-line (or per-split); whole-report Reject lives one level up (a distinct, more consequential
  * action, not buried in this panel).
+ * <p>
+ * A violation's "Authorize Exception" action (onApproveException) is a SEPARATE, approver-side
+ * justification from the employee's own - it never clears or blocks the violation, it just records
+ * that this approver reviewed and accepted it despite the flag. Once authorized
+ * (violation.approverJustifiedAt is set), it renders read-only.
  */
-export default function LineItemReviewPanel({ reportId, relevantLines, onApproveLine, onFlagLine, isBusy }) {
+export default function LineItemReviewPanel({ reportId, relevantLines, onApproveLine, onFlagLine, onApproveException, isBusy }) {
   const [flaggingLine, setFlaggingLine] = useState(null);
+  const [authorizingException, setAuthorizingException] = useState(null); // { line, violation }
 
   if (!relevantLines?.length) {
     return <p className="text-sm text-gray-500 px-4 py-3">No line items currently pending your review.</p>;
@@ -56,7 +62,26 @@ export default function LineItemReviewPanel({ reportId, relevantLines, onApprove
                     {violations.map((v, idx) => (
                       <li key={idx} className="flex items-start gap-1.5 text-xs text-amber-700">
                         <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-                        <span>{v.message}</span>
+                        <div className="min-w-0">
+                          <span>{v.message}</span>
+                          {v.approverJustifiedAt ? (
+                            <p className="mt-0.5 flex items-center gap-1 text-emerald-700">
+                              <ShieldCheck className="h-3 w-3 flex-shrink-0" />
+                              Exception authorized by {v.approverJustifiedBy} — “{v.approverJustification}”
+                            </p>
+                          ) : (
+                            onApproveException && (
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => setAuthorizingException({ line, violation: v })}
+                                className="mt-0.5 font-semibold text-[#0A0082] hover:underline disabled:opacity-50"
+                              >
+                                Authorize Exception
+                              </button>
+                            )
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -90,6 +115,21 @@ export default function LineItemReviewPanel({ reportId, relevantLines, onApprove
         onConfirm={(comment) => {
           onFlagLine(flaggingLine, comment);
           setFlaggingLine(null);
+        }}
+      />
+
+      <CommentPromptModal
+        isOpen={!!authorizingException}
+        title="Authorize policy exception"
+        description="Record why this expense is being approved despite the policy flag. This is your own note, separate from the employee's — the flag itself stays visible either way."
+        contextLabel={authorizingException?.violation?.message}
+        confirmLabel="Authorize Exception"
+        confirmVariant="primary"
+        isLoading={isBusy}
+        onCancel={() => setAuthorizingException(null)}
+        onConfirm={(justification) => {
+          onApproveException(authorizingException.line, authorizingException.violation.violationId, justification);
+          setAuthorizingException(null);
         }}
       />
     </>

@@ -123,6 +123,20 @@ export const useRejectReport = () => {
   });
 };
 
+/**
+ * A SEPARATE, approver-side authorization of a policy exception - distinct from the employee's own
+ * justify() (policyApi.js). Invalidates the same caches as reviewLineItem, since the queue's
+ * pendingLineItems[].policyViolations[] entry needs to reflect the newly-set approverJustification.
+ */
+export const useApproveException = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reportId, lineItemId, violationId, justification }) =>
+      approvalWorkflowApi.approveException(reportId, lineItemId, violationId, justification).then(unwrap),
+    onSettled: (_data, _err, { reportId }) => invalidateApprovalCaches(qc, reportId),
+  });
+};
+
 export const useBulkApprove = () => {
   const qc = useQueryClient();
   return useMutation({

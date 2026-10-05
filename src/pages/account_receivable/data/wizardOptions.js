@@ -18,10 +18,23 @@ export const BILLING_TYPES = [
     description: "Bill against completion of agreed project milestones.",
   },
   {
+    value: "MILESTONE_PLAN",
+    label: "Milestone Plan",
+    description: "Bill a fixed total contract value as a single full payment or a series of installments.",
+  },
+  {
     value: "RECURRING",
     label: "Recurring",
     description: "Bill a fixed recurring amount as a monthly retainer or subscription.",
   },
+];
+
+// Milestone Plan payment structure (backend: PaymentStructure). Only FULL_PAYMENT
+// and INSTALLMENTS are offered today — MILESTONES (project-milestone-driven,
+// sourced from PMS) is a future addition and must never be shown in the UI yet.
+export const PAYMENT_STRUCTURE_OPTIONS = [
+  { value: "FULL_PAYMENT", label: "Full Payment", description: "Bill the entire contract value in a single payment." },
+  { value: "INSTALLMENTS", label: "Installments", description: "Split the contract value across multiple percentage-based installments." },
 ];
 
 export const BILLING_TYPE_LABELS = BILLING_TYPES.reduce((acc, type) => {
@@ -101,6 +114,13 @@ export const MILESTONE_STATUS_OPTIONS = [
 // --- Recurring billing (BillingRecurringConfiguration, via /api/billing-recurring) ---
 // These mirror the backend enums verbatim — never rename/duplicate these values.
 
+// Backend: BillingContext — whether a Recurring configuration is tied to a
+// project or stands alone against a manually-described product/application/service.
+export const BILLING_CONTEXT_OPTIONS = [
+  { value: "PROJECT", label: "Project" },
+  { value: "PRODUCT_SERVICE", label: "Product / Service" },
+];
+
 // Shared duration-unit enum (backend: RenewalDurationUnit) — used both for the
 // primary billing frequency's durationUnit and for a custom renewal duration.
 export const DURATION_UNIT_OPTIONS = [
@@ -116,10 +136,18 @@ export const CONTRACT_VALUE_SOURCE_OPTIONS = [
   { value: "MANUAL", label: "Manual" },
 ];
 
-// Backend: RenewalType
-export const RENEWAL_TYPE_OPTIONS = [
-  { value: "MANUAL", label: "Manual" },
-  { value: "AUTO", label: "Automatic" },
+// Backend: RenewalType — automatic renewal is not supported, so only MANUAL is
+// ever sent; AUTO is never offered in the UI.
+export const RENEWAL_TYPE_OPTIONS = [{ value: "MANUAL", label: "Manual" }];
+
+// Renewal mode presented to the user on the Recurring billing form/renew
+// action — the simple choice the Maker actually makes. SAME_AS_PREVIOUS maps
+// to RenewalDurationType=SAME_DURATION + RenewalPricingType=SAME_PRICE;
+// CUSTOM maps to RenewalDurationType=CUSTOM + RenewalPricingType=REVISED_PRICE
+// (see buildRecurringRequestPayload/renewBillingRecurring).
+export const RECURRING_RENEWAL_MODE_OPTIONS = [
+  { value: "SAME_AS_PREVIOUS", label: "Same as Previous" },
+  { value: "CUSTOM", label: "Custom" },
 ];
 
 // Backend: RenewalDurationType
