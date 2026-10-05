@@ -23,6 +23,13 @@ import {
   lineItemService,
   receiptService,
 } from "@/pages/expense-management/api/expenseReportsApi";
+import TaxBreakdownPanel, {
+  emptyTaxValue,
+  taxValueFromLine,
+  taxRequestFields,
+  validateTaxValue,
+} from "@/pages/expense-management/components/expense-reports/TaxBreakdownPanel";
+import TaxStatusBadge from "@/pages/expense-management/components/expense-reports/TaxStatusBadge";
 import Select from "react-select";
 import FormInput from "@/components/forms/FormInput";
 import FormTextArea from "@/components/forms/FormTextArea";
@@ -35,6 +42,8 @@ import SummaryPanel from "@/pages/expense-management/components/expense-reports/
 import { useSubmitReport } from "@/pages/expense-management/approval-engine/hooks/useApprovalWorkflow";
 import api from "@/api/axiosInstance";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
+import { useClientPagination } from "@/pages/expense-management/components/common/pagination";
+import Pagination from "@/components/Pagination/pagination";
 
 const breadcrumbs = [
   { label: "Expense Management", to: "/expense-management/dashboard" },
@@ -132,11 +141,13 @@ export default function CreateExpensePage() {
     description: "",
     amount: "",
     currencyId: "",
-    taxAmount: "0",
+    tax: emptyTaxValue,
     clientBillable: false,
     projectId: "",
   });
   const [lineItemErrors, setLineItemErrors] = useState({});
+  // Latest server tax preview for the open line item form (drives validation and the request).
+  const [taxPreview, setTaxPreview] = useState(null);
   const [receiptFile, setReceiptFile] = useState(null);
   const [savingLineItem, setSavingLineItem] = useState(false);
 
@@ -176,18 +187,22 @@ export default function CreateExpensePage() {
     if (currentStep > 1 && categories.length === 0) {
       const loadStep2Lookups = async () => {
         try {
-          const [catList, projListResponse] = await Promise.all([
+          // Epic 8: the caller's own PMS-assigned ACTIVE projects, not the admin-wide list.
+          // Errors are surfaced (not silently swallowed to []) — an empty project list should
+          // only ever mean "PMS genuinely has no assigned work," never "the request failed."
+          const [catList, projList] = await Promise.all([
             lookupService.getActiveCategories(),
-            api.get("/xms/admin/projects", {
-              baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-            }).catch(() => ({ data: { data: [] } })),
+            lookupService.getAssignedProjects().catch((err) => {
+              console.error("Failed to load assigned projects:", err);
+              showStatusToast(
+                err.response?.data?.message || "Could not load your assigned projects.",
+                "error"
+              );
+              return [];
+            }),
           ]);
           setCategories(catList);
-          const pList = projListResponse?.data?.data || projListResponse?.data || [];
-          setProjects(Array.isArray(pList) ? pList : []);
+          setProjects(Array.isArray(projList) ? projList : []);
         } catch (err) {
           console.error("Failed to load categories/projects lookups:", err);
         }
@@ -321,7 +336,10 @@ export default function CreateExpensePage() {
   };
 
   const handleLineItemSelectChange = (name, value) => {
-    setLineItemFormData((prev) => ({ ...prev, [name]: value }));
+    // A new category brings its own default tax code, so an explicit pick is dropped.
+    setLineItemFormData((prev) =>
+      name === "categoryId" ? { ...prev, categoryId: value, tax: { ...prev.tax, taxCodeId: null } } : { ...prev, [name]: value }
+    );
     if (lineItemErrors[name]) setLineItemErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
@@ -334,11 +352,8 @@ export default function CreateExpensePage() {
       errors.amount = "Amount must be greater than 0.";
     }
     if (!lineItemFormData.currencyId) errors.currencyId = "Currency is required.";
-    if (Number(lineItemFormData.taxAmount) < 0) {
-      errors.taxAmount = "GST cannot be negative.";
-    } else if (Number(lineItemFormData.taxAmount) > (Number(lineItemFormData.amount) || 0)) {
-      errors.taxAmount = "GST cannot exceed total amount.";
-    }
+    const taxError = validateTaxValue(lineItemFormData.tax, taxPreview, lineItemFormData.amount);
+    if (taxError) errors.tax = taxError;
     if (lineItemFormData.clientBillable && !lineItemFormData.projectId) {
       errors.projectId = "Project is required for billable expenses.";
     }
@@ -359,7 +374,7 @@ export default function CreateExpensePage() {
         description: lineItemFormData.description.trim(),
         amount: Number(lineItemFormData.amount),
         currencyId: lineItemFormData.currencyId,
-        taxAmount: Number(lineItemFormData.taxAmount) || 0,
+        ...taxRequestFields(lineItemFormData.tax, taxPreview),
         costCenterId: createdReport?.costCenterId || formData.costCenterId,
         clientBillable: !!lineItemFormData.clientBillable,
         projectId: lineItemFormData.clientBillable ? lineItemFormData.projectId : "",
@@ -445,7 +460,8 @@ export default function CreateExpensePage() {
   // Setup GenericTable configurations for Step 2
   const headers = ["Category", "Merchant", "Date", "Amount", "Policy", "GST", "Net Amount", "Base Amount", "Billable", "Actions"];
   const columns = ["category", "merchant", "date", "amount", "policy", "gst", "net", "base", "billable", "actions"];
-  const tableRows = filteredLineItems.map((li) => {
+  const { pageItems: pagedLineItems, paginationProps: lineItemPager } = useClientPagination(filteredLineItems);
+  const tableRows = pagedLineItems.map((li) => {
     const showCurrency = li.currencyCode && (li.currencyCode === "EUR" || li.currencyCode !== li.baseCurrencyCode);
     return {
       category: <span className="font-medium text-gray-800 text-xs">{li.categoryName || "—"}</span>,
@@ -463,8 +479,12 @@ export default function CreateExpensePage() {
       ),
       policy: <PolicyStatusBadge lineStatus={li.lineStatus} policyWarnings={li.policyWarnings} />,
       gst: (
-        <span className="font-mono text-xs text-amber-600">
-          {formatAmount(li.taxAmount)} {showCurrency && <span className="text-[10px] text-gray-400">{li.currencyCode}</span>}
+        <span className="inline-flex flex-col items-start gap-0.5">
+          <span className="font-mono text-xs text-amber-600">
+            {formatAmount(li.taxAmount)} {showCurrency && <span className="text-[10px] text-gray-400">{li.currencyCode}</span>}
+          </span>
+          {li.tax?.taxCode && <span className="text-[10px] text-gray-400">{li.tax.taxCode}</span>}
+          <TaxStatusBadge tax={li.tax} />
         </span>
       ),
       net: (
@@ -507,10 +527,11 @@ export default function CreateExpensePage() {
                 description: li.description || "",
                 amount: li.amount || "",
                 currencyId: li.currencyId || "",
-                taxAmount: li.taxAmount || "0",
+                tax: taxValueFromLine(li),
                 clientBillable: !!li.clientBillable,
                 projectId: li.projectId || "",
               });
+              setTaxPreview(null);
               setReceiptFile(null);
               setLineItemErrors({});
               setIsLineItemDrawerOpen(true);
@@ -681,10 +702,11 @@ export default function CreateExpensePage() {
                     description: "",
                     amount: "",
                     currencyId: createdReport?.currencyId || formData.currencyId || "",
-                    taxAmount: "0",
+                    tax: emptyTaxValue,
                     clientBillable: false,
                     projectId: "",
                   });
+                  setTaxPreview(null);
                   setReceiptFile(null);
                   setLineItemErrors({});
                   setIsLineItemDrawerOpen(true);
@@ -735,6 +757,9 @@ export default function CreateExpensePage() {
             ) : (
               <div className="w-full overflow-x-auto rounded-lg">
                 <GenericTable headers={headers} rows={tableRows} columns={columns} />
+                <div className="mt-4 flex justify-center">
+                  <Pagination {...lineItemPager} />
+                </div>
               </div>
             )}
 
@@ -950,8 +975,8 @@ export default function CreateExpensePage() {
                   </div>
                 </div>
 
-                {/* Amount, Currency & GST */}
-                <div className="grid grid-cols-3 gap-3">
+                {/* Amount & Currency (tax below, calculated by the server) */}
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="block text-xs font-semibold text-gray-700">
                       Amount <span className="text-red-500">*</span>
@@ -994,30 +1019,25 @@ export default function CreateExpensePage() {
                     )}
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-gray-700">
-                      GST (Tax) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="taxAmount"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={lineItemFormData.taxAmount}
-                      onChange={handleLineItemInputChange}
-                      disabled={savingLineItem}
-                      className={`w-full px-2.5 py-1.5 h-[38px] rounded-md border text-xs focus:outline-none focus:ring-2 ${
-                        lineItemErrors.taxAmount
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/20"
-                      }`}
-                    />
-                    {lineItemErrors.taxAmount && (
-                      <span className="text-[11px] text-red-600 block mt-0.5">{lineItemErrors.taxAmount}</span>
-                    )}
-                  </div>
                 </div>
+
+                <TaxBreakdownPanel
+                  amount={lineItemFormData.amount}
+                  currencyId={lineItemFormData.currencyId}
+                  currencyCode={currencies.find((c) => c.currencyId === lineItemFormData.currencyId)?.currencyCode || ""}
+                  expenseDate={lineItemFormData.expenseDate}
+                  categoryId={lineItemFormData.categoryId}
+                  value={lineItemFormData.tax}
+                  onChange={(tax) => {
+                    setLineItemFormData((prev) => ({ ...prev, tax }));
+                    if (lineItemErrors.tax) setLineItemErrors((prev) => ({ ...prev, tax: "" }));
+                  }}
+                  onPreview={setTaxPreview}
+                  error={lineItemErrors.tax}
+                  disabled={savingLineItem}
+                  savedTaxSource={editingLineItem?.tax?.taxSource}
+                  savedTaxAmount={editingLineItem?.taxAmount}
+                />
 
                 {/* Client Billable & Project */}
                 <div className="grid grid-cols-2 gap-4">
@@ -1041,10 +1061,8 @@ export default function CreateExpensePage() {
                     </label>
                     <Select
                       options={projects
-                        .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
                         .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))}
                       value={projects
-                        .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
                         .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))
                         .find((o) => o.value === lineItemFormData.projectId) || null}
                       onChange={(opt) => handleLineItemSelectChange("projectId", opt ? opt.value : "")}

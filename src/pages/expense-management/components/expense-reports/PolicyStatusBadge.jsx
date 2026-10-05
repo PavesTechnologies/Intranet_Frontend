@@ -104,6 +104,21 @@ function ViolationRow({ warning }) {
           </span>
         </div>
       )}
+      {/* A SEPARATE, approver-side authorization - distinct from the employee's own justification
+          below. Read-only here; the action itself lives in the approver's own review queue. */}
+      {warning.approverJustifiedAt && (
+        <p className="mt-1.5 flex items-start gap-1 text-xs text-emerald-700">
+          <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+          <span>
+            Exception authorized by <span className="font-medium">{warning.approverJustifiedBy}</span>: “{warning.approverJustification}”
+          </span>
+        </p>
+      )}
+      {warning.justification && (
+        <p className="mt-1.5 text-xs text-gray-600">
+          <span className="font-medium text-gray-700">Employee note:</span> {warning.justification}
+        </p>
+      )}
     </div>
   );
 }
