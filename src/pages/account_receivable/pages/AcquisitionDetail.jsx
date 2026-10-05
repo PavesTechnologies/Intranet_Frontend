@@ -28,6 +28,7 @@ import {
   sendProjectManagerReminder,
   getAcquiredSnapshotMetadata,
   saveAcquiredSnapshotMetadata,
+  clearAcquiredSnapshotMetadata,
   formatBillingPeriod,
   toIsoDateOnly,
 } from "../services/billingDataAcquisitionService";
@@ -36,7 +37,7 @@ import { calculateTax, getTaxCalculationErrorMessage } from "../services/taxCalc
 import SnapshotWorkspace from "../components/acquisition/SnapshotWorkspace";
 import BackIconButton from "../components/common/BackIconButton";
 
-const QUEUE_PATH = "/account-receivable/billing-data-acquisition";
+const QUEUE_PATH = "/account-receivable/billing-data-acquisition/workspace";
 
 // Resolves the single primary, state-aware action shown in the page header —
 // avoids ever presenting more than one competing primary call-to-action.
@@ -135,32 +136,47 @@ function getPrimaryAction(status, { acquiring, calculatingTax, onAcquire, onReVa
 }
 
 export default function AcquisitionDetail() {
-  const navigate = useNavigate();
-  const location = useLocation();
   const { projectId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
 
+  // Prefer router navigation state if passed; otherwise fall back to loading by id
   const [config, setConfig] = useState(location.state?.config || null);
   const [loadingConfig, setLoadingConfig] = useState(!location.state?.config);
-  const [acquisitionResults, setAcquisitionResults] = useState(null);
-  const [acquiring, setAcquiring] = useState(false);
-  const [remindingPM, setRemindingPM] = useState(false);
-  const [calculatingTax, setCalculatingTax] = useState(false);
 
-  // Subview for draft invoice preview
+  // Sub-view: "WORKSPACE" (default live operational screen) | "DRAFT" (pre-tax commercial draft)
   const [subView, setSubView] = useState("WORKSPACE");
-  const [draft, setDraft] = useState(null);
-  const [generating, setGenerating] = useState(false);
 
-  // Manual period modal
+  // Acquisition execution state
+  const [acquiring, setAcquiring] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [calculatingTax, setCalculatingTax] = useState(false);
+  const [remindingPM, setRemindingPM] = useState(false);
+
+  // Results from the latest acquisition execution
+  const [acquisitionResults, setAcquisitionResults] = useState(
+    location.state?.acquisitionResults || null
+  );
+
+  // Draft commercial summary (populated when transitioning to DRAFT subview)
+  const [draft, setDraft] = useState(null);
+
+  // Manual billing period modal state
   const [showPeriodModal, setShowPeriodModal] = useState(false);
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
 
+  // Load configuration and existing snapshot on mount
   useEffect(() => {
     let isMounted = true;
 
     async function applyExistingSnapshot(targetConfig) {
       const st = String(targetConfig.billingStatus || "").trim().toUpperCase();
+      // Authoritative backend rule: NOT_ACQUIRED configurations must never query or hydrate snapshot data
+      if (st === "NOT_ACQUIRED") {
+        return;
+      }
+
       const shouldLoadExistingSnapshot =
         Boolean(targetConfig.snapshotId) ||
         [
@@ -175,13 +191,20 @@ export default function AcquisitionDetail() {
       const savedMeta = getAcquiredSnapshotMetadata(numericProjId);
 
       // CRITICAL: Determine the actual acquired snapshot period.
-      // Do NOT fall back blindly to targetConfig.periodStart if it is the project configuration period!
+      // Priority:
+      // 1. targetConfig.billingPeriodStart (from backend API)
+      // 2. targetConfig.snapshotPeriodStart
+      // 3. savedMeta?.billingPeriodStart (from localStorage)
+      // 4. targetConfig.existingSnapshot?.billingPeriodStart
+      // NEVER fall back to project start/end dates!
       const effectiveStart =
+        targetConfig.billingPeriodStart ||
         targetConfig.snapshotPeriodStart ||
         savedMeta?.billingPeriodStart ||
         targetConfig.existingSnapshot?.billingPeriodStart ||
         null;
       const effectiveEnd =
+        targetConfig.billingPeriodEnd ||
         targetConfig.snapshotPeriodEnd ||
         savedMeta?.billingPeriodEnd ||
         targetConfig.existingSnapshot?.billingPeriodEnd ||
@@ -248,35 +271,48 @@ export default function AcquisitionDetail() {
     async function initialize() {
       if (!config) {
         try {
+          // Acquisition Detail is a Timesheet/T&M-only view -- Fixed Price
+          // and Recurring never route here, so scope the match pool to T&M
+          // the same way the Data Acquisition console does.
           const list = await fetchActiveBillingConfigurations();
-          const match = list.find(
+          const tmList = list.filter((item) => item.billingTypeCode === "TIME_MATERIAL");
+          const match = tmList.find(
             (item) => String(item.projectId || item.id) === String(projectId)
           );
           if (isMounted && match) {
-            const savedMeta = getAcquiredSnapshotMetadata(match.projectId);
-            const actualStart = savedMeta?.billingPeriodStart || match.periodStart || "";
-            const actualEnd = savedMeta?.billingPeriodEnd || match.periodEnd || "";
+            const isNotAcquired = String(match.billingStatus || "").trim().toUpperCase() === "NOT_ACQUIRED";
+            if (isNotAcquired) {
+              clearAcquiredSnapshotMetadata(match.projectId);
+            }
+            const savedMeta = isNotAcquired ? null : getAcquiredSnapshotMetadata(match.projectId);
+            const actualStart = isNotAcquired ? null : (match.billingPeriodStart || savedMeta?.billingPeriodStart || null);
+            const actualEnd = isNotAcquired ? null : (match.billingPeriodEnd || savedMeta?.billingPeriodEnd || null);
+            const actualPeriod = (!isNotAcquired && actualStart && actualEnd) ? formatBillingPeriod(actualStart, actualEnd) : "—";
             const enrichedMatch = {
               ...match,
-              projectPeriodStart: match.periodStart,
-              projectPeriodEnd: match.periodEnd,
-              ...(savedMeta
+              snapshotPeriodStart: actualStart,
+              snapshotPeriodEnd: actualEnd,
+              billingPeriodStart: actualStart,
+              billingPeriodEnd: actualEnd,
+              billingPeriod: actualPeriod,
+              ...((!isNotAcquired && savedMeta)
                 ? {
-                    snapshotPeriodStart: savedMeta.billingPeriodStart,
-                    snapshotPeriodEnd: savedMeta.billingPeriodEnd,
-                    billingPeriodStart: savedMeta.billingPeriodStart,
-                    billingPeriodEnd: savedMeta.billingPeriodEnd,
-                    billingPeriod: savedMeta.billingPeriod || formatBillingPeriod(savedMeta.billingPeriodStart, savedMeta.billingPeriodEnd),
-                    snapshotId: savedMeta.snapshotId,
-                    snapshotNumber: savedMeta.snapshotNumber,
+                    snapshotId: savedMeta.snapshotId || match.snapshotId,
+                    snapshotNumber: savedMeta.snapshotNumber || match.snapshotNumber,
                     billingStatus: savedMeta.status || match.billingStatus,
                   }
-                : {}),
+                : {
+                    snapshotId: isNotAcquired ? null : match.snapshotId,
+                    snapshotNumber: isNotAcquired ? null : match.snapshotNumber,
+                    billingStatus: match.billingStatus,
+                  }),
             };
             setConfig(enrichedMatch);
-            setPeriodStart(actualStart);
-            setPeriodEnd(actualEnd);
-            applyExistingSnapshot(enrichedMatch);
+            setPeriodStart(actualStart || "");
+            setPeriodEnd(actualEnd || "");
+            if (!isNotAcquired) {
+              applyExistingSnapshot(enrichedMatch);
+            }
           } else if (isMounted) {
             showStatusToast("Project configuration not found.", "error");
             navigate(QUEUE_PATH, { replace: true });
@@ -287,14 +323,44 @@ export default function AcquisitionDetail() {
           if (isMounted) setLoadingConfig(false);
         }
       } else {
-        const savedMeta = getAcquiredSnapshotMetadata(config.projectId);
-        const actualStart = config.snapshotPeriodStart || savedMeta?.billingPeriodStart || config.periodStart || "";
-        const actualEnd = config.snapshotPeriodEnd || savedMeta?.billingPeriodEnd || config.periodEnd || "";
-        setPeriodStart(actualStart);
-        setPeriodEnd(actualEnd);
+        const isNotAcquired = String(config.billingStatus || "").trim().toUpperCase() === "NOT_ACQUIRED";
+        if (isNotAcquired) {
+          clearAcquiredSnapshotMetadata(config.projectId);
+        }
+        const savedMeta = isNotAcquired ? null : getAcquiredSnapshotMetadata(config.projectId);
+        const actualStart = isNotAcquired ? null : (config.billingPeriodStart || config.snapshotPeriodStart || savedMeta?.billingPeriodStart || null);
+        const actualEnd = isNotAcquired ? null : (config.billingPeriodEnd || config.snapshotPeriodEnd || savedMeta?.billingPeriodEnd || null);
+        const actualPeriod = (!isNotAcquired && actualStart && actualEnd) ? formatBillingPeriod(actualStart, actualEnd) : "—";
 
-        if (config.existingSnapshot?.snapshotId) {
-          const snap = config.existingSnapshot;
+        setPeriodStart(actualStart || "");
+        setPeriodEnd(actualEnd || "");
+
+        // Ensure projectDuration is present on config
+        let projectDuration = config.projectDuration;
+        if (!projectDuration || projectDuration === "—") {
+          const pStart = toIsoDateOnly(config.projectStartDate || config.effectiveFrom || config.startDate);
+          const pEnd = toIsoDateOnly(config.projectEndDate || config.effectiveTo || config.endDate);
+          if (pStart && pEnd) {
+            projectDuration = formatBillingPeriod(pStart, pEnd);
+          }
+        }
+
+        const updatedConfig = {
+          ...config,
+          projectDuration: projectDuration || "—",
+          billingStatus: config.billingStatus || "NOT_ACQUIRED",
+          billingPeriodStart: actualStart,
+          billingPeriodEnd: actualEnd,
+          snapshotPeriodStart: actualStart,
+          snapshotPeriodEnd: actualEnd,
+          billingPeriod: actualPeriod,
+          snapshotId: isNotAcquired ? null : (config.snapshotId || savedMeta?.snapshotId || null),
+          snapshotNumber: isNotAcquired ? null : (config.snapshotNumber || savedMeta?.snapshotNumber || null),
+          existingSnapshot: isNotAcquired ? null : config.existingSnapshot,
+        };
+
+        if (!isNotAcquired && updatedConfig.existingSnapshot?.snapshotId) {
+          const snap = updatedConfig.existingSnapshot;
           const resolvedStatus = snap.status || config.billingStatus || "READY";
           const snapStart = snap.billingPeriodStart || actualStart;
           const snapEnd = snap.billingPeriodEnd || actualEnd;
@@ -317,23 +383,23 @@ export default function AcquisitionDetail() {
             success: true,
             billingStatus: resolvedStatus,
           });
-          setConfig((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  billingStatus: resolvedStatus,
-                  snapshotNumber: snap.snapshotNumber,
-                  snapshotId: snap.snapshotId,
-                  billingPeriodStart: snapStart,
-                  billingPeriodEnd: snapEnd,
-                  snapshotPeriodStart: snapStart,
-                  snapshotPeriodEnd: snapEnd,
-                  billingPeriod: snapPeriod,
-                }
-              : prev
-          );
+          setConfig({
+            ...updatedConfig,
+            billingStatus: resolvedStatus,
+            snapshotNumber: snap.snapshotNumber,
+            snapshotId: snap.snapshotId,
+            billingPeriodStart: snapStart,
+            billingPeriodEnd: snapEnd,
+            snapshotPeriodStart: snapStart,
+            snapshotPeriodEnd: snapEnd,
+            billingPeriod: snapPeriod,
+          });
+        } else {
+          setConfig(updatedConfig);
+          if (!isNotAcquired) {
+            applyExistingSnapshot(updatedConfig);
+          }
         }
-        applyExistingSnapshot(config);
         setLoadingConfig(false);
       }
     }
@@ -347,11 +413,11 @@ export default function AcquisitionDetail() {
 
   const handleTriggerAcquire = (cfg) => {
     if (cfg.invoiceGeneration === "MANUAL") {
-      setPeriodStart(cfg.snapshotPeriodStart || cfg.periodStart);
-      setPeriodEnd(cfg.snapshotPeriodEnd || cfg.periodEnd);
+      setPeriodStart(cfg.billingPeriodStart || cfg.snapshotPeriodStart || "");
+      setPeriodEnd(cfg.billingPeriodEnd || cfg.snapshotPeriodEnd || "");
       setShowPeriodModal(true);
     } else {
-      executeAcquisition(cfg, cfg.snapshotPeriodStart || cfg.periodStart, cfg.snapshotPeriodEnd || cfg.periodEnd);
+      executeAcquisition(cfg, cfg.billingPeriodStart || cfg.snapshotPeriodStart || periodStart, cfg.billingPeriodEnd || cfg.snapshotPeriodEnd || periodEnd);
     }
   };
 
@@ -522,8 +588,8 @@ export default function AcquisitionDetail() {
     showStatusToast("Re-validating timesheet approvals...", "info");
     executeAcquisition(
       config,
-      periodStart || config.snapshotPeriodStart || config.billingPeriodStart,
-      periodEnd || config.snapshotPeriodEnd || config.billingPeriodEnd
+      config.billingPeriodStart || config.snapshotPeriodStart || periodStart,
+      config.billingPeriodEnd || config.snapshotPeriodEnd || periodEnd
     );
   };
 
@@ -559,34 +625,35 @@ export default function AcquisitionDetail() {
 
   if (loadingConfig) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader size="lg" text="Loading Project Billing Configuration..." />
+      <div className="flex h-[400px] items-center justify-center">
+        <Loader />
       </div>
     );
   }
 
   if (!config) {
     return (
-      <PageCard>
-        <PageCardContent className="p-8 text-center">
-          <p className="text-slate-600">Project configuration not found.</p>
-          <Button className="mt-4" onClick={() => navigate(QUEUE_PATH)}>
-            Back to Acquisition Console
-          </Button>
-        </PageCardContent>
-      </PageCard>
+      <div className="flex flex-col items-center justify-center p-12 text-center">
+        <p className="text-sm font-semibold text-slate-800">Configuration Not Found</p>
+        <p className="mt-1 text-xs text-slate-500">
+          The requested billing configuration does not exist or has been removed.
+        </p>
+        <Button variant="outline" size="small" className="mt-4" onClick={() => navigate(QUEUE_PATH)}>
+          Back to Queue
+        </Button>
+      </div>
     );
   }
 
-  // --- RENDER DRAFT VIEW ---
+  // --- RENDER DRAFT SUBVIEW ---
   if (subView === "DRAFT" && draft) {
     return (
-      <div className="space-y-6 animate-fade-in">
+      <div className="mx-auto max-w-4xl space-y-6">
         <div className="flex items-center justify-between border-b border-slate-200 pb-4">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Invoice Draft Generated</h2>
-            <p className="text-sm text-slate-500">
-              Draft Number: <span className="font-mono font-semibold text-slate-700">{draft.draftNumber}</span>
+            <h1 className="text-xl font-bold text-slate-900">Pre-Tax Commercial Draft</h1>
+            <p className="text-xs text-slate-500">
+              Review line-item totals before advancing to official tax calculation.
             </p>
           </div>
           <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
@@ -607,7 +674,7 @@ export default function AcquisitionDetail() {
               </div>
               <div>
                 <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Billing Period</div>
-                <div className="mt-1 font-mono font-semibold text-slate-800">{config.billingPeriod}</div>
+                <div className="mt-1 font-mono font-semibold text-slate-800">{config.billingPeriod || "—"}</div>
               </div>
               <div>
                 <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Currency</div>
@@ -700,16 +767,6 @@ export default function AcquisitionDetail() {
             </h1>
             <StatusBadge label={config.billingStatus || "NOT_ACQUIRED"} size="sm" />
           </div>
-          <p className="text-sm text-slate-600">
-            <span className="font-semibold text-slate-800">{config.projectName}</span>
-            <span className="mx-1.5 text-slate-300">&middot;</span>
-            {config.client}
-          </p>
-          {config.billingPeriod && (
-            <p className="text-xs text-slate-400">
-              Billing Period <span className="ml-1 font-medium text-slate-600">{config.billingPeriod}</span>
-            </p>
-          )}
         </div>
 
         <div className="flex flex-shrink-0 items-center gap-2">
@@ -720,8 +777,8 @@ export default function AcquisitionDetail() {
               onClick={() =>
                 executeAcquisition(
                   config,
-                  config.snapshotPeriodStart || config.billingPeriodStart || periodStart,
-                  config.snapshotPeriodEnd || config.billingPeriodEnd || periodEnd
+                  config.billingPeriodStart || config.snapshotPeriodStart || periodStart,
+                  config.billingPeriodEnd || config.snapshotPeriodEnd || periodEnd
                 )
               }
               disabled={acquiring}

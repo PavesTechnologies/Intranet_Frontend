@@ -9,6 +9,7 @@ import {
   updateTaxRateConfiguration,
   getApiErrorMessage,
 } from "../../services/taxRateConfigurationService";
+import { buildTaxConfigurationPayload } from "../../utils/taxRuleComponents";
 
 const buildDefaultForm = (region) => ({
   taxRegime: region?.taxRegime || "GST",
@@ -26,7 +27,7 @@ const buildDefaultForm = (region) => ({
  * region is always known from context and is shown read-only rather than
  * asked for again).
  */
-export default function TaxRuleFormModal({ isOpen, onClose, region, editingConfig, onSaved }) {
+export default function TaxRuleFormModal({ isOpen, onClose, region, editingConfig, taxTypes = [], onSaved }) {
   const [formData, setFormData] = useState(() => buildDefaultForm(region));
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -130,32 +131,7 @@ export default function TaxRuleFormModal({ isOpen, onClose, region, editingConfi
 
     setSubmitting(true);
     try {
-      const parseRatePayload = (val) => {
-        if (val === "" || val === null || val === undefined) return null;
-        const str = String(val).trim();
-        if (str === "") return null;
-        const num = Number(str);
-        return isNaN(num) || num <= 0 ? null : num;
-      };
-
-      const cgstPayload = parseRatePayload(formData.cgstRate);
-      const sgstPayload = parseRatePayload(formData.sgstRate);
-      const igstPayload = parseRatePayload(formData.igstRate);
-
-      const payload = {
-        taxRegionId: region.taxRegionId,
-        taxRegionName: region.taxRegionName || "",
-        taxRegionCode: region.taxRegionCode || "",
-        taxType: formData.taxRegime.trim(),
-        taxRegime: formData.taxRegime.trim(),
-        cgstRate: cgstPayload,
-        sgstRate: sgstPayload,
-        igstRate: igstPayload,
-        effectiveFrom: formData.effectiveFrom,
-        effectiveTo: formData.effectiveTo || null,
-        active: formData.active,
-        isActive: formData.active,
-      };
+      const payload = buildTaxConfigurationPayload(formData, region, taxTypes);
 
       let saved;
       if (editingConfig) {

@@ -51,7 +51,7 @@ export const getApiErrorMessage = (error, fallback = "Something went wrong. Plea
     const matches = [...rawMsg.matchAll(/default message \[([^\]]+)\]/g)];
     if (matches.length > 0) {
       const lastMatch = matches[matches.length - 1][1];
-      if (lastMatch && !lastMatch.includes("taxRateConfigurationRequestDto")) {
+      if (lastMatch && !lastMatch.toLowerCase().includes("requestdto")) {
         return lastMatch;
       }
     }
@@ -67,7 +67,13 @@ export const getApiErrorMessage = (error, fallback = "Something went wrong. Plea
 export const normalizeTaxRateConfiguration = (item = {}) => {
   if (!item || typeof item !== "object") return {};
 
-  const id = item.id || item.taxRateConfigurationId || item.tax_rate_configuration_id || "";
+  const id =
+    item.id ||
+    item.taxConfigurationId ||
+    item.tax_configuration_id ||
+    item.taxRateConfigurationId ||
+    item.tax_rate_configuration_id ||
+    "";
   
   // Tax region parsing
   const taxRegionObj = item.taxRegion || item.tax_region || {};
@@ -102,28 +108,50 @@ export const normalizeTaxRateConfiguration = (item = {}) => {
     return isNaN(num) ? null : num;
   };
 
-  let cgstRate = parseRate(item.cgstRate ?? item.cgst_rate ?? item.cgst);
-  let sgstRate = parseRate(item.sgstRate ?? item.sgst_rate ?? item.sgst);
-  let igstRate = parseRate(item.igstRate ?? item.igst_rate ?? item.igst);
+  let cgstRate = null;
+  let sgstRate = null;
+  let igstRate = null;
 
-  // Clean up legacy 0.0000 to null for non-applicable tax components
-  if (cgstRate !== null && cgstRate > 0 && sgstRate !== null && sgstRate > 0 && (igstRate === 0 || igstRate === null)) {
-    igstRate = null;
-  }
-  if (igstRate !== null && igstRate > 0 && (cgstRate === 0 || cgstRate === null) && (sgstRate === 0 || sgstRate === null)) {
-    cgstRate = null;
-    sgstRate = null;
+  const rawComponents = Array.isArray(item.components) ? item.components : [];
+  if (rawComponents.length > 0) {
+    rawComponents.forEach((comp) => {
+      const code = (
+        comp.taxTypeCode ||
+        comp.code ||
+        comp.taxType?.taxTypeCode ||
+        comp.taxType?.code ||
+        ""
+      ).toUpperCase();
+      const rate = parseRate(comp.taxRate ?? comp.rate ?? comp.appliedRate);
+      if (code === "CGST") cgstRate = rate;
+      else if (code === "SGST") sgstRate = rate;
+      else if (code === "IGST") igstRate = rate;
+    });
+  } else {
+    cgstRate = parseRate(item.cgstRate ?? item.cgst_rate ?? item.cgst);
+    sgstRate = parseRate(item.sgstRate ?? item.sgst_rate ?? item.sgst);
+    igstRate = parseRate(item.igstRate ?? item.igst_rate ?? item.igst);
+
+    // Clean up legacy 0.0000 to null for non-applicable tax components
+    if (cgstRate !== null && cgstRate > 0 && sgstRate !== null && sgstRate > 0 && (igstRate === 0 || igstRate === null)) {
+      igstRate = null;
+    }
+    if (igstRate !== null && igstRate > 0 && (cgstRate === 0 || cgstRate === null) && (sgstRate === 0 || sgstRate === null)) {
+      cgstRate = null;
+      sgstRate = null;
+    }
   }
 
   const effectiveFrom = item.effectiveFrom || item.effective_from || "";
   const effectiveTo = item.effectiveTo || item.effective_to || null;
 
-  const activeFlag = item.active ?? item.is_active ?? item.isActive ?? (item.status === "ACTIVE");
+  const activeFlag = item.active ?? item.is_active ?? item.isActive ?? (item.status === "ACTIVE") ?? true;
   const status = activeFlag ? "ACTIVE" : "INACTIVE";
 
   return {
     ...item,
     id,
+    taxConfigurationId: id,
     taxRateConfigurationId: id,
     taxRegionId,
     taxRegionName,
@@ -133,14 +161,17 @@ export const normalizeTaxRateConfiguration = (item = {}) => {
     cgstRate,
     sgstRate,
     igstRate,
+    components: rawComponents,
     effectiveFrom,
     effectiveTo,
     status,
     active: Boolean(activeFlag),
+    isActive: Boolean(activeFlag),
   };
 };
 
 export { getActiveTaxRegions, normalizeTaxRegion } from "./taxRegionService";
+export { getActiveTaxTypes, getTaxTypes, normalizeTaxType } from "./taxTypeService";
 
 // GET tax-rate-configurations
 export const getTaxRateConfigurations = async () => {

@@ -127,7 +127,9 @@ export default function CandidateOverridePanel({ candidate, onChanged }) {
             await applyHrOverride(candidate.id, reason);
             toast.success("Override applied — the candidate is back in screening.");
             setOpen(null);
-            onChanged?.();
+            // No detail re-fetch backs this page — apply the known outcome
+            // (server-guaranteed by the endpoint's own contract) directly.
+            onChanged?.({ hrOverride: true, pipelineStage: "SCREENING", stage: "SCREENING", overrideReason: reason });
           } catch (err) {
             toast.error(err?.response?.data?.message || "Could not apply the override.");
           }
@@ -149,7 +151,13 @@ export default function CandidateOverridePanel({ candidate, onChanged }) {
               `Override cleared — ${(res?.restored_decision_source || "automated").toLowerCase()} decision restored.`
             );
             setOpen(null);
-            onChanged?.();
+            onChanged?.({
+              hrOverride: false,
+              overrideReason: null,
+              pipelineStage: "REJECTED",
+              stage: "REJECTED",
+              decisionSource: res?.restored_decision_source ?? null,
+            });
           } catch (err) {
             toast.error(err?.response?.data?.message || "Could not clear the override.");
           }

@@ -28,7 +28,10 @@ function MetricTile({ label, value, icon: Icon, color, muted = false }) {
   return (
     <KPICard
       label={label}
-      value={value ?? "—"}
+      // Shows 0 while the summary is still loading (value is undefined),
+      // then swaps in the real count once it resolves — no dash, no
+      // layout jump.
+      value={value ?? 0}
       icon={Icon ? <Icon className="h-5 w-5" /> : null}
       color={muted && isZero ? "bg-slate-50 text-slate-400" : color}
       className="h-full"

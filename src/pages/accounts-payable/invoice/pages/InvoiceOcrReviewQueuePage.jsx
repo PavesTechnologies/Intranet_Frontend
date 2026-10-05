@@ -16,9 +16,13 @@ const PAGE_SIZE = 10;
 const HEADERS = ["File", "Invoice #", "Vendor", "Net Amount", "Confidence", "Status", "Actions"];
 const COLUMNS = ["file", "invoiceNumber", "vendor", "netAmount", "confidence", "status", "actions"];
 
+// Backend's ReviewQueueItem.path is "PATH_A" / "PATH_B" verbatim (API_Layer/interface/
+// review_queue_interface.py) — must match exactly, not the short "A"/"B" this used to compare
+// against, which silently filtered every item out while the tab count badges (read from the
+// separate total_path_a/total_path_b fields) still showed the real counts.
 const TABS = [
-  { key: "A", label: "Needs Correction" },
-  { key: "B", label: "No Vendor Match" },
+  { key: "PATH_A", label: "Needs Correction" },
+  { key: "PATH_B", label: "No Vendor Match" },
 ];
 
 function formatConfidence(value) {
@@ -50,7 +54,7 @@ async function handleViewDocument(inboundDocumentId) {
  * endpoint, keyed by inbound_document_id.
  */
 export default function InvoiceOcrReviewQueuePage() {
-  const [activeTab, setActiveTab] = useState("A");
+  const [activeTab, setActiveTab] = useState("PATH_A");
   const [page, setPage] = useState(1);
   const [reviewItem, setReviewItem] = useState(null);
 
@@ -58,7 +62,7 @@ export default function InvoiceOcrReviewQueuePage() {
   const { data, isLoading, isError, error } = useReviewQueue({ skip, limit: PAGE_SIZE });
 
   const items = (data?.items || []).filter((item) => item.path === activeTab);
-  const totalForTab = activeTab === "A" ? data?.total_path_a ?? 0 : data?.total_path_b ?? 0;
+  const totalForTab = activeTab === "PATH_A" ? data?.total_path_a ?? 0 : data?.total_path_b ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalForTab / PAGE_SIZE));
 
   const rows = items.map((item) => ({
@@ -107,13 +111,13 @@ export default function InvoiceOcrReviewQueuePage() {
               >
                 {tab.label}
                 <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                  {tab.key === "A" ? data?.total_path_a ?? 0 : data?.total_path_b ?? 0}
+                  {tab.key === "PATH_A" ? data?.total_path_a ?? 0 : data?.total_path_b ?? 0}
                 </span>
               </button>
             ))}
           </div>
 
-          {activeTab === "B" && (
+          {activeTab === "PATH_B" && (
             <p className="mb-3 text-xs text-gray-500">
               These documents were extracted successfully but no vendor could be matched automatically — assign a vendor to persist them as invoices.
             </p>

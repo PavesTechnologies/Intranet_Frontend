@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 import api from "../../../api/axiosInstance";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { showStatusToast } from "../../../components/toastfy/toast.jsx";
@@ -125,7 +124,7 @@ export default function HeadcountDemographicsPage() {
 
   const computeNationalityFromEmployees = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `${window.__APP_CONFIG__.EMPLOYEE_ONBOARDING_URL}/offerletters/`,
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );

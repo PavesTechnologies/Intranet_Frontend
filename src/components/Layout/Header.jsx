@@ -1,5 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
+<<<<<<< HEAD
 import { useLocation, useNavigate } from "react-router-dom";
+=======
+import { useNavigate } from "react-router-dom";
+>>>>>>> f874a3500f246fcbddf4728635b92889646a9eab
 import { LogOut, User, Menu, X, Eye, EyeOff, KeyRound, ChevronDown, Building2, Landmark, Check } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -7,7 +11,11 @@ import { FINANCE_ALL_ROLES } from "../../config/sidebarConfig";
 import { APPLICATIONS, isFinanceEnabled } from "../../utils/applicationRoutes";
 
 import Modal from "../Modal/modal";
+<<<<<<< HEAD
 import NotificationBell from "../../pages/expense-management/components/notifications/NotificationBell";
+=======
+import NotificationBell from "../../pages/accounts-payable/notifications/components/NotificationBell";
+>>>>>>> f874a3500f246fcbddf4728635b92889646a9eab
 import api from "../../api/axiosInstance";
 import { showStatusToast } from "../toastfy/toast";
 
@@ -225,8 +233,14 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
 
           {/* ── Right: application switcher + notifications + profile ── */}
           <div className="flex items-center space-x-4">
+<<<<<<< HEAD
             {/* Expense Management notifications - unread badge, dropdown, live updates */}
             {isExpenseManagement && <NotificationBell />}
+=======
+            {/* Notification bell. Renders itself only inside Accounts Payable, where the
+                notifications come from — see NotificationBell. */}
+            <NotificationBell />
+>>>>>>> f874a3500f246fcbddf4728635b92889646a9eab
 
             {/* Application Switcher — fully hidden when FINANCE_TOGGLE is off (public/config.js) */}
             {financeEnabled && (

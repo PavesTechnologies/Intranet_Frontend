@@ -1,6 +1,7 @@
 // src/api/axiosInstance.js
 
 import axios from "axios";
+import { notifySessionExpired } from "./sessionExpiry";
 
 const BASE_URL = window.__APP_CONFIG__.USER_MANAGEMENT_URL;
 
@@ -57,9 +58,17 @@ const saveTokens = (accessToken) => {
   localStorage.setItem("token", accessToken);
 };
 
-const clearTokens = () => {
-  localStorage.removeItem("token");
-  localStorage.removeItem("user");
+// AIRS answers 401 rather than 503 when it can't reach the JWKS endpoint to
+// verify signatures — see jwt_middleware.py, "Authentication service
+// unavailable". That's an infrastructure outage, not a dead session, and
+// treating it as one would sign every user out during a UMS deploy.
+const isAuthServiceDown = (err) => {
+  const detail =
+    err?.response?.data?.detail || err?.response?.data?.message || "";
+  return (
+    typeof detail === "string" &&
+    detail.toLowerCase().includes("authentication service unavailable")
+  );
 };
 
 // ─────────────────────────────────────
@@ -131,26 +140,33 @@ api.interceptors.response.use(
 
     const alreadyRetried = originalRequest?._retry;
 
-    // Ignore non-token-expiry errors
-    if (
-      !is401 ||
-      !isExpiredToken ||
-      isPublicUrl(originalRequest?.url) ||
-      alreadyRetried
-    ) {
-      // Replace the raw "Request failed with status code 401" surfaced to the UI
-      // with a friendly session message (but not for public auth endpoints such
-      // as login, where a 401 means bad credentials, not an expired session).
-      if (is401 && !isPublicUrl(originalRequest?.url)) {
-        error.message = "Session expired. Please login again.";
-      }
+    // Not a 401, a 401 from a public auth endpoint (bad credentials on the
+    // login form, a bad OTP, the refresh call itself), or the auth service
+    // being down. None of these mean this user's session has ended.
+    if (!is401 || isPublicUrl(originalRequest?.url) || isAuthServiceDown(error)) {
       return Promise.reject(error);
     }
+
+    // A 401 on a protected URL that a refresh cannot fix: "Invalid token",
+    // "Not authenticated", a bare 401, a non-string detail, or a 401 that
+    // survived a successful refresh. Retrying is pointless — end the session.
+    if (!isExpiredToken || alreadyRetried) {
+      error.message = "Session expired. Please login again.";
+      error.isSessionExpired = true;
+      notifySessionExpired();
+      return Promise.reject(error);
+    }
+
+    // Otherwise the token is merely expired — fall through to the refresh flow.
 
     // ─────────────────────────────────────
     // REQUEST QUEUE HANDLING
     // ─────────────────────────────────────
     if (isRefreshing) {
+      // Mark before queueing: without this a queued request that 401s again
+      // after replay re-enters as virgin and starts a second refresh.
+      originalRequest._retry = true;
+
       return new Promise((resolve, reject) => {
         failedQueue.push({ resolve, reject });
       })
@@ -187,9 +203,11 @@ api.interceptors.response.use(
       // Save new token
       saveTokens(newAccessToken);
 
-      // Update default headers
-      api.defaults.headers.common.Authorization =
-        `Bearer ${newAccessToken}`;
+      // Deliberately NOT setting api.defaults.headers.common.Authorization:
+      // axios merges defaults before the request interceptor runs, so the
+      // public-URL early return cannot strip it, and the next POST /auth/login
+      // after an expiry would carry the dead token. The request interceptor
+      // reads localStorage per request anyway.
 
       // Process queued requests
       processQueue(null, newAccessToken);
@@ -207,19 +225,21 @@ api.interceptors.response.use(
 
       processQueue(refreshError, null);
 
-      // Only logout if token truly missing
-      const latestToken = getAccessToken();
+      // A transport failure says nothing about the session — don't throw the
+      // user out over a Wi-Fi blip or a 5xx. The hand-thrown "No access token
+      // returned" above is not an axios error, so it correctly counts as fatal.
+      const isTransient =
+        (Boolean(refreshError.isAxiosError) && !refreshError.response) ||
+        isAuthServiceDown(refreshError);
 
-      if (!latestToken) {
-        clearTokens();
-
-        window.location.href = "/login";
-      }
-
-      // Friendly message only for a 401 (session could not be renewed).
-      // Other refresh failures (network/5xx) keep their original message.
-      if (refreshError.response?.status === 401) {
+      if (!isTransient) {
         refreshError.message = "Session expired. Please login again.";
+        refreshError.isSessionExpired = true;
+
+        // Hand control to React. AuthContext.logout(true) does the rest:
+        // POST /auth/logout, clear storage, tear down both websockets,
+        // reset state, navigate("/", { replace: true }).
+        notifySessionExpired();
       }
 
       return Promise.reject(refreshError);

@@ -79,6 +79,7 @@ function ActionMenu({ onEdit, onDelete, canManage }) {
 export default function EmployeeOnboardingPage() {
   const { user, hasRole } = useAuth();
   const isAdmin = hasRole(["ADMIN"]);
+  const isHR = hasRole(["HR"]);
   const currentEmployeeId = user?.employee_id;
 
   const [employees, setEmployees] = useState([]);
@@ -702,7 +703,7 @@ const downloadExcel = async () => {
 
         action: (
           <ActionMenu
-            canManage={isAdmin || isInReportingChainOf(currentEmployeeId, emp, employees)}
+            canManage={isAdmin || isHR || isInReportingChainOf(currentEmployeeId, emp, employees)}
             onEdit={() => {
               setEditEmployee(emp);
               setEditEmployeeUuid(emp.employee_uuid);
@@ -721,6 +722,7 @@ const downloadExcel = async () => {
     designations,
     designationMap,
     isAdmin,
+    isHR,
     currentEmployeeId,
   ]);
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAirsStore } from "./airsStore";
-import { getJDById, exportSingleJD, downloadJDById, getJDSkills, getJDUnknownSkills } from "../service/jdservice";
+import { getJDById, exportSingleJD, downloadJDById, getJDSkills, getJDUnknownSkills, updateJDSkill, removeJDSkill } from "../service/jdservice";
 import { useAuth } from "../../../contexts/AuthContext";
 import {
   ArrowLeft,
@@ -78,6 +78,43 @@ const statusLabel = (s) =>
 const entryLabel = (entry) =>
   typeof entry === "string" ? entry : entry?.name || entry?.skill_name || entry?.skill || "";
 
+const labelList = (value) => (Array.isArray(value) ? value.map(entryLabel).filter(Boolean) : []);
+
+// extracted_json.required_skills is { core: [...], supporting: [...] } for JDs
+// parsed with the current prompt, or a flat list (strings or
+// { name, importance }) for older JDs - normalise both into the same groups.
+const requiredSkillGroups = (required) => {
+  if (Array.isArray(required)) {
+    const byImportance = (level) => labelList(required.filter((s) => s?.importance === level));
+    return {
+      core: byImportance("core"),
+      supporting: byImportance("supporting"),
+      unclassified: labelList(required.filter((s) => !s?.importance)),
+    };
+  }
+  return { core: labelList(required?.core), supporting: labelList(required?.supporting), unclassified: [] };
+};
+
+const IMPORTANCE_BADGE = {
+  core: "bg-indigo-50 text-indigo-700 border-indigo-100",
+  supporting: "bg-sky-50 text-sky-700 border-sky-100",
+};
+
+function SkillChips({ items, chipClassName, emptyText = "None extracted." }) {
+  if (!items || items.length === 0) {
+    return <p className="text-xs text-slate-500 italic">{emptyText}</p>;
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((item, index) => (
+        <span key={`${item}-${index}`} className={`text-[10px] border px-2 py-0.5 rounded font-bold ${chipClassName}`}>
+          {item}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // Reduce a pipeline-summary payload into the three headline counts the card shows.
 const deriveCampaignStats = (summary) => {
   const stageCount = (key) =>
@@ -95,6 +132,8 @@ export default function JdDetails() {
   const { jds, campaigns, updateJd, restoreJdVersion, addCampaign } = useAirsStore();
   const { hasRole } = useAuth();
   const isHRAdmin = hasRole(["HR_ADMIN"]);
+  const isRecruiter = hasRole(["RECRUITER"]);
+  const isHiringManager = hasRole(["HIRING_MANAGER"]);
   const canViewPipeline = hasRole(["HR_ADMIN", "RECRUITER"]);
 
   const jd = jds.find((j) => j.id === id);
@@ -299,6 +338,53 @@ export default function JdDetails() {
 
   const [jdSkillsData, setJdSkillsData] = useState([]);
   const [jdUnknownSkillsData, setJdUnknownSkillsData] = useState([]);
+
+  // JD Skill edit / remove (HR_ADMIN). The backend refuses both (409) while the
+  // JD is used by an active campaign, and (400) when the change would leave the
+  // JD without a core skill - the service surfaces its message as a toast.
+  const [skillEditTarget, setSkillEditTarget] = useState(null);
+  const [skillEditForm, setSkillEditForm] = useState({ mandatory: true, importance: "supporting" });
+  const [skillRemoveTarget, setSkillRemoveTarget] = useState(null);
+  const [isSkillSaving, setIsSkillSaving] = useState(false);
+
+  const openSkillEdit = (sk) => {
+    setSkillEditTarget(sk);
+    setSkillEditForm({ mandatory: !!sk.mandatory, importance: sk.importance || "supporting" });
+  };
+
+  const closeSkillDialogs = () => {
+    if (isSkillSaving) return;
+    setSkillEditTarget(null);
+    setSkillRemoveTarget(null);
+  };
+
+  const handleSaveSkillEdit = async () => {
+    if (!skillEditTarget) return;
+    setIsSkillSaving(true);
+    try {
+      await updateJDSkill(skillEditTarget.id, skillEditForm);
+      setSkillEditTarget(null);
+      fetchJdSkills();
+    } catch {
+      // toast already shown by the service
+    } finally {
+      setIsSkillSaving(false);
+    }
+  };
+
+  const handleConfirmSkillRemove = async () => {
+    if (!skillRemoveTarget) return;
+    setIsSkillSaving(true);
+    try {
+      await removeJDSkill(skillRemoveTarget.id);
+      setSkillRemoveTarget(null);
+      fetchJdSkills();
+    } catch {
+      // toast already shown by the service
+    } finally {
+      setIsSkillSaving(false);
+    }
+  };
   const [isLoadingSkills, setIsLoadingSkills] = useState(false);
   const [isLoadingUnknownSkills, setIsLoadingUnknownSkills] = useState(false);
 
@@ -402,18 +488,22 @@ export default function JdDetails() {
     <div key="tier" className="w-full flex justify-center select-none">Match Tier</div>,
     <div key="confidence" className="w-full flex justify-center select-none">Confidence</div>,
     <div key="mandatory" className="w-full flex justify-center select-none">Mandatory</div>,
+    <div key="importance" className="w-full flex justify-center select-none">Importance</div>,
     <div key="status" className="w-full flex justify-center select-none">Status</div>,
-    <div key="createdAt" className="w-full flex justify-center select-none">Created Date</div>
-  ];
+    <div key="createdAt" className="w-full flex justify-center select-none">Created Date</div>,
+    isHRAdmin && <div key="action" className="w-full flex justify-center select-none">Action</div>,
+  ].filter(Boolean);
 
   const jdSkillsColumns = [
     "canonical_name",
     "match_tier",
     "confidence",
     "mandatory",
+    "importance",
     "status",
-    "created_at"
-  ];
+    "created_at",
+    isHRAdmin && "action",
+  ].filter(Boolean);
 
   const jdSkillsRows = useMemo(() => {
     return paginatedSkills.map((sk) => {
@@ -448,6 +538,17 @@ export default function JdDetails() {
             </span>
           </div>
         ),
+        importance: (
+          <div className="w-full flex justify-center">
+            {sk.importance ? (
+              <span className={`text-[9px] px-2 py-0.5 rounded font-bold border capitalize ${IMPORTANCE_BADGE[sk.importance] || "bg-slate-100 text-slate-500 border-slate-200"}`}>
+                {sk.importance}
+              </span>
+            ) : (
+              <span className="text-slate-400">—</span>
+            )}
+          </div>
+        ),
         status: (
           <div className="w-full flex justify-center">
             <span className="text-[9px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-bold border border-emerald-100">
@@ -460,35 +561,50 @@ export default function JdDetails() {
             {sk.created_at ? sk.created_at.split("T")[0] : ""}
           </div>
         ),
+        action: (
+          <div className="w-full flex justify-center gap-1.5">
+            <Button variant="outline" size="small" title="Edit Mandatory / Importance" onClick={() => openSkillEdit(sk)}>
+              <Edit2 className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="danger" size="small" title="Remove Skill from JD" onClick={() => setSkillRemoveTarget(sk)}>
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ),
         rowClass: "hover:bg-slate-50/50 transition",
       };
     });
   }, [paginatedSkills, skillsCurrentPage, jdSkillsData]);
 
+  // Selecting/resolving unknown skills is an HR_ADMIN-only action — the
+  // select and action columns only exist for that role; RECRUITER and
+  // HIRING_MANAGER get a plain read-only table.
   const jdUnknownSkillsHeaders = [
-    <div key="select" className="w-full flex justify-center select-none">
-      <input
-        type="checkbox"
-        checked={allUnknownSkillsSelected}
-        onChange={toggleSelectAllUnknownSkills}
-        className="h-3.5 w-3.5 cursor-pointer accent-indigo-600"
-      />
-    </div>,
+    isHRAdmin && (
+      <div key="select" className="w-full flex justify-center select-none">
+        <input
+          type="checkbox"
+          checked={allUnknownSkillsSelected}
+          onChange={toggleSelectAllUnknownSkills}
+          className="h-3.5 w-3.5 cursor-pointer accent-indigo-600"
+        />
+      </div>
+    ),
     <div key="rawSkill" className="w-full flex justify-start select-none">Raw Skill</div>,
     <div key="mandatory" className="w-full flex justify-center select-none">Mandatory</div>,
     <div key="status" className="w-full flex justify-center select-none">Status</div>,
     <div key="createdAt" className="w-full flex justify-center select-none">Created Date</div>,
-    <div key="action" className="w-full flex justify-center select-none">Action</div>
-  ];
+    isHRAdmin && <div key="action" className="w-full flex justify-center select-none">Action</div>,
+  ].filter(Boolean);
 
   const jdUnknownSkillsColumns = [
-    "select",
+    isHRAdmin && "select",
     "raw_text",
     "mandatory",
     "status",
     "created_at",
-    "action"
-  ];
+    isHRAdmin && "action",
+  ].filter(Boolean);
 
   const jdUnknownSkillsRows = useMemo(() => {
     return paginatedUnknownSkills.map((sk) => {
@@ -675,7 +791,10 @@ export default function JdDetails() {
     if (currentJd.skills) return currentJd.skills;
     let rawSkills = currentJd.parsed_skills || currentJd.required_skills || [];
     if (rawSkills && typeof rawSkills === "object" && !Array.isArray(rawSkills)) {
-      const required = Array.isArray(rawSkills.required) ? rawSkills.required : [];
+      // required is a flat list on older JDs, { core, supporting } on current ones.
+      const required = Array.isArray(rawSkills.required)
+        ? rawSkills.required
+        : [...labelList(rawSkills.required?.core), ...labelList(rawSkills.required?.supporting)];
       const preferred = Array.isArray(rawSkills.preferred) ? rawSkills.preferred : [];
       const reqMapped = required.map(sk => {
         if (typeof sk === "string") return { name: sk, mandatory: true, verified: true, weight: 15, confidence: 90, mappedTo: sk, mappingType: "Alias" };
@@ -1001,9 +1120,10 @@ export default function JdDetails() {
           { id: "extracted_json", label: "Extracted JSON" },
           { id: "jd_skills", label: "JD Skill" },
           { id: "jd_unknown_skills", label: "JD Unknown Skills" },
-          { id: "campaigns", label: "Campaigns" },
+          // RECRUITER and HIRING_MANAGER don't get the Campaigns tab here.
+          { id: "campaigns", label: "Campaigns", show: !isRecruiter && !isHiringManager },
           { id: "versions", label: "Version History" },
-        ].map((t) => (
+        ].filter((t) => t.show !== false).map((t) => (
           <button
             key={t.id}
             onClick={() => {
@@ -1138,38 +1258,85 @@ export default function JdDetails() {
                       )}
                     </div>
 
+                    {(() => {
+                      const groups = requiredSkillGroups(currentJd.extracted_json.required_skills);
+                      const hasRequired = groups.core.length + groups.supporting.length + groups.unclassified.length > 0;
+                      return (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <h4 className="text-[10px] font-bold text-slate-450 uppercase tracking-wider mb-2">Required Skills</h4>
+                            {!hasRequired ? (
+                              <p className="text-xs text-slate-500 italic">None extracted.</p>
+                            ) : (
+                              <div className="space-y-2.5">
+                                {groups.core.length > 0 && (
+                                  <div>
+                                    <span className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Core</span>
+                                    <SkillChips items={groups.core} chipClassName="bg-blue-100 text-blue-800 border-blue-200" />
+                                  </div>
+                                )}
+                                {groups.supporting.length > 0 && (
+                                  <div>
+                                    <span className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Supporting</span>
+                                    <SkillChips items={groups.supporting} chipClassName="bg-blue-50 text-blue-700 border-blue-100" />
+                                  </div>
+                                )}
+                                {groups.unclassified.length > 0 && (
+                                  <SkillChips items={groups.unclassified} chipClassName="bg-blue-50 text-blue-700 border-blue-100" />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="text-[10px] font-bold text-slate-450 uppercase tracking-wider mb-2">Preferred Skills</h4>
+                            <SkillChips
+                              items={labelList(currentJd.extracted_json.preferred_skills)}
+                              chipClassName="bg-indigo-50 text-indigo-700 border-indigo-100"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {currentJd.extracted_json.aliases && Object.keys(currentJd.extracted_json.aliases).length > 0 && (
+                      <div>
+                        <h4 className="text-[10px] font-bold text-slate-450 uppercase tracking-wider mb-2">Skill Aliases</h4>
+                        <div className="space-y-1.5">
+                          {Object.entries(currentJd.extracted_json.aliases).map(([skill, aliases]) => (
+                            <div key={skill} className="flex flex-wrap items-center gap-1.5 text-xs">
+                              <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded font-bold">{skill}</span>
+                              <span className="text-slate-400 font-semibold">also matches</span>
+                              <SkillChips items={labelList(aliases)} chipClassName="bg-slate-100 text-slate-700 border-slate-200" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Domain capabilities - business processes / functional areas, scored against resume experience (never a hard gate) */}
+                {currentJd.extracted_json.domain_capabilities && (
+                  <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest border-b pb-2.5 mb-4">Domain Capabilities</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <h4 className="text-[10px] font-bold text-slate-450 uppercase tracking-wider mb-2">Required Skills</h4>
-                        {currentJd.extracted_json.required_skills && currentJd.extracted_json.required_skills.length > 0 ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            {currentJd.extracted_json.required_skills.map((skill, index) => (
-                              <span key={index} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded font-bold">
-                                {entryLabel(skill)}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-500 italic">None extracted.</p>
-                        )}
+                        <h4 className="text-[10px] font-bold text-slate-450 uppercase tracking-wider mb-2">Required</h4>
+                        <SkillChips
+                          items={labelList(currentJd.extracted_json.domain_capabilities.required)}
+                          chipClassName="bg-emerald-50 text-emerald-700 border-emerald-100"
+                        />
                       </div>
                       <div>
-                        <h4 className="text-[10px] font-bold text-slate-450 uppercase tracking-wider mb-2">Preferred Skills</h4>
-                        {currentJd.extracted_json.preferred_skills && currentJd.extracted_json.preferred_skills.length > 0 ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            {currentJd.extracted_json.preferred_skills.map((skill, index) => (
-                              <span key={index} className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded font-bold">
-                                {entryLabel(skill)}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-500 italic">None extracted.</p>
-                        )}
+                        <h4 className="text-[10px] font-bold text-slate-450 uppercase tracking-wider mb-2">Preferred</h4>
+                        <SkillChips
+                          items={labelList(currentJd.extracted_json.domain_capabilities.preferred)}
+                          chipClassName="bg-teal-50 text-teal-700 border-teal-100"
+                        />
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Responsibilities */}
                 <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
@@ -1300,7 +1467,7 @@ export default function JdDetails() {
       )}
 
       {/* --- CAMPAIGNS TAB --- */}
-      {activeTab === "campaigns" && (
+      {activeTab === "campaigns" && !isRecruiter && !isHiringManager && (
         <div className="space-y-6">
           {/* Header row */}
           <div className="flex justify-between items-center bg-slate-50/50 p-5 rounded-xl border border-slate-200">
@@ -1327,25 +1494,26 @@ export default function JdDetails() {
               </div>
             </div>
 
-            {/* Right section: Action Buttons */}
-            <div className="flex-1 flex items-center justify-end gap-3">
-              <Button
-                size="small"
-                variant="primary"
-                disabled={!isJdCampaignEligible}
-                title={!isJdCampaignEligible
-                  ?"Campaigns require a verified,active JD - resolve unknown skills first."
-                  :undefined}
-                onClick={() => {
-                  setCampaignForm(DEFAULT_CAMPAIGN_FORM);
-                  setLinkCampaignModalOpen(true);
-                }}
-                className="flex items-center gap-1.5 font-bold shadow-sm"
-              >
-                <Plus className="h-3.5 w-3.5" /> New campaign
-              </Button>
-              
-            </div>
+            {/* Right section: Action Buttons — campaign creation is HR_ADMIN only */}
+            {isHRAdmin && (
+              <div className="flex-1 flex items-center justify-end gap-3">
+                <Button
+                  size="small"
+                  variant="primary"
+                  disabled={!isJdCampaignEligible}
+                  title={!isJdCampaignEligible
+                    ?"Campaigns require a verified,active JD - resolve unknown skills first."
+                    :undefined}
+                  onClick={() => {
+                    setCampaignForm(DEFAULT_CAMPAIGN_FORM);
+                    setLinkCampaignModalOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 font-bold shadow-sm"
+                >
+                  <Plus className="h-3.5 w-3.5" /> New campaign
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Campaign Cards Grid */}
@@ -1513,12 +1681,14 @@ export default function JdDetails() {
                           >
                             <Eye className="h-3 w-3" /> Compare diff
                           </button>
-                          <button
-                            onClick={() => setRestoreConfirmVersion(hist.version)}
-                            className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-amber-50 hover:text-amber-700 rounded text-[10px] font-bold transition"
-                          >
-                            <RefreshCw className="h-3 w-3" /> Restore state
-                          </button>
+                          {isHRAdmin && (
+                            <button
+                              onClick={() => setRestoreConfirmVersion(hist.version)}
+                              className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-amber-50 hover:text-amber-700 rounded text-[10px] font-bold transition"
+                            >
+                              <RefreshCw className="h-3 w-3" /> Restore state
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1688,6 +1858,106 @@ export default function JdDetails() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Edit JD Skill — mandatory flag + core/supporting importance */}
+      <Modal isOpen={!!skillEditTarget} onClose={closeSkillDialogs} title="Edit JD Skill" width="460px">
+        {skillEditTarget && (
+          <div className="space-y-4">
+            <p className="text-[12px] text-slate-600">
+              <span className="font-bold text-slate-900">{skillEditTarget.canonical_name}</span>
+            </p>
+
+            <div>
+              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Requirement</span>
+              <div className="flex gap-2">
+                {[
+                  { value: true, label: "Mandatory" },
+                  { value: false, label: "Preferred" },
+                ].map((option) => (
+                  <button
+                    key={option.label}
+                    type="button"
+                    onClick={() => setSkillEditForm((prev) => ({ ...prev, mandatory: option.value }))}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition ${
+                      skillEditForm.mandatory === option.value
+                        ? "bg-blue-50 text-blue-700 border-blue-200"
+                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {skillEditForm.mandatory && (
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Importance</span>
+                <div className="flex gap-2">
+                  {[
+                    { value: "core", label: "Core", hint: "Hard requirement - gated" },
+                    { value: "supporting", label: "Supporting", hint: "Scored, not gated" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setSkillEditForm((prev) => ({ ...prev, importance: option.value }))}
+                      className={`flex-1 px-3 py-2 rounded-lg text-left border transition ${
+                        skillEditForm.importance === option.value
+                          ? "bg-indigo-50 border-indigo-200"
+                          : "bg-white border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className="block text-xs font-semibold text-slate-800">{option.label}</span>
+                      <span className="block text-[10px] text-slate-500">{option.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-100">
+              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-[12px] text-amber-700">
+                Changes apply to future scoring. Skills can't be edited while this JD is used by an active campaign.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" size="small" onClick={closeSkillDialogs} disabled={isSkillSaving}>
+                Cancel
+              </Button>
+              <Button variant="primary" size="small" loading={isSkillSaving} onClick={handleSaveSkillEdit}>
+                Save
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Remove JD Skill — the skill stays in the skill ontology */}
+      <Modal isOpen={!!skillRemoveTarget} onClose={closeSkillDialogs} title="Remove Skill from JD" width="460px">
+        {skillRemoveTarget && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-100">
+              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-[12px] text-amber-700">
+                <span className="font-bold">{skillRemoveTarget.canonical_name}</span> will no longer be required or scored for this JD.
+                The skill itself stays in the skill ontology.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" size="small" onClick={closeSkillDialogs} disabled={isSkillSaving}>
+                Cancel
+              </Button>
+              <Button variant="danger" size="small" loading={isSkillSaving} onClick={handleConfirmSkillRemove}>
+                Remove
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Restore Confirmation Dialog */}

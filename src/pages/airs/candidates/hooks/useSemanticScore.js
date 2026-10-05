@@ -6,6 +6,8 @@ export default function useSemanticScore(campaignCandidateId) {
   const [breakdown, setBreakdown] = useState(null);
   const [loading, setLoading] = useState(Boolean(campaignCandidateId));
   const [error, setError] = useState(null);
+  // Set when this layer's task dead-lettered (backend `failure` block) - null otherwise.
+  const [failure, setFailure] = useState(null);
 
   const fetchBreakdown = useCallback(async () => {
     if (!campaignCandidateId) return;
@@ -13,11 +15,13 @@ export default function useSemanticScore(campaignCandidateId) {
     setError(null);
     try {
       const response = await getSemanticScoreBreakdown(campaignCandidateId);
+      setFailure((response?.data ?? response)?.failure ?? null);
       const mapped = mapSemanticScoreBreakdown(response);
       setBreakdown(mapped);
     } catch (err) {
       setError(err);
       setBreakdown(null);
+      setFailure(null);
     } finally {
       setLoading(false);
     }
@@ -32,5 +36,5 @@ export default function useSemanticScore(campaignCandidateId) {
     fetchBreakdown();
   }, [campaignCandidateId, fetchBreakdown]);
 
-  return { breakdown, loading, error, refetch: fetchBreakdown };
+  return { breakdown, failure, loading, error, refetch: fetchBreakdown };
 }

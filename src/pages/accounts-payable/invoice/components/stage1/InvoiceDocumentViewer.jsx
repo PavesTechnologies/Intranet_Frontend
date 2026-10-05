@@ -39,6 +39,11 @@ function downloadBlobUrl(url, fileName) {
  * (e.g. the upload session was resumed after a page refresh), this renders a filename-only
  * fallback instead of fabricating a preview.
  *
+ * Sizes to its own content (the PDF page at the current zoom), not a fixed/viewport-relative
+ * box — so at the default 100% zoom a typical single-page invoice renders in full with no
+ * internal scrollbar. The parent (Stage1ReviewSection) makes this column `sticky`, so it stays
+ * in view alongside the form next to it, however long that form is.
+ *
  * @param {Object} props
  * @param {string|null} props.fileUrl
  * @param {string} [props.originalFilename]
@@ -81,7 +86,7 @@ export default function InvoiceDocumentViewer({
   const pageWidth = BASE_PAGE_WIDTH * scale;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <div className="flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white">
       <div className="border-b border-gray-100 px-4 py-3">
         <h3 className="truncate text-sm font-semibold text-gray-800">
           {title}
@@ -165,7 +170,7 @@ export default function InvoiceDocumentViewer({
         </div>
       )}
 
-      <div className="flex flex-1 items-start justify-center overflow-auto bg-gray-100 p-4">
+      <div className="flex items-start justify-center overflow-auto bg-gray-100 p-4">
         {!fileUrl && (
           <div className="flex flex-col items-center gap-2 py-16 text-center text-gray-400">
             <FileText className="h-10 w-10" aria-hidden="true" />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import {
   AlertTriangle,
@@ -34,6 +34,14 @@ const emptyForm = () => ({
   paymentTerms: "",
 });
 
+/** Blank for merge purposes — an extracted value may fill any of these. */
+const isBlank = (value) =>
+  value === null || value === undefined || String(value).trim() === "";
+
+/** Flagged only after extraction has finished (see runExtraction). */
+const REQUIRED_FIELDS = ["vendorId"];
+const REQUIRED_MESSAGE = "Required — not found in the document. Please select it.";
+
 const ExtractedBadge = () => (
   <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-blue-600">
     <Sparkles className="h-3 w-3" aria-hidden="true" />
@@ -64,6 +72,12 @@ export default function QuotationFormModal({
   const [form, setForm] = useState(emptyForm());
   const [file, setFile] = useState(null);
   const [errors, setErrors] = useState({});
+
+  // Extraction resolves long after it was started, by which time the user may have typed
+  // into the very fields it is about to fill. Reading the form through a ref means the
+  // merge sees what is on screen now, not what it was when the file was chosen.
+  const formRef = useRef(form);
+  formRef.current = form;
 
   // Extraction is intentionally tracked separately from form submission state (createQuotation
   // below) — a failed/slow extraction must never block manual entry or final submission.
@@ -120,10 +134,24 @@ useEffect(() => {
     return;
   }
 
+  // Only fill an empty selection, or refine one this same extraction put there — a vendor
+  // the user picked by hand is never replaced.
+  if (!isBlank(formRef.current.vendorId) && !extractedFieldKeys.has("vendorId")) {
+    setPendingVendorId(null);
+    return;
+  }
+
   setForm((previous) => ({
     ...previous,
     vendorId: match.value,
   }));
+
+  setErrors((previous) => {
+    if (!previous.vendorId) return previous;
+    const next = { ...previous };
+    delete next.vendorId;
+    return next;
+  });
 
   setExtractedFieldKeys((previous) => {
     const next = new Set(previous);
@@ -132,7 +160,7 @@ useEffect(() => {
   });
 
   setPendingVendorId(null);
-}, [pendingVendorId, vendorsLoading, vendorOptions]);
+}, [pendingVendorId, vendorsLoading, vendorOptions, extractedFieldKeys]);
 
   const markExtracted = (key) => extractedFieldKeys.has(key);
 
@@ -178,24 +206,50 @@ useEffect(() => {
     setExtractionError(null);
     setExtractionCompleted(false);
 
+    // Nothing is "missing" while extraction is still running.
+    setErrors((previous) => {
+      const next = { ...previous };
+      REQUIRED_FIELDS.forEach((key) => delete next[key]);
+      return next;
+    });
+
     try {
       const response = await extractQuotation.mutateAsync(selectedFile);
       const data = response?.data || {};
 
       const patch = buildQuotationFormPatch(data);
+      const current = formRef.current;
 
-      setForm((previous) => ({
-        ...previous,
-        ...patch,
-      }));
+      // An extracted value only ever fills a blank — anything the user typed while
+      // extraction was running stands.
+      const applied = {};
+      Object.entries(patch).forEach(([key, value]) => {
+        if (isBlank(current[key])) {
+          applied[key] = value;
+        }
+      });
 
-      setExtractedFieldKeys(new Set(Object.keys(patch)));
+      const merged = { ...current, ...applied };
+
+      setForm(merged);
+      setExtractedFieldKeys(new Set(Object.keys(applied)));
 
       if (data.vendor_id !== undefined && data.vendor_id !== null) {
         setPendingVendorId(data.vendor_id);
       }
 
       setExtractionCompleted(true);
+
+      // Required fields are only flagged once extraction has had its chance to fill them,
+      // so the form never shows "Required" against something that is about to be answered.
+      setErrors((previous) => {
+        const next = { ...previous };
+        REQUIRED_FIELDS.forEach((key) => {
+          if (isBlank(merged[key])) next[key] = REQUIRED_MESSAGE;
+          else delete next[key];
+        });
+        return next;
+      });
     } catch (err) {
       setExtractionError(
         getApiErrorMessage(

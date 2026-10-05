@@ -45,7 +45,70 @@ export const PROCUREMENT_PERMISSIONS = {
 
   PO_VIEW: "PO_VIEW",
   PO_CREATE: "PO_CREATE",
+
+  // Vendor availability + onboarding branch (Backend/API_Layer/routes/vendor_onboarding_route.py).
+  // Each backend route accepts any-of a list, so a Procurement Officer who already holds
+  // QUOTATION_* / VENDOR_SELECT passes without a dedicated onboarding permission — these are
+  // the dedicated codes, checked first by the hook below.
+  VENDOR_AVAILABILITY_CHECK: "VENDOR_AVAILABILITY_CHECK",
+  ONBOARDING_VIEW: "ONBOARDING_VIEW",
+  ONBOARDING_CREATE: "ONBOARDING_CREATE",
+  ONBOARDING_ASSIGN: "ONBOARDING_ASSIGN",
+  ONBOARDING_PROCESS: "ONBOARDING_PROCESS",
+
+  // NDA lifecycle (Backend/API_Layer/routes/nda_route.py).
+  NDA_VIEW: "NDA_VIEW",
+  NDA_GENERATE: "NDA_GENERATE",
+  NDA_SEND: "NDA_SEND",
+  // The signed-NDA upload gate. NOTE: the backend's constant is named NDA_UPLOAD_SIGNED but
+  // the permission code it checks for is "NDA_UPLOAD" (nda_route.py) — this is the code.
+  NDA_UPLOAD: "NDA_UPLOAD",
 };
+
+/**
+ * The any-of lists the backend routes actually check, mirrored so the UI hides exactly what
+ * the API would reject. Keep these in step with the route-level constants:
+ *   vendor_onboarding_route.py — ONBOARDING_VIEW/CREATE/ASSIGN/PROCESS
+ *   nda_route.py               — NDA_VIEW/GENERATE/SEND
+ *   procurement_route.py       — vendor-availability
+ */
+export const ONBOARDING_ANY = {
+  VIEW: [PROCUREMENT_PERMISSIONS.ONBOARDING_VIEW, PROCUREMENT_PERMISSIONS.QUOTATION_VIEW],
+  CREATE: [PROCUREMENT_PERMISSIONS.ONBOARDING_CREATE, PROCUREMENT_PERMISSIONS.QUOTATION_CREATE],
+  ASSIGN: [PROCUREMENT_PERMISSIONS.ONBOARDING_ASSIGN, PROCUREMENT_PERMISSIONS.QUOTATION_CREATE],
+  PROCESS: [PROCUREMENT_PERMISSIONS.ONBOARDING_PROCESS, PROCUREMENT_PERMISSIONS.QUOTATION_CREATE],
+};
+
+export const NDA_ANY = {
+  VIEW: [
+    PROCUREMENT_PERMISSIONS.NDA_VIEW,
+    PROCUREMENT_PERMISSIONS.INVITE_VENDOR,
+    PROCUREMENT_PERMISSIONS.SEND_RFQ,
+  ],
+  GENERATE: [
+    PROCUREMENT_PERMISSIONS.NDA_GENERATE,
+    PROCUREMENT_PERMISSIONS.INVITE_VENDOR,
+    PROCUREMENT_PERMISSIONS.SEND_RFQ,
+  ],
+  SEND: [
+    PROCUREMENT_PERMISSIONS.NDA_SEND,
+    PROCUREMENT_PERMISSIONS.INVITE_VENDOR,
+    PROCUREMENT_PERMISSIONS.SEND_RFQ,
+  ],
+  // Mirrors NDA_UPLOAD_SIGNED in nda_route.py exactly.
+  UPLOAD_SIGNED: [
+    PROCUREMENT_PERMISSIONS.NDA_UPLOAD,
+    PROCUREMENT_PERMISSIONS.NDA_SEND,
+    PROCUREMENT_PERMISSIONS.INVITE_VENDOR,
+    PROCUREMENT_PERMISSIONS.SEND_RFQ,
+  ],
+};
+
+export const VENDOR_AVAILABILITY_ANY = [
+  PROCUREMENT_PERMISSIONS.VENDOR_AVAILABILITY_CHECK,
+  PROCUREMENT_PERMISSIONS.VENDOR_SELECT,
+  PROCUREMENT_PERMISSIONS.QUOTATION_VIEW,
+];
 
 /**
  * Any one of these lets a user land on the /procurement page at all — each tab inside it is

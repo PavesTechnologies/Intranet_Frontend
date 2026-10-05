@@ -1,11 +1,17 @@
-// Client-side helpers for the Recurring Billing Configuration wizard step.
+// Client-side helpers for the Recurring/Fixed Price Billing Configuration
+// wizard steps.
 //
-// This file intentionally contains only date-range validation. Billing
-// periods and amounts are never computed on the frontend — the backend's
-// generated BillingSchedule (see getBillingRecurringSchedule /
-// getBillingRecurringScheduleByBillingConfigurationId in
-// billingConfigurationService.js) is the sole source of truth and is what
-// drives the "Billing Schedule (Preview)" table.
+// Billing periods/amounts are still ultimately owned by the backend once a
+// configuration is saved — the backend's generated BillingSchedule (see
+// getBillingRecurringSchedule / getBillingRecurringScheduleByBillingConfigurationId
+// in billingConfigurationService.js) remains the source of truth and, once
+// available, is what the "Billing Schedule (Preview)" table displays.
+// Before that exists (or for Fixed Price, which has no backend schedule
+// endpoint at all), computeBillingSchedulePreview below derives the same
+// preview purely from the current, unsaved form state (Billing Frequency's
+// durationValue/durationUnit, Effective From/To, and the Contract Value) so
+// the preview updates immediately as those fields change, without creating
+// any billing_schedule records.
 
 import { formatDisplayDate } from "./format";
 
@@ -65,3 +71,144 @@ export function getRecurringDateErrors({
 
 export const hasRecurringDateErrors = (errors) =>
   Boolean(errors?.recurringStartDate || errors?.recurringEndDate);
+
+function parseDateOnly(value) {
+  const dateOnly = toDateOnly(value);
+  if (!dateOnly) return null;
+  const date = new Date(`${dateOnly}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function toDateOnlyString(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+// Steps a date forward by the Billing Frequency's own durationValue/
+// durationUnit (never a hardcoded MONTHLY/QUARTERLY/ANNUALLY branch) — mirrors
+// the unit handling already used by formatBillingFrequencyLabel in
+// billingConfigurationService.js. Returns null for a unit this preview
+// doesn't recognize, so the caller can fall back to "no schedule" instead of
+// guessing.
+function addDuration(date, durationValue, durationUnit) {
+  const unit = String(durationUnit || "").trim().toUpperCase();
+  const next = new Date(date.getTime());
+  if (unit === "MONTHS") {
+    next.setMonth(next.getMonth() + durationValue);
+  } else if (unit === "YEARS") {
+    next.setFullYear(next.getFullYear() + durationValue);
+  } else if (unit === "WEEKS") {
+    next.setDate(next.getDate() + durationValue * 7);
+  } else if (unit === "DAYS") {
+    next.setDate(next.getDate() + durationValue);
+  } else {
+    return null;
+  }
+  return next;
+}
+
+function addDays(date, days) {
+  const next = new Date(date.getTime());
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+// Derives the "Billing Schedule (Preview)" periods/amounts entirely on the
+// frontend, from the current (possibly unsaved) form state — used by the
+// Fixed Price billing form in BillingConfigurationStep.jsx, where the
+// Contract Value genuinely is a single total split across the schedule.
+//
+// NOT for Recurring: a Recurring amount is billed in full on every
+// occurrence (never divided — see countRecurringOccurrences below), so this
+// function must never be called from RecurringBillingForm.
+//
+// Periods step forward from effectiveFrom by durationValue/durationUnit
+// until effectiveTo is reached, with the final period's end date capped at
+// effectiveTo (marking it isPartialPeriod when that cap actually shortened
+// it). The Contract Value is split evenly across the resulting periods, with
+// any rounding remainder folded into the last period so the sum of all
+// period amounts always equals the Contract Value exactly.
+export function computeBillingSchedulePreview({
+  effectiveFrom,
+  effectiveTo,
+  contractValue,
+  durationValue,
+  durationUnit,
+} = {}) {
+  const startDate = parseDateOnly(effectiveFrom);
+  const endDate = parseDateOnly(effectiveTo);
+  const totalAmount = Number(contractValue);
+  const stepValue = Number(durationValue);
+
+  if (!startDate || !endDate || startDate > endDate) return [];
+  if (!Number.isFinite(totalAmount) || totalAmount <= 0) return [];
+  if (!Number.isFinite(stepValue) || stepValue <= 0 || !durationUnit) return [];
+
+  const rawPeriods = [];
+  let cursorStart = startDate;
+  // Backstop against a pathological step producing an unbounded loop — no
+  // real billing frequency needs anywhere near this many periods.
+  let guard = 0;
+  while (cursorStart <= endDate && guard < 1000) {
+    guard += 1;
+    const naturalNextStart = addDuration(cursorStart, stepValue, durationUnit);
+    if (!naturalNextStart) return [];
+
+    const naturalPeriodEnd = addDays(naturalNextStart, -1);
+    const cappedPeriodEnd = naturalPeriodEnd > endDate ? endDate : naturalPeriodEnd;
+
+    rawPeriods.push({
+      periodStartDate: toDateOnlyString(cursorStart),
+      periodEndDate: toDateOnlyString(cappedPeriodEnd),
+      isPartialPeriod: cappedPeriodEnd.getTime() !== naturalPeriodEnd.getTime(),
+    });
+
+    cursorStart = naturalNextStart;
+  }
+
+  if (rawPeriods.length === 0) return [];
+
+  const periodCount = rawPeriods.length;
+  const evenShare = Math.round((totalAmount / periodCount) * 100) / 100;
+  const lastShare = Math.round((totalAmount - evenShare * (periodCount - 1)) * 100) / 100;
+
+  return rawPeriods.map((period, index) => ({
+    periodNumber: index + 1,
+    periodStartDate: period.periodStartDate,
+    periodEndDate: period.periodEndDate,
+    billingAmount: index === periodCount - 1 ? lastShare : evenShare,
+    isPartialPeriod: period.isPartialPeriod,
+    isInvoiced: false,
+  }));
+}
+
+// Derives just the occurrence COUNT for Recurring billing from Effective
+// From/To and the Billing Frequency's durationValue/durationUnit — the same
+// period-stepping rule as computeBillingSchedulePreview above, but with no
+// amount math at all, since a Recurring amount is billed in full on every
+// occurrence rather than split across them. Purely a client-side display
+// estimate (e.g. "~6 occurrences") shown alongside the backend-generated
+// schedule preview; it never drives what gets saved or billed.
+export function countRecurringOccurrences({ effectiveFrom, effectiveTo, durationValue, durationUnit } = {}) {
+  const startDate = parseDateOnly(effectiveFrom);
+  const endDate = parseDateOnly(effectiveTo);
+  const stepValue = Number(durationValue);
+
+  if (!startDate || !endDate || startDate > endDate) return 0;
+  if (!Number.isFinite(stepValue) || stepValue <= 0 || !durationUnit) return 0;
+
+  let cursorStart = startDate;
+  let count = 0;
+  let guard = 0;
+  while (cursorStart <= endDate && guard < 1000) {
+    guard += 1;
+    const naturalNextStart = addDuration(cursorStart, stepValue, durationUnit);
+    if (!naturalNextStart) return count;
+    count += 1;
+    cursorStart = naturalNextStart;
+  }
+
+  return count;
+}

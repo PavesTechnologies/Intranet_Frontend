@@ -91,6 +91,8 @@ export const INTERVIEWER_DIRECTORY = [
   { id: 5, name: "Ranga K", email: "ranga.k@company.com" },
 ];
 
+// For a plain local "HH:MM" (no date, no zone) — a fresh value the viewer
+// just picked in this form, never something parsed out of a server field.
 export function formatTimeLabel(hhmm) {
   if (!hhmm) return "-";
   const d = new Date(`2000-01-01T${hhmm}:00`);
@@ -98,6 +100,7 @@ export function formatTimeLabel(hhmm) {
   return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
+// For a plain local "YYYY-MM-DD" (no zone) — same caveat as formatTimeLabel.
 export function formatDateLabel(dateStr) {
   if (!dateStr) return "-";
   const d = new Date(`${dateStr}T00:00:00`);
@@ -105,19 +108,39 @@ export function formatDateLabel(dateStr) {
   return d.toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" });
 }
 
-// round.date/start_time/end_time have no timezone suffix by the time they
-// reach here (interviewService.js already converted UTC -> local on the
-// way in), so parsing them with no 'Z' suffix reads as local wall-clock
-// time — exactly the comparison these two need against `new Date()`.
+// For the real thing: round.start_at/end_at are UTC instants ("...Z") off
+// the backend. `new Date(iso)` parses that instant correctly; the browser's
+// own toLocaleDateString/toLocaleTimeString then render it in whichever
+// timezone the current viewer's machine is actually set to — never the
+// scheduler's zone, and never a manual offset. This is what every genuine
+// *display* of a round's date/time should go through, in place of the
+// old date/start_time/end_time fields (which are relative to the
+// scheduler's zone, not the viewer's).
+export function formatInterviewDate(isoInstant) {
+  if (!isoInstant) return "-";
+  const d = new Date(isoInstant);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" });
+}
+
+export function formatInterviewTime(isoInstant) {
+  if (!isoInstant) return "-";
+  const d = new Date(isoInstant);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+// Plain instant comparisons — no timezone math needed at all, `Date.now()`
+// and the parsed instant are both timezone-agnostic.
 export function hasRoundStarted(round) {
-  if (!round?.date || !round?.start_time) return false;
-  const startAt = new Date(`${round.date}T${round.start_time}:00`);
+  if (!round?.start_at) return false;
+  const startAt = new Date(round.start_at);
   return !Number.isNaN(startAt.getTime()) && startAt.getTime() <= Date.now();
 }
 
 export function hasRoundEnded(round) {
-  if (!round?.date || !round?.end_time) return false;
-  const endAt = new Date(`${round.date}T${round.end_time}:00`);
+  if (!round?.end_at) return false;
+  const endAt = new Date(round.end_at);
   return !Number.isNaN(endAt.getTime()) && endAt.getTime() <= Date.now();
 }
 

@@ -38,15 +38,3 @@ export function getFieldLocation(extraction, rawKey) {
   if (!box) return null;
   return box;
 }
-
-/**
- * @param {Object} extraction - ExtractedInvoiceResponse.extraction
- * @param {string} rawKey
- * @returns {number | null}
- */
-export function getFieldConfidence(extraction, rawKey) {
-  const fromDetails = extraction?.field_details?.[rawKey]?.confidence;
-  if (typeof fromDetails === "number") return fromDetails;
-  const fromMap = extraction?.field_confidence?.[rawKey];
-  return typeof fromMap === "number" ? fromMap : null;
-}

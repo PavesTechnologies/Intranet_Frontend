@@ -1,152 +1,146 @@
 import { useState } from "react";
-import { toast } from "react-toastify";
+import { Link } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
-import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
 import Pagination from "../../../../components/Pagination/pagination";
 import StatusBadge from "../../../../components/status/statusbadge";
-import Modal from "../../../../components/Modal/modal";
+import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
-import FormInput from "../../../../components/forms/FormInput";
-import { usePayments } from "../hooks/usePayments";
-import { useUpdatePaymentStatusMutation } from "../hooks/usePaymentMutations";
-import { useApLookups } from "../../hooks/useApLookups";
+import EmptyState from "../../procurement/components/EmptyState";
+import { usePaymentHistoryList, usePaymentMetadata } from "../hooks/usePaymentTracking";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { AP_ROUTES } from "../../constants/routes";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
 
-const HEADERS = ["Payment #", "Vendor", "Scheduled", "Paid", "Amount", "Method", "Reference", "Status", "Actions"];
-const COLUMNS = ["id", "vendor", "scheduled", "paid", "amount", "method", "reference", "status", "actions"];
+const HEADERS = [
+  "Invoice #", "Vendor", "Invoice Amount", "TDS", "Net Payable", "Paid",
+  "Last Payment", "Mode", "UTR / Reference", "Status", "Receipts", "",
+];
+const COLUMNS = [
+  "invoiceNumber", "vendor", "invoiceAmount", "tds", "netPayable", "paid",
+  "lastPayment", "mode", "reference", "status", "receipts", "view",
+];
 
-function StatusUpdateModal({ payment, statusOptions, isOpen, onClose }) {
-  const updateStatus = useUpdatePaymentStatusMutation();
-  const [statusCode, setStatusCode] = useState("");
-  const [paymentDate, setPaymentDate] = useState("");
-  const [referenceNumber, setReferenceNumber] = useState(payment?.reference_number || "");
+const STATUS_OPTIONS = [
+  { value: "", label: "All statuses" },
+  { value: "PAID", label: "Paid" },
+  { value: "PARTIALLY_PAID", label: "Partially Paid" },
+];
 
-  if (!payment) return null;
-
-  const handleSubmit = () => {
-    if (!statusCode) {
-      toast.warning("Select a status.");
-      return;
-    }
-    updateStatus.mutate(
-      {
-        paymentId: payment.payment_id,
-        payload: {
-          status_code: statusCode,
-          payment_date: paymentDate || null,
-          reference_number: referenceNumber || null,
-        },
-      },
-      {
-        onSuccess: () => {
-          toast.success("Payment status updated.");
-          onClose();
-        },
-        onError: (error) => toast.error(getApiErrorMessage(error, "Could not update payment status.")),
-      },
-    );
-  };
-
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={`Update Payment #${payment.payment_id}`}
-      size="sm"
-      footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={handleSubmit} loading={updateStatus.isPending}>
-            Save
-          </Button>
-        </div>
-      }
-    >
-      <div className="space-y-4">
-        <FormSelect
-          label="New Status"
-          name="statusCode"
-          options={[{ value: "", label: "Select status" }, ...statusOptions.map((s) => ({ value: s.code, label: s.label }))]}
-          value={statusCode}
-          onChange={(e) => setStatusCode(e.target.value)}
-        />
-        <FormDatePicker label="Payment Date (if cleared/sent)" name="paymentDate" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
-        <FormInput label="Reference Number" name="referenceNumber" value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} />
-      </div>
-    </Modal>
-  );
-}
-
-/** Payment list + status transitions against GET/PATCH /apm/payment. */
+/**
+ * Invoices that have received at least one payment (GET /payment/history), most recently paid
+ * first. One row per invoice — an invoice can have several payments; the row shows the latest and
+ * "View" opens every payment with its receipts.
+ */
 export default function PaymentHistoryPage() {
-  const { paymentStatuses, paymentStatusOptions } = useApLookups();
-  const [statusId, setStatusId] = useState("");
-  const [activePayment, setActivePayment] = useState(null);
+  const { data: metadata } = usePaymentMetadata();
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [paymentMode, setPaymentMode] = useState("");
+  const [paidFrom, setPaidFrom] = useState("");
+  const [paidTo, setPaidTo] = useState("");
+  const debouncedSearch = useDebouncedValue(search.trim());
 
-  const { payments, page, setPage, totalPages, isLoading, isError, error } = usePayments({
-    statusId: statusId ? Number(statusId) : undefined,
+  const { items, total, page, setPage, totalPages, isLoading, isError, error } = usePaymentHistoryList({
+    search: debouncedSearch,
+    status,
+    paymentMode,
+    paidFrom,
+    paidTo,
   });
 
-  const statusOptionsForModal = paymentStatuses.map((s) => ({ code: s.status_code, label: s.status_name }));
-  const statusNameById = Object.fromEntries(paymentStatuses.map((s) => [s.status_id, s.status_name]));
+  const modeLabel = Object.fromEntries((metadata?.paymentModes ?? []).map((m) => [m.value, m.label]));
+  const modeOptions = [{ value: "", label: "All modes" }, ...(metadata?.paymentModes ?? []).map((m) => ({ value: m.value, label: m.label }))];
 
-  const rows = payments.map((payment) => ({
-    id: payment.payment_id,
-    vendor: `Vendor #${payment.vendor_id}`,
-    scheduled: formatDate(payment.scheduled_date),
-    paid: formatDate(payment.payment_date),
-    amount: formatCurrency(Number(payment.total_amount)),
-    method: payment.payment_method,
-    reference: payment.reference_number || "—",
-    status: payment.status_id ? <StatusBadge label={statusNameById[payment.status_id] || `#${payment.status_id}`} size="sm" /> : "—",
-    actions: (
-      <Button variant="outline" size="small" onClick={() => setActivePayment(payment)}>
-        Update Status
-      </Button>
-    ),
-  }));
+  const rows = items.map((invoice) => {
+    const symbol = invoice.currencySymbol;
+    const detailLink = AP_ROUTES.PAYMENT_DETAIL(invoice.invoiceId);
+    return {
+      invoiceNumber: (
+        <Link to={detailLink} className="font-medium text-[#0A0082] hover:underline">
+          {invoice.invoiceNumber}
+        </Link>
+      ),
+      vendor: invoice.vendorName,
+      invoiceAmount: formatCurrency(invoice.invoiceAmount, symbol),
+      tds: invoice.tdsApplicable ? formatCurrency(invoice.tdsAmount, symbol) : "—",
+      netPayable: formatCurrency(invoice.netPayable, symbol),
+      paid: (
+        <div>
+          <div>{formatCurrency(invoice.amountPaid, symbol)}</div>
+          {invoice.remainingAmount > 0 && (
+            <div className="text-xs text-gray-500">Remaining {formatCurrency(invoice.remainingAmount, symbol)}</div>
+          )}
+        </div>
+      ),
+      lastPayment: (
+        <div>
+          <div>{formatDate(invoice.lastPaymentDate)}</div>
+          {invoice.paymentCount > 1 && <div className="text-xs text-gray-500">{invoice.paymentCount} payments</div>}
+        </div>
+      ),
+      mode: modeLabel[invoice.lastPaymentMode] || invoice.lastPaymentMode || "—",
+      reference: invoice.lastPaymentReference || "—",
+      status: <StatusBadge label={invoice.statusName || invoice.statusCode} size="sm" />,
+      receipts: invoice.receiptCount > 0 ? `${invoice.receiptCount} file${invoice.receiptCount === 1 ? "" : "s"}` : "—",
+      view: (
+        <Link to={detailLink} className="text-sm font-medium text-[#0A0082] hover:underline">
+          View
+        </Link>
+      ),
+    };
+  });
+
+  const filtered = Boolean(debouncedSearch || status || paymentMode || paidFrom || paidTo);
 
   return (
     <div className="p-6">
-      <PageHeader title="Payment History" subtitle="All payments and their current status" />
+      <PageHeader
+        title="Payment History"
+        subtitle="Invoices with recorded payments"
+        actions={
+          <Link to={AP_ROUTES.PAYMENT_READY} className="text-sm font-medium text-[#0A0082] hover:underline">
+            ← Ready for Payment
+          </Link>
+        }
+      />
 
-      <div className="mb-4 max-w-xs">
-        <FormSelect
-          label="Filter by Status"
-          name="statusId"
-          options={[{ value: "", label: "All Statuses" }, ...paymentStatusOptions]}
-          value={statusId}
-          onChange={(e) => setStatusId(e.target.value)}
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-5 md:items-end">
+        <FormInput
+          label="Search"
+          name="search"
+          placeholder="Invoice number or vendor"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
+        <FormSelect label="Status" name="status" options={STATUS_OPTIONS} value={status} onChange={(e) => setStatus(e.target.value)} />
+        <FormSelect label="Payment Mode" name="paymentMode" options={modeOptions} value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} />
+        <FormDatePicker label="Paid From" name="paidFrom" value={paidFrom} onChange={(e) => setPaidFrom(e.target.value)} />
+        <FormDatePicker label="Paid To" name="paidTo" value={paidTo} min={paidFrom || undefined} onChange={(e) => setPaidTo(e.target.value)} />
       </div>
 
       {isError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {getApiErrorMessage(error, "Unable to load payments right now.")}
+          {getApiErrorMessage(error, "Unable to load payment history right now.")}
         </div>
+      ) : !isLoading && items.length === 0 ? (
+        <EmptyState title="No payment records found." description={filtered ? "Try clearing the filters." : undefined} />
       ) : (
         <>
           <GenericTable headers={HEADERS} columns={COLUMNS} rows={rows} loading={isLoading} />
-          <Pagination
-            currentPage={page}
-            totalPages={totalPages}
-            onPrevious={() => setPage((p) => Math.max(1, p - 1))}
-            onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-          />
+          <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+            <span>{`${total} invoice${total === 1 ? "" : "s"}`}</span>
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+              onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+            />
+          </div>
         </>
       )}
-
-      <StatusUpdateModal
-        payment={activePayment}
-        statusOptions={statusOptionsForModal}
-        isOpen={Boolean(activePayment)}
-        onClose={() => setActivePayment(null)}
-      />
     </div>
   );
 }

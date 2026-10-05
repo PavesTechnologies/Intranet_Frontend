@@ -35,26 +35,30 @@ export const goodsReceiptService = {
 
   /**
    * Uploads a GRN document for an existing goods receipt. Additional to manual GRN entry — does
-   * not replace it. Per POST /apm/grn/{grn_id}/document.
+   * not replace it. Per POST /apm/goods-receipt/{grn_id}/document — the /apm/grn prefix used to
+   * be the only reachable copy of this (goods_receipt_route.router was mounted at both prefixes),
+   * but /apm/grn is being retired, so this now goes through the same prefix as the rest of the
+   * GRN calls below.
    * @param {string|number} grnId
    * @param {File} file
    */
   uploadGoodsReceiptDocument: async (grnId, file) => {
     const formData = new FormData();
     formData.append("file", file);
-    const res = await api.post(`${BASE}/grn/${Number(grnId)}/document`, formData, {
+    const res = await api.post(`${BASE}/goods-receipt/${Number(grnId)}/document`, formData, {
       headers: authHeaders(),
     });
     return res.data;
   },
 
   /**
-   * Fetches the GRN document for download. Per GET /apm/grn/{grn_id}/document/download.
+   * Fetches the GRN document for download. Per GET /apm/goods-receipt/{grn_id}/document/download
+   * (see uploadGoodsReceiptDocument above for why this moved off /apm/grn).
    * @param {string|number} grnId
    * @returns {Promise<{blob: Blob, contentType: string, fileName: string|null}>}
    */
   downloadGoodsReceiptDocument: async (grnId) => {
-    const res = await api.get(`${BASE}/grn/${Number(grnId)}/document/download`, {
+    const res = await api.get(`${BASE}/goods-receipt/${Number(grnId)}/document/download`, {
       headers: authHeaders(),
       responseType: "blob",
     });

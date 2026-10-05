@@ -34,6 +34,8 @@ import VendorListPage from "./pages/accounts-payable/vendor/pages/VendorListPage
 import VendorDetailPage from "./pages/accounts-payable/vendor/pages/VendorDetailPage.jsx";
 import VendorOnboardingPage from "./pages/accounts-payable/vendor/pages/VendorOnboardingPage.jsx";
 import VendorUpdatePage from "./pages/accounts-payable/vendor/pages/VendorUpdatePage.jsx";
+import InternalRequestsPage from "./pages/accounts-payable/vendor/pages/InternalRequestsPage.jsx";
+import InternalRequestDetailPage from "./pages/accounts-payable/vendor/pages/InternalRequestDetailPage.jsx";
 import InvoiceUploadPage from "./pages/accounts-payable/invoice/pages/InvoiceUploadPage.jsx";
 import InvoiceOcrReviewQueuePage from "./pages/accounts-payable/invoice/pages/InvoiceOcrReviewQueuePage.jsx";
 import InvoiceValidationQueuePage from "./pages/accounts-payable/invoice/pages/InvoiceValidationQueuePage.jsx";
@@ -42,11 +44,19 @@ import InvoiceDetailPage from "./pages/accounts-payable/invoice/pages/InvoiceDet
 import PaymentReadyPage from "./pages/accounts-payable/payment/pages/PaymentReadyPage.jsx";
 import PaymentHistoryPage from "./pages/accounts-payable/payment/pages/PaymentHistoryPage.jsx";
 import PaymentMarkAsPaidPage from "./pages/accounts-payable/payment/pages/PaymentMarkAsPaidPage.jsx";
+import PaymentInvoiceDetailPage from "./pages/accounts-payable/payment/pages/PaymentInvoiceDetailPage.jsx";
+import TdsTrackingPage from "./pages/accounts-payable/tds-tracking/pages/TdsTrackingPage.jsx";
+import TdsTrackingDetailPage from "./pages/accounts-payable/tds-tracking/pages/TdsTrackingDetailPage.jsx";
+import { PAYMENT_ANY_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/paymentPermissions";
+import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/tdsTrackingPermissions";
 import PaymentQueuePage from "./pages/accounts-payable/payment/pages/PaymentQueuePage.jsx";
 import PaymentDetailsPage from "./pages/accounts-payable/payment/pages/PaymentDetailsPage.jsx";
 import APReportsPage from "./pages/accounts-payable/reports/pages/APReportsPage.jsx";
 import APSettingsPage from "./pages/accounts-payable/settings/pages/APSettingsPage.jsx";
 import SystemConfigurationPage from "./pages/accounts-payable/system-configuration/pages/SystemConfigurationPage.jsx";
+import ApprovalPolicyFormPage from "./pages/accounts-payable/system-configuration/pages/ApprovalPolicyFormPage.jsx";
+import { APPROVAL_PERMISSIONS } from "./pages/accounts-payable/constants/approvalPermissions";
+import { INVOICE_PERMISSIONS } from "./pages/accounts-payable/constants/invoicePermissions";
 import {
   PROCUREMENT_PERMISSIONS,
   PROCUREMENT_ANY_VIEW_PERMISSIONS,
@@ -55,6 +65,7 @@ import ProcurementPage from "./pages/accounts-payable/procurement/pages/Procurem
 import PrDetailPage from "./pages/accounts-payable/procurement/pages/PrDetailPage.jsx";
 import PurchaseOrderDetailPage from "./pages/accounts-payable/procurement/pages/PurchaseOrderDetailPage.jsx";
 import RfqDetailPage from "./pages/accounts-payable/procurement/pages/RfqDetailPage.jsx";
+import NotificationCenterPage from "./pages/accounts-payable/notifications/pages/NotificationCenterPage.jsx";
 
 
 // Resource Management
@@ -147,16 +158,13 @@ import AirsPlaceholder from "./pages/airs/pages/AirsPlaceholder.jsx";
 import ResumeIntakePage from "./pages/airs/resume-intake/ResumeIntakePage.jsx";
 import IntakeFlowPage from "./pages/airs/resume-intake/intake/IntakeFlowPage.jsx";
 import ReviewPage from "./pages/airs/resume-intake/intake/ReviewPage.jsx";
-import CandidateRankingPage from "./pages/airs/candidates/CandidateRankingPage.jsx";
 import CandidateScorePage from "./pages/airs/candidates/CandidateScore/CandidateScorePage.jsx";
-import InterviewQueuePage from "./pages/airs/interview-queue/InterviewQueuePage.jsx";
+import HMReviewPage from "./pages/airs/hm-review/HMReviewPage.jsx";
 import InterviewCalendarPage from "./pages/airs/interview-calendar/InterviewCalendarPage.jsx";
 import PipelineBoardPage from "./pages/airs/pipeline/PipelineBoardPage.jsx";
-import GlobalCandidatesPage from "./pages/airs/global-candidates/GlobalCandidatesPage.jsx";
 import PipelineCandidateScorecardPage from "./pages/airs/pipeline/PipelineCandidateScorecardPage.jsx";
 import TalentPoolPage from "./pages/airs/talent-pool/TalentPoolPage.jsx";
 import TalentPoolCandidateProfilePage from "./pages/airs/talent-pool/profile/TalentPoolCandidateProfilePage.jsx";
-import AnalyticsPage from "./pages/airs/analytics/AnalyticsPage.jsx";
 import SettingsPage from "./pages/airs/settings/SettingsPage.jsx";
 import SkillOntologyPage from "./pages/airs/skill-ontology/SkillOntologyPage.jsx";
 import SkillDetailPage from "./pages/airs/skill-ontology/SkillDetailPage.jsx";
@@ -292,6 +300,7 @@ import BillingDataAcquisition from "./pages/account_receivable/pages/BillingData
 import AcquisitionDetail from "./pages/account_receivable/pages/AcquisitionDetail.jsx";
 import TaxCalculationPage from "./pages/account_receivable/pages/TaxCalculation.jsx";
 import InvoiceGeneration from "./pages/account_receivable/pages/InvoiceGeneration.jsx";
+import InvoiceGenerationDetail from "./pages/account_receivable/pages/InvoiceGenerationDetail.jsx";
 import InvoiceApproval from "./pages/account_receivable/pages/InvoiceApproval.jsx";
 import InvoiceDetail from "./pages/account_receivable/pages/InvoiceDetail.jsx";
 import Configurations from "./pages/account_receivable/pages/Configurations.jsx";
@@ -301,6 +310,7 @@ import BillingFrequencyMasterPage from "./pages/account_receivable/pages/master-
 import PaymentTermsMasterPage from "./pages/account_receivable/pages/master-data/PaymentTermsMasterPage.jsx";
 import TaxConfigurationMasterPage from "./pages/account_receivable/pages/master-data/TaxConfigurationMasterPage.jsx";
 import TaxConfigurationRegionDetailPage from "./pages/account_receivable/pages/master-data/TaxConfigurationRegionDetailPage.jsx";
+import CompanyProfilePage from "./pages/account_receivable/pages/master-data/CompanyProfilePage.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -309,8 +319,8 @@ import OnboardingSummaryPage from "./pages/employee-onboarding/summary-page/Summ
 
 
 
-const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { isAuthenticated, user, logout } = useAuth();
+const ProtectedRoute = ({ children, allowedRoles, requiredPermissions }) => {
+  const { isAuthenticated, user, logout, hasAnyPermission } = useAuth();
   const location = useLocation();
   const isfirsttlogin = localStorage.getItem("isfirsttlogin");
 
@@ -336,13 +346,23 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
       normalizedAllowedRoles.includes(role.toUpperCase())
     );
     // console.log("ProtectedRoute check:", {
-      // isAuthenticated,
-      // user,
-      // allowedRoles,
-      // match: hasRole,
+    // isAuthenticated,
+    // user,
+    // allowedRoles,
+    // match: hasRole,
     // });
 
     if (!hasRole) {
+      return <Navigate to="/unauthorized" replace />;
+    }
+  }
+
+  // ✅ Permission-based restriction check (any-of) — for modules where UMS permission codes are
+  // the source of truth instead of a frontend role list (e.g. Invoice Management: a pure
+  // Approver or Finance user need not hold any of Admin/AP_Executive/Finance_Executive to be
+  // let in). Independent of allowedRoles above — a route may use either, not necessarily both.
+  if (requiredPermissions && requiredPermissions.length > 0) {
+    if (!hasAnyPermission(requiredPermissions)) {
       return <Navigate to="/unauthorized" replace />;
     }
   }
@@ -398,6 +418,19 @@ const RoleOffEntry = () => {
   return <Navigate to="/resource-management/roleoff/pm" replace />;
 };
 
+// AIRS routes were renamed /airs/* -> /ai-screening/*. Old links (bookmarks,
+// open tabs, anything shared before the rename) still point at /airs/*, so
+// they're redirected instead of falling through to "no routes matched".
+const LegacyAirsRedirect = () => {
+  const { pathname, search, hash } = useLocation();
+  return (
+    <Navigate
+      to={`${pathname.replace("/airs", "/ai-screening")}${search}${hash}`}
+      replace
+    />
+  );
+};
+
 // ✅ Application Routes
 const AppRoutes = () => {
   const { isAuthenticated, user, logout } = useAuth();
@@ -432,6 +465,9 @@ const AppRoutes = () => {
       <Routes>
         {/* Public Route */}
         <Route path="/" element={<LoginPage />} />
+        {/* No page lives here — "/" is the login route. This exists so the
+            legacy navigate("/login") calls don't render a blank screen. */}
+        <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="/register" element={<Register />} />
         {/* Fully public, unauthenticated — no session, no app shell. See
             src/pages/public/InterviewFeedbackFormPage.jsx. */}
@@ -487,6 +523,22 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path={AP_ROUTES.VENDOR_INTERNAL_REQUESTS}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <InternalRequestsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.VENDOR_INTERNAL_REQUEST_DETAIL()}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <InternalRequestDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path={AP_ROUTES.VENDOR_DETAIL()}
             element={
               <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
@@ -505,7 +557,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.INVOICE_UPLOAD}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <InvoiceUploadPage />
               </ProtectedRoute>
             }
@@ -513,7 +565,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.INVOICE_OCR_REVIEW}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <InvoiceOcrReviewQueuePage />
               </ProtectedRoute>
             }
@@ -521,7 +573,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.INVOICE_VALIDATION}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <InvoiceValidationQueuePage />
               </ProtectedRoute>
             }
@@ -529,7 +581,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.INVOICE_LIST}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <InvoiceListPage />
               </ProtectedRoute>
             }
@@ -537,7 +589,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.INVOICE_DETAIL()}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <InvoiceDetailPage />
               </ProtectedRoute>
             }
@@ -545,7 +597,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.PAYMENT_QUEUE}
             element={
-              <ProtectedRoute allowedRoles={["AP_Executive", "Admin", "Super_Admin"]}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <PaymentQueuePage />
               </ProtectedRoute>
             }
@@ -553,15 +605,17 @@ const AppRoutes = () => {
           {/* <Route
             path={AP_ROUTES.PAYMENT_QUEUE_DETAIL()}
             element={
-              <ProtectedRoute allowedRoles={["AP_Executive", "Admin", "Super_Admin"]}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <PaymentDetailsPage />
               </ProtectedRoute>
             }
           /> */}
+          {/* Payment Management / TDS Tracking — gated on the same permissions their backend
+              endpoints enforce (payment_route.py / tds_tracking_route.py), not INVOICE_VIEW. */}
           <Route
             path={AP_ROUTES.PAYMENT_READY}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={PAYMENT_ANY_VIEW_PERMISSIONS}>
                 <PaymentReadyPage />
               </ProtectedRoute>
             }
@@ -569,15 +623,39 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.PAYMENT_HISTORY}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={PAYMENT_ANY_VIEW_PERMISSIONS}>
                 <PaymentHistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.PAYMENT_DETAIL()}
+            element={
+              <ProtectedRoute requiredPermissions={PAYMENT_ANY_VIEW_PERMISSIONS}>
+                <PaymentInvoiceDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.TDS_TRACKING}
+            element={
+              <ProtectedRoute requiredPermissions={TDS_TRACKING_ANY_VIEW_PERMISSIONS}>
+                <TdsTrackingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.TDS_TRACKING_DETAIL()}
+            element={
+              <ProtectedRoute requiredPermissions={TDS_TRACKING_ANY_VIEW_PERMISSIONS}>
+                <TdsTrackingDetailPage />
               </ProtectedRoute>
             }
           />
           <Route
             path={AP_ROUTES.PAYMENT_MARK_PAID()}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <PaymentMarkAsPaidPage />
               </ProtectedRoute>
             }
@@ -603,6 +681,32 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
                 <SystemConfigurationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.SYSTEM_CONFIG_APPROVAL_POLICY_NEW}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} permission={APPROVAL_PERMISSIONS.APPROVAL_POLICY_MANAGE}>
+                <ApprovalPolicyFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.SYSTEM_CONFIG_APPROVAL_POLICY_EDIT()}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} permission={APPROVAL_PERMISSIONS.APPROVAL_POLICY_MANAGE}>
+                <ApprovalPolicyFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.NOTIFICATIONS}
+            element={
+              // Every AP user may read their own notifications - the backend derives the
+              // recipient from the JWT, so there is nothing finer to gate on here.
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <NotificationCenterPage />
               </ProtectedRoute>
             }
           />
@@ -711,7 +815,7 @@ const AppRoutes = () => {
             />
             <Route
               path="billing-data-acquisition"
-              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><BillingDataAcquisition /></ProtectedRoute>}
+              element={<Navigate to="/account-receivable/billing-data-acquisition/workspace" replace />}
             />
             <Route
               path="billing-data-acquisition/workspace"
@@ -734,8 +838,20 @@ const AppRoutes = () => {
               element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxCalculationPage /></ProtectedRoute>}
             />
             <Route
+              path="tax-calculation/occurrence/:occurrenceId"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxCalculationPage /></ProtectedRoute>}
+            />
+            <Route
               path="invoice-generation"
               element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><InvoiceGeneration /></ProtectedRoute>}
+            />
+            <Route
+              path="invoice-generation/:snapshotId"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><InvoiceGenerationDetail /></ProtectedRoute>}
+            />
+            <Route
+              path="invoice-generation/occurrence/:occurrenceId"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><InvoiceGenerationDetail /></ProtectedRoute>}
             />
             <Route
               path="invoice-approval"
@@ -743,6 +859,10 @@ const AppRoutes = () => {
             />
             <Route
               path="invoices/:snapshotId"
+              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><InvoiceDetail /></ProtectedRoute>}
+            />
+            <Route
+              path="invoices/occurrence/:occurrenceId"
               element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><InvoiceDetail /></ProtectedRoute>}
             />
             <Route
@@ -781,6 +901,14 @@ const AppRoutes = () => {
             <Route
               path="master-data/tax-configuration/:taxRegionId"
               element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><TaxConfigurationRegionDetailPage /></ProtectedRoute>}
+            />
+            <Route
+              path="master-data/company-profile"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><CompanyProfilePage /></ProtectedRoute>}
+            />
+            <Route
+              path="configurations/company-profile"
+              element={<Navigate to="/account-receivable/master-data/company-profile" replace />}
             />
           </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />
@@ -1432,13 +1560,14 @@ const AppRoutes = () => {
             }
           />
           {/* Was a tab inside CampaignDetails.jsx — moved to its own page with
-              a campaign selector. Same roles that could see that tab
-              (canSeePipeline = HR_ADMIN/RECRUITER); HIRING_MANAGER is
-              deliberately excluded, matching the tab's old visibility. */}
+              a campaign selector. Now also in HIRING_MANAGER's sidebar menu,
+              so it's allowed here too — the backend campaign list/interviews
+              calls are already scoped to whichever campaigns each role can
+              see. */}
           <Route
             path="/ai-screening/interview-calendar"
             element={
-              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER"]}>
+              <ProtectedRoute allowedRoles={["HR_ADMIN", "RECRUITER", "HIRING_MANAGER"]}>
                 <InterviewCalendarPage />
               </ProtectedRoute>
             }
@@ -1468,14 +1597,6 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/ai-screening/candidates"
-            element={
-              <ProtectedRoute roles={["General"]}>
-                <CandidateRankingPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/ai-screening/candidates/:candidateId"
             element={
               <ProtectedRoute roles={["General"]}>
@@ -1484,10 +1605,10 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/ai-screening/interview-queue"
+            path="/ai-screening/hm-review"
             element={
-              <ProtectedRoute allowedRoles={["HIRING_MANAGER", "HR_ADMIN"]}>
-                <InterviewQueuePage />
+              <ProtectedRoute allowedRoles={["HIRING_MANAGER"]}>
+                <HMReviewPage />
               </ProtectedRoute>
             }
           />
@@ -1507,18 +1628,6 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
-          {/* Global Candidate Directory (GET /candidates) — distinct from
-              /ai-screening/candidates below, which is the campaign-scoped
-              Candidates & Ranking page. HR_ADMIN only, matching the
-              backend's require_roles(UserRole.HR_ADMIN) on this endpoint. */}
-          <Route
-            path="/ai-screening/global-candidates"
-            element={
-              <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
-                <GlobalCandidatesPage />
-              </ProtectedRoute>
-            }
-          />
           <Route
             path="/ai-screening/talent-pool"
             element={
@@ -1532,14 +1641,6 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute roles={["General"]}>
                 <TalentPoolCandidateProfilePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ai-screening/analytics"
-            element={
-              <ProtectedRoute roles={["General"]}>
-                <AnalyticsPage />
               </ProtectedRoute>
             }
           />
@@ -1606,6 +1707,9 @@ const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
+
+          {/* Legacy /airs/* links -> the current /ai-screening/* paths. */}
+          <Route path="/airs/*" element={<LegacyAirsRedirect />} />
 
           {/* employee exit routes*/}
 

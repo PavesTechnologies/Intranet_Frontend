@@ -27,9 +27,11 @@ export default function useCampaignPermissions() {
     canManageScoring: isHRAdmin,
     canViewTimeline: isHRAdmin,
 
-    // ── HR_ADMIN + RECRUITER ─────────────────────────────────────────
+    // ── HR_ADMIN + RECRUITER + HIRING_MANAGER ────────────────────────
     // pipeline-summary, processing-status, dead-letter-queue
-    canViewPipeline: isHRAdmin || isRecruiter,
+    // NOTE: backend require_roles on these endpoints must also allow
+    // HIRING_MANAGER, or this will 403 despite being visible here.
+    canViewPipeline: isHRAdmin || isRecruiter || isHiringManager,
 
     // ── any campaign role (backend scopes HIRING_MANAGER to own) ────
     canViewCampaigns: isHRAdmin || isRecruiter || isHiringManager,

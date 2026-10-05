@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import Button from "../../../components/Button/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ErrorState from "../skill-ontology/components/ErrorState";
 import FilterListbox from "../../../components/filter/FilterListbox";
@@ -82,18 +80,13 @@ export default function PipelineBoardPage() {
           <h1 className="text-xl font-bold tracking-tight text-slate-900">Pipeline Board</h1>
           <p className="text-xs text-slate-500 mt-1">Drag candidate cards across stages. Changes sync to their record instantly.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-64">
-            <FilterListbox
-              options={campaignOptions}
-              value={campaignId}
-              onChange={(id) => setSearchParams({ campaign: id })}
-              placeholder="Select a campaign"
-            />
-          </div>
-          <Button variant="ghost" size="small" onClick={refresh}>
-            <RefreshCw className="h-4 w-4 mr-1.5" /> Refresh
-          </Button>
+        <div className="w-64">
+          <FilterListbox
+            options={campaignOptions}
+            value={campaignId}
+            onChange={(id) => setSearchParams({ campaign: id })}
+            placeholder="Select a campaign"
+          />
         </div>
       </div>
 
@@ -108,22 +101,24 @@ export default function PipelineBoardPage() {
           onRetry={refresh}
         />
       ) : (
-        <div className="flex gap-3 overflow-x-auto pb-2">
-          {columns.map(({ stage, cards }) => (
-            <PipelineColumn
-              key={stage}
-              stage={stage}
-              cards={cards}
-              onDragStart={startDrag}
-              onDrop={() => dropOnStage(stage)}
-              // The real Candidate Scorecard (Summary/Resume/Deterministic/
-              // Semantic/AI Evaluation/Final Status), keyed by
-              // campaign_candidate_id (card.id) — not the pipeline-only
-              // scorecard, which only has resume-parsed data and no real
-              // scores.
-              onCardClick={(card) => navigate(`/ai-screening/candidates/${card.id}`)}
-            />
-          ))}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="flex divide-x divide-slate-200 overflow-x-auto">
+            {columns.map(({ stage, cards }) => (
+              <PipelineColumn
+                key={stage}
+                stage={stage}
+                cards={cards}
+                onDragStart={startDrag}
+                onDrop={() => dropOnStage(stage)}
+                // The real Candidate Scorecard (Summary/Resume/Deterministic/
+                // Semantic/AI Evaluation/Final Status), keyed by
+                // campaign_candidate_id (card.id) — not the pipeline-only
+                // scorecard, which only has resume-parsed data and no real
+                // scores.
+                onCardClick={(card) => navigate(`/ai-screening/candidates/${card.id}`, { state: { candidate: card, campaignId } })}
+              />
+            ))}
+          </div>
         </div>
       )}
 

@@ -70,6 +70,20 @@ export const apLookupService = {
     return res.data;
   },
 
+  /**
+   * Vendor onboarding request statuses — CREATED / ASSIGNED / IN_PROGRESS /
+   * PRE_SCREEN_PENDING / NEED_INFORMATION / PASSED / FAILED / COMPLETED / CANCELLED
+   * (module_name "VENDOR_ONBOARDING"). Fetched rather than hardcoded so the Internal
+   * Requests status filter sends a real status_id.
+   */
+  getVendorOnboardingStatuses: async () => {
+    const res = await api.get(`${BASE}/system/status`, {
+      params: { module_name: "VENDOR_ONBOARDING" },
+      headers: authHeaders(),
+    });
+    return res.data;
+  },
+
   /** RFQ lifecycle statuses — DRAFT / SENT / RESPONSE_RECEIVED / CLOSED (module_name "RFQ"). */
   getRfqStatuses: async () => {
     const res = await api.get(`${BASE}/system/status`, {

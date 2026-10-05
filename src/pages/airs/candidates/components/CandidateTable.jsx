@@ -13,7 +13,8 @@ import {
   renderFlags,
 } from "../utils/candidateUtils.jsx";
 import { DASH } from "../utils/candidateDataUtils";
-import { deleteCandidate } from "../../service/resumeIntake";
+import { PIPELINE_STAGE_LABEL } from "../constants/candidateConstants";
+import { deleteCampaignCandidate } from "../../campaigns/services/candidateActionsService";
 import { extractErrorMessage } from "../../resume-intake/intake/utils/intakeUtils.jsx";
 import { useAuth } from "../../../../contexts/AuthContext";
 
@@ -45,11 +46,12 @@ export default function CandidateTable({
   noteCounts,
   // Per-row actions, rendered after the built-in ones
   renderExtraActions,
-  // The row itself already navigates to onView on click — some callers
-  // (CampaignDetails' Candidates tab) find the Eye button redundant next
-  // to that; others (CandidateRankingPage) still want it, so this defaults
-  // to keeping existing behavior everywhere.
+  // The row itself already navigates to onView on click, so CampaignDetails'
+  // Candidates tab (the only caller) hides the redundant Eye button.
   showViewButton = true,
+  // HIRING_MANAGER gets none of the built-in actions (no delete, no
+  // renderExtraActions) — drop the whole column rather than render it empty.
+  showActionsColumn = true,
 }) {
   const { hasRole } = useAuth();
   const canDeleteCandidates = hasRole(["HR_ADMIN"]);
@@ -64,7 +66,7 @@ export default function CandidateTable({
     if (!candidateToDelete) return;
     setIsDeleting(true);
     try {
-      await deleteCandidate(candidateToDelete.candidate_id);
+      await deleteCampaignCandidate(candidateToDelete.id);
       toast.success(`${candidateToDelete.name} has been deleted.`);
       setCandidateToDelete(null);
       onDeleted?.(candidateToDelete);
@@ -84,8 +86,12 @@ export default function CandidateTable({
     );
   }
 
-  const headers = ["Candidate", "Requirements", "Relevance", "ATS", "Overall", "AI Rec.", "Exp.", "Stage", "Risk", "Actions"];
-  const columns = ["name", "deterministic", "semantic", "ats", "composite", "aiRecommendation", "experience", "stage", "risk", "actions"];
+  const headers = ["Candidate", "Requirements", "Relevance", "ATS", "Overall", "AI Rec.", "Exp.", "Stage", "Risk"];
+  const columns = ["name", "deterministic", "semantic", "ats", "composite", "aiRecommendation", "experience", "stage", "risk"];
+  if (showActionsColumn) {
+    headers.push("Actions");
+    columns.push("actions");
+  }
 
   if (selectable) {
     headers.unshift(
@@ -161,8 +167,16 @@ export default function CandidateTable({
     // keyed `risk` to match the Risk column; c.rank is the ranking position and
     // is already shown beside the candidate's name
     risk: renderRiskBadge(c.risk),
-    actions: (
-      <div className="w-full flex items-center justify-end gap-1">
+    // A candidate sitting in HM_REVIEW is the hiring manager's to act on —
+    // nobody else gets buttons on that row, just the stage in plain text.
+    actions: String(c.stage || "").toUpperCase() === "HM_REVIEW" ? (
+      <div className="w-full flex items-center justify-center">
+        <span className="text-[11px] font-semibold text-slate-500">
+          {PIPELINE_STAGE_LABEL.HM_REVIEW}
+        </span>
+      </div>
+    ) : (
+      <div className="w-full flex items-center justify-center gap-1">
         {showViewButton && (
           <Button
             variant="ghost"

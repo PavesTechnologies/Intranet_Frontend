@@ -18,6 +18,23 @@ function isReasonRequiredError(err) {
   return status === 400 && typeof message === "string" && message.toLowerCase().includes("requires a reason");
 }
 
+// POST .../stage error bodies carry the specifics under error.detail —
+// { success, message, error: { code, detail } } — with detail either a
+// string (404 CANDIDATE_NOT_FOUND, 409 INVALID_STAGE_TRANSITION) or a list
+// of { field, message } (422 VALIDATION_ERROR). Falls back to the top-level
+// message, then formatApiError, for anything that doesn't match that shape.
+function formatStageMoveError(err) {
+  const data = err?.response?.data;
+  const detail = data?.error?.detail;
+  if (typeof detail === "string" && detail) return detail;
+  if (Array.isArray(detail) && detail.length) {
+    return detail
+      .map((d) => (d?.field ? `${d.field}: ${d.message || "Invalid value"}` : d?.message || "Invalid value"))
+      .join(" · ");
+  }
+  return formatApiError(err, "Failed to move this candidate. It stays in its current column.");
+}
+
 function mapCandidate(cc) {
   return {
     id: cc.id ?? cc.campaign_candidate_id,
@@ -27,6 +44,11 @@ function mapCandidate(cc) {
     role: cc.current_designation,
     composite: cc.composite_score,
     stage: cc.pipeline_stage,
+    // Drive the card's "what happens next" indicator (see PipelineCandidateCard).
+    parseStatus: cc.parse_status,
+    requirementsScore: cc.deterministic_score,
+    relevanceScore: cc.semantic_score,
+    aiScore: cc.ai_ats_score,
   };
 }
 
@@ -145,15 +167,15 @@ export default function usePipelineBoard(campaignId) {
   // ever moved locally, so there's nothing to "restore".
   const performMove = async (card, toStage, reason) => {
     try {
-      await moveCampaignCandidateStage(card.id, toStage, reason);
-      toast.success(`${card.name || "Candidate"} moved.`);
+      const res = await moveCampaignCandidateStage(card.id, toStage, reason);
+      toast.success(res?.message || `${card.name || "Candidate"} moved.`);
       await load();
     } catch (err) {
       if (isReasonRequiredError(err) && !reason) {
         setPendingReason({ card, toStage });
         return;
       }
-      toast.error(formatApiError(err, "Failed to move this candidate. It stays in its current column."));
+      toast.error(formatStageMoveError(err));
     }
   };
 

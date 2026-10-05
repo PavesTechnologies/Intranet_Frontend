@@ -12,6 +12,7 @@ import {
   Ban,
   Trash2,
   FilterX,
+  AlertTriangle,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -52,10 +53,20 @@ const CONFIG_STATUS_OPTIONS = [
   { label: "All Configuration Statuses", value: "ALL" },
   { label: "Active", value: "ACTIVE" },
   { label: "Inactive", value: "INACTIVE" },
+  { label: "Expired", value: "EXPIRED" },
 ];
 
 const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Approval Status", "Configuration Status", "Actions"];
 const TABLE_COLUMNS = ["client", "project", "billingType", "approvalStatus", "configurationStatus", "actions"];
+
+const TABLE_ALIGNMENTS = {
+  client: "left",
+  project: "left",
+  billingType: "left",
+  approvalStatus: "center",
+  configurationStatus: "center",
+  actions: "center",
+};
 
 export default function Overview() {
   const navigate = useNavigate();
@@ -122,6 +133,9 @@ export default function Overview() {
       setApprovalStatusFilter("ALL");
     } else if (key === "INACTIVE") {
       setConfigStatusFilter((prev) => (prev === "INACTIVE" ? "ALL" : "INACTIVE"));
+      setApprovalStatusFilter("ALL");
+    } else if (key === "EXPIRED") {
+      setConfigStatusFilter((prev) => (prev === "EXPIRED" ? "ALL" : "EXPIRED"));
       setApprovalStatusFilter("ALL");
     } else {
       setApprovalStatusFilter((prev) => (prev === key ? "ALL" : key));
@@ -229,58 +243,68 @@ export default function Overview() {
   const tableRows = useMemo(
     () =>
       paginatedConfigs.map((config) => ({
-        client: config.client,
+        client: <div className="text-left font-medium text-slate-800">{config.client}</div>,
         project: (
           <div className="text-left">
             <div className="font-semibold text-slate-900">{config.projectName}</div>
             <div className="text-xs text-slate-400">{config.projectCode}</div>
           </div>
         ),
-        billingType: getBillingTypeDisplayName(config.billingType),
+        billingType: (
+          <div className="text-left">
+            {getBillingTypeDisplayName(config.billingType)}
+          </div>
+        ),
         approvalStatus: (
-          <StatusBadge
-            label={config.approvalStatusLabel || config.approvalStatus || "Draft"}
-            size="sm"
-          />
+          <div className="flex items-center justify-center">
+            <StatusBadge
+              label={config.approvalStatusLabel || config.approvalStatus || "Draft"}
+              size="sm"
+            />
+          </div>
         ),
         configurationStatus: (
-          <StatusBadge
-            label={config.billingStatusLabel || config.billingStatus || "Inactive"}
-            size="sm"
-          />
+          <div className="flex items-center justify-center">
+            <StatusBadge
+              label={config.billingStatusLabel || config.billingStatus || "Inactive"}
+              size="sm"
+            />
+          </div>
         ),
         actions: (
-          <ActionMenu
-            items={[
-              { label: "View", icon: <Eye className="h-4 w-4" />, onClick: () => handleView(config) },
-              {
-                label: "Continue Draft",
-                icon: <ArrowRightCircle className="h-4 w-4" />,
-                hidden: config.approvalStatus !== "DRAFT",
-                onClick: () => handleContinueDraft(config),
-              },
-              {
-                label: "Edit",
-                icon: <Pencil className="h-4 w-4 text-gray-600" />,
-                hidden: config.approvalStatus === "DRAFT",
-                onClick: () => handleEdit(config),
-              },
-              {
-                label: "Deactivate",
-                icon: <Ban className="h-4 w-4" />,
-                hidden: !(config.approvalStatus === "APPROVED" && config.billingStatus === "ACTIVE"),
-                danger: true,
-                onClick: () => setDeactivateTarget(config),
-              },
-              {
-                label: "Delete",
-                icon: <Trash2 className="h-4 w-4" />,
-                hidden: config.approvalStatus !== "DRAFT",
-                danger: true,
-                onClick: () => setDeleteTarget(config),
-              },
-            ]}
-          />
+          <div className="flex items-center justify-center">
+            <ActionMenu
+              items={[
+                { label: "View", icon: <Eye className="h-4 w-4" />, onClick: () => handleView(config) },
+                {
+                  label: "Continue Draft",
+                  icon: <ArrowRightCircle className="h-4 w-4" />,
+                  hidden: config.approvalStatus !== "DRAFT",
+                  onClick: () => handleContinueDraft(config),
+                },
+                {
+                  label: "Edit",
+                  icon: <Pencil className="h-4 w-4 text-gray-600" />,
+                  hidden: config.approvalStatus === "DRAFT",
+                  onClick: () => handleEdit(config),
+                },
+                {
+                  label: "Deactivate",
+                  icon: <Ban className="h-4 w-4" />,
+                  hidden: !(config.approvalStatus === "APPROVED" && config.billingStatus === "ACTIVE"),
+                  danger: true,
+                  onClick: () => setDeactivateTarget(config),
+                },
+                {
+                  label: "Delete",
+                  icon: <Trash2 className="h-4 w-4" />,
+                  hidden: config.approvalStatus !== "DRAFT",
+                  danger: true,
+                  onClick: () => setDeleteTarget(config),
+                },
+              ]}
+            />
+          </div>
         ),
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -354,6 +378,15 @@ export default function Overview() {
       icon: Ban,
       color: "bg-slate-500 text-white",
       active: configStatusFilter === "INACTIVE" && approvalStatusFilter === "ALL",
+    },
+    {
+      key: "EXPIRED",
+      label: "Expired",
+      subLabel: null,
+      value: stats?.expired ?? configs.filter((c) => c.billingStatus === "EXPIRED").length,
+      icon: AlertTriangle,
+      color: "bg-orange-600 text-white",
+      active: configStatusFilter === "EXPIRED" && approvalStatusFilter === "ALL",
     },
   ];
 
@@ -519,7 +552,7 @@ export default function Overview() {
                 headers={TABLE_HEADERS}
                 columns={TABLE_COLUMNS}
                 rows={tableRows}
-                alignments={{ client: "left", project: "left" }}
+                alignments={TABLE_ALIGNMENTS}
                 loading={loadingConfigs}
               />
               <Pagination

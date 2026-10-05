@@ -40,7 +40,15 @@ import PrLineEditor from "../components/PrLineEditor";
 import ProcurementWorkflowStepper from "../components/ProcurementWorkflowStepper";
 import PrWorkflowTimeline from "../components/PrWorkflowTimeline";
 import RequesterLabel from "../components/RequesterLabel";
+import VendorAvailabilityPanel from "../components/VendorAvailabilityPanel";
+import { useOnboardingRequestsForPr } from "../hooks/useVendorOnboarding";
 import { isPrRequester } from "../utils/prAuthorization";
+import {
+  REQUIRED_BY_IN_PAST_MESSAGE,
+  getRequiredByApiError,
+  isRequiredByInPast,
+  todayIsoDate,
+} from "../utils/requiredBy";
 
 function Field({ label, value }) {
   return (
@@ -63,6 +71,9 @@ export default function PrDetailPage() {
   const { data: categories = [] } = usePurchaseCategories();
   const { data: prStatuses = [] } = usePrStatuses();
   const { purchaseOrders } = usePurchaseOrderList({ limit: 200 });
+  // Drives the onboarding branch on the workflow stepper and is already cached for the
+  // availability panel below.
+  const { data: onboardingRequests = [] } = useOnboardingRequestsForPr(prId);
 
   const submitMutation = useSubmitPurchaseRequisition(prId);
   const cancelMutation = useCancelPurchaseRequisition(prId);
@@ -134,6 +145,7 @@ export default function PrDetailPage() {
   const isDraft = statusCode === "DRAFT";
   const isPendingApproval = statusCode === "PENDING_APPROVAL";
   const isReturned = statusCode === "RETURNED";
+  const isCancelled = statusCode === "CANCELLED";
   const isRequester = isPrRequester(pr, user);
   const canSubmit = isDraft && allowedNext.has("PENDING_APPROVAL") && (pr.purchase_requisition_line || []).length > 0;
   const canCancel = allowedNext.has("CANCELLED");
@@ -152,7 +164,11 @@ export default function PrDetailPage() {
   // (see _require_requester in procurement_service.py), so this frontend condition is only ever
   // an added convenience, never a weakening of the real authorization boundary.
   const linesEditable = (isDraft && canEditPR) || (isReturned && isRequester);
-  const canEditHeader = isReturned && isRequester;
+  // A CANCELLED PR stays editable (PR_EDITABLE_STATUS_CODES in procurement_service.py) and the
+  // update never transitions it — it remains CANCELLED. Only the header is editable: the line
+  // endpoints still accept DRAFT/RETURNED only. No requester rule applies here server-side, so
+  // this is gated on PR_EDIT, the permission the update route itself checks.
+  const canEditHeader = (isReturned && isRequester) || (isCancelled && canEditPR);
   const showHeaderEditForm = isHeaderEditing && canEditHeader && headerForm != null;
   const canGenerate =
     canGeneratePO &&
@@ -283,10 +299,17 @@ export default function PrDetailPage() {
     if (headerErrors[name]) setHeaderErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
+  const requiredByChanged = headerForm != null && (headerForm.requiredBy || "") !== (pr.required_by || "");
+
   const validateHeader = () => {
     const nextErrors = {};
     if (!headerForm.departmentId) nextErrors.departmentId = "Department is required.";
     if (!headerForm.purchaseCategoryId) nextErrors.purchaseCategoryId = "Purchase category is required.";
+    // Only a CHANGED date is checked: an existing PR may carry a Required By that has since
+    // passed, and it must stay editable as long as that date is left alone.
+    if (requiredByChanged && isRequiredByInPast(headerForm.requiredBy)) {
+      nextErrors.requiredBy = REQUIRED_BY_IN_PAST_MESSAGE;
+    }
     setHeaderErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -298,9 +321,11 @@ export default function PrDetailPage() {
       department_id: Number(headerForm.departmentId),
       purchase_category_id: Number(headerForm.purchaseCategoryId),
       priority: headerForm.priority,
-      required_by: headerForm.requiredBy || null,
       delivery_location: headerForm.deliveryLocation.trim() || null,
     };
+    // The backend validates required_by whenever it is present, so an unchanged (possibly
+    // now-past) date is omitted rather than re-sent — omitted means "leave as is".
+    if (requiredByChanged) payload.required_by = headerForm.requiredBy || null;
 
     try {
       await updatePrMutation.mutateAsync(payload);
@@ -308,6 +333,8 @@ export default function PrDetailPage() {
       setIsHeaderEditing(false);
       setHeaderForm(null);
     } catch (err) {
+      const requiredByError = getRequiredByApiError(err);
+      if (requiredByError) setHeaderErrors((prev) => ({ ...prev, requiredBy: requiredByError }));
       toast.error(getApiErrorMessage(err, "Could not update this requisition."));
     }
   };
@@ -337,7 +364,10 @@ export default function PrDetailPage() {
       />
 
       <div className="mb-4">
-        <ProcurementWorkflowStepper prStatusCode={statusCode} />
+        <ProcurementWorkflowStepper
+          prStatusCode={statusCode}
+          onboardingRequests={onboardingRequests}
+        />
       </div>
 
       <PageCard className="mb-4">
@@ -458,6 +488,8 @@ export default function PrDetailPage() {
                 type="date"
                 value={headerForm.requiredBy}
                 onChange={handleHeaderChange}
+                min={todayIsoDate()}
+                error={headerErrors.requiredBy}
               />
             ) : (
               <Field label="Required By" value={formatDate(pr.required_by)} />
@@ -565,6 +597,15 @@ export default function PrDetailPage() {
             )}
           </PageCardContent>
         </PageCard>
+      )}
+
+      {["APPROVED", "VENDOR_SELECTION"].includes(statusCode) && (
+        <VendorAvailabilityPanel
+          pr={pr}
+          prStatusCode={statusCode}
+          departmentName={departmentName}
+          categoryName={categoryName}
+        />
       )}
 
       {["APPROVED", "VENDOR_SELECTION"].includes(statusCode) && (

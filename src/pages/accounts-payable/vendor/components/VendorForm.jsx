@@ -55,7 +55,8 @@ const VendorForm = ({
         value={formData.vendor_code}
         onChange={onChange}
         error={errors.vendor_code}
-        placeholder="Optional"
+        disabled={isDisabled("vendor_code")}
+        placeholder={isDisabled("vendor_code") ? "Generated automatically" : "Optional"}
       />
       {!hideCountryField && (
         <FormSelect

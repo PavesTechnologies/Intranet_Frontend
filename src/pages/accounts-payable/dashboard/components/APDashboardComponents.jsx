@@ -11,12 +11,13 @@ import {
 
 import {
   dashboardKpis,
-  attentionQueue,
   invoiceProcessingStages,
   apAging,
   paymentOverview,
   invoiceIntakeHealth,
 } from "../mocks/apDashboardMockData.js";
+
+import ModuleBadge from "../../notifications/components/ModuleBadge";
 
 /* ==========================================================================
    LOCAL SKELETON
@@ -449,6 +450,11 @@ export function APKpiGrid({
 
 export function AttentionQueue({
   isLoading = false,
+  items = [],
+  isError = false,
+  onRetry,
+  onViewAll,
+  onSelect,
 }) {
   if (isLoading) {
     return (
@@ -493,15 +499,23 @@ export function AttentionQueue({
     );
   }
 
+  /* Keyed by the backend's own priority values (ap.notification.priority). */
   const priorityStyles = {
-    Critical:
+    CRITICAL:
       "bg-rose-100 text-rose-700",
-    High:
+    HIGH:
       "bg-orange-100 text-orange-700",
-    Medium:
+    MEDIUM:
       "bg-amber-100 text-amber-700",
-    Low:
+    LOW:
       "bg-slate-100 text-slate-600",
+  };
+
+  const priorityBars = {
+    CRITICAL: "bg-rose-500",
+    HIGH: "bg-orange-400",
+    MEDIUM: "bg-amber-400",
+    LOW: "bg-slate-300",
   };
 
   return (
@@ -570,6 +584,7 @@ export function AttentionQueue({
 
         <button
           type="button"
+          onClick={onViewAll}
           className="
             text-[11px]
             font-semibold
@@ -584,136 +599,193 @@ export function AttentionQueue({
       </div>
 
       {/* Queue */}
-      <div
-        className="
-          mt-3
-          grid
-          gap-2
-          md:grid-cols-2
-          xl:grid-cols-4
-        "
-      >
-        {attentionQueue.map((item) => (
-          <div
-            key={item.invoice}
+      {isError ? (
+        <div
+          className="
+            mt-3
+            rounded-lg
+            border
+            border-slate-100
+            bg-slate-50/60
+            px-3
+            py-6
+            text-center
+          "
+        >
+          <p className="text-[11px] text-slate-500">
+            Unable to load items that need attention.
+          </p>
+
+          <button
+            type="button"
+            onClick={onRetry}
             className="
-              group
-              relative
-              overflow-hidden
-              rounded-lg
-              border
-              border-slate-100
-              bg-slate-50/60
-              px-3
-              py-2.5
-              transition-all
-              duration-300
-              hover:border-slate-200
-              hover:bg-white
-              hover:shadow-sm
+              mt-2
+              text-[11px]
+              font-semibold
+              text-[#0A0082]
+              hover:underline
             "
           >
-            {/* Priority indicator */}
-            <div
-              className={`
-                absolute
-                bottom-0
-                left-0
-                top-0
-                w-0.5
-                ${
-                  item.priority === "Critical"
-                    ? "bg-rose-500"
-                    : item.priority === "High"
-                    ? "bg-orange-400"
-                    : item.priority === "Medium"
-                    ? "bg-amber-400"
-                    : "bg-slate-300"
-                }
-              `}
-            />
-
-            <div
+            Retry
+          </button>
+        </div>
+      ) : items.length === 0 ? (
+        <div
+          className="
+            mt-3
+            rounded-lg
+            border
+            border-slate-100
+            bg-slate-50/60
+            px-3
+            py-6
+            text-center
+          "
+        >
+          <p className="text-[11px] text-slate-500">
+            You're all caught up. Nothing needs your attention.
+          </p>
+        </div>
+      ) : (
+        <div
+          className="
+            mt-3
+            grid
+            gap-2
+            md:grid-cols-2
+            xl:grid-cols-4
+          "
+        >
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onSelect?.(item)}
               className="
-                flex
-                items-center
-                justify-between
-                gap-2
+                group
+                relative
+                overflow-hidden
+                rounded-lg
+                border
+                border-slate-100
+                bg-slate-50/60
+                px-3
+                py-2.5
+                text-left
+                transition-all
+                duration-300
+                hover:border-slate-200
+                hover:bg-white
+                hover:shadow-sm
               "
             >
-              <span
-                className="
-                  text-xs
-                  font-bold
-                  text-slate-800
-                "
-              >
-                {item.invoice}
-              </span>
-
-              <span
+              {/* Priority indicator */}
+              <div
                 className={`
-                  rounded-full
-                  px-1.5
-                  py-0.5
-                  text-[9px]
-                  font-bold
+                  absolute
+                  bottom-0
+                  left-0
+                  top-0
+                  w-0.5
                   ${
-                    priorityStyles[
+                    priorityBars[
                       item.priority
-                    ]
+                    ] || priorityBars.LOW
                   }
                 `}
-              >
-                {item.priority}
-              </span>
-            </div>
+              />
 
-            <p
-              className="
-                mt-1
-                truncate
-                text-[10px]
-                font-semibold
-                text-slate-600
-              "
-            >
-              {item.issue}
-            </p>
-
-            <div
-              className="
-                mt-2
-                flex
-                items-center
-                justify-between
-                gap-2
-              "
-            >
-              <span
+              <div
                 className="
+                  flex
+                  items-center
+                  justify-between
+                  gap-2
+                "
+              >
+                <span
+                  className="
+                    truncate
+                    text-xs
+                    font-bold
+                    text-slate-800
+                  "
+                >
+                  {item.reference}
+                </span>
+
+                <span
+                  className={`
+                    shrink-0
+                    rounded-full
+                    px-1.5
+                    py-0.5
+                    text-[9px]
+                    font-bold
+                    ${
+                      priorityStyles[
+                        item.priority
+                      ] || priorityStyles.LOW
+                    }
+                  `}
+                >
+                  {item.priorityLabel}
+                </span>
+              </div>
+
+              <p
+                className="
+                  mt-1
                   truncate
-                  text-[9px]
-                  text-slate-400
-                "
-              >
-                {item.vendor}
-              </span>
-
-              <span
-                className="
-                  shrink-0
                   text-[10px]
-                  font-bold
-                  text-slate-800
+                  font-semibold
+                  text-slate-600
                 "
               >
-                {item.amount}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
+                {item.title}
+              </p>
+
+              {/* Where the work belongs - the backend's module, as given. */}
+              <ModuleBadge
+                module={item.module}
+                className="mt-1.5"
+              />
+
+              <div
+                className="
+                  mt-2
+                  flex
+                  items-center
+                  justify-between
+                  gap-2
+                "
+              >
+                <span
+                  className="
+                    truncate
+                    text-[9px]
+                    text-slate-400
+                  "
+                >
+                  {item.message}
+                </span>
+
+                <span
+                  className="
+                    shrink-0
+                    text-[10px]
+                    font-bold
+                    text-slate-800
+                  "
+                >
+                  {item.timestamp}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

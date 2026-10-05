@@ -55,6 +55,15 @@ import procurementService from "../services/procurementService";
 import PrLineEditor from "../components/PrLineEditor";
 import QuotationFormModal from "../components/QuotationFormModal";
 import InviteVendorsModal from "../components/InviteVendorsModal";
+import VendorNdaModal from "../components/VendorNdaModal";
+import StatusPill from "../../vendor-intake/components/PreScreenStatusBadge";
+import { useRfqEligibilityBatch } from "../hooks/useRfqEligibility";
+import {
+  ELIGIBILITY_CHECK_LABEL,
+  NDA_STATUS,
+  NDA_STATUS_LABEL,
+  NDA_STATUS_TONE,
+} from "../constants/vendorOnboarding";
 import RfqSendResultsPanel from "../components/RfqSendResultsPanel";
 import EmptyState from "../components/EmptyState";
 
@@ -174,6 +183,26 @@ export default function RfqDetailPage() {
     data: rfqQuotations = [],
   } = useQuotationsForRfq(
     normalizedRfqId
+  );
+
+  // Which invited vendor's NDA is open, if any.
+  const [ndaVendor, setNdaVendor] = useState(null);
+
+  // Per-vendor RFQ eligibility straight from the backend (PR / VENDOR / ONBOARDING /
+  // PRE_SCREEN / NDA gates). Each invited vendor has its own independent NDA state, so this
+  // is read per vendor and never inferred from another vendor's result.
+  //
+  // Declared here, above this component's early returns, so the hook order never changes
+  // between the loading and loaded renders. `rfq` may still be undefined at this point, hence
+  // the optional chaining and the `enabled` guard inside the hook.
+  const eligibilityVendorIds = Array.isArray(rfq?.rfq_vendor)
+    ? rfq.rfq_vendor.map((invitedVendor) => invitedVendor.vendor_id)
+    : [];
+
+  const { eligibilityByVendorId } = useRfqEligibilityBatch(
+    rfq?.pr_id,
+    eligibilityVendorIds,
+    { enabled: Boolean(rfq?.pr_id) && eligibilityVendorIds.length > 0 },
   );
 
   const sendRfq =
@@ -327,6 +356,23 @@ export default function RfqDetailPage() {
         quotation,
       ])
     );
+
+  /*
+   * Who actually responded. Closing the RFQ is the point where vendor selection opens, and
+   * only vendors with a quotation can be selected from there — so the officer is shown that
+   * split before closing rather than discovering it afterwards. Membership comes from the
+   * quotations the backend returned for this RFQ; nothing is inferred from invitation alone.
+   */
+  const respondedVendors = invitedVendors.filter((invitedVendor) =>
+    quotationByVendorId.has(invitedVendor.vendor_id),
+  );
+
+  const unresponsiveVendors = invitedVendors.filter(
+    (invitedVendor) => !quotationByVendorId.has(invitedVendor.vendor_id),
+  );
+
+  const vendorLabel = (invitedVendor) =>
+    vendorNameById.get(invitedVendor.vendor_id) || `Vendor #${invitedVendor.vendor_id}`;
 
   const hasInvitedVendors =
     invitedVendors.length > 0;
@@ -512,10 +558,18 @@ const handleCancelSend = () => {
     }
   };
 
+  /** The NDA gate the backend reported for a vendor, or null when it has not run. */
+  const ndaCheckFor = (vendorId) =>
+    (eligibilityByVendorId.get(Number(vendorId))?.checks || []).find(
+      (check) => check.check === "NDA",
+    ) || null;
+
   const vendorHeaders = [
     "Vendor",
     "Email",
     "Invited At",
+    "NDA",
+    "RFQ Eligibility",
     "Response",
     "Quotation No.",
   ];
@@ -524,6 +578,8 @@ const handleCancelSend = () => {
     "vendor",
     "email",
     "invitedAt",
+    "nda",
+    "eligibility",
     "response",
     "quotationNumber",
   ];
@@ -559,6 +615,112 @@ const handleCancelSend = () => {
             formatDateTime(
               invitedVendor.invited_at
             ),
+
+          nda: (() => {
+            const ndaCheck = ndaCheckFor(
+              invitedVendor.vendor_id
+            );
+
+            if (!ndaCheck) {
+              return (
+                <span className="text-xs text-gray-400">
+                  —
+                </span>
+              );
+            }
+
+            // NOT_REQUIRED needs no NDA work at all; anything else is a real NDA status.
+            const notRequired =
+              ndaCheck.status ===
+              NDA_STATUS.NOT_REQUIRED;
+
+            return (
+              <div className="flex flex-col items-center gap-1">
+                <StatusPill
+                  label={
+                    NDA_STATUS_LABEL[
+                      ndaCheck.status
+                    ] || ndaCheck.status
+                  }
+                  tone={
+                    NDA_STATUS_TONE[
+                      ndaCheck.status
+                    ] || "neutral"
+                  }
+                />
+
+                {!notRequired && (
+                  <Button
+                    size="small"
+                    variant="outline"
+                    onClick={() =>
+                      setNdaVendor({
+                        vendorId:
+                          invitedVendor.vendor_id,
+                        vendorName:
+                          vendorNameById.get(
+                            invitedVendor.vendor_id
+                          ),
+                        email:
+                          vendor?.email,
+                        vendorCode:
+                          vendor?.vendor_code,
+                      })
+                    }
+                  >
+                    Manage NDA
+                  </Button>
+                )}
+              </div>
+            );
+          })(),
+
+          eligibility: (() => {
+            const verdict =
+              eligibilityByVendorId.get(
+                Number(
+                  invitedVendor.vendor_id
+                )
+              );
+
+            if (!verdict) {
+              return (
+                <span className="text-xs text-gray-400">
+                  —
+                </span>
+              );
+            }
+
+            const failed =
+              verdict.failed_checks?.[0];
+
+            return (
+              <div className="flex flex-col items-center gap-1">
+                <StatusPill
+                  label={
+                    verdict.eligible
+                      ? "RFQ Eligible"
+                      : "RFQ Blocked"
+                  }
+                  tone={
+                    verdict.eligible
+                      ? "success"
+                      : "danger"
+                  }
+                />
+
+                {!verdict.eligible && (
+                  <span className="max-w-[16rem] text-center text-[11px] text-rose-600">
+                    {verdict.reason ||
+                      failed?.message ||
+                      (failed
+                        ? `${ELIGIBILITY_CHECK_LABEL[failed.check] || failed.check}: ${failed.status}`
+                        : "Blocked by the backend eligibility check.")}
+                  </span>
+                )}
+              </div>
+            );
+          })(),
 
           response: quotation ? (
             <span className="text-xs font-semibold text-emerald-700">
@@ -1166,7 +1328,37 @@ const handleCancelSend = () => {
       <ConfirmationModal
         isOpen={closeOpen}
         title="Close RFQ"
-        message={`Close ${rfq.rfq_number}? No further quotations can be added once it is closed, and vendor selection will become available.`}
+        message={
+          <span className="block space-y-2">
+            <span className="block">
+              Close {rfq.rfq_number}? No further quotations can be added once it is closed, and
+              vendor selection will become available.
+            </span>
+
+            <span className="block rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs">
+              <span className="block font-semibold text-emerald-700">
+                {respondedVendors.length} vendor(s) submitted a quotation
+              </span>
+              {respondedVendors.length > 0 && (
+                <span className="block text-gray-600">
+                  {respondedVendors.map(vendorLabel).join(", ")}
+                </span>
+              )}
+              <span className="mt-1 block text-gray-500">
+                Only these can be selected for the purchase order.
+              </span>
+            </span>
+
+            {unresponsiveVendors.length > 0 && (
+              <span className="block rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                <span className="block font-semibold">
+                  {unresponsiveVendors.length} invited vendor(s) never responded
+                </span>
+                <span className="block">{unresponsiveVendors.map(vendorLabel).join(", ")}</span>
+              </span>
+            )}
+          </span>
+        }
         confirmText="Close RFQ"
         cancelText="Cancel"
         isLoading={
@@ -1215,9 +1407,36 @@ const handleCancelSend = () => {
             setInviteOpen(false)
           }
           rfqId={normalizedRfqId}
+          prId={pr.id}
           excludeVendorIds={
             invitedVendorIds
           }
+          departmentName={departmentName}
+          categoryName={categoryName}
+          onManageNda={setNdaVendor}
+        />
+      )}
+
+      {/* Rendered after Invite Vendors so the NDA workspace stacks above it when it is
+          opened from a vendor row there. */}
+      {pr && ndaVendor && (
+        <VendorNdaModal
+          isOpen={Boolean(ndaVendor)}
+          onClose={() => setNdaVendor(null)}
+          vendorId={ndaVendor.vendorId}
+          vendorName={ndaVendor.vendorName}
+          vendorCode={ndaVendor.vendorCode}
+          prId={pr.id}
+          prNumber={pr.pr_number}
+          prDate={pr.created_at}
+          departmentId={pr.department_id}
+          purchaseCategoryId={pr.purchase_category_id}
+          departmentName={departmentName}
+          categoryName={categoryName}
+          businessRequirement={pr.justification}
+          // An NDA row only offers an NDA action when the backend says one is required.
+          ndaRequired
+          recipientEmail={ndaVendor.email}
         />
       )}
 

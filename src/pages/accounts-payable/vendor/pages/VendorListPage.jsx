@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Inbox, Plus } from "lucide-react";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -17,7 +17,7 @@ const DEFAULT_FILTERS = { search: "", statusId: "", countryId: "" };
 /** Route: /accounts-payable/vendors */
 export default function VendorListPage() {
   const navigate = useNavigate();
-  const { canOnboardVendor } = useApPermissions();
+  const { canOnboardVendor, canViewOnboarding } = useApPermissions();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
   const { vendors, isLoading, isError, error, page, setPage, totalPages } = useVendors(filters);
@@ -28,11 +28,22 @@ export default function VendorListPage() {
         title="Vendors"
         subtitle="Manage vendor master records, bank details, and verification status."
         actions={
-          canOnboardVendor ? (
-            <Button variant="primary" onClick={() => navigate(AP_ROUTES.VENDOR_ONBOARD)}>
-              <Plus className="h-4 w-4" /> Register Vendor
-            </Button>
-          ) : null
+          <>
+            {/* The Vendor Intaker's queue of onboarding requests raised from Procurement. */}
+            {canViewOnboarding && (
+              <Button
+                variant="outline"
+                onClick={() => navigate(AP_ROUTES.VENDOR_INTERNAL_REQUESTS)}
+              >
+                <Inbox className="h-4 w-4" /> Internal Requests
+              </Button>
+            )}
+            {canOnboardVendor && (
+              <Button variant="primary" onClick={() => navigate(AP_ROUTES.VENDOR_ONBOARD)}>
+                <Plus className="h-4 w-4" /> Register Vendor
+              </Button>
+            )}
+          </>
         }
       />
 

@@ -1,5 +1,4 @@
 import { getBillingTypeDisplayName } from "../../utils/billingType";
-import StatusBadge from "../../../../components/status/statusbadge";
 
 const BILLING_TYPE_LABELS = {
   TIME_MATERIAL: "Time & Material",
@@ -22,8 +21,10 @@ function Field({ label, children }) {
   );
 }
 
-// Business-facing snapshot fields only. Tax Region is intentionally omitted
-// here — it drives the backend tax engine, not this workspace's UI.
+// Snapshot Overview: Detailed commercial and context information.
+// Project Duration represents overall project/configuration duration.
+// Billing Period represents the user-selected/acquired billing snapshot period.
+// Status is omitted here because it is already displayed prominently in the page header.
 export default function BillingSummaryGrid({ config = {} }) {
   const billingTypeLabel =
     BILLING_TYPE_LABELS[config.billingType] || getBillingTypeDisplayName(config.billingType) || "—";
@@ -31,8 +32,11 @@ export default function BillingSummaryGrid({ config = {} }) {
   return (
     <div className="grid grid-cols-1 gap-x-10 sm:grid-cols-2">
       <div className="divide-y divide-slate-100">
-        <Field label="Project">{config.projectName}</Field>
-        <Field label="Client">{config.client}</Field>
+        <Field label="Project">{config.projectName || "—"}</Field>
+        <Field label="Client">{config.client || "—"}</Field>
+        <Field label="Project Duration">
+          <span className="font-mono tabular-nums">{config.projectDuration || "—"}</span>
+        </Field>
         <Field label="Billing Type">{billingTypeLabel}</Field>
         <Field label="Billing Frequency">{frequencyLabel(config.billingFrequency)}</Field>
       </div>
@@ -44,9 +48,6 @@ export default function BillingSummaryGrid({ config = {} }) {
           <span className="font-mono tabular-nums">{config.currency || "USD"}</span>
         </Field>
         <Field label="Payment Terms">{config.paymentTerms || "Net 30"}</Field>
-        <Field label="Status">
-          <StatusBadge label={config.billingStatus || "NOT_ACQUIRED"} size="sm" />
-        </Field>
       </div>
     </div>
   );

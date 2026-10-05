@@ -7,17 +7,24 @@ export default function PipelineColumn({ stage, cards, onDragStart, onDrop, onCa
     <div
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
-      className="rounded-2xl p-2.5 shrink-0 bg-slate-100"
-      style={{ width: 250 }}
+      className="flex-1 min-w-[240px] shrink-0 flex flex-col bg-white"
     >
-      <div className="flex items-center justify-between px-1.5 mb-2">
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full" style={{ background: PIPELINE_STAGE_COLOR[stage] }} />
-          <span className="text-[12.5px] font-bold text-slate-900">{PIPELINE_STAGE_LABEL[stage] || stage}</span>
-        </div>
-        <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-white text-slate-400">{cards.length}</span>
+      <div
+        className="flex items-center justify-center gap-1.5 px-3 py-2 sticky top-0 z-10 border-b-2"
+        style={{ backgroundColor: `${PIPELINE_STAGE_COLOR[stage]}14`, borderBottomColor: PIPELINE_STAGE_COLOR[stage] }}
+      >
+        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: PIPELINE_STAGE_COLOR[stage] }} />
+        <span className="text-[12.5px] font-bold truncate" style={{ color: PIPELINE_STAGE_COLOR[stage] }}>
+          {PIPELINE_STAGE_LABEL[stage] || stage}
+        </span>
+        <span
+          className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-white/70 shrink-0"
+          style={{ color: PIPELINE_STAGE_COLOR[stage] }}
+        >
+          {cards.length}
+        </span>
       </div>
-      <div className="space-y-2 max-h-[520px] overflow-y-auto pr-0.5">
+      <div className="divide-y divide-slate-200 max-h-[520px] overflow-y-auto">
         {cards.map((card) => (
           <PipelineCandidateCard
             key={card.id}

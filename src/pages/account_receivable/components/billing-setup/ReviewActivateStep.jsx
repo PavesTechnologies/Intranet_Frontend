@@ -6,6 +6,16 @@ import Modal from "../../../../components/Modal/modal";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { BILLING_MODE_LABELS } from "../../data/wizardOptions";
 import { getBillingTypeDisplayName } from "../../utils/billingType";
+import { formatCurrency, formatDisplayDate } from "../../utils/format";
+
+// Display-time safety net: a Project Code must never be the project's own
+// internal id — see the matching guard in ProjectStep.jsx / billingConfigurationService.js.
+const sanitizeProjectCode = (code, projectId) => {
+  const codeStr = code === null || code === undefined ? "" : String(code).trim();
+  if (!codeStr) return "";
+  if (projectId === null || projectId === undefined || projectId === "") return codeStr;
+  return codeStr === String(projectId).trim() ? "" : codeStr;
+};
 
 const labelizeStatus = (value) => {
   if (!value) return "";
@@ -48,19 +58,60 @@ const RATE_PREVIEW_COUNT = 4;
 const RATE_PERIOD_SUFFIX = { HOURLY: "/ hr", DAILY: "/ day", WEEKLY: "/ wk" };
 const RATE_PERIOD_LABEL = { HOURLY: "Hourly", DAILY: "Daily", WEEKLY: "Weekly" };
 
-function formatDisplayDate(isoValue) {
-  if (!isoValue || !/^\d{4}-\d{2}-\d{2}$/.test(isoValue)) return isoValue;
-  const date = new Date(`${isoValue}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return isoValue;
-  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-}
 
 function formatMoney(value, currency) {
   if (value === "" || value === null || value === undefined) return null;
-  const num = Number(value);
-  if (Number.isNaN(num)) return String(value);
-  const formatted = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(num);
-  return currency ? `${currency} ${formatted}` : formatted;
+  if (Number.isNaN(Number(value))) return String(value);
+  return formatCurrency(value, currency);
+}
+
+function parseNumericValue(value) {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "number") return Number.isNaN(value) ? null : value;
+  const str = String(value).replace(/,/g, "").replace(/[^0-9.-]+/g, "").trim();
+  if (!str) return null;
+  const num = Number(str);
+  return Number.isNaN(num) ? null : num;
+}
+
+function resolveMilestonePlanContractValue(milestonePlan, projectInfo, wizardData = {}) {
+  const candidates = [
+    milestonePlan?.totalContractValue,
+    milestonePlan?.contractValue,
+    milestonePlan?.totalAmount,
+    milestonePlan?.amount,
+    wizardData?.billingConfig?.milestonePlan?.totalContractValue,
+    wizardData?.billingConfig?.milestonePlanDetails?.totalContractValue,
+    wizardData?.billingConfig?.milestonePlanDetails?.contractValue,
+    wizardData?.billingConfig?.totalContractValue,
+    wizardData?.billingConfig?.contractValue,
+    wizardData?.milestonePlanDetails?.totalContractValue,
+    wizardData?.totalContractValue,
+    projectInfo?.projectBudget,
+    projectInfo?.budget,
+    projectInfo?.budgetAmount,
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = parseNumericValue(candidate);
+    if (parsed !== null && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return 0;
+}
+
+function resolvePaymentEntryAmount(entry, totalContractValue) {
+  const explicitAmount = parseNumericValue(entry?.amount);
+  if (explicitAmount !== null && explicitAmount > 0) {
+    return explicitAmount;
+  }
+  const percentage = parseNumericValue(entry?.percentage);
+  if (percentage !== null && percentage > 0 && totalContractValue > 0) {
+    return (percentage / 100) * totalContractValue;
+  }
+  return explicitAmount !== null ? explicitAmount : 0;
 }
 
 function ratePeriodSuffix(period) {
@@ -110,11 +161,13 @@ function getCommercialEffectiveDates(billingConfig) {
       to: billingConfig.fixedPrice?.effectiveTo || billingConfig.fixedPrice?.endDate || null,
     };
   }
-  if (billingType === "MILESTONE") {
-    return {
-      from: billingConfig.milestone?.effectiveFrom || null,
-      to: billingConfig.milestone?.effectiveTo || null,
-    };
+  if (
+    billingType === "MILESTONE_PLAN" ||
+    billingType === "MILESTONE_BASED" ||
+    billingType === "MILESTONE" ||
+    String(billingType || "").toUpperCase().includes("MILESTONE")
+  ) {
+    return { from: null, to: null };
   }
   return { from: null, to: null };
 }
@@ -275,6 +328,9 @@ function RoleRatesList({ roles, currency }) {
 export default function ReviewActivateStep({ wizardData, onEditStep }) {
   const { projectInfo = {}, billingConfig = {}, controls = {}, approvalStatus, billingStatus } = wizardData;
 
+  const billingContext = projectInfo.billingContext || "PROJECT";
+  const isProductService = billingContext === "PRODUCT_SERVICE";
+
   const currency = projectInfo.projectBudgetCurrency || projectInfo.currency || "";
 
   const frequencyNameCode = String(
@@ -284,28 +340,34 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
     .toUpperCase()
     .replace(/[\s-]+/g, "_");
 
-  const isOneTime = billingConfig.billingFrequency === "ONE_TIME" || frequencyNameCode === "ONE_TIME";
+  const isMilestonePlan =
+    billingConfig.billingType === "MILESTONE_PLAN" ||
+    billingConfig.billingType === "MILESTONE_BASED" ||
+    billingConfig.billingType === "MILESTONE" ||
+    String(billingConfig.billingTypeName || "").toUpperCase().includes("MILESTONE") ||
+    String(billingConfig.billingTypeLabel || "").toUpperCase().includes("MILESTONE");
 
   const billingTypeLabel = getBillingTypeDisplayName(
     billingConfig.billingTypeName ||
       billingConfig.billingTypeLabel ||
       billingConfig.billingType ||
-      "—"
+      "—",
   );
 
-  const billingFrequencyLabel = formatFrequencyLabel(
-    billingConfig.billingFrequency,
-    billingConfig.billingFrequencyName,
-    billingConfig.billingFrequencyLabel,
-    isOneTime
-  );
+  const billingFrequencyLabel = isMilestonePlan
+    ? "One-Time"
+    : formatFrequencyLabel(
+        billingConfig.billingFrequency,
+        billingConfig.billingFrequencyName,
+        billingConfig.billingFrequencyLabel,
+        isOneTime,
+      );
 
   const pricingModel = billingConfig.pricingModel || billingConfig.billingMode || "";
   const roleRateRows = (billingConfig.timeAndMaterial?.roles || []).filter(
     (roleRate) => roleRate.role || roleRate.rate
   );
   const standardRate = billingConfig.timeAndMaterial || {};
-  const standardRateDateRange = rateDateRange(standardRate);
   const commercialEffectiveDates = getCommercialEffectiveDates(billingConfig);
 
   const hasSchedule = Boolean(
@@ -331,11 +393,23 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
                 </span>
               </div>
               <h2 className="text-lg font-bold text-slate-900 sm:text-xl">
-                {projectInfo.projectName || "Billing Setup"}
+                {isProductService ? projectInfo.productName || "Billing Setup" : projectInfo.projectName || "Billing Setup"}
               </h2>
-              <p className="text-xs font-medium text-slate-500">
-                Project Code: <span className="font-bold text-slate-800">{projectInfo.projectCode || "—"}</span>
-              </p>
+              {isProductService ? (
+                <p className="text-xs font-medium text-slate-500">
+                  Product / Service Description:{" "}
+                  <span className="font-bold text-slate-800">{projectInfo.productDescription || "—"}</span>
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs font-medium text-slate-500">
+                    Project Code: <span className="font-bold text-slate-800">{sanitizeProjectCode(projectInfo.projectCode, projectInfo.projectId) || "—"}</span>
+                  </p>
+                  <p className="text-xs font-medium text-slate-500">
+                    Primary Location: <span className="font-bold text-slate-800">{projectInfo.primaryLocation || "—"}</span>
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
@@ -545,7 +619,6 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
                       label: "Standard Rate",
                       value: `${formatMoney(standardRate.rate, currency) || "—"} ${ratePeriodSuffix(standardRate.ratePeriod)}`,
                     },
-                    { label: "Effective Period", value: standardRateDateRange },
                   ]}
                 />
               )}
@@ -556,82 +629,22 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
 
           {billingConfig.billingType === "RECURRING" && (() => {
             const recurring = billingConfig.recurring || {};
-            const totalVal = Number(recurring.contractValue) || 0;
-            const pmsBudgetVal =
-              recurring.pmsProjectBudget !== "" && recurring.pmsProjectBudget !== null && recurring.pmsProjectBudget !== undefined
-                ? Number(recurring.pmsProjectBudget)
-                : projectInfo.projectBudget !== "" && projectInfo.projectBudget !== null && projectInfo.projectBudget !== undefined
-                ? Number(projectInfo.projectBudget)
-                : null;
-
-            const hasPmsBudget = pmsBudgetVal !== null && pmsBudgetVal !== undefined && !isNaN(pmsBudgetVal) && pmsBudgetVal > 0;
-            const isSameAmount = hasPmsBudget && totalVal === pmsBudgetVal;
-            const isDifferentAmount = hasPmsBudget && totalVal !== pmsBudgetVal;
-
-            let contractBudgetRows = [];
-            if (isSameAmount) {
-              contractBudgetRows = [
-                {
-                  label: "Contract / Project Budget",
-                  value: totalVal ? formatMoney(totalVal, currency) : "—",
-                },
-              ];
-            } else if (isDifferentAmount) {
-              contractBudgetRows = [
-                {
-                  label: (
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <span>Contract Value</span>
-                      <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200">
-                        Billing Amount Used
-                      </span>
-                    </span>
-                  ),
-                  value: totalVal ? formatMoney(totalVal, currency) : "—",
-                },
-                {
-                  label: "PMS Project Budget",
-                  value: formatMoney(pmsBudgetVal, currency),
-                },
-              ];
-            } else {
-              contractBudgetRows = [
-                {
-                  label: "Contract Value",
-                  value: totalVal ? formatMoney(totalVal, currency) : "—",
-                },
-              ];
-            }
+            const amount = Number(recurring.contractValue) || 0;
+            const isPmsSource = recurring.contractValueSource === "PMS";
+            const budgetSourceLabel = isProductService ? "Manual" : isPmsSource ? "Project Budget" : "Manual";
+            const renewalModeLabel = recurring.renewalMode === "CUSTOM" ? "Custom" : recurring.renewalMode === "SAME_AS_PREVIOUS" ? "Same as Previous" : "Not configured";
 
             return (
               <div className="space-y-3">
-                {isSameAmount && (
-                  <div className="flex items-center gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/70 px-3.5 py-2 text-xs font-medium text-emerald-900">
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                    <span>Contract Value and PMS Project Budget are the same ({formatMoney(totalVal, currency)}).</span>
-                  </div>
-                )}
-                {isDifferentAmount && (
-                  <div className="flex items-center gap-2 rounded-lg border border-amber-200/80 bg-amber-50/70 px-3.5 py-2 text-xs font-medium text-amber-900">
-                    <Info className="h-4 w-4 shrink-0 text-amber-600" />
-                    <span>
-                      Contract Value ({formatMoney(totalVal, currency)}) is used for billing because it differs from the PMS Project Budget ({formatMoney(pmsBudgetVal, currency)}).
-                    </span>
-                  </div>
-                )}
                 <PricingTable
                   rows={[
-                    ...contractBudgetRows,
+                    { label: "Billing Context", value: isProductService ? "Product / Service" : "Project" },
+                    { label: "Budget Source", value: budgetSourceLabel },
+                    { label: "Total Budget", value: amount ? formatMoney(amount, currency) : "—" },
                     { label: "Billing Frequency", value: billingFrequencyLabel },
-                    {
-                      label: "Billing Period",
-                      value:
-                        recurring.recurringStartDate || recurring.recurringEndDate
-                          ? `${formatDisplayDate(recurring.recurringStartDate) || "—"} – ${
-                              formatDisplayDate(recurring.recurringEndDate) || "Ongoing"
-                            }`
-                          : null,
-                    },
+                    // Renewal is a Subscription (Product/Service) concept only —
+                    // a project-based Recurring configuration is never renewed.
+                    ...(isProductService ? [{ label: "Renewal", value: renewalModeLabel }] : []),
                     ...(recurring.remarks ? [{ label: "Remarks", value: recurring.remarks }] : []),
                   ]}
                 />
@@ -639,56 +652,237 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
             );
           })()}
 
-          {billingConfig.billingType === "MILESTONE" && (
+          {billingConfig.billingType === "MILESTONE" && !isMilestonePlan && (
             <PricingTable rows={[{ label: "Milestones", value: `${(billingConfig.milestones || []).length} defined` }]} />
           )}
+
+          {isMilestonePlan && (() => {
+            const milestonePlan =
+              billingConfig.milestonePlan ||
+              billingConfig.milestonePlanDetails ||
+              wizardData.milestonePlanDetails ||
+              wizardData.milestonePlan ||
+              {};
+            const totalContractValue = resolveMilestonePlanContractValue(milestonePlan, projectInfo, wizardData);
+            const rawEntries =
+              milestonePlan.entries ||
+              milestonePlan.paymentEntries ||
+              milestonePlan.installmentEntries ||
+              milestonePlan.milestonePlanEntries ||
+              wizardData.paymentEntries ||
+              [];
+            const paymentStructure =
+              milestonePlan.paymentStructure ||
+              (rawEntries.length > 1 ? "INSTALLMENTS" : "FULL_PAYMENT");
+            const isFullPayment = paymentStructure === "FULL_PAYMENT";
+            const paymentStructureLabel = isFullPayment ? "Full Payment" : "Installments";
+            const entries =
+              rawEntries.length > 0
+                ? rawEntries
+                : [{ sequence: 1, percentage: 100, billingDate: "", remarks: "" }];
+
+            const allocatedAmount = entries.reduce(
+              (sum, entry) => sum + resolvePaymentEntryAmount(entry, totalContractValue),
+              0,
+            );
+            const remainingAmount = Math.max(0, totalContractValue - allocatedAmount);
+
+            const rows = [
+              { label: "Payment Structure", value: paymentStructureLabel },
+              { label: "Total Contract Value", value: formatMoney(totalContractValue, currency) },
+              { label: "Allocated Amount", value: formatMoney(allocatedAmount || totalContractValue, currency) },
+              { label: "Remaining Amount", value: formatMoney(remainingAmount, currency) },
+            ];
+
+            if (isFullPayment && entries[0]?.billingDate) {
+              rows.push({
+                label: "Billing Date",
+                value: formatDisplayDate(entries[0].billingDate),
+              });
+            }
+
+            if (milestonePlan.remarks) {
+              rows.push({ label: "Remarks", value: milestonePlan.remarks });
+            }
+
+            return (
+              <div className="space-y-3">
+                <PricingTable rows={rows} />
+              </div>
+            );
+          })()}
         </div>
       </CardShell>
 
-      {/* SECTION 3: Billing Schedule (Full-Width Card) */}
-      <CardShell icon={Calendar} title="Billing Schedule" stepId={2} onEdit={onEditStep}>
-        {hasSchedule ? (
-          <div className="space-y-1">
-            <DataRow label="Billing Frequency" value={billingFrequencyLabel} />
-            <DataRow
-              label="Effective From"
-              value={
-                commercialEffectiveDates.from
-                  ? formatDisplayDate(commercialEffectiveDates.from)
-                  : projectInfo.startDate
-                  ? formatDisplayDate(projectInfo.startDate)
-                  : "—"
-              }
-            />
-            <DataRow
-              label="Effective To"
-              value={
-                commercialEffectiveDates.to
-                  ? formatDisplayDate(commercialEffectiveDates.to) || "Ongoing"
-                  : projectInfo.endDate
-                  ? formatDisplayDate(projectInfo.endDate) || "Ongoing"
-                  : "Ongoing"
-              }
-            />
-            <DataRow
-              label="Project Duration"
-              value={
-                projectInfo.startDate
-                  ? `${formatDisplayDate(projectInfo.startDate)} – ${formatDisplayDate(projectInfo.endDate) || "Ongoing"}`
-                  : "—"
-              }
-            />
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 py-6 text-center">
-            <Calendar className="mb-2 h-8 w-8 text-slate-300" />
-            <p className="text-xs font-semibold text-slate-600">Billing schedule not applicable</p>
-            <p className="mt-0.5 text-[11px] text-slate-400">
-              This billing configuration type does not require a recurring schedule.
-            </p>
-          </div>
-        )}
-      </CardShell>
+      {/* SECTION 3: Billing Schedule / Payment Schedule (Full-Width Card) */}
+      {isMilestonePlan ? (() => {
+        const milestonePlan =
+          billingConfig.milestonePlan ||
+          billingConfig.milestonePlanDetails ||
+          wizardData.milestonePlanDetails ||
+          wizardData.milestonePlan ||
+          {};
+        const totalContractValue = resolveMilestonePlanContractValue(milestonePlan, projectInfo, wizardData);
+        const rawEntries =
+          milestonePlan.entries ||
+          milestonePlan.paymentEntries ||
+          milestonePlan.installmentEntries ||
+          milestonePlan.milestonePlanEntries ||
+          wizardData.paymentEntries ||
+          [];
+        const paymentStructure =
+          milestonePlan.paymentStructure ||
+          (rawEntries.length > 1 ? "INSTALLMENTS" : "FULL_PAYMENT");
+        const isFullPayment = paymentStructure === "FULL_PAYMENT";
+        const paymentStructureLabel = isFullPayment ? "Full Payment" : "Installments";
+        const entries =
+          rawEntries.length > 0
+            ? rawEntries
+            : [{ sequence: 1, percentage: 100, billingDate: "", remarks: "" }];
+
+        const validDates = entries
+          .map((e) => e.billingDate)
+          .filter(Boolean);
+        const firstPaymentDate = validDates[0] || null;
+        const lastPaymentDate = validDates.length > 1 ? validDates[validDates.length - 1] : validDates[0] || null;
+
+        return (
+          <CardShell icon={Calendar} title="Payment Schedule" stepId={2} onEdit={onEditStep}>
+            <div className="space-y-3.5">
+              <div className="space-y-1">
+                <DataRow label="Payment Structure" value={paymentStructureLabel} />
+                {isFullPayment ? (
+                  <>
+                    <DataRow label="Schedule Type" value="One-Time Payment" />
+                    <DataRow label="Billing Date" value={formatDisplayDate(entries[0]?.billingDate)} />
+                  </>
+                ) : (
+                  <>
+                    <DataRow label="Schedule Type" value="Custom Payment Dates" />
+                    <DataRow label="Number of Payments" value={String(entries.length)} />
+                    {firstPaymentDate && <DataRow label="First Payment" value={formatDisplayDate(firstPaymentDate)} />}
+                    {lastPaymentDate && <DataRow label="Last Payment" value={formatDisplayDate(lastPaymentDate)} />}
+                  </>
+                )}
+              </div>
+
+              {isFullPayment ? (
+                <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700">Payment 1</span>
+                    <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200">
+                      100%
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 pt-1">
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Payment Amount</span>
+                      <p className="mt-0.5 text-sm font-bold text-slate-900">
+                        {formatMoney(resolvePaymentEntryAmount(entries[0], totalContractValue), currency) || "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Percentage</span>
+                      <p className="mt-0.5 text-xs font-bold text-slate-900">100%</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Billing Date</span>
+                      <p className="mt-0.5 text-xs font-bold text-slate-900">{formatDisplayDate(entries[0]?.billingDate)}</p>
+                    </div>
+                  </div>
+                  {(entries[0]?.remarks || milestonePlan.remarks) && (
+                    <div className="pt-2 border-t border-slate-200/60 text-xs text-slate-600">
+                      <span className="font-semibold text-slate-500">Remarks: </span>
+                      <span>{entries[0]?.remarks || milestonePlan.remarks}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {entries.map((entry, index) => {
+                    const percentNum = parseNumericValue(entry.percentage) || 0;
+                    const amount = resolvePaymentEntryAmount(entry, totalContractValue);
+
+                    return (
+                      <div
+                        key={entry.paymentEntryId || index}
+                        className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3.5 space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Payment {entry.sequence || index + 1}
+                          </span>
+                          <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200">
+                            {percentNum}%
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 pt-0.5">
+                          <div>
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Payment Amount</span>
+                            <p className="mt-0.5 text-xs font-bold text-slate-900">{formatMoney(amount, currency) || "—"}</p>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Billing Date</span>
+                            <p className="mt-0.5 text-xs font-bold text-slate-900">{formatDisplayDate(entry.billingDate)}</p>
+                          </div>
+                        </div>
+                        {entry.remarks && (
+                          <div className="pt-1.5 border-t border-slate-200/60 text-xs text-slate-600">
+                            <span className="font-semibold text-slate-500">Remarks: </span>
+                            <span>{entry.remarks}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </CardShell>
+        );
+      })() : (
+        <CardShell icon={Calendar} title="Billing Schedule" stepId={2} onEdit={onEditStep}>
+          {hasSchedule ? (
+            <div className="space-y-1">
+              <DataRow label="Billing Frequency" value={billingFrequencyLabel} />
+              <DataRow
+                label="Effective Period"
+                value={(() => {
+                  const from = commercialEffectiveDates.from
+                    ? formatDisplayDate(commercialEffectiveDates.from)
+                    : projectInfo.startDate
+                    ? formatDisplayDate(projectInfo.startDate)
+                    : "—";
+                  const to = commercialEffectiveDates.to
+                    ? formatDisplayDate(commercialEffectiveDates.to) || "Ongoing"
+                    : projectInfo.endDate
+                    ? formatDisplayDate(projectInfo.endDate) || "Ongoing"
+                    : "Ongoing";
+                  return `${from} – ${to}`;
+                })()}
+              />
+              {!isProductService && (
+                <DataRow
+                  label="Project Duration"
+                  value={
+                    projectInfo.startDate
+                      ? `${formatDisplayDate(projectInfo.startDate)} – ${formatDisplayDate(projectInfo.endDate) || "Ongoing"}`
+                      : "—"
+                  }
+                />
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 py-6 text-center">
+              <Calendar className="mb-2 h-8 w-8 text-slate-300" />
+              <p className="text-xs font-semibold text-slate-600">Billing schedule not applicable</p>
+              <p className="mt-0.5 text-[11px] text-slate-400">
+                This billing configuration type does not require a recurring schedule.
+              </p>
+            </div>
+          )}
+        </CardShell>
+      )}
 
       {/* SECTION 4: Invoice & Control Settings (Full-Width Card) */}
       <CardShell icon={Receipt} title="Invoice & Control Settings" stepId={3} onEdit={onEditStep}>

@@ -1,22 +1,21 @@
-import { QUEUE_TYPES, QUEUE_LABELS } from "../../constants/queueTypes";
+import { QUEUE_LABELS, getVisibleQueueTypes } from "../../constants/queueTypes";
+import { useApPermissions } from "../../hooks/useApPermissions";
 
-// Explicit display order for Invoice Management's tabs — adding a new key to queueTypes.js and
-// this list is all a future status needs to appear as a tab; no status strings are hardcoded
-// here. Validation is deliberately excluded — it's a backend processing stage, surfaced via the
-// Status filter and the invoice detail page instead of a top-level tab (QUEUE_TYPES.VALIDATION
-// still exists for the standalone Validation Queue page).
-const TAB_ORDER = [
-  QUEUE_TYPES.ALL_INVOICES,
-  QUEUE_TYPES.OCR_REVIEW,
-  QUEUE_TYPES.APPROVAL,
-  QUEUE_TYPES.READY_FOR_PAYMENT,
-  QUEUE_TYPES.PAID,
-];
-
+/**
+ * Which tabs render at all is permission-driven (getVisibleQueueTypes), not a fixed list — an AP
+ * Executive, an Approver, and a Finance Executive each see a different subset, matching exactly
+ * what their UMS permissions let them act on. Validation is deliberately excluded from every
+ * user's set — it's a backend processing stage, surfaced via the Status filter and the invoice
+ * detail page instead of a top-level tab (QUEUE_TYPES.VALIDATION still exists for the standalone
+ * Validation Queue page).
+ */
 export default function InvoiceStatusTabs({ activeQueueType, onChange }) {
+  const permissions = useApPermissions();
+  const visibleQueueTypes = getVisibleQueueTypes(permissions);
+
   return (
     <div className="mb-4 flex flex-wrap gap-1 border-b border-gray-200">
-      {TAB_ORDER.map((queueType) => (
+      {visibleQueueTypes.map((queueType) => (
         <button
           key={queueType}
           type="button"
