@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { X, Wallet, FileText, User, Layers, CheckCircle2 } from "lucide-react";
 import Button from "@/components/Button/Button";
 import StatusBadge from "@/components/status/statusbadge";
+import InvoiceHandoffBadge from "@/pages/expense-management/components/expense-reports/InvoiceHandoffBadge";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import { showStatusToast } from "@/components/toastfy/toast";
 import EmployeeLabel from "../../../approval-engine/components/EmployeeLabel";
@@ -51,13 +52,23 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
   const businessPurpose = report?.businessPurpose || queueItem?.businessPurpose;
   const costCenterName = queueItem?.costCenterName || queueItem?.costCenter || report?.costCenterName || report?.costCenter;
   const totalAmount = queueItem?.totalAmount ?? queueItem?.amount ?? report?.totalAmount ?? report?.amount;
-  const currencyCode = queueItem?.currencyCode || report?.currencyCode || "INR";
+  // Report totals are in the base currency (queue items and report.baseCurrencyCode say so).
+  const currencyCode = queueItem?.currencyCode || report?.baseCurrencyCode || report?.currencyCode || "INR";
+  // Tax breakdown in base currency. The employee is paid the gross less cash advance adjustments;
+  // recoverable tax is claimed back by the company and never reduces reimbursement.
+  const sumLines = (pick) => lineItems.reduce((sum, l) => sum + (Number(pick(l)) || 0), 0);
+  const taxTotal = queueItem?.taxAmount ?? sumLines((l) => l.tax?.baseTaxAmount);
+  const recoverableTotal = queueItem?.recoverableTaxAmount ?? sumLines((l) => l.tax?.baseRecoverableTaxAmount);
+  const reimbursableAmount = queueItem?.reimbursableAmount ?? report?.reimbursableAmount ?? totalAmount;
   const approvedAt = queueItem?.approvedAt || queueItem?.createdAt || queueItem?.submittedAt || report?.approvedAt || report?.createdAt;
   const reportStatus = queueItem?.reportStatus || report?.reportStatus || "APPROVED";
-  const rawRouting = queueItem?.paymentRoutingStatus || report?.paymentRoutingStatus;
-  const paymentRoutingStatus = (!rawRouting || rawRouting === "NONE") ? "APPROVED_FOR_PAYMENT" : rawRouting;
+  // Real PaymentRoutingStatus values: NONE, APPROVED_FOR_PAYMENT, PAYMENT_COMPLETED,
+  // INVOICE_HANDOFF_PENDING, INVOICE_HANDOFF_COMPLETED, HANDOFF_FAILED - "PENDING" is not one of
+  // them and must never be treated as a stand-in for "payable".
+  const paymentRoutingStatus = queueItem?.paymentRoutingStatus || report?.paymentRoutingStatus || "NONE";
+  const invoiceHandoffStatus = queueItem?.invoiceHandoffStatus || report?.invoiceHandoffStatus;
 
-  const canComplete = paymentRoutingStatus === "APPROVED_FOR_PAYMENT" || paymentRoutingStatus === "PENDING" || paymentRoutingStatus === "NONE" || !paymentRoutingStatus;
+  const canComplete = paymentRoutingStatus === "APPROVED_FOR_PAYMENT";
 
   const handleConfirmPayment = () => {
     completePayment.mutate(reportId, {
@@ -120,7 +131,15 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
                   <span className="min-w-0 truncate font-medium text-gray-800">
                     {line.merchantName || line.categoryName || "Line item"}
                   </span>
-                  <span className="shrink-0 text-xs text-gray-500">{formatMoney(line.amount, line.currencyCode)}</span>
+                  <span className="shrink-0 text-right text-xs text-gray-500">
+                    {formatMoney(line.amount, line.currencyCode)}
+                    {line.taxAmount != null && Number(line.taxAmount) > 0 && (
+                      <span className="block text-[11px] text-gray-400">
+                        tax {formatMoney(line.taxAmount, line.currencyCode)}
+                        {line.tax?.taxCode ? ` · ${line.tax.taxCode}` : ""}
+                      </span>
+                    )}
+                  </span>
                 </div>
               ))}
             </div>
@@ -129,9 +148,15 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
 
         <Section icon={<Wallet className="h-4 w-4 text-gray-400" />} title="Amount">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Field label="Approved Amount" value={formatMoney(totalAmount, currencyCode)} />
+            <Field label="Gross (amount paid)" value={formatMoney(totalAmount, currencyCode)} />
+            <Field label="Tax" value={formatMoney(taxTotal, currencyCode)} />
+            <Field label="Recoverable Tax (ITC)" value={formatMoney(recoverableTotal, currencyCode)} />
+            <Field label="Reimbursable to Employee" value={<span className="font-bold text-emerald-700">{formatMoney(reimbursableAmount, currencyCode)}</span>} />
             <Field label="Currency" value={currencyCode} />
             <Field label="Payment Routing Status" value={<StatusBadge label={paymentRoutingStatus} size="sm" />} />
+            {invoiceHandoffStatus && invoiceHandoffStatus !== "NOT_APPLICABLE" && (
+              <Field label="Client Invoice" value={<InvoiceHandoffBadge status={invoiceHandoffStatus} />} />
+            )}
           </div>
         </Section>
 
@@ -156,7 +181,7 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
       <ConfirmationModal
         isOpen={confirming}
         title="Complete Payment"
-        message={`Mark ${reportNumber || "this report"} (${formatMoney(totalAmount, currencyCode)}) as paid? This cannot be undone.`}
+        message={`Mark ${reportNumber || "this report"} (${formatMoney(reimbursableAmount, currencyCode)} to the employee) as paid? This cannot be undone.`}
         confirmText="Complete Payment"
         cancelText="Cancel"
         variant="success"

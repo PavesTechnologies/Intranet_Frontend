@@ -33,8 +33,10 @@ import {
 } from "../../hooks/useApLookups";
 
 import {
-  usePurchaseOrders,
-} from "../../purchase-order/hooks/usePurchaseOrders";
+  useVendorPurchaseOrders,
+} from "../hooks/useVendorCollections";
+
+import VendorCollectionPanel from "./VendorCollectionPanel";
 
 import {
   useCreatePurchaseOrder,
@@ -258,19 +260,22 @@ const VendorPoTab = ({
   ] = useState(null);
 
   /*
-   * Fetch PO data using poId.
+   * Purchase orders for this vendor, from the vendor-scoped collection endpoint
+   * GET /apm/vendor/{vendor_id}/purchase-orders.
    *
-   * This will result in:
-   *
-   * /apm/purchase-order?po_id=15
+   * `count` is the backend's own number, so the header count and the Vendor Activity card
+   * cannot drift from each other or from the rows. The Overview cards read the same query key,
+   * so opening this tab reuses that response instead of firing a second request.
    */
   const {
-    purchaseOrders,
+    items: purchaseOrders,
+    count,
     isLoading,
     isError,
     error,
-  } = usePurchaseOrders(
-    poId
+    refetch,
+  } = useVendorPurchaseOrders(
+    vendorId
   );
 
   const {
@@ -782,34 +787,27 @@ const VendorPoTab = ({
       }
     );
 
-  if (isError) {
-    return (
-      <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-600">
-        {getApiErrorMessage(
-          error,
-          "Unable to load purchase orders right now."
-        )}
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <Button
-          onClick={openAdd}
-        >
-          <Plus className="h-4 w-4" />
-          Add PO
-        </Button>
-      </div>
-
-      {!isLoading &&
-      purchaseOrders.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">
-          No purchase orders found.
-        </div>
-      ) : (
+      <VendorCollectionPanel
+        title="Purchase Orders"
+        count={count}
+        isLoading={isLoading}
+        isError={isError}
+        error={error}
+        onRetry={refetch}
+        isEmpty={purchaseOrders.length === 0}
+        emptyMessage="No purchase orders found for this vendor."
+        errorMessage="Unable to load purchase orders right now."
+        actions={
+          <Button
+            onClick={openAdd}
+          >
+            <Plus className="h-4 w-4" />
+            Add PO
+          </Button>
+        }
+      >
         <GenericTable
           headers={[
             "PO Number",
@@ -834,9 +832,8 @@ const VendorPoTab = ({
             "document",
           ]}
           rows={rows}
-          loading={isLoading}
         />
-      )}
+      </VendorCollectionPanel>
 
       <Modal
         isOpen={isModalOpen}

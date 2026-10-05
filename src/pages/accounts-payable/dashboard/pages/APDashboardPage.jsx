@@ -5,6 +5,8 @@ import {
   useState,
 } from "react";
 
+import { useNavigate } from "react-router-dom";
+
 import {
   APKpiGrid,
   AttentionQueue,
@@ -13,6 +15,62 @@ import {
   FinancialHealthTube,
   InvoiceIntakeHealth,
 } from "../components/APDashboardComponents";
+
+import { AP_ROUTES } from "../../constants/routes";
+import { formatDate } from "../../utils/formatters";
+import {
+  DEFAULT_NOTIFICATION_FILTERS,
+  useNotifications,
+} from "../../notifications/hooks/useNotifications";
+import {
+  PRIORITY_LABEL,
+  PRIORITY_ORDER,
+  entityReference,
+  isActionRequired,
+  resolveNotificationRoute,
+} from "../../notifications/constants/notifications";
+
+/* -------------------------------------------------------------------------- */
+/* Requires Attention                                                         */
+/*                                                                            */
+/* Fed by the SAME notification query - and the same cache entry - as the      */
+/* header bell and the Notification Center: no second API, no fabricated rows. */
+/* It is a shortcut into the Center (the card links straight through), not a   */
+/* copy of it: only the few highest-priority items that still need an action   */
+/* are shown, from every AP module. "Still needs an action" is backend state - */
+/* unresolved and action-oriented - so a read item the user has not dealt with */
+/* stays, and resolved work never resurfaces.                                 */
+/* -------------------------------------------------------------------------- */
+
+const ATTENTION_LIMIT = 4;
+
+function toAttentionItems(notifications) {
+  const priorityRank = (priority) => {
+    const index = PRIORITY_ORDER.indexOf(priority);
+    return index === -1 ? PRIORITY_ORDER.length : index;
+  };
+
+  return [...notifications]
+    .filter(isActionRequired)
+    .sort((a, b) => {
+      const byPriority = priorityRank(a.priority) - priorityRank(b.priority);
+      if (byPriority !== 0) return byPriority;
+      // Newest first within a priority.
+      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    })
+    .slice(0, ATTENTION_LIMIT)
+    .map((notification) => ({
+      id: notification.id,
+      reference: entityReference(notification) || notification.title,
+      module: notification.module,
+      priority: notification.priority,
+      priorityLabel: PRIORITY_LABEL[notification.priority] || notification.priority,
+      title: notification.title,
+      message: notification.message,
+      timestamp: formatDate(notification.created_at),
+      route: resolveNotificationRoute(notification),
+    }));
+}
 
 /* -------------------------------------------------------------------------- */
 /* Dashboard Sections                                                         */
@@ -310,8 +368,23 @@ function useDashboardSections() {
 /* -------------------------------------------------------------------------- */
 
 export default function APDashboardPage() {
+  const navigate = useNavigate();
+
   const [isLoading, setIsLoading] =
     useState(true);
+
+  /*
+   * The signed-in user's unified notification stream - the same query the
+   * header bell and Notification Center use, so this adds no request of its own.
+   */
+  const {
+    notifications,
+    isLoading: notificationsLoading,
+    isError: notificationsError,
+    refetch: refetchNotifications,
+  } = useNotifications(DEFAULT_NOTIFICATION_FILTERS);
+
+  const attentionItems = toAttentionItems(notifications);
 
   const {
     activeSection,
@@ -328,10 +401,12 @@ export default function APDashboardPage() {
   const handleRefresh = useCallback(() => {
     setIsLoading(true);
 
+    refetchNotifications();
+
     window.setTimeout(() => {
       setIsLoading(false);
     }, 900);
-  }, []);
+  }, [refetchNotifications]);
 
   /* ---------------------------------------------------------------------- */
   /* Initial loading                                                         */
@@ -377,7 +452,14 @@ export default function APDashboardPage() {
         {/* ================================================================ */}
 
         <AttentionQueue
-          isLoading={isLoading}
+          isLoading={isLoading || notificationsLoading}
+          isError={notificationsError}
+          items={attentionItems}
+          onRetry={refetchNotifications}
+          onViewAll={() => navigate(AP_ROUTES.NOTIFICATIONS)}
+          onSelect={(item) =>
+            navigate(item.route || AP_ROUTES.NOTIFICATIONS)
+          }
         />
 
         {/* ================================================================ */}

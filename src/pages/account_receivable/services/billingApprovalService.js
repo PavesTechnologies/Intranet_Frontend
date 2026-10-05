@@ -46,13 +46,23 @@ const BILLING_TYPE_DETAILS_KEY = {
   RECURRING: "recurringDetails",
   TIME_MATERIAL: "tmRateCards",
   MILESTONE: "milestoneSchedules",
+  // Assumed to mirror the fixedPriceDetails/recurringDetails naming convention —
+  // a single nested BillingMilestonePlanResponseDto-shaped object. Verify this
+  // key against the real BillingConfigurationResponseDto if it differs.
+  MILESTONE_PLAN: "milestonePlanDetails",
 };
 
 const resolveBillingTypeDetailsKey = (record = {}) => {
   const type = String(record.billingTypeName || record.billingType || "").trim().toUpperCase();
   if (type.includes("FIXED")) return BILLING_TYPE_DETAILS_KEY.FIXED_PRICE;
   if (type.includes("RECURRING")) return BILLING_TYPE_DETAILS_KEY.RECURRING;
-  if (type.includes("MILESTONE")) return BILLING_TYPE_DETAILS_KEY.MILESTONE;
+  // No separate "Milestone Plan" master-data record exists — the billing type
+  // name is still literally "Milestone Based" (no "PLAN" substring), and it now
+  // drives the Milestone Plan flow, not the legacy bare Milestone one. Any
+  // "MILESTONE" name therefore resolves to Milestone Plan; the bare MILESTONE
+  // branch below is unreachable via live master data and kept only in case a
+  // genuinely distinct legacy record is ever reintroduced.
+  if (type.includes("MILESTONE")) return BILLING_TYPE_DETAILS_KEY.MILESTONE_PLAN;
   if (type.includes("TIME") || type.includes("MATERIAL") || type.includes("TIMESHEET")) return BILLING_TYPE_DETAILS_KEY.TIME_MATERIAL;
   return null;
 };
@@ -127,13 +137,38 @@ export const normalizeApprovalConfiguration = (record = {}) => {
     effectiveFrom: firstPresent(billingDetails?.effectiveFrom, record.effectiveFrom, record.startDate) || "",
     effectiveTo: firstPresent(billingDetails?.effectiveTo, record.effectiveTo, record.endDate) || "",
     hourlyRate: record.hourlyRate ?? "",
+    // Recurring-only fields (see buildRecurringRequestPayload/normalizeRecurringConfig)
+    // — read from the resolved billingDetails section (recurringDetails for a
+    // RECURRING record), falling back to a top-level field in case the
+    // backend also flattens it there.
+    billingContext: firstPresent(billingDetails?.billingContext, record.billingContext) || "PROJECT",
+    productName: firstPresent(billingDetails?.productName, record.productName) || "",
+    productDescription: firstPresent(billingDetails?.productDescription, record.productDescription) || "",
+    renewalType: firstPresent(billingDetails?.renewalType, record.renewalType) || "",
+    renewalDurationType: firstPresent(billingDetails?.renewalDurationType, record.renewalDurationType) || "",
+    renewalPricingType: firstPresent(billingDetails?.renewalPricingType, record.renewalPricingType) || "",
+    renewalContractValue: firstPresent(billingDetails?.renewalContractValue, record.renewalContractValue),
+    renewalBillingFrequencyId: firstPresent(billingDetails?.renewalBillingFrequencyId, record.renewalBillingFrequencyId) || "",
+    renewalEffectiveFrom: firstPresent(billingDetails?.renewalEffectiveFrom, record.renewalEffectiveFrom) || "",
     // contractValue/pmsProjectBudget/contractValueSource and every commercial
     // figure below are read from the resolved billingDetails section first —
     // that's the backend's source of truth — falling back to the legacy flat
     // fields only when billingDetails is null/missing (e.g. a draft that was
     // never saved with commercial details).
-    contractValue: firstPresent(billingDetails?.contractValue, record.contractValue, record.totalContractValue),
+    contractValue: firstPresent(
+      billingDetails?.contractValue,
+      // Milestone Plan's BillingMilestonePlanResponseDto field is
+      // "totalContractValue", not "contractValue" — folded into the same
+      // generic contractValue the Commercial Configuration section reads.
+      billingDetails?.totalContractValue,
+      record.contractValue,
+      record.totalContractValue,
+    ),
     contractValueSource: firstPresent(billingDetails?.contractValueSource, record.contractValueSource),
+    // Milestone Plan-only fields (BillingMilestonePlanResponseDto) — null/[]
+    // for every other billing type.
+    paymentStructure: billingDetails?.paymentStructure || "",
+    paymentEntries: Array.isArray(billingDetails?.entries) ? billingDetails.entries : [],
     // PMS Project Budget: fixedPriceDetails.pmsProjectBudget first, falling
     // back to the top-level projectBudget when the details value is null.
     pmsProjectBudget: firstPresent(billingDetails?.pmsProjectBudget, record.projectBudget, record.pmsProjectBudget),

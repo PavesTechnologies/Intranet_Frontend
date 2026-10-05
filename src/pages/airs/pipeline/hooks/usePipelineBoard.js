@@ -44,6 +44,11 @@ function mapCandidate(cc) {
     role: cc.current_designation,
     composite: cc.composite_score,
     stage: cc.pipeline_stage,
+    // Drive the card's "what happens next" indicator (see PipelineCandidateCard).
+    parseStatus: cc.parse_status,
+    requirementsScore: cc.deterministic_score,
+    relevanceScore: cc.semantic_score,
+    aiScore: cc.ai_ats_score,
   };
 }
 

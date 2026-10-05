@@ -182,6 +182,16 @@ describe("InvoiceTdsPanel — DETERMINED: read-only fields and correction", () =
     render(<InvoiceTdsPanel invoice={invoice} />);
     expect(screen.queryByRole("button", { name: /correct payment nature/i })).not.toBeInTheDocument();
   });
+
+  // Regression: once the invoice has actually been sent for approval, the payment nature is what
+  // the approvers are reviewing against — correcting it after that point would silently
+  // invalidate an in-flight or completed approval decision. Correction is only ever offered while
+  // still at OCR Reviewed, the same window Determine itself is offered in.
+  it("hides Correct Payment Nature once the invoice has moved past OCR Reviewed (e.g. Pending Approval), even with canEditTds", () => {
+    useInvoiceTds.mockReturnValue({ data: determinedTds, isLoading: false, error: null });
+    render(<InvoiceTdsPanel invoice={{ ...invoice, status: "Pending Approval" }} />);
+    expect(screen.queryByRole("button", { name: /correct payment nature/i })).not.toBeInTheDocument();
+  });
 });
 
 describe("InvoiceTdsPanel — Verify (Finance)", () => {

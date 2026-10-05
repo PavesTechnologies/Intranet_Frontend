@@ -189,7 +189,16 @@ export default function ResumeIntakePage() {
           )}
         </>
       ) : activeListTab === "processing" ? (
-        <InProcessingList files={inProcessingFiles} isLoading={inProcessingLoading} onRefresh={refreshInProcessing} />
+        <InProcessingList
+          files={inProcessingFiles}
+          isLoading={inProcessingLoading}
+          onRefresh={refreshInProcessing}
+          onCompleted={() => {
+            // A parsed resume belongs in Upload History - show it there, freshly fetched.
+            setActiveListTab("history");
+            refreshResumes?.();
+          }}
+        />
       ) : (
         <BulkUploadJobsList jobs={bulkJobs} isLoading={isBulkJobsLoading} onSelectJob={handleOpenJobDetail} />
       )}

@@ -5,7 +5,6 @@ import Select from "react-select";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import { PageCard, PageCardContent } from "@/components/Cards/PageCard";
 import GenericTable from "@/components/Table/table";
-import Pagination from "@/components/Pagination/pagination";
 import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
 import Modal from "@/components/Modal/modal";
@@ -18,6 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { showStatusToast } from "@/components/toastfy/toast";
 import api from "@/api/axiosInstance";
 import { Fonts } from "@/components/Fonts/Fonts";
+import Pagination from "@/components/Pagination/pagination";
 
 const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
 
@@ -1105,16 +1105,14 @@ export default function CurrencyManagementPage() {
                 />
               </div>
 
-              {currencyTotalPages > 1 && (
-                <div className="mt-4 flex justify-center">
-                  <Pagination
-                    currentPage={currencyCurrentPage}
-                    totalPages={currencyTotalPages}
-                    onPrevious={() => setCurrencyCurrentPage((p) => Math.max(p - 1, 1))}
-                    onNext={() => setCurrencyCurrentPage((p) => Math.min(p + 1, currencyTotalPages))}
-                  />
-                </div>
-              )}
+              <div className="mt-4 flex justify-center">
+                <Pagination
+                  currentPage={currencyCurrentPage}
+                  totalPages={currencyTotalPages}
+                  onPrevious={() => setCurrencyCurrentPage((p) => Math.max(p - 1, 1))}
+                  onNext={() => setCurrencyCurrentPage((p) => Math.min(p + 1, currencyTotalPages))}
+                />
+              </div>
             </>
           )
         ) : (
@@ -1151,16 +1149,14 @@ export default function CurrencyManagementPage() {
                 />
               </div>
 
-              {ratesTotalPages > 1 && (
-                <div className="mt-4 flex justify-center">
-                  <Pagination
-                    currentPage={rateCurrentPage}
-                    totalPages={ratesTotalPages}
-                    onPrevious={() => setRateCurrentPage((p) => Math.max(p - 1, 1))}
-                    onNext={() => setRateCurrentPage((p) => Math.min(p + 1, ratesTotalPages))}
-                  />
-                </div>
-              )}
+              <div className="mt-4 flex justify-center">
+                <Pagination
+                  currentPage={rateCurrentPage}
+                  totalPages={ratesTotalPages}
+                  onPrevious={() => setRateCurrentPage((p) => Math.max(p - 1, 1))}
+                  onNext={() => setRateCurrentPage((p) => Math.min(p + 1, ratesTotalPages))}
+                />
+              </div>
             </>
           )
         )}

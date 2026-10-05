@@ -3,8 +3,10 @@ import { RefreshCw, AlertCircle, FolderKanban, Hash, CalendarRange, MapPin, Mail
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
+import FormTextArea from "../../../../components/forms/FormTextArea";
 import SearchableSelect from "../common/SearchableSelect";
 import { showStatusToast } from "../../../../components/toastfy/toast";
+import { BILLING_CONTEXT_OPTIONS } from "../../data/wizardOptions";
 import {
   getBillingConfigurationClients,
   getAvailableProjectsForBillingConfiguration,
@@ -28,6 +30,18 @@ function formatPhoneNumber(countryCode, phoneNumber) {
   return [countryCode, phoneNumber].filter(Boolean).join(" ") || "—";
 }
 
+// Display-time safety net: a Project Code must never be the project's own
+// internal id. A legacy record can have that value persisted (saved before
+// this mapping was fixed) or a lookup can fall through to it — either way,
+// never show it as the code, here in the dropdown label or in the Synced
+// Information card below.
+function sanitizeProjectCode(code, projectId) {
+  const codeStr = code === null || code === undefined ? "" : String(code).trim();
+  if (!codeStr) return "";
+  if (projectId === null || projectId === undefined || projectId === "") return codeStr;
+  return codeStr === String(projectId).trim() ? "" : codeStr;
+}
+
 const EMPTY_PROJECT_FIELDS = {
   projectId: "",
   projectName: "",
@@ -42,6 +56,15 @@ const EMPTY_PROJECT_FIELDS = {
   phoneNumber: "",
   startDate: "",
   endDate: "",
+};
+
+// Product/Application/Service billing has no project at all — projectId must
+// stay null/absent (see buildBillingConfigurationRequestPayload), so switching
+// into PRODUCT_SERVICE clears every project-specific field a prior PROJECT
+// selection may have left behind.
+const EMPTY_PRODUCT_SERVICE_FIELDS = {
+  productName: "",
+  productDescription: "",
 };
 
 export default function ProjectStep({ value = {}, onChange }) {
@@ -119,6 +142,15 @@ export default function ProjectStep({ value = {}, onChange }) {
   // Internal projectSource defaults to ENTERPRISE if not set
   const projectSource = value.projectSource || "ENTERPRISE";
 
+  // Billing Context: PROJECT (default — every existing T&M/Fixed Price/
+  // Milestone/Recurring flow) vs PRODUCT_SERVICE (Recurring only — a
+  // standalone product/application/service with no project at all). This is
+  // a distinct concept from projectSource's ENTERPRISE/STANDALONE, which is
+  // still about a *project* (synced vs manually-entered) — a PRODUCT_SERVICE
+  // configuration never has a project, manually-entered or otherwise.
+  const billingContext = value.billingContext || "PROJECT";
+  const isProductService = billingContext === "PRODUCT_SERVICE";
+
   // `projects` is already exactly the set of projects eligible for a new
   // Billing Configuration (see getAvailableProjectsForBillingConfiguration) —
   // the backend is the sole source of truth for that eligibility, so no
@@ -191,7 +223,8 @@ export default function ProjectStep({ value = {}, onChange }) {
     if (!value.clientId) return [];
     return displayProjects.map((project) => {
       const id = String(project.projectId || project.id || "");
-      const label = project.projectCode ? `${project.projectCode} — ${project.projectName}` : project.projectName;
+      const code = sanitizeProjectCode(project.projectCode, project.projectId || project.id);
+      const label = code ? `${code} — ${project.projectName}` : project.projectName;
       return { value: id, label };
     });
   }, [displayProjects, value.clientId]);
@@ -204,32 +237,47 @@ export default function ProjectStep({ value = {}, onChange }) {
     );
   }, [displayProjects, value.projectId]);
 
-  // A Draft billing configuration can come back from the backend without its
-  // project-derived fields (e.g. projectCode) persisted — once the client's
-  // project list loads, backfill anything missing from the matched project so
-  // the summary card and step validation don't see a false "missing" field.
+  // A Draft billing configuration can come back from the backend with only
+  // SOME of its project-derived fields persisted (e.g. projectCode present
+  // but projectBudget/primaryLocation/email missing — the flat
+  // BillingConfigurationResponseDto is inconsistent about this; see
+  // billingConfigurationService.js). Once the matching project is resolved
+  // (from the client's project list, or synthesized from `value` itself while
+  // that list is still loading — see displayProjects above), backfill every
+  // field independently rather than gating the whole patch behind just two of
+  // them — otherwise a config that already has projectCode+projectDuration
+  // but not projectBudget would stay permanently blank on those other fields.
+  // This also makes hydration order-independent: it re-evaluates on every
+  // render where matchedProject or value changes, and is a no-op (no onChange
+  // call, so no update loop) as soon as nothing is actually missing.
   useEffect(() => {
     if (!matchedProject) return;
-    if (value.projectCode && value.projectDuration) return;
 
-    onChange({
-      ...value,
-      projectName: value.projectName || matchedProject.projectName,
-      projectCode: value.projectCode || matchedProject.projectCode,
-      projectDuration: value.projectDuration || matchedProject.projectDuration,
-      currency: value.currency || matchedProject.projectBudgetCurrency || matchedProject.currency || "",
-      projectBudget: value.projectBudget ?? matchedProject.projectBudget ?? "",
-      projectBudgetCurrency:
-        value.projectBudgetCurrency || matchedProject.projectBudgetCurrency || matchedProject.currency || "",
-      primaryLocation: value.primaryLocation || matchedProject.primaryLocation || "",
-      countryCode: value.countryCode || matchedProject.countryCode || "",
-      email: value.email || matchedProject.email || "",
-      phoneNumber: value.phoneNumber || matchedProject.phoneNumber || "",
-      startDate: value.startDate || matchedProject.startDate,
-      endDate: value.endDate || matchedProject.endDate,
-    });
+    const patch = {};
+    const take = (field, source = matchedProject[field]) => {
+      const current = value[field];
+      const hasCurrent = current !== undefined && current !== null && current !== "";
+      const hasSource = source !== undefined && source !== null && source !== "";
+      if (!hasCurrent && hasSource) patch[field] = source;
+    };
+
+    take("projectName");
+    take("projectCode", sanitizeProjectCode(matchedProject.projectCode, matchedProject.projectId || matchedProject.id));
+    take("projectDuration");
+    take("projectBudget");
+    take("projectBudgetCurrency", matchedProject.projectBudgetCurrency || matchedProject.currency);
+    take("currency", matchedProject.projectBudgetCurrency || matchedProject.currency);
+    take("primaryLocation");
+    take("countryCode");
+    take("email");
+    take("phoneNumber");
+    take("startDate");
+    take("endDate");
+
+    if (Object.keys(patch).length === 0) return;
+    onChange({ ...value, ...patch });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchedProject]);
+  }, [matchedProject, value]);
 
   const getProjectDurationLabel = (projectData) => {
     if (projectData?.projectDuration) return projectData.projectDuration;
@@ -263,7 +311,7 @@ export default function ProjectStep({ value = {}, onChange }) {
         clientName: value.clientName,
         projectId,
         projectName: project.projectName,
-        projectCode: project.projectCode,
+        projectCode: project.projectCode || "",
         projectDuration: project.projectDuration,
         currency: project.projectBudgetCurrency || project.currency || "",
         projectBudget: project.projectBudget ?? "",
@@ -282,6 +330,35 @@ export default function ProjectStep({ value = {}, onChange }) {
         projectId: "",
       });
     }
+  };
+
+  const handleBillingContextChange = (nextContext) => {
+    if (nextContext === billingContext) return;
+    if (nextContext === "PRODUCT_SERVICE") {
+      onChange({
+        ...value,
+        billingContext: "PRODUCT_SERVICE",
+        ...EMPTY_PROJECT_FIELDS,
+      });
+    } else {
+      onChange({
+        ...value,
+        billingContext: "PROJECT",
+        ...EMPTY_PRODUCT_SERVICE_FIELDS,
+      });
+    }
+  };
+
+  // Client search for Product/Service billing — the same enterprise client
+  // list as the PROJECT flow (a client is still required), but never touches
+  // projectSource/switchToStandalone: there is no project to fall back to.
+  const handleProductServiceClientSelect = (clientId) => {
+    const clientName = clientOptions.find((opt) => opt.value === clientId)?.label || "";
+    onChange({ ...value, clientId, clientName });
+  };
+
+  const useManualClientForProductService = (queryText = "") => {
+    onChange({ ...value, clientId: "", clientName: queryText });
   };
 
   const switchToStandalone = (queryText = "") => {
@@ -325,7 +402,32 @@ export default function ProjectStep({ value = {}, onChange }) {
 
   return (
     <div className="space-y-5">
-      {projectSource === "STANDALONE" && (
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">Billing Context</label>
+        <div className="inline-flex items-center gap-1 rounded-lg bg-slate-200/60 p-0.5">
+          {BILLING_CONTEXT_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => handleBillingContextChange(option.value)}
+              className={`rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                billingContext === option.value
+                  ? "bg-white text-[#0A0082] shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {isProductService && (
+          <p className="text-xs text-slate-500">
+            Bill a standalone product, application, or service — no project is required.
+          </p>
+        )}
+      </div>
+
+      {!isProductService && projectSource === "STANDALONE" && (
         <div className="flex justify-end">
           <button
             type="button"
@@ -341,7 +443,72 @@ export default function ProjectStep({ value = {}, onChange }) {
       {/* Inputs Section */}
       <div className="space-y-5">
 
-        {projectSource === "ENTERPRISE" ? (
+        {isProductService ? (
+          /* PRODUCT / SERVICE FLOW — client is still required, but there is
+             no project at all: projectId/projectCode/dates stay absent (see
+             buildBillingConfigurationRequestPayload). */
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <SearchableSelect
+                label="Client Name"
+                requiredMark
+                name="clientId"
+                options={clientOptions}
+                value={value.clientId || ""}
+                onChange={(event) => handleProductServiceClientSelect(event.target.value)}
+                placeholder={loadingClients ? "Loading clients..." : "Search client..."}
+                disabled={loadingClients}
+                anchor
+                emptyState={(query) =>
+                  query ? (
+                    <div className="p-4 text-center">
+                      <p className="text-sm text-slate-500 mb-2">No matching client found.</p>
+                      <button
+                        type="button"
+                        onClick={() => useManualClientForProductService(query)}
+                        className="w-full inline-flex justify-center items-center gap-1.5 rounded-md bg-[#0A0082] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#080066]"
+                      >
+                        Use &quot;{query}&quot; as client name
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="px-4 py-2 text-sm text-slate-500">No clients available.</div>
+                  )
+                }
+              />
+              {value.clientId === "" && value.clientName && (
+                <FormInput
+                  label="Client Name"
+                  requiredMark
+                  name="clientName"
+                  value={value.clientName || ""}
+                  onChange={handleFieldChange}
+                  placeholder="e.g. Meridian Financial Group"
+                />
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <FormInput
+                label="Product / Application / Service Name"
+                requiredMark
+                name="productName"
+                value={value.productName || ""}
+                onChange={handleFieldChange}
+                placeholder="e.g. Customer Support Portal"
+              />
+            </div>
+
+            <FormTextArea
+              label="Product / Service Description *"
+              name="productDescription"
+              value={value.productDescription || ""}
+              onChange={handleFieldChange}
+              placeholder="Briefly describe what is being billed"
+              rows={3}
+            />
+          </div>
+        ) : projectSource === "ENTERPRISE" ? (
           /* ENTERPRISE FLOW */
           <div className="space-y-5">
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -381,7 +548,15 @@ export default function ProjectStep({ value = {}, onChange }) {
                   requiredMark
                   name="projectId"
                   options={projectOptions}
-                  value={value.projectId || ""}
+                  // SearchableSelect matches this against option.value with
+                  // strict === (option.value is always String(projectId) — see
+                  // projectOptions below). A Draft loaded from the backend can
+                  // carry projectId as a number (e.g. 38), which would never
+                  // strictly equal the string "38" in projectOptions, leaving
+                  // the dropdown stuck on its placeholder even though the
+                  // correct project was selected. Stringify here so it always
+                  // matches regardless of where projectId came from.
+                  value={value.projectId ? String(value.projectId) : ""}
                   onChange={handleProjectSelect}
                   placeholder={projectSelectorPlaceholder}
                   disabled={loadingClients || !value.clientId || loadingProjects}
@@ -472,7 +647,7 @@ export default function ProjectStep({ value = {}, onChange }) {
               <FieldCell
                 icon={<Hash className="h-3 w-3" strokeWidth={1.75} />}
                 label="Project Code"
-                value={value.projectCode || "—"}
+                value={sanitizeProjectCode(value.projectCode, value.projectId) || "—"}
               />
             </div>
             <div className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-2 sm:divide-y-0 sm:divide-x">

@@ -16,6 +16,22 @@ import { notifySessionExpired } from "../../../../api/sessionExpiry";
  * /user/queue/report-updates and /user/queue/approval-queue-updates).
  */
 const ApprovalWebSocketContext = createContext(null);
+
+// Team notification feeds this user may join (/topic/notifications.<ROLE>), from the JWT's roles.
+// The backend refuses any feed whose role the user doesn't hold, so this is only an optimisation.
+const TEAM_FEED_ROLES = ["FINANCE_EXECUTIVE", "AP_EXECUTIVE", "ADMIN"];
+const teamFeedsFor = (token) => {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    const roles = (Array.isArray(payload.roles) ? payload.roles : String(payload.roles || "").split(","))
+      .map((r) => String(r).trim().toUpperCase());
+    const feeds = new Set(roles.filter((r) => TEAM_FEED_ROLES.includes(r)));
+    if (roles.includes("SUPER_ADMIN")) feeds.add("ADMIN");
+    return [...feeds];
+  } catch {
+    return [];
+  }
+};
 export const useApprovalWebSocket = () => useContext(ApprovalWebSocketContext);
 
 export default function ApprovalWebSocketProvider({ children }) {
@@ -82,6 +98,16 @@ export default function ApprovalWebSocketProvider({ children }) {
         // Backend: messagingTemplate.convertAndSendToUser(approverId, "/queue/approval-queue-updates", event)
         client.subscribe("/user/queue/approval-queue-updates", (msg) => {
           emitEvent("queue-update", parseBody(msg.body));
+        });
+        // Notification Center: personal notifications + this user's team inboxes
+        // (NotificationServiceImpl.USER_QUEUE / ROLE_TOPIC_PREFIX).
+        client.subscribe("/user/queue/notifications", (msg) => {
+          emitEvent("notification", parseBody(msg.body));
+        });
+        teamFeedsFor(localStorage.getItem("token") || "").forEach((role) => {
+          client.subscribe(`/topic/notifications.${role}`, (msg) => {
+            emitEvent("notification", parseBody(msg.body));
+          });
         });
       },
 

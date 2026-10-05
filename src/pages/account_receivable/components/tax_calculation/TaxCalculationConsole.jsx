@@ -41,7 +41,6 @@ import BillingOccurrenceCard from "./BillingOccurrenceCard";
 /* Global constants                                                    */
 /* ------------------------------------------------------------------ */
 
-const ACQUISITION_PATH = "/account-receivable/billing-data-acquisition";
 const OCCURRENCE_DETAIL_BASE = "/account-receivable/tax-calculation/occurrence";
 
 // Same page size as the other AR list pages (e.g. BillingApprovals)
@@ -487,9 +486,13 @@ export default function TaxCalculationConsole() {
       case STATUS_TABS.TAX_COMPLETED:
         return [
           {
-            label: "Generate Invoice",
+            label: "Proceed to Invoice Generation",
             icon: <FileText className="h-4 w-4 text-indigo-600" />,
-            onClick: () => handleAction(item),
+            onClick: () => {
+              navigate(`/account-receivable/invoice-generation/${snapId}`, {
+                state: { config: item.config, from: "tax-calculation-console" },
+              });
+            },
           },
           {
             label: "View Tax Calculation",
@@ -534,54 +537,6 @@ export default function TaxCalculationConsole() {
     return (
       <div className="flex h-80 items-center justify-center">
         <Loader size="lg" text="Loading Tax Calculation Console..." />
-      </div>
-    );
-  }
-
-  const hasAnyOccurrences =
-    readyOccurrences.length > 0 ||
-    upcomingOccurrences.length > 0 ||
-    processedOccurrences.length > 0 ||
-    invoicedOccurrences.length > 0;
-
-  // Genuine empty state: zero relevant snapshots AND zero billing occurrences
-  if (!loading && relevantSnapshots.length === 0 && !occLoading && !hasAnyOccurrences) {
-    return (
-      <div className="w-full space-y-6">
-        <PageHeader
-          title="Tax Calculation"
-          subtitle="Calculate and review tax for acquired billing snapshots."
-          action={
-            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
-              <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-          }
-        />
-
-        <PageCard>
-          <PageCardContent className="p-12 text-center space-y-4">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
-              <Calculator className="h-8 w-8" />
-            </div>
-            <div className="space-y-1.5 max-w-md mx-auto">
-              <h3 className="text-lg font-bold text-slate-800">
-                No Billing Snapshots in Tax Calculation Workspace
-              </h3>
-              <p className="text-sm text-slate-500">
-                Acquire and validate billing data before starting tax calculation.
-              </p>
-            </div>
-            <div className="pt-3">
-              <Button
-                onClick={() => navigate(ACQUISITION_PATH)}
-                className="bg-[#0A0082] text-white hover:bg-[#0A0082]/90 font-semibold px-6 py-2.5"
-              >
-                Go to Billing Data Acquisition
-              </Button>
-            </div>
-          </PageCardContent>
-        </PageCard>
       </div>
     );
   }
@@ -717,7 +672,7 @@ export default function TaxCalculationConsole() {
               alignments={TABLE_ALIGNMENTS}
               headerAlignments={TABLE_HEADER_ALIGNMENTS}
               loading={loading}
-              emptyMessage="No billing snapshots match your current filters."
+              emptyMessage={relevantSnapshots.length === 0 ? "No billing snapshots in tax calculation workspace." : "No billing snapshots match your current filters."}
             />
             {!loading && filteredSnapshots.length > 0 && (
               <Pagination

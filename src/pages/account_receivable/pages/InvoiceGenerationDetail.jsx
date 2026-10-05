@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   FileText,
@@ -10,6 +10,9 @@ import {
   RefreshCw,
   Send,
   Eye,
+  Clock,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
@@ -17,7 +20,6 @@ import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
 import StatusBadge from "../../../components/status/statusbadge";
 import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
-import Modal from "../../../components/Modal/modal";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { formatCurrency, formatDisplayDate } from "../utils/format";
 import InvoiceDocument from "../components/invoice/InvoiceDocument";
@@ -110,9 +112,17 @@ export default function InvoiceGenerationDetail() {
   const [occurrenceData, setOccurrenceData] = useState(passedState.occurrence || null);
   const [items, setItems] = useState([]);
 
-  // Preview Modal state
-  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  // Persistent Preview state and ref for smooth scroll
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(true);
+  const previewSectionRef = useRef(null);
   const [companyProfile, setCompanyProfile] = useState(null);
+
+  const handleScrollToPreview = () => {
+    setIsPreviewExpanded(true);
+    setTimeout(() => {
+      previewSectionRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    }, 50);
+  };
 
   const loadData = async (isManual = false) => {
     if (!effectiveId) {
@@ -312,7 +322,8 @@ export default function InvoiceGenerationDetail() {
   // Primary Action: Generate Invoice
   const handleGenerateInvoice = async () => {
     const targetId = isOccurrenceMode ? effectiveOccurrenceId : effectiveSnapshotId;
-    if (!targetId || generating) return;
+    const alreadyGenerated = Boolean(invoice && (invoice.invoiceId || invoice.invoiceNumber));
+    if (!targetId || generating || alreadyGenerated) return;
 
     setGenerating(true);
     try {
@@ -324,6 +335,7 @@ export default function InvoiceGenerationDetail() {
       }
 
       setInvoice(generated);
+      setIsPreviewExpanded(true);
       if (Array.isArray(generated?.items) && generated.items.length > 0) {
         setItems(generated.items);
       }
@@ -339,6 +351,9 @@ export default function InvoiceGenerationDetail() {
       }
 
       showStatusToast("Invoice generated successfully.", "success");
+      setTimeout(() => {
+        previewSectionRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+      }, 100);
     } catch (err) {
       const status = err?.response?.status;
       const msg = (err?.response?.data?.message || err?.message || "").toLowerCase();
@@ -350,6 +365,7 @@ export default function InvoiceGenerationDetail() {
           const existing = await getInvoice(targetId);
           if (existing) {
             setInvoice(existing);
+            setIsPreviewExpanded(true);
             if (Array.isArray(existing.items) && existing.items.length > 0) {
               setItems(existing.items);
             }
@@ -508,8 +524,11 @@ export default function InvoiceGenerationDetail() {
 
   const backToTaxUrl = isOccurrenceMode
     ? `/account-receivable/tax-calculation/occurrence/${effectiveOccurrenceId}`
-    : `/account-receivable/tax-calculation/${snapshotId}`;
+    : `/account-receivable/tax-calculation/${effectiveSnapshotId || snapshotId}`;
 
+  const canonicalInvoiceUrl = isOccurrenceMode
+    ? `/account-receivable/invoices/occurrence/${effectiveOccurrenceId}`
+    : `/account-receivable/invoices/${effectiveSnapshotId || snapshotId}`;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -590,68 +609,8 @@ export default function InvoiceGenerationDetail() {
       </div>
 
       {/* Workflow Guidance Banner */}
-      {isInvoiceGenerated ? (
-        <div className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-emerald-950">Invoice Generated Successfully</h3>
-                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
-                  {invoice?.invoiceNumber}
-                </span>
-              </div>
-              <p className="text-xs text-emerald-800 mt-0.5">
-                Authoritative invoice has been created and persisted. Review line items and submit for approval.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="small"
-              onClick={() => setIsPreviewModalOpen(true)}
-              className="bg-white text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 text-xs"
-            >
-              <Eye className="h-3.5 w-3.5" /> Preview Invoice
-            </Button>
-
-            {invoiceStatus === "GENERATED" && (
-              <Button
-                variant="primary"
-                size="small"
-                onClick={handleSubmitForApproval}
-                disabled={submitting}
-                className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold shadow-sm"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Submitting...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-3.5 w-3.5" /> Submit for Approval
-                  </>
-                )}
-              </Button>
-            )}
-
-            {invoiceStatus === "PENDING_APPROVAL" && (
-              <Button
-                variant="outline"
-                size="small"
-                onClick={() => navigate(INVOICE_APPROVAL_PATH)}
-                className="bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 flex items-center gap-1.5 text-xs font-semibold"
-              >
-                View in Invoice Approval <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            )}
-          </div>
-        </div>
-      ) : (
+      {!isInvoiceGenerated ? (
+        /* State A: Ready to Generate */
         <div className="flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50/70 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">
@@ -673,7 +632,7 @@ export default function InvoiceGenerationDetail() {
             variant="primary"
             size="small"
             onClick={handleGenerateInvoice}
-            disabled={generating}
+            disabled={generating || isInvoiceGenerated}
             className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center justify-center gap-1.5 text-xs font-semibold shadow-sm shrink-0"
           >
             {generating ? (
@@ -686,6 +645,197 @@ export default function InvoiceGenerationDetail() {
               </>
             )}
           </Button>
+        </div>
+      ) : invoiceStatus === "GENERATED" ? (
+        /* State B: Invoice Generated */
+        <div className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-emerald-950">Invoice Generated Successfully</h3>
+                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded">
+                  {invoice?.invoiceNumber}
+                </span>
+                <StatusBadge label={invoiceStatus} size="sm" />
+              </div>
+              <p className="text-xs text-emerald-800 mt-0.5">
+                Authoritative invoice created. Preview the document below and submit for approval.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="small"
+              onClick={handleScrollToPreview}
+              className="bg-white text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 text-xs font-semibold"
+            >
+              <Eye className="h-3.5 w-3.5 text-slate-600" /> Preview Invoice
+            </Button>
+
+            <Button
+              variant="primary"
+              size="small"
+              onClick={handleSubmitForApproval}
+              disabled={submitting}
+              className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold shadow-sm"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Submitting...
+                </>
+              ) : (
+                <>
+                  <Send className="h-3.5 w-3.5" /> Submit for Approval
+                </>
+              )}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="small"
+              onClick={() => navigate(canonicalInvoiceUrl)}
+              className="bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 flex items-center gap-1.5 text-xs font-semibold"
+            >
+              Open in Invoice Detail <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      ) : invoiceStatus === "PENDING_APPROVAL" ? (
+        /* State C: Pending Approval */
+        <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+              <Clock className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-amber-950">Invoice Submitted for Approval</h3>
+                <span className="font-mono text-xs font-bold text-amber-800 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded">
+                  {invoice?.invoiceNumber}
+                </span>
+                <StatusBadge label={invoiceStatus} size="sm" />
+              </div>
+              <p className="text-xs text-amber-800 mt-0.5">
+                This invoice has been submitted to the Invoice Approval workflow.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="small"
+              onClick={handleScrollToPreview}
+              className="bg-white text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 text-xs font-semibold"
+            >
+              <Eye className="h-3.5 w-3.5 text-slate-600" /> Preview Invoice
+            </Button>
+
+            <Button
+              variant="primary"
+              size="small"
+              onClick={() => navigate(INVOICE_APPROVAL_PATH)}
+              className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold shadow-sm"
+            >
+              Go to Invoice Approval <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+
+            <Button
+              variant="outline"
+              size="small"
+              onClick={() => navigate(canonicalInvoiceUrl)}
+              className="bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 flex items-center gap-1.5 text-xs font-semibold"
+            >
+              Open in Invoice Detail <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      ) : invoiceStatus === "APPROVED" ? (
+        /* State D: Approved */
+        <div className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-emerald-950">Invoice Approved</h3>
+                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded">
+                  {invoice?.invoiceNumber}
+                </span>
+                <StatusBadge label={invoiceStatus} size="sm" />
+              </div>
+              <p className="text-xs text-emerald-800 mt-0.5">
+                This invoice is approved. Use Canonical Invoice Detail to execute final delivery actions (Send to Client).
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="small"
+              onClick={handleScrollToPreview}
+              className="bg-white text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 text-xs font-semibold"
+            >
+              <Eye className="h-3.5 w-3.5 text-slate-600" /> Preview Invoice
+            </Button>
+
+            <Button
+              variant="primary"
+              size="small"
+              onClick={() => navigate(canonicalInvoiceUrl)}
+              className="bg-teal-700 hover:bg-teal-800 text-white flex items-center gap-1.5 text-xs font-semibold shadow-sm"
+            >
+              Go to Invoice Detail <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        /* State E: Rejected or Other Status */
+        <div className="flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50/70 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-700">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-rose-950">Invoice Status: {invoiceStatus}</h3>
+                <span className="font-mono text-xs font-bold text-rose-800 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded">
+                  {invoice?.invoiceNumber}
+                </span>
+                <StatusBadge label={invoiceStatus} size="sm" />
+              </div>
+              <p className="text-xs text-rose-800 mt-0.5">
+                Review this record in Canonical Invoice Detail for corrections and lifecycle actions.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="small"
+              onClick={handleScrollToPreview}
+              className="bg-white text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 text-xs font-semibold"
+            >
+              <Eye className="h-3.5 w-3.5 text-slate-600" /> Preview Invoice
+            </Button>
+
+            <Button
+              variant="primary"
+              size="small"
+              onClick={() => navigate(canonicalInvoiceUrl)}
+              className="bg-rose-700 hover:bg-rose-800 text-white flex items-center gap-1.5 text-xs font-semibold shadow-sm"
+            >
+              Go to Invoice Detail <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -826,58 +976,64 @@ export default function InvoiceGenerationDetail() {
         </div>
       </PageCard>
 
-      {/* Full-Screen/Large Invoice Preview Modal With Workflow Actions */}
-      <Modal
-        isOpen={isPreviewModalOpen}
-        onClose={() => setIsPreviewModalOpen(false)}
-        title="Preview Invoice"
-        subtitle="Review invoice details and submit for approval"
-        className="w-[92vw] max-w-[1000px]"
-        maxHeight="max-h-[90vh]"
-        scrollable={true}
-        bodyClassName="p-4 sm:p-5 bg-slate-100/60"
-        footerClassName="p-4 sm:p-5 bg-white border-t border-slate-200"
-        footer={
-          <div className="flex flex-wrap items-center justify-end gap-3 w-full">
-            <Button
-              variant="outline"
-              size="small"
-              onClick={() => setIsPreviewModalOpen(false)}
-              className="text-xs text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 px-4 py-2"
-            >
-              Close
-            </Button>
+      {/* Persistent Invoice Document Preview */}
+      {isInvoiceGenerated && (
+        <div id="invoice-document-preview" ref={previewSectionRef} className="space-y-3">
+          <PageCard className="overflow-hidden border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-3.5">
+              <div className="flex items-center gap-2.5">
+                <FileText className="h-4 w-4 text-indigo-700" />
+                <h3 className="text-sm font-bold text-slate-800">
+                  Authoritative Invoice Document Preview
+                </h3>
+                <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+                  {invoice?.invoiceNumber}
+                </span>
+                <StatusBadge label={invoiceStatus} size="sm" />
+              </div>
 
-            {invoiceStatus === "GENERATED" && (
-              <Button
-                variant="primary"
-                size="small"
-                onClick={handleSubmitForApproval}
-                disabled={submitting}
-                className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold shadow-sm px-4 py-2"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Submitting...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-3.5 w-3.5" /> Submit for Approval
-                  </>
-                )}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="small"
+                  onClick={() => setIsPreviewExpanded((prev) => !prev)}
+                  className="text-xs text-slate-600 bg-white flex items-center gap-1"
+                >
+                  {isPreviewExpanded ? (
+                    <>
+                      <ChevronUp className="h-3.5 w-3.5" /> Collapse Document
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-3.5 w-3.5" /> Expand Document
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="small"
+                  onClick={() => navigate(canonicalInvoiceUrl)}
+                  className="text-xs text-indigo-700 bg-white border-indigo-200 hover:bg-indigo-50 flex items-center gap-1"
+                >
+                  Open in Invoice Detail <ArrowRight className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+
+            {isPreviewExpanded && (
+              <div className="p-4 sm:p-6 bg-slate-100/60">
+                <InvoiceDocument
+                  invoice={invoice}
+                  snapshotId={effectiveId}
+                  taxCalc={taxCalc || occurrenceData}
+                  snapshotData={snapshotData || occurrenceData}
+                  companyProfile={companyProfile}
+                />
+              </div>
             )}
-          </div>
-        }
-      >
-        <InvoiceDocument
-          invoice={invoice}
-          snapshotId={effectiveId}
-          taxCalc={taxCalc || occurrenceData}
-          snapshotData={snapshotData || occurrenceData}
-          companyProfile={companyProfile}
-        />
-      </Modal>
+          </PageCard>
+        </div>
+      )}
     </div>
   );
 }

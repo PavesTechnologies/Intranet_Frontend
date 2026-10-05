@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Plus, Pencil, Trash2, Loader2, Landmark } from "lucide-react";
+import { Check, Plus, Pencil, Trash2, Loader2, Landmark, Wallet, Layers, Lock, AlertCircle } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
@@ -18,13 +18,16 @@ import {
   MILESTONE_STATUS_OPTIONS,
   CURRENCY_OPTIONS,
   CONTRACT_VALUE_SOURCE_OPTIONS,
+  RECURRING_RENEWAL_MODE_OPTIONS,
+  PAYMENT_STRUCTURE_OPTIONS,
 } from "../../data/wizardOptions";
-import { formatCurrency, formatDisplayDate } from "../../utils/format";
+import { formatCurrency, formatDisplayDate, formatIndianNumber } from "../../utils/format";
 import { getBillingTypeDisplayName } from "../../utils/billingType";
 import {
   getRecurringDateErrors,
   hasRecurringDateErrors,
   toDateOnly,
+  countRecurringOccurrences,
 } from "../../utils/recurringBillingSchedule";
 import {
   getActiveBillingTypes,
@@ -37,6 +40,13 @@ import {
   createFixedPriceConfiguration,
   updateFixedPriceConfiguration,
   deleteFixedPriceConfiguration,
+  isMilestonePlanNotFoundError,
+  getMilestonePlanByBillingConfiguration,
+  createMilestonePlanConfiguration,
+  updateMilestonePlanConfiguration,
+  deleteMilestonePlanConfiguration,
+  buildMilestonePlanRequestPayload,
+  normalizeMilestonePaymentEntry,
   toApiContractValueSource,
   formatBillingFrequencyLabel,
   getBillingRecurringByBillingConfigurationId,
@@ -48,6 +58,8 @@ import {
   getBillingRecurringSchedule,
   getBillingRecurringScheduleByBillingConfigurationId,
   previewBillingSchedule,
+  renewBillingRecurring,
+  getBillingRecurringRenewalHistory,
 } from "../../services/billingConfigurationService";
 
 let milestoneSeq = 0;
@@ -93,11 +105,15 @@ const FIXED_PRICE_FREQUENCY_ORDER = [
   "HALF_YEARLY",
   "ANNUALLY",
 ];
+// Featured order for new configurations is Time & Material, Milestone Plan,
+// Recurring — Fixed Price and the legacy bare Milestone type are kept after
+// them only for backward compatibility with existing configurations.
 const BILLING_TYPE_ORDER = [
   "TIME_MATERIAL",
-  "MILESTONE",
-  "FIXED_PRICE",
+  "MILESTONE_PLAN",
   "RECURRING",
+  "FIXED_PRICE",
+  "MILESTONE",
 ];
 
 function sortByOrder(options, order, key = "value") {
@@ -140,6 +156,14 @@ function getBillingFrequencyOptions(billingType, frequencies = []) {
 
   if (billingType === "FIXED_PRICE") {
     return sortByOrder(frequencies, FIXED_PRICE_FREQUENCY_ORDER, frequencyCode);
+  }
+
+  // Milestone Plan is driven by payment/installment dates, not a recurring
+  // cadence — it is always billed One-Time and the picker is never shown
+  // interactively for it (see the Billing Frequency render block below), but
+  // this keeps frequencyOptions consistent in case anything else reads it.
+  if (billingType === "MILESTONE_PLAN") {
+    return frequencies.filter((option) => frequencyCode(option) === "ONE_TIME");
   }
 
   // One-Time and Half-Yearly only make sense against Fixed Price/Recurring, so
@@ -249,8 +273,15 @@ function normalizeBillingType(type) {
       value = "TIME_MATERIAL";
       break;
 
+    // The billing_type_master record is still literally named "Milestone Based"
+    // (no separate master-data row exists for "Milestone Plan") — this billing
+    // type is now the Milestone Plan flow (Full Payment / Installments today,
+    // Milestones via PMS to follow later) and routes to MilestonePlanForm, not
+    // the legacy bare MilestoneForm. getBillingTypeDisplayName below relabels
+    // the raw "Milestone Based" master-data name to "Milestone Plan" for display.
     case "milestone based":
-      value = "MILESTONE";
+    case "milestone plan":
+      value = "MILESTONE_PLAN";
       break;
 
     case "subscription":
@@ -959,12 +990,19 @@ function ContractValueSourceBadge({ source }) {
   return null;
 }
 
-function EnterpriseBudgetSourceSelector({ value, onChange, projectBudget, currency }) {
+function EnterpriseBudgetSourceSelector({
+  value,
+  onChange,
+  projectBudget,
+  currency,
+  sourceLabel = "Contract Value Source:",
+  manualLabel = "Manual Input",
+}) {
   const isPms = value === "PMS" || value === "PMS_BUDGET";
 
   return (
     <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2">
-      <span className="text-xs font-semibold text-slate-700">Contract Value Source:</span>
+      <span className="text-xs font-semibold text-slate-700">{sourceLabel}</span>
       <div className="flex items-center gap-1 rounded-lg bg-slate-200/60 p-0.5">
         <button
           type="button"
@@ -976,7 +1014,7 @@ function EnterpriseBudgetSourceSelector({ value, onChange, projectBudget, curren
           }`}
         >
           <Landmark className="h-3.5 w-3.5" />
-          <span>Project Budget {projectBudget ? `(${currency || ""} ${projectBudget})` : ""}</span>
+          <span>Project Budget {projectBudget ? `(${formatCurrency(projectBudget, currency)})` : ""}</span>
         </button>
 
         <button
@@ -989,10 +1027,46 @@ function EnterpriseBudgetSourceSelector({ value, onChange, projectBudget, curren
           }`}
         >
           <Pencil className="h-3.5 w-3.5" />
-          <span>Manual Input</span>
+          <span>{manualLabel}</span>
         </button>
       </div>
     </div>
+  );
+}
+
+// Shows the raw editable number while focused (so typing isn't disrupted by
+// commas being inserted under the cursor) and the Indian-grouped, 2-decimal
+// display once the field blurs. The underlying value passed to onChange is
+// always the plain numeric string — only the on-screen text is formatted.
+function IndianAmountInput({ value, onChange, ...rest }) {
+  const [isFocused, setIsFocused] = useState(false);
+  const raw = value ?? "";
+  const displayValue = isFocused ? raw : formatIndianNumber(raw) || raw;
+
+  return (
+    <FormInput
+      {...rest}
+      type="text"
+      inputMode="decimal"
+      value={displayValue}
+      onFocus={(event) => {
+        setIsFocused(true);
+        rest.onFocus?.(event);
+      }}
+      onBlur={(event) => {
+        setIsFocused(false);
+        rest.onBlur?.(event);
+      }}
+      onChange={(event) => {
+        const cleaned = event.target.value.replace(/[^0-9.]/g, "");
+        const dotIndex = cleaned.indexOf(".");
+        const sanitized =
+          dotIndex === -1
+            ? cleaned
+            : cleaned.slice(0, dotIndex + 1) + cleaned.slice(dotIndex + 1).replace(/\./g, "");
+        onChange(sanitized);
+      }}
+    />
   );
 }
 
@@ -1137,6 +1211,9 @@ function FixedPriceForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [billingConfigurationId]);
 
+  const contractValueSource =
+    value.contractValueSource || (value.totalContractValue === projectBudget ? "PMS" : "MANUAL");
+  const isPmsSource = contractValueSource === "PMS";
   const contractValue = Number(value.totalContractValue) || 0;
   const retentionPercentNum = Number(value.retentionPercent);
   const hasRetention =
@@ -1366,7 +1443,7 @@ function FixedPriceForm({
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
         <EnterpriseBudgetSourceSelector
-          value={value.contractValueSource || (value.totalContractValue === projectBudget ? "PMS" : "MANUAL")}
+          value={contractValueSource}
           onChange={(nextSource) => {
             if (nextSource === "PMS") {
               update({
@@ -1380,25 +1457,40 @@ function FixedPriceForm({
           }}
           projectBudget={projectBudget}
           currency={currency}
+          sourceLabel="Budget Source:"
+          manualLabel="Manual Budget"
         />
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="md:col-span-2">
-            <FormInput
-              label={
-                <span className="flex flex-wrap items-center gap-2">
+            {isPmsSource ? (
+              <>
+                <label className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700">
                   Contract Value <span className="text-red-500">*</span>
-                  <ContractValueSourceBadge source={value.contractValueSource} />
-                </span>
-              }
-              name="totalContractValue"
-              type="number"
-              value={value.totalContractValue || ""}
-              onChange={(event) =>
-                update({ totalContractValue: event.target.value, contractValueSource: "MANUAL" })
-              }
-              placeholder={`e.g. 120000 (${currency})`}
-            />
+                  <ContractValueSourceBadge source="PMS" />
+                </label>
+                <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-900">
+                  {value.totalContractValue || value.totalContractValue === 0
+                    ? formatCurrency(value.totalContractValue, currency)
+                    : "Not available"}
+                </div>
+              </>
+            ) : (
+              <IndianAmountInput
+                label={
+                  <span className="flex flex-wrap items-center gap-2">
+                    Contract Value <span className="text-red-500">*</span>
+                    <ContractValueSourceBadge source={contractValueSource} />
+                  </span>
+                }
+                name="totalContractValue"
+                value={value.totalContractValue || ""}
+                onChange={(nextValue) =>
+                  update({ totalContractValue: nextValue, contractValueSource: "MANUAL" })
+                }
+                placeholder={`e.g. 120000 (${currency})`}
+              />
+            )}
           </div>
           <FormInput
             label="Retention % (optional)"
@@ -1598,6 +1690,694 @@ function FixedPriceForm({
   );
 }
 
+const EMPTY_FULL_PAYMENT_ENTRY = { sequence: 1, percentage: 100, billingDate: "", remarks: "" };
+const DEFAULT_MILESTONE_PLAN_STATE = {
+  paymentStructure: "FULL_PAYMENT",
+  entries: [
+    {
+      sequence: 1,
+      percentage: 100,
+      billingDate: "",
+      remarks: "",
+    },
+  ],
+  remarks: "",
+};
+// An installment plan normally requires multiple payments, so Installments
+// starts with two evenly-split entries rather than one — see
+// buildDefaultInstallmentEntries.
+const DEFAULT_INSTALLMENT_SPLIT = [50, 50];
+function buildDefaultInstallmentEntries() {
+  return DEFAULT_INSTALLMENT_SPLIT.map((percentage, index) => ({
+    sequence: index + 1,
+    percentage,
+    billingDate: "",
+    remarks: "",
+  }));
+}
+
+// Payment Plan cards shown in the UI — Milestones is a disabled "coming soon"
+// card only (PMS-managed, no lifecycle/name/status owned by AR). The
+// backend's PaymentStructure enum currently supports only FULL_PAYMENT and
+// INSTALLMENTS, so MILESTONES must never be selectable or sent to the API.
+const PAYMENT_PLAN_CARDS = [
+  {
+    ...PAYMENT_STRUCTURE_OPTIONS.find((option) => option.value === "FULL_PAYMENT"),
+    description: "One complete payment for the full contract value.",
+    icon: Wallet,
+  },
+  {
+    ...PAYMENT_STRUCTURE_OPTIONS.find((option) => option.value === "INSTALLMENTS"),
+    description: "Split the contract value into multiple scheduled payments.",
+    icon: Layers,
+  },
+  {
+    value: "MILESTONES",
+    label: "Milestones",
+    description: "Managed by PMS",
+    icon: Lock,
+    disabled: true,
+    badge: "Coming Soon",
+  },
+];
+
+// Enterprise-grade Payment Plan selector — a visually distinct card group
+// (icon, selected-state ring, disabled "coming soon" badge) rather than the
+// generic RadioCardGroup used elsewhere in this wizard.
+function PaymentPlanSelector({ value, onChange }) {
+  return (
+    <div role="radiogroup" aria-label="Payment Plan" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {PAYMENT_PLAN_CARDS.map((card) => {
+        const isSelected = value === card.value;
+        const Icon = card.icon;
+        return (
+          <button
+            key={card.value}
+            type="button"
+            role="radio"
+            aria-checked={isSelected}
+            disabled={card.disabled}
+            onClick={() => !card.disabled && onChange(card.value)}
+            className={`relative flex flex-col gap-2.5 rounded-xl border p-4 text-left transition-all focus:outline-none focus:ring-2 focus:ring-[#0A0082]/30 ${
+              isSelected
+                ? "border-[#0A0082] bg-[#0A0082]/[0.04] shadow-[0_0_0_1px_rgba(10,0,130,0.35)]"
+                : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
+            } ${card.disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+          >
+            {card.badge ? (
+              <span className="absolute right-3 top-3 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600 ring-1 ring-inset ring-amber-200">
+                {card.badge}
+              </span>
+            ) : isSelected ? (
+              <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-[#0A0082] text-white">
+                <Check className="h-3 w-3" />
+              </span>
+            ) : null}
+            <span
+              className={`flex h-9 w-9 items-center justify-center rounded-lg ${
+                isSelected ? "bg-[#0A0082] text-white" : "bg-slate-100 text-slate-500"
+              }`}
+            >
+              <Icon className="h-4.5 w-4.5" />
+            </span>
+            <span>
+              <span className="block text-sm font-semibold text-slate-900">{card.label}</span>
+              <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">{card.description}</span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PercentBadge({ value }) {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-full bg-[#0A0082]/10 px-2.5 py-0.5 text-xs font-bold text-[#0A0082]">
+      {value || 0}%
+    </span>
+  );
+}
+
+// Shared bottom summary for both Full Payment and Installments — Project
+// Budget (via totalContractValue) is always the single source of truth, so
+// there is never a separate "Total Contract Value" input anywhere in this form.
+function PaymentSummaryPanel({ totalContractValue, allocated, remaining, totalPercentage, currency, showPercentage, isComplete }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
+      <h3 className="mb-3 text-sm font-semibold text-slate-900">Payment Allocation</h3>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-slate-500">Total Contract Value</span>
+          <span className="font-semibold text-slate-900">{formatCurrency(totalContractValue, currency)}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-slate-500">Allocated Amount</span>
+          <span className="font-semibold text-slate-900">{formatCurrency(allocated, currency)}</span>
+        </div>
+        <div className="flex items-center justify-between border-t border-slate-200 pt-2 text-sm">
+          <span className="font-semibold text-slate-700">Remaining Amount</span>
+          <span className={`font-bold ${isComplete ? "text-[#0A0082]" : "text-amber-600"}`}>
+            {formatCurrency(remaining, currency)}
+          </span>
+        </div>
+        {showPercentage && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-500">Total Percentage</span>
+            <span className={`font-semibold ${isComplete ? "text-slate-900" : "text-red-600"}`}>
+              {totalPercentage}%
+            </span>
+          </div>
+        )}
+      </div>
+      {!isComplete && (
+        <p className="mt-3 flex items-start gap-1.5 text-xs font-medium text-amber-700">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          Payment plan is incomplete — allocate the remaining amount before saving.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Milestone Plan billing (PaymentStructure FULL_PAYMENT / INSTALLMENTS today —
+// MILESTONES will follow later via PMS and must not be offered here yet). This
+// is a distinct concept from the legacy MilestoneForm below (bare "MILESTONE"
+// billing type, project milestones) — "Installment" is the correct term for a
+// payment entry here, never "Milestone".
+function MilestonePlanForm({
+  value = {},
+  onChange,
+  currency,
+  projectBudget,
+  billingConfigurationId,
+  ensureBillingConfigurationId,
+}) {
+  const update = (patch) => onChange({ ...value, ...patch });
+  const [loadingConfig, setLoadingConfig] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const fetchedRef = useRef(null);
+  const seededRef = useRef(false);
+
+  const paymentStructure = value.paymentStructure || "FULL_PAYMENT";
+  const isFullPayment = paymentStructure === "FULL_PAYMENT";
+  const entries = value.entries || [];
+
+  // Seeds a sensible default shape the first time this form mounts for a
+  // brand-new Milestone Plan (nothing saved/loaded yet) — Full Payment with a
+  // single 100% entry — so the "100%" amount is visible immediately.
+  useEffect(() => {
+    if (seededRef.current) return;
+    seededRef.current = true;
+    if (value.paymentStructure || (value.entries || []).length > 0) return;
+    update({ ...DEFAULT_MILESTONE_PLAN_STATE });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Project Budget (shown once already, under Project Financials) is the
+  // single source of truth for the contract value here — there is no
+  // separate "Total Contract Value" input. Keep it synced onto form state so
+  // validation/payload always have it, and so a stale value loaded from a
+  // previously-saved record (from before the budget changed) is corrected.
+  useEffect(() => {
+    if (projectBudget === "" || projectBudget === null || projectBudget === undefined) return;
+    const cleanBudget =
+      typeof projectBudget === "number"
+        ? projectBudget
+        : Number(String(projectBudget).replace(/,/g, "").replace(/[^0-9.-]+/g, ""));
+    if (Number.isNaN(cleanBudget) || cleanBudget <= 0) return;
+    if (Number(value.totalContractValue) === cleanBudget) return;
+    update({ totalContractValue: cleanBudget });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectBudget, value.totalContractValue]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const load = async () => {
+      if (!billingConfigurationId) return;
+      if (fetchedRef.current === billingConfigurationId) return;
+      fetchedRef.current = billingConfigurationId;
+
+      setLoadingConfig(true);
+      try {
+        const record = await getMilestonePlanByBillingConfiguration(billingConfigurationId);
+        if (!mounted) return;
+        if (!record) {
+          update({
+            milestonePlanId: null,
+            ...DEFAULT_MILESTONE_PLAN_STATE,
+          });
+          return;
+        }
+        const loadedEntries = Array.isArray(record.entries)
+          ? record.entries.map((entry, index) => {
+              const normalized = normalizeMilestonePaymentEntry(entry);
+              return {
+                ...normalized,
+                sequence: normalized.sequence ?? index + 1,
+              };
+            })
+          : [];
+        update({
+          milestonePlanId: record.milestonePlanId || record.id || null,
+          totalContractValue: record.totalContractValue ?? value.totalContractValue ?? "",
+          paymentStructure: record.paymentStructure || "FULL_PAYMENT",
+          entries: loadedEntries,
+          remarks: record.remarks || "",
+        });
+      } catch (error) {
+        if (isMilestonePlanNotFoundError(error)) {
+          if (!mounted) return;
+          update({
+            milestonePlanId: null,
+            ...DEFAULT_MILESTONE_PLAN_STATE,
+          });
+          return;
+        }
+        showStatusToast(
+          getApiErrorMessage(error, "Unable to load milestone plan configuration."),
+          "error",
+        );
+      } finally {
+        if (mounted) setLoadingConfig(false);
+      }
+    };
+
+    load();
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [billingConfigurationId]);
+
+  // Switching Payment Structure must never leave stale entries from the other
+  // structure behind (e.g. a 60/40 installment split lingering after switching
+  // to Full Payment) — always start the newly selected structure fresh.
+  const handlePaymentStructureChange = (next) => {
+    if (next === paymentStructure) return;
+    update({
+      paymentStructure: next,
+      // An installment plan normally requires multiple payments, so it
+      // starts with two evenly-split entries, not one.
+      entries: next === "FULL_PAYMENT" ? [{ ...EMPTY_FULL_PAYMENT_ENTRY }] : buildDefaultInstallmentEntries(),
+    });
+  };
+
+  const updateFullPaymentEntry = (patch) => {
+    const current = entries[0] || EMPTY_FULL_PAYMENT_ENTRY;
+    update({ entries: [{ ...current, ...patch, sequence: 1, percentage: 100 }] });
+  };
+
+  // Prefills the new row with whatever percentage is left unallocated (never
+  // negative) so reaching 100% usually takes less manual arithmetic — still
+  // freely editable.
+  const addInstallment = () => {
+    const allocated = entries.reduce((sum, entry) => sum + (Number(entry.percentage) || 0), 0);
+    const remaining = Math.max(0, Math.round((100 - allocated) * 100) / 100);
+    update({
+      entries: [
+        ...entries,
+        { sequence: entries.length + 1, percentage: remaining > 0 ? remaining : "", billingDate: "", remarks: "" },
+      ],
+    });
+  };
+
+  const removeInstallment = (index) => {
+    if (entries.length <= 1) return;
+    const next = entries.filter((_, i) => i !== index).map((entry, i) => ({ ...entry, sequence: i + 1 }));
+    update({ entries: next });
+  };
+
+  const updateInstallment = (index, patch) => {
+    const next = entries.map((entry, i) => (i === index ? { ...entry, ...patch } : entry));
+    update({ entries: next });
+  };
+
+  // Project Budget drives every amount shown here — fall back to the stored
+  // value only for the brief window before the sync effect above runs.
+  const cleanProjectBudget =
+    projectBudget !== "" && projectBudget !== null && projectBudget !== undefined
+      ? typeof projectBudget === "number"
+        ? projectBudget
+        : Number(String(projectBudget).replace(/,/g, "").replace(/[^0-9.-]+/g, ""))
+      : null;
+  const cleanValueContractValue =
+    value.totalContractValue !== "" && value.totalContractValue !== null && value.totalContractValue !== undefined
+      ? typeof value.totalContractValue === "number"
+        ? value.totalContractValue
+        : Number(String(value.totalContractValue).replace(/,/g, "").replace(/[^0-9.-]+/g, ""))
+      : null;
+
+  const totalContractValueNum =
+    cleanProjectBudget !== null && !Number.isNaN(cleanProjectBudget) && cleanProjectBudget > 0
+      ? cleanProjectBudget
+      : cleanValueContractValue !== null && !Number.isNaN(cleanValueContractValue) && cleanValueContractValue > 0
+      ? cleanValueContractValue
+      : 0;
+
+  const entryErrors = entries.map((entry) => {
+    const errors = {};
+    const percentNum = Number(entry.percentage);
+    if (entry.percentage === "" || entry.percentage === null || entry.percentage === undefined) {
+      errors.percentage = "Percentage is required.";
+    } else if (Number.isNaN(percentNum) || percentNum <= 0) {
+      errors.percentage = "Percentage must be greater than 0.";
+    } else if (percentNum > 100) {
+      errors.percentage = "Percentage cannot exceed 100%.";
+    }
+    if (!entry.billingDate) {
+      errors.billingDate = "Billing date is required.";
+    }
+    return errors;
+  });
+  const hasEntryErrors = entryErrors.some((error) => error.percentage || error.billingDate);
+
+  const totalPercentage = entries.reduce((sum, entry) => sum + (Number(entry.percentage) || 0), 0);
+  const totalPercentageValid = entries.length > 0 && Math.abs(totalPercentage - 100) < 0.01;
+  const totalAllocated = entries.reduce(
+    (sum, entry) => sum + ((Number(entry.percentage) || 0) / 100) * totalContractValueNum,
+    0,
+  );
+  const remainingAmount = totalContractValueNum - totalAllocated;
+
+  const contractValueValid = totalContractValueNum > 0;
+  const isInstallmentsValid = entries.length > 0 && !hasEntryErrors && totalPercentageValid;
+  const isFullPaymentValid = Boolean(entries[0]?.billingDate) && !entryErrors[0]?.billingDate;
+  const isFormValid = contractValueValid && (isFullPayment ? isFullPaymentValid : isInstallmentsValid);
+
+  const saveMilestonePlanConfig = async () => {
+    if (!contractValueValid) {
+      showStatusToast("Total Contract Value is required and must be greater than zero.", "error");
+      return;
+    }
+    if (isFullPayment) {
+      if (!entries[0]?.billingDate) {
+        showStatusToast("Billing date is required.", "error");
+        return;
+      }
+    } else {
+      if (entries.length === 0) {
+        showStatusToast("At least one installment is required.", "error");
+        return;
+      }
+      if (hasEntryErrors) {
+        showStatusToast("Please fix the highlighted installment errors before saving.", "error");
+        return;
+      }
+      if (!totalPercentageValid) {
+        showStatusToast("Total installment percentage must equal 100%.", "error");
+        return;
+      }
+    }
+
+    if (!billingConfigurationId) {
+      showStatusToast(
+        "Unable to save milestone plan configuration: billing configuration id is missing. Please reload and try again.",
+        "error",
+      );
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // The parent billing configuration's draft may have been created before
+      // Billing Frequency was selected — re-sync it first, mirroring
+      // FixedPriceForm's saveFixedPriceConfig.
+      let resolvedConfigId = billingConfigurationId;
+      if (ensureBillingConfigurationId) {
+        const syncedId = await ensureBillingConfigurationId();
+        if (syncedId) resolvedConfigId = syncedId;
+      }
+
+      // totalContractValue is sourced from Project Budget (totalContractValueNum,
+      // same value already driving the Payment/Allocated/Remaining amounts above),
+      // never from value.totalContractValue directly — that field is only kept in
+      // sync by the effect above and can still be stale/blank at the moment Save
+      // is clicked (e.g. right after the budget first loads). There is no separate
+      // Total Contract Value input in this form.
+      const payload = buildMilestonePlanRequestPayload({
+        ...value,
+        totalContractValue: totalContractValueNum,
+      });
+
+      // value.milestonePlanId can still be unset here if the wizard's own load
+      // effect (above) hasn't resolved yet — re-check the backend directly so
+      // an existing record is updated, never re-created as a duplicate.
+      let existingId = value.milestonePlanId;
+      if (!existingId && resolvedConfigId) {
+        const existingRecord = await getMilestonePlanByBillingConfiguration(resolvedConfigId);
+        existingId = existingRecord?.milestonePlanId || existingRecord?.id || null;
+      }
+
+      const saved = existingId
+        ? await updateMilestonePlanConfiguration(existingId, payload)
+        : await createMilestonePlanConfiguration(resolvedConfigId, payload);
+
+      const savedMilestonePlanId =
+        saved?.milestonePlanId ||
+        saved?.id ||
+        saved?.data?.milestonePlanId ||
+        saved?.data?.id ||
+        existingId ||
+        value.milestonePlanId ||
+        null;
+
+      update({
+        milestonePlanId: savedMilestonePlanId,
+        totalContractValue: saved?.totalContractValue ?? totalContractValueNum,
+        paymentStructure: saved?.paymentStructure || value.paymentStructure || "FULL_PAYMENT",
+        remarks: saved?.remarks ?? value.remarks ?? "",
+        // Reconcile with the backend-calculated amounts so the display reflects
+        // exactly what was persisted, falling back to what was just entered.
+        entries:
+          Array.isArray(saved?.entries) && saved.entries.length > 0
+            ? saved.entries.map((entry, index) => {
+                const normalized = normalizeMilestonePaymentEntry(entry);
+                return {
+                  ...normalized,
+                  sequence: normalized.sequence ?? index + 1,
+                  percentage: normalized.percentage ?? entries[index]?.percentage ?? "",
+                  remarks: normalized.remarks || entries[index]?.remarks || "",
+                };
+              })
+            : entries.map(normalizeMilestonePaymentEntry),
+      });
+      showStatusToast("Milestone plan configuration saved", "success");
+    } catch (error) {
+      showStatusToast(
+        getApiErrorMessage(error, "Unable to save milestone plan configuration."),
+        "error",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const requestRemoveMilestonePlanConfig = () => {
+    if (!value.milestonePlanId) {
+      update({
+        milestonePlanId: null,
+        totalContractValue: "",
+        ...DEFAULT_MILESTONE_PLAN_STATE,
+      });
+      return;
+    }
+    setConfirmingDelete(true);
+  };
+
+  const removeMilestonePlanConfig = async () => {
+    const milestonePlanId = value.milestonePlanId;
+    if (!milestonePlanId) {
+      setConfirmingDelete(false);
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await deleteMilestonePlanConfiguration(milestonePlanId);
+      update({
+        milestonePlanId: null,
+        totalContractValue: "",
+        ...DEFAULT_MILESTONE_PLAN_STATE,
+      });
+      showStatusToast("Milestone plan configuration deleted.", "success");
+      setConfirmingDelete(false);
+    } catch (error) {
+      showStatusToast(
+        getApiErrorMessage(error, "Unable to delete milestone plan configuration."),
+        "error",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <h2 className={Fonts.heading4}>Milestone Plan</h2>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-slate-700">
+            Payment Plan <span className="text-red-500">*</span>
+          </label>
+          <PaymentPlanSelector value={paymentStructure} onChange={handlePaymentStructureChange} />
+        </div>
+
+        <div className="space-y-3 border-t border-slate-100 pt-5">
+          <h3 className="text-sm font-semibold text-slate-900">
+            {isFullPayment ? "Payment Schedule" : "Installment Schedule"}
+          </h3>
+
+          {isFullPayment ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-900">Payment 1</span>
+                <PercentBadge value={100} />
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <ReadOnlyField label="Payment Amount" value={formatCurrency(totalContractValueNum, currency)} />
+                <FormDatePicker
+                  label="Billing Date *"
+                  name="milestonePlanBillingDate"
+                  value={entries[0]?.billingDate || ""}
+                  onChange={(event) => updateFullPaymentEntry({ billingDate: event.target.value })}
+                />
+                <div className="md:col-span-2">
+                  <FormInput
+                    label="Payment Notes"
+                    name="milestonePlanFullPaymentRemarks"
+                    value={entries[0]?.remarks || ""}
+                    onChange={(event) => updateFullPaymentEntry({ remarks: event.target.value })}
+                    placeholder="Optional notes about this payment"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-6 text-center">
+              <p className="text-sm text-slate-500">No installments yet. Add one to get started.</p>
+              <div className="mt-3 flex justify-center">
+                <Button variant="outline" size="small" onClick={addInstallment}>
+                  <Plus className="h-4 w-4" /> Add Installment
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {entries.map((entry, index) => {
+                const percentNum = Number(entry.percentage) || 0;
+                const amount = (percentNum / 100) * totalContractValueNum;
+                const errors = entryErrors[index] || {};
+                return (
+                  <div key={index} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
+                          {index + 1}
+                        </span>
+                        <span className="text-sm font-semibold text-slate-900">Installment {index + 1}</span>
+                        <PercentBadge value={percentNum} />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeInstallment(index)}
+                        disabled={entries.length <= 1}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Remove
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                      <FormInput
+                        label="Payment Percentage *"
+                        name={`installmentPercentage-${index}`}
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={entry.percentage ?? ""}
+                        onChange={(event) => updateInstallment(index, { percentage: event.target.value })}
+                        placeholder="e.g. 50"
+                        error={errors.percentage}
+                      />
+                      <ReadOnlyField label="Payment Amount" value={formatCurrency(amount, currency)} />
+                      <FormDatePicker
+                        label="Billing Date *"
+                        name={`installmentBillingDate-${index}`}
+                        value={entry.billingDate || ""}
+                        onChange={(event) => updateInstallment(index, { billingDate: event.target.value })}
+                        error={errors.billingDate}
+                      />
+                      <FormInput
+                        label="Payment Notes"
+                        name={`installmentRemarks-${index}`}
+                        value={entry.remarks || ""}
+                        onChange={(event) => updateInstallment(index, { remarks: event.target.value })}
+                        placeholder="Optional"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="flex justify-center">
+                <Button variant="outline" size="small" onClick={addInstallment}>
+                  <Plus className="h-4 w-4" /> Add Installment
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <PaymentSummaryPanel
+          totalContractValue={totalContractValueNum}
+          allocated={isFullPayment ? totalContractValueNum : totalAllocated}
+          remaining={isFullPayment ? 0 : remainingAmount}
+          totalPercentage={isFullPayment ? 100 : totalPercentage}
+          currency={currency}
+          showPercentage={!isFullPayment}
+          isComplete={isFullPayment ? true : totalPercentageValid}
+        />
+
+        <div className="border-t border-slate-100 pt-4">
+          <FormTextArea
+            label="Plan Remarks"
+            name="milestonePlanRemarks"
+            value={value.remarks || ""}
+            onChange={(event) => update({ remarks: event.target.value })}
+            placeholder="Any additional notes about this milestone plan"
+            rows={3}
+          />
+        </div>
+
+        {loadingConfig ? (
+          <p className="text-sm text-slate-500">Loading saved milestone plan configuration…</p>
+        ) : (
+          <div className="flex items-center gap-2 border-t border-slate-100 pt-4">
+            <Button
+              variant="outline"
+              size="small"
+              onClick={saveMilestonePlanConfig}
+              loading={saving}
+              loadingText="Saving..."
+              disabled={!isFormValid}
+            >
+              <Check className="h-4 w-4" />
+              {value.milestonePlanId ? "Update Milestone Plan" : "Save Milestone Plan"}
+            </Button>
+            {value.milestonePlanId && (
+              <Button
+                variant="ghost"
+                size="small"
+                onClick={requestRemoveMilestonePlanConfig}
+                loading={deleting}
+                loadingText="Removing..."
+              >
+                <Trash2 className="h-4 w-4 text-red-500" /> Remove
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <ConfirmationModal
+        isOpen={confirmingDelete}
+        title="Delete Milestone Plan"
+        message="Remove this milestone plan configuration? This cannot be undone."
+        confirmText="Delete"
+        variant="danger"
+        isLoading={deleting}
+        onCancel={() => !deleting && setConfirmingDelete(false)}
+        onConfirm={removeMilestonePlanConfig}
+      />
+    </div>
+  );
+}
+
 const EMPTY_MILESTONE_FORM = {
   name: "",
   amount: "",
@@ -1610,6 +2390,7 @@ function MilestoneForm({
   settings = {},
   onMilestonesChange,
   onSettingsChange,
+  currency,
 }) {
   const [modalState, setModalState] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -1660,7 +2441,7 @@ function MilestoneForm({
 
   const tableRows = milestones.map((milestone) => ({
     name: milestone.name,
-    amount: milestone.amount,
+    amount: formatCurrency(milestone.amount, currency),
     dueDate: milestone.dueDate,
     status: (
       <StatusBadge
@@ -1819,12 +2600,24 @@ function MilestoneForm({
 // durationUnit, chosen via the shared Billing Frequency selector above)
 // determines the recurring period — there is no separate Pricing Model for
 // Recurring, and no hardcoded MONTHLY/QUARTERLY/ANNUALLY branching here.
+//
+// contractValue is the TOTAL recurring budget for the effective period (never
+// a per-occurrence amount) — mirrors Fixed Price's Budget Source model:
+// Project Budget (contractValueSource "PMS", seeded read-only from the
+// project's PMS budget) or Manual (a freely-typed total). A Product/Service
+// configuration has no project, so it is always Manual. Occurrence count and
+// per-period amounts are derived by the backend (never the frontend) from
+// this total, Billing Frequency, and Effective From/To.
 function RecurringBillingForm({
   value = {},
   onChange,
   currency,
+  billingContext,
+  productName,
+  productDescription,
   projectBudget,
   billingFrequencyId,
+  billingFrequencyOptions = [],
   billingFrequencyOption,
   billingConfigurationId,
   ensureBillingConfigurationId,
@@ -1832,6 +2625,9 @@ function RecurringBillingForm({
   projectEndDate,
 }) {
   const update = (patch) => onChange({ ...value, ...patch });
+  const isProductService = billingContext === "PRODUCT_SERVICE";
+  const contractValueSource = value.contractValueSource || (isProductService ? "MANUAL" : "PMS");
+  const isPmsSource = contractValueSource === "PMS";
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -1841,21 +2637,48 @@ function RecurringBillingForm({
   const [scheduleError, setScheduleError] = useState("");
   const fetchedRef = useRef(false);
 
+  // Renewal — manual only (SAME_AS_PREVIOUS or CUSTOM), never automatic.
+  const [showRenewalPanel, setShowRenewalPanel] = useState(false);
+  const [renewalMode, setRenewalMode] = useState("SAME_AS_PREVIOUS");
+  const [renewalEffectiveFrom, setRenewalEffectiveFrom] = useState("");
+  const [renewalEffectiveTo, setRenewalEffectiveTo] = useState("");
+  const [renewalContractValue, setRenewalContractValue] = useState("");
+  const [renewalBillingFrequencyId, setRenewalBillingFrequencyId] = useState("");
+  const [renewalRemarks, setRenewalRemarks] = useState("");
+  const [renewing, setRenewing] = useState(false);
+  const [renewalHistory, setRenewalHistory] = useState([]);
+  const [loadingRenewalHistory, setLoadingRenewalHistory] = useState(false);
+  const [showRenewalHistory, setShowRenewalHistory] = useState(false);
+
+  // Seeds contractValue/contractValueSource from the project's PMS budget the
+  // first time this form has neither set — mirrors FixedPriceForm's seed
+  // effect so Project Budget is the sensible default for a new configuration.
+  // Product/Service has no project, so it never seeds and stays Manual.
+  useEffect(() => {
+    if (isProductService) return;
+    if (value.contractValue || value.contractValueSource) return;
+    if (projectBudget === "" || projectBudget === null || projectBudget === undefined) return;
+    update({ contractValue: projectBudget, contractValueSource: "PMS" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectBudget, isProductService]);
+
   // Fetches backend-calculated schedule preview for Recurring via
-  // POST /api/billing-configurations/preview-schedule.
+  // POST /api/billing-configurations/preview-schedule. contractValue here is
+  // the TOTAL recurring budget for the effective period — the backend derives
+  // and distributes the per-period amounts from it, the frontend never does.
   const loadSchedulePreview = async (overrideValues) => {
     const current = overrideValues || value;
     const freqId =
       billingFrequencyId ||
       billingFrequencyOption?.billingFrequencyId ||
       billingFrequencyOption?.id;
-    const contractVal = Number(current.contractValue);
+    const amount = Number(current.contractValue);
     const effFrom =
       toDateOnly(current.recurringStartDate || current.effectiveFrom) || "";
     const effTo =
       toDateOnly(current.recurringEndDate || current.effectiveTo) || "";
 
-    if (!freqId || !contractVal || !effFrom || !effTo) {
+    if (!freqId || !amount || !effFrom || !effTo) {
       return;
     }
 
@@ -1867,7 +2690,7 @@ function RecurringBillingForm({
         billingFrequencyId: freqId,
         effectiveFrom: effFrom,
         effectiveTo: effTo,
-        contractValue: contractVal,
+        contractValue: amount,
       });
       setSchedule(periods);
     } catch (error) {
@@ -1880,16 +2703,14 @@ function RecurringBillingForm({
     }
   };
 
-  const contractValueSource = value.contractValueSource || "";
-  const isPmsSource = contractValueSource === "PMS_BUDGET";
-  const hasProjectBudget = projectBudget !== "" && projectBudget !== null && projectBudget !== undefined;
-
   // Project dates can arrive as a full timestamp depending on which backend
   // lookup supplied them; the date input's min/max (and every comparison
   // below) need a plain yyyy-mm-dd, so normalize once up front — otherwise
   // the project's own start/end date can be misread as outside its duration.
-  const projectStartDateOnly = toDateOnly(projectStartDate);
-  const projectEndDateOnly = toDateOnly(projectEndDate);
+  // A Product/Service configuration has no project, so these are always
+  // blank in that case and every bound below becomes a no-op.
+  const projectStartDateOnly = isProductService ? "" : toDateOnly(projectStartDate);
+  const projectEndDateOnly = isProductService ? "" : toDateOnly(projectEndDate);
 
   const billingFrequencyLabel = billingFrequencyOption
     ? formatBillingFrequencyLabel({
@@ -1955,26 +2776,30 @@ function RecurringBillingForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [billingConfigurationId]);
 
-  // Seed Contract Value Source once from the PMS project budget, same pattern
-  // as FixedPriceForm's own seed effect below.
-  useEffect(() => {
-    if (value.contractValueSource || value.contractValue) return;
-    if (!hasProjectBudget) return;
-    update({ contractValueSource: "PMS_BUDGET", contractValue: Number(projectBudget), pmsProjectBudget: Number(projectBudget) });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasProjectBudget, projectBudget]);
+  const loadRenewalHistory = async (recurringConfigurationId) => {
+    if (!recurringConfigurationId) return;
+    setLoadingRenewalHistory(true);
+    try {
+      const history = await getBillingRecurringRenewalHistory(recurringConfigurationId);
+      setRenewalHistory(history);
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Unable to load renewal history."), "error");
+    } finally {
+      setLoadingRenewalHistory(false);
+    }
+  };
 
-  // Requirement: Contract Value Source = PMS_BUDGET must always reflect the
-  // *current* project budget — never a frozen snapshot — so it is kept in sync
-  // whenever the project budget changes, and recalculated automatically on
-  // reload. MANUAL values are left untouched.
-  useEffect(() => {
-    if (!isPmsSource) return;
-    const nextValue = hasProjectBudget ? Number(projectBudget) : "";
-    if (value.contractValue === nextValue && value.pmsProjectBudget === nextValue) return;
-    update({ contractValue: nextValue, pmsProjectBudget: nextValue });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPmsSource, hasProjectBudget, projectBudget]);
+  // Opens the renewal action panel, seeding it from the current configuration
+  // so "Same as Previous" has a sensible Effective From to start with.
+  const openRenewalPanel = () => {
+    setRenewalMode("SAME_AS_PREVIOUS");
+    setRenewalEffectiveFrom("");
+    setRenewalEffectiveTo("");
+    setRenewalContractValue(value.contractValue ?? "");
+    setRenewalBillingFrequencyId(billingFrequencyOption?.billingFrequencyId || "");
+    setRenewalRemarks("");
+    setShowRenewalPanel(true);
+  };
 
   const dateErrors = getRecurringDateErrors({
     recurringStartDate: value.recurringStartDate,
@@ -1984,6 +2809,22 @@ function RecurringBillingForm({
   });
 
   const displaySchedule = schedule;
+
+  // Client-side display estimate only (never sent to the backend, never
+  // editable) — the authoritative occurrence count/amounts always come from
+  // displaySchedule once the backend has generated it.
+  const estimatedOccurrenceCount = countRecurringOccurrences({
+    effectiveFrom: value.recurringStartDate,
+    effectiveTo: value.recurringEndDate,
+    durationValue: billingFrequencyOption?.durationValue,
+    durationUnit: billingFrequencyOption?.durationUnit,
+  });
+  const occurrenceCount = displaySchedule.length || estimatedOccurrenceCount;
+  const scheduleTotal = displaySchedule.reduce((sum, period) => sum + (Number(period.billingAmount) || 0), 0);
+  // contractValue is the TOTAL recurring budget for the period, not a
+  // per-occurrence amount — the estimate fallback (before the backend
+  // schedule has loaded) is simply that total, never multiplied by occurrences.
+  const totalRecurringValue = displaySchedule.length > 0 ? scheduleTotal : Number(value.contractValue || 0);
 
   // Fires only when the user actually picks a complete date (native <input
   // type="date"> onChange never fires while browsing calendar months, only
@@ -2013,41 +2854,50 @@ function RecurringBillingForm({
   const contractValueIsBlank =
     value.contractValue === "" || value.contractValue === null || value.contractValue === undefined;
   const contractValueNum = Number(value.contractValue);
-  const contractValueError =
-    !isPmsSource && !contractValueIsBlank
-      ? Number.isNaN(contractValueNum) || contractValueNum <= 0
-        ? "Contract Value must be greater than 0."
-        : ""
-      : "";
+  const contractValueError = !contractValueIsBlank
+    ? Number.isNaN(contractValueNum) || contractValueNum <= 0
+      ? "Manual Budget must be greater than 0."
+      : ""
+    : "";
+  const projectBudgetIsBlank =
+    projectBudget === "" ||
+    projectBudget === null ||
+    projectBudget === undefined ||
+    Number.isNaN(Number(projectBudget)) ||
+    Number(projectBudget) <= 0;
 
-  // Persists the complete recurring billing configuration — contract value/
-  // source, billing frequency, and effective dates — and then refreshes the
-  // schedule preview from the backend. The frontend never derives periods/
-  // amounts itself, so every change to frequency, dates, or contract value
-  // must round-trip through this save before the preview can reflect it.
+  // Persists the complete recurring billing configuration — billing context,
+  // product details, the total recurring budget (Project Budget or Manual),
+  // billing frequency, and effective dates — and then refreshes the schedule
+  // preview from the backend. The frontend never derives periods/amounts
+  // itself, so every change to frequency, dates, or amount must round-trip
+  // through this save before the preview can reflect it.
   //
   // Every field this needs is validated here, up front, so clicking Save with
   // incomplete information always surfaces a clear, specific toast — never a
   // raw backend validation error from a request that should never have been sent.
   const saveRecurringConfig = async () => {
-    if (!contractValueSource) {
-      showStatusToast("Select a Contract Value Source before saving.", "error");
-      return;
-    }
-    if (contractValueIsBlank) {
-      showStatusToast("Contract Value is required before saving.", "error");
-      return;
-    }
-    if (contractValueError) {
-      showStatusToast(contractValueError, "error");
-      return;
+    if (isPmsSource) {
+      if (projectBudgetIsBlank) {
+        showStatusToast("Project Budget is not available for the selected project.", "error");
+        return;
+      }
+    } else {
+      if (contractValueIsBlank) {
+        showStatusToast("Manual Budget is required before saving.", "error");
+        return;
+      }
+      if (contractValueError) {
+        showStatusToast(contractValueError, "error");
+        return;
+      }
     }
     if (!billingFrequencyOption?.billingFrequencyId) {
       showStatusToast("Select a Billing Frequency before saving.", "error");
       return;
     }
     if (!value.recurringStartDate || !value.recurringEndDate) {
-      showStatusToast("Billing Start Date and Billing End Date are required.", "error");
+      showStatusToast("Effective From and Effective To are required.", "error");
       return;
     }
     if (hasRecurringDateErrors(dateErrors)) {
@@ -2075,7 +2925,10 @@ function RecurringBillingForm({
         if (syncedId) resolvedConfigId = syncedId;
       }
 
-      const payload = buildRecurringRequestPayload(value, billingFrequencyOption.billingFrequencyId);
+      const payload = buildRecurringRequestPayload(
+        { ...value, billingContext, productName, productDescription, contractValueSource },
+        billingFrequencyOption.billingFrequencyId,
+      );
 
       // value.recurringConfigurationId can still be unset here if the
       // wizard's own load effect (above) hasn't resolved yet — re-check the
@@ -2133,50 +2986,139 @@ function RecurringBillingForm({
     }
   };
 
+  // POST /api/billing-recurring/{recurringConfigurationId}/renew — a
+  // deliberate Maker action, never automatic. SAME_AS_PREVIOUS only needs a
+  // new Effective From (the renewed term reuses the current amount/frequency,
+  // extended for the same duration); CUSTOM also lets the Maker override the
+  // commercial terms for the renewed period.
+  const submitRenewal = async () => {
+    if (!value.recurringConfigurationId) return;
+    if (!renewalEffectiveFrom) {
+      showStatusToast("Effective From is required to renew.", "error");
+      return;
+    }
+    if (renewalMode === "CUSTOM") {
+      if (!renewalEffectiveTo) {
+        showStatusToast("Effective To is required for a custom renewal.", "error");
+        return;
+      }
+      if (renewalContractValue === "" || Number(renewalContractValue) <= 0) {
+        showStatusToast("Recurring Amount must be greater than 0 for a custom renewal.", "error");
+        return;
+      }
+      if (!renewalBillingFrequencyId) {
+        showStatusToast("Select a Billing Frequency for a custom renewal.", "error");
+        return;
+      }
+    }
+
+    setRenewing(true);
+    try {
+      const payload = {
+        renewalMode,
+        effectiveFrom: toDateOnly(renewalEffectiveFrom) || renewalEffectiveFrom,
+        remarks: renewalRemarks || "",
+        ...(renewalMode === "CUSTOM"
+          ? {
+              effectiveTo: toDateOnly(renewalEffectiveTo) || renewalEffectiveTo,
+              contractValue: Number(renewalContractValue),
+              billingFrequencyId: renewalBillingFrequencyId,
+            }
+          : {}),
+      };
+      await renewBillingRecurring(value.recurringConfigurationId, payload);
+      // Persist the chosen renewal mode/terms onto the base recurring record
+      // too, so the next Save/Update reflects it instead of nulling it out
+      // (see buildRecurringRequestPayload's RENEWAL_MODE_TO_API mapping).
+      update({
+        renewalMode,
+        renewalEffectiveFrom,
+        ...(renewalMode === "CUSTOM"
+          ? { renewalContractValue, renewalBillingFrequencyId }
+          : {}),
+      });
+      showStatusToast("Recurring configuration renewed.", "success");
+      setShowRenewalPanel(false);
+      await Promise.all([
+        loadSchedule(value.recurringConfigurationId, billingConfigurationId),
+        loadRenewalHistory(value.recurringConfigurationId),
+      ]);
+    } catch (error) {
+      showStatusToast(getApiErrorMessage(error, "Unable to renew recurring configuration."), "error");
+    } finally {
+      setRenewing(false);
+    }
+  };
+
+  const toggleRenewalHistory = () => {
+    const next = !showRenewalHistory;
+    setShowRenewalHistory(next);
+    if (next && renewalHistory.length === 0) {
+      loadRenewalHistory(value.recurringConfigurationId);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <h2 className={Fonts.heading4}>Recurring Billing Configuration</h2>
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-        <EnterpriseBudgetSourceSelector
-          value={contractValueSource}
-          onChange={(nextSource) => {
-            if (nextSource === "PMS" || nextSource === "PMS_BUDGET") {
-              update({
-                contractValueSource: "PMS_BUDGET",
-                contractValue: hasProjectBudget ? Number(projectBudget) : "",
-                pmsProjectBudget: hasProjectBudget ? Number(projectBudget) : "",
-              });
-            } else {
-              update({ contractValueSource: "MANUAL" });
-            }
-          }}
-          projectBudget={projectBudget}
-          currency={currency}
-        />
+        {isProductService && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3.5 text-xs text-slate-600">
+            <span className="font-semibold text-slate-700">Product / Application / Service:</span>{" "}
+            {productName || "—"}
+            {productDescription && <p className="mt-1 text-slate-500">{productDescription}</p>}
+          </div>
+        )}
+
+        {!isProductService && (
+          <EnterpriseBudgetSourceSelector
+            value={contractValueSource}
+            onChange={(nextSource) => {
+              if (nextSource === "PMS") {
+                update({ contractValueSource: "PMS", contractValue: projectBudget || "" });
+              } else {
+                update({ contractValueSource: "MANUAL" });
+              }
+            }}
+            projectBudget={projectBudget}
+            currency={currency}
+            sourceLabel="Budget Source:"
+            manualLabel="Manual Budget"
+          />
+        )}
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <FormInput
-              label={
-                <span className="flex flex-wrap items-center gap-2">
-                  Contract Value <span className="text-red-500">*</span>
-                  {isPmsSource && <PmsSyncedBadge />}
-                </span>
-              }
-              name="contractValue"
-              type="number"
-              min="0"
-              value={value.contractValue ?? ""}
-              onChange={(e) =>
-                update({
-                  contractValue: e.target.value,
-                  contractValueSource: "MANUAL",
-                })
-              }
-              placeholder={`e.g. 45678 (${currency})`}
-              error={contractValueError}
-            />
+            {isPmsSource ? (
+              <>
+                <label className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700">
+                  Project Budget
+                  <ContractValueSourceBadge source="PMS" />
+                </label>
+                <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-900">
+                  {projectBudgetIsBlank ? "Not available" : formatCurrency(projectBudget, currency)}
+                </div>
+                <p className="mt-1 text-xs text-slate-400">
+                  {projectBudgetIsBlank
+                    ? "Project Budget is not available for the selected project."
+                    : "Read-only — total budget for the selected recurring period."}
+                </p>
+              </>
+            ) : (
+              <>
+                <IndianAmountInput
+                  label="Manual Budget"
+                  requiredMark
+                  name="contractValue"
+                  value={value.contractValue ?? ""}
+                  onChange={(nextValue) => update({ contractValue: nextValue, contractValueSource: "MANUAL" })}
+                  placeholder={`e.g. 300000 (${currency})`}
+                  error={contractValueError}
+                />
+                <p className="mt-1 text-xs text-slate-400">Total budget for the selected recurring period.</p>
+              </>
+            )}
           </div>
 
           <div>
@@ -2190,14 +3132,14 @@ function RecurringBillingForm({
 
           <div>
             <FormDatePicker
-              label="Billing Start Date"
+              label="Effective From"
               requiredMark
               name="recurringStartDate"
               value={value.recurringStartDate || ""}
               onChange={(e) =>
                 handleDateFieldChange(
                   "recurringStartDate",
-                  "Billing Start Date",
+                  "Effective From",
                   e.target.value,
                 )
               }
@@ -2209,14 +3151,14 @@ function RecurringBillingForm({
 
           <div>
             <FormDatePicker
-              label="Billing End Date"
+              label="Effective To"
               requiredMark
               name="recurringEndDate"
               value={value.recurringEndDate || ""}
               onChange={(e) =>
                 handleDateFieldChange(
                   "recurringEndDate",
-                  "Billing End Date",
+                  "Effective To",
                   e.target.value,
                 )
               }
@@ -2329,12 +3271,149 @@ function RecurringBillingForm({
         )}
 
         <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-          <span className="text-sm font-semibold text-slate-900">Total Contract Value</span>
           <span className="text-sm font-semibold text-slate-900">
-            {value.contractValue || value.contractValue === 0 ? formatCurrency(value.contractValue, currency) : "—"}
+            {occurrenceCount > 0 ? `${occurrenceCount} Occurrence${occurrenceCount === 1 ? "" : "s"} — Total` : "Total"}
+          </span>
+          <span className="text-sm font-semibold text-slate-900">
+            {totalRecurringValue ? formatCurrency(totalRecurringValue, currency) : "—"}
           </span>
         </div>
       </div>
+
+      {/* Renewal is a Subscription (Product/Service) concept only — a
+          project-based Recurring configuration runs for the project's own
+          duration and is never "renewed" the way a standalone subscription
+          is, so this entire section is hidden for billingContext PROJECT. */}
+      {isProductService && value.recurringConfigurationId && (
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-slate-900">Renewal</h3>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="small" onClick={toggleRenewalHistory}>
+                {showRenewalHistory ? "Hide Renewal History" : "View Renewal History"}
+              </Button>
+              {!showRenewalPanel && (
+                <Button variant="outline" size="small" onClick={openRenewalPanel}>
+                  Renew Configuration
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {showRenewalHistory && (
+            <div className="rounded-lg border border-slate-100">
+              {loadingRenewalHistory ? (
+                <p className="p-4 text-center text-sm text-slate-500">Loading renewal history…</p>
+              ) : renewalHistory.length === 0 ? (
+                <p className="p-4 text-center text-sm text-slate-500">No renewals recorded yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold text-slate-600">Mode</th>
+                        <th className="px-3 py-2 text-left font-semibold text-slate-600">New Effective Period</th>
+                        <th className="px-3 py-2 text-left font-semibold text-slate-600">Amount</th>
+                        <th className="px-3 py-2 text-left font-semibold text-slate-600">Renewed On</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {renewalHistory.map((entry, index) => (
+                        <tr key={entry.renewalId ?? index}>
+                          <td className="px-3 py-2 text-slate-700">
+                            {entry.renewalMode === "CUSTOM" ? "Custom" : "Same as Previous"}
+                          </td>
+                          <td className="px-3 py-2 text-slate-700">
+                            {formatDisplayDate(entry.newEffectiveFrom)} – {formatDisplayDate(entry.newEffectiveTo) || "Ongoing"}
+                          </td>
+                          <td className="px-3 py-2 text-slate-700">
+                            {entry.contractValue || entry.contractValue === 0 ? formatCurrency(entry.contractValue, currency) : "—"}
+                          </td>
+                          <td className="px-3 py-2 text-slate-700">{formatDisplayDate(entry.renewedAt) || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {showRenewalPanel && (
+            <div className="space-y-3 rounded-lg border border-slate-100 bg-slate-50/60 p-4">
+              <RadioCardGroup
+                name="renewalMode"
+                options={RECURRING_RENEWAL_MODE_OPTIONS}
+                value={renewalMode}
+                onChange={setRenewalMode}
+                columns={2}
+              />
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FormDatePicker
+                  label="New Effective From"
+                  requiredMark
+                  name="renewalEffectiveFrom"
+                  value={renewalEffectiveFrom}
+                  onChange={(e) => setRenewalEffectiveFrom(e.target.value)}
+                  min={value.recurringEndDate || undefined}
+                />
+
+                {renewalMode === "CUSTOM" && (
+                  <>
+                    <FormDatePicker
+                      label="New Effective To"
+                      requiredMark
+                      name="renewalEffectiveTo"
+                      value={renewalEffectiveTo}
+                      onChange={(e) => setRenewalEffectiveTo(e.target.value)}
+                      min={renewalEffectiveFrom || undefined}
+                    />
+                    <FormInput
+                      label="Total Budget"
+                      requiredMark
+                      name="renewalContractValue"
+                      type="number"
+                      min="0"
+                      value={renewalContractValue}
+                      onChange={(e) => setRenewalContractValue(e.target.value)}
+                      placeholder={`e.g. 65000 (${currency})`}
+                    />
+                    <FormSelect
+                      label="Billing Frequency *"
+                      name="renewalBillingFrequencyId"
+                      value={renewalBillingFrequencyId}
+                      onChange={(e) => setRenewalBillingFrequencyId(e.target.value)}
+                      options={billingFrequencyOptions
+                        .filter((option) => frequencyCode(option) !== "ONE_TIME")
+                        .map((option) => ({ value: option.billingFrequencyId, label: option.label }))}
+                    />
+                  </>
+                )}
+
+                <div className="md:col-span-2">
+                  <FormTextArea
+                    label="Remarks"
+                    name="renewalRemarks"
+                    value={renewalRemarks}
+                    onChange={(e) => setRenewalRemarks(e.target.value)}
+                    rows={2}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button variant="primary" size="small" onClick={submitRenewal} loading={renewing} loadingText="Renewing...">
+                  Confirm Renewal
+                </Button>
+                <Button variant="ghost" size="small" onClick={() => setShowRenewalPanel(false)} disabled={renewing}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <ConfirmationModal
         isOpen={confirmingDelete}
@@ -2364,12 +3443,17 @@ export default function BillingConfigurationStep({
   const billingFrequency = value.billingFrequency || "";
   const billingTypeId = value.billingTypeId || "";
   const billingFrequencyId = value.billingFrequencyId || "";
+  const billingContext = projectInfo?.billingContext || "PROJECT";
+  const isProductService = billingContext === "PRODUCT_SERVICE";
   const currency = String(
     projectInfo?.projectBudgetCurrency || projectInfo?.currency || "",
   )
     .trim()
     .toUpperCase();
+  // A Product/Service configuration has no project at all, so there is no PMS
+  // project budget to sync from regardless of projectSource.
   const isPmsSourced =
+    !isProductService &&
     String(projectInfo?.projectSource || "ENTERPRISE").toUpperCase() ===
     "ENTERPRISE";
   const hasPmsBudget =
@@ -2462,6 +3546,57 @@ export default function BillingConfigurationStep({
     billingType,
     activeBillingFrequencyOptions,
   );
+  // Milestone Plan has no recurring frequency at all — Installments is
+  // billed on each entry's own date, not a single system-derived one, so the
+  // Billing Frequency field relabels itself to "Billing Schedule" for it.
+  const milestonePlanIsInstallments = (value.milestonePlan?.paymentStructure || "FULL_PAYMENT") === "INSTALLMENTS";
+  // Product/Application/Service billing has no project, so T&M/Fixed
+  // Price/Milestone (all project-scoped) never apply — only Recurring does.
+  // Fixed Price is also hidden from the picker for every other context — it is
+  // no longer offered for new configurations (superseded by Milestone Plan),
+  // but an existing configuration already saved as Fixed Price must keep
+  // showing/allowing it here so it stays viewable/editable.
+  const billingTypeOptionsForContext = isProductService
+    ? activeBillingTypeOptions.filter((type) => type.value === "RECURRING")
+    : activeBillingTypeOptions.filter(
+        (type) => type.value !== "FIXED_PRICE" || billingType === "FIXED_PRICE",
+      );
+
+  // Guards against a stale non-Recurring billing type left over from before
+  // the user switched Billing Context to Product/Service on Step 1 (e.g. they
+  // went back and changed it after already configuring Step 2).
+  useEffect(() => {
+    if (isProductService && billingType && billingType !== "RECURRING") {
+      showStatusToast(
+        "Product/Service billing only supports Recurring billing — please choose a Billing Type again.",
+        "warning",
+      );
+      update({ billingType: "", billingTypeId: "", billingMode: "", timeAndMaterial: {}, fixedPrice: {}, milestones: [], milestoneSettings: {}, milestonePlan: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isProductService, billingType]);
+
+  // Milestone Plan is billed against explicit payment/installment dates, not a
+  // recurring cadence — always force it to the master data's One-Time Billing
+  // Frequency and never let the user pick Weekly/Monthly/etc. Re-runs (and
+  // self-corrects) whenever billingType, the loaded frequency list, or the
+  // current selection changes, so it also fixes a stale/incorrect value on an
+  // existing loaded configuration, not just a fresh pill selection.
+  useEffect(() => {
+    if (billingType !== "MILESTONE_PLAN") return;
+    const oneTimeFrequency = activeBillingFrequencyOptions.find(
+      (option) => frequencyCode(option) === "ONE_TIME",
+    );
+    if (!oneTimeFrequency) return;
+    const oneTimeId = oneTimeFrequency.billingFrequencyId || oneTimeFrequency.id;
+    if (!oneTimeId || String(billingFrequencyId) === String(oneTimeId)) return;
+    update({
+      billingFrequency: oneTimeFrequency.value || "ONE_TIME",
+      billingFrequencyId: oneTimeId,
+      billingFrequencyName: oneTimeFrequency.label || oneTimeFrequency.billingFrequencyName || "One-Time",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [billingType, activeBillingFrequencyOptions, billingFrequencyId]);
 
   const handleBillingTypeChange = (nextId) => {
     const selectedOption = activeBillingTypeOptions.find(
@@ -2484,6 +3619,19 @@ export default function BillingConfigurationStep({
     ) {
       deleteFixedPriceConfiguration(staleFixedPriceId).catch((error) => {
         console.warn("Unable to remove previous fixed price configuration", error);
+      });
+    }
+
+    // Same cleanup for Milestone Plan: switching away after it was already
+    // saved would otherwise leave an orphaned milestone plan record.
+    const staleMilestonePlanId = value.milestonePlan?.milestonePlanId;
+    if (
+      billingType === "MILESTONE_PLAN" &&
+      normalizedBillingType !== "MILESTONE_PLAN" &&
+      staleMilestonePlanId
+    ) {
+      deleteMilestonePlanConfiguration(staleMilestonePlanId).catch((error) => {
+        console.warn("Unable to remove previous milestone plan configuration", error);
       });
     }
 
@@ -2526,6 +3674,8 @@ export default function BillingConfigurationStep({
         normalizedBillingType === "MILESTONE"
           ? value.milestoneSettings || {}
           : {},
+      milestonePlan:
+        normalizedBillingType === "MILESTONE_PLAN" ? value.milestonePlan || {} : {},
       recurring:
         normalizedBillingType === "RECURRING" ? value.recurring || {} : {},
     });
@@ -2535,7 +3685,9 @@ export default function BillingConfigurationStep({
     <div className="space-y-5">
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-900">Project Financials</h3>
+          <h3 className="text-sm font-semibold text-slate-900">
+            {isProductService ? "Billing Currency" : "Project Financials"}
+          </h3>
           {(isPmsSourced || hasPmsBudget) && <PmsSyncedBadge />}
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -2557,25 +3709,33 @@ export default function BillingConfigurationStep({
             />
           )}
 
-          {hasPmsBudget ? (
-            <ReadOnlyField label="Project Budget" value={projectInfo.projectBudget} />
-          ) : (
-            <FormInput
-              label="Project Budget"
-              name="projectBudget"
-              type="number"
-              min="0"
-              step="0.01"
-              value={projectInfo.projectBudget ?? ""}
-              onChange={(e) =>
-                onProjectInfoChange({
-                  ...projectInfo,
-                  projectBudget: e.target.value,
-                })
-              }
-              placeholder="e.g. 45678"
-            />
-          )}
+          {/* Project Budget is a project-level figure — it never applies to
+              Product/Service billing (no project at all). It is shown for
+              every project billing type, including Recurring, so Project
+              Financials looks the same regardless of billing type. */}
+          {!isProductService &&
+            (hasPmsBudget ? (
+              <ReadOnlyField
+                label="Project Budget"
+                value={formatCurrency(projectInfo.projectBudget, currency)}
+              />
+            ) : (
+              <FormInput
+                label="Project Budget"
+                name="projectBudget"
+                type="number"
+                min="0"
+                step="0.01"
+                value={projectInfo.projectBudget ?? ""}
+                onChange={(e) =>
+                  onProjectInfoChange({
+                    ...projectInfo,
+                    projectBudget: e.target.value,
+                  })
+                }
+                placeholder="e.g. 45678"
+              />
+            ))}
         </div>
       </div>
 
@@ -2589,7 +3749,7 @@ export default function BillingConfigurationStep({
           ) : (
             <PillSelectGroup
               name="billingTypeId"
-              options={activeBillingTypeOptions.map((type) => ({
+              options={billingTypeOptionsForContext.map((type) => ({
                 value: type.billingTypeId,
                 label: type.label,
               }))}
@@ -2601,33 +3761,55 @@ export default function BillingConfigurationStep({
 
         <div className="space-y-2">
           <label className="block text-sm font-medium text-slate-700">
-            Billing Frequency <span className="text-red-500">*</span>
+            {billingType === "MILESTONE_PLAN"
+              ? milestonePlanIsInstallments
+                ? "Billing Schedule"
+                : "Billing Frequency"
+              : (
+                <>
+                  Billing Frequency <span className="text-red-500">*</span>
+                </>
+              )}
           </label>
-          <PillSelectGroup
-            name="billingFrequencyId"
-            options={frequencyOptions.map((f) => ({
-              value: f.billingFrequencyId,
-              label: f.label,
-            }))}
-            value={billingFrequencyId}
-            onChange={(next) => {
-              const selectedFrequency = activeBillingFrequencyOptions.find(
-                (option) =>
-                  String(option.billingFrequencyId) === String(next),
-              );
-              update({
-                billingFrequency: selectedFrequency?.value || "",
-                billingFrequencyId:
-                  selectedFrequency?.billingFrequencyId ||
-                  selectedFrequency?.id ||
-                  "",
-                billingFrequencyName:
-                  selectedFrequency?.label ||
-                  selectedFrequency?.billingFrequencyName ||
-                  "",
-              });
-            }}
-          />
+          {billingType === "MILESTONE_PLAN" ? (
+            <div>
+              <ReadOnlyField
+                label=""
+                value={milestonePlanIsInstallments ? "Custom Payment Dates" : value.billingFrequencyName || "One-Time"}
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                {milestonePlanIsInstallments
+                  ? "Each installment carries its own billing date, set individually in the Milestone Plan below."
+                  : "Milestone Plan billing is driven by the payment date, not a recurring frequency."}
+              </p>
+            </div>
+          ) : (
+            <PillSelectGroup
+              name="billingFrequencyId"
+              options={frequencyOptions.map((f) => ({
+                value: f.billingFrequencyId,
+                label: f.label,
+              }))}
+              value={billingFrequencyId}
+              onChange={(next) => {
+                const selectedFrequency = activeBillingFrequencyOptions.find(
+                  (option) =>
+                    String(option.billingFrequencyId) === String(next),
+                );
+                update({
+                  billingFrequency: selectedFrequency?.value || "",
+                  billingFrequencyId:
+                    selectedFrequency?.billingFrequencyId ||
+                    selectedFrequency?.id ||
+                    "",
+                  billingFrequencyName:
+                    selectedFrequency?.label ||
+                    selectedFrequency?.billingFrequencyName ||
+                    "",
+                });
+              }}
+            />
+          )}
         </div>
       </div>
 
@@ -2696,6 +3878,18 @@ export default function BillingConfigurationStep({
                 settings={value.milestoneSettings}
                 onMilestonesChange={(next) => update({ milestones: next })}
                 onSettingsChange={(next) => update({ milestoneSettings: next })}
+                currency={currency}
+              />
+            )}
+
+            {billingType === "MILESTONE_PLAN" && (
+              <MilestonePlanForm
+                value={value.milestonePlan}
+                onChange={(next) => updateSection("milestonePlan", next)}
+                currency={currency}
+                projectBudget={projectInfo.projectBudget}
+                billingConfigurationId={value.billingConfigurationId || value.id}
+                ensureBillingConfigurationId={ensureBillingConfigurationId}
               />
             )}
 
@@ -2704,15 +3898,19 @@ export default function BillingConfigurationStep({
                 value={value.recurring || {}}
                 onChange={(next) => updateSection("recurring", next)}
                 currency={currency}
-                projectBudget={projectInfo.projectBudget}
+                billingContext={billingContext}
+                productName={projectInfo.productName}
+                productDescription={projectInfo.productDescription}
+                projectBudget={isProductService ? null : projectInfo.projectBudget}
                 billingFrequencyId={billingFrequencyId}
+                billingFrequencyOptions={activeBillingFrequencyOptions}
                 billingFrequencyOption={activeBillingFrequencyOptions.find(
                   (option) => String(option.billingFrequencyId) === String(billingFrequencyId),
                 )}
                 billingConfigurationId={value.billingConfigurationId || value.id}
                 ensureBillingConfigurationId={ensureBillingConfigurationId}
-                projectStartDate={projectInfo.startDate}
-                projectEndDate={projectInfo.endDate}
+                projectStartDate={isProductService ? "" : projectInfo.startDate}
+                projectEndDate={isProductService ? "" : projectInfo.endDate}
               />
             )}
           </div>
