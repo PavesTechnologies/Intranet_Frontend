@@ -59,8 +59,7 @@ export default function ApprovalWebSocketProvider({ children }) {
 
     const client = new Client({
       webSocketFactory: () => {
-        const freshToken = localStorage.getItem("token");
-        return new SockJS(`${BASE_URL}/xms/ws?token=${freshToken}`);
+        return new SockJS(`${BASE_URL}/xms/ws`);
       },
       connectHeaders: {},
       beforeConnect: () => {

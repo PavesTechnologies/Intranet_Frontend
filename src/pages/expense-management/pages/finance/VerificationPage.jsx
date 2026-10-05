@@ -53,7 +53,6 @@ export default function VerificationPage() {
   const items = data?.content || [];
   const isMutating = verifyLineItem.isPending || queryLineItem.isPending;
 
-<<<<<<< HEAD
   const lineItemsQueries = useQueries({
     queries: items.map((item) => ({
       queryKey: ["reportLineItems", item.reportId],
@@ -109,8 +108,7 @@ export default function VerificationPage() {
     });
   }, [items, lineItemsQueries, reviewsQueries]);
 
-=======
->>>>>>> 6a1e43b2b17d8368043b7d5982e4776d74ad1373
+
   const handleVerifyLine = (reportId, lineItemId) => {
     verifyLineItem.mutate(
       { reportId, lineItemId },
