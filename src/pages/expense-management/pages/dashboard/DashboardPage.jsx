@@ -1,181 +1,301 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FileStack, Clock3, CheckCircle2, Wallet, Plus, ArrowRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  BadgeCheck,
+  Clock3,
+  Hourglass,
+  Plus,
+  RefreshCw,
+  Send,
+  ShieldAlert,
+  TrendingUp,
+  Users,
+  Wallet,
+  ClipboardCheck,
+  MessageSquareWarning,
+  CalendarCheck,
+} from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
-import { PageCard, PageCardContent } from "@/components/Cards/PageCard";
+import PageHeader from "@/components/ui/PageHeader";
 import StatCard from "@/components/Cards/StatCard";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Button from "@/components/Button/Button";
-import StatusBadge from "@/components/status/statusbadge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
-import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
-import { useMyQueue } from "@/pages/expense-management/approval-engine/hooks/useApprovalWorkflow";
+import { dashboardService } from "@/pages/expense-management/api/expenseReportsApi";
+import { formatKpiValue } from "@/pages/expense-management/components/dashboard/dashboardTheme";
+import TaxDashboardSection from "@/pages/expense-management/components/dashboard/TaxDashboardSection";
+import {
+  ChartCard,
+  TrendChart,
+  Pipeline,
+  Breakdown,
+  Ranking,
+  Aging,
+  Budgets,
+  ItemList,
+} from "@/pages/expense-management/components/dashboard/DashboardWidgets";
 
-const breadcrumbs = [
-  { label: "Expense Management", to: "/expense-management/dashboard" },
-  { label: "Dashboard" },
+const VIEW_STORAGE_KEY = "xms.dashboard.view";
+
+/**
+ * One entry per role dashboard: who may see it, its tab label, the backend view it loads
+ * (GET /xms/dashboard/{view}), how its charts read, and where its rows / actions link.
+ */
+const VIEWS = [
+  {
+    view: "employee",
+    label: "My expenses",
+    roles: ["GENERAL", "MANAGER", "REPORTING_MANAGER", "FINANCE", "FINANCE_EXECUTIVE", "AP_EXECUTIVE", "ADMIN", "SUPER_ADMIN"],
+    subtitle: "Where your expense reports are, what needs fixing, and what you've been reimbursed.",
+    trend: { mode: "money", primaryLabel: "Spend", countLabel: "Expenses" },
+    attentionTitle: "Needs your attention",
+    attentionEmpty: "You're all caught up.",
+    activityTitle: "Recent activity",
+    link: (it) => `/expense-management/expenses/reports/${it.reportId}`,
+    actions: [
+      { label: "New expense", to: "/expense-management/expenses/create", icon: Plus, variant: "primary" },
+      { label: "My expenses", to: "/expense-management/expenses/my", variant: "outline" },
+    ],
+  },
+  {
+    view: "manager",
+    label: "Approvals",
+    // Reporting managers approve their reports' expenses, so they get this view next to My expenses.
+    roles: ["MANAGER", "REPORTING_MANAGER"],
+    subtitle: "Reports waiting for your decision, how long they've waited, and your recent decisions.",
+    trend: { mode: "decisions" },
+    agingNoun: "approvals",
+    attentionTitle: "Oldest waiting for you",
+    attentionEmpty: "No approvals waiting.",
+    link: () => "/expense-management/approvals",
+    showEmployee: true,
+    actions: [{ label: "Open approvals", to: "/expense-management/approvals", icon: ClipboardCheck, variant: "primary" }],
+  },
+  {
+    view: "finance",
+    label: "Finance",
+    roles: ["FINANCE_EXECUTIVE", "FINANCE"],
+    subtitle: "The verification queue, open queries, throughput, and where verified reports are now.",
+    trend: { mode: "money", primaryLabel: "Verified", countLabel: "Line items" },
+    agingNoun: "reports",
+    attentionTitle: "Longest in the queue",
+    attentionEmpty: "The queue is empty.",
+    activityTitle: "Latest verifications",
+    link: () => "/expense-management/finance",
+    showEmployee: true,
+    actions: [{ label: "Open Finance", to: "/expense-management/finance", icon: ClipboardCheck, variant: "primary" }],
+  },
+  {
+    view: "ap",
+    label: "AP Payments",
+    roles: ["AP_EXECUTIVE"],
+    subtitle: "What's owed to employees, how long it's been waiting, and payments going out.",
+    trend: { mode: "money", primaryLabel: "Paid", countLabel: "Reports" },
+    agingNoun: "payments",
+    attentionTitle: "Waiting longest for payment",
+    attentionEmpty: "Nothing waiting to be paid.",
+    activityTitle: "Recent payments",
+    link: () => "/expense-management/ap-payments/queue",
+    showEmployee: true,
+    actions: [{ label: "Open AP Payments", to: "/expense-management/ap-payments/queue", icon: Wallet, variant: "primary" }],
+  },
+  {
+    view: "admin",
+    label: "Organization",
+    roles: ["ADMIN", "SUPER_ADMIN"],
+    subtitle: "Organization-wide spend, workflow status, budgets and policy compliance.",
+    trend: { mode: "money", primaryLabel: "Spend", countLabel: "Expenses" },
+    activityTitle: "Latest submissions",
+    showEmployee: true,
+    actions: [{ label: "Masters", to: "/expense-management/masters/expense-categories", variant: "outline" }],
+  },
 ];
 
-const IN_REVIEW_STATUSES = ["PENDING_APPROVAL", "PENDING_FINANCE_VERIFICATION", "AWAITING_CORRECTION", "QUERY_RAISED"];
-
-const formatDate = (value) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "2-digit" });
+// KPI key -> icon (keys come from DashboardServiceImpl).
+const KPI_ICONS = {
+  claimed: TrendingUp, inProgress: Clock3, needsAction: AlertTriangle, awaiting: Hourglass, reimbursed: BadgeCheck,
+  pending: ClipboardCheck, pendingValue: Wallet, overdue: AlertTriangle, approved30: BadgeCheck, sentBack30: MessageSquareWarning,
+  toVerify: ClipboardCheck, queueValue: Wallet, queries: MessageSquareWarning, verified: BadgeCheck, exceptions: ShieldAlert,
+  toPay: Wallet, toPayValue: Wallet, paidMonth: CalendarCheck, avgDays: Clock3, failed: AlertTriangle,
+  spendMonth: TrendingUp, submitted: Send, claimants: Users, cycle: Clock3, violations: ShieldAlert,
+};
+const TONE_TEXT = {
+  indigo: "text-indigo-700", blue: "text-blue-700", emerald: "text-emerald-700",
+  amber: "text-amber-700", rose: "text-rose-700", gray: "text-slate-800",
 };
 
-const formatAmount = (value, currencyCode) =>
-  `${(Number(value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${
-    currencyCode ? ` ${currencyCode}` : ""
-  }`;
+const useDashboard = (view) =>
+  useQuery({
+    queryKey: ["xmsDashboard", view],
+    queryFn: () => dashboardService.get(view).then((res) => res.data?.data),
+    enabled: !!view,
+    staleTime: 60_000,
+  });
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
-  // Manager is read-only on the backend for report writes (ExpenseReportController
-  // allows only ADMIN/GENERAL to create/update/delete/submit) — don't show write actions.
-  const canManage = hasRole(["General"]);
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const { user, hasRole } = useAuth();
 
-  // Presence-based, same as My Approvals - a zero count just means no assigned tasks right now.
-  const { data: myQueue } = useMyQueue(0, 1);
-
+  const available = useMemo(() => VIEWS.filter((v) => hasRole(v.roles)), [hasRole]);
+  // Default to the user's most workflow-specific dashboard; remember their last choice.
+  const defaultView = useMemo(() => {
+    const priority = ["ap", "finance", "manager", "admin", "employee"];
+    return priority.find((p) => available.some((v) => v.view === p)) || "employee";
+  }, [available]);
+  const [view, setView] = useState(() => {
+    try {
+      return localStorage.getItem(VIEW_STORAGE_KEY) || null;
+    } catch {
+      return null;
+    }
+  });
+  const active = available.find((v) => v.view === view) || available.find((v) => v.view === defaultView) || VIEWS[0];
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoading(true);
-        setLoadError(false);
-        const res = await expenseReportService.getAll();
-        const payload = res.data?.data;
-        const list = Array.isArray(payload) ? payload : payload?.reports || payload?.content || [];
-        if (!cancelled) setReports(list);
-      } catch (err) {
-        console.error("Failed to load dashboard reports:", err);
-        if (!cancelled) setLoadError(true);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, active.view);
+    } catch {
+      /* private mode etc. - the choice just isn't remembered */
+    }
+  }, [active.view]);
 
-  const draftCount = reports.filter((r) => r.reportStatus === "DRAFT").length;
-  const inReviewCount = reports.filter((r) => IN_REVIEW_STATUSES.includes(r.reportStatus)).length;
-  const approvedCount = reports.filter((r) => ["APPROVED", "REIMBURSED", "CLOSED"].includes(r.reportStatus)).length;
-  const reimbursableTotal = reports
-    .filter((r) => ["APPROVED", "REIMBURSED", "CLOSED"].includes(r.reportStatus))
-    .reduce((sum, r) => sum + (Number(r.reimbursableAmount ?? r.totalAmount) || 0), 0);
-  const reimbursableCurrency = reports.find((r) => ["APPROVED", "REIMBURSED", "CLOSED"].includes(r.reportStatus))?.currencyCode;
-
-  const recentReports = [...reports]
-    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-    .slice(0, 5);
-
-  const pendingApprovalTasks = myQueue?.totalElements ?? 0;
+  const { data, isLoading, isError, error, refetch, isFetching } = useDashboard(active.view);
+  const currency = data?.baseCurrencyCode || "INR";
+  const firstName = (user?.name || user?.employee_name || "").split(" ")[0];
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Breadcrumb items={breadcrumbs} />
-        {canManage && (
-          <Button variant="primary" size="small" onClick={() => navigate("/expense-management/expenses/create")}>
-            <Plus size={14} />
-            Create Expense Report
+    <div className="space-y-4 p-4 sm:p-6">
+      <Breadcrumb items={[{ label: "Expense Management", to: "/expense-management/dashboard" }, { label: "Dashboard" }]} />
+
+      <PageHeader
+        title={firstName ? `Hi ${firstName}, here's your ${active.label.toLowerCase()} overview` : "Dashboard"}
+        subtitle={active.subtitle}
+        actions={
+          <>
+            <Button variant="outline" size="small" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw size={14} className={`mr-1 ${isFetching ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+            {active.actions.map((a) => (
+              <Button key={a.label} variant={a.variant} size="small" onClick={() => navigate(a.to)}>
+                {a.icon && <a.icon size={14} className="mr-1" />} {a.label}
+              </Button>
+            ))}
+          </>
+        }
+      />
+
+      {available.length > 1 && (
+        <Tabs value={active.view} onValueChange={setView}>
+          <TabsList className="h-auto flex-wrap">
+            {available.map((v) => (
+              <TabsTrigger key={v.view} value={v.view}>
+                {v.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      )}
+
+      {isLoading ? (
+        <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-white py-24">
+          <LoadingSpinner text="Loading dashboard…" />
+        </div>
+      ) : isError ? (
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-12 text-center">
+          <AlertTriangle className="h-6 w-6 text-rose-500" />
+          <p className="text-sm font-semibold text-rose-700">Couldn't load this dashboard.</p>
+          <p className="max-w-md text-xs text-rose-500">{error?.response?.data?.message || error?.message}</p>
+          <Button size="small" variant="outline" className="mt-2" onClick={() => refetch()}>
+            Retry
           </Button>
-        )}
+        </div>
+      ) : data ? (
+        <DashboardBody data={data} config={active} currency={currency} />
+      ) : null}
+    </div>
+  );
+}
+
+function DashboardBody({ data, config, currency }) {
+  const hasPipeline = data.pipeline?.length > 0;
+  const side = data.breakdown?.length
+    ? { title: data.breakdownTitle, node: <Breakdown slices={data.breakdown} currency={currency} /> }
+    : data.aging?.length
+    ? { title: "How long items have waited", node: <Aging buckets={data.aging} noun={config.agingNoun} /> }
+    : null;
+  const showAgingBelow = data.breakdown?.length && data.aging?.length;
+
+  return (
+    <>
+      {/* KPIs */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {data.kpis.map((k) => (
+          <StatCard
+            key={k.key}
+            title={k.label}
+            value={formatKpiValue(k, currency)}
+            subtitle={k.hint}
+            icon={KPI_ICONS[k.key]}
+            textColor={TONE_TEXT[k.tone] || TONE_TEXT.gray}
+          />
+        ))}
       </div>
 
-      {loading ? (
-        <div className="py-16">
-          <LoadingSpinner text="Loading dashboard..." />
-        </div>
-      ) : loadError ? (
-        <PageCard>
-          <PageCardContent className="py-12 text-center text-sm text-gray-500">
-            Failed to load your expense activity. Try refreshing the page.
-          </PageCardContent>
-        </PageCard>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="Total Reports" value={reports.length} icon={FileStack} />
-            <StatCard title="Draft" value={draftCount} icon={FileStack} textColor="text-slate-600" />
-            <StatCard title="In Review" value={inReviewCount} icon={Clock3} textColor="text-amber-600" />
-            <StatCard title="Approved" value={approvedCount} icon={CheckCircle2} textColor="text-emerald-600" />
-          </div>
+      {/* Trend + side panel */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <ChartCard title={data.trendTitle} subtitle={`Amounts in ${currency}`} className={side ? "lg:col-span-2" : "lg:col-span-3"}>
+          <TrendChart points={data.trend} currency={currency} {...config.trend} />
+        </ChartCard>
+        {side && <ChartCard title={side.title}>{side.node}</ChartCard>}
+      </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
-            <div className="lg:col-span-2 space-y-4">
-              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-base font-bold text-gray-900">Recent Reports</h2>
-                  <button
-                    type="button"
-                    onClick={() => navigate("/expense-management/expenses/my")}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-[#0A0082] hover:underline"
-                  >
-                    View all <ArrowRight className="h-3 w-3" />
-                  </button>
-                </div>
+      {/* Tax (Finance and admin views only) */}
+      {data.tax && <TaxDashboardSection tax={data.tax} currency={currency} />}
 
-                {recentReports.length === 0 ? (
-                  <div className="py-10 text-center text-sm text-gray-400">
-                    No expense reports yet — create your first one to get started.
-                  </div>
-                ) : (
-                  <ul className="divide-y divide-gray-100">
-                    {recentReports.map((r) => (
-                      <li
-                        key={r.reportId}
-                        className="flex cursor-pointer items-center justify-between gap-3 py-3 hover:bg-gray-50 -mx-1 px-1 rounded-md"
-                        onClick={() => navigate(`/expense-management/expenses/reports/${r.reportId}`)}
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-gray-800">{r.title || r.reportNumber}</p>
-                          <p className="text-xs text-gray-400">
-                            {r.reportNumber} · {formatDate(r.createdAt)}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-3">
-                          <span className="text-sm font-medium text-gray-700">{formatAmount(r.totalAmount, r.currencyCode)}</span>
-                          <StatusBadge label={r.reportStatus || "DRAFT"} size="sm" />
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <StatCard
-                title="Reimbursable (Approved)"
-                value={formatAmount(reimbursableTotal, reimbursableCurrency)}
-                icon={Wallet}
-                textColor="text-emerald-700"
-              />
-              {pendingApprovalTasks > 0 && (
-                <div
-                  className="cursor-pointer rounded-xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm hover:bg-indigo-100"
-                  onClick={() => navigate("/expense-management/approvals")}
-                >
-                  <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Awaiting Your Approval</p>
-                  <p className="mt-2 text-2xl font-bold text-indigo-800">{pendingApprovalTasks}</p>
-                  <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-indigo-600">
-                    Go to My Approvals <ArrowRight className="h-3 w-3" />
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
+      {hasPipeline && (
+        <ChartCard title="Workflow pipeline" subtitle="Where reports are right now">
+          <Pipeline stages={data.pipeline} />
+        </ChartCard>
       )}
-    </div>
+
+      {/* Ranking / aging / budgets */}
+      {(data.ranking?.length > 0 || showAgingBelow || data.budgets?.length > 0) && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {data.ranking?.length > 0 && (
+            <ChartCard title={data.rankingTitle} subtitle={`Amounts in ${currency}`}>
+              <Ranking slices={data.ranking} currency={currency} />
+            </ChartCard>
+          )}
+          {showAgingBelow && (
+            <ChartCard title="How long items have waited">
+              <Aging buckets={data.aging} noun={config.agingNoun} />
+            </ChartCard>
+          )}
+          {data.budgets?.length > 0 && (
+            <ChartCard title="Budget utilization" subtitle={`Cost centers, FY ${data.budgets[0].fiscalYear}`}>
+              <Budgets budgets={data.budgets} currency={currency} />
+            </ChartCard>
+          )}
+        </div>
+      )}
+
+      {/* Attention + activity */}
+      {(config.attentionTitle || config.activityTitle) && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {config.attentionTitle && (
+            <ChartCard title={config.attentionTitle} className={config.activityTitle ? "" : "lg:col-span-2"}>
+              <ItemList items={data.attention} currency={currency} linkFor={config.link} showEmployee={config.showEmployee} empty={config.attentionEmpty} />
+            </ChartCard>
+          )}
+          {config.activityTitle && (
+            <ChartCard title={config.activityTitle} className={config.attentionTitle ? "" : "lg:col-span-2"}>
+              <ItemList items={data.activity} currency={currency} linkFor={config.link} showEmployee={config.showEmployee} timeline empty="No recent activity." />
+            </ChartCard>
+          )}
+        </div>
+      )}
+    </>
   );
 }

@@ -24,7 +24,7 @@ export const ROLES = {
   FINANCE:           "Finance",
   // Accounts Receivable (AR) Maker-Checker roles.
   // FINANCE_EXECUTIVE mirrors the ad-hoc "Finance_Executive" literal already used
-  // by XMS_FINANCE/XMS_EVERYONE/AP_ROLES.FINANCE_EXECUTIVE below — same real
+  // by XMS_EVERYONE/AP_ROLES.FINANCE_EXECUTIVE below — same real
   // backend role, now also exposed as a named constant for AR's own use.
   // FINANCE_MANAGER is AR's Checker role (approve/reject billing configurations);
   // it does not exist anywhere else in the app.
@@ -43,12 +43,10 @@ const HR_MANAGEMENT    = [ROLES.HR, ROLES.REPORTING_MANAGER];
 // the /expense-management/* routes in App.jsx.
 const XMS_EMPLOYEE   = [ROLES.GENERAL];
 const XMS_MANAGER    = [ROLES.MANAGER];
-const XMS_FINANCE    = [ROLES.FINANCE, "Finance_Executive"];
-// Finance Verification's own action surface requires exactly FINANCE_EXECUTIVE on the backend
-// (FinanceVerificationController's @PreAuthorize) — unlike XMS_FINANCE above (used by Client
-// Billing, a read/placeholder area), the generic "Finance" viewing role does NOT satisfy this
-// controller, so including it here would let a Finance-role user into a page where every action
-// 403s. Kept separate from XMS_FINANCE so Client Billing's own role list is unaffected.
+// Finance Verification and Client Billing both require exactly FINANCE_EXECUTIVE on the backend
+// (FinanceVerificationController / InvoiceHandoffQueueController @PreAuthorize) — the generic
+// "Finance" viewing role does NOT satisfy them, so including it would let a Finance-role user into
+// pages where every action 403s.
 const XMS_FINANCE_VERIFICATION = [ROLES.FINANCE_EXECUTIVE];
 const XMS_ADMIN      = ADMIN_ROLES;
 export const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
@@ -180,7 +178,13 @@ export const XMS_SUBMENU = [
   {
     label: "Dashboard",
     to: "/expense-management/dashboard",
-    allowedRoles: XMS_EVERYONE,
+    // Every XMS role has its own dashboard view, AP Executive included.
+    allowedRoles: [...XMS_EVERYONE, ROLES.REPORTING_MANAGER, AP_ROLES.AP_EXECUTIVE],
+  },
+  {
+    label: "Notifications",
+    to: "/expense-management/activity/notifications",
+    allowedRoles: [...XMS_EVERYONE, ROLES.REPORTING_MANAGER, AP_ROLES.AP_EXECUTIVE],
   },
   {
     label: "Expenses",
@@ -194,18 +198,9 @@ export const XMS_SUBMENU = [
     ],
   },
   {
-    label: "Receipts",
-    to: "/expense-management/receipts/library",
-    allowedRoles: XMS_EMPLOYEE,
-    children: [
-      { label: "Receipt Library",  to: "/expense-management/receipts/library" },
-      { label: "OCR Processing",   to: "/expense-management/receipts/ocr-processing" },
-    ],
-  },
-  {
     label: "Cash Advance",
     to: "/expense-management/cash-advance/my",
-    allowedRoles: XMS_EMPLOYEE,
+    allowedRoles: XMS_EVERYONE,
     children: [
       { label: "Request Advance", to: "/expense-management/cash-advance/request" },
       { label: "My Advances",     to: "/expense-management/cash-advance/my" },
@@ -221,14 +216,10 @@ export const XMS_SUBMENU = [
     allowedRoles: XMS_EVERYONE,
   },
   {
+    // One page: verify, queried, and verified reports with their AP payment status.
     label: "Finance",
-    to: "/expense-management/finance/verification",
+    to: "/expense-management/finance",
     allowedRoles: XMS_FINANCE_VERIFICATION,
-    children: [
-      { label: "Verification",    to: "/expense-management/finance/verification" },
-      { label: "Reimbursements",  to: "/expense-management/finance/reimbursements" },
-      { label: "Payment Status",  to: "/expense-management/finance/payment-status" },
-    ],
   },
   {
     // AP_EXECUTIVE-only (matches ApPaymentController's own @PreAuthorize("hasRole('AP_EXECUTIVE')")
@@ -239,14 +230,11 @@ export const XMS_SUBMENU = [
     allowedRoles: [AP_ROLES.AP_EXECUTIVE],
   },
   {
+    // One page: the invoice-handoff queue + history. The backend only accepts FINANCE_EXECUTIVE
+    // (InvoiceHandoffQueueController), so the generic Finance role would 403 on every action.
     label: "Client Billing",
-    to: "/expense-management/client-billing/billable-expenses",
-    allowedRoles: XMS_FINANCE,
-    children: [
-      { label: "Billable Expenses", to: "/expense-management/client-billing/billable-expenses" },
-      { label: "Invoice Handoff",   to: "/expense-management/client-billing/invoice-handoff" },
-      { label: "Invoice Status",    to: "/expense-management/client-billing/invoice-status" },
-    ],
+    to: "/expense-management/client-billing",
+    allowedRoles: XMS_FINANCE_VERIFICATION,
   },
   {
     label: "Masters",
@@ -255,8 +243,6 @@ export const XMS_SUBMENU = [
     children: [
       { label: "Categories & Ledger Account", to: "/expense-management/masters/expense-categories" },
       { label: "Cost Center & Budget Management", to: "/expense-management/masters/cost-center-management" },
-      { label: "Projects",            to: "/expense-management/masters/projects" },
-      { label: "Clients",             to: "/expense-management/masters/clients" },
       { label: "Currency Management", to: "/expense-management/masters/currency-management" },
       { label: "Tax Configuration",   to: "/expense-management/masters/tax-configuration" },
     ],

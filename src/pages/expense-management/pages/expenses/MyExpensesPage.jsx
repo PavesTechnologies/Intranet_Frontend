@@ -5,7 +5,6 @@ import { Plus, Pencil, Trash2, Eye, FileStack, FilePlus2, Landmark, Layers, Aler
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import { PageCard, PageCardContent } from "@/components/Cards/PageCard";
 import GenericTable from "@/components/Table/table";
-import Pagination from "@/components/Pagination/pagination";
 import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
 import Modal from "@/components/Modal/modal";
@@ -22,6 +21,7 @@ import {
   REPORT_DELETABLE_STATUSES,
 } from "@/pages/expense-management/api/expenseReportsApi";
 import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
+import Pagination from "@/components/Pagination/pagination";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -190,9 +190,6 @@ export default function MyExpensesPage() {
     setCurrentPage(1);
   };
 
-  const handlePreviousPage = useCallback(() => setCurrentPage((p) => Math.max(p - 1, 1)), []);
-  const handleNextPage = useCallback(() => setCurrentPage((p) => Math.min(p + 1, totalPages)), [totalPages]);
-
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -313,8 +310,8 @@ export default function MyExpensesPage() {
     value: c.currencyId,
     label: `${c.currencyCode} - ${c.currencyName}`,
   }));
-  const headers = ["S.No", "Report #", "Title", "Cost Center", "Currency", "Total Amount", "Status", "Created", "Actions"];
-  const columns = ["serial_no", "reportNumber", "title", "costCenter", "currency", "totalAmount", "status", "created", "actions"];
+  const headers = ["S.No", "Title", "Cost Center", "Currency", "Total Amount", "Status", "Created", "Actions"];
+  const columns = ["serial_no", "title", "costCenter", "currency", "totalAmount", "status", "created", "actions"];
 
   const tableRows = displayedReports.map((r, index) => ({
     serial_no: ((currentPage - 1) * ITEMS_PER_PAGE + index + 1).toString(),
@@ -504,11 +501,14 @@ export default function MyExpensesPage() {
                 columns={columns}
               />
             </div>
-            {totalPages > 1 && (
-              <div className="mt-4 flex justify-center">
-                <Pagination currentPage={currentPage} totalPages={totalPages} onPrevious={handlePreviousPage} onNext={handleNextPage} />
-              </div>
-            )}
+            <div className="mt-4 flex justify-center">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+              />
+            </div>
           </>
         )}
       </div>
