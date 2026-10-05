@@ -1,24 +1,11 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import {
-  RefreshCw,
-  FileText,
-  ShieldCheck,
-  Calculator,
-  Loader2,
-  AlertTriangle,
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
-} from "lucide-react";
 
-import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
-import StatusBadge from "../../../components/status/statusbadge";
-import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
 import { showStatusToast } from "../../../components/toastfy/toast";
-import { formatCurrency, formatDisplayDate } from "../utils/format";
+import { formatDisplayDate } from "../utils/format";
+import { PIPELINE_STAGES, getSnapshotStage, formatFullPeriod } from "../utils/taxPipeline";
 
 import {
   calculateTax,
@@ -39,46 +26,9 @@ import {
 } from "../services/billingDataAcquisitionService";
 import TaxCalculationConsole from "../components/tax_calculation/TaxCalculationConsole";
 import OccurrenceTaxCalculationDetail from "../components/tax_calculation/OccurrenceTaxCalculationDetail";
+import TaxCalculationDetailView from "../components/tax_calculation/TaxCalculationDetailView";
 
 const CONSOLE_PATH = "/account-receivable/tax-calculation";
-
-const formatRatePercentage = (rate) => {
-  if (rate === null || rate === undefined || rate === "") return null;
-  const num = Number(rate);
-  if (Number.isNaN(num)) return null;
-  return `${num.toFixed(2)}%`;
-};
-
-// Applicability is decided entirely by the backend tax engine; this only
-// maps known enum values to a readable label and falls back to a generic
-// title-case conversion so an unrecognized future value never breaks the UI.
-const APPLICABILITY_LABELS = {
-  SAME_JURISDICTION: "Same Jurisdiction",
-  DIFFERENT_JURISDICTION: "Different Jurisdiction",
-  ALL: "All Jurisdictions",
-};
-
-const humanizeApplicability = (value) => {
-  if (!value) return "Not specified";
-  if (APPLICABILITY_LABELS[value]) return APPLICABILITY_LABELS[value];
-  return String(value)
-    .toLowerCase()
-    .split("_")
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-};
-
-function Field({ label, children }) {
-  return (
-    <div>
-      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
-      <span className="mt-0.5 block truncate text-sm font-semibold text-slate-800" title={typeof children === "string" ? children : undefined}>
-        {children || "—"}
-      </span>
-    </div>
-  );
-}
 
 export default function TaxCalculation() {
   const { snapshotId, occurrenceId } = useParams();
@@ -143,7 +93,7 @@ export default function TaxCalculation() {
       try {
         // This hydration path only ever backs the T&M billing-snapshot detail
         // view (the occurrenceId branch above returns before this runs for
-        // Fixed Price/Recurring), so scope the match pool to T&M the same
+        // Milestone Plan/Recurring), so scope the match pool to T&M the same
         // way Data Acquisition and the console's T&M table do.
         const allConfigs = await fetchActiveBillingConfigurations();
         const configs = allConfigs.filter((cfg) => cfg.billingTypeCode === "TIME_MATERIAL");
@@ -250,7 +200,7 @@ export default function TaxCalculation() {
     });
   };
 
-  // Fixed Price / Recurring Billing Occurrences are a distinct backend
+  // Milestone Plan / Recurring Billing Occurrences are a distinct backend
   // contract (BillingOccurrenceController) from the T&M billing-snapshot
   // flow above — routed separately (tax-calculation/occurrence/:occurrenceId).
   // This branch renders only the occurrence view; every hook above still runs
@@ -315,10 +265,14 @@ export default function TaxCalculation() {
     snapshotData?.billingPeriodEnd ||
     snapshotData?.snapshotPeriodEnd;
 
-  const billingPeriod =
-    rawPeriodStart && rawPeriodEnd
-      ? formatBillingPeriod(rawPeriodStart, rawPeriodEnd)
-      : snapshotData?.billingPeriod || passedState.billingPeriod || "—";
+  const billingPeriod = formatFullPeriod(
+    rawPeriodStart,
+    rawPeriodEnd,
+    snapshotData?.billingPeriod || passedState.billingPeriod || "—"
+  );
+  // A snapshot carries no separate billing date; its period end is the date
+  // it was billed up to (same rule as the Billing Tax Pipeline list).
+  const billingDate = snapshotData?.billingDate || rawPeriodEnd;
 
   // Tax Breakdown: render whatever components the backend returned
   const components = Array.isArray(taxCalc?.components) ? taxCalc.components : [];
@@ -329,6 +283,7 @@ export default function TaxCalculation() {
     snapshotData?.subtotal ??
     acquisitionResults?.labor?.amount ??
     5500;
+  const billingAmount = snapshotData?.subtotal ?? taxableAmount;
   const totalTaxAmount = taxCalc?.totalTaxAmount ?? 0;
   const grandTotal = taxCalc?.grandTotal ?? (taxableAmount + totalTaxAmount);
   const isTaxCompleted = Boolean(taxCalc && (taxCalc.components !== undefined || taxCalc.totalTaxAmount !== undefined));
@@ -339,394 +294,79 @@ export default function TaxCalculation() {
       ? (taxCalc?.status || "TAX_COMPLETED")
       : (snapshotData?.status || snapshotData?.billingStatus || "READY_FOR_TAX");
 
+  // One display status — the same backend-derived displayStatus as before,
+  // grouped the same way the Billing Tax Pipeline groups it.
+  const stage = isInvoiced
+    ? PIPELINE_STAGES.INVOICED
+    : isTaxCompleted
+      ? PIPELINE_STAGES.TAX_CALCULATED
+      : getSnapshotStage(displayStatus) || PIPELINE_STAGES.READY_FOR_TAX;
+  const statusLabel = String(displayStatus).toUpperCase() === "IN_TAX" ? "Tax in Progress" : undefined;
+
+  const viewInvoice = () =>
+    navigate(`/account-receivable/invoices/${effectiveSnapshotId}`, {
+      state: { from: "tax-calculation", source: "tax-calculation" },
+    });
+
+  const actionBar = isInvoiced
+    ? {
+        title: "Invoice Generated",
+        description: existingInvoice?.invoiceNumber
+          ? `Invoice ${existingInvoice.invoiceNumber} has been generated for this billing snapshot.`
+          : "An invoice has been generated for this billing snapshot.",
+        action: { label: "View Invoice", onClick: viewInvoice },
+      }
+    : isTaxCompleted
+      ? {
+          title: "Tax Calculation Verified",
+          description: "Ready to Generate Invoice",
+          action: { label: "Proceed to Invoice Generation", onClick: handleGenerateInvoice, disabled: calculating },
+        }
+      : {
+          title: "Ready for Tax Calculation",
+          description: "Source timesheets and taxable amount are verified. Calculate tax to compute the tax components.",
+          action: {
+            label: "Calculate Tax",
+            loadingLabel: "Calculating Tax...",
+            loading: calculating,
+            onClick: handleCalculateTax,
+          },
+        };
+
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-5">
-      <Breadcrumb
-        items={[
-          { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" },
-          { label: "Tax Calculation", to: CONSOLE_PATH },
-          { label: snapshotNum },
-        ]}
-      />
-
-      {/* Header */}
-      <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Tax Calculation</h1>
-            <StatusBadge label={displayStatus} size="sm" />
-          </div>
-          <p className="text-sm text-slate-600">
-            Snapshot <span className="ml-1 font-mono font-semibold text-slate-800">{snapshotNum}</span>
-          </p>
-          <p className="text-sm text-slate-600">
-            <span className="font-semibold text-slate-800">{projectName}</span>
-            <span className="mx-1.5 text-slate-300">&middot;</span>
-            {clientName}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => navigate(CONSOLE_PATH)}
-            className="flex items-center gap-1.5 text-xs text-slate-600"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Tax Workspace
-          </Button>
-
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => navigate("/account-receivable/billing-data-acquisition/workspace")}
-            className="flex items-center gap-1.5 text-xs text-slate-600"
-          >
-            Acquisition Detail
-          </Button>
-
-          {isInvoiced ? (
-            <>
-              <Button variant="outline" size="small" onClick={loadData} className="flex items-center gap-1.5 text-xs">
-                <RefreshCw className="h-3.5 w-3.5" /> Refresh
-              </Button>
-              <Button
-                variant="primary"
-                size="small"
-                onClick={() =>
-                  navigate(`/account-receivable/invoices/${effectiveSnapshotId}`, {
-                    state: { from: "tax-calculation", source: "tax-calculation" },
-                  })
-                }
-                className="flex items-center gap-1.5 text-xs font-semibold bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm"
-              >
-                <FileText className="h-3.5 w-3.5" /> View Invoice
-              </Button>
-            </>
-          ) : isTaxCompleted ? (
-            <Button variant="outline" size="small" onClick={loadData} className="flex items-center gap-1.5 text-xs">
-              <RefreshCw className="h-3.5 w-3.5" /> Refresh
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              size="small"
-              onClick={handleCalculateTax}
-              disabled={calculating}
-              className="flex items-center gap-1.5 text-xs font-semibold bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm"
-            >
-              {calculating ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Calculating Tax...
-                </>
-              ) : (
-                <>
-                  <Calculator className="h-3.5 w-3.5" /> Calculate Tax
-                </>
-              )}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Workflow Guidance Banner */}
-      {isInvoiced ? (
-        <div className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-emerald-950">Invoice Generated</h3>
-              <p className="text-xs text-emerald-800">
-                Authoritative financial invoice has been created and persisted for this billing snapshot.
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="primary"
-            size="small"
-            onClick={() =>
-              navigate(`/account-receivable/invoices/${effectiveSnapshotId}`, {
-                state: { from: "tax-calculation", source: "tax-calculation" },
-              })
-            }
-            className="flex items-center justify-center gap-1.5 text-xs font-semibold bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm shrink-0"
-          >
-            <FileText className="h-3.5 w-3.5" /> View Invoice <ArrowRight className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      ) : isTaxCompleted ? (
-        <div className="flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50/70 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-indigo-950">Tax Calculation Completed</h3>
-                <span className="text-xs font-semibold text-indigo-600">&rarr;</span>
-                <span className="text-xs font-bold text-indigo-800">Ready for Invoice</span>
-              </div>
-              <p className="text-xs text-indigo-700">
-                Tax components and grand total are verified. Click "Proceed to Invoice Generation" to proceed to invoice creation.
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="primary"
-            size="small"
-            onClick={handleGenerateInvoice}
-            disabled={calculating}
-            className="flex items-center justify-center gap-1.5 text-xs font-semibold bg-[#0A0082] hover:bg-[#0A0082]/90 text-white shadow-sm shrink-0"
-          >
-            <FileText className="h-3.5 w-3.5" /> Proceed to Invoice Generation <ArrowRight className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      ) : null}
-
-
-
-      {/* Backend Tax Engine Error Alert if calculation POST failed */}
-      {calcError && (
-        <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 shadow-sm">
-          <AlertTriangle className="h-4 w-4 flex-shrink-0 text-rose-600 mt-0.5" />
-          <div className="space-y-1">
-            <div className="font-semibold text-rose-900">Tax Calculation Error</div>
-            <div className="font-mono text-rose-800">{calcError}</div>
-            <div className="text-[11px] text-rose-600 pt-1">
-              Backend tax engine rejected calculation. Please review the tax rate configuration for this project's jurisdiction.
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Financial statement */}
-      <PageCard className="divide-y divide-slate-100">
-        {/* Calculation Context */}
-        <div className="p-5">
-          <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Calculation Context</h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-            <Field label="Project">{projectName}</Field>
-            <Field label="Client">{clientName}</Field>
-            <Field label="Snapshot">
-              <span className="font-mono">{snapshotNum}</span>
-            </Field>
-            <Field label="Billing Period">{billingPeriod}</Field>
-            <Field label="Currency">
-              <span className="font-mono">{currency}</span>
-            </Field>
-          </div>
-        </div>
-
-        {/* Commercial Value */}
-        <div className="p-5">
-          <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Commercial Value</h2>
-          <div className="max-w-sm space-y-1.5 text-sm">
-            <div className="flex items-center justify-between text-slate-600">
-              <span>Subtotal</span>
-              <span className="font-mono font-semibold text-slate-800">{formatCurrency(taxableAmount, currency)}</span>
-            </div>
-            <div className="flex items-center justify-between text-slate-600">
-              <span>Expenses</span>
-              <span className="font-mono font-semibold text-slate-800">{formatCurrency(0, currency)}</span>
-            </div>
-            <div className="flex items-center justify-between border-t border-slate-200 pt-2 font-bold text-slate-900">
-              <span>Taxable Amount</span>
-              <span className="font-mono text-base text-indigo-900">{formatCurrency(taxableAmount, currency)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Tax Breakdown */}
-        <div className="p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-              <FileText className="h-3.5 w-3.5 text-indigo-600" /> Tax Breakdown
-            </span>
-            <span className="text-[11px] font-medium text-slate-400">
-              {isTaxCompleted ? "Applicable Rates & Amounts" : "Pending Execution"}
-            </span>
-          </div>
-
-          {!isTaxCompleted ? (
-            <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/60 to-slate-50 p-6 text-center space-y-3">
-              <div className="inline-flex p-3 rounded-full bg-indigo-100 text-indigo-700">
-                <Calculator className="h-6 w-6" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-800">Snapshot Ready for Tax Calculation</h3>
-                <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Source timesheets and taxable amount (<strong className="font-mono">{formatCurrency(taxableAmount, currency)}</strong>) are verified. Click "Calculate Tax" below to compute tax components for this snapshot.
-                </p>
-              </div>
-              <div className="pt-2">
-                <Button
-                  variant="primary"
-                  onClick={handleCalculateTax}
-                  disabled={calculating}
-                  className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold px-5 py-2.5 shadow-sm"
-                >
-                  {calculating ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Calculating Tax...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <Calculator className="h-3.5 w-3.5" /> Calculate Tax
-                    </span>
-                  )}
-                </Button>
-              </div>
-            </div>
-          ) : components.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 p-4 text-center text-xs text-slate-500">
-              No tax components applicable for this configuration.
-            </div>
-          ) : (
-            <>
-              {/* Desktop / tablet table */}
-              <div className="hidden overflow-x-auto sm:block">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      <th className="pb-2 pr-3 font-bold">Tax Component</th>
-                      <th className="pb-2 px-3 font-bold">Applicability</th>
-                      <th className="pb-2 px-3 text-right font-bold">Rate</th>
-                      <th className="pb-2 pl-3 text-right font-bold">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {components.map((component) => (
-                      <tr key={component.id}>
-                        <td className="py-3 pr-3 align-top">
-                          <div className="font-semibold text-slate-800">
-                            {component.taxTypeName || component.taxTypeCode || "Tax Component"}
-                          </div>
-                          {component.taxTypeCode && component.taxTypeName && (
-                            <span className="mt-1 inline-block rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
-                              {component.taxTypeCode}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-3 align-top text-slate-600">
-                          {humanizeApplicability(component.applicabilityType)}
-                        </td>
-                        <td className="py-3 px-3 align-top text-right font-mono font-semibold text-slate-700">
-                          {formatRatePercentage(component.appliedRate) ?? "—"}
-                        </td>
-                        <td className="py-3 pl-3 align-top text-right font-mono font-bold text-slate-900">
-                          {formatCurrency(component.taxAmount, currency)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile stacked cards */}
-              <div className="space-y-2.5 sm:hidden">
-                {components.map((component) => (
-                  <div key={component.id} className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-semibold text-slate-800">
-                        {component.taxTypeName || component.taxTypeCode || "Tax Component"}
-                      </span>
-                      {component.taxTypeCode && component.taxTypeName && (
-                        <span className="shrink-0 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
-                          {component.taxTypeCode}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      {humanizeApplicability(component.applicabilityType)}
-                    </div>
-                    <div className="mt-2.5 flex items-center justify-between border-t border-slate-200 pt-2.5">
-                      <span className="text-xs text-slate-500">Rate</span>
-                      <span className="font-mono font-semibold text-slate-700">
-                        {formatRatePercentage(component.appliedRate) ?? "—"}
-                      </span>
-                    </div>
-                    <div className="mt-1.5 flex items-center justify-between">
-                      <span className="text-xs text-slate-500">Amount</span>
-                      <span className="font-mono font-bold text-slate-900">
-                        {formatCurrency(component.taxAmount, currency)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Tax Summary — compact calculation flow */}
-        <div className="p-5">
-          <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tax Summary</h2>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <div className="min-w-[130px]">
-              <span className="block text-[11px] text-slate-400">Taxable Amount</span>
-              <span className="block font-mono text-base font-semibold text-slate-800">
-                {formatCurrency(taxableAmount, currency)}
-              </span>
-            </div>
-            <span className="text-base text-slate-300">+</span>
-            <div className="min-w-[130px]">
-              <span className="block text-[11px] text-slate-400">Total Tax Amount</span>
-              <span className="block font-mono text-base font-semibold text-slate-800">
-                {isTaxCompleted ? formatCurrency(totalTaxAmount, currency) : "Pending"}
-              </span>
-            </div>
-            <span className="text-base text-slate-300">&rarr;</span>
-            <div className="min-w-[130px]">
-              <span className="block text-[11px] text-slate-400">Grand Total</span>
-              <span className="block font-mono text-base font-semibold text-indigo-900">
-                {formatCurrency(grandTotal, currency)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Grand Total — the single strongest visual element on the page */}
-        <div className="p-5">
-          <div className="rounded-xl border-2 border-indigo-200 bg-indigo-50/80 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-sm">
-            <div>
-              <span className="block text-xs font-bold uppercase tracking-wider text-indigo-700">Grand Total</span>
-              <span className="text-xs text-indigo-600">
-                {isTaxCompleted ? "Taxable Amount + Total Tax (Backend Authoritative)" : "Tax calculation pending"}
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="font-mono text-2xl font-extrabold text-indigo-950 sm:text-3xl">
-                {formatCurrency(grandTotal, currency)}
-              </div>
-              {isInvoiced ? (
-                <Button
-                  variant="primary"
-                  size="small"
-                  onClick={() =>
-                    navigate(`/account-receivable/invoices/${effectiveSnapshotId}?source=tax-calculation`, {
-                      state: { from: "tax-calculation", source: "tax-calculation" },
-                    })
-                  }
-                  className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold px-4 py-2 shadow-sm"
-                >
-                  <FileText className="mr-1.5 h-3.5 w-3.5" /> View Invoice
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      </PageCard>
-
-      {/* Authoritative Record */}
-      <div className="flex items-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-        <ShieldCheck className="h-4 w-4 flex-shrink-0 text-emerald-600" />
-        <p>
-          <span className="font-semibold text-slate-700">Authoritative Financial Record.</span>{" "}
-          Tax calculation amounts are generated by the backend tax engine and are read-only for this billing snapshot.
-        </p>
-      </div>
-    </div>
+    <TaxCalculationDetailView
+      onBack={() => navigate(CONSOLE_PATH)}
+      headerActions={
+        <Button
+          variant="outline"
+          size="small"
+          onClick={() => navigate("/account-receivable/billing-data-acquisition/workspace")}
+          className="text-xs text-slate-600"
+        >
+          Acquisition Detail
+        </Button>
+      }
+      billingType="Time & Material"
+      stage={stage}
+      statusLabel={statusLabel}
+      project={projectName}
+      client={clientName}
+      contextFields={[
+        { label: "Billing Period", value: billingPeriod },
+        { label: "Billing Date", value: formatDisplayDate(billingDate) },
+        { label: "Snapshot", value: snapshotNum },
+        taxCalc?.taxRegionName && { label: "Tax Region", value: taxCalc.taxRegionName },
+      ]}
+      currency={currency}
+      billingAmount={billingAmount}
+      taxableAmount={taxableAmount}
+      totalTaxAmount={totalTaxAmount}
+      grandTotal={grandTotal}
+      isTaxCompleted={isTaxCompleted}
+      components={components}
+      pendingMessage="Tax has not been calculated for this billing snapshot yet."
+      calcError={calcError}
+      actionBar={actionBar}
+    />
   );
 }
