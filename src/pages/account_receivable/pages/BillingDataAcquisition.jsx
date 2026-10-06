@@ -62,60 +62,59 @@ export default function BillingDataAcquisition() {
         configs.map(async (cfg) => {
           if (!cfg.projectId) return cfg;
 
-          const isNotAcquired = String(cfg.billingStatus || "").trim().toUpperCase() === "NOT_ACQUIRED";
-          if (isNotAcquired) {
-            // Authoritative backend rule: NOT_ACQUIRED configurations must never query or populate acquired snapshot data
-            clearAcquiredSnapshotMetadata(cfg.projectId);
-            return {
-              ...cfg,
-              billingStatus: "NOT_ACQUIRED",
-              billingPeriodStart: null,
-              billingPeriodEnd: null,
-              billingPeriod: "—",
-              periodStart: "",
-              periodEnd: "",
-              snapshotId: null,
-              snapshotNumber: null,
-              existingSnapshot: null,
-            };
-          }
+          // Check if there is an acquired snapshot period for this project (from API or supplementary localStorage)
+          const savedMeta = getAcquiredSnapshotMetadata(cfg.projectId, cfg.billingConfigurationId);
+          const isMatchingConfig = cfg.billingConfigurationId && savedMeta?.billingConfigurationId
+            ? String(savedMeta.billingConfigurationId) === String(cfg.billingConfigurationId)
+            : !cfg.billingConfigurationId && Boolean(savedMeta);
+          const validMeta = isMatchingConfig ? savedMeta : null;
+          const snapStart = cfg.billingPeriodStart || validMeta?.billingPeriodStart || null;
+          const snapEnd = cfg.billingPeriodEnd || validMeta?.billingPeriodEnd || null;
 
-          // Check if there is an acquired snapshot period for this genuinely acquired project
-          const savedMeta = getAcquiredSnapshotMetadata(cfg.projectId);
-          const snapStart = cfg.billingPeriodStart || savedMeta?.billingPeriodStart || null;
-          const snapEnd = cfg.billingPeriodEnd || savedMeta?.billingPeriodEnd || null;
-
-          // CRITICAL: Only query by-period if we have the actual acquired snapshot period.
-          // Do NOT call by-period using the project configuration period.
           if (snapStart && snapEnd) {
-            const existingSnapshot = await getBillingSnapshotByPeriod(
-              cfg.projectId,
-              snapStart,
-              snapEnd
-            );
-            if (existingSnapshot && existingSnapshot.snapshotId) {
-              const effectiveStatus = existingSnapshot.status || savedMeta?.status || cfg.billingStatus || "READY_FOR_TAX";
-              const actualStart = existingSnapshot.billingPeriodStart || snapStart;
-              const actualEnd = existingSnapshot.billingPeriodEnd || snapEnd;
-              const actualPeriod = existingSnapshot.billingPeriod || formatBillingPeriod(actualStart, actualEnd);
+            try {
+              const existingSnapshot = await getBillingSnapshotByPeriod(
+                cfg.projectId,
+                snapStart,
+                snapEnd,
+                cfg.billingConfigurationId
+              );
+              if (existingSnapshot && existingSnapshot.snapshotId) {
+                const effectiveStatus = existingSnapshot.status || validMeta?.status || "READY_FOR_TAX";
+                const actualStart = existingSnapshot.billingPeriodStart || snapStart;
+                const actualEnd = existingSnapshot.billingPeriodEnd || snapEnd;
+                const actualPeriod = existingSnapshot.billingPeriod || formatBillingPeriod(actualStart, actualEnd);
 
-              return {
-                ...cfg,
-                billingStatus: effectiveStatus,
-                snapshotNumber: existingSnapshot.snapshotNumber,
-                snapshotId: existingSnapshot.snapshotId,
-                snapshotPeriodStart: actualStart,
-                snapshotPeriodEnd: actualEnd,
-                billingPeriodStart: actualStart,
-                billingPeriodEnd: actualEnd,
-                billingPeriod: actualPeriod,
-                existingSnapshot,
-              };
+                return {
+                  ...cfg,
+                  billingStatus: effectiveStatus,
+                  snapshotLifecycleStatus: existingSnapshot.status || effectiveStatus,
+                  acquisitionStatus: existingSnapshot.acquisitionStatus || cfg.status,
+                  snapshotNumber: existingSnapshot.snapshotNumber,
+                  snapshotId: existingSnapshot.snapshotId,
+                  snapshotPeriodStart: actualStart,
+                  snapshotPeriodEnd: actualEnd,
+                  billingPeriodStart: actualStart,
+                  billingPeriodEnd: actualEnd,
+                  billingPeriod: actualPeriod,
+                  existingSnapshot,
+                };
+              } else if (validMeta) {
+                clearAcquiredSnapshotMetadata(cfg.projectId, cfg.billingConfigurationId, snapStart, snapEnd);
+              }
+            } catch (err) {
+              console.warn(`[BillingDataAcquisition] Snapshot lookup notice for project ${cfg.projectId}:`, err?.message);
             }
           }
           return {
             ...cfg,
             billingStatus: normalizeAcquisitionStatus(cfg.billingStatus, false),
+            snapshotId: null,
+            snapshotNumber: null,
+            existingSnapshot: null,
+            billingPeriodStart: null,
+            billingPeriodEnd: null,
+            billingPeriod: "—",
           };
         })
       );
