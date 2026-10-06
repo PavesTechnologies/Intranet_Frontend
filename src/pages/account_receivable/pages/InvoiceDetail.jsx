@@ -53,6 +53,8 @@ import {
   getDemoDelivery,
   saveDemoDelivery,
 } from "../utils/invoiceDemoData";
+import { getActiveCompanyProfile } from "../services/companyProfileService";
+import { getTaxCalculation } from "../services/taxCalculationService";
 import InvoiceDocument from "../components/invoice/InvoiceDocument";
 
 const TAX_WORKSPACE_PATH = "/account-receivable/tax-calculation";
@@ -127,6 +129,8 @@ export default function InvoiceDetail() {
   const isFromTaxCalculation = source === "tax-calculation";
 
   const [invoice, setInvoice] = useState(null);
+  const [taxCalc, setTaxCalc] = useState(null);
+  const [companyProfile, setCompanyProfile] = useState(null);
   const [approvalHistory, setApprovalHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
@@ -214,10 +218,37 @@ export default function InvoiceDetail() {
     else setLoading(true);
     setErrorMsg("");
 
+    // Load active seller company profile for invoice document
+    try {
+      const profile = await getActiveCompanyProfile();
+      setCompanyProfile(profile);
+    } catch (profErr) {
+      console.warn("[InvoiceDetail] Company profile notice:", profErr?.message);
+    }
+
     try {
       const data = await getInvoice(effectiveId);
       if (data) {
         setInvoice(data);
+
+        // Fallback: If tax components or tax region not directly on invoice, attempt fallback to completed tax calculation
+        const targetSnapshotId =
+          data.billingSnapshotId ||
+          (snapshotId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(snapshotId)
+            ? snapshotId
+            : null);
+
+        if (targetSnapshotId && (!data.taxBreakdown || data.taxBreakdown.length === 0 || !data.taxRegion)) {
+          try {
+            const calc = await getTaxCalculation(targetSnapshotId);
+            if (calc) {
+              setTaxCalc(calc);
+            }
+          } catch (calcErr) {
+            console.warn("[InvoiceDetail] Non-blocking tax calculation fallback notice:", calcErr?.message);
+          }
+        }
+
         if (data.invoiceId) {
           try {
             await loadApprovalHistory(data.invoiceId);
@@ -489,10 +520,6 @@ export default function InvoiceDetail() {
       setReacquiring(false);
     }
   };
-
-  useEffect(() => {
-    loadInvoice();
-  }, [snapshotId]);
 
   // Load demo delivery state from localStorage once invoice (and invoiceId) is known
   useEffect(() => {
@@ -1340,7 +1367,9 @@ export default function InvoiceDetail() {
       {/* Customer-Facing Invoice Document */}
       <InvoiceDocument
         invoice={invoice}
-        snapshotId={snapshotId}
+        snapshotId={snapshotId || invoice?.billingSnapshotId}
+        taxCalc={taxCalc}
+        companyProfile={companyProfile}
         deliveryState={deliveryState}
       />
 

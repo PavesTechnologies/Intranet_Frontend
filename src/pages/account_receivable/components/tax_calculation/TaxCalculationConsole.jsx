@@ -79,15 +79,28 @@ export default function TaxCalculationConsole() {
         getBillingOccurrences({ periodStatus: "SCHEDULED" }).catch(() => []),
         getBillingOccurrences({ periodStatus: "TAX_CALCULATED" }).catch(() => []),
       ]);
-      setReadyOccurrences(ready);
-      setUpcomingOccurrences(upcoming);
-      // Invoiced is not its own periodStatus/taxStatus value — it's the
-      // backend's isInvoiced flag on an already-tax-calculated occurrence,
-      // so it's split out here rather than queried separately.
-      setProcessedOccurrences(processed.filter((o) => !o.isInvoiced));
-      setInvoicedOccurrences(processed.filter((o) => o.isInvoiced));
+
+      const [invoicedReady, invoicedProcessed] = await Promise.all([
+        getBillingOccurrences({ periodStatus: "TAX_PENDING", isInvoiced: true }).catch(() => []),
+        getBillingOccurrences({ periodStatus: "TAX_CALCULATED", isInvoiced: true }).catch(() => []),
+      ]);
+
+      const invoicedMap = new Map();
+      [...(invoicedReady || []), ...(invoicedProcessed || [])].forEach((o) => {
+        if (o?.billingScheduleId) invoicedMap.set(o.billingScheduleId, o);
+      });
+      const invoicedList = Array.from(invoicedMap.values());
+
+      setReadyOccurrences(
+        (ready || []).filter((o) => !invoicedMap.has(o.billingScheduleId))
+      );
+      setUpcomingOccurrences(upcoming || []);
+      setProcessedOccurrences(
+        (processed || []).filter((o) => !invoicedMap.has(o.billingScheduleId))
+      );
+      setInvoicedOccurrences(invoicedList);
     } catch (err) {
-      console.error("[TaxCalculationConsole] Error loading billing occurrences:", err);
+      console.error("[TaxCalculationConsole] Error loading occurrences:", err);
     } finally {
       setOccLoading(false);
     }
@@ -95,73 +108,54 @@ export default function TaxCalculationConsole() {
 
   const loadData = async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
-    setLoading(true);
+    else setLoading(true);
 
     try {
-      // Time & Material billing snapshots only -- Milestone Plan/Recurring
-      // occurrences are loaded separately via getBillingOccurrences().
-      // fetchActiveBillingConfigurations() returns every active configuration
-      // regardless of billing type, so it must be filtered down here the same
-      // way Data Acquisition does.
-      const allActiveConfigs = await fetchActiveBillingConfigurations();
-      const activeConfigs = allActiveConfigs.filter((cfg) => cfg.billingTypeCode === "TIME_MATERIAL");
-      const regionsList = await getActiveTaxRegions().catch(() => []);
+      const [allConfigs, regionsList] = await Promise.all([
+        fetchActiveBillingConfigurations().catch(() => []),
+        getActiveTaxRegions().catch(() => []),
+      ]);
+
+      // Tax Calculation Console is scoped to Time & Material configurations;
+      // Fixed Price / Milestone Plan and Recurring Billing have their own
+      // schedules/occurrences.
+      const configs = allConfigs.filter((cfg) => cfg.billingTypeCode === "TIME_MATERIAL");
 
       const loadedSnapshots = (
         await Promise.all(
-          activeConfigs.map(async (cfg) => {
-            if (!cfg.projectId && !cfg.id) return null;
+          configs.map(async (cfg) => {
+            let snapStart = cfg.periodStart;
+            let snapEnd = cfg.periodEnd;
 
-            const savedMeta = getAcquiredSnapshotMetadata(cfg.projectId);
-            const snapStart = cfg.billingPeriodStart || savedMeta?.billingPeriodStart || null;
-            const snapEnd = cfg.billingPeriodEnd || savedMeta?.billingPeriodEnd || null;
+            const existingSnapshot = await getBillingSnapshotByPeriod(
+              cfg.projectId,
+              snapStart,
+              snapEnd
+            ).catch(() => null);
 
-            let existingSnapshot = null;
-            if (cfg.projectId && snapStart && snapEnd) {
-              existingSnapshot = await getBillingSnapshotByPeriod(cfg.projectId, snapStart, snapEnd).catch(() => null);
-            }
-
-            const snapshotId =
-              existingSnapshot?.snapshotId ||
-              savedMeta?.snapshotId ||
-              cfg.snapshotId ||
-              null;
-
-            const snapshotNumber =
-              existingSnapshot?.snapshotNumber ||
-              savedMeta?.snapshotNumber ||
-              cfg.snapshotNumber ||
-              null;
-
-            let snapshotStatus =
-              existingSnapshot?.status ||
-              savedMeta?.status ||
-              cfg.billingStatus ||
-              (snapshotId ? "READY_TO_TAX" : "NOT_ACQUIRED");
-
-            let taxableAmount =
-              existingSnapshot?.totalAmount ||
-              existingSnapshot?.subtotal ||
-              savedMeta?.totalAmount ||
-              savedMeta?.subtotal ||
-              cfg.projectBudget ||
-              0;
-
-            let taxRegionName = cfg.taxRegionName || cfg.taxRegionLabel || "India";
-            // Tax totals as returned by the backend tax engine, when calculated.
+            let snapshotId = existingSnapshot?.snapshotId || null;
+            let snapshotNumber = existingSnapshot?.snapshotNumber || null;
+            let snapshotStatus = existingSnapshot?.status || cfg.billingStatus || "READY_FOR_TAX";
+            let taxableAmount = existingSnapshot?.totalAmount ?? null;
             let totalTaxAmount = null;
             let grandTotal = null;
+            let taxRegionName = cfg.taxRegionName || cfg.taxRegion || null;
 
-            if (
-              snapshotId &&
-              (snapshotStatus === "TAX_COMPLETED" ||
-                snapshotStatus === "IN_TAX" ||
-                snapshotStatus === "INVOICED" ||
-                existingSnapshot)
-            ) {
+            if (cfg.projectId) {
+              const savedMeta = getAcquiredSnapshotMetadata(cfg.projectId);
+              if (savedMeta) {
+                if (savedMeta.snapshotId) snapshotId = savedMeta.snapshotId;
+                if (savedMeta.snapshotNumber) snapshotNumber = savedMeta.snapshotNumber;
+                if (savedMeta.status) snapshotStatus = savedMeta.status;
+                if (savedMeta.periodStart) snapStart = savedMeta.periodStart;
+                if (savedMeta.periodEnd) snapEnd = savedMeta.periodEnd;
+              }
+            }
+
+            if (snapshotId) {
               const taxCalcData = await getTaxCalculation(snapshotId).catch(() => null);
               if (taxCalcData) {
-                const tStatus = (taxCalcData.snapshotStatus || taxCalcData.status || "").toUpperCase();
+                const tStatus = (taxCalcData.status || "").toUpperCase();
                 if (tStatus === "CALCULATED" || tStatus === "TAX_COMPLETED" || tStatus === "COMPLETED") {
                   snapshotStatus = "TAX_COMPLETED";
                 } else if (taxCalcData.status) {
@@ -299,12 +293,12 @@ export default function TaxCalculationConsole() {
 
   const openSnapshotTax = (snapshot) =>
     navigate(`/account-receivable/tax-calculation/${snapshot.snapshotId}`, {
-      state: { config: snapshot.config },
+      state: { config: snapshot.config, from: "tax-calculation-console" },
     });
 
   const openOccurrenceTax = (occurrence) =>
     navigate(`${OCCURRENCE_DETAIL_BASE}/${occurrence.billingScheduleId}`, {
-      state: { occurrence },
+      state: { occurrence, from: "tax-calculation-console" },
     });
 
   // One action per row: Calculate Tax where the record is ready for it,

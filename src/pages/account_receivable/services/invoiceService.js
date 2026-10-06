@@ -204,15 +204,27 @@ export const normalizeTaxComponent = (component = {}, index = 0) => {
     id:
       source.taxCalculationComponentId ||
       source.tax_calculation_component_id ||
+      source.invoiceTaxComponentId ||
+      source.invoice_tax_component_id ||
       source.id ||
-      `${source.taxTypeCode || source.taxComponent || "tax"}-${index}`,
+      `${source.taxTypeCode || source.taxComponent || source.taxTypeName || "tax"}-${index}`,
     taxComponent:
       source.taxTypeName ||
+      source.tax_type_name ||
       source.taxComponent ||
+      source.tax_component ||
       source.taxTypeCode ||
+      source.tax_type_code ||
+      source.taxType ||
+      source.tax_type ||
       source.name ||
       "Tax Component",
-    taxTypeCode: source.taxTypeCode || source.tax_type_code || "",
+    taxTypeCode:
+      source.taxTypeCode ||
+      source.tax_type_code ||
+      source.taxType ||
+      source.tax_type ||
+      "",
     applicability:
       source.applicabilityType ||
       source.applicability ||
@@ -223,13 +235,31 @@ export const normalizeTaxComponent = (component = {}, index = 0) => {
         ? Number(source.appliedRate)
         : source.rate !== undefined && source.rate !== null
           ? Number(source.rate)
-          : null,
+          : source.taxRate !== undefined && source.taxRate !== null
+            ? Number(source.taxRate)
+            : source.tax_rate !== undefined && source.tax_rate !== null
+              ? Number(source.tax_rate)
+              : null,
+    taxableAmount:
+      source.taxableAmount !== undefined && source.taxableAmount !== null
+        ? Number(source.taxableAmount)
+        : source.taxable_amount !== undefined && source.taxable_amount !== null
+          ? Number(source.taxable_amount)
+          : source.taxableBase !== undefined && source.taxableBase !== null
+            ? Number(source.taxableBase)
+            : source.baseAmount !== undefined && source.baseAmount !== null
+              ? Number(source.baseAmount)
+              : source.base_amount !== undefined && source.base_amount !== null
+                ? Number(source.base_amount)
+                : null,
     amount:
       source.taxAmount !== undefined && source.taxAmount !== null
         ? Number(source.taxAmount)
         : source.amount !== undefined && source.amount !== null
           ? Number(source.amount)
-          : 0,
+          : source.tax_amount !== undefined && source.tax_amount !== null
+            ? Number(source.tax_amount)
+            : 0,
   };
 };
 
@@ -243,8 +273,15 @@ export const normalizeTaxComponent = (component = {}, index = 0) => {
 export const normalizeInvoice = (payload = {}) => {
   if (!payload || typeof payload !== "object") return null;
 
-  // Handles payload wrapped in { invoice: { ... } } or raw invoice object
-  const data = payload.invoice && typeof payload.invoice === "object" ? payload.invoice : payload;
+  // Handles payload wrapped in { invoice: { ... } }, { data: { invoice: { ... } } }, { data: { ... } }, or raw invoice object
+  let data = payload;
+  if (data.invoice && typeof data.invoice === "object" && !Array.isArray(data.invoice)) {
+    data = data.invoice;
+  } else if (data.data && typeof data.data === "object" && !Array.isArray(data.data)) {
+    data = (data.data.invoice && typeof data.data.invoice === "object" && !Array.isArray(data.data.invoice))
+      ? data.data.invoice
+      : data.data;
+  }
 
   const rawItems = Array.isArray(data.items)
     ? data.items
@@ -260,11 +297,25 @@ export const normalizeInvoice = (payload = {}) => {
     ? data.taxBreakdown
     : Array.isArray(data.taxComponents)
       ? data.taxComponents
-      : Array.isArray(data.components)
-        ? data.components
-        : Array.isArray(data.taxes)
-          ? data.taxes
-          : [];
+      : Array.isArray(data.invoiceTaxComponents)
+        ? data.invoiceTaxComponents
+        : Array.isArray(data.invoice_tax_components)
+          ? data.invoice_tax_components
+          : Array.isArray(data.taxDetails)
+            ? data.taxDetails
+            : Array.isArray(data.components)
+              ? data.components
+              : Array.isArray(data.taxes)
+                ? data.taxes
+                : Array.isArray(data.taxCalculation?.components)
+                  ? data.taxCalculation.components
+                  : Array.isArray(data.taxCalculation?.taxComponents)
+                    ? data.taxCalculation.taxComponents
+                    : Array.isArray(data.taxContext?.components)
+                      ? data.taxContext.components
+                      : [];
+
+  const normalizedTaxComponents = rawTaxComponents.map(normalizeTaxComponent);
 
   // Actual snapshot billing period handling
   const periodStart = toIsoDateOnly(
@@ -293,6 +344,46 @@ export const normalizeInvoice = (payload = {}) => {
       formattedAddress = parts.length > 0 ? parts.join(", ") : null;
     }
   }
+
+  // Authoritative financial totals directly from backend
+  const subtotal =
+    data.subtotal !== undefined && data.subtotal !== null
+      ? Number(data.subtotal)
+      : data.sub_total !== undefined && data.sub_total !== null
+        ? Number(data.sub_total)
+        : data.taxableAmount !== undefined && data.taxableAmount !== null
+          ? Number(data.taxableAmount)
+          : data.taxable_amount !== undefined && data.taxable_amount !== null
+            ? Number(data.taxable_amount)
+            : 0;
+
+  const totalTax =
+    data.totalTax !== undefined && data.totalTax !== null
+      ? Number(data.totalTax)
+      : data.totalTaxAmount !== undefined && data.totalTaxAmount !== null
+        ? Number(data.totalTaxAmount)
+        : data.total_tax !== undefined && data.total_tax !== null
+          ? Number(data.total_tax)
+          : data.total_tax_amount !== undefined && data.total_tax_amount !== null
+            ? Number(data.total_tax_amount)
+            : data.taxCalculation?.totalTaxAmount !== undefined && data.taxCalculation?.totalTaxAmount !== null
+              ? Number(data.taxCalculation.totalTaxAmount)
+              : (normalizedTaxComponents.length > 0
+                  ? normalizedTaxComponents.reduce((acc, c) => acc + (c.amount || 0), 0)
+                  : 0);
+
+  const grandTotal =
+    data.grandTotal !== undefined && data.grandTotal !== null
+      ? Number(data.grandTotal)
+      : data.grand_total !== undefined && data.grand_total !== null
+        ? Number(data.grand_total)
+        : data.totalAmount !== undefined && data.totalAmount !== null
+          ? Number(data.totalAmount)
+          : data.total_amount !== undefined && data.total_amount !== null
+            ? Number(data.total_amount)
+            : data.taxCalculation?.grandTotal !== undefined && data.taxCalculation?.grandTotal !== null
+              ? Number(data.taxCalculation.grandTotal)
+              : (subtotal + totalTax);
 
   return {
     invoiceId: data.invoiceId || data.invoice_id || data.id || "",
@@ -403,29 +494,97 @@ export const normalizeInvoice = (payload = {}) => {
       (data.payment_term_code ? `${data.payment_term_code} Days` : null) ||
       null,
 
-    // Items & Tax Breakdown
+    // Items & Tax Breakdown (Authoritative from backend)
     items: rawItems.map(normalizeInvoiceItem),
-    taxBreakdown: rawTaxComponents.map(normalizeTaxComponent),
+    taxBreakdown: normalizedTaxComponents,
+    taxComponents: normalizedTaxComponents,
+
+    // Tax Context (Authoritative from backend; null if not provided)
+    supplierState:
+      data.supplierState ||
+      data.supplier_state ||
+      data.taxContext?.supplierState ||
+      data.taxContext?.supplier_state ||
+      data.taxCalculation?.supplierState ||
+      data.taxCalculation?.supplier_state ||
+      null,
+    customerState:
+      data.customerState ||
+      data.customer_state ||
+      data.taxContext?.customerState ||
+      data.taxContext?.customer_state ||
+      data.taxCalculation?.customerState ||
+      data.taxCalculation?.customer_state ||
+      null,
+    placeOfSupply:
+      data.placeOfSupply ||
+      data.place_of_supply ||
+      data.taxContext?.placeOfSupply ||
+      data.taxContext?.place_of_supply ||
+      data.taxCalculation?.placeOfSupply ||
+      data.taxCalculation?.place_of_supply ||
+      null,
+    taxRegion:
+      data.taxRegion ||
+      data.tax_region ||
+      data.taxRegionName ||
+      data.tax_region_name ||
+      data.taxContext?.taxRegion ||
+      data.taxContext?.tax_region ||
+      data.taxContext?.taxRegionName ||
+      data.taxContext?.tax_region_name ||
+      data.taxCalculation?.taxRegion ||
+      data.taxCalculation?.tax_region ||
+      data.taxCalculation?.taxRegionName ||
+      data.taxCalculation?.tax_region_name ||
+      null,
+    taxRegionName:
+      data.taxRegionName ||
+      data.tax_region_name ||
+      data.taxRegion ||
+      data.tax_region ||
+      data.taxContext?.taxRegionName ||
+      data.taxContext?.tax_region_name ||
+      data.taxCalculation?.taxRegionName ||
+      data.taxCalculation?.tax_region_name ||
+      null,
+
+    // Seller Info (Authoritative from backend if provided)
+    sellerName:
+      data.sellerName ||
+      data.seller_name ||
+      data.companyName ||
+      data.company_name ||
+      null,
+    sellerAddress:
+      data.sellerAddress ||
+      data.seller_address ||
+      data.companyAddress ||
+      data.company_address ||
+      null,
+    sellerGstin:
+      data.sellerGstin ||
+      data.seller_gstin ||
+      data.companyGstin ||
+      data.company_gstin ||
+      null,
+    sellerEmail:
+      data.sellerEmail ||
+      data.seller_email ||
+      data.companyEmail ||
+      data.company_email ||
+      null,
+    sellerPhone:
+      data.sellerPhone ||
+      data.seller_phone ||
+      data.companyPhone ||
+      data.company_phone ||
+      null,
 
     // Financial Totals (Strictly backend authoritative)
-    subtotal:
-      data.subtotal !== undefined && data.subtotal !== null
-        ? Number(data.subtotal)
-        : data.taxableAmount !== undefined && data.taxableAmount !== null
-          ? Number(data.taxableAmount)
-          : 0,
-    totalTax:
-      data.totalTax !== undefined && data.totalTax !== null
-        ? Number(data.totalTax)
-        : data.totalTaxAmount !== undefined && data.totalTaxAmount !== null
-          ? Number(data.totalTaxAmount)
-          : 0,
-    grandTotal:
-      data.grandTotal !== undefined && data.grandTotal !== null
-        ? Number(data.grandTotal)
-        : data.totalAmount !== undefined && data.totalAmount !== null
-          ? Number(data.totalAmount)
-          : 0,
+    subtotal,
+    totalTax,
+    grandTotal,
   };
 };
 
@@ -657,6 +816,20 @@ export const getInvoice = async (snapshotIdOrInvoiceId) => {
       normalized.snapshotNumber = rawId;
     }
     return normalized;
+  }
+
+  // Fallback: try direct GET /api/v1/invoices/{rawId} in case rawId is a non-standard invoice ID format
+  try {
+    const invUrl = `${AR_BASE_URL}/api/v1/invoices/${rawId}`;
+    const invResponse = await api.get(invUrl);
+    const unwrapped = unwrapData(invResponse);
+    if (unwrapped) {
+      return normalizeInvoice(unwrapped);
+    }
+  } catch (invErr) {
+    if (invErr?.response?.status && invErr.response.status !== 404) {
+      throw invErr;
+    }
   }
 
   const notFoundErr = new Error("Invoice could not be found for the provided identifier.");
