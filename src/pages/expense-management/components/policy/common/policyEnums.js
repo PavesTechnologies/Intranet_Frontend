@@ -1,10 +1,17 @@
-import { DollarSign, Receipt, CalendarClock, FileWarning, Copy } from "lucide-react";
+import { DollarSign, Receipt, CalendarClock, FileWarning, Copy, Users } from "lucide-react";
 
 /**
  * Exact enum values from the Policy & Compliance Engine backend contract.
  * Never add/rename/remove values here without the backend contract changing.
  */
-export const RULE_TYPES = ["AMOUNT_LIMIT", "RECEIPT_REQUIRED", "BACKDATED_DAYS", "MISSING_DESCRIPTION", "DUPLICATE_EXPENSE"];
+export const RULE_TYPES = [
+  "AMOUNT_LIMIT",
+  "RECEIPT_REQUIRED",
+  "BACKDATED_DAYS",
+  "MISSING_DESCRIPTION",
+  "DUPLICATE_EXPENSE",
+  "CROSS_EMPLOYEE_DUPLICATE_EXPENSE",
+];
 export const ENFORCEMENT_TYPES = ["WARN", "BLOCK"];
 export const SEVERITIES = ["WARN", "INFO"];
 export const OVERAGE_TIERS = ["MINOR", "MODERATE", "SEVERE"];
@@ -33,8 +40,13 @@ export const RULE_TYPE_META = {
   },
   DUPLICATE_EXPENSE: {
     label: "Duplicate Expense",
-    description: "Flag expenses that look like duplicates of another.",
+    description: "Flag expenses that look like duplicates of another submission by the same employee.",
     Icon: Copy,
+  },
+  CROSS_EMPLOYEE_DUPLICATE_EXPENSE: {
+    label: "Cross-Employee Duplicate",
+    description: "Flag when a DIFFERENT employee already submitted a matching vendor/date/amount expense — e.g. a shared bill claimed twice.",
+    Icon: Users,
   },
 };
 

@@ -1,6 +1,8 @@
 import { AP_ALL_ROLES, AP_ROLES } from "../pages/accounts-payable/constants/apRoles";
 import { AP_ROUTES } from "../pages/accounts-payable/constants/routes";
 import { INVOICE_PERMISSIONS } from "../pages/accounts-payable/constants/invoicePermissions";
+import { PAYMENT_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/paymentPermissions";
+import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/tdsTrackingPermissions";
 
 /**
  * Canonical role identifiers.
@@ -22,7 +24,7 @@ export const ROLES = {
   FINANCE:           "Finance",
   // Accounts Receivable (AR) Maker-Checker roles.
   // FINANCE_EXECUTIVE mirrors the ad-hoc "Finance_Executive" literal already used
-  // by XMS_FINANCE/XMS_EVERYONE/AP_ROLES.FINANCE_EXECUTIVE below — same real
+  // by XMS_EVERYONE/AP_ROLES.FINANCE_EXECUTIVE below — same real
   // backend role, now also exposed as a named constant for AR's own use.
   // FINANCE_MANAGER is AR's Checker role (approve/reject billing configurations);
   // it does not exist anywhere else in the app.
@@ -41,12 +43,10 @@ const HR_MANAGEMENT    = [ROLES.HR, ROLES.REPORTING_MANAGER];
 // the /expense-management/* routes in App.jsx.
 const XMS_EMPLOYEE   = [ROLES.GENERAL];
 const XMS_MANAGER    = [ROLES.MANAGER];
-const XMS_FINANCE    = [ROLES.FINANCE, "Finance_Executive"];
-// Finance Verification's own action surface requires exactly FINANCE_EXECUTIVE on the backend
-// (FinanceVerificationController's @PreAuthorize) — unlike XMS_FINANCE above (used by Client
-// Billing, a read/placeholder area), the generic "Finance" viewing role does NOT satisfy this
-// controller, so including it here would let a Finance-role user into a page where every action
-// 403s. Kept separate from XMS_FINANCE so Client Billing's own role list is unaffected.
+// Finance Verification and Client Billing both require exactly FINANCE_EXECUTIVE on the backend
+// (FinanceVerificationController / InvoiceHandoffQueueController @PreAuthorize) — the generic
+// "Finance" viewing role does NOT satisfy them, so including it would let a Finance-role user into
+// pages where every action 403s.
 const XMS_FINANCE_VERIFICATION = [ROLES.FINANCE_EXECUTIVE];
 const XMS_ADMIN      = ADMIN_ROLES;
 export const XMS_EVERYONE   = [ROLES.GENERAL, ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", ...ADMIN_ROLES];
@@ -178,7 +178,13 @@ export const XMS_SUBMENU = [
   {
     label: "Dashboard",
     to: "/expense-management/dashboard",
-    allowedRoles: XMS_EVERYONE,
+    // Every XMS role has its own dashboard view, AP Executive included.
+    allowedRoles: [...XMS_EVERYONE, ROLES.REPORTING_MANAGER, AP_ROLES.AP_EXECUTIVE],
+  },
+  {
+    label: "Notifications",
+    to: "/expense-management/activity/notifications",
+    allowedRoles: [...XMS_EVERYONE, ROLES.REPORTING_MANAGER, AP_ROLES.AP_EXECUTIVE],
   },
   {
     label: "Expenses",
@@ -192,18 +198,9 @@ export const XMS_SUBMENU = [
     ],
   },
   {
-    label: "Receipts",
-    to: "/expense-management/receipts/library",
-    allowedRoles: XMS_EMPLOYEE,
-    children: [
-      { label: "Receipt Library",  to: "/expense-management/receipts/library" },
-      { label: "OCR Processing",   to: "/expense-management/receipts/ocr-processing" },
-    ],
-  },
-  {
     label: "Cash Advance",
     to: "/expense-management/cash-advance/my",
-    allowedRoles: XMS_EMPLOYEE,
+    allowedRoles: XMS_EVERYONE,
     children: [
       { label: "Request Advance", to: "/expense-management/cash-advance/request" },
       { label: "My Advances",     to: "/expense-management/cash-advance/my" },
@@ -219,14 +216,10 @@ export const XMS_SUBMENU = [
     allowedRoles: XMS_EVERYONE,
   },
   {
+    // One page: verify, queried, and verified reports with their AP payment status.
     label: "Finance",
-    to: "/expense-management/finance/verification",
+    to: "/expense-management/finance",
     allowedRoles: XMS_FINANCE_VERIFICATION,
-    children: [
-      { label: "Verification",    to: "/expense-management/finance/verification" },
-      { label: "Reimbursements",  to: "/expense-management/finance/reimbursements" },
-      { label: "Payment Status",  to: "/expense-management/finance/payment-status" },
-    ],
   },
   {
     // AP_EXECUTIVE-only (matches ApPaymentController's own @PreAuthorize("hasRole('AP_EXECUTIVE')")
@@ -237,14 +230,11 @@ export const XMS_SUBMENU = [
     allowedRoles: [AP_ROLES.AP_EXECUTIVE],
   },
   {
+    // One page: the invoice-handoff queue + history. The backend only accepts FINANCE_EXECUTIVE
+    // (InvoiceHandoffQueueController), so the generic Finance role would 403 on every action.
     label: "Client Billing",
-    to: "/expense-management/client-billing/billable-expenses",
-    allowedRoles: XMS_FINANCE,
-    children: [
-      { label: "Billable Expenses", to: "/expense-management/client-billing/billable-expenses" },
-      { label: "Invoice Handoff",   to: "/expense-management/client-billing/invoice-handoff" },
-      { label: "Invoice Status",    to: "/expense-management/client-billing/invoice-status" },
-    ],
+    to: "/expense-management/client-billing",
+    allowedRoles: XMS_FINANCE_VERIFICATION,
   },
   {
     label: "Masters",
@@ -253,8 +243,6 @@ export const XMS_SUBMENU = [
     children: [
       { label: "Categories & Ledger Account", to: "/expense-management/masters/expense-categories" },
       { label: "Cost Center & Budget Management", to: "/expense-management/masters/cost-center-management" },
-      { label: "Projects",            to: "/expense-management/masters/projects" },
-      { label: "Clients",             to: "/expense-management/masters/clients" },
       { label: "Currency Management", to: "/expense-management/masters/currency-management" },
       { label: "Tax Configuration",   to: "/expense-management/masters/tax-configuration" },
     ],
@@ -338,9 +326,25 @@ const _INVOICE_VIEW_PERMISSIONS = [INVOICE_PERMISSIONS.INVOICE_VIEW];
 
 export const AP_SUBMENU = [
   { label: "Dashboard", to: AP_ROUTES.DASHBOARD, allowedRoles: AP_ALL_ROLES },
+  // Same gate as the route itself: every AP user has their own notifications, and which ones
+  // they see is decided by the backend from the JWT, so there is nothing finer to filter on.
+  { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
+  { label: "Notifications", to: AP_ROUTES.NOTIFICATIONS, allowedRoles: AP_ALL_ROLES },
   { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
   { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
-  { label: "Payments", to: AP_ROUTES.PAYMENT_READY, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
-  { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
-  { label: "System Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: AP_ALL_ROLES },
+  // Payment Management (Ready for Payment ⇄ Payment History, cross-linked from each page) and
+  // TDS Tracking are flat entries: the AP flyout doesn't open nested children. Gated on the
+  // permissions their backend endpoints enforce, so a user without them never sees a page that
+  // would only 403.
+  { label: "Payment Management", to: AP_ROUTES.PAYMENT_READY, requiredPermissions: PAYMENT_ANY_VIEW_PERMISSIONS },
+  { label: "TDS Tracking", to: AP_ROUTES.TDS_TRACKING, requiredPermissions: TDS_TRACKING_ANY_VIEW_PERMISSIONS },
+  // { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
+  // Split into two role-exclusive entries (both pointing at the same route) rather than one
+  // AP_ALL_ROLES item — System Configuration's tabs are now Admin-only/Finance_Executive-only
+  // (see SystemConfigurationPage.jsx's canManageSystemConfig/canManageTdsConfig split), so
+  // Vendor_Intake/AP_Executive shouldn't see either nav entry at all, and Finance_Executive
+  // should see it labeled for what they'll actually land on (just the TDS tab), not the generic
+  // label that implies access to Fiscal Years/Tax Compliance/etc. they don't have.
+  { label: "System Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: [AP_ROLES.ADMIN] },
+  { label: "TDS Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: [AP_ROLES.FINANCE_EXECUTIVE] },
 ];

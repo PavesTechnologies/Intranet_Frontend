@@ -21,6 +21,7 @@ import LineReviewStatusBadge, { deriveLineReviewState } from "./LineReviewStatus
 import ApprovalLevelTimeline from "./ApprovalLevelTimeline";
 import ReceiptViewer from "./ReceiptViewer";
 import CommentPromptModal from "./CommentPromptModal";
+import TaxStatusBadge from "@/pages/expense-management/components/expense-reports/TaxStatusBadge";
 import {
   useApprovalStatus,
   useLineItemReviews,
@@ -168,7 +169,9 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
   const costCenterName = queueItem?.costCenterName || queueItem?.costCenter || queueItem?.costCenterCode || queueItem?.departmentName || historyItem?.costCenterName || historyItem?.costCenter || fullReport?.costCenterName || fullReport?.costCenter;
   const submittedAt = queueItem?.submittedAt || queueItem?.createdAt || queueItem?.submittedDate || historyItem?.submittedAt || historyItem?.createdAt || fullReport?.submittedAt || fullReport?.createdAt;
   const totalAmount = queueItem?.totalAmount ?? historyItem?.totalAmount ?? fullReport?.totalAmount;
-  const currencyCode = queueItem?.currencyCode || historyItem?.currencyCode || fullReport?.currencyCode;
+  // Report totals are in the organization base currency. Queue items already label them with it;
+  // report responses carry it as baseCurrencyCode (their currencyCode is the report's own currency).
+  const currencyCode = queueItem?.currencyCode || historyItem?.baseCurrencyCode || fullReport?.baseCurrencyCode || historyItem?.currencyCode || fullReport?.currencyCode;
 
   const isMutating = reviewLineItem.isPending || reviewSplit.isPending || rejectReport.isPending || bulkApprove.isPending;
   const canAct = isQueueMode && reportStatus !== "APPROVED" && reportStatus !== "REJECTED";
@@ -180,14 +183,15 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
 
   const handleApprove = () => {
     if (!selectedRelevant) return;
+    const onSuccess = () => showStatusToast("Approved", "success");
     const onError = (err) => showStatusToast(err.response?.data?.message || "Failed to approve", "error");
     if (selectedRelevant.isSplit) {
       Promise.all(
         selectedRelevant.mySplits.map((s) => reviewSplit.mutateAsync({ reportId, splitId: s.splitId, decision: "APPROVED" }))
-      ).catch(onError);
+      ).then(onSuccess).catch(onError);
       return;
     }
-    reviewLineItem.mutate({ reportId, lineItemId: selectedRelevant.lineItemId, decision: "APPROVED" }, { onError });
+    reviewLineItem.mutate({ reportId, lineItemId: selectedRelevant.lineItemId, decision: "APPROVED" }, { onSuccess, onError });
   };
 
   const handleBulkApprove = () => {
@@ -333,9 +337,24 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
                       </div>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       <Field label="Line Amount" value={formatMoney(selectedLine.amount, selectedLine.currencyCode)} />
-                      {selectedLine.taxAmount != null && <Field label="Tax / GST" value={formatMoney(selectedLine.taxAmount, selectedLine.currencyCode)} />}
+                      {selectedLine.taxAmount != null && (
+                        <div>
+                          <Field
+                            label="Tax"
+                            value={`${formatMoney(selectedLine.taxAmount, selectedLine.currencyCode)}${
+                              selectedLine.tax?.taxCode ? ` · ${selectedLine.tax.taxCode}` : ""
+                            }`}
+                          />
+                          <div className="mt-1">
+                            <TaxStatusBadge tax={selectedLine.tax} />
+                          </div>
+                        </div>
+                      )}
+                      {selectedLine.netAmount != null && (
+                        <Field label="Before Tax" value={formatMoney(selectedLine.netAmount, selectedLine.currencyCode)} />
+                      )}
                       <Field label="Report Total" value={formatMoney(totalAmount, currencyCode)} />
                     </div>
                   )}

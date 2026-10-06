@@ -31,9 +31,22 @@ export const financeVerificationApi = {
   getStatus: (reportId) =>
     api.get(`/xms/finance-verification/${reportId}/status`, withBase()),
 
+  // PageResponse<FinanceHistoryItemResponse> - status must be "VERIFIED" or "QUERIED"
+  getHistory: (status, page = 0, size = 20) =>
+    api.get("/xms/finance-verification/history", withBase({ params: { status, page, size } })),
+
+  // FinancePaymentSummaryResponse: awaitingPaymentCount (with AP), paidCount
+  getPaymentSummary: () =>
+    api.get("/xms/finance-verification/payment-summary", withBase()),
+
   // ExpenseReportResponse
-  verifyLineItem: (reportId, lineItemId) =>
-    api.post(`/xms/finance-verification/${reportId}/line-items/${lineItemId}/verify`, {}, withBase()),
+  verifyLineItem: (reportId, lineItemId, taxChecked) =>
+    // taxChecked: Finance confirms it checked a line whose tax is flagged (MISMATCH / REQUIRES_FINANCE_REVIEW).
+    api.post(`/xms/finance-verification/${reportId}/line-items/${lineItemId}/verify`, { taxChecked: !!taxChecked }, withBase()),
+
+  // FINANCE_EXECUTIVE per-line tax correction: { taxCodeId?, taxAmount?, itcRecoverablePercent?, reason }.
+  adjustLineTax: (reportId, lineItemId, payload) =>
+    api.post(`/xms/finance-verification/${reportId}/line-items/${lineItemId}/tax-adjustment`, payload, withBase()),
 
   // ExpenseReportResponse - reason parameter required
   queryLineItem: (reportId, lineItemId, reason) =>

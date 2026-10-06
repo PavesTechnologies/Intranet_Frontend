@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAirsStore } from "./airsStore";
-import { getJDById, updateJDById, updateJDFromFile, createJD, createJDFromFile, viewJDFile } from "../service/jdservice";
+import { getJDById, updateJDById, updateJDFromFile, createJD, createJDFromFile, viewJDFile, getEducationOptions } from "../service/jdservice";
 import {
   FileText,
   FileUp,
@@ -47,6 +47,8 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
   const [noticePeriod, setNoticePeriod] = useState("");
   const [educationDegree, setEducationDegree] = useState("");
   const [educationField, setEducationField] = useState("");
+  // Suggestions only (values already used across JDs) - the inputs stay free text.
+  const [educationOptions, setEducationOptions] = useState({ degrees: [], fields: [] });
   const [rawText, setRawText] = useState("");
   const [originalRawText, setOriginalRawText] = useState("");
   const [promptTemplateId, setPromptTemplateId] = useState("");
@@ -83,6 +85,18 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
       setIsLoadingExistingFile(false);
     }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    getEducationOptions().then((res) => {
+      if (cancelled || !res?.data) return;
+      setEducationOptions({
+        degrees: Array.isArray(res.data.degrees) ? res.data.degrees : [],
+        fields: Array.isArray(res.data.fields) ? res.data.fields : [],
+      });
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (editId) {
@@ -407,6 +421,8 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
           <input
             type="text"
             placeholder="e.g. Bachelor's Degree"
+            list="jd-education-degree-options"
+            autoComplete="off"
             value={educationDegree}
             onChange={(e) => {
               setEducationDegree(e.target.value);
@@ -415,12 +431,19 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
             className={`w-full px-3 py-2 border rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${errors.educationDegree ? "border-red-500 ring-1 ring-red-500" : "border-slate-200"
               }`}
           />
+          <datalist id="jd-education-degree-options">
+            {educationOptions.degrees.map((degree) => (
+              <option key={degree} value={degree} />
+            ))}
+          </datalist>
         </FormField>
 
         <FormField label="Education Field" required error={errors.educationField}>
           <input
             type="text"
             placeholder="e.g. Computer Science"
+            list="jd-education-field-options"
+            autoComplete="off"
             value={educationField}
             onChange={(e) => {
               setEducationField(e.target.value);
@@ -429,6 +452,11 @@ export default function JdForm({ editId, onSuccess, onCancel }) {
             className={`w-full px-3 py-2 border rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${errors.educationField ? "border-red-500 ring-1 ring-red-500" : "border-slate-200"
               }`}
           />
+          <datalist id="jd-education-field-options">
+            {educationOptions.fields.map((field) => (
+              <option key={field} value={field} />
+            ))}
+          </datalist>
         </FormField>
 
         <FormField label="JD Parsing Prompt" required error={errors.promptTemplateId} className="sm:col-span-2">

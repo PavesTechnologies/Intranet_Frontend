@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorState from "@/pages/airs/skill-ontology/components/ErrorState";
 import useAiEvaluation from "../../../hooks/useAiEvaluation";
@@ -6,8 +6,14 @@ import AiSummaryCard from "./components/AiSummaryCard";
 import AiInsightsCard from "./components/AiInsightsCard";
 
 // AI Review Score tab — GET /airs/campaign-candidates/{campaign_candidate_id}/ai-evaluation.
-export default function AiEvaluationTab({ candidate }) {
-  const { breakdown, loading, error, refetch } = useAiEvaluation(candidate?.id);
+export default function AiEvaluationTab({ candidate, onLayerFailure }) {
+  const { breakdown, failure, loading, error, refetch } = useAiEvaluation(candidate?.id);
+
+  // Optional: lets a host page (PipelineCandidateScorecardPage) flag/retry a
+  // dead-lettered layer from this tab's own fresh response.
+  useEffect(() => {
+    if (!loading && !error) onLayerFailure?.("ai", failure);
+  }, [loading, error, failure, onLayerFailure]);
 
   if (loading) {
     return (

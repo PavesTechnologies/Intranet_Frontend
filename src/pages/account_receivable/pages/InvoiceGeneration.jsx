@@ -91,7 +91,7 @@ export default function InvoiceGeneration() {
 
   useEffect(() => {
     if (targetSnapshotId) {
-      navigate(`/account-receivable/invoice-generation/${targetSnapshotId}`, {
+      navigate(`/account-receivable/invoices/${targetSnapshotId}`, {
         replace: true,
         state: {
           from: "invoice-generation",

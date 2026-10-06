@@ -13,6 +13,7 @@ import {
   Receipt,
   Layers,
   Calendar,
+  DollarSign,
 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
@@ -23,6 +24,14 @@ import {
   lineItemService,
   receiptService,
 } from "@/pages/expense-management/api/expenseReportsApi";
+import TaxBreakdownPanel, {
+  emptyTaxValue,
+  taxValueFromLine,
+  taxRequestFields,
+  validateTaxValue,
+} from "@/pages/expense-management/components/expense-reports/TaxBreakdownPanel";
+import TaxStatusBadge from "@/pages/expense-management/components/expense-reports/TaxStatusBadge";
+import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import Select from "react-select";
 import FormInput from "@/components/forms/FormInput";
 import FormTextArea from "@/components/forms/FormTextArea";
@@ -35,6 +44,8 @@ import SummaryPanel from "@/pages/expense-management/components/expense-reports/
 import { useSubmitReport } from "@/pages/expense-management/approval-engine/hooks/useApprovalWorkflow";
 import api from "@/api/axiosInstance";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
+import { useClientPagination } from "@/pages/expense-management/components/common/pagination";
+import Pagination from "@/components/Pagination/pagination";
 
 const breadcrumbs = [
   { label: "Expense Management", to: "/expense-management/dashboard" },
@@ -111,6 +122,7 @@ export default function CreateExpensePage() {
   const [currencies, setCurrencies] = useState([]);
   const [categories, setCategories] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [cashAdvances, setCashAdvances] = useState([]);
   const [lookupsLoading, setLookupsLoading] = useState(true);
 
   const [formData, setFormData] = useState({
@@ -118,9 +130,19 @@ export default function CreateExpensePage() {
     businessPurpose: "",
     costCenterId: "",
     currencyId: "",
+    cashAdvanceId: "",
   });
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+
+  // Check URL query parameters for pre-selected cash advance
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const prefilledAdvId = searchParams.get("cashAdvanceId");
+    if (prefilledAdvId) {
+      setFormData((prev) => ({ ...prev, cashAdvanceId: prefilledAdvId }));
+    }
+  }, []);
 
   // Line item modal & drawer states
   const [isLineItemDrawerOpen, setIsLineItemDrawerOpen] = useState(false);
@@ -132,11 +154,13 @@ export default function CreateExpensePage() {
     description: "",
     amount: "",
     currencyId: "",
-    taxAmount: "0",
+    tax: emptyTaxValue,
     clientBillable: false,
     projectId: "",
   });
   const [lineItemErrors, setLineItemErrors] = useState({});
+  // Latest server tax preview for the open line item form (drives validation and the request).
+  const [taxPreview, setTaxPreview] = useState(null);
   const [receiptFile, setReceiptFile] = useState(null);
   const [savingLineItem, setSavingLineItem] = useState(false);
 
@@ -151,16 +175,105 @@ export default function CreateExpensePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("date_desc");
 
-  useEffect(() => {
+const ELIGIBLE_ADVANCE_STATUSES = [
+  "DISBURSED",
+  "PARTIALLY_SETTLED",
+  "PARTIALLY_ADJUSTED",
+  "EXPENSE_SUBMITTED",
+  "EXPENSE_VERIFIED",
+  "IN_PROGRESS",
+  "ACTIVE",
+  "SETTLEMENT_PENDING",
+  "RECONCILIATION_PENDING",
+  "UNDER_REVIEW",
+  "SUBMITTED_FOR_REVIEW",
+  "APPROVED",
+];
+
+const INELIGIBLE_ADVANCE_STATUSES = [
+  "DRAFT",
+  "SUBMITTED",
+  "PENDING",
+  "REJECTED",
+  "CANCELLED",
+  "CLOSED",
+  "SETTLED",
+];
+
+const extractAdvList = (res) => {
+  if (!res) return [];
+  const raw = res.data?.data ?? res.data ?? res;
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.content)) return raw.content;
+  if (Array.isArray(raw?.items)) return raw.items;
+  if (Array.isArray(res.data?.content)) return res.data.content;
+  if (Array.isArray(res.data?.items)) return res.data.items;
+  return [];
+};
+
+useEffect(() => {
     const loadLookups = async () => {
       try {
         setLookupsLoading(true);
-        const [costCenterList, currencyList] = await Promise.all([
+
+        const fetchAdvances = async () => {
+          let res;
+          try {
+            res = await cashAdvanceApi.getMyAdvances();
+          } catch {
+            res = await cashAdvanceApi.getAll();
+          }
+          let list = extractAdvList(res);
+          if (list.length === 0) {
+            try {
+              const allRes = await cashAdvanceApi.getAll();
+              const allList = extractAdvList(allRes);
+              if (allList.length > 0) list = allList;
+            } catch {
+              // ignore
+            }
+          }
+          return list;
+        };
+
+        const [costCenterList, currencyList, advList] = await Promise.all([
           lookupService.getActiveCostCenters(),
           lookupService.getActiveCurrencies(),
+          fetchAdvances(),
         ]);
         setCostCenters(costCenterList);
         setCurrencies(currencyList);
+
+        const searchParams = new URLSearchParams(window.location.search);
+        const prefilledAdvId = searchParams.get("cashAdvanceId") || formData.cashAdvanceId;
+
+        const activeAdv = advList.filter((a) => {
+          const advId = String(a.advanceId || a.id || a.cashAdvanceId || "");
+          if (prefilledAdvId && String(prefilledAdvId) === advId) {
+            return true;
+          }
+
+          const statusUpper = (a.status || "").toUpperCase().trim().replace(/\s+/g, "_");
+
+          const isEligibleStatus =
+            ELIGIBLE_ADVANCE_STATUSES.includes(statusUpper) ||
+            (!INELIGIBLE_ADVANCE_STATUSES.includes(statusUpper) &&
+              (statusUpper.includes("DISBURSE") ||
+                statusUpper.includes("SETTLE") ||
+                statusUpper.includes("EXPENSE") ||
+                statusUpper.includes("PROGRESS")));
+
+          const amountVal = Number(a.amount ?? a.advanceAmount ?? a.disbursedAmount ?? 0);
+          const outstandingVal = Number(
+            a.outstandingBalance ?? a.remainingBalance ?? a.balance ?? amountVal
+          );
+
+          const hasBalance = outstandingVal > 0 || (a.outstandingBalance == null && amountVal >= 0);
+
+          return isEligibleStatus && hasBalance;
+        });
+
+        setCashAdvances(activeAdv);
       } catch (err) {
         console.error("Failed to load lookups:", err);
         showStatusToast("Failed to load cost centers / currencies.", "error");
@@ -176,18 +289,22 @@ export default function CreateExpensePage() {
     if (currentStep > 1 && categories.length === 0) {
       const loadStep2Lookups = async () => {
         try {
-          const [catList, projListResponse] = await Promise.all([
+          // Epic 8: the caller's own PMS-assigned ACTIVE projects, not the admin-wide list.
+          // Errors are surfaced (not silently swallowed to []) — an empty project list should
+          // only ever mean "PMS genuinely has no assigned work," never "the request failed."
+          const [catList, projList] = await Promise.all([
             lookupService.getActiveCategories(),
-            api.get("/xms/admin/projects", {
-              baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-            }).catch(() => ({ data: { data: [] } })),
+            lookupService.getAssignedProjects().catch((err) => {
+              console.error("Failed to load assigned projects:", err);
+              showStatusToast(
+                err.response?.data?.message || "Could not load your assigned projects.",
+                "error"
+              );
+              return [];
+            }),
           ]);
           setCategories(catList);
-          const pList = projListResponse?.data?.data || projListResponse?.data || [];
-          setProjects(Array.isArray(pList) ? pList : []);
+          setProjects(Array.isArray(projList) ? projList : []);
         } catch (err) {
           console.error("Failed to load categories/projects lookups:", err);
         }
@@ -208,6 +325,23 @@ export default function CreateExpensePage() {
     value: c.categoryId,
     label: `${c.categoryCode} - ${c.categoryName}`,
   }));
+
+  const cashAdvanceOptions = useMemo(() => {
+    return cashAdvances.map((a) => {
+      const rawId = String(a.advanceId || a.id || a.cashAdvanceId || "");
+      const formattedId = rawId.startsWith("ADV-") ? rawId : `ADV-${rawId.slice(0, 8)}`;
+      const title = a.title || a.purpose || a.businessPurpose || "Cash Advance";
+      const amount = Number(a.amount ?? a.advanceAmount ?? a.disbursedAmount ?? 0);
+      const currency = a.currencyCode || a.currency || "INR";
+      const outstanding = Number(a.outstandingBalance ?? a.remainingBalance ?? a.balance ?? amount);
+
+      return {
+        value: rawId,
+        label: `${formattedId} (${title}) - Amount: ${amount} ${currency} (Outstanding: ${outstanding} ${currency})`,
+        advance: a,
+      };
+    });
+  }, [cashAdvances]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -246,6 +380,7 @@ export default function CreateExpensePage() {
       businessPurpose: formData.businessPurpose.trim(),
       costCenterId: formData.costCenterId,
       currencyId: formData.currencyId,
+      ...(formData.cashAdvanceId ? { cashAdvanceId: formData.cashAdvanceId } : {}),
     };
 
     try {
@@ -321,7 +456,10 @@ export default function CreateExpensePage() {
   };
 
   const handleLineItemSelectChange = (name, value) => {
-    setLineItemFormData((prev) => ({ ...prev, [name]: value }));
+    // A new category brings its own default tax code, so an explicit pick is dropped.
+    setLineItemFormData((prev) =>
+      name === "categoryId" ? { ...prev, categoryId: value, tax: { ...prev.tax, taxCodeId: null } } : { ...prev, [name]: value }
+    );
     if (lineItemErrors[name]) setLineItemErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
@@ -334,11 +472,8 @@ export default function CreateExpensePage() {
       errors.amount = "Amount must be greater than 0.";
     }
     if (!lineItemFormData.currencyId) errors.currencyId = "Currency is required.";
-    if (Number(lineItemFormData.taxAmount) < 0) {
-      errors.taxAmount = "GST cannot be negative.";
-    } else if (Number(lineItemFormData.taxAmount) > (Number(lineItemFormData.amount) || 0)) {
-      errors.taxAmount = "GST cannot exceed total amount.";
-    }
+    const taxError = validateTaxValue(lineItemFormData.tax, taxPreview, lineItemFormData.amount);
+    if (taxError) errors.tax = taxError;
     if (lineItemFormData.clientBillable && !lineItemFormData.projectId) {
       errors.projectId = "Project is required for billable expenses.";
     }
@@ -359,7 +494,7 @@ export default function CreateExpensePage() {
         description: lineItemFormData.description.trim(),
         amount: Number(lineItemFormData.amount),
         currencyId: lineItemFormData.currencyId,
-        taxAmount: Number(lineItemFormData.taxAmount) || 0,
+        ...taxRequestFields(lineItemFormData.tax, taxPreview),
         costCenterId: createdReport?.costCenterId || formData.costCenterId,
         clientBillable: !!lineItemFormData.clientBillable,
         projectId: lineItemFormData.clientBillable ? lineItemFormData.projectId : "",
@@ -445,7 +580,8 @@ export default function CreateExpensePage() {
   // Setup GenericTable configurations for Step 2
   const headers = ["Category", "Merchant", "Date", "Amount", "Policy", "GST", "Net Amount", "Base Amount", "Billable", "Actions"];
   const columns = ["category", "merchant", "date", "amount", "policy", "gst", "net", "base", "billable", "actions"];
-  const tableRows = filteredLineItems.map((li) => {
+  const { pageItems: pagedLineItems, paginationProps: lineItemPager } = useClientPagination(filteredLineItems);
+  const tableRows = pagedLineItems.map((li) => {
     const showCurrency = li.currencyCode && (li.currencyCode === "EUR" || li.currencyCode !== li.baseCurrencyCode);
     return {
       category: <span className="font-medium text-gray-800 text-xs">{li.categoryName || "—"}</span>,
@@ -463,8 +599,12 @@ export default function CreateExpensePage() {
       ),
       policy: <PolicyStatusBadge lineStatus={li.lineStatus} policyWarnings={li.policyWarnings} />,
       gst: (
-        <span className="font-mono text-xs text-amber-600">
-          {formatAmount(li.taxAmount)} {showCurrency && <span className="text-[10px] text-gray-400">{li.currencyCode}</span>}
+        <span className="inline-flex flex-col items-start gap-0.5">
+          <span className="font-mono text-xs text-amber-600">
+            {formatAmount(li.taxAmount)} {showCurrency && <span className="text-[10px] text-gray-400">{li.currencyCode}</span>}
+          </span>
+          {li.tax?.taxCode && <span className="text-[10px] text-gray-400">{li.tax.taxCode}</span>}
+          <TaxStatusBadge tax={li.tax} />
         </span>
       ),
       net: (
@@ -507,10 +647,11 @@ export default function CreateExpensePage() {
                 description: li.description || "",
                 amount: li.amount || "",
                 currencyId: li.currencyId || "",
-                taxAmount: li.taxAmount || "0",
+                tax: taxValueFromLine(li),
                 clientBillable: !!li.clientBillable,
                 projectId: li.projectId || "",
               });
+              setTaxPreview(null);
               setReceiptFile(null);
               setLineItemErrors({});
               setIsLineItemDrawerOpen(true);
@@ -635,6 +776,33 @@ export default function CreateExpensePage() {
               </div>
             </div>
 
+            {/* Stage 4: Link Disbursed Cash Advance */}
+            <div className="space-y-1 bg-indigo-50/40 p-3 rounded-lg border border-indigo-100">
+              <label className="flex items-center gap-1.5 text-sm font-medium text-indigo-900">
+                <DollarSign size={14} className="text-indigo-600" />
+                Link Disbursed Cash Advance (Optional)
+              </label>
+              <p className="text-[11px] text-gray-500 mb-1">
+                Link this expense report to an active disbursed cash advance to adjust outstanding balances.
+              </p>
+              <Select
+                options={cashAdvanceOptions}
+                value={cashAdvanceOptions.find((o) => String(o.value) === String(formData.cashAdvanceId)) || null}
+                onChange={(opt) => handleSelectChange("cashAdvanceId", opt ? opt.value : "")}
+                placeholder="Search and select active cash advance..."
+                isClearable
+                isSearchable
+                isLoading={lookupsLoading}
+                menuPortalTarget={document.body}
+                menuPosition="fixed"
+                styles={{
+                  ...customSelectStyles,
+                  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                }}
+                isDisabled={submitting}
+              />
+            </div>
+
             <div className="flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-100 p-3">
               <FileText size={16} className="text-blue-500 shrink-0 mt-0.5" />
               <p className="text-xs text-blue-700">
@@ -681,10 +849,11 @@ export default function CreateExpensePage() {
                     description: "",
                     amount: "",
                     currencyId: createdReport?.currencyId || formData.currencyId || "",
-                    taxAmount: "0",
+                    tax: emptyTaxValue,
                     clientBillable: false,
                     projectId: "",
                   });
+                  setTaxPreview(null);
                   setReceiptFile(null);
                   setLineItemErrors({});
                   setIsLineItemDrawerOpen(true);
@@ -735,6 +904,9 @@ export default function CreateExpensePage() {
             ) : (
               <div className="w-full overflow-x-auto rounded-lg">
                 <GenericTable headers={headers} rows={tableRows} columns={columns} />
+                <div className="mt-4 flex justify-center">
+                  <Pagination {...lineItemPager} />
+                </div>
               </div>
             )}
 
@@ -950,8 +1122,8 @@ export default function CreateExpensePage() {
                   </div>
                 </div>
 
-                {/* Amount, Currency & GST */}
-                <div className="grid grid-cols-3 gap-3">
+                {/* Amount & Currency (tax below, calculated by the server) */}
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="block text-xs font-semibold text-gray-700">
                       Amount <span className="text-red-500">*</span>
@@ -994,30 +1166,25 @@ export default function CreateExpensePage() {
                     )}
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-gray-700">
-                      GST (Tax) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="taxAmount"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={lineItemFormData.taxAmount}
-                      onChange={handleLineItemInputChange}
-                      disabled={savingLineItem}
-                      className={`w-full px-2.5 py-1.5 h-[38px] rounded-md border text-xs focus:outline-none focus:ring-2 ${
-                        lineItemErrors.taxAmount
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/20"
-                      }`}
-                    />
-                    {lineItemErrors.taxAmount && (
-                      <span className="text-[11px] text-red-600 block mt-0.5">{lineItemErrors.taxAmount}</span>
-                    )}
-                  </div>
                 </div>
+
+                <TaxBreakdownPanel
+                  amount={lineItemFormData.amount}
+                  currencyId={lineItemFormData.currencyId}
+                  currencyCode={currencies.find((c) => c.currencyId === lineItemFormData.currencyId)?.currencyCode || ""}
+                  expenseDate={lineItemFormData.expenseDate}
+                  categoryId={lineItemFormData.categoryId}
+                  value={lineItemFormData.tax}
+                  onChange={(tax) => {
+                    setLineItemFormData((prev) => ({ ...prev, tax }));
+                    if (lineItemErrors.tax) setLineItemErrors((prev) => ({ ...prev, tax: "" }));
+                  }}
+                  onPreview={setTaxPreview}
+                  error={lineItemErrors.tax}
+                  disabled={savingLineItem}
+                  savedTaxSource={editingLineItem?.tax?.taxSource}
+                  savedTaxAmount={editingLineItem?.taxAmount}
+                />
 
                 {/* Client Billable & Project */}
                 <div className="grid grid-cols-2 gap-4">
@@ -1041,10 +1208,8 @@ export default function CreateExpensePage() {
                     </label>
                     <Select
                       options={projects
-                        .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
                         .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))}
                       value={projects
-                        .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
                         .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))
                         .find((o) => o.value === lineItemFormData.projectId) || null}
                       onChange={(opt) => handleLineItemSelectChange("projectId", opt ? opt.value : "")}

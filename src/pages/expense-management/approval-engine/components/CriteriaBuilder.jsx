@@ -10,24 +10,29 @@ const FIELD_OPTIONS = [
   { value: "CATEGORY", label: "Category" },
   { value: "DEPARTMENT", label: "Department" },
   { value: "COST_CENTER", label: "Cost Center" },
+  { value: "HAS_POLICY_VIOLATION", label: "Has Policy Violation" },
 ];
+
+// The server ignores `value` entirely for this field - EQUALS means "the report has a violation",
+// NOT_EQUALS means "it has none". There's nothing else to compare a value against.
+const isValuelessField = (field) => field === "HAS_POLICY_VIOLATION";
 
 // GREATER_THAN*/LESS_THAN* are only legal when field === "AMOUNT" (server-enforced) - the operator
 // list is filtered per-row so an admin can never build a request the backend will reject.
 const OPERATORS_FOR_FIELD = (field) =>
   field === "AMOUNT"
     ? [
-        { value: "EQUALS", label: "=" },
-        { value: "NOT_EQUALS", label: "≠" },
-        { value: "GREATER_THAN", label: ">" },
-        { value: "GREATER_THAN_OR_EQUAL", label: "≥" },
-        { value: "LESS_THAN", label: "<" },
-        { value: "LESS_THAN_OR_EQUAL", label: "≤" },
-      ]
+      { value: "EQUALS", label: "=" },
+      { value: "NOT_EQUALS", label: "≠" },
+      { value: "GREATER_THAN", label: ">" },
+      { value: "GREATER_THAN_OR_EQUAL", label: "≥" },
+      { value: "LESS_THAN", label: "<" },
+      { value: "LESS_THAN_OR_EQUAL", label: "≤" },
+    ]
     : [
-        { value: "EQUALS", label: "=" },
-        { value: "NOT_EQUALS", label: "≠" },
-      ];
+      { value: "EQUALS", label: "=" },
+      { value: "NOT_EQUALS", label: "≠" },
+    ];
 
 function CriterionRow({ id, criterion, onChange, onRemove }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
@@ -35,7 +40,12 @@ function CriterionRow({ id, criterion, onChange, onRemove }) {
 
   const setField = (field) => {
     const operators = OPERATORS_FOR_FIELD(field).map((o) => o.value);
-    onChange({ ...criterion, field, operator: operators.includes(criterion.operator) ? criterion.operator : operators[0] });
+    onChange({
+      ...criterion,
+      field,
+      operator: operators.includes(criterion.operator) ? criterion.operator : operators[0],
+      value: isValuelessField(field) ? null : criterion.value,
+    });
   };
 
   return (
@@ -61,12 +71,18 @@ function CriterionRow({ id, criterion, onChange, onRemove }) {
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
-      <input
-        className="text-sm border border-gray-300 rounded-md px-2 py-1.5 flex-1 min-w-0"
-        placeholder={criterion.field === "AMOUNT" ? "e.g. 10000" : "value"}
-        value={criterion.value || ""}
-        onChange={(e) => onChange({ ...criterion, value: e.target.value })}
-      />
+      {isValuelessField(criterion.field) ? (
+        <div className="text-sm text-gray-400 italic flex-1 min-w-0 px-2 py-1.5">
+          {criterion.operator === "NOT_EQUALS" ? "matches when the report has no violation" : "matches when the report has a violation"}
+        </div>
+      ) : (
+        <input
+          className="text-sm border border-gray-300 rounded-md px-2 py-1.5 flex-1 min-w-0"
+          placeholder={criterion.field === "AMOUNT" ? "e.g. 10000" : "value"}
+          value={criterion.value || ""}
+          onChange={(e) => onChange({ ...criterion, value: e.target.value })}
+        />
+      )}
       <button type="button" onClick={onRemove} className="text-gray-400 hover:text-rose-600 shrink-0">
         <Trash2 className="h-4 w-4" />
       </button>

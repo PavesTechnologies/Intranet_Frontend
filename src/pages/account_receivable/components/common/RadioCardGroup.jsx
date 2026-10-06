@@ -17,6 +17,10 @@ export default function RadioCardGroup({
     <div role="radiogroup" aria-label={name} className={`grid grid-cols-1 gap-3 ${columnClass}`}>
       {options.map((option) => {
         const isSelected = String(value) === String(option.value);
+        // Per-option disabled (e.g. a "coming soon" card) — additive, opt-in via
+        // option.disabled; every existing caller's options are unaffected since
+        // they never set it, so behavior there is unchanged.
+        const isOptionDisabled = disabled || Boolean(option.disabled);
 
         return (
           <button
@@ -24,12 +28,12 @@ export default function RadioCardGroup({
             type="button"
             role="radio"
             aria-checked={isSelected}
-            disabled={disabled}
+            disabled={isOptionDisabled}
             onClick={() => onChange?.(option.value)}
             className={`rounded-xl border p-4 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-[#0A0082]/30 ${isSelected
                 ? "border-[#0A0082] bg-[#0A0082]/5 ring-1 ring-[#0A0082]"
                 : "border-slate-200 bg-white hover:border-slate-300"
-              } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+              } ${isOptionDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
           >
             <div className="flex items-start gap-3">
               <span
