@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ResponsiveContainer,
@@ -38,7 +39,15 @@ import {
 import { useEmployeeDirectory, resolveEmployeeName } from "../../../expense-management/approval-engine/hooks/useEmployeeDirectory";
 import { formatDate, formatTime } from "../../utils/formatters";
 import { formatDashboardAmount, formatTrendPeriodLabel, prettifyKey } from "../utils/dashboardFormatters";
-import { actionItemRoute, recentActivityRoute } from "../utils/dashboardNavigation";
+import {
+  actionItemRoute,
+  recentActivityRoute,
+  categorizeKpiTitle,
+  canNavigateToKpi,
+  canNavigateToActionItem,
+  kpiRoute,
+} from "../utils/dashboardNavigation";
+import { useApPermissions } from "../../hooks/useApPermissions";
 
 // AP's own brand accent (#0A0082, used throughout invoice/payment/system-config forms) leads a
 // small categorical palette for pie slices / multi-currency trend series — not recharts defaults.
@@ -82,16 +91,6 @@ export function ChartCard({ title, subtitle, children, className = "", action })
 // instead of showing 20+ identical white tiles in one flat row.
 const KPI_GROUPS = ["Invoices", "Procurement", "Vendors", "Other"];
 
-function categorizeKpiTitle(title = "") {
-  const t = title.toLowerCase();
-  if (/\bprs?\b/.test(t) || t.includes("rfq") || t.includes("purchase order") || t.includes("sourcing") || t.includes("vendor selection")) {
-    return "Procurement";
-  }
-  if (t.includes("invoice")) return "Invoices";
-  if (t.includes("vendor") || t.includes("onboarding")) return "Vendors";
-  return "Other";
-}
-
 function toneForKpiTitle(title = "") {
   const t = title.toLowerCase();
   if (/(failed|disputed|rejected|overdue)/.test(t)) return "rose";
@@ -129,9 +128,14 @@ function iconForKpiTitle(title = "") {
   return Hash;
 }
 
-function KpiTile({ kpi }) {
+function KpiTile({ kpi, permissions }) {
   const navigate = useNavigate();
-  const to = actionItemRoute(kpi);
+  // A tile only gets a click-through when the user both (a) has somewhere to go and (b) actually
+  // holds the permission that target page requires — otherwise the link would just dead-end them.
+  // kpiRoute() (title-based) is used here rather than actionItemRoute() (key/module-based) because
+  // kpi.key/kpi.module values aren't confirmed against a real backend payload — title is the one
+  // signal already proven reliable for these tiles (see dashboardNavigation.js's routeForTitle).
+  const to = canNavigateToKpi(kpi, permissions) ? kpiRoute(kpi) : null;
   const hasAmounts = Array.isArray(kpi.amounts) && kpi.amounts.length > 0;
   const primaryValue = hasAmounts ? formatDashboardAmount(kpi.amounts[0]) : kpi.value ?? "—";
   const extraCurrencyLines = hasAmounts && kpi.amounts.length > 1 ? kpi.amounts.slice(1) : [];
@@ -167,6 +171,7 @@ function KpiTile({ kpi }) {
  * title) so related metrics read together instead of one flat wall of identical cards.
  */
 export function KpiGrid({ kpis }) {
+  const permissions = useApPermissions();
   if (!kpis?.length) return null;
 
   const grouped = new Map();
@@ -183,7 +188,7 @@ export function KpiGrid({ kpis }) {
           <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">{group}</h3>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {grouped.get(group).map((kpi) => (
-              <KpiTile key={kpi.key} kpi={kpi} />
+              <KpiTile key={kpi.key} kpi={kpi} permissions={permissions} />
             ))}
           </div>
         </div>
@@ -198,13 +203,14 @@ export function KpiGrid({ kpis }) {
  * hidden per the spec's own UX guidance ("prefer hiding zero-value action items"). */
 export function ActionRequiredList({ items }) {
   const navigate = useNavigate();
+  const permissions = useApPermissions();
   const visible = (items || []).filter((item) => Number(item.value) > 0);
   if (visible.length === 0) return <Empty text="Nothing needs your attention right now." />;
 
   return (
     <ul className="space-y-2">
       {visible.map((item) => {
-        const to = actionItemRoute(item);
+        const to = canNavigateToActionItem(item, permissions) ? actionItemRoute(item) : null;
         return (
           <li
             key={item.key}
@@ -355,32 +361,49 @@ export function DashboardTrendChart({ trend }) {
 
 /** {title, entity_type, entity_id, reference, actor, occurred_at}[]. `actor` is a numeric
  * employee id — resolved to a name the same way InvoiceAuditHistory.jsx resolves changed_by. */
+const RECENT_ACTIVITY_PREVIEW_COUNT = 5;
+
 export function RecentActivityList({ items }) {
   const navigate = useNavigate();
   const { data: employeeDirectory } = useEmployeeDirectory();
+  const [expanded, setExpanded] = useState(false);
   if (!items?.length) return <Empty text="No recent activity." />;
 
+  const hasMore = items.length > RECENT_ACTIVITY_PREVIEW_COUNT;
+  const visibleItems = expanded ? items : items.slice(0, RECENT_ACTIVITY_PREVIEW_COUNT);
+
   return (
-    <ul className="space-y-3 border-l border-gray-200 pl-4">
-      {items.map((item, index) => {
-        const to = recentActivityRoute(item);
-        return (
-          <li
-            key={`${item.entity_type}-${item.entity_id}-${item.occurred_at}-${index}`}
-            onClick={to ? () => navigate(to) : undefined}
-            className={`relative ${to ? "cursor-pointer" : ""}`}
-          >
-            <span className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-[#0A0082]" />
-            <p className="text-sm font-medium text-gray-900">{item.title}</p>
-            <p className="text-xs text-gray-500">
-              {item.reference && <span className="font-mono">{item.reference}</span>}
-              {item.reference && " · "}
-              {formatDate(item.occurred_at)} {formatTime(item.occurred_at)}
-              {item.actor ? ` · ${resolveEmployeeName(employeeDirectory, item.actor)}` : ""}
-            </p>
-          </li>
-        );
-      })}
-    </ul>
+    <div>
+      <ul className="space-y-3 border-l border-gray-200 pl-4">
+        {visibleItems.map((item, index) => {
+          const to = recentActivityRoute(item);
+          return (
+            <li
+              key={`${item.entity_type}-${item.entity_id}-${item.occurred_at}-${index}`}
+              onClick={to ? () => navigate(to) : undefined}
+              className={`relative ${to ? "cursor-pointer" : ""}`}
+            >
+              <span className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-[#0A0082]" />
+              <p className="text-sm font-medium text-gray-900">{item.title}</p>
+              <p className="text-xs text-gray-500">
+                {item.reference && <span className="font-mono">{item.reference}</span>}
+                {item.reference && " · "}
+                {formatDate(item.occurred_at)} {formatTime(item.occurred_at)}
+                {item.actor ? ` · ${resolveEmployeeName(employeeDirectory, item.actor)}` : ""}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+      {hasMore && (
+        <button
+          type="button"
+          onClick={() => setExpanded((prev) => !prev)}
+          className="mt-3 text-xs font-semibold text-[#0A0082] hover:underline"
+        >
+          {expanded ? "Show less" : `View ${items.length - RECENT_ACTIVITY_PREVIEW_COUNT} more`}
+        </button>
+      )}
+    </div>
   );
 }

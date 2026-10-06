@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
@@ -37,8 +37,15 @@ const STATUS_OPTIONS = [
  */
 export default function PaymentReadyPage() {
   const { canRecordPayment } = useApPermissions();
+  // Deep-linkable via `?status=READY_FOR_PAYMENT`/`?status=PARTIALLY_PAID` (e.g. from the AP
+  // Dashboard's "Ready for Payment"/"Partially Paid" tiles) — one-shot initial read, same pattern
+  // as InvoiceQueueView's `?queue=`. An unrecognized value just behaves like "All payable".
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(() => {
+    const requested = searchParams.get("status");
+    return STATUS_OPTIONS.some((o) => o.value === requested) ? requested : "";
+  });
   const [overdue, setOverdue] = useState(false);
   const [payingInvoice, setPayingInvoice] = useState(null);
   const debouncedSearch = useDebouncedValue(search.trim());
