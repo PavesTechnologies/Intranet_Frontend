@@ -47,10 +47,7 @@ export default function TaxCalculation() {
   const [hasInvoice, setHasInvoice] = useState(false);
   const [existingInvoice, setExistingInvoice] = useState(null);
 
-  const isTaxCalculationConsole = location.pathname === CONSOLE_PATH;
-  const effectiveSnapshotId = isTaxCalculationConsole
-    ? null
-    : snapshotId || taxCalc?.billingSnapshotId || snapshotData?.snapshotId || null;
+  const effectiveSnapshotId = snapshotId || taxCalc?.billingSnapshotId || snapshotData?.snapshotId || null;
 
   const loadData = async () => {
     if (!effectiveSnapshotId) {
@@ -192,9 +189,7 @@ export default function TaxCalculation() {
     navigate(`/account-receivable/invoice-generation/${effectiveSnapshotId}`, {
       state: {
         from: "tax-calculation",
-        source: passedState.source === "billing-data-acquisition"
-          ? "billing-data-acquisition"
-          : "tax-calculation",
+        source: "tax-calculation",
         snapshotId: effectiveSnapshotId,
         projectId: snapshotData?.projectId || null,
         config: snapshotData,
@@ -314,28 +309,28 @@ export default function TaxCalculation() {
 
   const actionBar = isInvoiced
     ? {
-        title: "Invoice Generated",
-        description: existingInvoice?.invoiceNumber
-          ? `Invoice ${existingInvoice.invoiceNumber} has been generated for this billing snapshot.`
-          : "An invoice has been generated for this billing snapshot.",
-        action: { label: "View Invoice", onClick: viewInvoice },
-      }
+      title: "Invoice Generated",
+      description: existingInvoice?.invoiceNumber
+        ? `Invoice ${existingInvoice.invoiceNumber} has been generated for this billing snapshot.`
+        : "An invoice has been generated for this billing snapshot.",
+      action: { label: "View Invoice", onClick: viewInvoice },
+    }
     : isTaxCompleted
       ? {
-          title: "Tax Calculation Verified",
-          description: "Tax components and grand total are verified. Click \"Proceed to Invoice Generation\" to review the invoice preview and generate the invoice.",
-          action: { label: "Proceed to Invoice Generation", onClick: handleGenerateInvoice, disabled: calculating },
-        }
+        title: "Tax Calculation Verified",
+        description: "Tax components and grand total are verified. Click \"Proceed to Invoice Generation\" to review the invoice preview and generate the invoice.",
+        action: { label: "Proceed to Invoice Generation", onClick: handleGenerateInvoice, disabled: calculating },
+      }
       : {
-          title: "Ready for Tax Calculation",
-          description: "Source timesheets and taxable amount are verified. Calculate tax to compute the tax components.",
-          action: {
-            label: "Calculate Tax",
-            loadingLabel: "Calculating Tax...",
-            loading: calculating,
-            onClick: handleCalculateTax,
-          },
-        };
+        title: "Ready for Tax Calculation",
+        description: "Source timesheets and taxable amount are verified. Calculate tax to compute the tax components.",
+        action: {
+          label: "Calculate Tax",
+          loadingLabel: "Calculating Tax...",
+          loading: calculating,
+          onClick: handleCalculateTax,
+        },
+      };
 
   return (
     <TaxCalculationDetailView
@@ -385,3 +380,4 @@ export default function TaxCalculation() {
     />
   );
 }
+
