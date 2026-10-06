@@ -13,6 +13,8 @@ import {
   useDeleteDepartmentApprover,
 } from "../hooks/useDepartmentApprovers";
 import EmployeeLabel from "../components/EmployeeLabel";
+import { useClientPagination } from "@/pages/expense-management/components/common/pagination";
+import Pagination from "@/components/Pagination/pagination";
 
 const emptyForm = { departmentApproverId: null, departmentUuid: "", approverEmployeeId: "", status: "ACTIVE" };
 
@@ -25,6 +27,7 @@ const emptyForm = { departmentApproverId: null, departmentUuid: "", approverEmpl
  */
 export default function DepartmentApproversPage() {
   const { data: approvers, isLoading, isError, refetch } = useDepartmentApprovers();
+  const { pageItems: pageApprovers, paginationProps } = useClientPagination(approvers || []);
   const saveApprover = useSaveDepartmentApprover();
   const deleteApprover = useDeleteDepartmentApprover();
 
@@ -125,7 +128,7 @@ export default function DepartmentApproversPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {approvers.map((row) => (
+              {pageApprovers.map((row) => (
                 <tr key={row.departmentApproverId} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <span className="rounded-md bg-gray-100 px-2 py-1 font-mono text-xs text-gray-600" title={row.departmentUuid}>
@@ -154,6 +157,11 @@ export default function DepartmentApproversPage() {
               ))}
             </tbody>
           </table>
+          <div className="px-4 pb-3">
+            <div className="mt-4 flex justify-center">
+              <Pagination {...paginationProps} />
+            </div>
+          </div>
         </div>
       )}
 

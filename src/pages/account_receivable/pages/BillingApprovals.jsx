@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, CheckCircle2, XCircle, ClipboardCheck, Clock, FolderKanban, Building2, Calendar, Receipt, Wallet, Info, AlertTriangle } from "lucide-react";
+import { Eye, CheckCircle2, XCircle, ClipboardCheck, Clock, FolderKanban, Calendar, Info } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
@@ -24,9 +24,16 @@ import {
   rejectBillingConfigurationRequest,
 } from "../services/billingApprovalService";
 import { fetchBillingConfigurations } from "../services/billingConfigService";
-import { formatFrequencyLabel } from "../components/billing-setup/ReviewActivateStep";
+import { formatFrequencyLabel, ReviewHeader } from "../components/billing-setup/ReviewActivateStep";
+import ConfigurationChanges, {
+  ChangedFieldsContext,
+  ChangedIndicator,
+  getChangedFieldLabels,
+  useIsFieldChanged,
+} from "../components/billing-setup/ConfigurationChanges";
 import { BILLING_MODE_LABELS } from "../data/wizardOptions";
 import { getBillingTypeDisplayName } from "../utils/billingType";
+import { formatCurrency, formatDisplayDate } from "../utils/format";
 
 const PAGE_SIZE = 5;
 
@@ -129,18 +136,25 @@ function formatDateTime(value) {
   });
 }
 
-function formatMoney(value, currency) {
-  if (value === "" || value === null || value === undefined) return null;
-  const num = Number(value);
-  if (Number.isNaN(num)) return String(value);
-  const formatted = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(num);
-  return currency ? `${currency} ${formatted}` : formatted;
+// Review-model amounts are numbers or null (not populated) — null renders as
+// "—" via InfoRow, never as a zero. Currency is shown once as its own field,
+// so amounts use the shared AR formatter (₹1,45,000.00 for INR).
+function formatAmount(value, currency) {
+  return value === null || value === undefined ? null : formatCurrency(value, currency || "INR");
 }
 
+const PAYMENT_STRUCTURE_LABELS = { FULL_PAYMENT: "Full Payment", INSTALLMENTS: "Installments" };
+const CONTRACT_VALUE_SOURCE_LABELS = { PMS: "PMS Project Budget", MANUAL: "Manual Input" };
+const RATE_PERIOD_SUFFIX = { HOURLY: "/ hr", DAILY: "/ day", WEEKLY: "/ wk", MONTHLY: "/ month" };
+
 function InfoRow({ label, value }) {
+  const isChanged = useIsFieldChanged(label);
   return (
     <div className="flex items-start justify-between gap-4 border-b border-slate-100 py-2.5 text-xs last:border-0">
-      <span className="text-slate-500 font-medium">{label}</span>
+      <span className="flex items-center gap-1.5 text-slate-500 font-medium">
+        {label}
+        {isChanged && <ChangedIndicator />}
+      </span>
       <span className="text-right font-bold text-slate-900">{value || "—"}</span>
     </div>
   );
@@ -160,6 +174,317 @@ function ReviewSection({ title, rows }) {
         </div>
       </PageCardContent>
     </PageCard>
+  );
+}
+
+function ReviewTable({ title, headers, rows, emptyMessage }) {
+  return (
+    <PageCard className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+      <PageCardContent className="p-0">
+        <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">{title}</h3>
+        </div>
+        {rows.length > 0 ? (
+          <div className="overflow-x-auto p-2">
+            <table className="w-full text-xs">
+              <thead>
+                <tr>
+                  {headers.map((header) => (
+                    <th key={header} className="px-3 py-2 text-left font-semibold text-slate-500">{header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((row) => (
+                  <tr key={row.key}>
+                    {row.cells.map((cell, index) => (
+                      <td key={index} className={`px-3 py-2 ${index === 0 ? "font-medium text-slate-700" : "text-slate-900"}`}>
+                        {cell ?? "—"}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="px-5 py-4 text-xs text-slate-500">{emptyMessage}</p>
+        )}
+      </PageCardContent>
+    </PageCard>
+  );
+}
+
+// Read-only Review modal body. Renders ONLY config.review (built by
+// buildApprovalReviewModel in billingApprovalService.js) — every value has a
+// single definition there and is shown in exactly one section here.
+function ApprovalReviewDetails({ config }) {
+  const review = config.review || {};
+  const { billingType, currency, projectBudget, totalValue, pricingDetails = {}, schedule = { items: [] } } = review;
+  const money = (value) => formatAmount(value, currency);
+  const changedFieldLabels = useMemo(() => getChangedFieldLabels(config.changes), [config.changes]);
+
+  const billingFrequencyLabel = formatFrequencyLabel(
+    null,
+    review.billingFrequencyName,
+    review.billingFrequencyId,
+    billingType === "FIXED_PRICE"
+  );
+
+  const contractValueRows = totalValue
+    ? [
+        ...(totalValue.source
+          ? [{ label: "Contract Value Source", value: CONTRACT_VALUE_SOURCE_LABELS[totalValue.source] || totalValue.source }]
+          : []),
+        { label: "Contract Value", value: money(totalValue.amount) },
+      ]
+    : [{ label: "Contract Value", value: null }];
+
+  return (
+    <ChangedFieldsContext.Provider value={changedFieldLabels}>
+      <div className="space-y-4">
+        {/* 1. Project / Configuration — the same primary summary as the wizard's
+            View/Review (shared ReviewHeader, same resolved project). Currency,
+            Project Budget and the current statuses live here only. */}
+        <ReviewHeader
+          projectInfo={review.project || {}}
+          isProductService={review.project?.billingContext === "PRODUCT_SERVICE"}
+          approvalStatus={config.approvalStatus}
+          billingStatus={config.billingStatus}
+          summary={[
+            { label: "Billing Type", value: getBillingTypeDisplayName(review.billingTypeName), strong: true },
+            { label: "Billing Frequency", value: billingFrequencyLabel },
+            { label: "Currency", value: currency },
+            { label: "Project Budget", value: money(projectBudget), emphasize: true },
+          ]}
+        />
+
+        {/* Changes Pending Approval — the backend's previous approved -> new
+            proposed values, shown before the details and the Approve/Reject
+            actions. */}
+        <ConfigurationChanges changes={config.changes} currency={currency} />
+
+        {/* 2. Billing-type-specific details */}
+        {billingType === "FIXED_PRICE" && (
+          <PageCard className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm p-4 space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-2">
+              Fixed Price Financial Summary
+            </h3>
+
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 text-xs">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Financial Calculation Formula
+              </span>
+              <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold text-slate-800">
+                <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 shadow-2xs">Billable Amount</span>
+                <span className="text-slate-400">−</span>
+                <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 shadow-2xs">Retention Amount</span>
+                <span className="text-slate-400">−</span>
+                <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 shadow-2xs">Advance Received</span>
+                <span className="font-extrabold text-indigo-600">=</span>
+                <span className="rounded-md bg-[#0A0082] px-2 py-0.5 font-extrabold text-white shadow-2xs">
+                  Remaining Receivable
+                </span>
+              </div>
+            </div>
+
+            {totalValue?.differsFromProjectBudget && (
+              <div className="flex items-center gap-2 rounded-lg border border-amber-200/80 bg-amber-50/70 px-3.5 py-2 text-xs font-medium text-amber-900">
+                <Info className="h-4 w-4 shrink-0 text-amber-600" />
+                <span>Contract Value differs from the Project Budget and is used for billing calculation.</span>
+              </div>
+            )}
+
+            <div className="divide-y divide-slate-100 text-xs">
+              {[
+                ...contractValueRows,
+                {
+                  label: "Retention %",
+                  value: pricingDetails.retentionPercent !== null ? `${pricingDetails.retentionPercent}%` : null,
+                },
+                {
+                  label: "Retention Amount",
+                  value: pricingDetails.retentionAmount ? `-${money(pricingDetails.retentionAmount)}` : money(pricingDetails.retentionAmount),
+                },
+                { label: "Billable Amount", value: money(pricingDetails.billableAmount) },
+                {
+                  label: "Advance Received",
+                  value: pricingDetails.advanceReceived ? `-${money(pricingDetails.advanceReceived)}` : money(pricingDetails.advanceReceived),
+                },
+              ].map((row) => (
+                <div key={row.label} className="flex justify-between py-2">
+                  <span className="text-slate-500 font-medium">{row.label}</span>
+                  <span className="font-bold text-slate-900">{row.value || "—"}</span>
+                </div>
+              ))}
+              <div className="flex justify-between py-2 bg-emerald-50/40 px-2 rounded">
+                <span className="text-emerald-800 font-bold">Remaining Receivable</span>
+                <span className="font-extrabold text-emerald-900">{money(pricingDetails.remainingReceivable) || "—"}</span>
+              </div>
+            </div>
+          </PageCard>
+        )}
+
+        {billingType === "TIME_MATERIAL" && (
+          <>
+            <ReviewSection
+              title="Time & Material Pricing"
+              rows={[
+                {
+                  label: "Pricing Model",
+                  value: BILLING_MODE_LABELS[pricingDetails.pricingModel] || pricingDetails.pricingModel || "Standard",
+                },
+              ]}
+            />
+            <ReviewTable
+              title="Rate Card"
+              headers={["Role", "Rate"]}
+              rows={(pricingDetails.rateCards || []).map((card) => ({
+                key: card.key,
+                cells: [
+                  card.role,
+                  card.rate !== null ? `${money(card.rate)} ${RATE_PERIOD_SUFFIX[card.ratePeriod] || ""}`.trim() : null,
+                ],
+              }))}
+              emptyMessage="No rate cards have been configured."
+            />
+          </>
+        )}
+
+        {billingType === "RECURRING" && (() => {
+          const isProductServiceContext = pricingDetails.billingContext === "PRODUCT_SERVICE";
+          const renewal = pricingDetails.renewal;
+          return (
+            <>
+              <ReviewSection
+                title="Recurring Pricing Details"
+                rows={[
+                  { label: "Billing Context", value: isProductServiceContext ? "Product / Service" : "Project" },
+                  ...(isProductServiceContext
+                    ? [
+                        { label: "Product / Application / Service", value: pricingDetails.productName },
+                        { label: "Description", value: pricingDetails.productDescription },
+                      ]
+                    : []),
+                  ...contractValueRows,
+                ]}
+              />
+              {/* Renewal is a Subscription (Product/Service) concept only —
+                  a project-based Recurring configuration is never renewed. */}
+              {isProductServiceContext && (
+                <ReviewSection
+                  title="Renewal Configuration"
+                  rows={
+                    renewal
+                      ? [
+                          { label: "Renewal Mode", value: renewal.mode },
+                          ...(renewal.mode === "Custom"
+                            ? [
+                                { label: "Renewal Amount", value: money(renewal.amount) },
+                                { label: "Renewal Effective From", value: formatDisplayDate(renewal.effectiveFrom) },
+                              ]
+                            : []),
+                        ]
+                      : [{ label: "Renewal Mode", value: "Not configured" }]
+                  }
+                />
+              )}
+            </>
+          );
+        })()}
+
+        {billingType === "MILESTONE_PLAN" && (
+          <>
+            <ReviewSection
+              title="Milestone Plan Details"
+              rows={[
+                {
+                  label: "Payment Structure",
+                  value: PAYMENT_STRUCTURE_LABELS[review.paymentStructure] || formatApprovalStatusLabel(review.paymentStructure),
+                },
+                { label: "Total Value", value: money(totalValue?.amount) },
+              ]}
+            />
+            <ReviewTable
+              title="Payment"
+              headers={["Payment", "Percentage", "Amount", "Billing Date"]}
+              rows={review.payments.map((payment) => ({
+                key: payment.key,
+                cells: [
+                  payment.label,
+                  payment.percentage !== null ? `${payment.percentage}%` : null,
+                  money(payment.amount),
+                  formatDisplayDate(payment.billingDate),
+                ],
+              }))}
+              emptyMessage="No payments have been configured for this Milestone Plan."
+            />
+          </>
+        )}
+
+        {/* 3. Billing Schedule — only the schedule facts relevant to this billing type */}
+        <PageCard className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+          <PageCardContent className="p-0">
+            <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3 flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-[#0A0082]" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">Billing Schedule</h3>
+            </div>
+            <div className="p-4">
+              {schedule.items.length > 0 ? (
+                <div className="space-y-1">
+                  {schedule.items.map((item) => (
+                    <InfoRow
+                      key={item.label}
+                      label={item.label}
+                      value={item.isDate ? (item.value ? formatDisplayDate(item.value) : item.emptyText) : item.value}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-4 text-center">
+                  <Calendar className="h-7 w-7 text-slate-300 mb-1" />
+                  <p className="text-xs font-semibold text-slate-600">{schedule.emptyMessage || "Billing schedule not available"}</p>
+                </div>
+              )}
+            </div>
+          </PageCardContent>
+        </PageCard>
+
+        {/* 4. Invoice & Tax Controls */}
+        <ReviewSection
+          title="Invoice & Tax Controls"
+          rows={[
+            { label: "Payment Terms", value: config.paymentTermName || config.paymentTerms },
+            { label: "Tax Region", value: config.taxRegionName || config.taxRegion },
+            { label: "Invoice Generation Mode", value: config.invoiceGenerationType || (config.autoInvoiceGeneration ? "Automatic" : "Manual") },
+            ...(config.autoInvoiceGeneration && config.invoiceGenerationDay
+              ? [{ label: "Generation Day", value: `Day ${config.invoiceGenerationDay}` }]
+              : []),
+            { label: "Expense Billing Eligibility", value: config.expenseBillingEligible ? "Eligible" : "Not Eligible" },
+          ]}
+        />
+
+        {/* 5. Submission & Workflow Information */}
+        <ReviewSection
+          title="Submission & Workflow Information"
+          rows={[
+            // Current statuses are in the primary summary; the statuses the
+            // configuration had before this submission come from the backend
+            // snapshot (re-approval only).
+            ...(config.previousApprovalStatus
+              ? [{ label: "Previous Approval Status", value: <StatusBadge label={formatApprovalStatusLabel(config.previousApprovalStatus)} size="sm" /> }]
+              : []),
+            ...(config.previousBillingStatus
+              ? [{ label: "Previous Billing Status", value: <StatusBadge label={formatApprovalStatusLabel(config.previousBillingStatus)} size="sm" /> }]
+              : []),
+            { label: "Submitted By", value: config.submittedBy },
+            { label: "Submitted Date", value: formatDateTime(config.createdAt) },
+            { label: "Last Updated", value: formatDateTime(config.updatedAt) },
+            ...(config.rejectionReason ? [{ label: "Rejection Reason", value: config.rejectionReason }] : []),
+          ]}
+        />
+      </div>
+    </ChangedFieldsContext.Provider>
   );
 }
 
@@ -197,8 +522,9 @@ export default function BillingApprovals() {
         if (!id) return;
         combinedMap.set(id, {
           billingConfigurationId: id,
-          projectName: item.projectName || "—",
-          projectCode: item.projectCode || "—",
+          billingContext: item.billingContext || "PROJECT",
+          projectName: item.projectName || item.productName || "—",
+          projectCode: item.projectCode || (item.billingContext === "PRODUCT_SERVICE" ? "Product/Service" : "—"),
           clientName: item.client || item.clientName || "—",
           billingTypeName: item.billingType || item.billingTypeName || "—",
           billingFrequencyName: item.billingFrequency || item.billingFrequencyName || "—",
@@ -329,14 +655,30 @@ export default function BillingApprovals() {
 
   // Approving is a single click from the review screen — no extra "are you
   // sure" step, since the review screen itself is already the confirmation.
+  // After Approve/Reject, re-read the configuration from the backend and keep
+  // the review open on the RESULTING state — e.g. APPROVED + ACTIVE, or the
+  // previously approved version the backend restored after a rejected change.
+  // Nothing is derived here: whatever the backend now returns is shown.
+  const showRefreshedReview = async (billingConfigurationId) => {
+    try {
+      const refreshed = await getBillingConfigurationForApproval(billingConfigurationId);
+      setReviewTarget(refreshed);
+      return refreshed;
+    } catch {
+      setReviewTarget(null);
+      return null;
+    }
+  };
+
   const handleApprove = async () => {
     if (!reviewTarget) return;
     setApproveLoading(true);
     try {
-      await approveBillingConfigurationRequest(reviewTarget.billingConfigurationId);
-      showStatusToast("Billing Configuration approved successfully.", "success");
-      setReviewTarget(null);
-      await loadAllApprovals();
+      const { billingConfigurationId } = reviewTarget;
+      const hadChanges = (reviewTarget.changes || []).length > 0;
+      await approveBillingConfigurationRequest(billingConfigurationId);
+      showStatusToast(hadChanges ? "Changes approved successfully." : "Billing Configuration approved successfully.", "success");
+      await Promise.all([loadAllApprovals(), showRefreshedReview(billingConfigurationId)]);
     } catch (error) {
       showStatusToast(getApiErrorMessage(error, "Failed to approve billing configuration."), "error");
     } finally {
@@ -353,11 +695,20 @@ export default function BillingApprovals() {
 
     setRejectLoading(true);
     try {
-      await rejectBillingConfigurationRequest(rejectTarget.billingConfigurationId, rejectionReason.trim());
-      showStatusToast("Billing Configuration rejected successfully.", "success");
+      const { billingConfigurationId } = rejectTarget;
+      const hadChanges = (rejectTarget.changes || []).length > 0;
+      await rejectBillingConfigurationRequest(billingConfigurationId, rejectionReason.trim());
       setRejectTarget(null);
       setRejectionReason("");
-      await loadAllApprovals();
+      const [, refreshed] = await Promise.all([loadAllApprovals(), showRefreshedReview(billingConfigurationId)]);
+      // For a rejected re-approval the backend restores the previously
+      // approved version — confirm that only when the refreshed record shows it.
+      showStatusToast(
+        hadChanges && refreshed?.approvalStatus === "APPROVED"
+          ? "Changes rejected. The previously approved configuration has been restored."
+          : "Billing Configuration rejected successfully.",
+        "success"
+      );
     } catch (error) {
       showStatusToast(getApiErrorMessage(error, "Failed to reject billing configuration."), "error");
     } finally {
@@ -527,7 +878,6 @@ export default function BillingApprovals() {
         isOpen={Boolean(reviewTarget)}
         onClose={closeReview}
         title="Review Billing Configuration Request"
-        subtitle={reviewTarget ? `${reviewTarget.projectName || "—"} (${reviewTarget.clientName || "—"})` : ""}
         titleIcon={<ClipboardCheck className="h-5 w-5 text-[#0A0082]" />}
         size="3xl"
         footer={
@@ -557,299 +907,7 @@ export default function BillingApprovals() {
           )
         }
       >
-        {reviewTarget && (() => {
-          const typeUpper = String(reviewTarget.billingTypeName || reviewTarget.billingType || "").toUpperCase();
-          const isTimesheetBased = typeUpper.includes("TIMESHEET") || typeUpper.includes("TIME") || typeUpper.includes("MATERIAL");
-          const isFixedPrice = typeUpper.includes("FIXED");
-          const isRecurring = typeUpper.includes("RECURRING");
-          const isMilestone = typeUpper.includes("MILESTONE");
-
-          const currency = reviewTarget.currencyCode || reviewTarget.currency || "";
-
-          // reviewTarget.contractValue/pmsProjectBudget/contractValueSource and every
-          // commercial figure below already come straight from the billing-type-specific
-          // details section (fixedPriceDetails/recurringDetails) via
-          // normalizeApprovalConfiguration — read them as-is, never recomputed here.
-          const contractVal = Number(reviewTarget.contractValue) || 0;
-          const pmsBudgetVal = Number(reviewTarget.pmsProjectBudget) || 0;
-
-          const hasContractVal = contractVal > 0;
-          const hasPmsBudget = pmsBudgetVal > 0;
-          const isSameAmount = hasPmsBudget && hasContractVal && contractVal === pmsBudgetVal;
-          const isDifferentAmount = hasPmsBudget && hasContractVal && contractVal !== pmsBudgetVal;
-
-          const sourceRaw = reviewTarget.contractValueSource;
-
-          const sourceLabel =
-            sourceRaw === "PMS" || sourceRaw === "PMS_BUDGET"
-              ? "PMS Project Budget"
-              : sourceRaw === "MANUAL"
-                ? "Manual Input"
-                : sourceRaw
-                  ? String(sourceRaw)
-                  : hasContractVal && isSameAmount
-                    ? "PMS Project Budget"
-                    : "Manual Input";
-
-          // PMS Project Budget and Contract Value can represent the exact same
-          // amount (when the source is PMS) — showing them as two separate rows
-          // alongside a third "Contract Value Source" row was redundant. Combine
-          // them into a single row whose LABEL carries the source (so the value
-          // stays a plain amount, never "amount / source"): PMS source reads as
-          // "Contract / PMS Project Budget", Manual source reads as "Contract Value".
-          const hasCommercialValue = hasContractVal || hasPmsBudget;
-          const combinedContractValue = hasContractVal ? contractVal : pmsBudgetVal;
-          const isPmsContractSource = sourceLabel === "PMS Project Budget";
-          const contractValueLabelText = isPmsContractSource ? "Contract / PMS Project Budget" : "Contract Value";
-          const contractValueRowLabel = (
-            <span className="flex flex-wrap items-center gap-1.5">
-              <span>{contractValueLabelText}</span>
-              {isDifferentAmount && (
-                <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200">
-                  Billing Amount Used
-                </span>
-              )}
-            </span>
-          );
-          const contractValueRowValue = hasCommercialValue ? formatMoney(combinedContractValue, currency) : null;
-
-          const retentionPercent = Number(reviewTarget.retentionPercent) || 0;
-          const retentionAmount = Number(reviewTarget.retentionAmount) || 0;
-          const hasRetention = retentionAmount > 0 || retentionPercent > 0;
-
-          const billableAmount = Number(reviewTarget.billableAmount) || 0;
-
-          const advanceReceived = Number(reviewTarget.advanceReceived) || 0;
-          const hasAdvance = advanceReceived > 0;
-
-          const remainingAmount = Number(reviewTarget.remainingAmount) || 0;
-
-          const billingFreqLabel = formatFrequencyLabel(
-            reviewTarget.billingFrequency,
-            reviewTarget.billingFrequencyName,
-            reviewTarget.billingFrequencyId,
-            isFixedPrice || String(reviewTarget.billingTypeName || "").toUpperCase().includes("ONE")
-          );
-
-          const hasSchedule = Boolean(reviewTarget.effectiveFrom || reviewTarget.effectiveTo || reviewTarget.billingFrequency);
-
-          return (
-            <div className="space-y-4">
-              {/* 1. Commercial Configuration */}
-              <ReviewSection
-                title="Commercial Configuration"
-                rows={[
-                  {
-                    label: "Billing Type",
-                    value: getBillingTypeDisplayName(reviewTarget.billingTypeName || reviewTarget.billingType),
-                  },
-                  { label: "Billing Frequency", value: billingFreqLabel },
-                  { label: "Currency", value: currency },
-                  { label: "PMS Project Budget", value: formatMoney(pmsBudgetVal, currency) },
-                  ...(hasContractVal
-                    ? [
-                      {
-                        label: (
-                          <span className="flex flex-wrap items-center gap-1.5">
-                            <span>Contract Value</span>
-                            {isDifferentAmount && (
-                              <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200">
-                                Billing Amount Used
-                              </span>
-                            )}
-                          </span>
-                        ),
-                        value: formatMoney(contractVal, currency),
-                      },
-                      { label: "Contract Value Source", value: sourceLabel },
-                    ]
-                    : []),
-                  ...(isTimesheetBased && reviewTarget.pricingModel
-                    ? [{ label: "Pricing Model", value: BILLING_MODE_LABELS[reviewTarget.pricingModel] || reviewTarget.pricingModel }]
-                    : []),
-                ]}
-              />
-
-              {/* 2. Billing & Pricing Details */}
-              {isFixedPrice && (
-                <div className="space-y-3">
-                  <PageCard className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm p-4 space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-2">
-                      Fixed Price Financial Summary
-                    </h3>
-
-                    {/* Financial Formula Banner */}
-                    <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 text-xs">
-                      <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Financial Calculation Formula
-                      </span>
-                      <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold text-slate-800">
-                        <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 shadow-2xs">Billable Amount</span>
-                        <span className="text-slate-400">−</span>
-                        <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 shadow-2xs">Retention Amount</span>
-                        <span className="text-slate-400">−</span>
-                        <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 shadow-2xs">Advance Received</span>
-                        <span className="font-extrabold text-indigo-600">=</span>
-                        <span className="rounded-md bg-[#0A0082] px-2 py-0.5 font-extrabold text-white shadow-2xs">
-                          Remaining Receivable
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Primary Highlighted Remaining Receivable Card */}
-                    <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
-                      <div>
-                        <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">Remaining Receivable</span>
-                        <span className="block text-[11px] text-emerald-600">Net outstanding balance to collect</span>
-                      </div>
-                      <span className="text-xl font-black text-emerald-900 sm:text-2xl">
-                        {formatMoney(remainingAmount, currency) || "—"}
-                      </span>
-                    </div>
-
-                    {/* SAME vs DIFFERENT Budget Warning Banner */}
-                    {isSameAmount && (
-                      <div className="flex items-center gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/70 px-3.5 py-2 text-xs font-medium text-emerald-900">
-                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                        <span>Contract Value and PMS Project Budget are the same ({formatMoney(contractVal, currency)}).</span>
-                      </div>
-                    )}
-                    {isDifferentAmount && (
-                      <div className="flex items-center gap-2 rounded-lg border border-amber-200/80 bg-amber-50/70 px-3.5 py-2 text-xs font-medium text-amber-900">
-                        <Info className="h-4 w-4 shrink-0 text-amber-600" />
-                        <span>
-                          Contract Value ({formatMoney(contractVal, currency)}) is used for billing calculation because it differs from PMS Project Budget ({formatMoney(pmsBudgetVal, currency)}).
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Financial Breakdown Table */}
-                    <div className="divide-y divide-slate-100 text-xs">
-                      <div className="flex justify-between py-2">
-                        <span className="text-slate-500 font-medium">{contractValueLabelText}</span>
-                        <span className="font-bold text-slate-900">{contractValueRowValue || "—"}</span>
-                      </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-slate-500 font-medium">Retention %</span>
-                        <span className="font-bold text-slate-900">{hasRetention ? `${retentionPercent}%` : "0%"}</span>
-                      </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-slate-500 font-medium">Retention Amount</span>
-                        <span className="font-bold text-slate-900">{hasRetention ? `-${formatMoney(retentionAmount, currency)}` : formatMoney(0, currency)}</span>
-                      </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-slate-500 font-medium">Billable Amount</span>
-                        <span className="font-bold text-slate-900">{formatMoney(billableAmount, currency)}</span>
-                      </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-slate-500 font-medium">Advance Received</span>
-                        <span className="font-bold text-slate-900">{hasAdvance ? `-${formatMoney(advanceReceived, currency)}` : formatMoney(0, currency)}</span>
-                      </div>
-                      <div className="flex justify-between py-2 bg-emerald-50/40 px-2 rounded">
-                        <span className="text-emerald-800 font-bold">Remaining Receivable</span>
-                        <span className="font-extrabold text-emerald-900">{formatMoney(remainingAmount, currency)}</span>
-                      </div>
-                    </div>
-                  </PageCard>
-                </div>
-              )}
-
-              {isTimesheetBased && (
-                <ReviewSection
-                  title="Timesheet Rates & Pricing"
-                  rows={[
-                    { label: "Pricing Mode", value: BILLING_MODE_LABELS[reviewTarget.pricingModel] || reviewTarget.pricingModel || "Standard" },
-                    ...(reviewTarget.hourlyRate ? [{ label: "Standard Rate", value: `${formatMoney(reviewTarget.hourlyRate, currency)} / hr` }] : []),
-                    { label: "PMS Project Budget", value: formatMoney(pmsBudgetVal, currency) },
-                  ]}
-                />
-              )}
-
-              {isRecurring && (
-                <div className="space-y-3">
-                  {isSameAmount && (
-                    <div className="flex items-center gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/70 px-3.5 py-2 text-xs font-medium text-emerald-900">
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                      <span>Contract Value and PMS Project Budget are the same ({formatMoney(contractVal, currency)}).</span>
-                    </div>
-                  )}
-                  {isDifferentAmount && (
-                    <div className="flex items-center gap-2 rounded-lg border border-amber-200/80 bg-amber-50/70 px-3.5 py-2 text-xs font-medium text-amber-900">
-                      <Info className="h-4 w-4 shrink-0 text-amber-600" />
-                      <span>
-                        Contract Value ({formatMoney(contractVal, currency)}) is used for billing calculation because it differs from PMS Project Budget ({formatMoney(pmsBudgetVal, currency)}).
-                      </span>
-                    </div>
-                  )}
-                  <ReviewSection
-                    title="Recurring Pricing Details"
-                    rows={[
-                      { label: contractValueLabelText, value: contractValueRowValue },
-                    ]}
-                  />
-                </div>
-              )}
-
-              {/* 3. Billing Schedule */}
-              <PageCard className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
-                <PageCardContent className="p-0">
-                  <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3 flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-[#0A0082]" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">Billing Schedule</h3>
-                  </div>
-                  <div className="p-4">
-                    {hasSchedule ? (
-                      <div className="space-y-1">
-                        <InfoRow label="Billing Frequency" value={billingFreqLabel} />
-                        <InfoRow label="Effective From" value={formatDate(reviewTarget.effectiveFrom)} />
-                        <InfoRow label="Effective To" value={formatDate(reviewTarget.effectiveTo) || "Ongoing"} />
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-4 text-center">
-                        <Calendar className="h-7 w-7 text-slate-300 mb-1" />
-                        <p className="text-xs font-semibold text-slate-600">Billing schedule not applicable</p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">This configuration does not require a recurring schedule.</p>
-                      </div>
-                    )}
-                  </div>
-                </PageCardContent>
-              </PageCard>
-
-              {/* 4. Invoice & Tax Controls */}
-              <ReviewSection
-                title="Invoice & Tax Controls"
-                rows={[
-                  { label: "Payment Terms", value: reviewTarget.paymentTermName || reviewTarget.paymentTerms },
-                  { label: "Tax Region", value: reviewTarget.taxRegionName || reviewTarget.taxRegion },
-                  { label: "Invoice Generation Mode", value: reviewTarget.invoiceGenerationType || (reviewTarget.autoInvoiceGeneration ? "Automatic" : "Manual") },
-                  ...(reviewTarget.autoInvoiceGeneration && reviewTarget.invoiceGenerationDay
-                    ? [{ label: "Generation Day", value: `Day ${reviewTarget.invoiceGenerationDay}` }]
-                    : []),
-                  { label: "Expense Billing Eligibility", value: reviewTarget.expenseBillingEligible ? "Eligible" : "Not Eligible" },
-                ]}
-              />
-
-              {/* 5. Submission & Workflow Information */}
-              <ReviewSection
-                title="Submission & Workflow Information"
-                rows={[
-                  {
-                    label: "Approval Status",
-                    value: <StatusBadge label={formatApprovalStatusLabel(reviewTarget.approvalStatus)} size="sm" />,
-                  },
-                  {
-                    label: "Billing Status",
-                    value: <StatusBadge label={formatApprovalStatusLabel(reviewTarget.billingStatus)} size="sm" />,
-                  },
-                  { label: "Submitted By", value: reviewTarget.submittedBy },
-                  { label: "Submitted Date", value: formatDateTime(reviewTarget.createdAt) },
-                  { label: "Last Updated", value: formatDateTime(reviewTarget.updatedAt) },
-                  ...(reviewTarget.rejectionReason ? [{ label: "Rejection Reason", value: reviewTarget.rejectionReason }] : []),
-                ]}
-              />
-            </div>
-          );
-        })()}
+        {reviewTarget && <ApprovalReviewDetails config={reviewTarget} />}
       </Modal>
 
       {/* 5. Reject Confirmation — shared ConfirmationModal, reason kept as a required field */}

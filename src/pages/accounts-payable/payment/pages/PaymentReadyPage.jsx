@@ -1,69 +1,144 @@
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
-import { useInvoices } from "../../invoice/hooks/useInvoices";
-import { PAYMENT_QUEUE_STATUSES } from "../../constants/invoiceStatus";
+import Pagination from "../../../../components/Pagination/pagination";
+import StatusBadge from "../../../../components/status/statusbadge";
+import FormInput from "../../../../components/forms/FormInput";
+import FormSelect from "../../../../components/forms/FormSelect";
+import EmptyState from "../../procurement/components/EmptyState";
+import RecordPaymentModal from "../components/RecordPaymentModal";
+import { useReadyForPayment } from "../hooks/usePaymentTracking";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { useApPermissions } from "../../hooks/useApPermissions";
 import { AP_ROUTES } from "../../constants/routes";
-import { formatCurrency, formatDate, calculateBalance } from "../../utils/formatters";
+import { formatCurrency, formatDate } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
 
-const PAGE_SIZE = 20;
+const HEADERS = [
+  "Invoice #", "Vendor", "Invoice Date", "Due Date", "Invoice Amount", "TDS",
+  "Net Payable", "Paid", "Remaining", "Status", "Action",
+];
+const COLUMNS = [
+  "invoiceNumber", "vendor", "invoiceDate", "dueDate", "invoiceAmount", "tds",
+  "netPayable", "paid", "remaining", "status", "action",
+];
 
-const HEADERS = ["Invoice #", "Vendor", "Due Date", "Net Amount", "Balance", "Actions"];
-const COLUMNS = ["invoiceNumber", "vendor", "dueDate", "netAmount", "balance", "actions"];
+const STATUS_OPTIONS = [
+  { value: "", label: "All payable" },
+  { value: "READY_FOR_PAYMENT", label: "Ready for Payment" },
+  { value: "PARTIALLY_PAID", label: "Partially Paid" },
+];
 
 /**
- * Every Approved invoice with an outstanding balance — there's no distinct "ready for payment"
- * status on the backend (see constants/invoiceStatus.js), so this reuses the existing invoice
- * list endpoint filtered client-side, same as the Invoice Management "Ready for Payment" tab.
- * The difference here is the Pay action, which this queue is specifically for.
+ * Invoices Finance can pay now: READY_FOR_PAYMENT and PARTIALLY_PAID (GET /payment/ready-for-payment,
+ * server-side search/filter/pagination). TDS, net payable and remaining all come from the backend.
  */
 export default function PaymentReadyPage() {
-  const navigate = useNavigate();
-  const { invoices, isLoading, isError, error } = useInvoices({
-    statuses: PAYMENT_QUEUE_STATUSES,
-    pageSize: PAGE_SIZE,
+  const { canRecordPayment } = useApPermissions();
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [overdue, setOverdue] = useState(false);
+  const [payingInvoice, setPayingInvoice] = useState(null);
+  const debouncedSearch = useDebouncedValue(search.trim());
+
+  const { items, total, page, setPage, totalPages, isLoading, isFetching, isError, error } = useReadyForPayment({
+    search: debouncedSearch,
+    status,
+    overdue,
   });
 
-  const payable = invoices.filter((invoice) => calculateBalance(invoice.netAmount, invoice.amountPaid) > 0);
-
-  const rows = payable.map((invoice) => {
-    const symbol = invoice.currency?.symbol || "₹";
-    const balance = calculateBalance(invoice.netAmount, invoice.amountPaid);
+  const rows = items.map((invoice) => {
+    const symbol = invoice.currencySymbol;
     return {
-      invoiceNumber: invoice.invoiceNumber,
-      vendor: invoice.vendor?.name || "—",
-      dueDate: formatDate(invoice.dueDate),
-      netAmount: (
-        <div>
-          <div>{formatCurrency(invoice.netAmount, symbol)}</div>
-          {invoice.tdsApplicable && invoice.payableAmount != null && (
-            <div className="text-xs font-normal text-gray-500">
-              Payable: {formatCurrency(invoice.payableAmount, symbol)}
-            </div>
-          )}
-        </div>
+      invoiceNumber: (
+        <Link to={AP_ROUTES.PAYMENT_DETAIL(invoice.invoiceId)} className="font-medium text-[#0A0082] hover:underline">
+          {invoice.invoiceNumber}
+        </Link>
       ),
-      balance: formatCurrency(balance, symbol),
-      actions: (
-        <Button variant="primary" size="small" onClick={() => navigate(AP_ROUTES.PAYMENT_MARK_PAID(invoice.id))}>
-          Pay
-        </Button>
+      vendor: invoice.vendorName,
+      invoiceDate: formatDate(invoice.invoiceDate),
+      dueDate: (
+        <span className={invoice.isOverdue ? "font-medium text-red-600" : ""}>
+          {formatDate(invoice.dueDate)}
+          {invoice.isOverdue && <span className="ml-1 text-xs">(overdue)</span>}
+        </span>
       ),
+      invoiceAmount: formatCurrency(invoice.invoiceAmount, symbol),
+      tds: invoice.tdsApplicable ? formatCurrency(invoice.tdsAmount, symbol) : "—",
+      netPayable: formatCurrency(invoice.netPayable, symbol),
+      paid: formatCurrency(invoice.amountPaid, symbol),
+      remaining: <span className="font-semibold">{formatCurrency(invoice.remainingAmount, symbol)}</span>,
+      status: <StatusBadge label={invoice.statusName || invoice.statusCode} size="sm" />,
+      action:
+        canRecordPayment && invoice.remainingAmount > 0 ? (
+          <Button variant="primary" size="small" onClick={() => setPayingInvoice(invoice)}>
+            Record Payment
+          </Button>
+        ) : (
+          <Link to={AP_ROUTES.PAYMENT_DETAIL(invoice.invoiceId)} className="text-sm font-medium text-[#0A0082] hover:underline">
+            View
+          </Link>
+        ),
     };
   });
 
+  const filtered = Boolean(debouncedSearch || status || overdue);
+
   return (
     <div className="p-6">
-      <PageHeader title="Ready for Payment" subtitle="Approved invoices with an outstanding balance" />
+      <PageHeader
+        title="Ready for Payment"
+        subtitle="Approved invoices with verified TDS and an outstanding payable balance"
+        actions={
+          <Link to={AP_ROUTES.PAYMENT_HISTORY} className="text-sm font-medium text-[#0A0082] hover:underline">
+            Payment History →
+          </Link>
+        }
+      />
+
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4 md:items-end">
+        <FormInput
+          label="Search"
+          name="search"
+          placeholder="Invoice number or vendor"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="md:col-span-2"
+        />
+        <FormSelect label="Status" name="status" options={STATUS_OPTIONS} value={status} onChange={(e) => setStatus(e.target.value)} />
+        <label className="flex items-center gap-2 pb-2 text-sm text-gray-700">
+          <input type="checkbox" checked={overdue} onChange={(e) => setOverdue(e.target.checked)} />
+          Overdue only
+        </label>
+      </div>
+
       {isError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {getApiErrorMessage(error, "Unable to load invoices right now.")}
+          {getApiErrorMessage(error, "Unable to load invoices ready for payment right now.")}
         </div>
+      ) : !isLoading && items.length === 0 ? (
+        <EmptyState
+          title="No invoices are currently ready for payment."
+          description={filtered ? "Try clearing the filters." : undefined}
+        />
       ) : (
-        <GenericTable headers={HEADERS} columns={COLUMNS} rows={rows} loading={isLoading} />
+        <>
+          <GenericTable headers={HEADERS} columns={COLUMNS} rows={rows} loading={isLoading} />
+          <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+            <span>{isFetching && !isLoading ? "Refreshing…" : `${total} invoice${total === 1 ? "" : "s"}`}</span>
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+              onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+            />
+          </div>
+        </>
       )}
+
+      <RecordPaymentModal isOpen={Boolean(payingInvoice)} invoice={payingInvoice} onClose={() => setPayingInvoice(null)} />
     </div>
   );
 }

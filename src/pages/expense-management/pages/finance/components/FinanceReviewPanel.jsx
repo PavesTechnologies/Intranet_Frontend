@@ -21,7 +21,9 @@ import LineReviewStatusBadge, { deriveLineReviewState } from "../../../approval-
 import FinanceApprovalLevelTimeline from "./FinanceApprovalLevelTimeline";
 import ReceiptViewer from "../../../approval-engine/components/ReceiptViewer";
 import CommentPromptModal from "../../../approval-engine/components/CommentPromptModal";
-import { useFinanceStatus, useFinanceReviews, useVerifyLineItem, useQueryLineItem } from "../hooks/useFinanceVerification";
+import { useFinanceStatus, useFinanceReviews, useVerifyLineItem, useQueryLineItem, useAdjustLineTax } from "../hooks/useFinanceVerification";
+import FinanceTaxPanel, { AdjustTaxModal, needsTaxConfirmation } from "./FinanceTaxPanel";
+import { useAuth } from "@/contexts/AuthContext";
 import { formatMoney, formatDate } from "../../../approval-engine/constants/approvalLabels";
 
 const isLineEligible = (line) => {
@@ -67,6 +69,13 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
   
   const verifyLineItem = useVerifyLineItem();
   const queryLineItem = useQueryLineItem();
+  const adjustLineTax = useAdjustLineTax();
+  const { hasRole } = useAuth();
+  // Per-line tax adjustment is FINANCE_EXECUTIVE only; global tax configuration stays with Admin.
+  const canAdjustTax = hasRole(["Finance_Executive"]);
+  const [adjustingLine, setAdjustingLine] = useState(null);
+  // Line ids whose flagged tax Finance has confirmed checking (required to verify them).
+  const [taxCheckedIds, setTaxCheckedIds] = useState(() => new Set());
 
   const { data: fullReport } = useQuery({
     queryKey: ["expenseReviewReport", reportId],
@@ -146,9 +155,12 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
   const costCenterName = queueItem?.costCenterName || queueItem?.costCenter || queueItem?.costCenterCode || queueItem?.departmentName || fullReport?.costCenterName || fullReport?.costCenter;
   const submittedAt = queueItem?.submittedAt || queueItem?.createdAt || queueItem?.submittedDate || fullReport?.submittedAt || fullReport?.createdAt;
   const totalAmount = queueItem?.totalAmount ?? fullReport?.totalAmount;
-  const currencyCode = queueItem?.currencyCode || fullReport?.currencyCode;
+  // Report totals are in the base currency (queue items and report.baseCurrencyCode say so).
+  const currencyCode = queueItem?.currencyCode || fullReport?.baseCurrencyCode || fullReport?.currencyCode;
 
-  const isMutating = verifyLineItem.isPending || queryLineItem.isPending;
+  const isMutating = verifyLineItem.isPending || queryLineItem.isPending || adjustLineTax.isPending;
+  const taxNeedsConfirmation = needsTaxConfirmation(selectedLine);
+  const taxChecked = !!selectedLine && taxCheckedIds.has(selectedLine.lineItemId);
   const canAct = reportStatus === "PENDING_FINANCE_VERIFICATION";
 
   if (!isOpen) return null;
@@ -156,10 +168,24 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
   const handleVerify = () => {
     if (!selectedLine) return;
     verifyLineItem.mutate(
-      { reportId, lineItemId: selectedLine.lineItemId },
+      { reportId, lineItemId: selectedLine.lineItemId, taxChecked },
       {
         onSuccess: () => showStatusToast("Line item verified successfully", "success"),
         onError: (err) => showStatusToast(err.response?.data?.message || "Failed to verify line item", "error"),
+      }
+    );
+  };
+
+  const handleAdjustTax = (payload) => {
+    if (!adjustingLine) return;
+    adjustLineTax.mutate(
+      { reportId, lineItemId: adjustingLine.lineItemId, payload },
+      {
+        onSuccess: () => {
+          showStatusToast("Tax adjusted", "success");
+          setAdjustingLine(null);
+        },
+        onError: (err) => showStatusToast(err.response?.data?.message || "Failed to adjust tax", "error"),
       }
     );
   };
@@ -284,9 +310,16 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
                 <Section icon={<Wallet className="h-4 w-4 text-gray-400" />} title="Amount">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <Field label="Line Amount" value={formatMoney(selectedLine.amount, selectedLine.currencyCode)} />
-                    {selectedLine.taxAmount != null && <Field label="Tax / GST" value={formatMoney(selectedLine.taxAmount, selectedLine.currencyCode)} />}
                     <Field label="Report Total" value={formatMoney(totalAmount, currencyCode)} />
                   </div>
+                </Section>
+
+                <Section icon={<Wallet className="h-4 w-4 text-gray-400" />} title="Tax">
+                  <FinanceTaxPanel
+                    line={selectedLine}
+                    canAdjust={canAct && canAdjustTax && !!selectedLine.tax}
+                    onAdjust={() => setAdjustingLine(selectedLine)}
+                  />
                 </Section>
 
                 {selectedViolations.length > 0 && (
@@ -313,9 +346,26 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
               >
                 <MessageSquareWarning className="h-4 w-4" /> Request Correction
               </Button>
+              {taxNeedsConfirmation && (
+                <label className="mr-auto flex items-center gap-2 text-xs text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={taxChecked}
+                    onChange={(e) =>
+                      setTaxCheckedIds((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(selectedLine.lineItemId);
+                        else next.delete(selectedLine.lineItemId);
+                        return next;
+                      })
+                    }
+                  />
+                  I checked this line's tax against the receipt
+                </label>
+              )}
               <Button
                 variant="success"
-                disabled={isMutating || !selectedLine || !isLineEligible(selectedLine)}
+                disabled={isMutating || !selectedLine || !isLineEligible(selectedLine) || (taxNeedsConfirmation && !taxChecked)}
                 loading={verifyLineItem.isPending}
                 onClick={handleVerify}
               >
@@ -325,6 +375,14 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
           )}
         </div>
       </div>
+
+      <AdjustTaxModal
+        isOpen={!!adjustingLine}
+        onClose={() => setAdjustingLine(null)}
+        line={adjustingLine}
+        onSubmit={handleAdjustTax}
+        submitting={adjustLineTax.isPending}
+      />
 
       <CommentPromptModal
         isOpen={!!queryingLine}

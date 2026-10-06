@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { UploadCloud, FileText, Image as ImageIcon, Eye, Download, Trash2, Loader2 } from "lucide-react";
+import { UploadCloud, FileText, Image as ImageIcon, Eye, Download, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import Button from "@/components/Button/Button";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import { useAuth } from "@/contexts/AuthContext";
@@ -71,14 +71,35 @@ export default function ReceiptDropzone({ lineItemId }) {
       const formData = new FormData();
       formData.append("file", file);
       try {
-        await receiptService.upload(lineItemId, formData, (evt) => {
+        const uploadRes = await receiptService.upload(lineItemId, formData, (evt) => {
           if (!evt.total) return;
           const progress = Math.round((evt.loaded / evt.total) * 100);
           setUploadingFiles((prev) =>
             prev.map((f) => (f.name === file.name ? { ...f, progress } : f))
           );
         });
-        showStatusToast(`Receipt "${file.name}" uploaded successfully!`, "success");
+        // The upload endpoint deliberately returns only { receiptId, processingStatus } (see its
+        // own javadoc) - the advisory duplicate-file-reuse flag only comes back on the full
+        // receipt, so fetch it once, best-effort, purely to decide which toast to show. The list
+        // badge below (via fetchReceipts) is the authoritative source either way.
+        const uploadedReceiptId = uploadRes?.data?.data?.receiptId || uploadRes?.data?.receiptId;
+        let isDuplicateFileReuse = false;
+        if (uploadedReceiptId) {
+          try {
+            const detailRes = await receiptService.getById(uploadedReceiptId);
+            isDuplicateFileReuse = !!(detailRes?.data?.data || detailRes?.data)?.possibleDuplicateFileReuse;
+          } catch {
+            // best-effort only - the list badge still surfaces this once fetchReceipts() runs below
+          }
+        }
+        if (isDuplicateFileReuse) {
+          showStatusToast(
+            `"${file.name}" looks identical to a receipt already uploaded elsewhere — it's still saved, but please double-check this isn't an accidental duplicate.`,
+            "warning"
+          );
+        } else {
+          showStatusToast(`Receipt "${file.name}" uploaded successfully!`, "success");
+        }
       } catch (err) {
         console.error("Failed to upload receipt:", err);
         const errMsg = err.response?.data?.message || err.response?.data?.detail || `Failed to upload "${file.name}".`;
@@ -215,7 +236,18 @@ export default function ReceiptDropzone({ lineItemId }) {
                 {isImageFile(r.fileName) ? <ImageIcon size={16} /> : <FileText size={16} />}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-gray-800 truncate">{r.fileName || "Receipt"}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-semibold text-gray-800 truncate">{r.fileName || r.originalFileName || "Receipt"}</p>
+                  {r.possibleDuplicateFileReuse && (
+                    <span
+                      title="This exact file was already uploaded as another receipt — possible accidental duplicate. This is advisory only and doesn't block anything."
+                      className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
+                    >
+                      <AlertTriangle size={10} />
+                      Possible duplicate
+                    </span>
+                  )}
+                </div>
                 <p className="text-[10px] text-gray-400">
                   {formatFileSize(r.fileSize)} &bull; {formatDate(r.uploadedAt)}
                 </p>

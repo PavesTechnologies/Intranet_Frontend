@@ -3,8 +3,11 @@ import { Clock, CheckCircle2, XCircle, Layers, RefreshCw } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import PendingApprovalsPage from "./PendingApprovalsPage";
 import ApprovalHistoryPage from "./ApprovalHistoryPage";
+import CashAdvanceApprovalsList from "../components/CashAdvanceApprovalsList";
 import { useMyQueue, useMyHistory } from "../hooks/useApprovalWorkflow";
 import SearchInput from "@/components/filter/Searchbar";
+import FormSelect from "@/components/forms/FormSelect";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Shared with PendingApprovalsPage/ApprovalHistoryPage's own content fetch: same (page, size) means
 // react-query serves both the summary-card count here AND the active tab's content from the exact
@@ -12,9 +15,30 @@ import SearchInput from "@/components/filter/Searchbar";
 const QUEUE_PAGE_SIZE = 20;
 
 export default function ApprovalsPage() {
-  const [activeTab, setActiveTab] = useState("pending"); // "pending" | "approved" | "history"
+  const { hasRole } = useAuth();
+  const [activeTab, setActiveTab] = useState("pending"); // "pending" | "approved" | "rejected"
+  const [approvalCategory, setApprovalCategory] = useState("EXPENSE_REPORTS"); // "EXPENSE_REPORTS" | "CASH_ADVANCES"
   const [reloadKey, setReloadKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
+
+  const isManager = hasRole
+    ? hasRole([
+        "Manager",
+        "MANAGER",
+        "Reporting_Manager",
+        "Project_Manager",
+        "Delivery_Manager",
+        "Resource_Manager",
+        "General",
+        "GENERAL",
+        "Finance Executive",
+        "FINANCE_EXECUTIVE",
+        "Finance",
+        "FINANCE",
+        "Admin",
+        "ADMIN"
+      ])
+    : true;
 
   const breadcrumbs = [
     { label: "Expense Management", to: "/expense-management/dashboard" },
@@ -39,21 +63,45 @@ export default function ApprovalsPage() {
     rejectedQuery.refetch();
   };
 
-  const tabs = [
-    { key: "pending", label: "Pending", icon: Clock },
-    { key: "approved", label: "Approved", icon: CheckCircle2 },
-    { key: "history", label: "History", icon: Layers },
+  const handleSearch = (value) => {
+    setSearchTerm(value || "");
+  };
+
+  const categoryOptions = [
+    { label: "Expense Reports", value: "EXPENSE_REPORTS" },
+    ...(isManager ? [{ label: "Cash Advances", value: "CASH_ADVANCES" }] : []),
+  ];
+
+  const activeCategory = isManager ? approvalCategory : "EXPENSE_REPORTS";
+
+  const statusFilterOptions = [
+    { label: "Pending", value: "pending" },
+    { label: "Approved", value: "approved" },
+    { label: "Rejected", value: "rejected" },
   ];
 
   return (
     <div className="space-y-3 p-4 sm:p-6">
+      {/* Scope custom styles to hide child component breadcrumbs & headers, and remove child outer padding */}
+      <style>{`
+        .approvals-tab-container nav[aria-label="Breadcrumb"] {
+          display: none !important;
+        }
+        .approvals-tab-container h1 {
+          display: none !important;
+        }
+        .approvals-tab-container > div {
+          padding: 0 !important;
+        }
+      `}</style>
+
       <Breadcrumb items={breadcrumbs} />
 
       {/* Page Header */}
       <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm sm:p-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <h1 className="text-lg font-bold text-[#0a174e]">My Approvals</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Review and manage expense report approval requests.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Review and manage expense report and cash advance approval requests.</p>
         </div>
 
         <button
@@ -108,68 +156,52 @@ export default function ApprovalsPage() {
         </div>
       </div>
 
-      {/* Tabs + Search */}
+      {/* Filter and Search Card */}
       <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex space-x-1 rounded-lg bg-gray-50 p-1">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition ${
-                    isActive ? "bg-white text-blue-600 shadow-sm" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  }`}
-                >
-                  <Icon size={16} />
-                  {tab.label}
-                  {tab.key === "pending" && pendingCount > 0 && (
-                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isActive ? "bg-blue-100 text-blue-700" : "bg-gray-200 text-gray-600"}`}>
-                      {pendingCount}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="w-full lg:w-72">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+          <div className="lg:col-span-2">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
             <SearchInput
               value={searchTerm}
-              onSearch={(value) => setSearchTerm(value || "")}
-              placeholder="Search by report number or merchant/category..."
+              onSearch={handleSearch}
+              placeholder="Search by report/advance number or title/category..."
               className="!py-1.5 !px-3 !text-xs"
             />
           </div>
+          <FormSelect
+            label="Type"
+            name="approvalCategory"
+            value={activeCategory}
+            onChange={(e) => setApprovalCategory(e.target.value)}
+            options={categoryOptions}
+            className="[&>label]:text-xs [&>label]:mb-1"
+            buttonClassName="!py-1.5 !px-3 !text-xs"
+          />
+          <FormSelect
+            label="Status"
+            name="activeTab"
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value)}
+            options={statusFilterOptions}
+            className="[&>label]:text-xs [&>label]:mb-1"
+            buttonClassName="!py-1.5 !px-3 !text-xs"
+          />
         </div>
       </div>
 
-      {/* Tab Content */}
-      {activeTab === "pending" ? (
-        <PendingApprovalsPage key={`pending-${reloadKey}`} searchTerm={searchTerm} hideHeader noPadding />
-      ) : activeTab === "approved" ? (
-        <ApprovalHistoryPage
-          key={`approved-${reloadKey}`}
-          outcome="APPROVED"
-          title="Approved"
-          breadcrumbLabel="Approved"
-          searchTerm={searchTerm}
-          hideHeader
-          noPadding
-        />
-      ) : (
-        <ApprovalHistoryPage
-          key={`history-${reloadKey}`}
-          title="History"
-          breadcrumbLabel="History"
-          searchTerm={searchTerm}
-          hideHeader
-          noPadding
-          allowOutcomeFilter
-        />
-      )}
+      {/* Tab Content container */}
+      <div className="approvals-tab-container">
+        {activeCategory === "CASH_ADVANCES" ? (
+          <CashAdvanceApprovalsList key={`cash-${activeTab}-${reloadKey}`} activeTab={activeTab} searchTerm={searchTerm} />
+        ) : activeTab === "pending" ? (
+          <PendingApprovalsPage key={`pending-${reloadKey}`} searchTerm={searchTerm} />
+        ) : activeTab === "approved" ? (
+          <ApprovalHistoryPage key={`approved-${reloadKey}`} outcome="APPROVED" title="Approved" breadcrumbLabel="Approved" searchTerm={searchTerm} />
+        ) : (
+          <ApprovalHistoryPage key={`rejected-${reloadKey}`} outcome="REJECTED" title="Rejected" breadcrumbLabel="Rejected" searchTerm={searchTerm} />
+        )}
+      </div>
     </div>
   );
 }
+
