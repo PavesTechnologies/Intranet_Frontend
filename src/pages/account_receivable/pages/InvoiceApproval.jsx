@@ -9,6 +9,7 @@ import {
   Eye,
   FileText,
   FileCheck,
+  FilterX,
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
@@ -78,15 +79,29 @@ const TABLE_ALIGNMENTS = {
   invoiceNumber: "left",
   client: "left",
   project: "left",
-  billingPeriod: "center",
-  invoiceDate: "center",
+  billingPeriod: "left",
+  invoiceDate: "left",
   dueDate: "center",
-  grandTotal: "right",
+  grandTotal: "left",
   status: "center",
   submittedAt: "left",
   lastAction: "left",
   actions: "center",
 };
+
+const TABLE_HEADER_ALIGNMENTS = {
+  client: "center",
+  project: "center",
+  billingPeriod: "center",
+  invoiceDate: "center",
+  dueDate: "center",
+  grandTotal: "center",
+  status: "center",
+  submittedAt: "center",
+  lastAction: "center",
+  actions: "center",
+}
+
 
 const getInvoiceStatus = (inv) => (inv.status || inv.invoiceStatus || "").toUpperCase();
 
@@ -450,8 +465,8 @@ export default function InvoiceApproval() {
           {isRejected && (
             <span
               className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${item.correctionRequired
-                  ? "bg-rose-50 text-rose-700 border-rose-200"
-                  : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                ? "bg-rose-50 text-rose-700 border-rose-200"
+                : "bg-emerald-50 text-emerald-700 border-emerald-200"
                 }`}
             >
               {item.correctionRequired ? "Correction Required" : "Ready to Resubmit"}
@@ -542,6 +557,21 @@ export default function InvoiceApproval() {
                   placeholder="Filter by Status"
                 />
               </div>
+              {(statusTab !== STATUS_TABS.ALL || searchQuery) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusTab(STATUS_TABS.ALL);
+                    setSearchQuery("");
+                    setCurrentPage(1);
+                  }}
+                  title="Clear all search and status filters"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
+                >
+                  <FilterX className="h-3.5 w-3.5 text-slate-500" />
+                  <span>Clear</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -551,6 +581,7 @@ export default function InvoiceApproval() {
               columns={TABLE_COLUMNS}
               rows={tableRows}
               alignments={TABLE_ALIGNMENTS}
+              headerAlignments={TABLE_HEADER_ALIGNMENTS}
               loading={loading}
               emptyMessage="No matching invoices found for the selected criteria."
             />

@@ -1,10 +1,8 @@
 import React from "react";
 import {
-  FileText,
   AlertTriangle,
   CheckCircle2,
   Info,
-  Loader2,
   ArrowRight,
   ArrowLeft,
   Send,
@@ -22,9 +20,7 @@ export default function InvoiceDraftBanner({
   invoiceStatus = "DRAFT_PREVIEW",
   invoiceNumber = null,
   isTaxCompleted = true,
-  generating = false,
   generateError = "",
-  onGenerateInvoice,
   onViewInvoice,
   onBackToTax,
   onSubmitForApproval,
@@ -71,14 +67,6 @@ export default function InvoiceDraftBanner({
               >
                 <ArrowLeft className="h-3.5 w-3.5" /> Back to Tax Calculation
               </Button>
-              <Button
-                variant="primary"
-                size="small"
-                disabled={true}
-                className="bg-slate-300 text-slate-500 cursor-not-allowed flex items-center justify-center gap-2 text-xs font-semibold shadow-xs px-4 py-2"
-              >
-                <FileText className="h-4 w-4" /> Generate Official Invoice
-              </Button>
             </div>
           </div>
         ) : (
@@ -105,25 +93,6 @@ export default function InvoiceDraftBanner({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                variant="primary"
-                size="small"
-                onClick={onGenerateInvoice}
-                disabled={generating || !isTaxCompleted}
-                className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center justify-center gap-2 text-xs font-semibold shadow-xs px-4 py-2"
-              >
-                {generating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Generating Official Invoice...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="h-4 w-4" /> Generate Official Invoice
-                  </>
-                )}
-              </Button>
-            </div>
           </div>
         )
       ) : (

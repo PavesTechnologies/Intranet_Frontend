@@ -104,18 +104,8 @@ const accountReceivableSubmenu = [
     to: "/account-receivable/invoice-approval",
   },
   {
-    label: "Configurations",
+    label: "Configuration",
     to: "/account-receivable/master-data",
-    children: [
-      {
-        label: "Configurations Overview",
-        to: "/account-receivable/master-data",
-      },
-      {
-        label: "Seller Information / Company Profile",
-        to: "/account-receivable/master-data/company-profile",
-      },
-    ],
   },
 ];
 

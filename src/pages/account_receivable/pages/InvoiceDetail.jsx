@@ -689,58 +689,17 @@ export default function InvoiceDetail() {
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5">
-      {/* Breadcrumb */}
-      <Breadcrumb
-        items={
-          isFromTaxCalculation
-            ? [
-              ...(isOccurrenceMode
-                ? []
-                : [{ label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" }]),
-              { label: "Tax Calculation", to: backToTaxUrl },
-              { label: "Invoice" },
-              { label: invoice?.invoiceNumber || invoice?.snapshotNumber || effectiveId },
-            ]
-            : [
-              ...(isOccurrenceMode
-                ? []
-                : [{ label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" }]),
-              { label: "Invoice Generation", to: INVOICE_WORKSPACE_PATH },
-              { label: "Invoice" },
-              { label: invoice?.invoiceNumber || invoice?.snapshotNumber || effectiveId },
-            ]
-        }
-      />
-
       {/* Header */}
       <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Invoice</h1>
-            <StatusBadge label={invoice?.invoiceStatus || "GENERATED"} size="sm" />
+            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Invoice Generated</h1>
           </div>
           <p className="text-sm text-slate-600">
             Invoice Number:{" "}
             <span className="ml-1 font-mono font-bold text-indigo-700">
               {invoice?.invoiceNumber || "—"}
             </span>
-            {invoice?.snapshotNumber && (
-              <>
-                <span className="mx-2 text-slate-300">&middot;</span>
-                <span className="text-xs text-slate-500">
-                  Snapshot <span className="font-mono font-semibold text-slate-700">{invoice.snapshotNumber}</span>
-                </span>
-              </>
-            )}
-          </p>
-          <p className="text-sm text-slate-600">
-            <span className="font-semibold text-slate-800">{invoice?.projectName || "Website Redesign"}</span>
-            {invoice?.clientName && (
-              <>
-                <span className="mx-1.5 text-slate-300">&middot;</span>
-                {invoice.clientName}
-              </>
-            )}
           </p>
         </div>
 
@@ -760,21 +719,6 @@ export default function InvoiceDetail() {
                 : "Send to Client"}
             </Button>
           )}
-
-          {/* Action: Submit for Approval (for GENERATED invoices) */}
-          {(invoice?.invoiceStatus === "GENERATED" || !invoice?.invoiceStatus) && (
-            <Button
-              variant="primary"
-              size="small"
-              onClick={handleSubmitForApproval}
-              disabled={submitting || refreshing}
-              className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold"
-            >
-              <Send className="h-3.5 w-3.5" />
-              {submitting ? "Submitting..." : "Submit for Approval"}
-            </Button>
-          )}
-
 
           {/* Actions: Approve & Reject (for PENDING_APPROVAL invoices) */}
           {invoice?.invoiceStatus === "PENDING_APPROVAL" && (
@@ -833,45 +777,6 @@ export default function InvoiceDetail() {
               </Button>
             )
           )}
-
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => navigate(INVOICE_APPROVAL_PATH)}
-            className="flex items-center gap-1.5 text-xs text-slate-600"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" /> Invoice Approval Queue
-          </Button>
-
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => navigate(INVOICE_WORKSPACE_PATH)}
-            className="flex items-center gap-1.5 text-xs text-slate-600"
-          >
-            Invoice Workspace
-          </Button>
-
-          {effectiveId && (
-            <Button
-              variant="outline"
-              size="small"
-              onClick={() => navigate(backToTaxUrl)}
-              className="flex items-center gap-1.5 text-xs text-slate-600"
-            >
-              Tax Calculation
-            </Button>
-          )}
-
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => loadInvoice(true)}
-            disabled={refreshing || submitting || approving || rejecting || refreshingAfterCorrection || savingCorrection || reacquiring}
-            className="flex items-center gap-1.5 text-xs"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Refresh
-          </Button>
         </div>
       </div>
 
@@ -1364,6 +1269,8 @@ export default function InvoiceDetail() {
         taxCalc={taxCalc}
         companyProfile={companyProfile}
         deliveryState={deliveryState}
+        presentation="plain"
+        showStatus={false}
       />
 
       {/* Authoritative Record Notice */}
@@ -1750,6 +1657,21 @@ export default function InvoiceDetail() {
           </div>
         </div>
       </Modal>
+
+      {(invoice?.invoiceStatus === "GENERATED" || !invoice?.invoiceStatus) && (
+        <div className="mt-8 flex justify-end border-t border-slate-200 pt-5">
+          <Button
+            variant="primary"
+            size="small"
+            onClick={handleSubmitForApproval}
+            disabled={submitting || refreshing}
+            className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold"
+          >
+            <Send className="h-3.5 w-3.5" />
+            {submitting ? "Submitting..." : "Submit for Approval"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

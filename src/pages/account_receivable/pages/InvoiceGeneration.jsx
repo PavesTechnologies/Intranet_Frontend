@@ -12,7 +12,7 @@ import {
   AlertCircle,
   MailCheck,
 } from "lucide-react";
-
+ 
 import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
@@ -23,7 +23,7 @@ import ConfirmationModal from "../../../components/confirmation_modal/Confirmati
 import { showStatusToast } from "../../../components/toastfy/toast";
 import ARTable from "../components/common/ARTable";
 import ActionMenu from "../components/common/ActionMenu";
-
+ 
 import { formatCurrency, formatDisplayDate } from "../utils/format";
 import {
   getInvoices,
@@ -37,56 +37,56 @@ import {
   DEMO_DELIVERY_STATUS,
   DEMO_SENT_BY,
 } from "../utils/invoiceDemoData";
-
+ 
 const PAGE_SIZE = 6;
-
+ 
 export default function InvoiceGeneration() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-
+ 
   const [invoices, setInvoices] = useState([]);
   const [backendSummary, setBackendSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-
+ 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-
+ 
   // Confirmation modal states
   const [submitTarget, setSubmitTarget] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [sendTarget, setSendTarget] = useState(null);
   const [sendLoading, setSendLoading] = useState(false);
-
+ 
   // Demo delivery map: invoiceId → { deliveryStatus, sentAt, sentBy }
   // Loaded from localStorage on mount and after each refresh
   const [demoDeliveryMap, setDemoDeliveryMap] = useState(() =>
     loadDemoDeliveryMap()
   );
-
+ 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-
+ 
   const handleKpiClick = (type) => {
     if (type === "TOTAL") {
       setStatusFilter("ALL");
     }
-
+ 
     if (type === "GENERATED") {
       setStatusFilter("GENERATED");
     }
   };
-
+ 
   // Route forwarder: if snapshotId is provided as a query parameter or state,
   // forward to the dedicated workflow
   const targetSnapshotId =
     searchParams.get("snapshotId") ||
     location.state?.snapshotId ||
     null;
-
+ 
   useEffect(() => {
     if (targetSnapshotId) {
       navigate(`/account-receivable/invoices/${targetSnapshotId}`, {
@@ -98,22 +98,22 @@ export default function InvoiceGeneration() {
       });
     }
   }, [targetSnapshotId, navigate]);
-
+ 
   const loadData = async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
-
+ 
     setLoading(true);
     setError(null);
-
+ 
     try {
       const { invoices: fetchedInvoices, summary } = await getInvoices();
-
+ 
       setInvoices(fetchedInvoices || []);
       setBackendSummary(summary || null);
-
+ 
       // Re-sync demo delivery map on each data refresh
       setDemoDeliveryMap(loadDemoDeliveryMap());
-
+ 
       if (isManualRefresh) {
         showStatusToast(
           "Invoice generation queue refreshed.",
@@ -122,12 +122,12 @@ export default function InvoiceGeneration() {
       }
     } catch (err) {
       console.error("[InvoiceGeneration] Error loading invoices:", err);
-
+ 
       const message = getInvoiceErrorMessage(
         err,
         "Failed to load invoices."
       );
-
+ 
       setError(message);
       showStatusToast(message, "error");
     } finally {
@@ -135,17 +135,17 @@ export default function InvoiceGeneration() {
       setRefreshing(false);
     }
   };
-
+ 
   useEffect(() => {
     loadData();
   }, []);
-
+ 
   const handleViewInvoice = (inv) => {
     const targetId =
       inv.billingSnapshotId ||
       inv.snapshotId ||
       inv.invoiceId;
-
+ 
     if (!targetId) {
       showStatusToast(
         "Identifier is missing for this invoice.",
@@ -153,7 +153,7 @@ export default function InvoiceGeneration() {
       );
       return;
     }
-
+ 
     navigate(`/account-receivable/invoices/${targetId}`, {
       state: {
         from: "invoice-generation",
@@ -161,46 +161,46 @@ export default function InvoiceGeneration() {
       },
     });
   };
-
+ 
   // Filtered invoices
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
       const st = (inv.invoiceStatus || "").toUpperCase();
-
+ 
       // Status filter
       if (statusFilter !== "ALL") {
         if (st !== statusFilter) return false;
       }
-
+ 
       // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-
+ 
         const num = (inv.invoiceNumber || "").toLowerCase();
         const client = (inv.clientName || "").toLowerCase();
         const project = (inv.projectName || "").toLowerCase();
         const snapNum = (inv.snapshotNumber || "").toLowerCase();
-
+ 
         const matches =
           num.includes(q) ||
           client.includes(q) ||
           project.includes(q) ||
           snapNum.includes(q);
-
+ 
         if (!matches) return false;
       }
-
+ 
       return true;
     });
   }, [invoices, statusFilter, searchQuery]);
-
+ 
   // Invoice KPIs
   const kpis = useMemo(() => {
     if (backendSummary) {
       return {
         totalInvoices:
           backendSummary.totalInvoices ?? invoices.length,
-
+ 
         generatedInvoices:
           backendSummary.generatedInvoices ??
           invoices.filter(
@@ -208,31 +208,31 @@ export default function InvoiceGeneration() {
               (i.invoiceStatus || "").toUpperCase() ===
               "GENERATED"
           ).length,
-
+ 
         totalInvoicedAmount:
           backendSummary.totalInvoicedAmount ?? 0,
-
+ 
         currency: invoices[0]?.currency || "USD",
       };
     }
-
+ 
     const totalInvoices = invoices.length;
-
+ 
     const generatedInvoices = invoices.filter(
       (i) =>
         (i.invoiceStatus || "").toUpperCase() ===
         "GENERATED"
     ).length;
-
+ 
     const totalInvoicedAmount = invoices.reduce(
       (sum, inv) =>
         sum + (Number(inv.grandTotal) || 0),
       0
     );
-
+ 
     const primaryCurrency =
       invoices[0]?.currency || "USD";
-
+ 
     return {
       totalInvoices,
       generatedInvoices,
@@ -240,25 +240,25 @@ export default function InvoiceGeneration() {
       currency: primaryCurrency,
     };
   }, [invoices, backendSummary]);
-
+ 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter]);
-
+ 
   const totalPages = Math.max(1, Math.ceil(filteredInvoices.length / PAGE_SIZE));
-
+ 
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
-
+ 
   const paginatedInvoices = useMemo(() => {
     const startIndex = (currentPage - 1) * PAGE_SIZE;
     return filteredInvoices.slice(startIndex, startIndex + PAGE_SIZE);
   }, [filteredInvoices, currentPage]);
-
+ 
   const handleConfirmSubmit = async () => {
     if (!submitTarget) return;
     const invId = submitTarget.invoiceId || submitTarget.billingSnapshotId || submitTarget.snapshotId;
@@ -279,7 +279,7 @@ export default function InvoiceGeneration() {
       setSubmitLoading(false);
     }
   };
-
+ 
   const handleConfirmSend = async () => {
     if (!sendTarget) return;
     const invId = sendTarget.invoiceId || sendTarget.billingSnapshotId || sendTarget.snapshotId;
@@ -300,14 +300,14 @@ export default function InvoiceGeneration() {
         setSendTarget(null);
         return;
       }
-
+ 
       const clientEmail =
         backendResult?.recipientEmail ||
         backendResult?.email ||
         sendTarget.email ||
         sendTarget.clientEmail ||
         null;
-
+ 
       saveDemoDelivery(invId, {
         deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT,
         sentAt: new Date().toISOString(),
@@ -328,7 +328,7 @@ export default function InvoiceGeneration() {
       setSendLoading(false);
     }
   };
-
+ 
   if (loading && !refreshing) {
     return (
       <div className="flex h-80 items-center justify-center">
@@ -339,7 +339,7 @@ export default function InvoiceGeneration() {
       </div>
     );
   }
-
+ 
   const tableHeaders = [
     "Invoice Number",
     "Client",
@@ -352,7 +352,7 @@ export default function InvoiceGeneration() {
     "Status",
     "Actions",
   ];
-
+ 
   const tableColumns = [
     "invoiceNumber",
     "client",
@@ -365,7 +365,7 @@ export default function InvoiceGeneration() {
     "status",
     "actions",
   ];
-
+ 
   const tableAlignments = {
     invoiceNumber: "left",
     client: "left",
@@ -378,33 +378,33 @@ export default function InvoiceGeneration() {
     status: "center",
     actions: "center",
   };
-
+ 
   const tableRows = paginatedInvoices.map((item) => {
     const st = (item.invoiceStatus || "").toUpperCase();
-
+ 
     const iid =
       item.invoiceId ||
       item.billingSnapshotId ||
       item.snapshotId;
-
+ 
     const delivery =
       demoDeliveryMap[iid] || {
         deliveryStatus: DEMO_DELIVERY_STATUS.NOT_SENT,
       };
-
+ 
     const isSent =
       delivery.deliveryStatus ===
       DEMO_DELIVERY_STATUS.SENT_TO_CLIENT;
-
+ 
     return {
       onRowClick: () => handleViewInvoice(item),
-
+ 
       invoiceNumber: (
         <div className="text-left">
           <span className="font-mono font-bold text-indigo-700">
             {item.invoiceNumber || "—"}
           </span>
-
+ 
           {item.snapshotNumber && (
             <div className="text-xs font-mono text-slate-400">
               {item.snapshotNumber}
@@ -412,19 +412,19 @@ export default function InvoiceGeneration() {
           )}
         </div>
       ),
-
+ 
       client: (
         <div className="text-left font-semibold text-slate-800">
           {item.clientName || "Account Management"}
         </div>
       ),
-
+ 
       project: (
         <div className="text-left">
           <div className="font-bold text-slate-900">
             {item.projectName || "Website Redesign"}
           </div>
-
+ 
           {item.projectCode && (
             <div className="text-xs font-mono text-slate-400">
               {item.projectCode}
@@ -432,13 +432,13 @@ export default function InvoiceGeneration() {
           )}
         </div>
       ),
-
+ 
       billingPeriod: (
         <div className="flex items-center justify-center font-medium text-slate-700">
           {item.billingPeriod || "—"}
         </div>
       ),
-
+ 
       invoiceDate: (
         <div className="flex items-center justify-center font-medium text-slate-700">
           {item.invoiceDate
@@ -446,7 +446,7 @@ export default function InvoiceGeneration() {
             : "—"}
         </div>
       ),
-
+ 
       dueDate: (
         <div className="flex items-center justify-center font-medium text-slate-700">
           {item.dueDate
@@ -454,13 +454,13 @@ export default function InvoiceGeneration() {
             : "—"}
         </div>
       ),
-
+ 
       currency: (
         <div className="flex items-center justify-center font-semibold text-slate-700">
           {item.currency || "USD"}
         </div>
       ),
-
+ 
       grandTotal: (
         <div className="text-right font-mono font-bold text-slate-900">
           {formatCurrency(
@@ -469,14 +469,14 @@ export default function InvoiceGeneration() {
           )}
         </div>
       ),
-
+ 
       status: (
         <div className="flex flex-col items-center justify-center gap-1">
           <StatusBadge
             label={item.invoiceStatus || "GENERATED"}
             size="sm"
           />
-
+ 
           {st === "REJECTED" && (
             <span
               className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${
@@ -492,7 +492,7 @@ export default function InvoiceGeneration() {
           )}
         </div>
       ),
-
+ 
       actions: (
         <div className="flex items-center justify-center">
           <ActionMenu
@@ -502,14 +502,14 @@ export default function InvoiceGeneration() {
                 icon: <Eye className="h-4 w-4 text-slate-600" />,
                 onClick: () => handleViewInvoice(item),
               },
-
+ 
               {
                 label: "Submit for Approval",
                 icon: <CheckCircle2 className="h-4 w-4 text-indigo-600" />,
                 hidden: st !== "GENERATED",
                 onClick: () => setSubmitTarget(item),
               },
-
+ 
               {
                 label: isSent
                   ? "Resend to Client"
@@ -520,7 +520,7 @@ export default function InvoiceGeneration() {
                   setSendTarget(item);
                 },
               },
-
+ 
               {
                 label: "Review Rejection",
                 icon: <AlertCircle className="h-4 w-4 text-rose-600" />,
@@ -534,7 +534,7 @@ export default function InvoiceGeneration() {
       ),
     };
   });
-
+ 
   return (
     <div className="w-full space-y-6">
       {/* Page Header */}
@@ -557,20 +557,20 @@ export default function InvoiceGeneration() {
           </Button>
         }
       />
-
+ 
       {/* Inline Error Notice if data fetch failed */}
       {error && (
         <div className="flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 shadow-sm">
           <AlertCircle className="h-5 w-5 flex-shrink-0 text-rose-600 mt-0.5" />
-
+ 
           <div className="flex-1 space-y-1">
             <div className="font-bold text-rose-900">
               Failed to Load Invoices
             </div>
-
+ 
             <div>{error}</div>
           </div>
-
+ 
           <Button
             size="sm"
             variant="outline"
@@ -582,7 +582,7 @@ export default function InvoiceGeneration() {
           </Button>
         </div>
       )}
-
+ 
       {/* KPI Section */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {/* Total Invoices */}
@@ -596,16 +596,16 @@ export default function InvoiceGeneration() {
               <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
                 Total Invoices
               </span>
-
+ 
               <Layers className="h-4 w-4 text-indigo-600" />
             </div>
-
+ 
             <div className="mt-2 text-2xl font-extrabold text-slate-900">
               {kpis.totalInvoices}
             </div>
           </div>
         </button>
-
+ 
         {/* Generated Invoices */}
         <button
           type="button"
@@ -617,26 +617,26 @@ export default function InvoiceGeneration() {
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
                 Generated Invoices
               </span>
-
+ 
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             </div>
-
+ 
             <div className="mt-2 text-2xl font-extrabold text-emerald-900">
               {kpis.generatedInvoices}
             </div>
           </div>
         </button>
-
+ 
         {/* Total Invoiced Amount */}
         <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 shadow-sm">
           <div className="flex items-center justify-between text-indigo-700">
             <span className="text-xs font-bold uppercase tracking-wider text-indigo-700">
               Total Invoiced Amount
             </span>
-
+ 
             <DollarSign className="h-4 w-4 text-indigo-600" />
           </div>
-
+ 
           <div className="mt-2 text-2xl font-extrabold text-indigo-950 font-mono">
             {formatCurrency(
               kpis.totalInvoicedAmount,
@@ -645,14 +645,14 @@ export default function InvoiceGeneration() {
           </div>
         </div>
       </div>
-
+ 
       {/* Controls & Invoice Queue Table */}
       <PageCard>
         <PageCardContent className="space-y-4 p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-
+ 
               <input
                 type="text"
                 placeholder="Search by invoice number, project, client, or snapshot..."
@@ -663,13 +663,13 @@ export default function InvoiceGeneration() {
                 className="w-full rounded-lg border border-slate-200 pl-9 pr-4 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
-
+ 
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
                 <Filter className="h-3.5 w-3.5" />
                 Status:
               </div>
-
+ 
               <select
                 value={statusFilter}
                 onChange={(e) =>
@@ -680,32 +680,32 @@ export default function InvoiceGeneration() {
                 <option value="ALL">
                   All Statuses
                 </option>
-
+ 
                 <option value="GENERATED">
                   Invoice Generated
                 </option>
-
+ 
                 <option value="PENDING_APPROVAL">
                   Pending Approval
                 </option>
-
+ 
                 <option value="APPROVED">
                   Approved
                 </option>
-
+ 
                 <option value="REJECTED">
                   Rejected
                 </option>
               </select>
             </div>
           </div>
-
+ 
           <div className="border-t border-slate-100 pt-3 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-800">
                 Invoice Queue
               </h3>
-
+ 
               <span className="text-xs text-slate-400 font-medium">
                 {filteredInvoices.length}{" "}
                 {filteredInvoices.length === 1
@@ -713,7 +713,7 @@ export default function InvoiceGeneration() {
                   : "Invoices"}
               </span>
             </div>
-
+ 
             <ARTable
               headers={tableHeaders}
               columns={tableColumns}
@@ -726,7 +726,7 @@ export default function InvoiceGeneration() {
                   : "No invoices generated yet"
               }
             />
-
+ 
             {!loading && filteredInvoices.length > 0 && (
               <Pagination
                 currentPage={currentPage}
@@ -738,7 +738,7 @@ export default function InvoiceGeneration() {
           </div>
         </PageCardContent>
       </PageCard>
-
+ 
       {/* Submit for Approval Modal */}
       <ConfirmationModal
         isOpen={Boolean(submitTarget)}
@@ -754,7 +754,7 @@ export default function InvoiceGeneration() {
         onCancel={() => !submitLoading && setSubmitTarget(null)}
         onConfirm={handleConfirmSubmit}
       />
-
+ 
       {/* Send to Client Modal */}
       <ConfirmationModal
         isOpen={Boolean(sendTarget)}
@@ -773,3 +773,4 @@ export default function InvoiceGeneration() {
     </div>
   );
 }
+ 
