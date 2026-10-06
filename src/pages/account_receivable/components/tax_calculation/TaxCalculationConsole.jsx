@@ -40,12 +40,23 @@ import BillingTaxPipeline from "./BillingTaxPipeline";
 const OCCURRENCE_DETAIL_BASE = "/account-receivable/tax-calculation/occurrence";
 const ALL = "ALL";
 
-const KPI_CARDS = [
-  { key: ALL, label: "Total", icon: Layers, color: "bg-[#0A0082] text-white" },
-  { key: PIPELINE_STAGES.UPCOMING, label: "Upcoming", icon: CalendarClock, color: "bg-slate-500 text-white" },
-  { key: PIPELINE_STAGES.READY_FOR_TAX, label: "Ready for Tax", icon: Calculator, color: "bg-amber-500 text-white" },
-  { key: PIPELINE_STAGES.TAX_CALCULATED, label: "Tax Calculated", icon: CheckCircle2, color: "bg-indigo-600 text-white" },
-  { key: PIPELINE_STAGES.INVOICED, label: "Invoiced", icon: FileText, color: "bg-emerald-600 text-white" },
+const STATUS_TABS = {
+  ALL: "ALL",
+  READY_TO_TAX: "READY_TO_TAX",
+  IN_TAX: "IN_TAX",
+  TAX_COMPLETED: "TAX_COMPLETED",
+  INVOICED: "INVOICED",
+};
+
+const TABLE_HEADERS = [
+  "Client",
+  "Project",
+  "Snapshot Number",
+  "Billing Period",
+  "Tax Region",
+  "Commercial Amount",
+  "Status",
+  "Actions",
 ];
 
 export default function TaxCalculationConsole() {
