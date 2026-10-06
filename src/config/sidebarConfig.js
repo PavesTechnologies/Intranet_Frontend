@@ -69,7 +69,7 @@ const XMS_REPORT_VIEWERS = [ROLES.MANAGER, ROLES.FINANCE, "Finance_Executive", .
  * wizard. See App.jsx route guards and Sidebar.jsx's AR submenu split.
  */
 export const AR_MAKER_ROLES = [ROLES.SUPER_ADMIN, ROLES.FINANCE_EXECUTIVE];
-export const AR_CHECKER_ROLES = [ROLES.SUPER_ADMIN, ROLES.FINANCE_MANAGER];
+export const AR_CHECKER_ROLES = [ROLES.FINANCE_MANAGER];
 export const AR_ALL_ROLES = [...new Set([...AR_MAKER_ROLES, ...AR_CHECKER_ROLES])];
 
 /**
