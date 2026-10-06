@@ -1,3 +1,11 @@
+/**
+ * NOT USED AT RUNTIME ANYMORE. APDashboardPage.jsx now renders entirely from the real
+ * GET /apm/dashboard/summary response (see dashboard/hooks/useDashboardSummary.js,
+ * dashboard/components/DashboardWidgets.jsx) — the components that used to read this file
+ * (APKpiGrid, InvoiceProcessingTube, FinancialHealthTube, InvoiceIntakeHealth in
+ * APDashboardComponents.jsx) are no longer imported by the page. Kept only for reference; safe to
+ * delete once no longer useful as one.
+ */
 export const dashboardKpis = [
   {
     title: "Total Invoices",

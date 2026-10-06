@@ -1,24 +1,11 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import {
-  RefreshCw,
-  FileText,
-  ShieldCheck,
-  Calculator,
-  Loader2,
-  AlertTriangle,
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
-} from "lucide-react";
 
-import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
-import StatusBadge from "../../../components/status/statusbadge";
-import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
 import { showStatusToast } from "../../../components/toastfy/toast";
-import { formatCurrency, formatDisplayDate } from "../utils/format";
+import { formatDisplayDate } from "../utils/format";
+import { PIPELINE_STAGES, getSnapshotStage, formatFullPeriod } from "../utils/taxPipeline";
 
 import {
   calculateTax,
@@ -39,46 +26,9 @@ import {
 } from "../services/billingDataAcquisitionService";
 import TaxCalculationConsole from "../components/tax_calculation/TaxCalculationConsole";
 import OccurrenceTaxCalculationDetail from "../components/tax_calculation/OccurrenceTaxCalculationDetail";
+import TaxCalculationDetailView from "../components/tax_calculation/TaxCalculationDetailView";
 
 const CONSOLE_PATH = "/account-receivable/tax-calculation";
-
-const formatRatePercentage = (rate) => {
-  if (rate === null || rate === undefined || rate === "") return null;
-  const num = Number(rate);
-  if (Number.isNaN(num)) return null;
-  return `${num.toFixed(2)}%`;
-};
-
-// Applicability is decided entirely by the backend tax engine; this only
-// maps known enum values to a readable label and falls back to a generic
-// title-case conversion so an unrecognized future value never breaks the UI.
-const APPLICABILITY_LABELS = {
-  SAME_JURISDICTION: "Same Jurisdiction",
-  DIFFERENT_JURISDICTION: "Different Jurisdiction",
-  ALL: "All Jurisdictions",
-};
-
-const humanizeApplicability = (value) => {
-  if (!value) return "Not specified";
-  if (APPLICABILITY_LABELS[value]) return APPLICABILITY_LABELS[value];
-  return String(value)
-    .toLowerCase()
-    .split("_")
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-};
-
-function Field({ label, children }) {
-  return (
-    <div>
-      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
-      <span className="mt-0.5 block truncate text-sm font-semibold text-slate-800" title={typeof children === "string" ? children : undefined}>
-        {children || "—"}
-      </span>
-    </div>
-  );
-}
 
 export default function TaxCalculation() {
   const { snapshotId, occurrenceId } = useParams();
@@ -146,7 +96,7 @@ export default function TaxCalculation() {
       try {
         // This hydration path only ever backs the T&M billing-snapshot detail
         // view (the occurrenceId branch above returns before this runs for
-        // Fixed Price/Recurring), so scope the match pool to T&M the same
+        // Milestone Plan/Recurring), so scope the match pool to T&M the same
         // way Data Acquisition and the console's T&M table do.
         const allConfigs = await fetchActiveBillingConfigurations();
         const configs = allConfigs.filter((cfg) => cfg.billingTypeCode === "TIME_MATERIAL");
@@ -255,7 +205,7 @@ export default function TaxCalculation() {
     });
   };
 
-  // Fixed Price / Recurring Billing Occurrences are a distinct backend
+  // Milestone Plan / Recurring Billing Occurrences are a distinct backend
   // contract (BillingOccurrenceController) from the T&M billing-snapshot
   // flow above — routed separately (tax-calculation/occurrence/:occurrenceId).
   // This branch renders only the occurrence view; every hook above still runs
@@ -320,10 +270,14 @@ export default function TaxCalculation() {
     snapshotData?.billingPeriodEnd ||
     snapshotData?.snapshotPeriodEnd;
 
-  const billingPeriod =
-    rawPeriodStart && rawPeriodEnd
-      ? formatBillingPeriod(rawPeriodStart, rawPeriodEnd)
-      : snapshotData?.billingPeriod || passedState.billingPeriod || "—";
+  const billingPeriod = formatFullPeriod(
+    rawPeriodStart,
+    rawPeriodEnd,
+    snapshotData?.billingPeriod || passedState.billingPeriod || "—"
+  );
+  // A snapshot carries no separate billing date; its period end is the date
+  // it was billed up to (same rule as the Billing Tax Pipeline list).
+  const billingDate = snapshotData?.billingDate || rawPeriodEnd;
 
   // Tax Breakdown: render whatever components the backend returned
   const components = Array.isArray(taxCalc?.components) ? taxCalc.components : [];
@@ -334,6 +288,7 @@ export default function TaxCalculation() {
     snapshotData?.subtotal ??
     acquisitionResults?.labor?.amount ??
     5500;
+  const billingAmount = snapshotData?.subtotal ?? taxableAmount;
   const totalTaxAmount = taxCalc?.totalTaxAmount ?? 0;
   const grandTotal = taxCalc?.grandTotal ?? (taxableAmount + totalTaxAmount);
   const isTaxCompleted = Boolean(taxCalc && (taxCalc.components !== undefined || taxCalc.totalTaxAmount !== undefined));
@@ -343,6 +298,45 @@ export default function TaxCalculation() {
     : isTaxCompleted
       ? (taxCalc?.status || "TAX_COMPLETED")
       : (snapshotData?.status || snapshotData?.billingStatus || "READY_FOR_TAX");
+
+  // One display status — the same backend-derived displayStatus as before,
+  // grouped the same way the Billing Tax Pipeline groups it.
+  const stage = isInvoiced
+    ? PIPELINE_STAGES.INVOICED
+    : isTaxCompleted
+      ? PIPELINE_STAGES.TAX_CALCULATED
+      : getSnapshotStage(displayStatus) || PIPELINE_STAGES.READY_FOR_TAX;
+  const statusLabel = String(displayStatus).toUpperCase() === "IN_TAX" ? "Tax in Progress" : undefined;
+
+  const viewInvoice = () =>
+    navigate(`/account-receivable/invoices/${effectiveSnapshotId}`, {
+      state: { from: "tax-calculation", source: "tax-calculation" },
+    });
+
+  const actionBar = isInvoiced
+    ? {
+        title: "Invoice Generated",
+        description: existingInvoice?.invoiceNumber
+          ? `Invoice ${existingInvoice.invoiceNumber} has been generated for this billing snapshot.`
+          : "An invoice has been generated for this billing snapshot.",
+        action: { label: "View Invoice", onClick: viewInvoice },
+      }
+    : isTaxCompleted
+      ? {
+          title: "Tax Calculation Verified",
+          description: "Ready to Generate Invoice",
+          action: { label: "Proceed to Invoice Generation", onClick: handleGenerateInvoice, disabled: calculating },
+        }
+      : {
+          title: "Ready for Tax Calculation",
+          description: "Source timesheets and taxable amount are verified. Calculate tax to compute the tax components.",
+          action: {
+            label: "Calculate Tax",
+            loadingLabel: "Calculating Tax...",
+            loading: calculating,
+            onClick: handleCalculateTax,
+          },
+        };
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5">
