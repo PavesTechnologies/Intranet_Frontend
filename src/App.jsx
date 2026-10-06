@@ -856,7 +856,7 @@ const AppRoutes = () => {
             />
             <Route
               path="invoice-approval"
-              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><InvoiceApproval /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_CHECKER_ROLES}><InvoiceApproval /></ProtectedRoute>}
             />
             <Route
               path="invoices/:snapshotId"
