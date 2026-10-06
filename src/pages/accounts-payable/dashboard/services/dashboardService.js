@@ -35,6 +35,36 @@ export const dashboardService = {
       throw withNormalizedStatus(error);
     }
   },
+
+  /**
+   * Searches the full activity history — unlike `recent_activity` on the summary response (capped
+   * to whatever the dashboard already loaded), this hits the backend's audit log directly
+   * (dashboard_dao.py's search_audit), so it finds activity well past what the dashboard shows.
+   * Same visibility rules as /summary (authorization comes from the caller's token — an
+   * Invoice-only user can never search up vendor/procurement activity), and the same date-range
+   * limits (30 days default, 366 max; an out-of-range span or unknown entity_type is a 422).
+   *
+   * @param {{search?: string, entityType?: string, fromDate?: string, toDate?: string, page?: number, pageSize?: number}} [params]
+   * @returns {Promise<{period: object, page: number, page_size: number, total: number, items: Array}>}
+   *   `items` share recent_activity's exact shape: {title, entity_type, entity_id, reference, actor, occurred_at}.
+   */
+  async getActivity({ search, entityType, fromDate, toDate, page, pageSize } = {}) {
+    try {
+      const response = await api.get(`${AP_BASE_URL}/dashboard/activity`, {
+        params: {
+          search: search || undefined,
+          entity_type: entityType || undefined,
+          from_date: fromDate || undefined,
+          to_date: toDate || undefined,
+          page: page || undefined,
+          page_size: pageSize || undefined,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      throw withNormalizedStatus(error);
+    }
+  },
 };
 
 export default dashboardService;

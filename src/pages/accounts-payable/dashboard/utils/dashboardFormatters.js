@@ -28,6 +28,31 @@ export function prettifyKey(key) {
   return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/**
+ * "2026-10-05T14:52:00Z" -> "2 min ago" / "3 hours ago" / "Yesterday" — for Recent Activity rows.
+ * Falls back to an absolute date once an item is more than 6 days old, where "N days ago" stops
+ * being a useful read and the actual date is more informative.
+ */
+export function formatRelativeTime(occurredAt) {
+  if (!occurredAt) return "";
+  const date = new Date(occurredAt);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.round(diffMs / 60000);
+  if (diffMinutes < 1) return "Just now";
+  if (diffMinutes < 60) return `${diffMinutes} min ago`;
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+
+  const diffDays = Math.round(diffHours / 24);
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+
+  return date.toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" });
+}
+
 /** "2026-09-06" + "2026-10-05" -> "Sep 6 – Oct 5, 2026", for the header subtitle. */
 export function formatPeriodRange(fromDate, toDate) {
   if (!fromDate || !toDate) return "";
