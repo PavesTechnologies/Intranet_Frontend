@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -29,13 +29,24 @@ const PAGE_SIZE = 10;
  * create an invoice (INVOICE_CREATE), and if the caller's requested defaultQueueType isn't one
  * of this user's visible tabs (see InvoiceStatusTabs/getVisibleQueueTypes), fall back to their
  * first visible one instead of landing on a tab they can't see.
+ *
+ * The starting tab can also be deep-linked via `?queue=<QUEUE_TYPES value>` (e.g. the AP
+ * Dashboard's "Approved Invoices" tile links to `?queue=approved` so it opens straight on the
+ * Approved tab instead of Invoice Management's default) — same one-shot
+ * `useState(searchParams.get(...) || default)` pattern already used for `?prId=` in
+ * VendorSelectionTab/QuotationTab. An unrecognized or not-currently-visible value is ignored, same
+ * as an unrecognized defaultQueueType.
  */
 export default function InvoiceQueueView({ title, subtitle, defaultQueueType, showUploadAction = false, showKpis = false }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const permissions = useApPermissions();
   const visibleQueueTypes = getVisibleQueueTypes(permissions);
+  const requestedQueueType = searchParams.get("queue");
   const [queueType, setQueueType] = useState(
-    visibleQueueTypes.includes(defaultQueueType) ? defaultQueueType : visibleQueueTypes[0],
+    requestedQueueType && visibleQueueTypes.includes(requestedQueueType)
+      ? requestedQueueType
+      : visibleQueueTypes.includes(defaultQueueType) ? defaultQueueType : visibleQueueTypes[0],
   );
   const { filters, setSearch, setInvoiceType, setStatus, setDateRange, setPage, resetFilters, hasActiveFilters } =
     useInvoiceFilters();
