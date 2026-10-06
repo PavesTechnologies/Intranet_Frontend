@@ -599,17 +599,7 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
  
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
-      {/* A. Breadcrumb Navigation */}
-      <Breadcrumb
-        items={[
-          { label: "Home", to: "/dashboard" },
-          { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" },
-          { label: "Tax Calculation", to: backToTaxUrl },
-          { label: "Invoice Generation" },
-        ]}
-      />
- 
- 
+      
       {/* Page Header */}
       <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1.5">
@@ -669,38 +659,13 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
             onClick={() => navigate(backToTaxUrl)}
             className="flex items-center gap-1.5 text-xs text-slate-700"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Tax Calculation
           </Button>
  
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => loadData(true)}
-            disabled={refreshing || submitting || generating || submittingForApproval}
-            className="flex items-center gap-1.5 text-xs text-slate-700"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />{" "}
-            {isInvoiceGenerated ? "Refresh" : "Refresh Preview"}
-          </Button>
+
         </div>
       </div>
- 
-      {/* A. AR Lifecycle Stepper */}
-      <InvoiceLifecycleStepper
-        generationState={generating ? "GENERATING" : isInvoiceGenerated ? "GENERATED" : "DRAFT"}
-        invoiceStatus={invoice?.invoiceStatus}
-        backToTaxUrl={backToTaxUrl}
-      />
- 
-      {/* B. Invoice Context Cards */}
-      <InvoiceContextCards
-        projectName={projectName}
-        clientName={clientName}
-        billingPeriod={billingPeriod}
-        currency={currency}
-      />
- 
-      {/* C. Invoice Banner (hidden while modal is generating) */}
+
+      {/* Draft status and errors belong above the preview. */}
       {!generating && (
         <InvoiceDraftBanner
           isInvoiceGenerated={isInvoiceGenerated}
@@ -710,6 +675,7 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
           generating={generating}
           generateError={generateError}
           onGenerateInvoice={handleGenerateInvoice}
+          showGenerateAction={false}
           onSubmitForApproval={handleSubmitForApproval}
           submittingForApproval={submittingForApproval}
           onViewInvoice={() => {
@@ -719,8 +685,9 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
           onBackToTax={() => navigate(backToTaxUrl)}
         />
       )}
- 
-      {/* D. Document-Style Invoice: rendered in all 3 states (with live isGenerating state in State B) */}
+
+
+      {/* Preview keeps the richer cards and tables for review before generation. */}
       <InvoicePreviewDocument
         invoice={invoice || previewInvoice}
         snapshotId={effectiveId}
@@ -729,8 +696,29 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
         companyProfile={companyProfile}
         isGenerating={generating}
       />
- 
- 
+
+      {!isInvoiceGenerated && (
+        <div className="flex justify-end">
+          <Button
+            variant="primary"
+            size="small"
+            onClick={handleGenerateInvoice}
+            disabled={generating || !isTaxCompleted}
+            className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center justify-center gap-2 text-xs font-semibold shadow-xs px-4 py-2"
+          >
+            {generating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Generating Official Invoice...
+              </>
+            ) : (
+              <>
+                <FileText className="h-4 w-4" /> Generate Official Invoice
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
       {/* E. Generation Modal (GENERATING -> GENERATED -> ERROR) */}
       <InvoiceGenerationModal
         isOpen={generationModalOpen}

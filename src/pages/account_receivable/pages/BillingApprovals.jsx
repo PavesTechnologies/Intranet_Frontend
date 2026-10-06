@@ -185,7 +185,7 @@ function ReviewTable({ title, headers, rows, emptyMessage }) {
         </div>
         {rows.length > 0 ? (
           <div className="overflow-x-auto p-2">
-            <table className="w-full text-xs">
+            <table className="w-full text-left text-xs">
               <thead>
                 <tr>
                   {headers.map((header) => (
@@ -197,7 +197,7 @@ function ReviewTable({ title, headers, rows, emptyMessage }) {
                 {rows.map((row) => (
                   <tr key={row.key}>
                     {row.cells.map((cell, index) => (
-                      <td key={index} className={`px-3 py-2 ${index === 0 ? "font-medium text-slate-700" : "text-slate-900"}`}>
+                      <td key={index} className={`px-3 py-2 text-left ${index === 0 ? "font-medium text-slate-700" : "text-slate-900"}`}>
                         {cell ?? "—"}
                       </td>
                     ))}

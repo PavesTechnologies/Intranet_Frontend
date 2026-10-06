@@ -43,7 +43,10 @@ export default function InvoicePreviewDocument({
   snapshotData,
   companyProfile,
   isGenerating = false,
+  presentation = "card",
+  showStatus = true,
 }) {
+  const isPlain = presentation === "plain";
   const isDraft =
     !invoice?.invoiceNumber ||
     invoice?.invoiceStatus === "DRAFT_PREVIEW" ||
@@ -337,13 +340,13 @@ export default function InvoicePreviewDocument({
   const hasNotesOrTerms = Boolean(additionalNotes || termsAndConditions);
 
   return (
-    <div className="bg-white border border-slate-300 rounded-lg shadow-sm p-6 sm:p-10 space-y-7 text-slate-800 w-full print:border-none print:shadow-none print:p-0">
+    <div className={`bg-white ${isPlain ? "p-0 sm:p-2 space-y-8" : "border border-slate-300 rounded-lg shadow-sm p-6 sm:p-10 space-y-7"} text-slate-800 w-full print:border-none print:shadow-none print:p-0`}>
       {/* ========================================================================= */}
       {/* 1. DOCUMENT HEADER: Seller Information (Left) & Invoice Metadata (Right)  */}
       {/* ========================================================================= */}
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 pb-6 border-b border-slate-200">
+      <div className={`gap-6 pb-6 border-b border-slate-200 md:items-start ${isPlain ? "grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_420px]" : "flex flex-col md:flex-row md:justify-between"}`}>
         {/* Left: Seller Corporate Profile */}
-        <div className="space-y-2.5 max-w-md">
+        <div className={`space-y-2.5 ${isPlain ? "min-w-0" : "max-w-md"}`}>
           <img
             src={logoSrc}
             alt="Company Logo"
@@ -388,12 +391,9 @@ export default function InvoicePreviewDocument({
         </div>
 
         {/* Right: Tax Invoice Title & Authoritative Metadata */}
-        <div className="md:flex md:flex-col md:items-end space-y-3 shrink-0">
+        <div className={`md:flex md:flex-col space-y-3 ${isPlain ? "min-w-0 md:items-stretch" : "shrink-0 md:items-end"}`}>
           <div className="md:text-right">
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 uppercase">
-              TAX INVOICE
-            </h1>
-            <div className="mt-1 flex md:justify-end">
+            {showStatus && <div className="mt-1 flex md:justify-end">
               <span
                 className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold ${
                   isGenerating
@@ -416,13 +416,13 @@ export default function InvoicePreviewDocument({
                   invoiceStatus
                 )}
               </span>
-            </div>
+            </div>}
           </div>
 
-          <div className="space-y-1.5 text-xs text-slate-700 w-full md:w-auto min-w-[270px] bg-slate-50/70 p-3 rounded-md border border-slate-200/80">
-            <div className="grid grid-cols-[105px_12px_1fr] items-center">
+          <div className={`space-y-2 text-xs text-slate-700 w-full ${isPlain ? "py-3 border-y border-slate-300" : "md:w-auto min-w-[270px] bg-slate-50/70 p-3 rounded-md border border-slate-200/80"}`}>
+            <div className={`grid items-center gap-x-3 ${isPlain ? "grid-cols-[135px_minmax(0,1fr)]" : "grid-cols-[105px_12px_1fr]"}`}>
               <span className="text-slate-500 font-medium">Invoice Number</span>
-              <span className="text-slate-400 font-semibold">:</span>
+              {!isPlain && <span className="text-slate-400 font-semibold">:</span>}
               <span
                 className={`font-mono ${
                   isGenerating
@@ -441,9 +441,9 @@ export default function InvoicePreviewDocument({
                 )}
               </span>
             </div>
-            <div className="grid grid-cols-[105px_12px_1fr] items-center">
+            <div className={`grid items-center gap-x-3 ${isPlain ? "grid-cols-[135px_minmax(0,1fr)]" : "grid-cols-[105px_12px_1fr]"}`}>
               <span className="text-slate-500 font-medium">Invoice Date</span>
-              <span className="text-slate-400 font-semibold">:</span>
+              {!isPlain && <span className="text-slate-400 font-semibold">:</span>}
               <span className="font-medium text-slate-900">
                 {isGenerating ? (
                   <span className="text-slate-500 italic">Assigning...</span>
@@ -456,9 +456,9 @@ export default function InvoicePreviewDocument({
                 )}
               </span>
             </div>
-            <div className="grid grid-cols-[105px_12px_1fr] items-center">
+            <div className={`grid items-center gap-x-3 ${isPlain ? "grid-cols-[135px_minmax(0,1fr)]" : "grid-cols-[105px_12px_1fr]"}`}>
               <span className="text-slate-500 font-medium">Due Date</span>
-              <span className="text-slate-400 font-semibold">:</span>
+              {!isPlain && <span className="text-slate-400 font-semibold">:</span>}
               <span className="font-medium text-slate-900">
                 {isGenerating ? (
                   <span className="text-slate-500 italic">Calculating...</span>
@@ -471,9 +471,9 @@ export default function InvoicePreviewDocument({
                 )}
               </span>
             </div>
-            <div className="grid grid-cols-[105px_12px_1fr] items-center">
+            <div className={`grid items-center gap-x-3 ${isPlain ? "grid-cols-[135px_minmax(0,1fr)]" : "grid-cols-[105px_12px_1fr]"}`}>
               <span className="text-slate-500 font-medium">Currency</span>
-              <span className="text-slate-400 font-semibold">:</span>
+              {!isPlain && <span className="text-slate-400 font-semibold">:</span>}
               <span className="font-mono font-bold text-slate-900">{currency}</span>
             </div>
           </div>
@@ -483,7 +483,7 @@ export default function InvoicePreviewDocument({
       {/* ========================================================================= */}
       {/* 2. BILL TO & PROJECT DETAILS SECTION                                      */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 rounded-lg border border-slate-200 bg-slate-50/50">
+      <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${isPlain ? "py-5 border-b border-slate-200" : "p-5 rounded-lg border border-slate-200 bg-slate-50/50"}`}>
         {/* Left Column: Bill To */}
         <div className="space-y-3">
           <div className="border-b border-slate-200 pb-1.5">
@@ -594,21 +594,21 @@ export default function InvoicePreviewDocument({
             No line items recorded for this billing snapshot.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-md border border-slate-200">
+          <div className={`overflow-x-auto ${isPlain ? "border-y border-slate-300" : "rounded-md border border-slate-200"}`}>
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                  <th className="py-2.5 px-3 text-left w-10">#</th>
-                  <th className="py-2.5 px-3 text-left">
+                  <th className="py-2.5 px-3 !text-left w-10">#</th>
+                  <th className="py-2.5 px-3 !text-left">
                     {hasRole ? "Resource / Item" : "Description / Item"}
                   </th>
-                  {hasRole && <th className="py-2.5 px-3 text-left">Role</th>}
-                  {hasWorkDate && <th className="py-2.5 px-3 text-left">Work Date</th>}
-                  <th className="py-2.5 px-3 text-right">
+                  {hasRole && <th className="py-2.5 px-3 !text-left">Role</th>}
+                  {hasWorkDate && <th className="py-2.5 px-3 !text-left">Work Date</th>}
+                  <th className="py-2.5 px-3 !text-left">
                     {hasHours ? "Hours / Qty" : "Quantity"}
                   </th>
-                  <th className="py-2.5 px-3 text-right">Rate</th>
-                  <th className="py-2.5 pr-4 pl-3 text-right">Amount</th>
+                  <th className="py-2.5 px-3 !text-left">Rate</th>
+                  <th className="py-2.5 pr-4 pl-3 !text-left">Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -617,15 +617,15 @@ export default function InvoicePreviewDocument({
                     key={it.id || idx}
                     className="hover:bg-slate-50/50 transition-colors"
                   >
-                    <td className="py-2.5 px-3 text-slate-400 font-medium">{idx + 1}</td>
-                    <td className="py-2.5 px-3 text-slate-900 font-semibold">
+                    <td className="py-2.5 px-3 !text-left text-slate-400 font-medium">{idx + 1}</td>
+                    <td className="py-2.5 px-3 !text-left text-slate-900 font-semibold">
                       {it.itemName || it.resourceName || it.description || it.employee || "Line Item"}
                     </td>
                     {hasRole && (
-                      <td className="py-2.5 px-3 text-slate-600">{it.role || "—"}</td>
+                      <td className="py-2.5 px-3 !text-left text-slate-600">{it.role || "—"}</td>
                     )}
                     {hasWorkDate && (
-                      <td className="py-2.5 px-3 text-slate-600 font-medium">
+                      <td className="py-2.5 px-3 !text-left text-slate-600 font-medium">
                         {it.workDate
                           ? formatDisplayDate(it.workDate)
                           : it.date
@@ -633,19 +633,19 @@ export default function InvoicePreviewDocument({
                           : "—"}
                       </td>
                     )}
-                    <td className="py-2.5 px-3 text-right font-mono font-medium text-slate-700">
+                    <td className="py-2.5 px-3 !text-left font-mono font-medium text-slate-700">
                       {it.hours !== undefined && it.hours !== null
                         ? Number(it.hours).toFixed(2)
                         : it.quantity !== undefined && it.quantity !== null
                         ? Number(it.quantity).toFixed(2)
                         : "—"}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-medium text-slate-700">
+                    <td className="py-2.5 px-3 !text-left font-mono font-medium text-slate-700">
                       {it.rate !== undefined && it.rate !== null
                         ? formatCurrency(it.rate, currency)
                         : "—"}
                     </td>
-                    <td className="py-2.5 pr-4 pl-3 text-right font-mono font-bold text-slate-900">
+                    <td className="py-2.5 pr-4 pl-3 !text-left font-mono font-bold text-slate-900">
                       {formatCurrency(it.amount ?? it.totalAmount ?? 0, currency)}
                     </td>
                   </tr>
@@ -671,15 +671,15 @@ export default function InvoicePreviewDocument({
             No tax components available
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-md border border-slate-200">
+          <div className={`overflow-x-auto ${isPlain ? "border-y border-slate-300" : "rounded-md border border-slate-200"}`}>
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                  <th className="py-2.5 px-3 text-left">Tax Type</th>
-                  <th className="py-2.5 px-3 text-left">Applicability</th>
-                  <th className="py-2.5 px-3 text-right">Rate</th>
-                  <th className="py-2.5 px-3 text-right">Taxable Amount</th>
-                  <th className="py-2.5 pr-4 pl-3 text-right">Tax Amount</th>
+                  <th className="py-2.5 px-3 !text-left">Tax Type</th>
+                  <th className="py-2.5 px-3 !text-left">Applicability</th>
+                  <th className="py-2.5 px-3 !text-left">Rate</th>
+                  <th className="py-2.5 px-3 !text-left">Taxable Amount</th>
+                  <th className="py-2.5 pr-4 pl-3 !text-left">Tax Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -688,31 +688,31 @@ export default function InvoicePreviewDocument({
                     key={comp.id || idx}
                     className="hover:bg-slate-50/50 transition-colors"
                   >
-                    <td className="py-2.5 px-3 font-semibold text-slate-900">
+                    <td className="py-2.5 px-3 !text-left font-semibold text-slate-900">
                       {comp.taxTypeCode || comp.taxComponent}
                     </td>
-                    <td className="py-2.5 px-3 text-slate-600">
+                    <td className="py-2.5 px-3 !text-left text-slate-600">
                       {humanizeApplicability(comp.applicability)}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-700">
+                    <td className="py-2.5 px-3 !text-left font-mono font-semibold text-slate-700">
                       {formatRatePercentage(comp.rate) ?? "—"}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-medium text-slate-700">
+                    <td className="py-2.5 px-3 !text-left font-mono font-medium text-slate-700">
                       {comp.taxableAmount !== null && comp.taxableAmount !== undefined
                         ? formatCurrency(comp.taxableAmount, currency)
                         : "—"}
                     </td>
-                    <td className="py-2.5 pr-4 pl-3 text-right font-mono font-bold text-slate-900">
+                    <td className="py-2.5 pr-4 pl-3 !text-left font-mono font-bold text-slate-900">
                       {formatCurrency(comp.amount, currency)}
                     </td>
                   </tr>
                 ))}
                 {/* Total Tax Summary Row inside Tax Table */}
                 <tr className="border-t-2 border-slate-300 bg-slate-50/80 font-bold">
-                  <td colSpan={4} className="py-2.5 px-3 text-right text-slate-800">
+                  <td colSpan={4} className="py-2.5 px-3 !text-left text-slate-800">
                     Total Tax
                   </td>
-                  <td className="py-2.5 pr-4 pl-3 text-right font-mono text-slate-900 font-extrabold">
+                  <td className="py-2.5 pr-4 pl-3 !text-left font-mono text-slate-900 font-extrabold">
                     {formatCurrency(totalTax, currency)}
                   </td>
                 </tr>
@@ -727,7 +727,7 @@ export default function InvoicePreviewDocument({
       {/* ========================================================================= */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
         {/* Left: Tax Context */}
-        <div className="p-5 rounded-lg border border-slate-200 bg-slate-50/50 space-y-3 flex flex-col justify-between">
+        <div className={`${isPlain ? "py-4 border-y border-slate-200" : "p-5 rounded-lg border border-slate-200 bg-slate-50/50"} space-y-3 flex flex-col justify-between`}>
           <div>
             <div className="border-b border-slate-200 pb-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
@@ -771,7 +771,7 @@ export default function InvoicePreviewDocument({
         </div>
 
         {/* Right: Financial Summary */}
-        <div className="p-5 rounded-lg border border-slate-200 bg-slate-50/50 space-y-3 flex flex-col justify-between">
+        <div className={`${isPlain ? "py-4" : "p-5 rounded-lg border border-slate-200 bg-slate-50/50"} space-y-3 flex flex-col justify-between`}>
           <div className="border-b border-slate-200 pb-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
               FINANCIAL SUMMARY
@@ -802,11 +802,11 @@ export default function InvoicePreviewDocument({
           </div>
 
           {/* Strong Grand Total Box */}
-          <div className="rounded-md bg-slate-900 text-white p-3.5 flex items-center justify-between shadow-xs">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+          <div className={`${isPlain ? "border-t-2 border-slate-900 pt-3 text-slate-900" : "rounded-md bg-slate-900 text-white p-3.5 shadow-xs"} flex items-center justify-between`}>
+            <span className={`text-xs font-bold uppercase tracking-wider ${isPlain ? "text-slate-600" : "text-slate-200"}`}>
               Grand Total
             </span>
-            <span className="font-mono text-lg sm:text-xl font-black text-white">
+            <span className={`font-mono text-lg sm:text-xl font-black ${isPlain ? "text-slate-900" : "text-white"}`}>
               {formatCurrency(grandTotal, currency)}
             </span>
           </div>

@@ -337,22 +337,7 @@ export default function TaxCalculation() {
       onBack={() => navigate(CONSOLE_PATH)}
       headerActions={
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => navigate("/account-receivable/billing-data-acquisition/workspace")}
-            className="text-xs text-slate-600"
-          >
-            Acquisition Detail
-          </Button>
-          <Button
-            variant="outline"
-            size="small"
-            onClick={loadData}
-            className="flex items-center gap-1.5 text-xs text-slate-600"
-          >
-            <RefreshCw className="h-3.5 w-3.5" /> Refresh
-          </Button>
+ 
         </div>
       }
       billingType="Time & Material"
