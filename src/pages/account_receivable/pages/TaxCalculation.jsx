@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { RefreshCw } from "lucide-react";
 
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
@@ -14,7 +15,6 @@ import {
 } from "../services/taxCalculationService";
 import {
   getInvoice,
-  getInvoiceErrorMessage,
 } from "../services/invoiceService";
 import {
   getBillingSnapshotByPeriod,
@@ -22,7 +22,6 @@ import {
   saveAcquiredSnapshotMetadata,
   fetchActiveBillingConfigurations,
   formatBillingPeriod,
-  toIsoDateOnly,
 } from "../services/billingDataAcquisitionService";
 import TaxCalculationConsole from "../components/tax_calculation/TaxCalculationConsole";
 import OccurrenceTaxCalculationDetail from "../components/tax_calculation/OccurrenceTaxCalculationDetail";
@@ -42,7 +41,7 @@ export default function TaxCalculation() {
   const [loading, setLoading] = useState(Boolean(snapshotId));
   const [calculating, setCalculating] = useState(false);
   const [calcError, setCalcError] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
+  const [, setErrorMsg] = useState("");
 
   // Invoice workflow states
   const [hasInvoice, setHasInvoice] = useState(false);
@@ -69,7 +68,7 @@ export default function TaxCalculation() {
       }
     } catch (err) {
       // Not yet calculated: expected when navigating from Billing Data Acquisition
-      console.log("[TaxCalculation] No previous tax calculation found, awaiting calculation.");
+      console.log("[TaxCalculation] No previous tax calculation found, awaiting calculation.", err?.message);
     }
 
     // 2. Check if invoice already generated on backend for this snapshot
@@ -304,8 +303,8 @@ export default function TaxCalculation() {
   const statusLabel = String(displayStatus).toUpperCase() === "IN_TAX" ? "Tax in Progress" : undefined;
 
   const viewInvoice = () =>
-    navigate(`/account-receivable/invoices/${effectiveSnapshotId}`, {
-      state: { from: "tax-calculation", source: "tax-calculation" },
+    navigate(`/account-receivable/invoices/${existingInvoice?.invoiceId || effectiveSnapshotId}`, {
+      state: { from: "tax-calculation", source: "tax-calculation", invoice: existingInvoice },
     });
 
   const actionBar = isInvoiced
@@ -319,7 +318,7 @@ export default function TaxCalculation() {
     : isTaxCompleted
       ? {
           title: "Tax Calculation Verified",
-          description: "Ready to Generate Invoice",
+          description: "Tax components and grand total are verified. Click \"Proceed to Invoice Generation\" to review the invoice preview and generate the invoice.",
           action: { label: "Proceed to Invoice Generation", onClick: handleGenerateInvoice, disabled: calculating },
         }
       : {
@@ -337,14 +336,24 @@ export default function TaxCalculation() {
     <TaxCalculationDetailView
       onBack={() => navigate(CONSOLE_PATH)}
       headerActions={
-        <Button
-          variant="outline"
-          size="small"
-          onClick={() => navigate("/account-receivable/billing-data-acquisition/workspace")}
-          className="text-xs text-slate-600"
-        >
-          Acquisition Detail
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="small"
+            onClick={() => navigate("/account-receivable/billing-data-acquisition/workspace")}
+            className="text-xs text-slate-600"
+          >
+            Acquisition Detail
+          </Button>
+          <Button
+            variant="outline"
+            size="small"
+            onClick={loadData}
+            className="flex items-center gap-1.5 text-xs text-slate-600"
+          >
+            <RefreshCw className="h-3.5 w-3.5" /> Refresh
+          </Button>
+        </div>
       }
       billingType="Time & Material"
       stage={stage}
@@ -365,6 +374,7 @@ export default function TaxCalculation() {
       isTaxCompleted={isTaxCompleted}
       components={components}
       pendingMessage="Tax has not been calculated for this billing snapshot yet."
+      summaryNotes={[taxCalc?.taxCalculatedAt ? `Calculated on ${formatDisplayDate(taxCalc.taxCalculatedAt)}` : null].filter(Boolean)}
       calcError={calcError}
       actionBar={actionBar}
     />

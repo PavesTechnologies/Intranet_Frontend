@@ -195,7 +195,7 @@ export default function TimesheetDataTable({
                     ? "Timesheets were found for this billing period, but none have been approved for billing yet."
                     : billingStatus === "CONFIGURATION_REQUIRED"
                     ? "Billing configuration is incomplete. Please complete setup in Project Configuration to enable billing acquisition."
-                    : billingStatus === "ALREADY_BILLED"
+                    : billingStatus === "ALREADY_BILLED" || billingStatus === "INVOICED"
                     ? "Timesheet records for this billing period have already been processed into an invoice."
                     : billingStatus === "ACQUISITION_FAILED"
                     ? "Source billing data could not be retrieved due to a system error. Click 'Retry Acquisition' to try again."

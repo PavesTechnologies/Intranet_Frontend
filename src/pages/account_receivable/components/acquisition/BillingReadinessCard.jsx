@@ -24,11 +24,26 @@ export default function BillingReadinessCard({
 }) {
   if (!config) return null;
 
-  const status = config.billingStatus || "NOT_ACQUIRED";
+  const rawStatus =
+    config.snapshotLifecycleStatus ||
+    acquisitionResults?.snapshotLifecycleStatus ||
+    config.billingStatus ||
+    acquisitionResults?.billingStatus ||
+    "NOT_ACQUIRED";
+  const status = String(rawStatus).toUpperCase();
   const laborRes = acquisitionResults?.labor || {};
   const readiness = laborRes.readiness || {};
 
-  const isApprovedStatus = ["READY", "READY_TO_TAX", "READY_FOR_TAX", "TAX_COMPLETED", "IN_TAX"].includes(status);
+  const isApprovedStatus = [
+    "READY",
+    "READY_TO_TAX",
+    "READY_FOR_TAX",
+    "TAX_COMPLETED",
+    "IN_TAX",
+    "INVOICED",
+    "ALREADY_BILLED",
+    "BILLED",
+  ].includes(status);
   const approvedCount = readiness.approvedCount ?? (isApprovedStatus ? laborRes.records?.length || 0 : 0);
   const pendingCount = readiness.pendingCount ?? 0;
   const approvedHours = readiness.approvedHours ?? (isApprovedStatus ? laborRes.records?.reduce((acc, r) => acc + Number(r.hours || 0), 0) : 0);
@@ -42,7 +57,7 @@ export default function BillingReadinessCard({
           <FileCheck className="h-4 w-4 text-indigo-600" />
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Billing Readiness</h3>
         </div>
-        <StatusBadge label={status} size="sm" />
+        <StatusBadge label={config.snapshotLifecycleStatus || config.billingStatus || "NOT_ACQUIRED"} size="sm" />
       </div>
 
       {/* State-driven Content */}
@@ -142,8 +157,8 @@ export default function BillingReadinessCard({
             Billing configuration is incomplete. Complete setup before acquiring billing data.
           </p>
         </div>
-      ) : status === "ALREADY_BILLED" ? (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-900 space-y-1">
+      ) : status === "ALREADY_BILLED" || status === "INVOICED" || status === "BILLED" ? (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-900 space-y-2">
           <div className="flex items-center gap-1.5 font-bold text-blue-900 text-xs">
             <FileSpreadsheet className="h-4 w-4 text-blue-600 flex-shrink-0" />
             Billing Period Invoiced
@@ -151,15 +166,34 @@ export default function BillingReadinessCard({
           <p className="text-xs text-blue-800">
             This billing period has already been invoiced.
           </p>
+          {(approvedCount > 0 || approvedHours > 0) && (
+            <div className="flex items-center gap-3 text-xs font-semibold text-blue-800 border-t border-blue-200/60 pt-1.5">
+              <span>Billed Records: <strong className="font-mono">{approvedCount}</strong></span>
+              <span>&middot;</span>
+              <span>Total Hours: <strong className="font-mono">{approvedHours} hrs</strong></span>
+            </div>
+          )}
         </div>
-      ) : (
+      ) : status === "ACQUISITION_FAILED" || status === "FAILED" || status === "ERROR" ? (
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-900 space-y-1">
           <div className="flex items-center gap-1.5 font-bold text-rose-900 text-xs">
             <XCircle className="h-4 w-4 text-rose-600 flex-shrink-0" />
             Acquisition Failed
           </div>
           <p className="text-xs text-rose-800">
-            We couldn't retrieve billing data at this time.
+            {laborRes.error ||
+              acquisitionResults?.message ||
+              "We couldn't retrieve billing data at this time. Please try again."}
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-800 space-y-1">
+          <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+            <Info className="h-4 w-4 text-slate-500 flex-shrink-0" />
+            {rawStatus}
+          </div>
+          <p className="text-xs text-slate-600">
+            Status: {rawStatus}
           </p>
         </div>
       )}

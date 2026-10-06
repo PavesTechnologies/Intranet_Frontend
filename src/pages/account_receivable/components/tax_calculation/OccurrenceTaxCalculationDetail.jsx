@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { RefreshCw } from "lucide-react";
 
 import { PageCard } from "../../../../components/Cards/PageCard";
+import Button from "../../../../components/Button/Button";
 import Loader from "../../../../components/ui/Loader";
+import BackIconButton from "../common/BackIconButton";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import { formatDisplayDate } from "../../utils/format";
 import {
@@ -11,12 +14,9 @@ import {
   getOccurrenceStage,
   formatFullPeriod,
 } from "../../utils/taxPipeline";
-import BackIconButton from "../common/BackIconButton";
-import TaxCalculationDetailView from "./TaxCalculationDetailView";
 
 import {
   getBillingOccurrence,
-  getOccurrenceTaxCalculation,
   calculateOccurrenceTax,
   getOccurrenceErrorMessage,
   mergeOccurrenceWithTaxCalc,
@@ -25,64 +25,32 @@ import {
   getActiveTaxRateConfigurations,
   getTaxRateConfigurationsByTaxRegion,
 } from "../../services/taxRateConfigurationService";
+import TaxCalculationDetailView from "./TaxCalculationDetailView";
 
 const CONSOLE_PATH = "/account-receivable/tax-calculation";
 
-/**
- * Tax Calculation detail view for a Milestone Plan / Recurring Billing
- * Occurrence. Renders through the same TaxCalculationDetailView as the T&M
- * snapshot detail (TaxCalculation.jsx) so both billing flows share one
- * layout, but reads/writes exclusively through the BillingOccurrenceController
- * endpoints — it never touches the billing-snapshot tax APIs.
- */
 export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const passedState = location.state || {};
 
-  const [occurrence, setOccurrence] = useState(passedState.occurrence || null);
-  const [taxConfig, setTaxConfig] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [occurrence, setOccurrence] = useState(location.state?.occurrence || null);
+  const [loading, setLoading] = useState(!occurrence);
   const [calculating, setCalculating] = useState(false);
   const [calcError, setCalcError] = useState("");
 
+  // Applicable tax configuration for preview when tax is pending
+  const [taxConfig, setTaxConfig] = useState(null);
+
   const loadOccurrenceDetail = async () => {
-    setLoading(true);
-    setCalcError("");
     try {
-      const base = await getBillingOccurrence(occurrenceId);
-      let merged = base;
+      const data = await getBillingOccurrence(occurrenceId);
+      setOccurrence(data);
 
-      const periodStatusUpper = (base?.periodStatus || "").toUpperCase();
-      const taxStatusUpper = (base?.taxStatus || "").toUpperCase();
-      const calcStatusUpper = (base?.taxCalculationStatus || "").toUpperCase();
-      const isCalculated =
-        periodStatusUpper === "TAX_CALCULATED" ||
-        taxStatusUpper === "TAX_CALCULATED" ||
-        taxStatusUpper === "CALCULATED" ||
-        calcStatusUpper === "CALCULATED" ||
-        base?.isInvoiced;
-
-      if (base && isCalculated) {
-        // If taxComponents or totalTaxAmount are not yet present on base, fetch from tax-calculation endpoint
-        if (!base.taxComponents?.length || base.totalTaxAmount === null) {
-          try {
-            const taxCalc = await getOccurrenceTaxCalculation(occurrenceId);
-            if (taxCalc) merged = mergeOccurrenceWithTaxCalc(base, taxCalc);
-          } catch (err) {
-            console.log("[OccurrenceTaxCalculationDetail] No secondary tax calculation response, using occurrence data.");
-          }
-        }
-      }
-
-      setOccurrence(merged);
-
-      // Read-only GET of applicable tax configuration for this occurrence's tax region
+      // Pre-fetch tax rate configuration for read-only preview if available
       try {
-        const regionId = merged?.taxRegionId || base?.taxRegionId;
-        const regionCode = merged?.taxRegionCode || base?.taxRegionCode;
-        const regionName = merged?.taxRegionName || base?.taxRegionName;
-
+        const regionId = data?.taxRegionId;
+        const regionCode = data?.taxRegionCode;
+        const regionName = data?.taxRegionName;
         if (regionId) {
           const configs = await getTaxRateConfigurationsByTaxRegion(regionId);
           if (Array.isArray(configs) && configs.length > 0) {
@@ -249,7 +217,8 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
     : isTaxCompleted
     ? {
         title: "Tax Calculation Verified",
-        description: "Ready to Generate Invoice",
+        description:
+          "Authoritative tax calculation completed. Review context, components, and summary below, then proceed to review the complete invoice preview and generate the invoice.",
         action: { label: "Proceed to Invoice Generation", onClick: handleGenerateInvoice },
       }
     : isReady
@@ -271,6 +240,16 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
   return (
     <TaxCalculationDetailView
       onBack={() => navigate(CONSOLE_PATH)}
+      headerActions={
+        <Button
+          variant="outline"
+          size="small"
+          onClick={loadOccurrenceDetail}
+          className="flex items-center gap-1.5 text-xs text-slate-600"
+        >
+          <RefreshCw className="h-3.5 w-3.5" /> Refresh
+        </Button>
+      }
       billingType={billingType}
       stage={stage || PIPELINE_STAGES.UPCOMING}
       statusLabel={statusLabel}

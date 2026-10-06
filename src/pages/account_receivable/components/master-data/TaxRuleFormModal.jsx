@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { AlertCircle } from "lucide-react";
 
 import Button from "../../../../components/Button/Button";
 import FormInput from "../../../../components/forms/FormInput";
@@ -27,13 +28,24 @@ const buildDefaultForm = (region) => ({
  * region is always known from context and is shown read-only rather than
  * asked for again).
  */
-export default function TaxRuleFormModal({ isOpen, onClose, region, editingConfig, taxTypes = [], onSaved }) {
+export default function TaxRuleFormModal({
+  isOpen,
+  onClose,
+  region,
+  editingConfig,
+  existingConfigs = [],
+  taxTypes = [],
+  onOpenManageExisting,
+  onSaved,
+}) {
   const [formData, setFormData] = useState(() => buildDefaultForm(region));
   const [formErrors, setFormErrors] = useState({});
+  const [duplicateError, setDuplicateError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
+    setDuplicateError(null);
 
     if (editingConfig) {
       let cgstVal = editingConfig.cgstRate !== null && editingConfig.cgstRate !== undefined ? String(editingConfig.cgstRate) : "";
@@ -68,6 +80,7 @@ export default function TaxRuleFormModal({ isOpen, onClose, region, editingConfi
   }, [isOpen, editingConfig, region]);
 
   const validateForm = () => {
+    setDuplicateError(null);
     const errors = {};
 
     if (!formData.taxRegime || !formData.taxRegime.trim()) {
@@ -125,11 +138,20 @@ export default function TaxRuleFormModal({ isOpen, onClose, region, editingConfi
     return Object.keys(errors).length === 0;
   };
 
+  const findMatchingExistingConfig = () => {
+    if (!existingConfigs || existingConfigs.length === 0) return null;
+    return (
+      existingConfigs.find((cfg) => cfg.status === "ACTIVE" || cfg.active) ||
+      existingConfigs[0]
+    );
+  };
+
   const handleSubmitForm = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
     setSubmitting(true);
+    setDuplicateError(null);
     try {
       const payload = buildTaxConfigurationPayload(formData, region, taxTypes);
 
@@ -145,8 +167,21 @@ export default function TaxRuleFormModal({ isOpen, onClose, region, editingConfi
       onSaved?.(saved, Boolean(editingConfig));
       onClose?.();
     } catch (error) {
-      const msg = getApiErrorMessage(error, `Failed to ${editingConfig ? "update" : "create"} tax rule.`);
-      showStatusToast(msg, "error");
+      const rawMsg = getApiErrorMessage(error, `Failed to ${editingConfig ? "update" : "create"} tax rule.`);
+      const isDuplicate =
+        rawMsg.toLowerCase().includes("already exists") ||
+        error?.response?.data?.message?.toLowerCase().includes("already exists");
+
+      if (isDuplicate) {
+        const matchingConfig = findMatchingExistingConfig();
+        setDuplicateError({
+          message:
+            "An active tax configuration already exists for this tax region and effective period. You can open and manage tax components on the existing configuration instead of creating a duplicate.",
+          matchingConfig,
+        });
+      } else {
+        showStatusToast(rawMsg, "error");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -158,11 +193,11 @@ export default function TaxRuleFormModal({ isOpen, onClose, region, editingConfi
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={editingConfig ? "Edit Tax Rule" : "Add Tax Rule"}
+      title={editingConfig ? "Edit Tax Configuration" : "Add Tax Configuration"}
       subtitle={
         editingConfig
-          ? `Update tax rates and effective range for ${regionLabel}`
-          : `Define tax rates and effective period for ${regionLabel}`
+          ? `Update configuration details and tax rates for ${regionLabel}`
+          : `Create a new tax configuration for ${regionLabel}`
       }
       size="lg"
       footer={
@@ -171,12 +206,40 @@ export default function TaxRuleFormModal({ isOpen, onClose, region, editingConfi
             Cancel
           </Button>
           <Button type="button" onClick={handleSubmitForm} loading={submitting} loadingText="Saving...">
-            {editingConfig ? "Update Tax Rule" : "Create Tax Rule"}
+            {editingConfig ? "Update Configuration" : "Create Configuration"}
           </Button>
         </div>
       }
     >
       <form onSubmit={handleSubmitForm} className="space-y-4">
+        {duplicateError && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-3">
+            <div className="flex items-start gap-2.5">
+              <div className="mt-0.5 rounded-full bg-amber-100 p-1 text-amber-700">
+                <AlertCircle className="h-4 w-4" />
+              </div>
+              <div className="space-y-1 text-xs">
+                <p className="font-bold text-amber-900">Active Configuration Already Exists</p>
+                <p className="text-amber-800 leading-relaxed">{duplicateError.message}</p>
+              </div>
+            </div>
+            {duplicateError.matchingConfig && onOpenManageExisting && (
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  size="small"
+                  onClick={() => {
+                    onClose();
+                    onOpenManageExisting(duplicateError.matchingConfig);
+                  }}
+                  className="text-xs font-semibold"
+                >
+                  Manage Existing Components &rarr;
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700">Tax Region</label>
