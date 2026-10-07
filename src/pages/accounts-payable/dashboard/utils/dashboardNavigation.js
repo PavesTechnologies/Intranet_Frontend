@@ -54,6 +54,11 @@ const MODULE_FALLBACK_ROUTE = {
  */
 export function categorizeKpiTitle(title = "") {
   const t = title.toLowerCase();
+  // Checked before "Invoices" even though TDS is invoice-adjacent: TDS Tracking is its own page
+  // (deduction/deposit/filing, independent of the invoice's own payment status — see
+  // TdsTrackingDetailPage's "Independent of the TDS status" note), not a queue inside Invoice
+  // Management, so it needs its own group/route rather than being swept into "Invoices".
+  if (t.includes("tds")) return "TDS";
   if (/\bprs?\b/.test(t) || t.includes("rfq") || t.includes("purchase order") || t.includes("sourcing") || t.includes("vendor selection")) {
     return "Procurement";
   }
@@ -81,6 +86,14 @@ export function categorizeKpiTitle(title = "") {
 export function routeForTitle(title = "") {
   const t = title.toLowerCase();
   const group = categorizeKpiTitle(title);
+
+  if (group === "TDS") {
+    // TDS Tracking's own list already filters by both determination status ("Determined (not
+    // verified)") and tracking status (deduction/deposit/filing stage) — whichever TDS stage a
+    // title names, the one page that can actually show it is this one. There's no per-stage
+    // sub-route to split "awaiting deduction" from "awaiting filing" further.
+    return AP_ROUTES.TDS_TRACKING;
+  }
 
   if (group === "Invoices") {
     if (t.includes("ocr")) return AP_ROUTES.INVOICE_OCR_REVIEW;
@@ -148,6 +161,12 @@ export function canNavigateToKpi(kpi, permissions = {}) {
   const t = title.toLowerCase();
   const group = categorizeKpiTitle(title);
   const p = permissions;
+
+  if (group === "TDS") {
+    // Whoever can see the TDS Tracking list, verify a determination, or log a tracking activity —
+    // anyone on either side of "verify" vs. "deduct/deposit/file" can at least view where it stands.
+    return Boolean(p.canViewTdsTracking || p.canVerifyTds || p.canUpdateTdsTracking || p.canViewTds);
+  }
 
   if (group === "Invoices") {
     // Intake/OCR pipeline — AP Executive / whoever uploads or reviews OCR.
