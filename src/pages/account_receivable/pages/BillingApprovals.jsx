@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, CheckCircle2, XCircle, ClipboardCheck, Clock, FolderKanban, Calendar, Info } from "lucide-react";
-
+import { Eye, CheckCircle2, XCircle, ClipboardCheck, Clock, FolderKanban, Building2, Calendar, Receipt, Wallet, Info, AlertTriangle, FilterX } from "lucide-react";
 import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import { KPICard } from "../../../components/kpi/KPI";
@@ -186,7 +185,7 @@ function ReviewTable({ title, headers, rows, emptyMessage }) {
         </div>
         {rows.length > 0 ? (
           <div className="overflow-x-auto p-2">
-            <table className="w-full text-xs">
+            <table className="w-full text-left text-xs">
               <thead>
                 <tr>
                   {headers.map((header) => (
@@ -198,7 +197,7 @@ function ReviewTable({ title, headers, rows, emptyMessage }) {
                 {rows.map((row) => (
                   <tr key={row.key}>
                     {row.cells.map((cell, index) => (
-                      <td key={index} className={`px-3 py-2 ${index === 0 ? "font-medium text-slate-700" : "text-slate-900"}`}>
+                      <td key={index} className={`px-3 py-2 text-left ${index === 0 ? "font-medium text-slate-700" : "text-slate-900"}`}>
                         {cell ?? "—"}
                       </td>
                     ))}
@@ -233,11 +232,11 @@ function ApprovalReviewDetails({ config }) {
 
   const contractValueRows = totalValue
     ? [
-        ...(totalValue.source
-          ? [{ label: "Contract Value Source", value: CONTRACT_VALUE_SOURCE_LABELS[totalValue.source] || totalValue.source }]
-          : []),
-        { label: "Contract Value", value: money(totalValue.amount) },
-      ]
+      ...(totalValue.source
+        ? [{ label: "Contract Value Source", value: CONTRACT_VALUE_SOURCE_LABELS[totalValue.source] || totalValue.source }]
+        : []),
+      { label: "Contract Value", value: money(totalValue.amount) },
+    ]
     : [{ label: "Contract Value", value: null }];
 
   return (
@@ -362,9 +361,9 @@ function ApprovalReviewDetails({ config }) {
                   { label: "Billing Context", value: isProductServiceContext ? "Product / Service" : "Project" },
                   ...(isProductServiceContext
                     ? [
-                        { label: "Product / Application / Service", value: pricingDetails.productName },
-                        { label: "Description", value: pricingDetails.productDescription },
-                      ]
+                      { label: "Product / Application / Service", value: pricingDetails.productName },
+                      { label: "Description", value: pricingDetails.productDescription },
+                    ]
                     : []),
                   ...contractValueRows,
                 ]}
@@ -377,14 +376,14 @@ function ApprovalReviewDetails({ config }) {
                   rows={
                     renewal
                       ? [
-                          { label: "Renewal Mode", value: renewal.mode },
-                          ...(renewal.mode === "Custom"
-                            ? [
-                                { label: "Renewal Amount", value: money(renewal.amount) },
-                                { label: "Renewal Effective From", value: formatDisplayDate(renewal.effectiveFrom) },
-                              ]
-                            : []),
-                        ]
+                        { label: "Renewal Mode", value: renewal.mode },
+                        ...(renewal.mode === "Custom"
+                          ? [
+                            { label: "Renewal Amount", value: money(renewal.amount) },
+                            { label: "Renewal Effective From", value: formatDisplayDate(renewal.effectiveFrom) },
+                          ]
+                          : []),
+                      ]
                       : [{ label: "Renewal Mode", value: "Not configured" }]
                   }
                 />

@@ -308,12 +308,12 @@ export default function TaxCalculationConsole() {
     const open =
       record.source === "SNAPSHOT"
         ? () => {
-            if (!record.original.snapshotId) {
-              showStatusToast("Billing snapshot information is unavailable. Please refresh the billing data.", "error");
-              return;
-            }
-            openSnapshotTax(record.original);
+          if (!record.original.snapshotId) {
+            showStatusToast("Billing snapshot information is unavailable. Please refresh the billing data.", "error");
+            return;
           }
+          openSnapshotTax(record.original);
+        }
         : () => openOccurrenceTax(record.original);
 
     if (record.stage === PIPELINE_STAGES.READY_FOR_TAX) {
@@ -369,3 +369,4 @@ export default function TaxCalculationConsole() {
     </div>
   );
 }
+

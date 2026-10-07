@@ -1,4 +1,5 @@
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -34,11 +35,22 @@ import {
   ClipboardList,
   UserPlus,
   Building2,
+  Search,
 } from "lucide-react";
 import { useEmployeeDirectory, resolveEmployeeName } from "../../../expense-management/approval-engine/hooks/useEmployeeDirectory";
-import { formatDate, formatTime } from "../../utils/formatters";
-import { formatDashboardAmount, formatTrendPeriodLabel, prettifyKey } from "../utils/dashboardFormatters";
-import { actionItemRoute, recentActivityRoute } from "../utils/dashboardNavigation";
+import { formatDashboardAmount, formatTrendPeriodLabel, formatRelativeTime, prettifyKey } from "../utils/dashboardFormatters";
+import {
+  actionItemRoute,
+  recentActivityRoute,
+  categorizeKpiTitle,
+  canNavigateToKpi,
+  canNavigateToActionItem,
+  kpiRoute,
+} from "../utils/dashboardNavigation";
+import { useApPermissions } from "../../hooks/useApPermissions";
+import { useDashboardActivity } from "../hooks/useDashboardActivity";
+import { useDebouncedValue } from "../../payment/hooks/useDebouncedValue";
+import { AP_ROUTES } from "../../constants/routes";
 
 // AP's own brand accent (#0A0082, used throughout invoice/payment/system-config forms) leads a
 // small categorical palette for pie slices / multi-currency trend series — not recharts defaults.
@@ -82,16 +94,6 @@ export function ChartCard({ title, subtitle, children, className = "", action })
 // instead of showing 20+ identical white tiles in one flat row.
 const KPI_GROUPS = ["Invoices", "Procurement", "Vendors", "Other"];
 
-function categorizeKpiTitle(title = "") {
-  const t = title.toLowerCase();
-  if (/\bprs?\b/.test(t) || t.includes("rfq") || t.includes("purchase order") || t.includes("sourcing") || t.includes("vendor selection")) {
-    return "Procurement";
-  }
-  if (t.includes("invoice")) return "Invoices";
-  if (t.includes("vendor") || t.includes("onboarding")) return "Vendors";
-  return "Other";
-}
-
 function toneForKpiTitle(title = "") {
   const t = title.toLowerCase();
   if (/(failed|disputed|rejected|overdue)/.test(t)) return "rose";
@@ -129,9 +131,14 @@ function iconForKpiTitle(title = "") {
   return Hash;
 }
 
-function KpiTile({ kpi }) {
+function KpiTile({ kpi, permissions }) {
   const navigate = useNavigate();
-  const to = actionItemRoute(kpi);
+  // A tile only gets a click-through when the user both (a) has somewhere to go and (b) actually
+  // holds the permission that target page requires — otherwise the link would just dead-end them.
+  // kpiRoute() (title-based) is used here rather than actionItemRoute() (key/module-based) because
+  // kpi.key/kpi.module values aren't confirmed against a real backend payload — title is the one
+  // signal already proven reliable for these tiles (see dashboardNavigation.js's routeForTitle).
+  const to = canNavigateToKpi(kpi, permissions) ? kpiRoute(kpi) : null;
   const hasAmounts = Array.isArray(kpi.amounts) && kpi.amounts.length > 0;
   const primaryValue = hasAmounts ? formatDashboardAmount(kpi.amounts[0]) : kpi.value ?? "—";
   const extraCurrencyLines = hasAmounts && kpi.amounts.length > 1 ? kpi.amounts.slice(1) : [];
@@ -167,6 +174,7 @@ function KpiTile({ kpi }) {
  * title) so related metrics read together instead of one flat wall of identical cards.
  */
 export function KpiGrid({ kpis }) {
+  const permissions = useApPermissions();
   if (!kpis?.length) return null;
 
   const grouped = new Map();
@@ -183,7 +191,7 @@ export function KpiGrid({ kpis }) {
           <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">{group}</h3>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {grouped.get(group).map((kpi) => (
-              <KpiTile key={kpi.key} kpi={kpi} />
+              <KpiTile key={kpi.key} kpi={kpi} permissions={permissions} />
             ))}
           </div>
         </div>
@@ -198,23 +206,40 @@ export function KpiGrid({ kpis }) {
  * hidden per the spec's own UX guidance ("prefer hiding zero-value action items"). */
 export function ActionRequiredList({ items }) {
   const navigate = useNavigate();
+  const permissions = useApPermissions();
   const visible = (items || []).filter((item) => Number(item.value) > 0);
   if (visible.length === 0) return <Empty text="Nothing needs your attention right now." />;
 
   return (
     <ul className="space-y-2">
       {visible.map((item) => {
-        const to = actionItemRoute(item);
+        const to = canNavigateToActionItem(item, permissions) ? actionItemRoute(item) : null;
+        // Same icon-by-title convention as the KPI tiles (iconForKpiTitle), so e.g. an approval
+        // item gets a clock/check icon and a payment item gets a credit-card icon instead of one
+        // generic triangle for every row regardless of what it actually is.
+        const Icon = iconForKpiTitle(item.title);
         return (
           <li
             key={item.key}
+            role={to ? "button" : undefined}
+            tabIndex={to ? 0 : undefined}
             onClick={to ? () => navigate(to) : undefined}
+            onKeyDown={
+              to
+                ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate(to);
+                    }
+                  }
+                : undefined
+            }
             className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 ${
               PRIORITY_STYLES[item.priority] || PRIORITY_STYLES.low
-            } ${to ? "cursor-pointer hover:brightness-95" : ""}`}
+            } ${to ? "cursor-pointer hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082] focus-visible:ring-offset-1" : ""}`}
           >
             <div className="flex min-w-0 items-center gap-2">
-              <AlertTriangle size={16} className="shrink-0" />
+              <Icon size={16} className="shrink-0" />
               <span className="truncate text-sm font-medium">{item.title}</span>
             </div>
             <div className="flex shrink-0 items-center gap-2">
@@ -304,7 +329,9 @@ export function FinancialSummaryCards({ items }) {
 export function DashboardTrendChart({ trend }) {
   const series = trend?.series || [];
   const hasData = series.some((s) => s.points?.some((p) => Number(p.value) > 0));
-  if (!hasData) return <Empty text="No activity in this period yet." />;
+  // Named after the trend itself ("Invoice Count", "Invoice Amount") rather than a generic
+  // message, so a sparse period reads as "nothing happened" instead of looking like a broken chart.
+  if (!hasData) return <Empty text={`No ${prettifyKey(trend?.key).toLowerCase() || "activity"} during the selected period.`} />;
 
   // Pivot into one row per period, one field per currency code, so recharts can render each
   // currency as its own <Area> sharing the same x-axis.
@@ -354,33 +381,116 @@ export function DashboardTrendChart({ trend }) {
 // ---------------------------------------------------------------- recent activity
 
 /** {title, entity_type, entity_id, reference, actor, occurred_at}[]. `actor` is a numeric
- * employee id — resolved to a name the same way InvoiceAuditHistory.jsx resolves changed_by. */
-export function RecentActivityList({ items }) {
-  const navigate = useNavigate();
-  const { data: employeeDirectory } = useEmployeeDirectory();
-  if (!items?.length) return <Empty text="No recent activity." />;
+ * employee id — resolved to a name the same way InvoiceAuditHistory.jsx resolves changed_by.
+ * Shared row renderer between the dashboard's compact RecentActivityCard and the standalone
+ * Activity page, so the two never drift out of visual sync. */
+const RECENT_ACTIVITY_PREVIEW_COUNT = 5;
 
+export function ActivityRows({ items, employeeDirectory, navigate, dense = false }) {
   return (
-    <ul className="space-y-3 border-l border-gray-200 pl-4">
+    <ul className={dense ? "space-y-3 border-l border-gray-200 pl-4" : "space-y-4 border-l border-gray-200 pl-5"}>
       {items.map((item, index) => {
         const to = recentActivityRoute(item);
         return (
           <li
             key={`${item.entity_type}-${item.entity_id}-${item.occurred_at}-${index}`}
             onClick={to ? () => navigate(to) : undefined}
-            className={`relative ${to ? "cursor-pointer" : ""}`}
+            className={`relative ${to ? "cursor-pointer group" : ""}`}
           >
-            <span className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-[#0A0082]" />
-            <p className="text-sm font-medium text-gray-900">{item.title}</p>
-            <p className="text-xs text-gray-500">
+            <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-[#0A0082]" />
+            <p className={`font-medium text-gray-900 ${dense ? "text-sm" : "text-sm group-hover:text-[#0A0082]"}`}>{item.title}</p>
+            <p className="mt-0.5 text-xs text-gray-500">
               {item.reference && <span className="font-mono">{item.reference}</span>}
               {item.reference && " · "}
-              {formatDate(item.occurred_at)} {formatTime(item.occurred_at)}
+              {formatRelativeTime(item.occurred_at)}
               {item.actor ? ` · ${resolveEmployeeName(employeeDirectory, item.actor)}` : ""}
             </p>
           </li>
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * The dashboard's Recent Activity widget — its own ChartCard (not wrapped by the caller) so the
+ * search box can sit in the card's title row via `action`, matching "Recent Activity   [Search]"
+ * on one line. Below RECENT_ACTIVITY_PREVIEW_COUNT items, a "View N more" toggle expands the rest
+ * of what the summary call already returned; typing a search switches to a live, debounced query
+ * against GET /apm/dashboard/activity (the full history, not just what's already loaded) instead.
+ * "View all activity" always links through to the standalone Activity page, carrying the current
+ * search term and the dashboard's own date range along.
+ *
+ * @param {{items: Array, period?: {from_date?: string, to_date?: string}}} props
+ */
+export function RecentActivityCard({ items, period }) {
+  const navigate = useNavigate();
+  const { data: employeeDirectory } = useEmployeeDirectory();
+  const [expanded, setExpanded] = useState(false);
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
+  const isSearching = Boolean(debouncedSearch);
+
+  const { data: searchResults, isFetching: isSearchFetching } = useDashboardActivity({
+    search: debouncedSearch,
+    fromDate: period?.from_date,
+    toDate: period?.to_date,
+    page: 1,
+    pageSize: 10,
+    enabled: isSearching,
+  });
+
+  const viewAllHref = `${AP_ROUTES.DASHBOARD_ACTIVITY}${debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : ""}`;
+  const searchBox = (
+    <div className="relative w-full sm:w-56">
+      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search activities..."
+        className="w-full rounded-md border border-gray-200 py-1.5 pl-8 pr-2 text-xs focus:border-[#0A0082] focus:outline-none"
+      />
+    </div>
+  );
+
+  let body;
+  if (isSearching) {
+    const results = searchResults?.items || [];
+    body = isSearchFetching && results.length === 0 ? (
+      <p className="py-6 text-center text-xs text-gray-400">Searching…</p>
+    ) : results.length === 0 ? (
+      <Empty text={`No activity matches "${debouncedSearch}".`} />
+    ) : (
+      <ActivityRows items={results} employeeDirectory={employeeDirectory} navigate={navigate} dense />
+    );
+  } else if (!items?.length) {
+    body = <Empty text="No recent activity." />;
+  } else {
+    const hasMore = items.length > RECENT_ACTIVITY_PREVIEW_COUNT;
+    const visibleItems = expanded ? items : items.slice(0, RECENT_ACTIVITY_PREVIEW_COUNT);
+    body = (
+      <>
+        <ActivityRows items={visibleItems} employeeDirectory={employeeDirectory} navigate={navigate} dense />
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setExpanded((prev) => !prev)}
+            className="mt-3 text-xs font-semibold text-[#0A0082] hover:underline"
+          >
+            {expanded ? "Show less" : `View ${items.length - RECENT_ACTIVITY_PREVIEW_COUNT} more`}
+          </button>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <ChartCard title="Recent Activity" action={searchBox}>
+      {body}
+      <Link to={viewAllHref} className="mt-4 block text-right text-xs font-semibold text-[#0A0082] hover:underline">
+        View all activity →
+      </Link>
+    </ChartCard>
   );
 }

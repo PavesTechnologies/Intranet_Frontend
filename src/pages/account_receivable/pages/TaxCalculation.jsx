@@ -313,50 +313,35 @@ export default function TaxCalculation() {
 
   const actionBar = isInvoiced
     ? {
-        title: "Invoice Generated",
-        description: existingInvoice?.invoiceNumber
-          ? `Invoice ${existingInvoice.invoiceNumber} has been generated for this billing snapshot.`
-          : "An invoice has been generated for this billing snapshot.",
-        action: { label: "View Invoice", onClick: viewInvoice },
-      }
+      title: "Invoice Generated",
+      description: existingInvoice?.invoiceNumber
+        ? `Invoice ${existingInvoice.invoiceNumber} has been generated for this billing snapshot.`
+        : "An invoice has been generated for this billing snapshot.",
+      action: { label: "View Invoice", onClick: viewInvoice },
+    }
     : isTaxCompleted
       ? {
-          title: "Tax Calculation Verified",
-          description: "Tax components and grand total are verified. Click \"Proceed to Invoice Generation\" to review the invoice preview and generate the invoice.",
-          action: { label: "Proceed to Invoice Generation", onClick: handleGenerateInvoice, disabled: calculating },
-        }
+        title: "Tax Calculation Verified",
+        description: "Tax components and grand total are verified. Click \"Proceed to Invoice Generation\" to review the invoice preview and generate the invoice.",
+        action: { label: "Proceed to Invoice Generation", onClick: handleGenerateInvoice, disabled: calculating },
+      }
       : {
-          title: "Ready for Tax Calculation",
-          description: "Source timesheets and taxable amount are verified. Calculate tax to compute the tax components.",
-          action: {
-            label: "Calculate Tax",
-            loadingLabel: "Calculating Tax...",
-            loading: calculating,
-            onClick: handleCalculateTax,
-          },
-        };
+        title: "Ready for Tax Calculation",
+        description: "Source timesheets and taxable amount are verified. Calculate tax to compute the tax components.",
+        action: {
+          label: "Calculate Tax",
+          loadingLabel: "Calculating Tax...",
+          loading: calculating,
+          onClick: handleCalculateTax,
+        },
+      };
 
   return (
     <TaxCalculationDetailView
       onBack={() => navigate(CONSOLE_PATH)}
       headerActions={
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => navigate("/account-receivable/billing-data-acquisition/workspace")}
-            className="text-xs text-slate-600"
-          >
-            Acquisition Detail
-          </Button>
-          <Button
-            variant="outline"
-            size="small"
-            onClick={loadData}
-            className="flex items-center gap-1.5 text-xs text-slate-600"
-          >
-            <RefreshCw className="h-3.5 w-3.5" /> Refresh
-          </Button>
+ 
         </div>
       }
       billingType="Time & Material"
@@ -385,3 +370,4 @@ export default function TaxCalculation() {
     />
   );
 }
+

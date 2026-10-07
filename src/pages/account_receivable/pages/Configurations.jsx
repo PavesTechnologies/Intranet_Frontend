@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import { 
-  Plus, 
-  Pencil, 
-  Trash2, 
-  Search, 
-  RefreshCw, 
-  Eye, 
-  ArrowUpDown, 
-  ArrowUp, 
-  ArrowDown, 
-  ChevronLeft, 
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Search,
+  RefreshCw,
+  Eye,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ChevronLeft,
   ChevronRight,
-  Info 
+  Info
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
@@ -490,11 +490,10 @@ export default function Configurations() {
               <button
                 key={m.id}
                 onClick={() => setSelectedMaster(m.id)}
-                className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${
-                  isActive
+                className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${isActive
                     ? "bg-[#0A0082] text-white shadow-sm border border-[#0A0082]"
                     : "text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-800"
-                }`}
+                  }`}
               >
                 {m.label}
               </button>
@@ -535,7 +534,7 @@ export default function Configurations() {
               />
             </div>
 
-            {/* Clear filters button */}
+            {/* clear button */}
             {(searchQuery || statusFilter) && (
               <Button
                 variant="ghost"
@@ -594,7 +593,7 @@ export default function Configurations() {
                 Next
               </Button>
             </div>
-            
+
             {/* Desktop pagination */}
             <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
               <div>
@@ -625,11 +624,10 @@ export default function Configurations() {
                         key={pageNum}
                         onClick={() => setCurrentPage(pageNum)}
                         aria-current={isCurrent ? "page" : undefined}
-                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold border focus:z-20 focus:outline-none ${
-                          isCurrent
+                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold border focus:z-20 focus:outline-none ${isCurrent
                             ? "z-10 bg-[#0A0082] text-white border-[#0A0082]"
                             : "text-slate-900 border-slate-300 hover:bg-slate-50"
-                        }`}
+                          }`}
                       >
                         {pageNum}
                       </button>
@@ -710,9 +708,8 @@ export default function Configurations() {
                       value={formData[field.name] || ""}
                       onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
                       placeholder={`Enter ${field.label.toLowerCase()}`}
-                      className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20 ${
-                        formErrors[field.name] ? "border-red-300 focus:border-red-500" : "border-slate-300"
-                      }`}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20 ${formErrors[field.name] ? "border-red-300 focus:border-red-500" : "border-slate-300"
+                        }`}
                       rows={3}
                     />
                     {formErrors[field.name] && (

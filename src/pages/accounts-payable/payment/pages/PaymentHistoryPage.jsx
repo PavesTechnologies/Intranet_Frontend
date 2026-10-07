@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
 import GenericTable from "../../../../components/Table/table";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -36,8 +36,14 @@ const STATUS_OPTIONS = [
  */
 export default function PaymentHistoryPage() {
   const { data: metadata } = usePaymentMetadata();
+  // Deep-linkable via `?status=PAID`/`?status=PARTIALLY_PAID` (e.g. from the AP Dashboard's
+  // "Paid Invoices" tile) — one-shot initial read, same pattern as InvoiceQueueView's `?queue=`.
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(() => {
+    const requested = searchParams.get("status");
+    return STATUS_OPTIONS.some((o) => o.value === requested) ? requested : "";
+  });
   const [paymentMode, setPaymentMode] = useState("");
   const [paidFrom, setPaidFrom] = useState("");
   const [paidTo, setPaidTo] = useState("");

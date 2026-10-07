@@ -51,9 +51,8 @@ function SummaryCell({ label, value, emphasis = false }) {
     <div className={`rounded-md px-3 py-2 ${emphasis ? "bg-indigo-50/70" : "bg-slate-50"}`}>
       <div className="text-[11px] text-slate-500">{label}</div>
       <div
-        className={`mt-0.5 whitespace-nowrap font-mono text-sm tabular-nums ${
-          emphasis ? "font-semibold text-indigo-900" : "font-medium text-slate-900"
-        }`}
+        className={`mt-0.5 whitespace-nowrap font-mono text-sm tabular-nums ${emphasis ? "font-semibold text-indigo-900" : "font-medium text-slate-900"
+          }`}
       >
         {value}
       </div>
@@ -160,8 +159,7 @@ export default function TaxCalculationDetailView({
 
         {/* Calculation Summary */}
         <Section title="Calculation Summary" aside={currency ? `Currency: ${currency}` : null}>
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-            <SummaryCell label="Billing Amount" value={money(billingAmount)} />
+          <div className="mx-auto grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:max-w-6xl lg:grid-cols-3">
             <SummaryCell label="Taxable Amount" value={money(taxableAmount)} />
             <SummaryCell label="Total Tax" value={isTaxCompleted ? money(totalTaxAmount) : pending} />
             <SummaryCell label="Grand Total" value={isTaxCompleted ? money(grandTotal) : pending} emphasis={isTaxCompleted} />
