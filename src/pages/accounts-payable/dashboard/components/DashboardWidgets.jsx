@@ -92,7 +92,7 @@ export function ChartCard({ title, subtitle, children, className = "", action })
 // Backend KPIs carry a title but no category/severity — both are inferred client-side from the
 // title text so the grid can group related metrics and color the ones that signal a problem,
 // instead of showing 20+ identical white tiles in one flat row.
-const KPI_GROUPS = ["Invoices", "Procurement", "Vendors", "Other"];
+const KPI_GROUPS = ["Invoices", "TDS", "Procurement", "Vendors", "Other"];
 
 function toneForKpiTitle(title = "") {
   const t = title.toLowerCase();
@@ -111,6 +111,7 @@ const TONE_CHIP_STYLES = {
 
 function iconForKpiTitle(title = "") {
   const t = title.toLowerCase();
+  if (t.includes("tds")) return FileText;
   if (t.includes("ocr failed")) return AlertCircle;
   if (t.includes("ocr review")) return ScanLine;
   if (t.includes("draft")) return FileEdit;
