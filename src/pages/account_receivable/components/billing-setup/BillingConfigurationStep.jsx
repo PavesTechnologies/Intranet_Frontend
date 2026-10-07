@@ -756,6 +756,7 @@ function TimeAndMaterialForm({
               disabled={isExisting}
             />
             <FormSelect
+              anchorOptions
               label="Rate Period *"
               name="ratePeriod"
               value={standardRate.ratePeriod}
@@ -1791,7 +1792,7 @@ function PaymentPlanSelector({ value, onChange }) {
 }
 
 // Eyebrow-style heading shared by every Milestone Plan section, so the form
-// reads as one workflow: Payment Plan → Schedule → Summary → Notes.
+// reads as one workflow: Payment Plan → Schedule → Notes → Summary.
 function PlanSectionHeading({ title, description, aside }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-2">
@@ -1831,9 +1832,9 @@ function PaymentEntryCard({
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0A0082] text-xs font-bold tabular-nums text-white">
             {formatSequence(index)}
           </span>
-          <span className="truncate text-sm font-semibold uppercase tracking-wide text-slate-900">{title}</span>
+          <span className="truncate text-sm font-semibold text-slate-900">{title}</span>
         </div>
-        <span className={`shrink-0 text-lg font-bold tabular-nums ${hasPercent ? "text-[#0A0082]" : "text-slate-300"}`}>
+        <span className={`shrink-0 text-sm font-semibold tabular-nums ${hasPercent ? "text-[#0A0082]" : "text-slate-300"}`}>
           {hasPercent ? `${Number(percentage)}%` : "—%"}
         </span>
       </div>
@@ -1924,48 +1925,45 @@ function PaymentSummaryPanel({ totalValue, scheduledAmount, totalPercentage, cur
   const remainingAmount = status === "complete" ? 0 : totalValue - scheduledAmount;
 
   const remainingTone = {
-    complete: { box: "border-emerald-200 bg-emerald-50", value: "text-emerald-700", note: "text-emerald-700", icon: Check, text: "Fully scheduled" },
-    remaining: { box: "border-amber-200 bg-amber-50", value: "text-amber-700", note: "text-amber-700", icon: AlertCircle, text: "Amount remaining to schedule" },
-    exceeded: { box: "border-red-300 bg-red-50", value: "text-red-700", note: "text-red-700", icon: AlertCircle, text: "Allocation exceeds total value" },
+    complete: { tone: "text-emerald-700", icon: Check, text: "Fully scheduled" },
+    remaining: { tone: "text-amber-700", icon: AlertCircle, text: `${percentRemaining}% remaining to schedule` },
+    exceeded: { tone: "text-red-700", icon: AlertCircle, text: `Allocation exceeds 100% by ${Math.abs(percentRemaining)}%` },
   }[status];
   const StatusIcon = remainingTone.icon;
 
-  const row = "flex items-baseline justify-between gap-4 py-2.5";
+  // Compact finance-style statement: labels left, amounts right, one rule
+  // above the emphasized Remaining Amount line.
+  const row = "flex items-baseline justify-between gap-4 py-1";
+  const label = "text-slate-600";
+  const amount = "font-medium tabular-nums text-slate-900";
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
+    <div className="space-y-2">
       <PlanSectionHeading title="Payment Summary" />
-      <div className="mt-2 divide-y divide-slate-200/70">
+      <dl className="rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm">
         <div className={row}>
-          <span className="text-sm text-slate-600">Total Value</span>
-          <span className="text-base font-bold tabular-nums text-slate-900">{formatCurrency(totalValue, currency)}</span>
+          <dt className={label}>Total Value</dt>
+          <dd className={amount}>{formatCurrency(totalValue, currency)}</dd>
         </div>
         <div className={row}>
-          <span className="text-sm text-slate-600">Scheduled Amount</span>
-          <span className="text-base font-semibold tabular-nums text-slate-900">{formatCurrency(scheduledAmount, currency)}</span>
+          <dt className={label}>Scheduled Amount</dt>
+          <dd className={amount}>{formatCurrency(scheduledAmount, currency)}</dd>
         </div>
         <div className={row}>
-          <span className="text-sm text-slate-600">Total Allocation</span>
-          <span className="text-right">
-            <span className="block text-base font-semibold tabular-nums text-slate-900">{roundPercent(totalPercentage)}%</span>
-            <span className={`block text-xs font-medium ${status === "complete" ? "text-emerald-700" : status === "remaining" ? "text-amber-700" : "text-red-700"}`}>
-              {status === "complete"
-                ? "✓ Fully allocated"
-                : status === "remaining"
-                ? `${percentRemaining}% remaining`
-                : `Exceeds 100% by ${Math.abs(percentRemaining)}%`}
-            </span>
-          </span>
+          <dt className={label}>Total Allocation</dt>
+          <dd className={`${amount} ${status === "complete" ? "" : remainingTone.tone}`}>{roundPercent(totalPercentage)}%</dd>
         </div>
-      </div>
-      <div className={`mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg border px-4 py-3 ${remainingTone.box}`} role="status">
-        <div>
-          <span className="block text-sm font-semibold text-slate-800">Remaining Amount</span>
-          <span className={`mt-0.5 flex items-center gap-1 text-xs font-medium ${remainingTone.note}`}>
+        <div className="mt-1.5 border-t border-slate-200 pt-2" role="status">
+          <div className={row}>
+            <dt className="font-semibold text-slate-800">Remaining Amount</dt>
+            <dd className={`font-semibold tabular-nums ${status === "complete" ? "text-slate-900" : remainingTone.tone}`}>
+              {formatCurrency(remainingAmount, currency)}
+            </dd>
+          </div>
+          <p className={`flex items-center gap-1 text-xs font-medium ${remainingTone.tone}`}>
             <StatusIcon className="h-3.5 w-3.5 shrink-0" /> {remainingTone.text}
-          </span>
+          </p>
         </div>
-        <span className={`text-xl font-bold tabular-nums ${remainingTone.value}`}>{formatCurrency(remainingAmount, currency)}</span>
-      </div>
+      </dl>
     </div>
   );
 }
@@ -2357,11 +2355,11 @@ function MilestonePlanForm({
 
   return (
     <div className="space-y-4">
-      <h2 className={Fonts.heading4}>Milestone Plan</h2>
+      <h2 className="text-base font-semibold text-slate-900">Milestone Plan</h2>
 
       <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-sm">
         {/* 1. Payment Plan — how the Total Value is paid */}
-        <section className="space-y-3 p-4 sm:p-6">
+        <section className="space-y-3 p-4 sm:px-6 sm:py-5">
           <PlanSectionHeading
             title="Payment Plan"
             description="Choose how the project's total value will be billed."
@@ -2370,7 +2368,7 @@ function MilestonePlanForm({
         </section>
 
         {/* 2. Schedule — how many payments, how much each, and when */}
-        <section className="space-y-3 bg-slate-50/40 p-4 sm:p-6">
+        <section className="space-y-3 bg-slate-50/40 p-4 sm:px-6 sm:py-5">
           <PlanSectionHeading
             title={isFullPayment ? "Payment Schedule" : "Installment Schedule"}
             description={
@@ -2431,8 +2429,26 @@ function MilestonePlanForm({
           )}
         </section>
 
-        {/* 3. Payment Summary — overall allocation, Remaining Amount last */}
-        <section className="p-4 sm:p-6">
+        {/* 3. Plan Notes — the single notes field (plan-level remarks), part
+            of the configuration itself rather than appended after the summary */}
+        <section className="space-y-2 p-4 sm:px-6 sm:py-5">
+          <label htmlFor="milestonePlanRemarks" className="flex items-baseline gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Plan Notes</span>
+            <span className="text-xs font-normal text-slate-400">Optional</span>
+          </label>
+          <textarea
+            id="milestonePlanRemarks"
+            name="milestonePlanRemarks"
+            value={value.remarks || ""}
+            onChange={(event) => update({ remarks: event.target.value })}
+            placeholder="Add any additional information about this payment plan, commercial agreement, or billing arrangement."
+            rows={3}
+            className="block min-h-[76px] w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
+          />
+        </section>
+
+        {/* 4. Payment Summary — overall allocation, Remaining Amount last */}
+        <section className="p-4 sm:px-6 sm:py-5">
           <PaymentSummaryPanel
             totalValue={totalContractValueNum}
             scheduledAmount={isFullPayment ? totalContractValueNum : totalAllocated}
@@ -2441,44 +2457,15 @@ function MilestonePlanForm({
           />
         </section>
 
-        {/* 4. Plan Notes — the single notes field (plan-level remarks) */}
-        <section className="space-y-2 p-4 sm:p-6">
-          <label htmlFor="milestonePlanRemarks" className="block">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Plan Notes</span>
-            <span className="ml-2 text-xs font-normal text-slate-400">Optional</span>
-          </label>
-          <textarea
-            id="milestonePlanRemarks"
-            name="milestonePlanRemarks"
-            value={value.remarks || ""}
-            onChange={(event) => update({ remarks: event.target.value })}
-            placeholder="Add any additional information about this payment plan, commercial agreement, or billing arrangement."
-            rows={5}
-            className="block min-h-[120px] w-full resize-y rounded-lg border border-slate-300 px-4 py-3 text-sm leading-relaxed text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
-          />
-        </section>
-
-        {/* 5. Actions */}
-        <section className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        {/* 5. Actions — destructive Remove on the left, save status + primary on the right */}
+        <section className="flex flex-col-reverse gap-3 rounded-b-xl bg-slate-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           {loadingConfig ? (
             <p className="flex items-center gap-2 text-sm text-slate-500">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading saved milestone plan…
             </p>
           ) : (
             <>
-              <div className="min-w-0 text-xs">
-                {saveBlockers.length > 0 ? (
-                  <p className="flex items-start gap-1.5 font-medium text-slate-500">
-                    <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0 text-amber-500" />
-                    <span>To save: {saveBlockers.join(" · ")}</span>
-                  </p>
-                ) : (
-                  <p className="flex items-center gap-1.5 font-medium text-emerald-700">
-                    <Check className="h-3.5 w-3.5 shrink-0" /> Ready to save
-                  </p>
-                )}
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="shrink-0">
                 {value.milestonePlanId && (
                   <Button
                     variant="ghost"
@@ -2490,6 +2477,20 @@ function MilestonePlanForm({
                     <Trash2 className="h-4 w-4 text-red-500" /> Remove
                   </Button>
                 )}
+              </div>
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+                <div className="min-w-0 text-xs">
+                  {saveBlockers.length > 0 ? (
+                    <p className="flex items-start gap-1.5 font-medium text-slate-500">
+                      <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0 text-amber-500" />
+                      <span>To save: {saveBlockers.join(" · ")}</span>
+                    </p>
+                  ) : (
+                    <p className="flex items-center gap-1.5 font-medium text-emerald-700">
+                      <Check className="h-3.5 w-3.5 shrink-0" /> Ready to save
+                    </p>
+                  )}
+                </div>
                 <Button
                   variant="primary"
                   size="small"
@@ -2497,6 +2498,7 @@ function MilestonePlanForm({
                   loading={saving}
                   loadingText="Saving..."
                   disabled={!isFormValid}
+                  className="shrink-0 self-end sm:self-auto"
                 >
                   <Check className="h-4 w-4" />
                   {value.milestonePlanId ? "Update Milestone Plan" : "Save Milestone Plan"}
@@ -2696,6 +2698,7 @@ function MilestoneForm({
             />
             {modalState.mode === "edit" && (
               <FormSelect
+                anchorOptions
                 label="Status"
                 name="status"
                 value={modalState.form.status}
@@ -3523,6 +3526,7 @@ function RecurringBillingForm({
                       placeholder={`e.g. 65000 (${currency})`}
                     />
                     <FormSelect
+                      anchorOptions
                       label="Billing Frequency *"
                       name="renewalBillingFrequencyId"
                       value={renewalBillingFrequencyId}
@@ -3838,6 +3842,7 @@ export default function BillingConfigurationStep({
             <ReadOnlyField label="Billing Currency *" value={currency} />
           ) : (
             <FormSelect
+              anchorOptions
               label="Billing Currency *"
               name="currency"
               value={currency}

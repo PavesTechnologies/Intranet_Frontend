@@ -415,7 +415,6 @@ export default function TaxConfigurationRegionDetailPage() {
         region={region}
         editingConfig={editingRuleConfig}
         existingConfigs={configs}
-        taxTypes={taxTypes}
         onOpenManageExisting={(existingConfig) => handleOpenManageComponents(existingConfig)}
         onSaved={handleRuleSaved}
       />

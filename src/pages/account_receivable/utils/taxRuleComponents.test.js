@@ -1,247 +1,264 @@
 import { describe, it, expect } from "vitest";
-import { buildTaxConfigurationPayload, deriveTaxComponentRows } from "./taxRuleComponents";
+import {
+  buildComponentValues,
+  buildTaxConfigurationPayload,
+  deriveTaxComponentRows,
+  findUnmappedConfigComponents,
+  getComponentLabel,
+  resolveConfiguredRegime,
+  validateComponentValues,
+} from "./taxRuleComponents";
 import { normalizeTaxRateConfiguration } from "../services/taxRateConfigurationService";
+import { normalizeTaxStructure } from "../services/taxStructureService";
 
-describe("Tax Configuration Component-Based Mapping and Normalization", () => {
-  const mockTaxTypes = [
-    {
-      id: "tt-cgst-001",
-      taxTypeId: "tt-cgst-001",
-      taxTypeCode: "CGST",
-      taxTypeName: "Central GST",
-      isActive: true,
-    },
-    {
-      id: "tt-sgst-002",
-      taxTypeId: "tt-sgst-002",
-      taxTypeCode: "SGST",
-      taxTypeName: "State GST",
-      isActive: true,
-    },
-    {
-      id: "tt-igst-003",
-      taxTypeId: "tt-igst-003",
-      taxTypeCode: "IGST",
-      taxTypeName: "Integrated GST",
-      isActive: true,
-    },
-  ];
+const comp = (id, taxTypeId, name, displayOrder, extra = {}) => ({
+  taxComponentId: id,
+  taxTypeId,
+  taxTypeCode: name.toUpperCase(),
+  taxTypeName: name,
+  componentCode: name.toUpperCase(),
+  componentName: `${name} Rate`,
+  inputType: "PERCENTAGE",
+  displayOrder,
+  ...extra,
+});
 
-  const mockRegion = {
-    taxRegionId: "reg-india-001",
-    taxRegionName: "India",
-    taxRegionCode: "IN",
-  };
+const indiaStructure = normalizeTaxStructure({
+  taxRegion: { taxRegionId: "reg-in", taxRegionCode: "IN", taxRegionName: "India", currencyCode: "INR" },
+  taxRegimes: [
+    {
+      taxRegimeId: "regime-gst",
+      taxRegimeCode: "GST",
+      taxRegimeName: "GST",
+      // Deliberately out of order: the form must sort by displayOrder.
+      components: [
+        comp("c-igst", "tt-igst", "IGST", 3),
+        comp("c-cgst", "tt-cgst", "CGST", 1),
+        comp("c-sgst", "tt-sgst", "SGST", 2),
+      ],
+    },
+  ],
+});
+const gst = indiaStructure.taxRegimes[0];
 
-  // CASE 1: CGST = 9, SGST = 9, IGST = 0
-  it("CASE 1: creates 2 SAME_JURISDICTION components for CGST=9, SGST=9, IGST=0", () => {
-    const formData = {
-      taxRegime: "GST",
-      cgstRate: "9",
-      sgstRate: "9",
-      igstRate: "0",
+const ukStructure = normalizeTaxStructure({
+  taxRegion: { taxRegionId: "reg-uk", taxRegionCode: "UK", taxRegionName: "United Kingdom", currencyCode: "GBP" },
+  taxRegimes: [
+    {
+      taxRegimeId: "regime-vat",
+      taxRegimeCode: "VAT",
+      taxRegimeName: "VAT",
+      components: [comp("c-vat", "tt-vat", "VAT", 1), comp("c-fee", "tt-fee", "Env Fee", 2, { inputType: "FIXED_AMOUNT" })],
+    },
+  ],
+});
+const vat = ukStructure.taxRegimes[0];
+
+const valuesFor = (regime, map) =>
+  buildComponentValues(regime).map((v) => ({ ...v, ...(map[v.taxComponentId] || {}) }));
+
+describe("Tax structure normalization", () => {
+  it("sorts regime components by displayOrder", () => {
+    expect(gst.components.map((c) => c.taxComponentId)).toEqual(["c-cgst", "c-sgst", "c-igst"]);
+  });
+
+  it("labels fields by input type without knowing the component", () => {
+    expect(getComponentLabel(vat.components[0], "GBP")).toBe("VAT Rate (%)");
+    expect(getComponentLabel(vat.components[1], "GBP")).toBe("Env Fee Rate (GBP)");
+  });
+});
+
+describe("buildTaxConfigurationPayload (TaxConfigurationRequestDto)", () => {
+  it("maps CGST=9, SGST=9 to two components and omits blank/zero IGST", () => {
+    const payload = buildTaxConfigurationPayload({
+      taxRegionId: "reg-in",
+      regime: gst,
+      componentValues: valuesFor(gst, {
+        "c-cgst": { value: "9", applicabilityType: "SAME_JURISDICTION" },
+        "c-sgst": { value: "9", applicabilityType: "SAME_JURISDICTION" },
+        "c-igst": { value: "0" },
+      }),
       effectiveFrom: "2026-01-01",
       effectiveTo: "2026-12-31",
-      active: true,
-    };
-
-    const payload = buildTaxConfigurationPayload(formData, mockRegion, mockTaxTypes);
+    });
 
     expect(payload).toEqual({
-      taxRegionId: "reg-india-001",
+      taxRegionId: "reg-in",
+      taxRegimeId: "regime-gst",
       taxRegime: "GST",
       effectiveFrom: "2026-01-01",
       effectiveTo: "2026-12-31",
       components: [
-        {
-          taxTypeId: "tt-cgst-001",
-          taxRate: 9,
-          applicabilityType: "SAME_JURISDICTION",
-        },
-        {
-          taxTypeId: "tt-sgst-002",
-          taxRate: 9,
-          applicabilityType: "SAME_JURISDICTION",
-        },
+        { taxTypeId: "tt-cgst", taxRate: 9, applicabilityType: "SAME_JURISDICTION" },
+        { taxTypeId: "tt-sgst", taxRate: 9, applicabilityType: "SAME_JURISDICTION" },
       ],
     });
-
-    // Verify root forbidden fields are not present
-    expect(payload.cgstRate).toBeUndefined();
-    expect(payload.sgstRate).toBeUndefined();
-    expect(payload.igstRate).toBeUndefined();
-    expect(payload.taxRegionName).toBeUndefined();
-    expect(payload.taxRegionCode).toBeUndefined();
-    expect(payload.taxType).toBeUndefined();
     expect(payload.active).toBeUndefined();
-    expect(payload.isActive).toBeUndefined();
+    expect(payload.cgstRate).toBeUndefined();
   });
 
-  // CASE 2: CGST = 0, SGST = 0, IGST = 18
-  it("CASE 2: creates 1 DIFFERENT_JURISDICTION component for IGST=18, CGST=0, SGST=0", () => {
-    const formData = {
-      taxRegime: "GST",
-      cgstRate: "0",
-      sgstRate: "0",
-      igstRate: "18",
+  it("works for a single-component regime without any region-specific code", () => {
+    const payload = buildTaxConfigurationPayload({
+      taxRegionId: "reg-uk",
+      regime: vat,
+      componentValues: valuesFor(vat, { "c-vat": { value: "20" } }),
       effectiveFrom: "2026-01-01",
       effectiveTo: "",
-      active: true,
-    };
-
-    const payload = buildTaxConfigurationPayload(formData, mockRegion, mockTaxTypes);
+    });
 
     expect(payload).toEqual({
-      taxRegionId: "reg-india-001",
-      taxRegime: "GST",
+      taxRegionId: "reg-uk",
+      taxRegimeId: "regime-vat",
+      taxRegime: "VAT",
       effectiveFrom: "2026-01-01",
       effectiveTo: null,
-      components: [
-        {
-          taxTypeId: "tt-igst-003",
-          taxRate: 18,
-          applicabilityType: "DIFFERENT_JURISDICTION",
-        },
-      ],
+      components: [{ taxTypeId: "tt-vat", taxRate: 20, applicabilityType: "ALL" }],
     });
   });
 
-  // CASE 3: All zero rates or missing rates
-  it("CASE 3: blocks submission when all rates are zero or invalid", () => {
-    const formData = {
-      taxRegime: "GST",
-      cgstRate: "0",
-      sgstRate: "0",
-      igstRate: "0",
-      effectiveFrom: "2026-01-01",
-      effectiveTo: "",
-    };
-
-    expect(() => buildTaxConfigurationPayload(formData, mockRegion, mockTaxTypes)).toThrow(
-      "At least one tax component with a valid positive rate is required."
-    );
-  });
-
-  // CASE 4: Missing CGST tax type master record
-  it("CASE 4: blocks submission with meaningful error when required tax type is missing from master data", () => {
-    const formData = {
-      taxRegime: "GST",
-      cgstRate: "9",
-      sgstRate: "9",
-      igstRate: "0",
-      effectiveFrom: "2026-01-01",
-    };
-
-    const partialTaxTypes = [
-      { id: "tt-sgst-002", taxTypeCode: "SGST", taxTypeName: "State GST" },
-      { id: "tt-igst-003", taxTypeCode: "IGST", taxTypeName: "Integrated GST" },
+  it("never sends values that do not belong to the selected regime", () => {
+    const leftovers = [
+      ...valuesFor(gst, { "c-cgst": { value: "9" } }),
+      ...valuesFor(vat, { "c-vat": { value: "20" } }),
     ];
+    const payload = buildTaxConfigurationPayload({
+      taxRegionId: "reg-uk",
+      regime: vat,
+      componentValues: leftovers,
+      effectiveFrom: "2026-01-01",
+    });
+    expect(payload.components.map((c) => c.taxTypeId)).toEqual(["tt-vat"]);
+  });
 
-    expect(() => buildTaxConfigurationPayload(formData, mockRegion, partialTaxTypes)).toThrow(
-      "Active CGST tax type record was not found. Please verify Tax Type Master configuration."
+  it("blocks submission when every value is blank or zero", () => {
+    expect(() =>
+      buildTaxConfigurationPayload({
+        taxRegionId: "reg-in",
+        regime: gst,
+        componentValues: valuesFor(gst, { "c-cgst": { value: "0" } }),
+        effectiveFrom: "2026-01-01",
+      })
+    ).toThrow("At least one tax component with a valid positive rate is required.");
+  });
+});
+
+describe("validateComponentValues", () => {
+  it("rejects negative and out-of-range percentages from metadata, not component names", () => {
+    const errors = validateComponentValues(
+      gst,
+      valuesFor(gst, { "c-cgst": { value: "-1" }, "c-sgst": { value: "101" }, "c-igst": { value: "abc" } })
+    );
+    expect(errors["c-cgst"]).toMatch(/between 0 and 100/);
+    expect(errors["c-sgst"]).toMatch(/between 0 and 100/);
+    expect(errors["c-igst"]).toBe("Enter a valid percentage");
+  });
+
+  it("allows fixed amounts above 100 but not negative", () => {
+    expect(validateComponentValues(vat, valuesFor(vat, { "c-fee": { value: "250" } }))).toEqual({});
+    expect(validateComponentValues(vat, valuesFor(vat, { "c-fee": { value: "-5" } }))["c-fee"]).toMatch(
+      /cannot be less than 0/
     );
   });
 
-  // CASE 5: GET response with components[]
-  it("CASE 5: normalizes component-based GET response into flat UI rates", () => {
-    const backendResponse = {
-      taxConfigurationId: "cfg-001",
-      taxRegionId: "reg-india-001",
-      taxRegionCode: "IN",
-      taxRegionName: "India",
-      taxRegime: "GST",
-      effectiveFrom: "2026-01-01",
-      effectiveTo: "2026-12-31",
-      isActive: true,
-      components: [
-        {
-          taxConfigurationComponentId: "tcc-1",
-          taxTypeId: "tt-cgst-001",
-          taxTypeCode: "CGST",
-          taxTypeName: "Central GST",
-          taxRate: 9,
-          applicabilityType: "SAME_JURISDICTION",
-          isActive: true,
-        },
-        {
-          taxConfigurationComponentId: "tcc-2",
-          taxTypeId: "tt-sgst-002",
-          taxTypeCode: "SGST",
-          taxTypeName: "State GST",
-          taxRate: 9,
-          applicabilityType: "SAME_JURISDICTION",
-          isActive: true,
-        },
+  it("honours backend min/max/required metadata", () => {
+    const regime = normalizeTaxStructure({
+      taxRegimes: [
+        { taxRegimeId: "r", taxRegimeCode: "X", components: [comp("c1", "t1", "X", 1, { maxValue: 15, required: true })] },
       ],
-    };
-
-    const normalized = normalizeTaxRateConfiguration(backendResponse);
-
-    expect(normalized.id).toBe("cfg-001");
-    expect(normalized.cgstRate).toBe(9);
-    expect(normalized.sgstRate).toBe(9);
-    expect(normalized.igstRate).toBeNull();
-    expect(normalized.components).toHaveLength(2);
-    expect(normalized.active).toBe(true);
-
-    // Also verify deriveTaxComponentRows displays both CGST and SGST rows
-    const rows = deriveTaxComponentRows([normalized]);
-    expect(rows).toHaveLength(2);
-    expect(rows[0].component).toBe("CGST");
-    expect(rows[0].cgstRate).toBe(9);
-    expect(rows[1].component).toBe("SGST");
-    expect(rows[1].sgstRate).toBe(9);
+    }).taxRegimes[0];
+    expect(validateComponentValues(regime, valuesFor(regime, {}))["c1"]).toBe("This value is required");
+    expect(validateComponentValues(regime, valuesFor(regime, { c1: { value: "16" } }))["c1"]).toMatch(/0 and 15/);
   });
 
-  // CASE 6: Legacy GET response with flat fields
-  it("CASE 6: retains fallback for legacy GET response with flat fields", () => {
-    const legacyResponse = {
+  it("requires at least one positive value", () => {
+    expect(validateComponentValues(gst, valuesFor(gst, {}))._components).toBeDefined();
+  });
+});
+
+describe("Edit mode helpers", () => {
+  const existing = normalizeTaxRateConfiguration({
+    taxConfigurationId: "cfg-001",
+    taxRegionId: "reg-in",
+    taxRegime: "GST",
+    effectiveFrom: "2026-01-01",
+    isActive: true,
+    components: [
+      { taxConfigurationComponentId: "tcc-1", taxTypeId: "tt-cgst", taxTypeCode: "CGST", taxRate: 9, applicabilityType: "SAME_JURISDICTION" },
+      { taxConfigurationComponentId: "tcc-2", taxTypeId: "tt-sgst", taxTypeCode: "SGST", taxRate: 9, applicabilityType: "SAME_JURISDICTION" },
+    ],
+  });
+
+  it("resolves the configured regime and pre-fills values and applicability", () => {
+    const regime = resolveConfiguredRegime(indiaStructure.taxRegimes, existing);
+    expect(regime.taxRegimeId).toBe("regime-gst");
+    expect(buildComponentValues(regime, existing)).toEqual([
+      { taxComponentId: "c-cgst", value: "9", applicabilityType: "SAME_JURISDICTION" },
+      { taxComponentId: "c-sgst", value: "9", applicabilityType: "SAME_JURISDICTION" },
+      { taxComponentId: "c-igst", value: "", applicabilityType: "ALL" },
+    ]);
+  });
+
+  it("falls back to component overlap when the stored regime label does not match", () => {
+    const regime = resolveConfiguredRegime(indiaStructure.taxRegimes, { ...existing, taxRegime: "Goods & Services" });
+    expect(regime.taxRegimeId).toBe("regime-gst");
+  });
+
+  it("reports configured components the regime has no field for", () => {
+    expect(findUnmappedConfigComponents(gst, existing)).toEqual([]);
+    expect(findUnmappedConfigComponents(vat, existing)).toHaveLength(2);
+  });
+
+  it("re-submitting an edited config keeps every component", () => {
+    const values = buildComponentValues(gst, existing).map((v) => (v.taxComponentId === "c-cgst" ? { ...v, value: "8" } : v));
+    const payload = buildTaxConfigurationPayload({
+      taxRegionId: "reg-in",
+      regime: gst,
+      componentValues: values,
+      effectiveFrom: "2026-01-01",
+    });
+    expect(payload.components).toEqual([
+      { taxTypeId: "tt-cgst", taxRate: 8, applicabilityType: "SAME_JURISDICTION" },
+      { taxTypeId: "tt-sgst", taxRate: 9, applicabilityType: "SAME_JURISDICTION" },
+    ]);
+  });
+});
+
+describe("Configuration normalization and rows", () => {
+  it("derives one row per configured component", () => {
+    const normalized = normalizeTaxRateConfiguration({
+      taxConfigurationId: "cfg-001",
+      taxRegionId: "reg-in",
+      taxRegime: "GST",
+      components: [
+        { taxTypeId: "tt-cgst", taxTypeCode: "CGST", taxRate: 9 },
+        { taxTypeId: "tt-sgst", taxTypeCode: "SGST", taxRate: 9 },
+      ],
+    });
+    const rows = deriveTaxComponentRows([normalized]);
+    expect(rows.map((r) => [r.component, r.taxRate])).toEqual([
+      ["CGST", 9],
+      ["SGST", 9],
+    ]);
+  });
+
+  it("keeps a row for a configuration with no components", () => {
+    const rows = deriveTaxComponentRows([{ taxRegime: "VAT", components: [] }]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].component).toBe("VAT");
+  });
+
+  it("retains fallback for legacy GET response with flat fields", () => {
+    const normalized = normalizeTaxRateConfiguration({
       id: "legacy-cfg-002",
-      taxRegionId: "reg-india-001",
-      taxRegionCode: "IN",
-      taxRegionName: "India",
+      taxRegionId: "reg-in",
       taxRegime: "GST",
       cgstRate: 9,
       sgstRate: 9,
       igstRate: null,
       effectiveFrom: "2026-01-01",
-      effectiveTo: "2026-12-31",
       active: true,
-    };
-
-    const normalized = normalizeTaxRateConfiguration(legacyResponse);
-
+    });
     expect(normalized.id).toBe("legacy-cfg-002");
     expect(normalized.cgstRate).toBe(9);
-    expect(normalized.sgstRate).toBe(9);
-    expect(normalized.igstRate).toBeNull();
-  });
-
-  // CASE 7: Edit CGST 9 → 8 while SGST remains 9
-  it("CASE 7: creates complete component list when editing CGST 9 to 8 with SGST remaining 9", () => {
-    const editingFormData = {
-      taxRegime: "GST",
-      cgstRate: "8",
-      sgstRate: "9",
-      igstRate: "0",
-      effectiveFrom: "2026-01-01",
-      effectiveTo: "2026-12-31",
-      active: true,
-    };
-
-    const putPayload = buildTaxConfigurationPayload(editingFormData, mockRegion, mockTaxTypes);
-
-    expect(putPayload.components).toEqual([
-      {
-        taxTypeId: "tt-cgst-001",
-        taxRate: 8,
-        applicabilityType: "SAME_JURISDICTION",
-      },
-      {
-        taxTypeId: "tt-sgst-002",
-        taxRate: 9,
-        applicabilityType: "SAME_JURISDICTION",
-      },
-    ]);
   });
 });

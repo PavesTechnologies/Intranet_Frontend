@@ -219,6 +219,7 @@ export default function BillingControlsStep({ value = {}, onChange }) {
               <p className="text-sm text-slate-500">Loading payment terms…</p>
             ) : (
               <FormSelect
+                anchorOptions
                 name="paymentTermId"
                 value={value.paymentTermId || ""}
                 onChange={(event) => {
@@ -243,6 +244,7 @@ export default function BillingControlsStep({ value = {}, onChange }) {
               <p className="text-sm text-slate-500">Loading tax regions...</p>
             ) : (
               <FormSelect
+                anchorOptions
                 name="taxRegionId"
                 value={value.taxRegionId || ""}
                 onChange={(event) => {

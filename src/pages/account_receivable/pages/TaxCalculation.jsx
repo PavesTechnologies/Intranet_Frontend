@@ -269,6 +269,10 @@ export default function TaxCalculation() {
     rawPeriodEnd,
     snapshotData?.billingPeriod || passedState.billingPeriod || "—"
   );
+  // Project Duration uses only the backend's project dates — never the
+  // snapshot's billing period.
+  const projectStartDate = taxCalc?.projectStartDate || snapshotData?.projectStartDate;
+  const projectEndDate = taxCalc?.projectEndDate || snapshotData?.projectEndDate;
   // A snapshot carries no separate billing date; its period end is the date
   // it was billed up to (same rule as the Billing Tax Pipeline list).
   const billingDate = snapshotData?.billingDate || rawPeriodEnd;
@@ -361,11 +365,12 @@ export default function TaxCalculation() {
       project={projectName}
       client={clientName}
       contextFields={[
+        { label: "Project Duration", value: formatFullPeriod(projectStartDate, projectEndDate) },
         { label: "Billing Period", value: billingPeriod },
         { label: "Billing Date", value: formatDisplayDate(billingDate) },
-        { label: "Snapshot", value: snapshotNum },
-        taxCalc?.taxRegionName && { label: "Tax Region", value: taxCalc.taxRegionName },
+        { label: "Tax Region", value: taxCalc?.taxRegionName },
       ]}
+      extraContextFields={[{ label: "Snapshot", value: snapshotNum }]}
       currency={currency}
       billingAmount={billingAmount}
       taxableAmount={taxableAmount}

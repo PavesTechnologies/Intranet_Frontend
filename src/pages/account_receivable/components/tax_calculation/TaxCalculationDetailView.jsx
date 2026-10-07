@@ -80,6 +80,7 @@ export default function TaxCalculationDetailView({
   project,
   client,
   contextFields = [],
+  extraContextFields = [],
   currency,
   billingAmount,
   taxableAmount,
@@ -98,11 +99,16 @@ export default function TaxCalculationDetailView({
   const pending = <span className="font-sans text-slate-400">Pending</span>;
   const displayStatus = statusLabel || PIPELINE_STAGE_LABELS[stage] || "—";
 
+  // Row-major two-column grid, so the order reads as pairs:
+  // Project | Client, Billing Type | Project Duration,
+  // Billing Period | Billing Date, Tax Region | Status — then any extras.
   const fields = [
     { label: "Project", value: project },
     { label: "Client", value: client },
     { label: "Billing Type", value: billingType },
     ...contextFields.filter((f) => f && f.label),
+    { label: "Status", value: displayStatus },
+    ...extraContextFields.filter((f) => f && f.label),
   ];
 
   return (
@@ -149,10 +155,6 @@ export default function TaxCalculationDetailView({
                 </dd>
               </div>
             ))}
-            <div className="flex min-w-0 items-baseline gap-3">
-              <dt className="w-28 shrink-0 text-slate-500">Status</dt>
-              <dd className="font-medium text-slate-900">{displayStatus}</dd>
-            </div>
           </dl>
         </Section>
 

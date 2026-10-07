@@ -188,10 +188,15 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
   const totalTaxAmount = occurrence.totalTaxAmount ?? 0;
   const grandTotal = occurrence.grandTotal ?? (isTaxCompleted ? taxableAmount + totalTaxAmount : null);
 
+  // Project Duration (project lifecycle) and Billing Period (this occurrence)
+  // come from separate backend fields and are never substituted for each other.
   const contextFields = [
+    { label: "Project Duration", value: formatFullPeriod(occurrence.projectStartDate, occurrence.projectEndDate) },
     { label: "Billing Period", value: formatFullPeriod(occurrence.periodStartDate, occurrence.periodEndDate) },
     { label: "Billing Date", value: formatDisplayDate(occurrence.billingDate) },
-    occurrence.taxRegionName && { label: "Tax Region", value: occurrence.taxRegionName },
+    { label: "Tax Region", value: occurrence.taxRegionName },
+  ];
+  const extraContextFields = [
     occurrence.primaryLocation && { label: "Primary Location", value: occurrence.primaryLocation },
   ];
 
@@ -199,10 +204,8 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
   const configParts = isReady
     ? [
         occurrence.taxRegionName || taxConfig?.taxRegionLabel,
-        taxConfig?.taxRegime || "GST",
-        taxConfig?.cgstRate !== null && taxConfig?.cgstRate !== undefined ? `CGST ${taxConfig.cgstRate}%` : null,
-        taxConfig?.sgstRate !== null && taxConfig?.sgstRate !== undefined ? `SGST ${taxConfig.sgstRate}%` : null,
-        taxConfig?.igstRate !== null && taxConfig?.igstRate !== undefined ? `IGST ${taxConfig.igstRate}%` : null,
+        taxConfig?.taxRegime,
+        ...(taxConfig?.components || []).map((comp) => `${comp.taxTypeCode || comp.taxTypeName} ${comp.taxRate}%`),
       ].filter(Boolean)
     : [];
 
@@ -256,6 +259,7 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
       project={occurrence.projectName}
       client={occurrence.clientName}
       contextFields={contextFields}
+      extraContextFields={extraContextFields}
       currency={currency}
       billingAmount={billingAmount}
       taxableAmount={taxableAmount}

@@ -9,6 +9,7 @@ import TaxComponentManagementModal from "../../components/master-data/TaxCompone
 import TaxRuleFormModal from "../../components/master-data/TaxRuleFormModal";
 import * as taxRegionService from "../../services/taxRegionService";
 import * as taxRateConfigService from "../../services/taxRateConfigurationService";
+import * as taxStructureService from "../../services/taxStructureService";
 import * as toastfy from "../../../../components/toastfy/toast";
 
 vi.mock("../../../../components/toastfy/toast", () => ({
@@ -107,8 +108,25 @@ describe("Tax Configuration Component Management", () => {
     ],
   };
 
+  const mockIndiaStructure = taxStructureService.normalizeTaxStructure({
+    taxRegion: { taxRegionId: "reg-india-001", taxRegionCode: "IN", taxRegionName: "India", currencyCode: "INR" },
+    taxRegimes: [
+      {
+        taxRegimeId: "regime-gst",
+        taxRegimeCode: "GST",
+        taxRegimeName: "GST",
+        components: [
+          { taxComponentId: "c-cgst", taxTypeId: "tt-cgst-001", taxTypeCode: "CGST", componentName: "CGST Rate", inputType: "PERCENTAGE", displayOrder: 1 },
+          { taxComponentId: "c-sgst", taxTypeId: "tt-sgst-002", taxTypeCode: "SGST", componentName: "SGST Rate", inputType: "PERCENTAGE", displayOrder: 2 },
+          { taxComponentId: "c-igst", taxTypeId: "tt-igst-003", taxTypeCode: "IGST", componentName: "IGST Rate", inputType: "PERCENTAGE", displayOrder: 3 },
+        ],
+      },
+    ],
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(taxStructureService, "getTaxStructureByRegion").mockResolvedValue(mockIndiaStructure);
   });
 
   const renderDetailPage = () => {
@@ -356,7 +374,7 @@ describe("Tax Configuration Component Management", () => {
     );
 
     // Fill valid form
-    fireEvent.change(screen.getByLabelText(/cgst rate/i), { target: { value: "9" } });
+    fireEvent.change(await screen.findByLabelText(/cgst rate/i), { target: { value: "9" } });
     fireEvent.change(screen.getByLabelText(/sgst rate/i), { target: { value: "9" } });
     fireEvent.change(screen.getByLabelText(/effective from/i), { target: { value: "2026-01-01" } });
 
@@ -519,7 +537,7 @@ describe("Tax Configuration Component Management", () => {
       />
     );
 
-    fireEvent.change(screen.getByLabelText(/cgst rate/i), { target: { value: "9" } });
+    fireEvent.change(await screen.findByLabelText(/cgst rate/i), { target: { value: "9" } });
     fireEvent.change(screen.getByLabelText(/sgst rate/i), { target: { value: "9" } });
     fireEvent.change(screen.getByLabelText(/effective from/i), { target: { value: "2027-01-01" } });
 

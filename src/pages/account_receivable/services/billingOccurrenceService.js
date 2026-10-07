@@ -132,9 +132,14 @@ export const normalizeBillingOccurrence = (item = {}) => {
     billingConfigurationId: item.billingConfigurationId ?? null,
     recurringConfigurationId: item.recurringConfigurationId ?? null,
     periodNumber: item.periodNumber ?? null,
+    // Billing Period — the span this occurrence bills for. Never project dates.
     periodStartDate: item.periodStartDate ?? item.billingPeriodStart ?? item.billingPeriodStartDate ?? "",
     periodEndDate: item.periodEndDate ?? item.billingPeriodEnd ?? item.billingPeriodEndDate ?? "",
     billingDate: item.billingDate ?? item.invoiceDate ?? "",
+    // Project Duration — the project's own lifecycle, only from the backend's
+    // project dates (never derived from the billing period or billing date).
+    projectStartDate: item.projectStartDate ?? "",
+    projectEndDate: item.projectEndDate ?? "",
     billingAmount: rawBillingAmount,
     scheduleType: item.scheduleType ?? "",
     isPartialPeriod: Boolean(item.isPartialPeriod),
@@ -209,6 +214,8 @@ export const mergeOccurrenceWithTaxCalc = (base = {}, taxCalc = {}) => {
     periodStartDate: b.periodStartDate || c.periodStartDate,
     periodEndDate: b.periodEndDate || c.periodEndDate,
     billingDate: b.billingDate || c.billingDate,
+    projectStartDate: b.projectStartDate || c.projectStartDate,
+    projectEndDate: b.projectEndDate || c.projectEndDate,
 
     billingAmount:
       b.billingAmount !== null && b.billingAmount !== undefined

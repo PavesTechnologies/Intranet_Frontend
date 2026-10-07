@@ -897,7 +897,7 @@ export default function NewConfigurationWizard() {
   </div>
 
   {/* Active Form Step Container */}
-  <PageCard className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <PageCard className="rounded-2xl border border-slate-200 bg-white shadow-sm">
     <PageCardContent className="space-y-6 p-5 sm:p-6 lg:p-8">
       {currentStep === 1 && (
         <ProjectStep
