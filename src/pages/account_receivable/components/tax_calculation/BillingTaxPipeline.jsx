@@ -1,9 +1,10 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { ChevronRight, Inbox } from "lucide-react";
+import { Calculator, ChevronRight, Eye, Inbox } from "lucide-react";
 
 import { PageCard } from "../../../../components/Cards/PageCard";
 import SearchInput from "../../../../components/filter/Searchbar";
 import ARClearFiltersButton from "../common/ARClearFiltersButton";
+import ActionMenu from "../common/ActionMenu";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import Pagination from "../../../../components/Pagination/pagination";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
@@ -272,16 +273,16 @@ export default function BillingTaxPipeline({
                       className={`h-12 align-middle transition-colors hover:bg-slate-50 ${clickable ? "cursor-pointer" : ""}`}
                     >
                       {/* max-w-0 lets the % width win so long names truncate instead of widening the column */}
-                      <td className={`max-w-0 py-2 font-medium text-slate-800 ${cellPadding(0)}`}>
+                      <td className={`max-w-0 py-2 text-left font-medium text-slate-800 ${cellPadding(0)}`}>
                         <div className="truncate" title={record.client}>{record.client}</div>
                       </td>
-                      <td className={`max-w-0 py-2 ${cellPadding(1)}`}>
+                      <td className={`max-w-0 py-2 text-left ${cellPadding(1)}`}>
                         <div className="truncate font-semibold text-slate-900" title={record.project}>{record.project}</div>
                       </td>
-                      <td className={`py-2 ${cellPadding(2)}`}>
+                      <td className={`py-2 text-left ${cellPadding(2)}`}>
                         <BillingTypeBadge label={record.billingType} />
                       </td>
-                      <td className={`whitespace-nowrap py-2 text-slate-700 ${cellPadding(3)}`}>
+                      <td className={`whitespace-nowrap py-2 text-left text-slate-700 ${cellPadding(3)}`}>
                         {record.billingPeriod}
                         {/* An upcoming occurrence is identified by when it will bill */}
                         {record.stage === PIPELINE_STAGES.UPCOMING && record.billingDate && (
@@ -296,15 +297,20 @@ export default function BillingTaxPipeline({
                       </td>
                       <td className={`py-2 text-center ${cellPadding(6)}`} onClick={(e) => e.stopPropagation()}>
                         {action && (
-                          <Button
-                            variant={action.emphasis ? "primary" : "outline"}
-                            size="small"
-                            onClick={action.onClick}
-                            disabled={action.disabled}
-                            className="whitespace-nowrap text-xs font-semibold"
-                          >
-                            {action.label}
-                          </Button>
+                          <ActionMenu
+                            items={[
+                              {
+                                label: action.label,
+                                icon: action.emphasis ? (
+                                  <Calculator className="h-4 w-4 text-amber-600" />
+                                ) : (
+                                  <Eye className="h-4 w-4 text-slate-600" />
+                                ),
+                                disabled: action.disabled,
+                                onClick: action.onClick,
+                              },
+                            ]}
+                          />
                         )}
                       </td>
                     </tr>

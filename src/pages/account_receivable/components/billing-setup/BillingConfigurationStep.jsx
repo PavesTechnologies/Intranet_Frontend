@@ -930,11 +930,13 @@ function TimeAndMaterialForm({
                         {!isExisting && (
                           <td className="px-4 py-3 text-center">
                             <div className="flex items-center justify-center gap-1.5">
-                              <button
+                              <Button
                                 type="button"
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => saveRow(index)}
                                 disabled={item.saving || item.deleting}
-                                className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="text-green-600 hover:text-green-700 hover:bg-green-50"
                                 title="Save rate"
                               >
                                 {item.saving ? (
@@ -942,12 +944,14 @@ function TimeAndMaterialForm({
                                 ) : (
                                   <Check className="h-4 w-4" />
                                 )}
-                              </button>
-                              <button
+                              </Button>
+                              <Button
                                 type="button"
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => removeRole(index)}
                                 disabled={item.saving || item.deleting}
-                                className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
                                 title="Remove role"
                               >
                                 {item.deleting ? (
@@ -955,7 +959,7 @@ function TimeAndMaterialForm({
                                 ) : (
                                   <Trash2 className="h-4 w-4" />
                                 )}
-                              </button>
+                              </Button>
                             </div>
                           </td>
                         )}

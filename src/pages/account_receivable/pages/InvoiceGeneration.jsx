@@ -531,11 +531,11 @@ export default function InvoiceGeneration() {
     invoiceNumber: "left",
     client: "left",
     project: "left",
-    billingPeriod: "center",
-    invoiceDate: "center",
-    dueDate: "center",
-    currency: "center",
-    grandTotal: "right",
+    billingPeriod: "left",
+    invoiceDate: "left",
+    dueDate: "left",
+    currency: "left",
+    grandTotal: "left",
     status: "center",
     actions: "center",
   };
@@ -663,56 +663,41 @@ export default function InvoiceGeneration() {
 
       actions: (
         <div className="flex items-center justify-center">
-          {isReady ? (
-            <Button
-              size="small"
-              variant="primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleGenerateInvoice(item);
-              }}
-              className="text-xs font-semibold py-1 px-2.5 flex items-center gap-1 shadow-xs"
-            >
-              <FileText className="h-3.5 w-3.5" />
-              Generate Invoice
-            </Button>
-          ) : (
-            <ActionMenu
-              items={[
-                {
-                  label: "View Invoice",
-                  icon: <Eye className="h-4 w-4 text-slate-600" />,
-                  onClick: () => handleViewInvoice(item),
-                },
-
-                {
-                  label: "Submit for Approval",
-                  icon: <CheckCircle2 className="h-4 w-4 text-indigo-600" />,
-                  hidden: st !== "GENERATED",
-                  onClick: () => setSubmitTarget(item),
-                },
-
-                {
-                  label: isSent
-                    ? "Resend to Client"
-                    : "Send to Client",
-                  icon: <MailCheck className="h-4 w-4 text-emerald-600" />,
-                  hidden: st !== "APPROVED",
-                  onClick: () => {
-                    setSendTarget(item);
-                  },
-                },
-
-                {
-                  label: "Review Rejection",
-                  icon: <AlertCircle className="h-4 w-4 text-rose-600" />,
-                  hidden: st !== "REJECTED",
-                  danger: true,
-                  onClick: () => handleViewInvoice(item),
-                },
-              ]}
-            />
-          )}
+          <ActionMenu
+            items={[
+              {
+                label: "Generate Invoice",
+                icon: <FileText className="h-4 w-4 text-indigo-600" />,
+                hidden: !isReady,
+                onClick: () => handleGenerateInvoice(item),
+              },
+              {
+                label: "View Invoice",
+                icon: <Eye className="h-4 w-4 text-slate-600" />,
+                hidden: isReady,
+                onClick: () => handleViewInvoice(item),
+              },
+              {
+                label: "Submit for Approval",
+                icon: <CheckCircle2 className="h-4 w-4 text-indigo-600" />,
+                hidden: st !== "GENERATED",
+                onClick: () => setSubmitTarget(item),
+              },
+              {
+                label: isSent ? "Resend to Client" : "Send to Client",
+                icon: <MailCheck className="h-4 w-4 text-emerald-600" />,
+                hidden: st !== "APPROVED",
+                onClick: () => setSendTarget(item),
+              },
+              {
+                label: "Review Rejection",
+                icon: <AlertCircle className="h-4 w-4 text-rose-600" />,
+                hidden: st !== "REJECTED",
+                danger: true,
+                onClick: () => handleViewInvoice(item),
+              },
+            ]}
+          />
         </div>
       ),
     };

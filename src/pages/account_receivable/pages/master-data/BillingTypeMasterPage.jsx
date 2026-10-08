@@ -17,7 +17,6 @@ import FormInput from "../../../../components/forms/FormInput";
 import Modal from "../../../../components/Modal/modal";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import StatusBadge from "../../../../components/status/statusbadge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../../../components/ui/tooltip";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import SearchInput from "../../../../components/filter/Searchbar";
 import ARClearFiltersButton from "../../components/common/ARClearFiltersButton";
@@ -41,33 +40,19 @@ const PAGE_SIZE = 8;
 
 const EMPTY_FORM = { billingTypeName: "", description: "" };
 
-const ACTION_TONE_CLASSES = {
-  default: "text-slate-500 hover:bg-slate-100 hover:text-slate-800",
-  danger: "text-rose-500 hover:bg-rose-50 hover:text-rose-700",
-  success: "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700",
-};
-
-// Inline row-action icon with a hover tooltip — used only for the Billing Type
-// table, which trades the shared ActionMenu (3-dot) pattern for three
-// always-visible icons per the design.
-const InlineActionButton = ({ icon, label, onClick, disabled = false, tone = "default" }) => (
-  <TooltipProvider>
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          onClick={onClick}
-          disabled={disabled}
-          aria-label={label}
-          className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${ACTION_TONE_CLASSES[tone]} ${disabled ? "cursor-not-allowed opacity-50" : ""
-            }`}
-        >
-          {icon}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top">{label}</TooltipContent>
-    </Tooltip>
-  </TooltipProvider>
+// Always-visible row actions use the shared button primitive.
+const InlineActionButton = ({ icon, label, onClick, disabled = false }) => (
+  <Button
+    type="button"
+    variant="ghost"
+    size="icon"
+    onClick={onClick}
+    disabled={disabled}
+    aria-label={label}
+    title={label}
+  >
+    {icon}
+  </Button>
 );
 
 export default function BillingTypeMasterPage() {
@@ -287,16 +272,14 @@ export default function BillingTypeMasterPage() {
           />
           {item.isActive ? (
             <InlineActionButton
-              icon={<Trash2 className="h-4 w-4" />}
+              icon={<Trash2 className="h-4 w-4 text-rose-500" />}
               label="Delete"
-              tone="danger"
               onClick={() => setDeleteTarget(item)}
             />
           ) : (
             <InlineActionButton
-              icon={<CheckCircle2 className="h-4 w-4" />}
+              icon={<CheckCircle2 className="h-4 w-4 text-emerald-600" />}
               label="Activate"
-              tone="success"
               disabled={activatingId === item.billingTypeId}
               onClick={() => handleActivate(item)}
             />
