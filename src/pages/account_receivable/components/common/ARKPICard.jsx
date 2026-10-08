@@ -7,7 +7,6 @@ export default function ARKPICard({
   value,
   icon,
   color,
-  active,
   onClick,
   suffix,
   className,
@@ -17,7 +16,7 @@ export default function ARKPICard({
       onClick={onClick}
       className={cn(
         "flex h-full min-h-[96px] w-full items-center gap-3 rounded-xl border p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md",
-        active ? "border-indigo-400 bg-indigo-50/40 ring-2 ring-indigo-500/30" : "border-slate-200 bg-white",
+        "border-slate-200 bg-white",
         className
       )}
     >
