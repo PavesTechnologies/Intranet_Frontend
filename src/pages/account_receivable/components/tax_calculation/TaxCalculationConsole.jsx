@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 import PageHeader from "../../../../components/ui/PageHeader";
-import { KPICard } from "../../../../components/kpi/KPI";
+import ARKPICard from "../common/ARKPICard";
 import Button from "../../../../components/Button/Button";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 
@@ -346,15 +346,15 @@ export default function TaxCalculationConsole() {
             type="button"
             onClick={() => handleKpiClick(kpi.key)}
             title={`Show ${kpi.label}`}
-            className="rounded-xl text-left outline-none focus:outline-none focus-visible:outline-none"
+            className="w-full rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
           >
-            <KPICard
+            <ARKPICard
               label={kpi.label}
               value={pipelineLoading ? "…" : stageCounts[kpi.key]}
               icon={<kpi.icon className="h-5 w-5" />}
               color={kpi.color}
               active={stage === kpi.key}
-              className="h-full w-full cursor-pointer bg-white shadow-sm border border-slate-200 transition-all hover:shadow-md !ring-0 !outline-none focus:!ring-0 focus:!outline-none focus-visible:!ring-0 focus-visible:!outline-none"
+              className="h-full w-full"
             />
           </button>
         ))}
