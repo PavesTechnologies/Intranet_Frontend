@@ -930,11 +930,13 @@ function TimeAndMaterialForm({
                         {!isExisting && (
                           <td className="px-4 py-3 text-center">
                             <div className="flex items-center justify-center gap-1.5">
-                              <button
+                              <Button
                                 type="button"
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => saveRow(index)}
                                 disabled={item.saving || item.deleting}
-                                className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="text-green-600 hover:text-green-700 hover:bg-green-50"
                                 title="Save rate"
                               >
                                 {item.saving ? (
@@ -942,12 +944,14 @@ function TimeAndMaterialForm({
                                 ) : (
                                   <Check className="h-4 w-4" />
                                 )}
-                              </button>
-                              <button
+                              </Button>
+                              <Button
                                 type="button"
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => removeRole(index)}
                                 disabled={item.saving || item.deleting}
-                                className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
                                 title="Remove role"
                               >
                                 {item.deleting ? (
@@ -955,7 +959,7 @@ function TimeAndMaterialForm({
                                 ) : (
                                   <Trash2 className="h-4 w-4" />
                                 )}
-                              </button>
+                              </Button>
                             </div>
                           </td>
                         )}
@@ -1633,31 +1637,31 @@ function FixedPriceForm({
             <table className="w-full table-fixed divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="w-1/5 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Period</th>
-                  <th className="w-1/5 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">From</th>
-                  <th className="w-1/5 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">To</th>
-                  <th className="w-1/5 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Amount</th>
-                  <th className="w-1/5 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Partial Period</th>
+                  <th className="w-1/5 px-3 py-2.5 text-left align-middle font-semibold text-slate-600">Period</th>
+                  <th className="w-1/5 px-3 py-2.5 text-left align-middle font-semibold text-slate-600">From</th>
+                  <th className="w-1/5 px-3 py-2.5 text-left align-middle font-semibold text-slate-600">To</th>
+                  <th className="w-1/5 px-3 py-2.5 text-left align-middle font-semibold text-slate-600">Amount</th>
+                  <th className="w-1/5 px-3 py-2.5 text-left align-middle font-semibold text-slate-600">Partial Period</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {schedulePreview.map((period, index) => (
                   <tr key={period.periodNumber ?? index}>
-                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                    <td className="px-3 py-2.5 text-left align-middle text-slate-700">
                       Period {period.periodNumber ?? index + 1}
                     </td>
-                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                    <td className="px-3 py-2.5 text-left align-middle text-slate-700">
                       {formatDisplayDate(period.periodStartDate)}
                     </td>
-                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                    <td className="px-3 py-2.5 text-left align-middle text-slate-700">
                       {formatDisplayDate(period.periodEndDate)}
                     </td>
-                    <td className="px-3 py-2.5 text-center align-middle font-medium text-slate-900">
+                    <td className="px-3 py-2.5 text-left align-middle font-medium text-slate-900">
                       {period.billingAmount || period.billingAmount === 0
                         ? formatCurrency(period.billingAmount, currency)
                         : "—"}
                     </td>
-                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                    <td className="px-3 py-2.5 text-left align-middle text-slate-700">
                       {period.isPartialPeriod ? "Yes" : "No"}
                     </td>
                   </tr>
@@ -3378,32 +3382,32 @@ function RecurringBillingForm({
             <table className="w-full table-fixed divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="w-1/6 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Period</th>
-                  <th className="w-1/6 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">From</th>
-                  <th className="w-1/6 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">To</th>
-                  <th className="w-1/6 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Amount</th>
-                  <th className="w-1/6 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Partial Period</th>
+                  <th className="w-1/6 px-3 py-2.5 text-left align-middle font-semibold text-slate-600">Period</th>
+                  <th className="w-1/6 px-3 py-2.5 text-left align-middle font-semibold text-slate-600">From</th>
+                  <th className="w-1/6 px-3 py-2.5 text-left align-middle font-semibold text-slate-600">To</th>
+                  <th className="w-1/6 px-3 py-2.5 text-left align-middle font-semibold text-slate-600">Amount</th>
+                  <th className="w-1/6 px-3 py-2.5 text-left align-middle font-semibold text-slate-600">Partial Period</th>
                   <th className="w-1/6 px-3 py-2.5 text-center align-middle font-semibold text-slate-600">Invoiced</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {displaySchedule.map((period, index) => (
                   <tr key={period.periodNumber ?? index}>
-                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                    <td className="px-3 py-2.5 text-left align-middle text-slate-700">
                       Period {period.periodNumber ?? index + 1}
                     </td>
-                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                    <td className="px-3 py-2.5 text-left align-middle text-slate-700">
                       {formatDisplayDate(period.periodStartDate)}
                     </td>
-                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                    <td className="px-3 py-2.5 text-left align-middle text-slate-700">
                       {formatDisplayDate(period.periodEndDate)}
                     </td>
-                    <td className="px-3 py-2.5 text-center align-middle font-medium text-slate-900">
+                    <td className="px-3 py-2.5 text-left align-middle font-medium text-slate-900">
                       {period.billingAmount || period.billingAmount === 0
                         ? formatCurrency(period.billingAmount, currency)
                         : "—"}
                     </td>
-                    <td className="px-3 py-2.5 text-center align-middle text-slate-700">
+                    <td className="px-3 py-2.5 text-left align-middle text-slate-700">
                       {period.isPartialPeriod ? "Yes" : "No"}
                     </td>
                     <td className="px-3 py-2.5 text-center align-middle">
@@ -3752,6 +3756,8 @@ export default function BillingConfigurationStep({
     if (!selectedOption) return;
 
     const normalizedBillingType = selectedOption.value;
+    const mustChooseRecurringFrequency =
+      normalizedBillingType === "RECURRING" && billingType !== "RECURRING";
     const nextPricingModels = getPricingModelOptions(normalizedBillingType);
     const nextBillingMode =
       nextPricingModels.length > 0 ? nextPricingModels[0].value : "";
@@ -3803,11 +3809,21 @@ export default function BillingConfigurationStep({
       billingMode: nextBillingMode,
       billingFrequency:
         normalizedBillingType === "RECURRING"
-          ? value.billingFrequency || ""
+          ? mustChooseRecurringFrequency
+            ? ""
+            : value.billingFrequency || ""
           : "",
       billingFrequencyId:
         normalizedBillingType === "RECURRING"
-          ? value.billingFrequencyId || ""
+          ? mustChooseRecurringFrequency
+            ? ""
+            : value.billingFrequencyId || ""
+          : "",
+      billingFrequencyName:
+        normalizedBillingType === "RECURRING"
+          ? mustChooseRecurringFrequency
+            ? ""
+            : value.billingFrequencyName || ""
           : "",
       timeAndMaterial:
         normalizedBillingType === "TIME_MATERIAL"

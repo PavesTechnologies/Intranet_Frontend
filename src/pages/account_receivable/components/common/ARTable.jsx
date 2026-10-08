@@ -12,39 +12,23 @@ const ARTable = ({
   headers = [],
   rows = [],
   columns = [],
-  alignments = {},
   loading = false,
   emptyMessage = "No records found.",
 }) => {
   const hasData = rows.length > 0;
 
   const getAlignmentClass = (colOrHeader, idx) => {
-    if (alignments) {
-      if (alignments[colOrHeader] === "left") return "text-left";
-      if (alignments[colOrHeader] === "center") return "text-center";
-      if (alignments[colOrHeader] === "right") return "text-right";
-
-      const colKey = columns[idx];
-      if (colKey && alignments[colKey] === "left") return "text-left";
-      if (colKey && alignments[colKey] === "center") return "text-center";
-      if (colKey && alignments[colKey] === "right") return "text-right";
-
-      const headerKey = headers[idx];
-      if (headerKey && alignments[headerKey] === "left") return "text-left";
-      if (headerKey && alignments[headerKey] === "center") return "text-center";
-      if (headerKey && alignments[headerKey] === "right") return "text-right";
-
-      if (alignments[idx] === "left") return "text-left";
-      if (alignments[idx] === "center") return "text-center";
-      if (alignments[idx] === "right") return "text-right";
-    }
-
-    const name = String(columns[idx] || headers[idx] || colOrHeader || "").toLowerCase();
-    if (name === "client" || name === "project") {
-      return "text-left";
-    }
-
-    return idx === 0 ? "text-left" : "text-center";
+    const names = [columns[idx], headers[idx], colOrHeader]
+      .filter(Boolean)
+      .map((name) =>
+        String(name)
+          .replace(/([a-z])([A-Z])/g, "$1 $2")
+          .toLowerCase()
+          .split(/[^a-z]+/)
+      );
+    return names.some((parts) => parts.some((part) => part === "status" || part === "action" || part === "actions"))
+      ? "text-center"
+      : "text-left";
   };
 
   return (

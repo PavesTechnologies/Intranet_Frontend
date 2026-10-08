@@ -3,7 +3,6 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   FileText,
   RefreshCw,
-  Search,
   CheckCircle2,
   FolderKanban,
   Clock,
@@ -16,6 +15,7 @@ import {
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
+import SearchInput from "../../../components/filter/Searchbar";
 import { PageCard } from "../../../components/Cards/PageCard";
 import ARKPICard from "../components/common/ARKPICard";
 import { cn } from "@/lib/utils";
@@ -531,11 +531,11 @@ export default function InvoiceGeneration() {
     invoiceNumber: "left",
     client: "left",
     project: "left",
-    billingPeriod: "center",
-    invoiceDate: "center",
-    dueDate: "center",
-    currency: "center",
-    grandTotal: "right",
+    billingPeriod: "left",
+    invoiceDate: "left",
+    dueDate: "left",
+    currency: "left",
+    grandTotal: "left",
     status: "center",
     actions: "center",
   };
@@ -663,56 +663,41 @@ export default function InvoiceGeneration() {
 
       actions: (
         <div className="flex items-center justify-center">
-          {isReady ? (
-            <Button
-              size="xs"
-              variant="primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleGenerateInvoice(item);
-              }}
-              className="text-xs font-semibold py-1 px-2.5 flex items-center gap-1 shadow-xs"
-            >
-              <FileText className="h-3.5 w-3.5" />
-              Generate Invoice
-            </Button>
-          ) : (
-            <ActionMenu
-              items={[
-                {
-                  label: "View Invoice",
-                  icon: <Eye className="h-4 w-4 text-slate-600" />,
-                  onClick: () => handleViewInvoice(item),
-                },
-
-                {
-                  label: "Submit for Approval",
-                  icon: <CheckCircle2 className="h-4 w-4 text-indigo-600" />,
-                  hidden: st !== "GENERATED",
-                  onClick: () => setSubmitTarget(item),
-                },
-
-                {
-                  label: isSent
-                    ? "Resend to Client"
-                    : "Send to Client",
-                  icon: <MailCheck className="h-4 w-4 text-emerald-600" />,
-                  hidden: st !== "APPROVED",
-                  onClick: () => {
-                    setSendTarget(item);
-                  },
-                },
-
-                {
-                  label: "Review Rejection",
-                  icon: <AlertCircle className="h-4 w-4 text-rose-600" />,
-                  hidden: st !== "REJECTED",
-                  danger: true,
-                  onClick: () => handleViewInvoice(item),
-                },
-              ]}
-            />
-          )}
+          <ActionMenu
+            items={[
+              {
+                label: "Generate Invoice",
+                icon: <FileText className="h-4 w-4 text-indigo-600" />,
+                hidden: !isReady,
+                onClick: () => handleGenerateInvoice(item),
+              },
+              {
+                label: "View Invoice",
+                icon: <Eye className="h-4 w-4 text-slate-600" />,
+                hidden: isReady,
+                onClick: () => handleViewInvoice(item),
+              },
+              {
+                label: "Submit for Approval",
+                icon: <CheckCircle2 className="h-4 w-4 text-indigo-600" />,
+                hidden: st !== "GENERATED",
+                onClick: () => setSubmitTarget(item),
+              },
+              {
+                label: isSent ? "Resend to Client" : "Send to Client",
+                icon: <MailCheck className="h-4 w-4 text-emerald-600" />,
+                hidden: st !== "APPROVED",
+                onClick: () => setSendTarget(item),
+              },
+              {
+                label: "Review Rejection",
+                icon: <AlertCircle className="h-4 w-4 text-rose-600" />,
+                hidden: st !== "REJECTED",
+                danger: true,
+                onClick: () => handleViewInvoice(item),
+              },
+            ]}
+          />
         </div>
       ),
     };
@@ -727,7 +712,7 @@ export default function InvoiceGeneration() {
         actions={
           <Button
             variant="outline"
-            size="sm"
+            size="small"
             onClick={() => loadData(true)}
             disabled={refreshing}
           >
@@ -755,7 +740,7 @@ export default function InvoiceGeneration() {
           </div>
 
           <Button
-            size="sm"
+            size="small"
             variant="outline"
             onClick={() => loadData(true)}
             className="text-xs bg-white text-rose-700 border-rose-300 hover:bg-rose-50 font-semibold shrink-0"
@@ -779,7 +764,7 @@ export default function InvoiceGeneration() {
                 key={kpi.key}
                 type="button"
                 onClick={() => handleKpiClick(kpi.key)}
-                className="text-left rounded-xl transition-transform active:scale-[0.99] focus:outline-none"
+                className="w-full rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
               >
                 <ARKPICard
                   label={kpi.label}
@@ -788,11 +773,7 @@ export default function InvoiceGeneration() {
                   icon={<kpi.icon className="h-5 w-5" />}
                   color={kpi.color}
                   active={kpi.active}
-                  className={cn(
-                    "h-full w-full cursor-pointer bg-white shadow-sm transition-all hover:shadow-md",
-                    kpi.isTotal && !kpi.active && "border-indigo-200/80 bg-gradient-to-br from-indigo-50/30 to-white",
-                    kpi.active && "ring-2 ring-indigo-500/40 border-indigo-400 bg-indigo-50/20"
-                  )}
+                  className="h-full w-full"
                 />
               </button>
             ))}
@@ -810,7 +791,7 @@ export default function InvoiceGeneration() {
                 key={kpi.key}
                 type="button"
                 onClick={() => handleKpiClick(kpi.key)}
-                className="text-left rounded-xl transition-transform active:scale-[0.99] focus:outline-none"
+                className="w-full rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
               >
                 <ARKPICard
                   label={kpi.label}
@@ -819,10 +800,7 @@ export default function InvoiceGeneration() {
                   icon={<kpi.icon className="h-5 w-5" />}
                   color={kpi.color}
                   active={kpi.active}
-                  className={cn(
-                    "h-full w-full cursor-pointer bg-white shadow-sm transition-all hover:shadow-md",
-                    kpi.active && "ring-2 ring-indigo-500/40 border-indigo-400 bg-indigo-50/20"
-                  )}
+                  className="h-full w-full"
                 />
               </button>
             ))}
@@ -858,14 +836,11 @@ export default function InvoiceGeneration() {
 
         {/* Search Toolbar — placed inside the pipeline card */}
         <div className="px-4 py-3 sm:px-5">
-          <div className="relative w-full">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by invoice number, project, client, snapshot..."
+          <div className="relative w-full lg:max-w-md">
+            <SearchInput
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50/70 pl-8 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              placeholder="Search by invoice number, project, client, snapshot..."
             />
           </div>
         </div>
