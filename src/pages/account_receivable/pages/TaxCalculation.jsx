@@ -6,7 +6,7 @@ import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { formatDisplayDate } from "../utils/format";
-import { PIPELINE_STAGES, getSnapshotStage, formatFullPeriod } from "../utils/taxPipeline";
+import { PIPELINE_STAGES, getTaxPipelineStatus, formatFullPeriod } from "../utils/taxPipeline";
 
 import {
   calculateTax,
@@ -269,6 +269,10 @@ export default function TaxCalculation() {
     rawPeriodEnd,
     snapshotData?.billingPeriod || passedState.billingPeriod || "—"
   );
+  // Project Duration uses only the backend's project dates — never the
+  // snapshot's billing period.
+  const projectStartDate = taxCalc?.projectStartDate || snapshotData?.projectStartDate;
+  const projectEndDate = taxCalc?.projectEndDate || snapshotData?.projectEndDate;
   // A snapshot carries no separate billing date; its period end is the date
   // it was billed up to (same rule as the Billing Tax Pipeline list).
   const billingDate = snapshotData?.billingDate || rawPeriodEnd;
@@ -286,21 +290,24 @@ export default function TaxCalculation() {
   const totalTaxAmount = taxCalc?.totalTaxAmount ?? 0;
   const grandTotal = taxCalc?.grandTotal ?? (taxableAmount + totalTaxAmount);
   const isTaxCompleted = Boolean(taxCalc && (taxCalc.components !== undefined || taxCalc.totalTaxAmount !== undefined));
-  const isInvoiced = Boolean(hasInvoice || snapshotData?.billingStatus === "INVOICED" || snapshotData?.status === "INVOICED");
-  const displayStatus = isInvoiced
-    ? "INVOICED"
-    : isTaxCompleted
-      ? (taxCalc?.status || "TAX_COMPLETED")
-      : (snapshotData?.status || snapshotData?.billingStatus || "READY_FOR_TAX");
+  const displayStatus = isTaxCompleted
+    ? (taxCalc?.status || "TAX_COMPLETED")
+    : (snapshotData?.status || snapshotData?.billingStatus || "READY_FOR_TAX");
 
-  // One display status — the same backend-derived displayStatus as before,
-  // grouped the same way the Billing Tax Pipeline groups it.
-  const stage = isInvoiced
-    ? PIPELINE_STAGES.INVOICED
-    : isTaxCompleted
-      ? PIPELINE_STAGES.TAX_CALCULATED
-      : getSnapshotStage(displayStatus) || PIPELINE_STAGES.READY_FOR_TAX;
-  const statusLabel = String(displayStatus).toUpperCase() === "IN_TAX" ? "Tax in Progress" : undefined;
+  // Same normalized status the Billing Tax Pipeline list shows. Invoiced only
+  // when the invoice lookup above returned a persisted invoice. A loaded T&M
+  // snapshot is already acquired, so it is never "upcoming".
+  const pipelineStatus = getTaxPipelineStatus({
+    isInvoiced: hasInvoice,
+    invoiceId: existingInvoice?.invoiceId,
+    status: isTaxCompleted ? "TAX_COMPLETED" : displayStatus,
+  });
+  const stage = pipelineStatus === PIPELINE_STAGES.UPCOMING ? PIPELINE_STAGES.READY_FOR_TAX : pipelineStatus;
+  const isInvoiced = stage === PIPELINE_STAGES.INVOICED;
+  const statusLabel =
+    stage === PIPELINE_STAGES.TAX_CALCULATED && String(displayStatus).toUpperCase() === "IN_TAX"
+      ? "Tax in Progress"
+      : undefined;
 
   const viewInvoice = () =>
     navigate(`/account-receivable/invoices/${existingInvoice?.invoiceId || effectiveSnapshotId}`, {
@@ -346,11 +353,12 @@ export default function TaxCalculation() {
       project={projectName}
       client={clientName}
       contextFields={[
+        { label: "Project Duration", value: formatFullPeriod(projectStartDate, projectEndDate) },
         { label: "Billing Period", value: billingPeriod },
         { label: "Billing Date", value: formatDisplayDate(billingDate) },
-        { label: "Snapshot", value: snapshotNum },
-        taxCalc?.taxRegionName && { label: "Tax Region", value: taxCalc.taxRegionName },
+        { label: "Tax Region", value: taxCalc?.taxRegionName },
       ]}
+      extraContextFields={[{ label: "Snapshot", value: snapshotNum }]}
       currency={currency}
       billingAmount={billingAmount}
       taxableAmount={taxableAmount}

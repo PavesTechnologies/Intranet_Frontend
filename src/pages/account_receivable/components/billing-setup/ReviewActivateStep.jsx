@@ -537,8 +537,8 @@ function PaymentSchedule({ review, currency }) {
     : [
         { label: "Schedule Type", value: "Custom Payment Dates" },
         { label: "Number of Payments", value: String(review.payments.length) },
-        { label: "First Payment", value: formatDisplayDate(review.firstPaymentDate) },
-        { label: "Last Payment", value: formatDisplayDate(review.lastPaymentDate) },
+        { label: "First Billing Date", value: formatDisplayDate(review.firstPaymentDate) },
+        { label: "Last Billing Date", value: formatDisplayDate(review.lastPaymentDate) },
       ];
   return (
     <div className="space-y-3 py-1">

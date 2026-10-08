@@ -23,6 +23,7 @@ export default function InvoiceGenerationModal({
   snapshotId = "",
   taxCalc = null,
   snapshotData = null,
+  occurrence = null,
   companyProfile = null,
   generateError = "",
   submittingForApproval = false,
@@ -113,6 +114,7 @@ export default function InvoiceGenerationModal({
                 snapshotId={snapshotId}
                 taxCalc={taxCalc}
                 snapshotData={snapshotData}
+                occurrence={occurrence}
                 companyProfile={companyProfile}
                 isGenerating={false}
               />

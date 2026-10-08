@@ -168,7 +168,8 @@ describe("Redesigned Corporate Invoice Document (InvoicePreviewDocument)", () =>
 
     expect(screen.getByText("FINANCIAL SUMMARY")).toBeInTheDocument();
     expect(screen.getByText("Subtotal")).toBeInTheDocument();
-    expect(screen.getByText("Tax")).toBeInTheDocument();
+    // Tax breakdown total row + Financial Summary "Total Tax"
+    expect(screen.getAllByText("Total Tax").length).toBe(2);
     expect(screen.getByText("Grand Total")).toBeInTheDocument();
     expect(screen.getByText("USD 11,800.00")).toBeInTheDocument();
   });

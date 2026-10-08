@@ -55,6 +55,7 @@ import {
 } from "../utils/invoiceDemoData";
 import { getActiveCompanyProfile } from "../services/companyProfileService";
 import { getTaxCalculation } from "../services/taxCalculationService";
+import { getBillingOccurrence } from "../services/billingOccurrenceService";
 import InvoiceDocument from "../components/invoice/InvoiceDocument";
 
 const TAX_WORKSPACE_PATH = "/account-receivable/tax-calculation";
@@ -129,6 +130,7 @@ export default function InvoiceDetail() {
 
   const [invoice, setInvoice] = useState(null);
   const [taxCalc, setTaxCalc] = useState(null);
+  const [occurrence, setOccurrence] = useState(null);
   const [companyProfile, setCompanyProfile] = useState(null);
   const [approvalHistory, setApprovalHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -245,6 +247,18 @@ export default function InvoiceDetail() {
             }
           } catch (calcErr) {
             console.warn("[InvoiceDetail] Non-blocking tax calculation fallback notice:", calcErr?.message);
+          }
+        }
+
+        // Milestone Plan / Recurring / Fixed Price invoices: the billing
+        // occurrence carries the billing type and the occurrence-based line
+        // item (Invoice -> Billing Occurrence -> Billing Configuration).
+        const occurrenceRef = data.billingScheduleId || paramOccurrenceId;
+        if (occurrenceRef && !data.billingSnapshotId) {
+          try {
+            setOccurrence(await getBillingOccurrence(occurrenceRef));
+          } catch (occErr) {
+            console.warn("[InvoiceDetail] Non-blocking billing occurrence notice:", occErr?.message);
           }
         }
 
@@ -1267,6 +1281,7 @@ export default function InvoiceDetail() {
         invoice={invoice}
         snapshotId={snapshotId || invoice?.billingSnapshotId}
         taxCalc={taxCalc}
+        occurrence={occurrence}
         companyProfile={companyProfile}
         deliveryState={deliveryState}
         presentation="plain"

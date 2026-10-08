@@ -1,8 +1,14 @@
 import React from "react";
 import { Loader2 } from "lucide-react";
 import { formatCurrency, formatDisplayDate } from "../../utils/format";
-import { formatBillingPeriod } from "../../services/billingDataAcquisitionService";
 import { formatClientPhone } from "../../services/invoiceService";
+import {
+  INVOICE_BILLING_TYPE_LABELS,
+  buildInvoiceLineItems,
+  formatDateRange,
+  formatPaymentTerms,
+  resolveInvoiceBillingType,
+} from "../../utils/invoicePresentation";
 import pavesLogo from "../../assets/paves-logo.png";
 
 const formatRatePercentage = (rate) => {
@@ -10,6 +16,21 @@ const formatRatePercentage = (rate) => {
   const num = Number(rate);
   if (Number.isNaN(num)) return null;
   return `${num.toFixed(2)}%`;
+};
+
+// Line-item cell styling by column key (same look as the previous fixed table).
+const LINE_CELL_CLASS = {
+  item: "text-slate-900 font-semibold",
+  payment: "text-slate-900 font-semibold",
+  role: "text-slate-600",
+  workDate: "text-slate-600 font-medium",
+  billingDate: "text-slate-600 font-medium",
+  billingPeriod: "text-slate-600 font-medium whitespace-nowrap",
+  sequence: "font-mono font-medium text-slate-700",
+  percent: "font-mono font-medium text-slate-700",
+  quantity: "font-mono font-medium text-slate-700",
+  rate: "font-mono font-medium text-slate-700",
+  amount: "font-mono font-bold text-slate-900",
 };
 
 const APPLICABILITY_LABELS = {
@@ -41,6 +62,9 @@ export default function InvoicePreviewDocument({
   snapshotId,
   taxCalc,
   snapshotData,
+  // Billing occurrence (Milestone Plan / Recurring / Fixed Price invoices) —
+  // source of the billing type and the occurrence-based line item.
+  occurrence = null,
   companyProfile,
   isGenerating = false,
   presentation = "card",
@@ -74,13 +98,25 @@ export default function InvoicePreviewDocument({
     taxCalc?.billingPeriodEnd ||
     snapshotData?.billingPeriodEnd;
 
-  const billingPeriod =
-    rawStart && rawEnd
-      ? formatBillingPeriod(rawStart, rawEnd)
-      : invoice?.billingPeriod ||
-        taxCalc?.billingPeriod ||
-        snapshotData?.billingPeriod ||
-        "Not provided";
+  const billingPeriod = formatDateRange(
+    rawStart,
+    rawEnd,
+    invoice?.billingPeriod || taxCalc?.billingPeriod || snapshotData?.billingPeriod || "Not provided"
+  );
+
+  // Project Duration — the project's own start/end dates, never the billing period.
+  const projectStart =
+    invoice?.projectStartDate || occurrence?.projectStartDate || taxCalc?.projectStartDate || snapshotData?.projectStartDate;
+  const projectEnd =
+    invoice?.projectEndDate || occurrence?.projectEndDate || taxCalc?.projectEndDate || snapshotData?.projectEndDate;
+  const projectDuration = formatDateRange(projectStart, projectEnd, "Not provided");
+
+  const billingType = resolveInvoiceBillingType({
+    invoice,
+    occurrence,
+    context: snapshotData || taxCalc,
+  });
+  const billingTypeLabel = billingType ? INVOICE_BILLING_TYPE_LABELS[billingType] : null;
 
   const projectName =
     invoice?.projectName ||
@@ -182,12 +218,9 @@ export default function InvoicePreviewDocument({
     companyProfile?.logoUrl || companyProfile?.logoReference || pavesLogo;
 
   const paymentTermsDisplay =
-    invoice?.paymentTermName ||
-    snapshotData?.paymentTermName ||
-    taxCalc?.paymentTermName ||
-    (invoice?.paymentTermCode ? `${invoice.paymentTermCode} Days` : null) ||
-    (snapshotData?.paymentTermCode ? `${snapshotData.paymentTermCode} Days` : null) ||
-    (taxCalc?.paymentTermCode ? `${taxCalc.paymentTermCode} Days` : null) ||
+    formatPaymentTerms(invoice || {}) ||
+    formatPaymentTerms(snapshotData || {}) ||
+    formatPaymentTerms(taxCalc || {}) ||
     "Not provided";
 
   const snapshotNumber =
@@ -221,13 +254,11 @@ export default function InvoicePreviewDocument({
     taxCalc?.placeOfSupply ||
     "Not provided";
 
-  // Items
+  // Line items — layout follows the billing type (T&M resources, Milestone
+  // Plan payments, Recurring periods, Fixed Price billing).
   const items = Array.isArray(invoice?.items) ? invoice.items : [];
-
-  // Check if items have T&M-specific attributes (role, workDate, hours)
-  const hasWorkDate = items.some((it) => Boolean(it.workDate || it.date));
-  const hasRole = items.some((it) => Boolean(it.role));
-  const hasHours = items.some((it) => it.hours !== undefined && it.hours !== null);
+  const lineItems = buildInvoiceLineItems({ billingType, items, occurrence, invoice, currency });
+  const lastLineColumn = lineItems.columns.length - 1;
 
   // Authoritative Tax Breakdown
   const rawBreakdown =
@@ -555,6 +586,20 @@ export default function InvoicePreviewDocument({
                 {projectCode}
               </span>
             </div>
+            {billingTypeLabel && (
+              <div className="grid grid-cols-[105px_12px_1fr] items-center">
+                <span className="text-slate-500 font-medium">Billing Type</span>
+                <span className="text-slate-400 font-semibold">:</span>
+                <span className="text-slate-900">{billingTypeLabel}</span>
+              </div>
+            )}
+            <div className="grid grid-cols-[105px_12px_1fr] items-center">
+              <span className="text-slate-500 font-medium">Project Duration</span>
+              <span className="text-slate-400 font-semibold">:</span>
+              <span className={projectDuration !== "Not provided" ? "text-slate-900 whitespace-nowrap" : "italic text-slate-400"}>
+                {projectDuration}
+              </span>
+            </div>
             <div className="grid grid-cols-[105px_12px_1fr] items-center">
               <span className="text-slate-500 font-medium">Billing Period</span>
               <span className="text-slate-400 font-semibold">:</span>
@@ -585,13 +630,13 @@ export default function InvoicePreviewDocument({
             INVOICE LINE ITEMS
           </h3>
           <span className="text-[11px] font-medium text-slate-500">
-            {items.length} {items.length === 1 ? "Item" : "Items"}
+            {lineItems.rows.length} {lineItems.rows.length === 1 ? "Item" : "Items"}
           </span>
         </div>
 
-        {items.length === 0 ? (
+        {lineItems.rows.length === 0 ? (
           <div className="py-8 text-center text-xs text-slate-400 italic border border-dashed border-slate-200 rounded-md">
-            No line items recorded for this billing snapshot.
+            No invoice line items available.
           </div>
         ) : (
           <div className={`overflow-x-auto ${isPlain ? "border-y border-slate-300" : "rounded-md border border-slate-200"}`}>
@@ -599,55 +644,28 @@ export default function InvoicePreviewDocument({
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-600">
                   <th className="py-2.5 px-3 !text-left w-10">#</th>
-                  <th className="py-2.5 px-3 !text-left">
-                    {hasRole ? "Resource / Item" : "Description / Item"}
-                  </th>
-                  {hasRole && <th className="py-2.5 px-3 !text-left">Role</th>}
-                  {hasWorkDate && <th className="py-2.5 px-3 !text-left">Work Date</th>}
-                  <th className="py-2.5 px-3 !text-left">
-                    {hasHours ? "Hours / Qty" : "Quantity"}
-                  </th>
-                  <th className="py-2.5 px-3 !text-left">Rate</th>
-                  <th className="py-2.5 pr-4 pl-3 !text-left">Amount</th>
+                  {lineItems.columns.map((col, cIdx) => (
+                    <th
+                      key={col.key}
+                      className={`py-2.5 !text-left ${cIdx === lastLineColumn ? "pr-4 pl-3" : "px-3"}`}
+                    >
+                      {col.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {items.map((it, idx) => (
+                {lineItems.rows.map((row, idx) => (
                   <tr
-                    key={it.id || idx}
+                    key={row.id || idx}
                     className="hover:bg-slate-50/50 transition-colors"
                   >
                     <td className="py-2.5 px-3 !text-left text-slate-400 font-medium">{idx + 1}</td>
-                    <td className="py-2.5 px-3 !text-left text-slate-900 font-semibold">
-                      {it.itemName || it.resourceName || it.description || it.employee || "Line Item"}
-                    </td>
-                    {hasRole && (
-                      <td className="py-2.5 px-3 !text-left text-slate-600">{it.role || "—"}</td>
-                    )}
-                    {hasWorkDate && (
-                      <td className="py-2.5 px-3 !text-left text-slate-600 font-medium">
-                        {it.workDate
-                          ? formatDisplayDate(it.workDate)
-                          : it.date
-                          ? formatDisplayDate(it.date)
-                          : "—"}
+                    {lineItems.columns.map((col, cIdx) => (
+                      <td key={col.key} className={`py-2.5 !text-left ${LINE_CELL_CLASS[col.key] || "text-slate-700"} ${cIdx === lastLineColumn ? "pr-4 pl-3" : "px-3"}`}>
+                        {row[col.key]}
                       </td>
-                    )}
-                    <td className="py-2.5 px-3 !text-left font-mono font-medium text-slate-700">
-                      {it.hours !== undefined && it.hours !== null
-                        ? Number(it.hours).toFixed(2)
-                        : it.quantity !== undefined && it.quantity !== null
-                        ? Number(it.quantity).toFixed(2)
-                        : "—"}
-                    </td>
-                    <td className="py-2.5 px-3 !text-left font-mono font-medium text-slate-700">
-                      {it.rate !== undefined && it.rate !== null
-                        ? formatCurrency(it.rate, currency)
-                        : "—"}
-                    </td>
-                    <td className="py-2.5 pr-4 pl-3 !text-left font-mono font-bold text-slate-900">
-                      {formatCurrency(it.amount ?? it.totalAmount ?? 0, currency)}
-                    </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -794,7 +812,7 @@ export default function InvoicePreviewDocument({
               </div>
             )}
             <div className="flex items-center justify-between text-slate-700">
-              <span className="font-medium">Tax</span>
+              <span className="font-medium">Total Tax</span>
               <span className="font-mono font-bold text-slate-900">
                 {formatCurrency(totalTax, currency)}
               </span>

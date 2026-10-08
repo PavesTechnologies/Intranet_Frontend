@@ -133,6 +133,17 @@ export const normalizeTaxConfigurationComponent = (comp = {}) => {
   };
 };
 
+// The AR backend serializes LocalDate as [yyyy, m, d]; date inputs and the
+// request DTO need "yyyy-MM-dd".
+export const toIsoDate = (val) => {
+  if (Array.isArray(val)) {
+    const [y, m, d] = val;
+    if (!y || !m || !d) return "";
+    return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+  return typeof val === "string" ? val.slice(0, 10) : "";
+};
+
 export const normalizeTaxRateConfiguration = (item = {}) => {
   if (!item || typeof item !== "object") return {};
 
@@ -208,8 +219,9 @@ export const normalizeTaxRateConfiguration = (item = {}) => {
     }
   }
 
-  const effectiveFrom = item.effectiveFrom || item.effective_from || "";
-  const effectiveTo = item.effectiveTo || item.effective_to || null;
+  const effectiveFrom = toIsoDate(item.effectiveFrom || item.effective_from) || "";
+  const effectiveTo = toIsoDate(item.effectiveTo || item.effective_to) || null;
+  const taxRegimeId = item.taxRegimeId || item.tax_regime_id || null;
 
   const activeFlag = item.active ?? item.is_active ?? item.isActive ?? (item.status === "ACTIVE") ?? true;
   const status = activeFlag ? "ACTIVE" : "INACTIVE";
@@ -224,6 +236,7 @@ export const normalizeTaxRateConfiguration = (item = {}) => {
     taxRegionCode,
     taxRegionLabel,
     taxRegime,
+    taxRegimeId,
     cgstRate,
     sgstRate,
     igstRate,
