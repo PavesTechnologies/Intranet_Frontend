@@ -67,7 +67,9 @@ import ReceiptDropzone from "@/pages/expense-management/components/expense-repor
 import PolicyStatusBadge, {
   PolicyResultBanner,
   derivePolicyStatus,
+  isJustified,
 } from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
+import PolicyJustificationModal from "@/pages/expense-management/components/expense-reports/PolicyJustificationModal";
 import ApprovalStatusPill from "@/pages/expense-management/approval-engine/components/ApprovalStatusPill";
 import { useApprovalLiveSync } from "@/pages/expense-management/approval-engine/hooks/useApprovalLiveSync";
 import {
@@ -139,19 +141,40 @@ export default function ExpenseReportDetailPage() {
 
   const needsCorrectionLines = (lineItemReviews || []).filter((r) => r.status === "NEEDS_CORRECTION");
   const queriedLines = (financeReviews || []).filter((r) => r.status === "QUERIED" || r.status === "QUERY_RAISED" || r.reason);
+  // Who sent the report back and why. An approver's Needs Correction and a Finance query both
+  // leave it AWAITING_CORRECTION, and the employee can't read Finance's own review list, so the
+  // approval status carries both (correctionRequestedBy / correctionRequests). The review lists
+  // above are only a fallback for a backend that doesn't send them yet.
+  const correctionFromFinance =
+    approvalStatus?.correctionRequestedBy === "FINANCE" ||
+    (!approvalStatus?.correctionRequestedBy && (report?.reportStatus === "QUERY_RAISED" || queriedLines.length > 0));
+  const correctionRequests = approvalStatus?.correctionRequests?.length
+    ? approvalStatus.correctionRequests
+    : (correctionFromFinance ? queriedLines : needsCorrectionLines).map((r) => ({
+        lineItemId: r.lineItemId,
+        comment: r.reason || r.comment,
+      }));
   // Mirrors the backend's ReportStatus.isEditable() set exactly (EMS/enums/ReportStatus.java) -
   // report-level Edit/Delete must stay available during AWAITING_CORRECTION (that's the whole
   // point of the correction loop), not just DRAFT. Also gates Add/Edit/Delete Line Item and
   // Submit, since the backend rejects all of those once the report leaves this status set.
   const isReportEditable = REPORT_EDITABLE_STATUSES.includes(report?.reportStatus);
 
-  // Enforcement (not severity) decides whether submission is actually blocked — see
-  // PolicyStatusBadge.derivePolicyStatus. Submit/Resubmit must stay disabled while any
-  // line item is BLOCKED, matching the backend's submission-time policy gate exactly.
-  const blockedLineItems = lineItems.filter(
-    (li) => derivePolicyStatus(li.lineStatus, li.policyWarnings).status === "BLOCKED"
+  // Every policy violation the employee hasn't explained yet. The backend's submission gate needs
+  // an explanation for each (WARN or BLOCK); once explained, the approver and Finance decide.
+  // Submit/Resubmit opens the justification dialog for these instead of being disabled.
+  const unexplainedViolations = useMemo(
+    () =>
+      lineItems.flatMap((li) =>
+        (li.policyWarnings || [])
+          .filter((w) => w.violationId && !isJustified(w))
+          .map((violation) => ({ lineItem: li, violation }))
+      ),
+    [lineItems]
   );
-  const hasBlockedLineItem = blockedLineItems.length > 0;
+  const [justifyDialog, setJustifyDialog] = useState(null); // { mode: "submit" | "save", items } | null
+  const [justifySaving, setJustifySaving] = useState(false);
+  const [justifyError, setJustifyError] = useState("");
 
     const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -786,14 +809,53 @@ export default function ExpenseReportDetailPage() {
     }
   };
 
-  const handleSubmitOrResubmit = () => {
+  const submitNow = () => {
     submitReport.mutate(reportId, {
       onSuccess: () => {
         showStatusToast(["AWAITING_CORRECTION", "QUERY_RAISED"].includes(report.reportStatus) ? "Report resubmitted" : "Report submitted for approval", "success");
         fetchReport();
+        fetchLineItems();
       },
       onError: (err) => showStatusToast(err.response?.data?.message || "Failed to submit report", "error"),
     });
+  };
+
+  const openJustifyDialog = (mode) => {
+    setJustifyError("");
+    setJustifyDialog({ mode, items: unexplainedViolations });
+  };
+
+  // Unexplained policy violations are explained first, then the report is submitted.
+  const handleSubmitOrResubmit = () => {
+    if (unexplainedViolations.length > 0) {
+      openJustifyDialog("submit");
+      return;
+    }
+    submitNow();
+  };
+
+  const handleJustifyConfirm = async (entries) => {
+    setJustifySaving(true);
+    setJustifyError("");
+    try {
+      for (const entry of entries) {
+        await lineItemService.justifyPolicyWarning(reportId, entry.lineItemId, entry.violationId, entry.justification);
+      }
+    } catch (err) {
+      setJustifyError(err.response?.data?.message || err.response?.data?.detail || "Couldn't save your explanation. Try again.");
+      setJustifySaving(false);
+      fetchLineItems();
+      return;
+    }
+    await fetchLineItems();
+    setJustifySaving(false);
+    const mode = justifyDialog?.mode;
+    setJustifyDialog(null);
+    if (mode === "submit") {
+      submitNow();
+    } else {
+      showStatusToast("Explanations saved", "success");
+    }
   };
 
   const handleLifecycleConfirm = () => {
@@ -1067,6 +1129,7 @@ export default function ExpenseReportDetailPage() {
                         ? `Pending ${approvalStatus.currentLevelDisplayName}`
                         : undefined
                     }
+                    correctionRequestedBy={approvalStatus?.correctionRequestedBy}
                   />
                 </div>
                 <p className="text-xs text-gray-400 font-mono mt-1">{report.reportNumber}</p>
@@ -1081,8 +1144,7 @@ export default function ExpenseReportDetailPage() {
                       loading={submitReport.isPending}
                       loadingText="Submitting..."
                       onClick={handleSubmitOrResubmit}
-                      disabled={report.reportStatus !== "DRAFT" || lineItems.length === 0 || hasBlockedLineItem || isLifecycleBusy}
-                      title={hasBlockedLineItem ? "Resolve the blocked policy violation(s) below before submitting." : undefined}
+                      disabled={report.reportStatus !== "DRAFT" || lineItems.length === 0 || isLifecycleBusy}
                       className={lineItems.length === 0 ? "!pointer-events-auto cursor-not-allowed" : ""}
                     >
                       Submit for Approval
@@ -1095,8 +1157,7 @@ export default function ExpenseReportDetailPage() {
                       loading={submitReport.isPending}
                       loadingText="Resubmitting..."
                       onClick={handleSubmitOrResubmit}
-                      disabled={hasBlockedLineItem || isLifecycleBusy}
-                      title={hasBlockedLineItem ? "Resolve the blocked policy violation(s) below before resubmitting." : undefined}
+                      disabled={isLifecycleBusy}
                     >
                       Resubmit
                     </Button>
@@ -1108,8 +1169,7 @@ export default function ExpenseReportDetailPage() {
                       loading={submitReport.isPending}
                       loadingText="Resubmitting..."
                       onClick={handleSubmitOrResubmit}
-                      disabled={hasBlockedLineItem || isLifecycleBusy}
-                      title={hasBlockedLineItem ? "Resolve the blocked policy violation(s) below before resubmitting." : undefined}
+                      disabled={isLifecycleBusy}
                     >
                       Resubmit
                     </Button>
@@ -1140,50 +1200,41 @@ export default function ExpenseReportDetailPage() {
               )}
             </div>
 
-            {report.reportStatus === "AWAITING_CORRECTION" && needsCorrectionLines.length > 0 && (
+            {["AWAITING_CORRECTION", "QUERY_RAISED"].includes(report.reportStatus) && correctionRequests.length > 0 && (
               <div className="mt-4 rounded-lg bg-orange-50 border border-orange-200 px-4 py-3">
                 <p className="text-sm font-semibold text-orange-800">
-                  {needsCorrectionLines.length} line item{needsCorrectionLines.length > 1 ? "s" : ""} need correction
+                  {correctionFromFinance ? "Finance requested a correction on " : "Your approver requested a correction on "}
+                  {correctionRequests.length} line item{correctionRequests.length > 1 ? "s" : ""}
                 </p>
                 <ul className="mt-2 space-y-1.5">
-                  {needsCorrectionLines.map((r) => (
+                  {correctionRequests.map((r) => (
                     <li key={r.lineItemId} className="text-sm text-orange-700">
                       <span className="font-medium">{lineItems.find((li) => li.lineItemId === r.lineItemId)?.merchantName || "Line item"}:</span>{" "}
-                      {r.comment}
+                      {r.comment || "Correction requested"}
                     </li>
                   ))}
                 </ul>
-                <p className="mt-2 text-xs text-orange-600">Fix the flagged line(s) below, then click Resubmit above.</p>
+                <p className="mt-2 text-xs text-orange-600">
+                  Fix the flagged line{correctionRequests.length > 1 ? "s" : ""} below, then click Resubmit above
+                  {correctionFromFinance ? "; it goes straight back to Finance unless the change needs re-approval." : "."}
+                </p>
               </div>
             )}
 
-            {report.reportStatus === "QUERY_RAISED" && queriedLines.length > 0 && (
-              <div className="mt-4 rounded-lg bg-orange-50 border border-orange-200 px-4 py-3">
-                <p className="text-sm font-semibold text-orange-800">
-                  Finance Executive requested correction on {queriedLines.length} line item{queriedLines.length > 1 ? "s" : ""}
-                </p>
-                <ul className="mt-2 space-y-1.5">
-                  {queriedLines.map((r) => (
-                    <li key={r.lineItemId} className="text-sm text-orange-700">
-                      <span className="font-medium">{lineItems.find((li) => li.lineItemId === r.lineItemId)?.merchantName || "Line item"}:</span>{" "}
-                      {r.reason || r.comment || "Correction requested"}
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-2 text-xs text-orange-600">Fix the flagged line(s) below, then click Resubmit above.</p>
-              </div>
-            )}
-
-            {hasBlockedLineItem && ["DRAFT", "AWAITING_CORRECTION", "QUERY_RAISED"].includes(report.reportStatus) && (
-              <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3">
-                <p className="text-sm font-semibold text-red-800">
-                  This report cannot be submitted — {blockedLineItems.length} line item{blockedLineItems.length > 1 ? "s are" : " is"} blocked by policy.
-                </p>
-                <p className="mt-1 text-xs text-red-600">
-                  A policy violation on {blockedLineItems.length > 1 ? "these line items" : "this line item"} requires enforcement and cannot be
-                  overridden by justification alone. Fix the flagged {blockedLineItems.length > 1 ? "amounts/details" : "amount/details"} in the
-                  "Policy" column below before submitting.
-                </p>
+            {canManage && isReportEditable && unexplainedViolations.length > 0 && (
+              <div className="mt-4 flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">
+                    {unexplainedViolations.length} policy violation{unexplainedViolations.length > 1 ? "s need" : " needs"} your explanation
+                  </p>
+                  <p className="mt-0.5 text-xs text-amber-700">
+                    Some expenses go over policy. Explain why before you submit; your approver and Finance will see your explanation and
+                    decide whether to accept them.
+                  </p>
+                </div>
+                <Button variant="outline" size="small" className="shrink-0" onClick={() => openJustifyDialog("save")}>
+                  Explain now
+                </Button>
               </div>
             )}
 
@@ -1504,6 +1555,16 @@ export default function ExpenseReportDetailPage() {
         onCancel={() => setLineItemToDelete(null)}
         isLoading={deletingLineItem}
         variant="danger"
+      />
+
+      <PolicyJustificationModal
+        isOpen={!!justifyDialog}
+        items={justifyDialog?.items || []}
+        mode={justifyDialog?.mode}
+        isSaving={justifySaving || submitReport.isPending}
+        error={justifyError}
+        onConfirm={handleJustifyConfirm}
+        onCancel={() => setJustifyDialog(null)}
       />
 
       {isEditReportOpen && createPortal(
@@ -2773,9 +2834,9 @@ function LineItemDrawer({
   };
 
   // Enforcement (not severity) decides the outcome — see PolicyStatusBadge.
-  // BLOCKED keeps the drawer open (with the violation banner visible) rather
-  // than closing behind a misleading success toast; WARNING still follows
-  // the normal save-and-close flow but surfaces the warning via toast.
+  // BLOCKED (an unexplained BLOCK rule) keeps the drawer open with the violation
+  // banner visible, since the employee will have to explain it when submitting;
+  // WARNING follows the normal save-and-close flow and surfaces the warning via toast.
   const finalizeLineItemSave = (savedItem, successMessage, { closeOnSuccess = false } = {}) => {
     const { status, warnings } = derivePolicyStatus(savedItem?.lineStatus, savedItem?.policyWarnings);
     setSavedLineItem(savedItem);
@@ -2783,8 +2844,10 @@ function LineItemDrawer({
     if (status === "BLOCKED") {
       const firstMsg = warnings[0]?.message;
       showStatusToast(
-        firstMsg ? `Saved, but blocked by policy: ${firstMsg}` : "Saved, but this line item is blocked by policy.",
-        "error"
+        firstMsg
+          ? `Saved. Over policy: ${firstMsg} You'll be asked to explain it when you submit.`
+          : "Saved. This is over policy; you'll be asked to explain it when you submit.",
+        "warning"
       );
       onSaved?.();
       return;
