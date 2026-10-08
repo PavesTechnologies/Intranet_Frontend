@@ -79,6 +79,30 @@ const formatDate = (dateValue) => {
   return d.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "2-digit" });
 };
 
+const getSettlementDueDate = (adv) =>
+  adv?.settlementDueDate || adv?.settlement_due_date || null;
+
+const isOverdue = (adv) => {
+  const status = String(adv?.status || "").toUpperCase();
+  if (["SETTLED", "CLOSED", "CANCELLED", "REJECTED"].includes(status)) return false;
+  const balance = Number(adv?.outstandingBalance ?? adv?.outstanding_balance ?? 0) || 0;
+  const dueValue = getSettlementDueDate(adv);
+  if (balance <= 0 || !dueValue) return false;
+  const due = new Date(String(dueValue).slice(0, 10) + "T00:00:00");
+  if (Number.isNaN(due.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return due < today;
+};
+
+const getAgingDays = (adv) => {
+  if (!isOverdue(adv)) return 0;
+  const due = new Date(String(getSettlementDueDate(adv)).slice(0, 10) + "T00:00:00");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.floor((today - due) / 86400000));
+};
+
 const getCostCenterValue = (adv) => {
   if (!adv) return "—";
 
@@ -166,6 +190,8 @@ const getStatusBadge = (status) => {
       return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Closed</span>;
     case "REJECTED":
       return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 border border-rose-200">Rejected</span>;
+    case "OVERDUE":
+      return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 border border-rose-200">Overdue</span>;
     case "CANCELLED":
       return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-600 border border-slate-300">Cancelled</span>;
     default:
@@ -227,7 +253,14 @@ export default function MyAdvancesPage() {
         const verifiedExpSum = linkedReports
           .filter((r) => {
             const statusUpper = (r.status || "").toUpperCase();
-            return !["REJECTED", "DRAFT", "CANCELLED"].includes(statusUpper);
+            return [
+              "APPROVED",
+              "EXPENSE_VERIFIED",
+              "EXPENSE VERIFIED",
+              "VERIFIED",
+              "SETTLED",
+              "CLOSED",
+            ].includes(statusUpper);
           })
           .reduce((sum, r) => {
             const amt = Number(r.totalAmount ?? r.amount ?? r.totalApprovedAmount ?? r.approvedAmount ?? r.verifiedAmount ?? 0);
@@ -244,9 +277,11 @@ export default function MyAdvancesPage() {
             : verifiedExpSum;
 
         const advAmt = Number(adv.amount) || 0;
+        const authoritativeOutstanding =
+          adv.outstandingBalance ?? adv.outstanding_balance ?? adv.balance;
         const outstandingBalance =
-          adv.outstandingBalance != null
-            ? Number(adv.outstandingBalance)
+          authoritativeOutstanding != null
+            ? Math.max(0, Number(authoritativeOutstanding) || 0)
             : Math.max(0, advAmt - verifiedExpenseAmount);
 
         return {
@@ -302,10 +337,16 @@ export default function MyAdvancesPage() {
       .reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
 
     const totalSettled = advances
-      .filter((a) => (a.status || "").toUpperCase() === "SETTLED")
+      .filter((a) => ["SETTLED", "CLOSED"].includes((a.status || "").toUpperCase()))
       .reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
 
-    return { totalCount, pendingCount, totalDisbursed, totalSettled };
+    const outstandingBalance = advances
+      .filter((a) => !["SETTLED", "CLOSED", "CANCELLED", "REJECTED"].includes((a.status || "").toUpperCase()))
+      .reduce((sum, a) => sum + (Number(a.outstandingBalance) || 0), 0);
+
+    const overdueCount = advances.filter(isOverdue).length;
+
+    return { totalCount, pendingCount, totalDisbursed, totalSettled, outstandingBalance, overdueCount };
   }, [advances]);
 
   // Handle Actions
@@ -478,6 +519,17 @@ export default function MyAdvancesPage() {
             <p className="text-xl font-bold text-emerald-600 mt-0.5">{formatMoney(stats.totalSettled)}</p>
           </div>
         </div>
+
+        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-sm flex items-center gap-3">
+          <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
+            <AlertCircle size={18} />
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Outstanding Balance</p>
+            <p className="text-xl font-bold text-amber-600 mt-0.5">{formatMoney(stats.outstandingBalance)}</p>
+            {stats.overdueCount > 0 && <p className="text-[10px] text-rose-600 mt-0.5">{stats.overdueCount} overdue</p>}
+          </div>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -542,6 +594,7 @@ export default function MyAdvancesPage() {
                   <th className="py-3 px-4">Cost Center</th>
                   <th className="py-3 px-4">Currency</th>
                   <th className="py-3 px-4">Needed By</th>
+                  <th className="py-3 px-4 text-right">Outstanding</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -574,8 +627,16 @@ export default function MyAdvancesPage() {
                       <td className="py-3 px-4 whitespace-nowrap text-gray-600">
                         {formatDate(getNeededByDateValue(adv))}
                       </td>
+                      <td className="py-3 px-4 text-right whitespace-nowrap font-semibold">
+                        <span className={isOverdue(adv) ? "text-rose-600" : "text-amber-600"}>
+                          {formatMoney(adv.outstandingBalance, adv.currencyCode || "INR")}
+                        </span>
+                      </td>
                       <td className="py-3 px-4 whitespace-nowrap">
-                        {getStatusBadge(adv.status)}
+                        {isOverdue(adv) ? getStatusBadge("OVERDUE") : getStatusBadge(adv.status)}
+                        {isOverdue(adv) && (
+                          <p className="text-[10px] text-rose-600 mt-1 font-medium">{getAgingDays(adv)} day(s) overdue</p>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
@@ -683,6 +744,30 @@ export default function MyAdvancesPage() {
                   verifiedExpenseAmount={selectedAdvance.verifiedExpenseAmount || selectedAdvance.expenseAmount || selectedAdvance.totalExpenses || 0}
                   currencyCode={selectedAdvance.currencyCode || "INR"}
                   status={selectedAdvance.status}
+                  outstandingBalance={selectedAdvance.outstandingBalance}
+                  expenseReport={selectedAdvance.linkedExpenseReport}
+                  onApplyOffset={async ({ expenseReportId, offsetAmount }) => {
+                    if (!expenseReportId) {
+                      showStatusToast("No linked expense report is available for the advance offset.", "error");
+                      return;
+                    }
+                    const maxOffset = Math.min(
+                      Number(selectedAdvance.outstandingBalance) || 0,
+                      Number(selectedAdvance.linkedExpenseReport?.reimbursableTotal ?? selectedAdvance.linkedExpenseReport?.totalAmount ?? 0) || 0
+                    );
+                    if (offsetAmount <= 0 || offsetAmount > maxOffset) {
+                      showStatusToast("Offset amount cannot exceed the verified expense amount or outstanding advance balance.", "error");
+                      return;
+                    }
+                    await cashAdvanceApi.applyAdvanceOffset(expenseReportId, {
+                      cashAdvanceId: selectedAdvance.advanceId || selectedAdvance.id,
+                      advanceId: selectedAdvance.advanceId || selectedAdvance.id,
+                      offsetAmount,
+                    });
+                    showStatusToast("Advance offset applied successfully.", "success");
+                    setSelectedAdvance(null);
+                    fetchMyAdvances();
+                  }}
                 />
               )}
 

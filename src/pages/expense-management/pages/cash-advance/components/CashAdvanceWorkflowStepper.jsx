@@ -128,8 +128,10 @@ export const getStageIndex = (statusStr) => {
 
 export default function CashAdvanceWorkflowStepper({ currentStatus, linkedExpenseReport = null, className = "" }) {
   const currentStageIndex = getStageIndex(currentStatus);
-  const isRejected = (currentStatus || "").toUpperCase() === "REJECTED";
-  const isCancelled = (currentStatus || "").toUpperCase() === "CANCELLED";
+  const upperStatus = (currentStatus || "").toUpperCase();
+  const isRejected = upperStatus === "REJECTED";
+  const isCancelled = upperStatus === "CANCELLED";
+  const isOverdue = upperStatus === "OVERDUE";
 
   return (
     <div className={`rounded-xl border border-gray-200 bg-white p-4 shadow-sm ${className}`}>
@@ -146,6 +148,10 @@ export default function CashAdvanceWorkflowStepper({ currentStatus, linkedExpens
           <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
             <XCircle size={13} /> Rejected
           </span>
+        ) : isOverdue ? (
+          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
+            <Clock size={13} /> Overdue
+          </span>
         ) : isCancelled ? (
           <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-700 border border-slate-300 flex items-center gap-1">
             <XCircle size={13} /> Cancelled
@@ -161,8 +167,8 @@ export default function CashAdvanceWorkflowStepper({ currentStatus, linkedExpens
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-7">
         {STAGES.map((stage) => {
           const Icon = stage.icon;
-          const isPassed = !isRejected && !isCancelled && currentStageIndex > stage.id;
-          const isCurrent = !isRejected && !isCancelled && currentStageIndex === stage.id;
+          const isPassed = !isRejected && !isCancelled && !isOverdue && currentStageIndex > stage.id;
+          const isCurrent = !isRejected && !isCancelled && !isOverdue && currentStageIndex === stage.id;
 
           let cardStyle = "border-gray-200 bg-gray-50/70 text-gray-400";
           let iconBg = "bg-gray-200 text-gray-500";
