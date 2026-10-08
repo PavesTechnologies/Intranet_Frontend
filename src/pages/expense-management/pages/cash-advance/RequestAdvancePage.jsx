@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+
 import { AlertCircle, CheckCircle2, Info, Loader2 } from "lucide-react";
 
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
@@ -8,7 +9,26 @@ import FormSelect from "@/components/forms/FormSelect";
 import FormTextArea from "@/components/forms/FormTextArea";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { showStatusToast } from "@/components/toastfy/toast";
+
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
+import { lookupService } from "@/pages/expense-management/api/expenseReportsApi";
+
+/* Required label */
+const RequiredLabel = ({ children }) => (
+  <span>
+    {children} <span className="text-red-500">*</span>
+  </span>
+);
+
+/* Optional label */
+const OptionalLabel = ({ children }) => (
+  <span>
+    {children}{" "}
+    <span className="text-xs font-normal text-gray-400">
+      (Optional)
+    </span>
+  </span>
+);
 
 const formatMoney = (amount, currencyCode = "INR") => {
   const num = Number(amount) || 0;
@@ -63,7 +83,9 @@ const isOverdueAdvance = (advance) => {
   const status = String(advance.status || "").toUpperCase();
 
   if (
-    ["SETTLED", "CLOSED", "CANCELLED", "REJECTED"].includes(status)
+    ["SETTLED", "CLOSED", "CANCELLED", "REJECTED"].includes(
+      status
+    )
   ) {
     return false;
   }
@@ -85,7 +107,9 @@ const isOverdueAdvance = (advance) => {
 
   if (!dueDate) return false;
 
-  const due = new Date(`${String(dueDate).slice(0, 10)}T00:00:00`);
+  const due = new Date(
+    `${String(dueDate).slice(0, 10)}T00:00:00`
+  );
 
   if (Number.isNaN(due.getTime())) return false;
 
@@ -109,14 +133,16 @@ const getOutstandingBalance = (advance) => {
 const getActiveAdvances = (list) => {
   return list.filter((advance) => {
     const status = String(advance.status || "").toUpperCase();
-
     const balance = getOutstandingBalance(advance);
 
     if (balance <= 0) return false;
 
-    return !["SETTLED", "CLOSED", "CANCELLED", "REJECTED"].includes(
-      status
-    );
+    return ![
+      "SETTLED",
+      "CLOSED",
+      "CANCELLED",
+      "REJECTED",
+    ].includes(status);
   });
 };
 
@@ -125,7 +151,7 @@ export default function RequestAdvancePage() {
     title: "",
     costCenterId: "",
     amount: "",
-    currencyCode: "INR",
+    currencyId: "",
     purpose: "",
     neededByDate: "",
     settlementDueDate: "",
@@ -133,11 +159,22 @@ export default function RequestAdvancePage() {
   });
 
   const [errors, setErrors] = useState({});
+
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
 
   const [advances, setAdvances] = useState([]);
   const [balanceLoading, setBalanceLoading] = useState(true);
+
+  /* Cost Centers */
+  const [costCenters, setCostCenters] = useState([]);
+  const [loadingCostCenters, setLoadingCostCenters] =
+    useState(true);
+
+  /* Currencies */
+  const [currencies, setCurrencies] = useState([]);
+  const [loadingCurrencies, setLoadingCurrencies] =
+    useState(true);
 
   const breadcrumbs = [
     {
@@ -153,14 +190,19 @@ export default function RequestAdvancePage() {
     },
   ];
 
+  /*
+   * Load outstanding cash advances
+   */
   useEffect(() => {
     const loadOutstandingAdvances = async () => {
       setBalanceLoading(true);
 
       try {
-        const response = await cashAdvanceApi.getMyAdvances();
+        const response =
+          await cashAdvanceApi.getMyAdvances();
 
-        const rawData = response?.data?.data ?? response?.data ?? [];
+        const rawData =
+          response?.data?.data ?? response?.data ?? [];
 
         const list = Array.isArray(rawData)
           ? rawData
@@ -185,25 +227,191 @@ export default function RequestAdvancePage() {
     loadOutstandingAdvances();
   }, []);
 
+  /*
+   * Load active Cost Centers
+   */
+  useEffect(() => {
+    let isMounted = true;
+
+    setLoadingCostCenters(true);
+
+    lookupService
+      .getActiveCostCenters()
+      .then((data) => {
+        if (isMounted) {
+          setCostCenters(
+            Array.isArray(data) ? data : []
+          );
+        }
+      })
+      .catch((error) => {
+        console.error(
+          "Failed to load cost centers:",
+          error
+        );
+
+        if (isMounted) {
+          setCostCenters([]);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoadingCostCenters(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  /*
+   * Load active Currencies
+   */
+  useEffect(() => {
+    let isMounted = true;
+
+    setLoadingCurrencies(true);
+
+    lookupService
+      .getActiveCurrencies()
+      .then((data) => {
+        if (isMounted) {
+          setCurrencies(
+            Array.isArray(data) ? data : []
+          );
+        }
+      })
+      .catch((error) => {
+        console.error(
+          "Failed to load currencies:",
+          error
+        );
+
+        if (isMounted) {
+          setCurrencies([]);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoadingCurrencies(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  /*
+   * Get active advances
+   */
   const activeAdvances = useMemo(
     () => getActiveAdvances(advances),
     [advances]
   );
 
+  /*
+   * Calculate outstanding balance
+   */
   const outstandingBalance = useMemo(() => {
     return activeAdvances.reduce(
-      (total, advance) => total + getOutstandingBalance(advance),
+      (total, advance) =>
+        total + getOutstandingBalance(advance),
       0
     );
   }, [activeAdvances]);
 
+  /*
+   * Find overdue advances
+   */
   const overdueAdvances = useMemo(
     () => activeAdvances.filter(isOverdueAdvance),
     [activeAdvances]
   );
 
-  const hasOverdueAdvance = overdueAdvances.length > 0;
+  const hasOverdueAdvance =
+    overdueAdvances.length > 0;
 
+  /*
+   * Cost Center dropdown options
+   */
+  const costCenterOptions = useMemo(() => {
+    return costCenters
+      .map((costCenter) => {
+        const id =
+          costCenter.costCenterId ??
+          costCenter.id ??
+          costCenter.uuid;
+
+        const code =
+          costCenter.costCenterCode ??
+          costCenter.code ??
+          "";
+
+        const name =
+          costCenter.costCenterName ??
+          costCenter.name ??
+          "";
+
+        if (!id) {
+          return null;
+        }
+
+        return {
+          value: String(id),
+          label:
+            code && name
+              ? `${code} - ${name}`
+              : code ||
+                name ||
+                String(id),
+        };
+      })
+      .filter(Boolean);
+  }, [costCenters]);
+
+  /*
+   * Currency dropdown options
+   */
+  const currencyOptions = useMemo(() => {
+    return currencies
+      .map((currency) => {
+        const id =
+          currency.currencyId ??
+          currency.id ??
+          currency.uuid;
+
+        const code =
+          currency.currencyCode ??
+          currency.code ??
+          "";
+
+        const name =
+          currency.currencyName ??
+          currency.name ??
+          "";
+
+        if (!id) {
+          return null;
+        }
+
+        return {
+          value: String(id),
+          label:
+            code && name
+              ? `${code} - ${name}`
+              : code ||
+                name ||
+                String(id),
+        };
+      })
+      .filter(Boolean);
+  }, [currencies]);
+
+  /*
+   * Update form fields
+   */
   const updateField = (name, value) => {
     setFormData((previous) => ({
       ...previous,
@@ -211,7 +419,11 @@ export default function RequestAdvancePage() {
     }));
 
     setErrors((previous) => {
-      if (!previous[name] && !previous.general && !previous.overdue) {
+      if (
+        !previous[name] &&
+        !previous.general &&
+        !previous.overdue
+      ) {
         return previous;
       }
 
@@ -223,6 +435,9 @@ export default function RequestAdvancePage() {
     });
   };
 
+  /*
+   * Validate form
+   */
   const validateForm = () => {
     const newErrors = {};
 
@@ -230,8 +445,17 @@ export default function RequestAdvancePage() {
       newErrors.title = "Title is required.";
     }
 
-    if (!formData.amount || Number(formData.amount) <= 0) {
-      newErrors.amount = "Enter a valid advance amount.";
+    if (
+      !formData.amount ||
+      Number(formData.amount) <= 0
+    ) {
+      newErrors.amount =
+        "Enter a valid advance amount.";
+    }
+
+    if (!formData.currencyId) {
+      newErrors.currencyId =
+        "Currency is required.";
     }
 
     if (!formData.purpose.trim()) {
@@ -240,7 +464,8 @@ export default function RequestAdvancePage() {
     }
 
     if (!formData.neededByDate) {
-      newErrors.neededByDate = "Needed By Date is required.";
+      newErrors.neededByDate =
+        "Needed By Date is required.";
     }
 
     if (!formData.settlementDueDate) {
@@ -248,6 +473,9 @@ export default function RequestAdvancePage() {
         "Settlement Expected Date is required.";
     }
 
+    /*
+     * Check settlement date
+     */
     if (
       formData.neededByDate &&
       formData.settlementDueDate &&
@@ -268,6 +496,9 @@ export default function RequestAdvancePage() {
       }
     }
 
+    /*
+     * Check overdue advance
+     */
     if (hasOverdueAdvance) {
       newErrors.overdue =
         "You have an overdue cash advance. Resolve the outstanding advance before requesting another advance.";
@@ -278,11 +509,17 @@ export default function RequestAdvancePage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  /*
+   * Build request payload
+   */
   const buildPayload = () => ({
     ...formData,
     amount: Number(formData.amount),
   });
 
+  /*
+   * Submit cash advance request
+   */
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -293,7 +530,14 @@ export default function RequestAdvancePage() {
     setSubmitting(true);
 
     try {
-      await cashAdvanceApi.create(buildPayload());
+      const payload = buildPayload();
+
+      console.log(
+        "Cash Advance Payload:",
+        payload
+      );
+
+      await cashAdvanceApi.create(payload);
 
       showStatusToast(
         "Cash advance request submitted successfully.",
@@ -303,7 +547,10 @@ export default function RequestAdvancePage() {
       window.location.href =
         "/expense-management/cash-advance/my";
     } catch (error) {
-      console.error("Failed to submit cash advance:", error);
+      console.error(
+        "Failed to submit cash advance:",
+        error
+      );
 
       showStatusToast(
         error?.response?.data?.message ||
@@ -316,6 +563,9 @@ export default function RequestAdvancePage() {
     }
   };
 
+  /*
+   * Save draft
+   */
   const handleSaveDraft = async () => {
     const draftErrors = {};
 
@@ -323,8 +573,12 @@ export default function RequestAdvancePage() {
       draftErrors.title = "Title is required.";
     }
 
-    if (!formData.amount || Number(formData.amount) <= 0) {
-      draftErrors.amount = "Enter a valid advance amount.";
+    if (
+      !formData.amount ||
+      Number(formData.amount) <= 0
+    ) {
+      draftErrors.amount =
+        "Enter a valid advance amount.";
     }
 
     if (Object.keys(draftErrors).length > 0) {
@@ -335,7 +589,14 @@ export default function RequestAdvancePage() {
     setSavingDraft(true);
 
     try {
-      await cashAdvanceApi.create(buildPayload());
+      const payload = buildPayload();
+
+      console.log(
+        "Cash Advance Draft Payload:",
+        payload
+      );
+
+      await cashAdvanceApi.create(payload);
 
       showStatusToast(
         "Cash advance draft saved successfully.",
@@ -345,7 +606,10 @@ export default function RequestAdvancePage() {
       window.location.href =
         "/expense-management/cash-advance/my";
     } catch (error) {
-      console.error("Failed to save cash advance draft:", error);
+      console.error(
+        "Failed to save cash advance draft:",
+        error
+      );
 
       showStatusToast(
         error?.response?.data?.message ||
@@ -369,8 +633,8 @@ export default function RequestAdvancePage() {
         </h1>
 
         <p className="mt-0.5 text-xs text-gray-500">
-          Submit a cash advance request for upcoming business
-          expenses.
+          Submit a cash advance request for upcoming
+          business expenses.
         </p>
       </div>
 
@@ -418,51 +682,58 @@ export default function RequestAdvancePage() {
                   >
                     {formatMoney(
                       outstandingBalance,
-                      formData.currencyCode || "INR"
+                      "INR"
                     )}
                   </p>
                 )}
               </div>
 
-              {!balanceLoading && activeAdvances.length > 0 && (
-                <span className="text-xs font-medium text-gray-600">
-                  {activeAdvances.length} active advance
-                  {activeAdvances.length !== 1 ? "s" : ""}
-                </span>
-              )}
+              {!balanceLoading &&
+                activeAdvances.length > 0 && (
+                  <span className="text-xs font-medium text-gray-600">
+                    {activeAdvances.length} active advance
+                    {activeAdvances.length !== 1
+                      ? "s"
+                      : ""}
+                  </span>
+                )}
             </div>
 
-            {!balanceLoading && hasOverdueAdvance && (
-              <div className="mt-2 rounded-lg border border-rose-200 bg-white/70 p-3">
-                <p className="text-xs font-semibold text-rose-800">
-                  Overdue outstanding advance
-                </p>
+            {!balanceLoading &&
+              hasOverdueAdvance && (
+                <div className="mt-2 rounded-lg border border-rose-200 bg-white/70 p-3">
+                  <p className="text-xs font-semibold text-rose-800">
+                    Overdue outstanding advance
+                  </p>
 
-                <p className="mt-1 text-[11px] leading-relaxed text-rose-700">
-                  You have an overdue cash advance with an outstanding
-                  balance. Please resolve it before submitting a new
-                  cash advance request.
-                </p>
-              </div>
-            )}
+                  <p className="mt-1 text-[11px] leading-relaxed text-rose-700">
+                    You have an overdue cash advance with
+                    an outstanding balance. Please resolve it
+                    before submitting a new cash advance
+                    request.
+                  </p>
+                </div>
+              )}
 
             {!balanceLoading &&
               !hasOverdueAdvance &&
               outstandingBalance > 0 && (
                 <p className="mt-2 text-[11px] leading-relaxed text-amber-800">
-                  You currently have an outstanding cash advance.
-                  You may submit another request because the existing
-                  advance is not overdue, but the balance will remain
-                  visible during approval and settlement.
+                  You currently have an outstanding cash
+                  advance. You may submit another request
+                  because the existing advance is not overdue,
+                  but the balance will remain visible during
+                  approval and settlement.
                 </p>
               )}
 
-            {!balanceLoading && outstandingBalance <= 0 && (
-              <p className="mt-2 text-[11px] text-emerald-800">
-                You currently have no outstanding cash advance
-                balance.
-              </p>
-            )}
+            {!balanceLoading &&
+              outstandingBalance <= 0 && (
+                <p className="mt-2 text-[11px] text-emerald-800">
+                  You currently have no outstanding cash
+                  advance balance.
+                </p>
+              )}
           </div>
         </div>
       </div>
@@ -478,126 +749,197 @@ export default function RequestAdvancePage() {
           </h2>
 
           <p className="mt-0.5 text-[11px] text-gray-500">
-            Provide the details required for your cash advance
-            request.
+            Provide the details required for your cash
+            advance request.
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* Title */}
           <FormInput
-            label="Title / Subject"
+            label={
+              <RequiredLabel>
+                Title / Subject
+              </RequiredLabel>
+            }
             name="title"
             value={formData.title}
             onChange={(event) =>
-              updateField("title", event.target.value)
+              updateField(
+                "title",
+                event.target.value
+              )
             }
             placeholder="e.g. Client Visit Expenses"
             error={errors.title}
-            required
           />
 
-          <FormInput
-            label="Cost Center"
+          {/* Cost Center - Optional */}
+          <FormSelect
+            label={
+              <OptionalLabel>
+                Cost Center
+              </OptionalLabel>
+            }
             name="costCenterId"
             value={formData.costCenterId}
             onChange={(event) =>
-              updateField("costCenterId", event.target.value)
+              updateField(
+                "costCenterId",
+                event.target.value
+              )
             }
-            placeholder="Enter cost center"
+            options={costCenterOptions}
+            placeholder={
+              loadingCostCenters
+                ? "Loading cost centers..."
+                : "-- Select Cost Center --"
+            }
           />
 
+          {/* Amount */}
           <FormInput
-            label="Amount"
+            label={
+              <RequiredLabel>
+                Amount
+              </RequiredLabel>
+            }
             name="amount"
             type="number"
             min="0"
             step="0.01"
             value={formData.amount}
             onChange={(event) =>
-              updateField("amount", event.target.value)
+              updateField(
+                "amount",
+                event.target.value
+              )
             }
             placeholder="Enter amount"
             error={errors.amount}
-            required
           />
 
+          {/* Currency */}
           <FormSelect
-            label="Currency"
-            name="currencyCode"
-            value={formData.currencyCode}
-            onChange={(event) =>
-              updateField("currencyCode", event.target.value)
+            label={
+              <RequiredLabel>
+                Currency
+              </RequiredLabel>
             }
-            options={[
-              { label: "INR", value: "INR" },
-              { label: "USD", value: "USD" },
-              { label: "EUR", value: "EUR" },
-              { label: "GBP", value: "GBP" },
-            ]}
+            name="currencyId"
+            value={formData.currencyId}
+            onChange={(event) =>
+              updateField(
+                "currencyId",
+                event.target.value
+              )
+            }
+            options={currencyOptions}
+            placeholder={
+              loadingCurrencies
+                ? "Loading currencies..."
+                : "-- Select Currency --"
+            }
+            error={errors.currencyId}
           />
         </div>
 
+        {/* Purpose */}
         <FormTextArea
-          label="Purpose / Business Justification"
+          label={
+            <RequiredLabel>
+              Purpose / Business Justification
+            </RequiredLabel>
+          }
           name="purpose"
           value={formData.purpose}
           onChange={(event) =>
-            updateField("purpose", event.target.value)
+            updateField(
+              "purpose",
+              event.target.value
+            )
           }
           placeholder="Explain why the cash advance is required."
           rows={4}
           error={errors.purpose}
-          required
         />
 
+        {/* Dates */}
         <div>
           <h2 className="text-sm font-bold text-gray-900">
             Dates & Settlement Timeline
           </h2>
 
           <p className="mt-0.5 text-[11px] text-gray-500">
-            Enter when the funds are required and when settlement is
-            expected.
+            Enter when the funds are required and when
+            settlement is expected.
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* Needed By Date */}
           <FormInput
-            label="Needed By Date"
+            label={
+              <RequiredLabel>
+                Needed By Date
+              </RequiredLabel>
+            }
             name="neededByDate"
             type="date"
-            value={getDateValue(formData.neededByDate)}
+            value={getDateValue(
+              formData.neededByDate
+            )}
             onChange={(event) =>
-              updateField("neededByDate", event.target.value)
+              updateField(
+                "neededByDate",
+                event.target.value
+              )
             }
             error={errors.neededByDate}
-            required
           />
 
+          {/* Settlement Date */}
           <FormInput
-            label="Settlement Expected Date"
+            label={
+              <RequiredLabel>
+                Settlement Expected Date
+              </RequiredLabel>
+            }
             name="settlementDueDate"
             type="date"
-            value={getDateValue(formData.settlementDueDate)}
+            value={getDateValue(
+              formData.settlementDueDate
+            )}
             onChange={(event) =>
-              updateField("settlementDueDate", event.target.value)
+              updateField(
+                "settlementDueDate",
+                event.target.value
+              )
             }
             error={errors.settlementDueDate}
-            required
           />
         </div>
 
+        {/* Notes - Optional */}
         <FormTextArea
-          label="Additional Notes"
+          label={
+            <OptionalLabel>
+              Additional Notes
+            </OptionalLabel>
+          }
           name="notes"
           value={formData.notes}
           onChange={(event) =>
-            updateField("notes", event.target.value)
+            updateField(
+              "notes",
+              event.target.value
+            )
           }
           placeholder="Add any additional information."
           rows={3}
         />
 
+        {/* Overdue Error */}
         {errors.overdue && (
           <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
@@ -608,23 +950,31 @@ export default function RequestAdvancePage() {
           </div>
         )}
 
+        {/* General Error */}
         {errors.general && (
           <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
             {errors.general}
           </div>
         )}
 
+        {/* Buttons */}
         <div className="flex flex-col-reverse gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end">
           <Button
             type="button"
             variant="outline"
             onClick={handleSaveDraft}
-            disabled={savingDraft || submitting}
+            disabled={
+              savingDraft || submitting
+            }
             className="text-xs"
           >
             {savingDraft ? (
-              <LoadingSpinner size="sm" className="mr-1.5" />
+              <LoadingSpinner
+                size="sm"
+                className="mr-1.5"
+              />
             ) : null}
+
             Save Draft
           </Button>
 
@@ -635,13 +985,18 @@ export default function RequestAdvancePage() {
               submitting ||
               savingDraft ||
               balanceLoading ||
-              hasOverdueAdvance
+              hasOverdueAdvance ||
+              loadingCurrencies
             }
             className="bg-blue-600 text-xs text-white hover:bg-blue-700"
           >
             {submitting ? (
-              <LoadingSpinner size="sm" className="mr-1.5" />
+              <LoadingSpinner
+                size="sm"
+                className="mr-1.5"
+              />
             ) : null}
+
             Submit Request
           </Button>
         </div>

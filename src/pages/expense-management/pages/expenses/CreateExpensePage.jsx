@@ -47,7 +47,9 @@ import { useSubmitReport } from "@/pages/expense-management/approval-engine/hook
 import api from "@/api/axiosInstance";
 
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
-
+import TaxBreakdownPanel, {
+  emptyTaxValue,
+} from "@/pages/expense-management/components/expense-reports/TaxBreakdownPanel";
 const breadcrumbs = [
   {
     label: "Expense Management",
