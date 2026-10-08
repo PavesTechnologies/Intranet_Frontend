@@ -1,5 +1,6 @@
 import api from "../../../api/axiosInstance";
 import { formatBillingPeriod, toIsoDateOnly } from "./billingDataAcquisitionService";
+import { formatPaymentTerms } from "../utils/invoicePresentation";
 
 const AR_BASE_URL =
   window.__APP_CONFIG__?.AR_BASE_URL ||
@@ -172,7 +173,8 @@ export const normalizeInvoiceItem = (item = {}, index = 0) => {
       "",
     resourceName: source.resourceName || source.resource_name || null,
     itemType: source.itemType || source.item_type || "",
-    role: source.role || source.designation || "Unknown",
+    // Only a real backend role — never a placeholder (Milestone/Recurring lines have none).
+    role: source.role || source.designation || null,
     workDate: toIsoDateOnly(source.workDate || source.work_date || source.date) || "",
     quantity:
       source.quantity !== undefined && source.quantity !== null
@@ -481,18 +483,23 @@ export const normalizeInvoice = (payload = {}) => {
     // Invoice Context
     projectName: data.projectName || data.project_name || data.project || "",
     projectCode: data.projectCode || data.project_code || "",
+    // Project Duration — the project's own lifecycle; never the billing period.
+    projectStartDate: toIsoDateOnly(data.projectStartDate || data.project_start_date) || "",
+    projectEndDate: toIsoDateOnly(data.projectEndDate || data.project_end_date) || "",
     billingPeriod: displayPeriod,
     billingPeriodStart: periodStart,
     billingPeriodEnd: periodEnd,
-    currency: data.currency || data.currencyCode || "USD",
+    // Billing type, only when the backend sends it (see resolveInvoiceBillingType).
+    billingTypeCode: data.billingTypeCode || data.billing_type_code || null,
+    billingTypeName: data.billingTypeName || data.billing_type_name || (typeof data.billingType === "string" ? data.billingType : null),
+    currency: data.currencyCode || data.currency || data.currency_code || "USD",
+    currencyCode: data.currencyCode || data.currency || data.currency_code || "USD",
     paymentTermCode: data.paymentTermCode || data.payment_term_code || null,
     paymentTermName: data.paymentTermName || data.payment_term_name || null,
-    paymentTerms:
-      data.paymentTermName ||
-      data.payment_term_name ||
-      (data.paymentTermCode ? `${data.paymentTermCode} Days` : null) ||
-      (data.payment_term_code ? `${data.payment_term_code} Days` : null) ||
-      null,
+    paymentTerms: formatPaymentTerms({
+      paymentTermName: data.paymentTermName || data.payment_term_name,
+      paymentTermCode: data.paymentTermCode || data.payment_term_code,
+    }),
 
     // Items & Tax Breakdown (Authoritative from backend)
     items: rawItems.map(normalizeInvoiceItem),

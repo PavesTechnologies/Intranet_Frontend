@@ -227,7 +227,7 @@ describe("Invoice Preview Synchronization with Backend DTOs", () => {
       expect(normalized.paymentTerms).toBe("Net 30");
     });
 
-    it("falls back to paymentTermCode + ' Days' when paymentTermName is absent", () => {
+    it("falls back to 'Net ' + paymentTermCode when paymentTermName is absent", () => {
       const dto = {
         invoiceId: "inv-2222",
         paymentTermCode: "45",
@@ -236,7 +236,7 @@ describe("Invoice Preview Synchronization with Backend DTOs", () => {
       const normalized = normalizeInvoice(dto);
       expect(normalized.paymentTermName).toBeNull();
       expect(normalized.paymentTermCode).toBe("45");
-      expect(normalized.paymentTerms).toBe("45 Days");
+      expect(normalized.paymentTerms).toBe("Net 45");
     });
 
     it("does not default to Net 30 when payment terms are completely absent", () => {

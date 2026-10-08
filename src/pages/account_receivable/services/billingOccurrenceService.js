@@ -145,7 +145,9 @@ export const normalizeBillingOccurrence = (item = {}) => {
     isPartialPeriod: Boolean(item.isPartialPeriod),
     periodStatus: periodStatus,
     taxStatus: taxStatus,
-    isInvoiced: Boolean(item.isInvoiced),
+    // Persisted flag the backend sets when an invoice is generated for this
+    // occurrence. Strict: a "false" string or other truthy value is not true.
+    isInvoiced: item.isInvoiced === true || String(item.isInvoiced).toLowerCase() === "true",
     invoiceDate: item.invoiceDate ?? null,
     remarks: item.remarks ?? "",
     isActive: item.isActive !== undefined ? Boolean(item.isActive) : true,
@@ -204,6 +206,16 @@ export const mergeOccurrenceWithTaxCalc = (base = {}, taxCalc = {}) => {
     ...c,
 
     billingScheduleId: b.billingScheduleId || c.billingScheduleId,
+    // The tax-calculation response carries no occurrence/configuration
+    // identity — keep the occurrence's, or the billing type (resolved from
+    // these links) and the invoice line item are lost.
+    billingConfigurationId: b.billingConfigurationId || c.billingConfigurationId,
+    recurringConfigurationId: b.recurringConfigurationId || c.recurringConfigurationId,
+    billingTypeName: b.billingTypeName || c.billingTypeName,
+    periodNumber: b.periodNumber ?? c.periodNumber,
+    isPartialPeriod: b.isPartialPeriod || c.isPartialPeriod,
+    isInvoiced: b.isInvoiced || c.isInvoiced,
+    invoiceDate: b.invoiceDate || c.invoiceDate,
     projectName: b.projectName || c.projectName,
     clientName: b.clientName || c.clientName,
     currencyCode: b.currencyCode || c.currencyCode || "USD",

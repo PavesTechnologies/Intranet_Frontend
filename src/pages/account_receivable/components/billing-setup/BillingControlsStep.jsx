@@ -198,14 +198,14 @@ export default function BillingControlsStep({ value = {}, onChange }) {
         )}
       </div>
 
-      {/* Section 2: Payment terms */}
+      {/* Section 2: Billing & Tax Settings (Payment Terms, Tax Region, Expense Billing Eligible) */}
       <div className="space-y-6 pt-6 border-t border-slate-100">
         <div>
           <h3 className={Fonts.subheading}>
-            Payment terms
+            Billing &amp; Tax Settings
           </h3>
           <p className="mt-1 text-xs text-slate-500">
-            Defines when payment becomes due after an invoice is generated.
+            Configure invoice payment and tax settings for this project.
           </p>
         </div>
 

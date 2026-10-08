@@ -167,7 +167,7 @@ describe("Invoice Tax Breakdown and Tax Context Verification", () => {
 
     expect(screen.getByText("FINANCIAL SUMMARY")).toBeInTheDocument();
     expect(screen.getByText("Subtotal")).toBeInTheDocument();
-    expect(screen.getByText("Tax")).toBeInTheDocument();
+    expect(screen.getAllByText("Total Tax").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Grand Total")).toBeInTheDocument();
     expect(screen.getByText("USD 1,062.00")).toBeInTheDocument();
   });

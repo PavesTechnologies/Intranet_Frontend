@@ -11,7 +11,7 @@ import { formatDisplayDate } from "../../utils/format";
 import {
   PIPELINE_STAGES,
   getOccurrenceBillingType,
-  getOccurrenceStage,
+  getTaxPipelineStatus,
   formatFullPeriod,
 } from "../../utils/taxPipeline";
 
@@ -162,14 +162,11 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
     ? occurrence.components
     : [];
 
-  // One display status from the same backend fields this page has always
-  // used (isInvoiced / periodStatus / taxStatus / taxCalculationStatus).
-  const stage = getOccurrenceStage(occurrence);
-  const isTaxCompleted = stage === PIPELINE_STAGES.TAX_CALCULATED || stage === PIPELINE_STAGES.INVOICED;
+  // Same normalized status the Billing Tax Pipeline list shows for this row.
+  const stage = getTaxPipelineStatus(occurrence);
+  const isInvoiced = stage === PIPELINE_STAGES.INVOICED;
+  const isTaxCompleted = stage === PIPELINE_STAGES.TAX_CALCULATED || isInvoiced;
   const isReady = stage === PIPELINE_STAGES.READY_FOR_TAX;
-  const statusLabel = stage
-    ? undefined
-    : String(occurrence.periodStatus || occurrence.taxStatus || "—").replace(/_/g, " ");
 
   const billingAmount =
     occurrence.billingAmount !== null && occurrence.billingAmount !== undefined
@@ -209,7 +206,7 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
       ].filter(Boolean)
     : [];
 
-  const actionBar = occurrence.isInvoiced
+  const actionBar = isInvoiced
     ? {
         title: "Invoice Generated",
         description: occurrence.invoiceDate
@@ -254,8 +251,7 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
         </Button>
       }
       billingType={billingType}
-      stage={stage || PIPELINE_STAGES.UPCOMING}
-      statusLabel={statusLabel}
+      stage={stage}
       project={occurrence.projectName}
       client={occurrence.clientName}
       contextFields={contextFields}

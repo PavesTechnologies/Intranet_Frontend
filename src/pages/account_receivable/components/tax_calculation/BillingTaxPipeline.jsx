@@ -14,6 +14,8 @@ import {
   PIPELINE_STAGE_ORDER,
   PIPELINE_STAGE_LABELS,
   PIPELINE_EMPTY_MESSAGES,
+  countPipelineStages,
+  filterByPipelineStage,
   formatMonthKey,
 } from "../../utils/taxPipeline";
 
@@ -110,19 +112,10 @@ export default function BillingTaxPipeline({
     });
   }, [records, searchQuery, billingTypeFilter, regionFilter, monthFilter]);
 
-  const stageCounts = useMemo(() => {
-    const counts = { [ALL]: filteredRecords.length };
-    PIPELINE_STAGE_ORDER.forEach((s) => {
-      counts[s] = 0;
-    });
-    filteredRecords.forEach((r) => {
-      counts[r.stage] += 1;
-    });
-    return counts;
-  }, [filteredRecords]);
+  const stageCounts = useMemo(() => countPipelineStages(filteredRecords), [filteredRecords]);
 
   const visibleRecords = useMemo(
-    () => (stage === ALL ? filteredRecords : filteredRecords.filter((r) => r.stage === stage)),
+    () => filterByPipelineStage(filteredRecords, stage),
     [filteredRecords, stage]
   );
 
