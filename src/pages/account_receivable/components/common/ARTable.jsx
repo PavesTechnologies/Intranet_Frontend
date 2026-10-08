@@ -20,8 +20,13 @@ const ARTable = ({
   const getAlignmentClass = (colOrHeader, idx) => {
     const names = [columns[idx], headers[idx], colOrHeader]
       .filter(Boolean)
-      .map((name) => String(name).toLowerCase());
-    return names.some((name) => name.includes("status") || name.includes("action"))
+      .map((name) =>
+        String(name)
+          .replace(/([a-z])([A-Z])/g, "$1 $2")
+          .toLowerCase()
+          .split(/[^a-z]+/)
+      );
+    return names.some((parts) => parts.some((part) => part === "status" || part === "action" || part === "actions"))
       ? "text-center"
       : "text-left";
   };
