@@ -182,6 +182,11 @@ export const normalizeInvoiceItem = (item = {}, index = 0) => {
         : source.hours !== undefined && source.hours !== null
           ? Number(source.hours)
           : 0,
+    hours:
+      source.hours !== undefined && source.hours !== null
+        ? Number(source.hours)
+        : null,
+    sourceReference: source.sourceReference || source.sourceReferenceId || source.source_reference || null,
     rate:
       source.rate !== undefined && source.rate !== null
         ? Number(source.rate)
@@ -389,10 +394,20 @@ export const normalizeInvoice = (payload = {}) => {
 
   return {
     invoiceId: data.invoiceId || data.invoice_id || data.id || "",
-    invoiceNumber: data.invoiceNumber || data.invoice_number || "—",
-    invoiceStatus: data.invoiceStatus || data.status || "GENERATED",
-    invoiceDate: toIsoDateOnly(data.invoiceDate || data.invoice_date || data.issueDate || data.createdAt) || "",
-    dueDate: toIsoDateOnly(data.dueDate || data.due_date) || "",
+    invoiceNumber:
+      data.invoiceNumber ||
+      data.invoice_number ||
+      (data.generated === false ? "Assigned on generation" : "—"),
+    invoiceStatus:
+      data.invoiceStatus ||
+      data.status ||
+      (data.generated === false ? "Draft Preview" : "GENERATED"),
+    invoiceDate:
+      toIsoDateOnly(data.invoiceDate || data.invoice_date || data.issueDate || data.createdAt) ||
+      (data.generated === false ? null : ""),
+    dueDate:
+      toIsoDateOnly(data.dueDate || data.due_date) ||
+      (data.generated === false ? null : ""),
 
     // Rejection reason if returned directly on invoice
     rejectionReason:
@@ -557,7 +572,17 @@ export const normalizeInvoice = (payload = {}) => {
       null,
 
     // Seller Info (Authoritative from backend if provided)
+    sellerLegalName:
+      data.sellerLegalName ||
+      data.seller_legal_name ||
+      data.sellerName ||
+      data.seller_name ||
+      data.companyName ||
+      data.company_name ||
+      null,
     sellerName:
+      data.sellerLegalName ||
+      data.seller_legal_name ||
       data.sellerName ||
       data.seller_name ||
       data.companyName ||
@@ -566,9 +591,34 @@ export const normalizeInvoice = (payload = {}) => {
     sellerAddress:
       data.sellerAddress ||
       data.seller_address ||
+      ([
+        data.sellerAddressLine1,
+        data.sellerAddressLine2,
+        data.sellerCity,
+        data.sellerState,
+        data.sellerPostalCode,
+        data.sellerCountry,
+      ].filter(Boolean).length > 0
+        ? [
+            data.sellerAddressLine1,
+            data.sellerAddressLine2,
+            data.sellerCity,
+            data.sellerState,
+            data.sellerPostalCode,
+            data.sellerCountry,
+          ]
+            .filter(Boolean)
+            .join(", ")
+        : null) ||
       data.companyAddress ||
       data.company_address ||
       null,
+    sellerAddressLine1: data.sellerAddressLine1 || null,
+    sellerAddressLine2: data.sellerAddressLine2 || null,
+    sellerCity: data.sellerCity || null,
+    sellerState: data.sellerState || null,
+    sellerPostalCode: data.sellerPostalCode || null,
+    sellerCountry: data.sellerCountry || null,
     sellerGstin:
       data.sellerGstin ||
       data.seller_gstin ||
@@ -587,12 +637,51 @@ export const normalizeInvoice = (payload = {}) => {
       data.companyPhone ||
       data.company_phone ||
       null,
+    sellerLogoReference:
+      data.sellerLogoReference ||
+      data.seller_logo_reference ||
+      data.logo ||
+      data.logoUrl ||
+      null,
+    sellerInfo: {
+      legalName: data.sellerLegalName || data.sellerName || data.companyName || null,
+      address:
+        data.sellerAddress ||
+        [data.sellerAddressLine1, data.sellerAddressLine2, data.sellerCity, data.sellerState, data.sellerPostalCode, data.sellerCountry].filter(Boolean).join(", ") ||
+        null,
+      gstin: data.sellerGstin || data.companyGstin || null,
+      email: data.sellerEmail || data.companyEmail || null,
+      phone: data.sellerPhone || data.companyPhone || null,
+      logoUrl: data.sellerLogoReference || data.logo || null,
+    },
+
+    // Pre-generation flag from backend
+    generated:
+      data.generated !== undefined && data.generated !== null
+        ? Boolean(data.generated)
+        : Boolean(data.invoiceNumber && data.invoiceNumber !== "Assigned on generation" && data.invoiceNumber !== "—"),
 
     // Financial Totals (Strictly backend authoritative)
     subtotal,
     totalTax,
     grandTotal,
   };
+};
+
+/**
+ * GET /api/v1/billing-snapshots/{snapshotId}/invoice-preview
+ * Authoritative pre-generation invoice preview endpoint.
+ * Returns the complete preview with snapshot line items, authoritative totals,
+ * client, project, seller, and generated status without creating or modifying an invoice.
+ */
+export const previewInvoice = async (snapshotId) => {
+  if (!snapshotId) {
+    throw new Error("Billing snapshot UUID is required to preview an invoice.");
+  }
+  const url = `${AR_BASE_URL}/api/v1/billing-snapshots/${snapshotId}/invoice-preview`;
+  const response = await api.get(url);
+  const data = unwrapData(response);
+  return normalizeInvoice(data);
 };
 
 /**
@@ -854,6 +943,128 @@ export const getInvoiceById = async (invoiceId) => {
   return normalizeInvoice(unwrapData(response));
 };
 
+
+/**
+ * Normalizes a single row returned by GET /api/v1/invoice-generation/workspace.
+ * Backend provides authoritative workspaceStatus and financial amounts.
+ */
+export const normalizeInvoiceGenerationWorkspaceItem = (row = {}) => {
+  const source = row && typeof row === "object" ? row : {};
+  const periodStart = toIsoDateOnly(source.billingPeriodStart);
+  const periodEnd = toIsoDateOnly(source.billingPeriodEnd);
+  const displayPeriod =
+    periodStart && periodEnd
+      ? formatBillingPeriod(periodStart, periodEnd)
+      : (source.billingPeriod || "—");
+
+  return {
+    workspaceStatus: (source.workspaceStatus || (source.invoiceId ? "GENERATED" : "READY_FOR_INVOICE")).toUpperCase(),
+    snapshotId: source.snapshotId || null,
+    snapshotNumber: source.snapshotNumber || null,
+    snapshotStatus: source.snapshotStatus || null,
+    clientName: source.clientName || "—",
+    projectName: source.projectName || "—",
+    projectCode: source.projectCode || null,
+    billingType: source.billingType || null,
+    billingPeriod: displayPeriod,
+    billingPeriodStart: periodStart,
+    billingPeriodEnd: periodEnd,
+    currency: source.currencyCode || source.currency || "USD",
+    currencyCode: source.currencyCode || source.currency || "USD",
+    amount: source.amount !== undefined && source.amount !== null ? Number(source.amount) : 0,
+    totalTaxAmount: source.totalTaxAmount !== undefined && source.totalTaxAmount !== null ? Number(source.totalTaxAmount) : 0,
+    grandTotal: source.grandTotal !== undefined && source.grandTotal !== null ? Number(source.grandTotal) : 0,
+    invoiceId: source.invoiceId || null,
+    invoiceNumber: source.invoiceNumber || null,
+    invoiceStatus: source.invoiceStatus ? source.invoiceStatus.toUpperCase() : null,
+    invoiceDate: toIsoDateOnly(source.invoiceDate) || null,
+    dueDate: toIsoDateOnly(source.dueDate) || null,
+  };
+};
+
+/**
+ * GET /api/v1/invoice-generation/workspace
+ * Retrieves the invoice generation workspace including summary metrics
+ * and rows containing both TAX_COMPLETED candidates (ready for invoice generation)
+ * and existing generated/in-progress invoices.
+ */
+export const getInvoiceGenerationWorkspace = async () => {
+  const url = `${AR_BASE_URL}/api/v1/invoice-generation/workspace`;
+  const response = await api.get(url);
+  const rawData = unwrapData(response);
+
+  let rows = [];
+  let summary = null;
+
+  if (rawData && typeof rawData === "object") {
+    if (Array.isArray(rawData.rows)) {
+      rows = rawData.rows;
+    } else if (Array.isArray(rawData.content)) {
+      rows = rawData.content;
+    } else if (Array.isArray(rawData.items)) {
+      rows = rawData.items;
+    } else if (Array.isArray(rawData)) {
+      rows = rawData;
+    }
+
+    if (rawData.summary && typeof rawData.summary === "object") {
+      summary = {
+        readyForInvoiceCount: Number(rawData.summary.readyForInvoiceCount) || 0,
+        readyForInvoiceAmount: Number(rawData.summary.readyForInvoiceAmount) || 0,
+        generatedCount: Number(rawData.summary.generatedCount) || 0,
+        pendingApprovalCount: Number(rawData.summary.pendingApprovalCount) || 0,
+        approvedCount: Number(rawData.summary.approvedCount) || 0,
+        rejectedCount: Number(rawData.summary.rejectedCount) || 0,
+        invoicedCount: Number(rawData.summary.invoicedCount) || 0,
+        totalInvoicedAmount: Number(rawData.summary.totalInvoicedAmount) || 0,
+      };
+    }
+  } else if (Array.isArray(rawData)) {
+    rows = rawData;
+  }
+
+  const normalizedRows = rows.map(normalizeInvoiceGenerationWorkspaceItem).filter(Boolean);
+
+  if (!summary) {
+    const readyForInvoiceRows = normalizedRows.filter(
+      (r) => r.workspaceStatus === "READY_FOR_INVOICE"
+    );
+    const generatedRows = normalizedRows.filter(
+      (r) => r.workspaceStatus === "GENERATED"
+    );
+    const invoicedRows = normalizedRows.filter(
+      (r) => r.workspaceStatus === "INVOICED"
+    );
+    const totalInvoicedAmount = normalizedRows
+      .filter((r) => r.workspaceStatus !== "READY_FOR_INVOICE")
+      .reduce((sum, r) => sum + (Number(r.grandTotal) || 0), 0);
+
+    summary = {
+      readyForInvoiceCount: readyForInvoiceRows.length,
+      readyForInvoiceAmount: readyForInvoiceRows.reduce(
+        (sum, r) => sum + (Number(r.grandTotal) || 0),
+        0
+      ),
+      generatedCount: generatedRows.length,
+      pendingApprovalCount: normalizedRows.filter(
+        (r) => r.workspaceStatus === "PENDING_APPROVAL"
+      ).length,
+      approvedCount: normalizedRows.filter(
+        (r) => r.workspaceStatus === "APPROVED"
+      ).length,
+      rejectedCount: normalizedRows.filter(
+        (r) => r.workspaceStatus === "REJECTED"
+      ).length,
+      invoicedCount: invoicedRows.length,
+      totalInvoicedAmount,
+    };
+  }
+
+  return {
+    summary,
+    rows: normalizedRows,
+  };
+};
 
 /**
  * GET /api/v1/invoices

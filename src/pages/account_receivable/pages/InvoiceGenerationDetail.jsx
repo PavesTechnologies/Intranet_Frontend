@@ -26,6 +26,7 @@ import {
 } from "../services/taxCalculationService";
 import {
   getInvoice,
+  previewInvoice as previewInvoiceApi,
   generateInvoice,
   generateInvoiceForOccurrence,
   submitInvoiceForApproval,
@@ -38,13 +39,12 @@ import {
   mergeOccurrenceWithTaxCalc,
 } from "../services/billingOccurrenceService";
 import {
-  getBillingSnapshotByPeriod,
   formatBillingPeriod,
   toIsoDateOnly,
 } from "../services/billingDataAcquisitionService";
 import { formatPaymentTerms } from "../utils/invoicePresentation";
 
-export const DEFAULT_MIN_PRESENTATION_MS = 1000;
+export const DEFAULT_MIN_PRESENTATION_MS = typeof process !== "undefined" && process.env?.NODE_ENV === "test" ? 0 : 300;
  
 export default function InvoiceGenerationDetail({ minPresentationDuration = DEFAULT_MIN_PRESENTATION_MS } = {}) {
   const { snapshotId, occurrenceId: paramOccurrenceId } = useParams();
@@ -94,6 +94,7 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
   // Data states
   const [taxCalc, setTaxCalc] = useState(passedState.taxCalculation || null);
   const [invoice, setInvoice] = useState(null);
+  const [previewData, setPreviewData] = useState(null);
   const [snapshotData, setSnapshotData] = useState(passedState.config || null);
   const [occurrenceData, setOccurrenceData] = useState(passedState.occurrence || null);
   const [items, setItems] = useState([]);
@@ -109,17 +110,15 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
     if (isManual) setRefreshing(true);
     else setLoading(true);
     setErrorMsg("");
- 
-    // 1. Fetch active seller company profile for Invoice Preview
-    try {
-      const profile = await getActiveCompanyProfile();
-      setCompanyProfile(profile);
-    } catch (profErr) {
-      console.warn("[InvoiceGenerationDetail] Company profile notice:", profErr?.message);
-    }
- 
-    try {
+     try {
       if (isOccurrenceMode) {
+        // Fetch active seller company profile for Occurrence mode
+        try {
+          const profile = await getActiveCompanyProfile();
+          setCompanyProfile(profile);
+        } catch (profErr) {
+          console.warn("[InvoiceGenerationDetail] Company profile notice:", profErr?.message);
+        }
         // Check if invoice has ALREADY been generated for this occurrence
         let existingInvoice = null;
         try {
@@ -168,102 +167,28 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
           setItems([]);
         }
       } else {
-        // Check if invoice has ALREADY been generated for this snapshot
-        let existingInvoice = null;
-        try {
-          existingInvoice = await getInvoice(effectiveSnapshotId);
-          if (existingInvoice && (existingInvoice.invoiceId || existingInvoice.invoiceNumber)) {
-            setInvoice(existingInvoice);
-            if (Array.isArray(existingInvoice.items) && existingInvoice.items.length > 0) {
-              setItems(existingInvoice.items);
-            }
-          }
-        } catch (invErr) {
-          const isNotFound = invErr?.response?.status === 404;
-          if (!isNotFound) {
-            console.warn("[InvoiceGenerationDetail] Invoice check notice:", invErr?.message);
-          }
-          setInvoice(null);
-        }
- 
-        // Fetch completed tax calculation for this snapshot
-        let calc = taxCalc;
-        try {
-          calc = await getTaxCalculation(effectiveSnapshotId);
-          if (calc) {
-            setTaxCalc(calc);
-          }
-        } catch (calcErr) {
-          console.warn("[InvoiceGenerationDetail] Tax calculation fetch notice:", calcErr?.message);
-        }
- 
-        // Hydrate line items if not already loaded from existing invoice
-        if (!existingInvoice || !existingInvoice.items || existingInvoice.items.length === 0) {
-          let loadedItems = [];
- 
-          const passedLabor = passedState.acquisitionResults?.labor;
-          if (passedLabor && Array.isArray(passedLabor.timesheets) && passedLabor.timesheets.length > 0) {
-            loadedItems = passedLabor.timesheets.map((t, idx) => ({
-              id: t.sourceReferenceId || `item-${idx}`,
-              resourceName: t.employee || t.itemName || "Timesheet Entry",
-              itemName: t.employee || t.itemName || "Timesheet Entry",
-              employee: t.employee || "Timesheet Entry",
-              role: t.role || "Consultant",
-              workDate: toIsoDateOnly(t.workDate),
-              hours: t.hours || t.quantity || 0,
-              quantity: t.hours || t.quantity || 0,
-              rate: t.rate || 0,
-              amount: t.amount || 0,
-            }));
+        // Authoritative Invoice Preview API: GET /api/v1/billing-snapshots/{snapshotId}/invoice-preview
+        const preview = await previewInvoiceApi(effectiveSnapshotId);
+        if (preview) {
+          setPreviewData(preview);
+          if (preview.generated) {
+            setInvoice(preview);
           } else {
-            const pId = calc?.projectId || snapshotData?.projectId || passedState.projectId;
-            const pStart = toIsoDateOnly(calc?.billingPeriodStart || snapshotData?.billingPeriodStart);
-            const pEnd = toIsoDateOnly(calc?.billingPeriodEnd || snapshotData?.billingPeriodEnd);
- 
-            if (pId && pStart && pEnd) {
-              try {
-                const snap = await getBillingSnapshotByPeriod(pId, pStart, pEnd);
-                if (snap && Array.isArray(snap.laborRecords) && snap.laborRecords.length > 0) {
-                  loadedItems = snap.laborRecords.map((t, idx) => ({
-                    id: t.id || `item-${idx}`,
-                    resourceName: t.employee || "Timesheet Entry",
-                    itemName: t.employee || "Timesheet Entry",
-                    employee: t.employee || "Timesheet Entry",
-                    role: t.role || "Consultant",
-                    workDate: t.workDate,
-                    hours: t.hours || 0,
-                    quantity: t.hours || 0,
-                    rate: t.rate || 0,
-                    amount: t.amount || 0,
-                  }));
-                }
-              } catch (snapErr) {
-                console.warn("[InvoiceGenerationDetail] Snapshot items fetch notice:", snapErr?.message);
-              }
-            }
+            setInvoice(null);
           }
- 
-          // Fallback: billable services summary from taxable amount
-          if (loadedItems.length === 0) {
-            const subtotalAmt = calc?.taxableAmount ?? snapshotData?.totalAmount ?? 0;
-            if (subtotalAmt > 0) {
-              loadedItems = [
-                {
-                  id: "labor-summary-1",
-                  resourceName: `${calc?.projectName || snapshotData?.projectName || "Project"} Billable Services`,
-                  itemName: `${calc?.projectName || snapshotData?.projectName || "Project"} Billable Services`,
-                  role: "Consultant / Engineering",
-                  workDate: toIsoDateOnly(calc?.billingPeriodEnd || snapshotData?.billingPeriodEnd),
-                  hours: 1,
-                  quantity: 1,
-                  rate: subtotalAmt,
-                  amount: subtotalAmt,
-                },
-              ];
-            }
+          if (Array.isArray(preview.items) && preview.items.length > 0) {
+            setItems(preview.items);
           }
- 
-          setItems(loadedItems);
+        }
+
+        // Fetch active seller company profile only if seller info not returned in preview
+        if (!preview?.sellerName && !preview?.sellerLegalName) {
+          try {
+            const profile = await getActiveCompanyProfile();
+            setCompanyProfile(profile);
+          } catch (profErr) {
+            console.warn("[InvoiceGenerationDetail] Company profile notice:", profErr?.message);
+          }
         }
       }
  
@@ -288,7 +213,10 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
   }, [effectiveId]);
  
   // Authoritative tax and invoice state flags
-  const isInvoiceGenerated = Boolean(invoice && (invoice.invoiceId || invoice.invoiceNumber));
+  const isInvoiceGenerated = Boolean(
+    (invoice && (invoice.invoiceId || invoice.invoiceNumber) && invoice.invoiceNumber !== "Assigned on generation") ||
+    (previewData?.generated && previewData?.invoiceNumber && previewData.invoiceNumber !== "Assigned on generation")
+  );
   const isTaxCompleted = isOccurrenceMode
     ? Boolean(
         occurrenceData?.taxCalculationStatus === "COMPLETED" ||
@@ -298,20 +226,21 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
         occurrenceData?.grandTotal !== undefined
       )
     : Boolean(
+        previewData?.taxComponents?.length > 0 ||
+        previewData?.totalTax !== undefined ||
+        previewData?.grandTotal !== undefined ||
         taxCalc?.taxCalculationStatus === "COMPLETED" ||
-        taxCalc?.calculationStatus === "COMPLETED" ||
-        taxCalc?.status === "COMPLETED" ||
-        taxCalc?.grandTotal !== undefined ||
-        taxCalc?.totalTaxAmount !== undefined
+        taxCalc?.grandTotal !== undefined
       );
  
   // Derived contextual fields
   const invoiceStatus = isInvoiceGenerated
-    ? (invoice?.invoiceStatus || "GENERATED").toUpperCase()
+    ? (invoice?.invoiceStatus || invoice?.status || previewData?.status || "GENERATED").toUpperCase()
     : "Draft Preview";
  
   const projectName =
     invoice?.projectName ||
+    previewData?.projectName ||
     taxCalc?.projectName ||
     occurrenceData?.projectName ||
     snapshotData?.projectName ||
@@ -319,6 +248,7 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
  
   const projectCode =
     invoice?.projectCode ||
+    previewData?.projectCode ||
     snapshotData?.projectCode ||
     taxCalc?.projectCode ||
     occurrenceData?.projectCode ||
@@ -326,6 +256,7 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
  
   const clientName =
     invoice?.clientName ||
+    previewData?.clientName ||
     taxCalc?.clientName ||
     occurrenceData?.clientName ||
     snapshotData?.clientName ||
@@ -333,67 +264,142 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
  
   const recordLabel = isOccurrenceMode
     ? (occurrenceData?.periodNumber ? `Occurrence #${occurrenceData.periodNumber}` : (effectiveOccurrenceId || "Billing Occurrence"))
-    : (invoice?.snapshotNumber || invoice?.billingSnapshotNumber || taxCalc?.snapshotNumber || snapshotData?.snapshotNumber || snapshotId);
- 
+    : (invoice?.snapshotNumber || invoice?.billingSnapshotNumber || previewData?.snapshotNumber || previewData?.billingSnapshotNumber || taxCalc?.snapshotNumber || snapshotData?.snapshotNumber || snapshotId);
+
   const rawStart =
     invoice?.billingPeriodStart ||
+    previewData?.billingPeriodStart ||
     taxCalc?.billingPeriodStart ||
     occurrenceData?.periodStartDate ||
     snapshotData?.billingPeriodStart;
- 
+
   const rawEnd =
     invoice?.billingPeriodEnd ||
+    previewData?.billingPeriodEnd ||
     taxCalc?.billingPeriodEnd ||
     occurrenceData?.periodEndDate ||
     snapshotData?.billingPeriodEnd;
- 
+
   const billingPeriod =
     rawStart && rawEnd
       ? formatBillingPeriod(rawStart, rawEnd)
-      : invoice?.billingPeriod || taxCalc?.billingPeriod || occurrenceData?.period || snapshotData?.billingPeriod || "—";
- 
+      : invoice?.billingPeriod || previewData?.billingPeriod || taxCalc?.billingPeriod || occurrenceData?.period || snapshotData?.billingPeriod || "—";
+
   const currency =
     invoice?.currency ||
+    previewData?.currency ||
     taxCalc?.currencyCode ||
     occurrenceData?.currencyCode ||
     snapshotData?.currency ||
     "USD";
- 
+
   const paymentTerms =
     formatPaymentTerms(invoice || {}) ||
+    formatPaymentTerms(previewData || {}) ||
+    previewData?.paymentTerms ||
     formatPaymentTerms(snapshotData || {}) ||
     formatPaymentTerms(taxCalc || {}) ||
     formatPaymentTerms(occurrenceData || {}) ||
     "Not provided";
- 
+
   const subtotal =
     invoice?.subtotal ??
+    previewData?.subtotal ??
     taxCalc?.taxableAmount ??
     occurrenceData?.taxableAmount ??
     occurrenceData?.billingAmount ??
     snapshotData?.subtotal ??
     0;
- 
+
   const totalTax =
     invoice?.totalTax ??
+    previewData?.totalTax ??
+    previewData?.totalTaxAmount ??
     taxCalc?.totalTaxAmount ??
     occurrenceData?.totalTaxAmount ??
     0;
- 
+
   const grandTotal =
     invoice?.grandTotal ??
+    previewData?.grandTotal ??
     taxCalc?.grandTotal ??
     occurrenceData?.grandTotal ??
     (subtotal + totalTax);
- 
+
   // Authoritative Preview Invoice object for rendering before backend persistence
   const previewInvoice = useMemo(() => {
+    if (invoice && invoice.invoiceId && invoice.invoiceNumber && invoice.invoiceNumber !== "Assigned on generation") {
+      return invoice;
+    }
+    if (previewData) {
+      const isOfficial = Boolean(previewData.generated);
+      return {
+        ...previewData,
+        invoiceId: isOfficial ? previewData.invoiceId : null,
+        invoiceNumber: isOfficial ? previewData.invoiceNumber : "Assigned on generation",
+        invoiceDate: isOfficial ? previewData.invoiceDate : null,
+        dueDate: isOfficial ? previewData.dueDate : null,
+        invoiceStatus: isOfficial ? (previewData.status || previewData.invoiceStatus || "GENERATED") : "Draft Preview",
+        isDraftPreview: !isOfficial,
+        generated: isOfficial,
+        snapshotId: effectiveSnapshotId,
+        billingSnapshotId: effectiveSnapshotId,
+        billingScheduleId: effectiveOccurrenceId,
+        snapshotNumber: recordLabel,
+        billingSnapshotNumber: recordLabel,
+        projectId: previewData.projectId,
+        projectCode: previewData.projectCode || projectCode,
+        projectName: previewData.projectName || projectName,
+        clientName: previewData.clientName || clientName,
+        billingPeriod: previewData.billingPeriod || billingPeriod,
+        billingPeriodStart: rawStart,
+        billingPeriodEnd: rawEnd,
+        currency,
+        paymentTermName: previewData.paymentTermName || paymentTerms,
+        paymentTerms: previewData.paymentTerms || previewData.paymentTermName || paymentTerms,
+        billingAddress: previewData.billingAddress || null,
+        email: previewData.email || null,
+        phone: previewData.phone || null,
+        gstinOrTaxId: previewData.gstinOrTaxId || previewData.gstin || null,
+        subtotal: previewData.subtotal ?? subtotal,
+        totalTax: previewData.totalTax ?? totalTax,
+        grandTotal: previewData.grandTotal ?? grandTotal,
+        taxComponents: previewData.taxComponents || previewData.taxBreakdown || [],
+        taxBreakdown: previewData.taxBreakdown || previewData.taxComponents || [],
+        items: Array.isArray(previewData.items) && previewData.items.length > 0 ? previewData.items : items,
+        sellerName: previewData.sellerName || previewData.sellerLegalName || companyProfile?.legalName || companyProfile?.companyName,
+        sellerAddress: previewData.sellerAddress || companyProfile?.address,
+        sellerGstin: previewData.sellerGstin || companyProfile?.taxRegistrationNumber || companyProfile?.gstin,
+        sellerEmail: previewData.sellerEmail || companyProfile?.email,
+        sellerPhone: previewData.sellerPhone || companyProfile?.phoneNumber || companyProfile?.phone,
+        sellerLogoReference: previewData.sellerLogoReference || companyProfile?.logoUrl,
+        sellerInfo: previewData.sellerInfo || (companyProfile ? {
+          legalName: companyProfile.legalName || companyProfile.companyName,
+          address: companyProfile.address,
+          gstin: companyProfile.taxRegistrationNumber || companyProfile.gstin,
+          email: companyProfile.email,
+          phone: companyProfile.phoneNumber || companyProfile.phone,
+          logoUrl: companyProfile.logoUrl,
+        } : null),
+        clientInfo: {
+          clientName: previewData.clientName || clientName,
+          billingAddress: previewData.billingAddress,
+          country: previewData.country,
+          email: previewData.email,
+          phone: previewData.phone,
+          taxId: previewData.gstinOrTaxId || previewData.gstin,
+        },
+      };
+    }
     if (invoice) return invoice;
     return {
       invoiceId: null,
-      invoiceNumber: null,
-      invoiceStatus: "DRAFT_PREVIEW",
+      invoiceNumber: "Assigned on generation",
+      invoiceDate: null,
+      dueDate: null,
+      invoiceStatus: "Draft Preview",
       isDraftPreview: true,
+      generated: false,
       snapshotId: effectiveSnapshotId,
       billingSnapshotId: effectiveSnapshotId,
       billingScheduleId: effectiveOccurrenceId,
@@ -409,8 +415,12 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
       billingPeriodStart: rawStart,
       billingPeriodEnd: rawEnd,
       currency,
-      paymentTermName: paymentTerms,
-      paymentTerms,
+      paymentTermName: paymentTerms !== "Not provided" ? paymentTerms : (snapshotData?.paymentTermName || null),
+      paymentTerms: paymentTerms !== "Not provided" ? paymentTerms : (snapshotData?.paymentTermName || null),
+      billingAddress: snapshotData?.billingAddress || taxCalc?.billingAddress || occurrenceData?.billingAddress || null,
+      email: snapshotData?.clientEmail || taxCalc?.clientEmail || occurrenceData?.clientEmail || null,
+      phone: snapshotData?.clientPhone || taxCalc?.clientPhone || occurrenceData?.clientPhone || null,
+      gstinOrTaxId: snapshotData?.clientTaxId || taxCalc?.clientTaxId || occurrenceData?.clientTaxId || null,
       subtotal,
       totalTax,
       grandTotal,
@@ -434,15 +444,16 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
         : null,
       clientInfo: {
         clientName,
-        billingAddress: snapshotData?.billingAddress || taxCalc?.billingAddress || occurrenceData?.billingAddress,
-        country: snapshotData?.country || taxCalc?.country || occurrenceData?.country,
-        email: snapshotData?.clientEmail || taxCalc?.clientEmail || occurrenceData?.clientEmail,
-        phone: snapshotData?.clientPhone || taxCalc?.clientPhone || occurrenceData?.clientPhone,
-        taxId: snapshotData?.clientTaxId || taxCalc?.clientTaxId || occurrenceData?.clientTaxId,
+        billingAddress: snapshotData?.billingAddress || taxCalc?.billingAddress || occurrenceData?.billingAddress || null,
+        country: snapshotData?.country || taxCalc?.country || occurrenceData?.country || null,
+        email: snapshotData?.clientEmail || taxCalc?.clientEmail || occurrenceData?.clientEmail || null,
+        phone: snapshotData?.clientPhone || taxCalc?.clientPhone || occurrenceData?.clientPhone || null,
+        taxId: snapshotData?.clientTaxId || taxCalc?.clientTaxId || occurrenceData?.clientTaxId || null,
       },
     };
   }, [
     invoice,
+    previewData,
     effectiveSnapshotId,
     effectiveOccurrenceId,
     recordLabel,
@@ -463,7 +474,7 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
     items,
     companyProfile,
   ]);
- 
+
   // Explicit Invoice Generation action triggered ONLY by user clicking Generate Official Invoice
   const handleGenerateInvoice = async () => {
     if (isGeneratingRef.current || generating) return;
@@ -601,18 +612,10 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
                   ? "GENERATING"
                   : isInvoiceGenerated
                   ? (invoice?.invoiceStatus === "GENERATED" || !invoice?.invoiceStatus ? "INVOICE GENERATED" : invoiceStatus)
-                  : "Draft Preview"
+                  : (taxCalc?.status === "TAX_COMPLETED" || snapshotData?.status === "TAX_COMPLETED" ? "Tax Completed" : "Draft Preview")
               }
               size="sm"
             />
-            {!isInvoiceGenerated && !generating && (
-              <span
-                className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-amber-800"
-                aria-label="Draft not generated"
-              >
-                DRAFT — NOT GENERATED
-              </span>
-            )}
             {isInvoiceGenerated && (
               <span
                 className="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-emerald-800"

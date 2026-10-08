@@ -72,7 +72,9 @@ export default function InvoicePreviewDocument({
 }) {
   const isPlain = presentation === "plain";
   const isDraft =
+    invoice?.generated === false ||
     !invoice?.invoiceNumber ||
+    invoice?.invoiceNumber === "Assigned on generation" ||
     invoice?.invoiceStatus === "DRAFT_PREVIEW" ||
     invoice?.isDraftPreview;
 
@@ -133,12 +135,14 @@ export default function InvoicePreviewDocument({
   // Client billing information from backend
   const clientName =
     invoice?.clientName ||
+    invoice?.clientInfo?.clientName ||
     taxCalc?.clientName ||
     snapshotData?.clientName ||
     "Not provided";
 
   const clientAddress =
     invoice?.billingAddress ||
+    invoice?.clientInfo?.billingAddress ||
     snapshotData?.billingAddress ||
     taxCalc?.billingAddress ||
     "Not configured";
@@ -146,12 +150,14 @@ export default function InvoicePreviewDocument({
   const clientGstin =
     invoice?.gstinOrTaxId ||
     invoice?.gstin ||
+    invoice?.clientInfo?.taxId ||
     snapshotData?.clientTaxId ||
     taxCalc?.clientTaxId ||
     "Not configured";
 
   const clientEmail =
     invoice?.email ||
+    invoice?.clientInfo?.email ||
     snapshotData?.clientEmail ||
     taxCalc?.email ||
     "Not configured";
@@ -170,6 +176,7 @@ export default function InvoicePreviewDocument({
 
   const rawClientPhone =
     invoice?.phone ||
+    invoice?.clientInfo?.phone ||
     taxCalc?.phone ||
     snapshotData?.clientPhone ||
     snapshotData?.phone ||
@@ -179,12 +186,22 @@ export default function InvoicePreviewDocument({
     ? formatClientPhone(clientCountryCode, rawClientPhone)
     : "Not configured";
 
-  // Seller information from authoritative CompanyProfile API
+  // Seller information from authoritative preview invoice or CompanyProfile API
   const sellerName =
+    invoice?.sellerLegalName ||
+    invoice?.sellerName ||
+    invoice?.sellerInfo?.legalName ||
     companyProfile?.legalName ||
     companyProfile?.companyName ||
-    invoice?.sellerName ||
     "Not configured";
+
+  const invoiceSellerParts = [
+    invoice?.sellerAddressLine1,
+    invoice?.sellerAddressLine2,
+    [invoice?.sellerCity, invoice?.sellerState].filter(Boolean).join(", "),
+    invoice?.sellerPostalCode,
+    invoice?.sellerCountry,
+  ].filter(Boolean);
 
   const sellerAddressParts = [
     companyProfile?.addressLine1,
@@ -195,32 +212,47 @@ export default function InvoicePreviewDocument({
   ].filter(Boolean);
 
   const sellerAddress =
-    sellerAddressParts.length > 0
+    invoice?.sellerAddress ||
+    invoice?.sellerInfo?.address ||
+    (invoiceSellerParts.length > 0
+      ? invoiceSellerParts.join(", ")
+      : sellerAddressParts.length > 0
       ? sellerAddressParts.join(", ")
-      : companyProfile?.address || invoice?.sellerAddress || "Not configured";
+      : companyProfile?.address || "Not configured");
 
   const sellerGstin =
+    invoice?.sellerGstin ||
+    invoice?.sellerInfo?.gstin ||
     companyProfile?.taxRegistrationNumber ||
     companyProfile?.gstin ||
-    invoice?.sellerGstin ||
     "Not configured";
 
   const sellerEmail =
-    companyProfile?.email || invoice?.sellerEmail || "Not configured";
+    invoice?.sellerEmail ||
+    invoice?.sellerInfo?.email ||
+    companyProfile?.email ||
+    "Not configured";
 
   const sellerPhone =
+    invoice?.sellerPhone ||
+    invoice?.sellerInfo?.phone ||
     companyProfile?.phoneNumber ||
     companyProfile?.phone ||
-    invoice?.sellerPhone ||
     "Not configured";
 
   const logoSrc =
-    companyProfile?.logoUrl || companyProfile?.logoReference || pavesLogo;
+    invoice?.sellerLogoReference ||
+    invoice?.sellerInfo?.logoUrl ||
+    companyProfile?.logoUrl ||
+    companyProfile?.logoReference ||
+    pavesLogo;
 
   const paymentTermsDisplay =
     formatPaymentTerms(invoice || {}) ||
     formatPaymentTerms(snapshotData || {}) ||
     formatPaymentTerms(taxCalc || {}) ||
+    invoice?.paymentTerms ||
+    snapshotData?.paymentTerms ||
     "Not provided";
 
   const snapshotNumber =
@@ -424,30 +456,31 @@ export default function InvoicePreviewDocument({
         {/* Right: Tax Invoice Title & Authoritative Metadata */}
         <div className={`md:flex md:flex-col space-y-3 ${isPlain ? "min-w-0 md:items-stretch" : "shrink-0 md:items-end"}`}>
           <div className="md:text-right">
-            {showStatus && <div className="mt-1 flex md:justify-end">
-              <span
-                className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold ${
-                  isGenerating
-                    ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                    : isDraft
-                    ? "bg-indigo-100 text-indigo-800 border border-indigo-200"
-                    : "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                }`}
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="h-3 w-3 animate-spin text-[#0A0082]" />
-                    Generating
-                  </>
-                ) : isDraft ? (
-                  "DRAFT – NOT GENERATED"
-                ) : invoiceStatus === "GENERATED" ? (
-                  "INVOICE GENERATED"
-                ) : (
-                  invoiceStatus
-                )}
-              </span>
-            </div>}
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase">
+              TAX INVOICE
+            </h1>
+            {showStatus && !isDraft && (
+              <div className="mt-1 flex md:justify-end">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold ${
+                    isGenerating
+                      ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                      : "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                  }`}
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin text-[#0A0082]" />
+                      Generating
+                    </>
+                  ) : invoiceStatus === "GENERATED" ? (
+                    "INVOICE GENERATED"
+                  ) : (
+                    invoiceStatus
+                  )}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className={`space-y-2 text-xs text-slate-700 w-full ${isPlain ? "py-3 border-y border-slate-300" : "md:w-auto min-w-[270px] bg-slate-50/70 p-3 rounded-md border border-slate-200/80"}`}>
