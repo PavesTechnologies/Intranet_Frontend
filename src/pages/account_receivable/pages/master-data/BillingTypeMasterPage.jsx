@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  Search,
   Plus,
   Eye,
   Pencil,
@@ -9,9 +8,11 @@ import {
   CheckCircle2,
   Layers,
   ShieldAlert,
+  FilterX,
 } from "lucide-react";
 
 import PageHeader from "../../../../components/ui/PageHeader";
+import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Button from "../../../../components/Button/Button";
 import FormInput from "../../../../components/forms/FormInput";
 import Modal from "../../../../components/Modal/modal";
@@ -19,9 +20,10 @@ import ConfirmationModal from "../../../../components/confirmation_modal/Confirm
 import StatusBadge from "../../../../components/status/statusbadge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../../../components/ui/tooltip";
 import { showStatusToast } from "../../../../components/toastfy/toast";
+import SearchInput from "../../../../components/filter/Searchbar";
+import Pagination from "../../../../components/Pagination/pagination";
 import ARTable from "../../components/common/ARTable";
 import MasterStatCards from "../../components/common/MasterStatCards";
-import MasterStatusTabs from "../../components/common/MasterStatusTabs";
 import BackIconButton from "../../components/common/BackIconButton";
 import DetailsDrawer from "../../components/common/DetailsDrawer";
 import {
@@ -35,6 +37,7 @@ import {
 
 const NAME_MAX_LENGTH = 100;
 const DESCRIPTION_MAX_LENGTH = 500;
+const PAGE_SIZE = 8;
 
 const EMPTY_FORM = { billingTypeName: "", description: "" };
 
@@ -56,9 +59,8 @@ const InlineActionButton = ({ icon, label, onClick, disabled = false, tone = "de
           onClick={onClick}
           disabled={disabled}
           aria-label={label}
-          className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${ACTION_TONE_CLASSES[tone]} ${
-            disabled ? "cursor-not-allowed opacity-50" : ""
-          }`}
+          className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${ACTION_TONE_CLASSES[tone]} ${disabled ? "cursor-not-allowed opacity-50" : ""
+            }`}
         >
           {icon}
         </button>
@@ -78,6 +80,7 @@ export default function BillingTypeMasterPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("ACTIVE");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -135,18 +138,10 @@ export default function BillingTypeMasterPage() {
     return { total, active, inactive: total - active };
   }, [billingTypes]);
 
-  const statusTabs = useMemo(
-    () => [
-      { key: "ALL", label: "All", count: stats.total },
-      { key: "ACTIVE", label: "Active", count: stats.active },
-      { key: "INACTIVE", label: "Inactive", count: stats.inactive },
-    ],
-    [stats]
-  );
-
   const filteredItems = useMemo(() => {
     return billingTypes.filter((item) => {
-      if (activeTab !== "ALL" && item.status !== activeTab) return false;
+      if (activeTab === "ACTIVE" && !item.isActive) return false;
+      if (activeTab === "INACTIVE" && item.isActive) return false;
 
       const query = searchQuery.trim().toLowerCase();
       if (query) {
@@ -158,7 +153,29 @@ export default function BillingTypeMasterPage() {
     });
   }, [billingTypes, searchQuery, activeTab]);
 
-  const hasActiveFilters = Boolean(searchQuery);
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    return filteredItems.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [filteredItems, currentPage]);
+
+  const hasActiveFilters = Boolean(searchQuery || activeTab !== "ALL");
+
+  const handleKpiClick = (key) => {
+    setActiveTab((current) => (key === "ALL" || current === key ? "ALL" : key));
+    setCurrentPage(1);
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setActiveTab("ALL");
+    setCurrentPage(1);
+  };
 
   const handleOpenEditModal = (item) => {
     setEditingItem(item);
@@ -248,12 +265,13 @@ export default function BillingTypeMasterPage() {
     }
   };
 
-  const tableHeaders = ["Billing Type Name", "Status", "Actions"];
-  const tableColumns = ["billingTypeName", "status", "actions"];
+  const tableHeaders = ["Billing Type", "Description", "Status", "Actions"];
+  const tableColumns = ["billingTypeName", "description", "status", "actions"];
 
   const tableRows = useMemo(() => {
-    return filteredItems.map((item) => ({
-      billingTypeName: <span className="font-semibold text-slate-800">{item.billingTypeName}</span>,
+    return paginatedItems.map((item) => ({
+      billingTypeName: <span className="font-semibold text-slate-900">{item.billingTypeName}</span>,
+      description: <span className="block max-w-lg truncate text-xs text-slate-500">{item.description || "—"}</span>,
       status: <StatusBadge label={item.status} size="sm" />,
       actions: (
         <div className="flex items-center justify-center gap-0.5">
@@ -286,7 +304,7 @@ export default function BillingTypeMasterPage() {
         </div>
       ),
     }));
-  }, [filteredItems, activatingId]);
+  }, [paginatedItems, activatingId]);
 
   return (
     <div className="w-full space-y-6">
@@ -315,51 +333,67 @@ export default function BillingTypeMasterPage() {
 
       <MasterStatCards
         items={[
-          { label: "Total", value: stats.total, icon: <Layers className="h-5 w-5" /> },
-          { label: "Active", value: stats.active, tone: "success", icon: <CheckCircle2 className="h-5 w-5" /> },
-          { label: "Inactive", value: stats.inactive, tone: "danger", icon: <Trash2 className="h-5 w-5" /> },
+          { key: "ALL", label: "Total Billing Types", value: stats.total, active: activeTab === "ALL", onClick: () => handleKpiClick("ALL"), icon: <Layers className="h-5 w-5" /> },
+          { key: "ACTIVE", label: "Active", value: stats.active, active: activeTab === "ACTIVE", onClick: () => handleKpiClick("ACTIVE"), tone: "success", icon: <CheckCircle2 className="h-5 w-5" /> },
+          { key: "INACTIVE", label: "Inactive", value: stats.inactive, active: activeTab === "INACTIVE", onClick: () => handleKpiClick("INACTIVE"), tone: "danger", icon: <Trash2 className="h-5 w-5" /> },
         ]}
       />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <MasterStatusTabs tabs={statusTabs} activeKey={activeTab} onChange={setActiveTab} />
-
-        <div className="flex items-center gap-2">
-          <div className="relative w-full sm:w-[380px]">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search billing types..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
-            />
+      <PageCard className="overflow-hidden">
+        <PageCardContent className="space-y-4 p-4 sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Billing Types</h2>
+              <p className="mt-0.5 text-xs text-slate-500">Manage the billing models available to AR configurations</p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="w-full sm:w-72">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={(event) => {
+                    setSearchQuery(event.target.value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Search billing types..."
+                />
+              </div>
+              {hasActiveFilters && (
+                <Button type="button" variant="ghost" size="small" onClick={handleResetFilters} className="flex items-center justify-center gap-1.5 whitespace-nowrap text-xs text-slate-600">
+                  <FilterX className="h-3.5 w-3.5" /> clear
+                </Button>
+              )}
+            </div>
           </div>
 
-          {hasActiveFilters && (
-            <Button
-              variant="ghost"
-              size="small"
-              onClick={() => setSearchQuery("")}
-              className="text-xs text-slate-500 hover:text-slate-700"
-            >
-              Clear Filters
-            </Button>
-          )}
-        </div>
-      </div>
+          <ARTable
+            headers={tableHeaders}
+            columns={tableColumns}
+            rows={tableRows}
+            alignments={{ status: "center", actions: "center" }}
+            loading={loading}
+            emptyMessage={
+              hasActiveFilters
+                ? "No billing types match the selected filters."
+                : "No billing types found. Create a type to configure billing behavior."
+            }
+          />
 
-      <ARTable
-        headers={tableHeaders}
-        columns={tableColumns}
-        rows={tableRows}
-        loading={loading}
-        emptyMessage={
-          hasActiveFilters
-            ? "No billing types match your search."
-            : "No Billing Types Found. Create your first billing type to start configuring billing behavior."
-        }
-      />
+          {!loading && filteredItems.length > 0 && (
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-slate-500">
+                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredItems.length)} of {filteredItems.length} types
+              </p>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+                onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+                className="py-0"
+              />
+            </div>
+          )}
+        </PageCardContent>
+      </PageCard>
 
       {/* Create / Edit Modal */}
       <Modal
@@ -404,9 +438,8 @@ export default function BillingTypeMasterPage() {
               placeholder="Enter a short description"
               rows={4}
               maxLength={DESCRIPTION_MAX_LENGTH}
-              className={`w-full rounded-lg border px-4 py-2 text-sm shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20 ${
-                formErrors.description ? "border-red-300 focus:border-red-500" : "border-gray-300"
-              }`}
+              className={`w-full rounded-lg border px-4 py-2 text-sm shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20 ${formErrors.description ? "border-red-300 focus:border-red-500" : "border-gray-300"
+                }`}
             />
             <div className="flex items-center justify-between">
               {formErrors.description ? (

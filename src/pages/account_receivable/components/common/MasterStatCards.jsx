@@ -16,10 +16,16 @@ const MasterStatCards = ({ items = [] }) => {
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       {items.map((item, idx) => {
         const tone = TONE_STYLES[item.tone] || TONE_STYLES.neutral;
+        const isInteractive = typeof item.onClick === "function";
+        const Card = isInteractive ? "button" : "div";
         return (
-          <div
-            key={idx}
-            className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+          <Card
+            key={item.key || idx}
+            type={isInteractive ? "button" : undefined}
+            onClick={item.onClick}
+            aria-pressed={isInteractive ? Boolean(item.active) : undefined}
+            className={`flex w-full items-center justify-between rounded-xl border bg-white p-4 text-left font-[inherit] shadow-sm transition ${isInteractive ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082] focus-visible:ring-offset-2" : ""
+              } ${item.active ? "border-[#0A0082]/40 ring-1 ring-[#0A0082]/15" : "border-slate-200"}`}
           >
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -32,7 +38,7 @@ const MasterStatCards = ({ items = [] }) => {
                 {item.icon}
               </div>
             )}
-          </div>
+          </Card>
         );
       })}
     </div>

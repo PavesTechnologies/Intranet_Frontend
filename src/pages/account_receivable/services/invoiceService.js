@@ -1,5 +1,6 @@
 import api from "../../../api/axiosInstance";
 import { formatBillingPeriod, toIsoDateOnly } from "./billingDataAcquisitionService";
+import { formatPaymentTerms } from "../utils/invoicePresentation";
 
 const AR_BASE_URL =
   window.__APP_CONFIG__?.AR_BASE_URL ||
@@ -172,7 +173,8 @@ export const normalizeInvoiceItem = (item = {}, index = 0) => {
       "",
     resourceName: source.resourceName || source.resource_name || null,
     itemType: source.itemType || source.item_type || "",
-    role: source.role || source.designation || "Unknown",
+    // Only a real backend role — never a placeholder (Milestone/Recurring lines have none).
+    role: source.role || source.designation || null,
     workDate: toIsoDateOnly(source.workDate || source.work_date || source.date) || "",
     quantity:
       source.quantity !== undefined && source.quantity !== null
@@ -180,6 +182,11 @@ export const normalizeInvoiceItem = (item = {}, index = 0) => {
         : source.hours !== undefined && source.hours !== null
           ? Number(source.hours)
           : 0,
+    hours:
+      source.hours !== undefined && source.hours !== null
+        ? Number(source.hours)
+        : null,
+    sourceReference: source.sourceReference || source.sourceReferenceId || source.source_reference || null,
     rate:
       source.rate !== undefined && source.rate !== null
         ? Number(source.rate)
@@ -204,15 +211,27 @@ export const normalizeTaxComponent = (component = {}, index = 0) => {
     id:
       source.taxCalculationComponentId ||
       source.tax_calculation_component_id ||
+      source.invoiceTaxComponentId ||
+      source.invoice_tax_component_id ||
       source.id ||
-      `${source.taxTypeCode || source.taxComponent || "tax"}-${index}`,
+      `${source.taxTypeCode || source.taxComponent || source.taxTypeName || "tax"}-${index}`,
     taxComponent:
       source.taxTypeName ||
+      source.tax_type_name ||
       source.taxComponent ||
+      source.tax_component ||
       source.taxTypeCode ||
+      source.tax_type_code ||
+      source.taxType ||
+      source.tax_type ||
       source.name ||
       "Tax Component",
-    taxTypeCode: source.taxTypeCode || source.tax_type_code || "",
+    taxTypeCode:
+      source.taxTypeCode ||
+      source.tax_type_code ||
+      source.taxType ||
+      source.tax_type ||
+      "",
     applicability:
       source.applicabilityType ||
       source.applicability ||
@@ -223,13 +242,31 @@ export const normalizeTaxComponent = (component = {}, index = 0) => {
         ? Number(source.appliedRate)
         : source.rate !== undefined && source.rate !== null
           ? Number(source.rate)
-          : null,
+          : source.taxRate !== undefined && source.taxRate !== null
+            ? Number(source.taxRate)
+            : source.tax_rate !== undefined && source.tax_rate !== null
+              ? Number(source.tax_rate)
+              : null,
+    taxableAmount:
+      source.taxableAmount !== undefined && source.taxableAmount !== null
+        ? Number(source.taxableAmount)
+        : source.taxable_amount !== undefined && source.taxable_amount !== null
+          ? Number(source.taxable_amount)
+          : source.taxableBase !== undefined && source.taxableBase !== null
+            ? Number(source.taxableBase)
+            : source.baseAmount !== undefined && source.baseAmount !== null
+              ? Number(source.baseAmount)
+              : source.base_amount !== undefined && source.base_amount !== null
+                ? Number(source.base_amount)
+                : null,
     amount:
       source.taxAmount !== undefined && source.taxAmount !== null
         ? Number(source.taxAmount)
         : source.amount !== undefined && source.amount !== null
           ? Number(source.amount)
-          : 0,
+          : source.tax_amount !== undefined && source.tax_amount !== null
+            ? Number(source.tax_amount)
+            : 0,
   };
 };
 
@@ -243,8 +280,15 @@ export const normalizeTaxComponent = (component = {}, index = 0) => {
 export const normalizeInvoice = (payload = {}) => {
   if (!payload || typeof payload !== "object") return null;
 
-  // Handles payload wrapped in { invoice: { ... } } or raw invoice object
-  const data = payload.invoice && typeof payload.invoice === "object" ? payload.invoice : payload;
+  // Handles payload wrapped in { invoice: { ... } }, { data: { invoice: { ... } } }, { data: { ... } }, or raw invoice object
+  let data = payload;
+  if (data.invoice && typeof data.invoice === "object" && !Array.isArray(data.invoice)) {
+    data = data.invoice;
+  } else if (data.data && typeof data.data === "object" && !Array.isArray(data.data)) {
+    data = (data.data.invoice && typeof data.data.invoice === "object" && !Array.isArray(data.data.invoice))
+      ? data.data.invoice
+      : data.data;
+  }
 
   const rawItems = Array.isArray(data.items)
     ? data.items
@@ -260,11 +304,25 @@ export const normalizeInvoice = (payload = {}) => {
     ? data.taxBreakdown
     : Array.isArray(data.taxComponents)
       ? data.taxComponents
-      : Array.isArray(data.components)
-        ? data.components
-        : Array.isArray(data.taxes)
-          ? data.taxes
-          : [];
+      : Array.isArray(data.invoiceTaxComponents)
+        ? data.invoiceTaxComponents
+        : Array.isArray(data.invoice_tax_components)
+          ? data.invoice_tax_components
+          : Array.isArray(data.taxDetails)
+            ? data.taxDetails
+            : Array.isArray(data.components)
+              ? data.components
+              : Array.isArray(data.taxes)
+                ? data.taxes
+                : Array.isArray(data.taxCalculation?.components)
+                  ? data.taxCalculation.components
+                  : Array.isArray(data.taxCalculation?.taxComponents)
+                    ? data.taxCalculation.taxComponents
+                    : Array.isArray(data.taxContext?.components)
+                      ? data.taxContext.components
+                      : [];
+
+  const normalizedTaxComponents = rawTaxComponents.map(normalizeTaxComponent);
 
   // Actual snapshot billing period handling
   const periodStart = toIsoDateOnly(
@@ -294,12 +352,62 @@ export const normalizeInvoice = (payload = {}) => {
     }
   }
 
+  // Authoritative financial totals directly from backend
+  const subtotal =
+    data.subtotal !== undefined && data.subtotal !== null
+      ? Number(data.subtotal)
+      : data.sub_total !== undefined && data.sub_total !== null
+        ? Number(data.sub_total)
+        : data.taxableAmount !== undefined && data.taxableAmount !== null
+          ? Number(data.taxableAmount)
+          : data.taxable_amount !== undefined && data.taxable_amount !== null
+            ? Number(data.taxable_amount)
+            : 0;
+
+  const totalTax =
+    data.totalTax !== undefined && data.totalTax !== null
+      ? Number(data.totalTax)
+      : data.totalTaxAmount !== undefined && data.totalTaxAmount !== null
+        ? Number(data.totalTaxAmount)
+        : data.total_tax !== undefined && data.total_tax !== null
+          ? Number(data.total_tax)
+          : data.total_tax_amount !== undefined && data.total_tax_amount !== null
+            ? Number(data.total_tax_amount)
+            : data.taxCalculation?.totalTaxAmount !== undefined && data.taxCalculation?.totalTaxAmount !== null
+              ? Number(data.taxCalculation.totalTaxAmount)
+              : (normalizedTaxComponents.length > 0
+                  ? normalizedTaxComponents.reduce((acc, c) => acc + (c.amount || 0), 0)
+                  : 0);
+
+  const grandTotal =
+    data.grandTotal !== undefined && data.grandTotal !== null
+      ? Number(data.grandTotal)
+      : data.grand_total !== undefined && data.grand_total !== null
+        ? Number(data.grand_total)
+        : data.totalAmount !== undefined && data.totalAmount !== null
+          ? Number(data.totalAmount)
+          : data.total_amount !== undefined && data.total_amount !== null
+            ? Number(data.total_amount)
+            : data.taxCalculation?.grandTotal !== undefined && data.taxCalculation?.grandTotal !== null
+              ? Number(data.taxCalculation.grandTotal)
+              : (subtotal + totalTax);
+
   return {
     invoiceId: data.invoiceId || data.invoice_id || data.id || "",
-    invoiceNumber: data.invoiceNumber || data.invoice_number || "—",
-    invoiceStatus: data.invoiceStatus || data.status || "GENERATED",
-    invoiceDate: toIsoDateOnly(data.invoiceDate || data.invoice_date || data.issueDate || data.createdAt) || "",
-    dueDate: toIsoDateOnly(data.dueDate || data.due_date) || "",
+    invoiceNumber:
+      data.invoiceNumber ||
+      data.invoice_number ||
+      (data.generated === false ? "Assigned on generation" : "—"),
+    invoiceStatus:
+      data.invoiceStatus ||
+      data.status ||
+      (data.generated === false ? "Draft Preview" : "GENERATED"),
+    invoiceDate:
+      toIsoDateOnly(data.invoiceDate || data.invoice_date || data.issueDate || data.createdAt) ||
+      (data.generated === false ? null : ""),
+    dueDate:
+      toIsoDateOnly(data.dueDate || data.due_date) ||
+      (data.generated === false ? null : ""),
 
     // Rejection reason if returned directly on invoice
     rejectionReason:
@@ -390,43 +498,190 @@ export const normalizeInvoice = (payload = {}) => {
     // Invoice Context
     projectName: data.projectName || data.project_name || data.project || "",
     projectCode: data.projectCode || data.project_code || "",
+    // Project Duration — the project's own lifecycle; never the billing period.
+    projectStartDate: toIsoDateOnly(data.projectStartDate || data.project_start_date) || "",
+    projectEndDate: toIsoDateOnly(data.projectEndDate || data.project_end_date) || "",
     billingPeriod: displayPeriod,
     billingPeriodStart: periodStart,
     billingPeriodEnd: periodEnd,
-    currency: data.currency || data.currencyCode || "USD",
+    // Billing type, only when the backend sends it (see resolveInvoiceBillingType).
+    billingTypeCode: data.billingTypeCode || data.billing_type_code || null,
+    billingTypeName: data.billingTypeName || data.billing_type_name || (typeof data.billingType === "string" ? data.billingType : null),
+    currency: data.currencyCode || data.currency || data.currency_code || "USD",
+    currencyCode: data.currencyCode || data.currency || data.currency_code || "USD",
     paymentTermCode: data.paymentTermCode || data.payment_term_code || null,
     paymentTermName: data.paymentTermName || data.payment_term_name || null,
-    paymentTerms:
-      data.paymentTermName ||
-      data.payment_term_name ||
-      (data.paymentTermCode ? `${data.paymentTermCode} Days` : null) ||
-      (data.payment_term_code ? `${data.payment_term_code} Days` : null) ||
+    paymentTerms: formatPaymentTerms({
+      paymentTermName: data.paymentTermName || data.payment_term_name,
+      paymentTermCode: data.paymentTermCode || data.payment_term_code,
+    }),
+
+    // Items & Tax Breakdown (Authoritative from backend)
+    items: rawItems.map(normalizeInvoiceItem),
+    taxBreakdown: normalizedTaxComponents,
+    taxComponents: normalizedTaxComponents,
+
+    // Tax Context (Authoritative from backend; null if not provided)
+    supplierState:
+      data.supplierState ||
+      data.supplier_state ||
+      data.taxContext?.supplierState ||
+      data.taxContext?.supplier_state ||
+      data.taxCalculation?.supplierState ||
+      data.taxCalculation?.supplier_state ||
+      null,
+    customerState:
+      data.customerState ||
+      data.customer_state ||
+      data.taxContext?.customerState ||
+      data.taxContext?.customer_state ||
+      data.taxCalculation?.customerState ||
+      data.taxCalculation?.customer_state ||
+      null,
+    placeOfSupply:
+      data.placeOfSupply ||
+      data.place_of_supply ||
+      data.taxContext?.placeOfSupply ||
+      data.taxContext?.place_of_supply ||
+      data.taxCalculation?.placeOfSupply ||
+      data.taxCalculation?.place_of_supply ||
+      null,
+    taxRegion:
+      data.taxRegion ||
+      data.tax_region ||
+      data.taxRegionName ||
+      data.tax_region_name ||
+      data.taxContext?.taxRegion ||
+      data.taxContext?.tax_region ||
+      data.taxContext?.taxRegionName ||
+      data.taxContext?.tax_region_name ||
+      data.taxCalculation?.taxRegion ||
+      data.taxCalculation?.tax_region ||
+      data.taxCalculation?.taxRegionName ||
+      data.taxCalculation?.tax_region_name ||
+      null,
+    taxRegionName:
+      data.taxRegionName ||
+      data.tax_region_name ||
+      data.taxRegion ||
+      data.tax_region ||
+      data.taxContext?.taxRegionName ||
+      data.taxContext?.tax_region_name ||
+      data.taxCalculation?.taxRegionName ||
+      data.taxCalculation?.tax_region_name ||
       null,
 
-    // Items & Tax Breakdown
-    items: rawItems.map(normalizeInvoiceItem),
-    taxBreakdown: rawTaxComponents.map(normalizeTaxComponent),
+    // Seller Info (Authoritative from backend if provided)
+    sellerLegalName:
+      data.sellerLegalName ||
+      data.seller_legal_name ||
+      data.sellerName ||
+      data.seller_name ||
+      data.companyName ||
+      data.company_name ||
+      null,
+    sellerName:
+      data.sellerLegalName ||
+      data.seller_legal_name ||
+      data.sellerName ||
+      data.seller_name ||
+      data.companyName ||
+      data.company_name ||
+      null,
+    sellerAddress:
+      data.sellerAddress ||
+      data.seller_address ||
+      ([
+        data.sellerAddressLine1,
+        data.sellerAddressLine2,
+        data.sellerCity,
+        data.sellerState,
+        data.sellerPostalCode,
+        data.sellerCountry,
+      ].filter(Boolean).length > 0
+        ? [
+            data.sellerAddressLine1,
+            data.sellerAddressLine2,
+            data.sellerCity,
+            data.sellerState,
+            data.sellerPostalCode,
+            data.sellerCountry,
+          ]
+            .filter(Boolean)
+            .join(", ")
+        : null) ||
+      data.companyAddress ||
+      data.company_address ||
+      null,
+    sellerAddressLine1: data.sellerAddressLine1 || null,
+    sellerAddressLine2: data.sellerAddressLine2 || null,
+    sellerCity: data.sellerCity || null,
+    sellerState: data.sellerState || null,
+    sellerPostalCode: data.sellerPostalCode || null,
+    sellerCountry: data.sellerCountry || null,
+    sellerGstin:
+      data.sellerGstin ||
+      data.seller_gstin ||
+      data.companyGstin ||
+      data.company_gstin ||
+      null,
+    sellerEmail:
+      data.sellerEmail ||
+      data.seller_email ||
+      data.companyEmail ||
+      data.company_email ||
+      null,
+    sellerPhone:
+      data.sellerPhone ||
+      data.seller_phone ||
+      data.companyPhone ||
+      data.company_phone ||
+      null,
+    sellerLogoReference:
+      data.sellerLogoReference ||
+      data.seller_logo_reference ||
+      data.logo ||
+      data.logoUrl ||
+      null,
+    sellerInfo: {
+      legalName: data.sellerLegalName || data.sellerName || data.companyName || null,
+      address:
+        data.sellerAddress ||
+        [data.sellerAddressLine1, data.sellerAddressLine2, data.sellerCity, data.sellerState, data.sellerPostalCode, data.sellerCountry].filter(Boolean).join(", ") ||
+        null,
+      gstin: data.sellerGstin || data.companyGstin || null,
+      email: data.sellerEmail || data.companyEmail || null,
+      phone: data.sellerPhone || data.companyPhone || null,
+      logoUrl: data.sellerLogoReference || data.logo || null,
+    },
+
+    // Pre-generation flag from backend
+    generated:
+      data.generated !== undefined && data.generated !== null
+        ? Boolean(data.generated)
+        : Boolean(data.invoiceNumber && data.invoiceNumber !== "Assigned on generation" && data.invoiceNumber !== "—"),
 
     // Financial Totals (Strictly backend authoritative)
-    subtotal:
-      data.subtotal !== undefined && data.subtotal !== null
-        ? Number(data.subtotal)
-        : data.taxableAmount !== undefined && data.taxableAmount !== null
-          ? Number(data.taxableAmount)
-          : 0,
-    totalTax:
-      data.totalTax !== undefined && data.totalTax !== null
-        ? Number(data.totalTax)
-        : data.totalTaxAmount !== undefined && data.totalTaxAmount !== null
-          ? Number(data.totalTaxAmount)
-          : 0,
-    grandTotal:
-      data.grandTotal !== undefined && data.grandTotal !== null
-        ? Number(data.grandTotal)
-        : data.totalAmount !== undefined && data.totalAmount !== null
-          ? Number(data.totalAmount)
-          : 0,
+    subtotal,
+    totalTax,
+    grandTotal,
   };
+};
+
+/**
+ * GET /api/v1/billing-snapshots/{snapshotId}/invoice-preview
+ * Authoritative pre-generation invoice preview endpoint.
+ * Returns the complete preview with snapshot line items, authoritative totals,
+ * client, project, seller, and generated status without creating or modifying an invoice.
+ */
+export const previewInvoice = async (snapshotId) => {
+  if (!snapshotId) {
+    throw new Error("Billing snapshot UUID is required to preview an invoice.");
+  }
+  const url = `${AR_BASE_URL}/api/v1/billing-snapshots/${snapshotId}/invoice-preview`;
+  const response = await api.get(url);
+  const data = unwrapData(response);
+  return normalizeInvoice(data);
 };
 
 /**
@@ -659,6 +914,20 @@ export const getInvoice = async (snapshotIdOrInvoiceId) => {
     return normalized;
   }
 
+  // Fallback: try direct GET /api/v1/invoices/{rawId} in case rawId is a non-standard invoice ID format
+  try {
+    const invUrl = `${AR_BASE_URL}/api/v1/invoices/${rawId}`;
+    const invResponse = await api.get(invUrl);
+    const unwrapped = unwrapData(invResponse);
+    if (unwrapped) {
+      return normalizeInvoice(unwrapped);
+    }
+  } catch (invErr) {
+    if (invErr?.response?.status && invErr.response.status !== 404) {
+      throw invErr;
+    }
+  }
+
   const notFoundErr = new Error("Invoice could not be found for the provided identifier.");
   notFoundErr.response = { status: 404, data: { message: "Invoice could not be found." } };
   throw notFoundErr;
@@ -674,6 +943,128 @@ export const getInvoiceById = async (invoiceId) => {
   return normalizeInvoice(unwrapData(response));
 };
 
+
+/**
+ * Normalizes a single row returned by GET /api/v1/invoice-generation/workspace.
+ * Backend provides authoritative workspaceStatus and financial amounts.
+ */
+export const normalizeInvoiceGenerationWorkspaceItem = (row = {}) => {
+  const source = row && typeof row === "object" ? row : {};
+  const periodStart = toIsoDateOnly(source.billingPeriodStart);
+  const periodEnd = toIsoDateOnly(source.billingPeriodEnd);
+  const displayPeriod =
+    periodStart && periodEnd
+      ? formatBillingPeriod(periodStart, periodEnd)
+      : (source.billingPeriod || "—");
+
+  return {
+    workspaceStatus: (source.workspaceStatus || (source.invoiceId ? "GENERATED" : "READY_FOR_INVOICE")).toUpperCase(),
+    snapshotId: source.snapshotId || null,
+    snapshotNumber: source.snapshotNumber || null,
+    snapshotStatus: source.snapshotStatus || null,
+    clientName: source.clientName || "—",
+    projectName: source.projectName || "—",
+    projectCode: source.projectCode || null,
+    billingType: source.billingType || null,
+    billingPeriod: displayPeriod,
+    billingPeriodStart: periodStart,
+    billingPeriodEnd: periodEnd,
+    currency: source.currencyCode || source.currency || "USD",
+    currencyCode: source.currencyCode || source.currency || "USD",
+    amount: source.amount !== undefined && source.amount !== null ? Number(source.amount) : 0,
+    totalTaxAmount: source.totalTaxAmount !== undefined && source.totalTaxAmount !== null ? Number(source.totalTaxAmount) : 0,
+    grandTotal: source.grandTotal !== undefined && source.grandTotal !== null ? Number(source.grandTotal) : 0,
+    invoiceId: source.invoiceId || null,
+    invoiceNumber: source.invoiceNumber || null,
+    invoiceStatus: source.invoiceStatus ? source.invoiceStatus.toUpperCase() : null,
+    invoiceDate: toIsoDateOnly(source.invoiceDate) || null,
+    dueDate: toIsoDateOnly(source.dueDate) || null,
+  };
+};
+
+/**
+ * GET /api/v1/invoice-generation/workspace
+ * Retrieves the invoice generation workspace including summary metrics
+ * and rows containing both TAX_COMPLETED candidates (ready for invoice generation)
+ * and existing generated/in-progress invoices.
+ */
+export const getInvoiceGenerationWorkspace = async () => {
+  const url = `${AR_BASE_URL}/api/v1/invoice-generation/workspace`;
+  const response = await api.get(url);
+  const rawData = unwrapData(response);
+
+  let rows = [];
+  let summary = null;
+
+  if (rawData && typeof rawData === "object") {
+    if (Array.isArray(rawData.rows)) {
+      rows = rawData.rows;
+    } else if (Array.isArray(rawData.content)) {
+      rows = rawData.content;
+    } else if (Array.isArray(rawData.items)) {
+      rows = rawData.items;
+    } else if (Array.isArray(rawData)) {
+      rows = rawData;
+    }
+
+    if (rawData.summary && typeof rawData.summary === "object") {
+      summary = {
+        readyForInvoiceCount: Number(rawData.summary.readyForInvoiceCount) || 0,
+        readyForInvoiceAmount: Number(rawData.summary.readyForInvoiceAmount) || 0,
+        generatedCount: Number(rawData.summary.generatedCount) || 0,
+        pendingApprovalCount: Number(rawData.summary.pendingApprovalCount) || 0,
+        approvedCount: Number(rawData.summary.approvedCount) || 0,
+        rejectedCount: Number(rawData.summary.rejectedCount) || 0,
+        invoicedCount: Number(rawData.summary.invoicedCount) || 0,
+        totalInvoicedAmount: Number(rawData.summary.totalInvoicedAmount) || 0,
+      };
+    }
+  } else if (Array.isArray(rawData)) {
+    rows = rawData;
+  }
+
+  const normalizedRows = rows.map(normalizeInvoiceGenerationWorkspaceItem).filter(Boolean);
+
+  if (!summary) {
+    const readyForInvoiceRows = normalizedRows.filter(
+      (r) => r.workspaceStatus === "READY_FOR_INVOICE"
+    );
+    const generatedRows = normalizedRows.filter(
+      (r) => r.workspaceStatus === "GENERATED"
+    );
+    const invoicedRows = normalizedRows.filter(
+      (r) => r.workspaceStatus === "INVOICED"
+    );
+    const totalInvoicedAmount = normalizedRows
+      .filter((r) => r.workspaceStatus !== "READY_FOR_INVOICE")
+      .reduce((sum, r) => sum + (Number(r.grandTotal) || 0), 0);
+
+    summary = {
+      readyForInvoiceCount: readyForInvoiceRows.length,
+      readyForInvoiceAmount: readyForInvoiceRows.reduce(
+        (sum, r) => sum + (Number(r.grandTotal) || 0),
+        0
+      ),
+      generatedCount: generatedRows.length,
+      pendingApprovalCount: normalizedRows.filter(
+        (r) => r.workspaceStatus === "PENDING_APPROVAL"
+      ).length,
+      approvedCount: normalizedRows.filter(
+        (r) => r.workspaceStatus === "APPROVED"
+      ).length,
+      rejectedCount: normalizedRows.filter(
+        (r) => r.workspaceStatus === "REJECTED"
+      ).length,
+      invoicedCount: invoicedRows.length,
+      totalInvoicedAmount,
+    };
+  }
+
+  return {
+    summary,
+    rows: normalizedRows,
+  };
+};
 
 /**
  * GET /api/v1/invoices

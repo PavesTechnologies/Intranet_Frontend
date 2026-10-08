@@ -756,6 +756,7 @@ function TimeAndMaterialForm({
               disabled={isExisting}
             />
             <FormSelect
+              anchorOptions
               label="Rate Period *"
               name="ratePeriod"
               value={standardRate.ratePeriod}
@@ -1703,18 +1704,17 @@ const DEFAULT_MILESTONE_PLAN_STATE = {
   ],
   remarks: "",
 };
-// An installment plan normally requires multiple payments, so Installments
-// starts with two evenly-split entries rather than one — see
-// buildDefaultInstallmentEntries.
-const DEFAULT_INSTALLMENT_SPLIT = [50, 50];
-function buildDefaultInstallmentEntries() {
-  return DEFAULT_INSTALLMENT_SPLIT.map((percentage, index) => ({
-    sequence: index + 1,
-    percentage,
-    billingDate: "",
-    remarks: "",
-  }));
+// Installments start with a single empty row — the number of installments and
+// every percentage are entirely user-driven, never prefilled. clientKey is a
+// UI-only React key (buildMilestonePlanRequestPayload never sends it).
+let installmentKeyCounter = 0;
+function buildEmptyInstallmentEntry(sequence) {
+  installmentKeyCounter += 1;
+  return { clientKey: `installment-${installmentKeyCounter}`, sequence, percentage: "", billingDate: "", remarks: "" };
 }
+
+const formatSequence = (index) => String(index + 1).padStart(2, "0");
+const roundPercent = (value) => Math.round(value * 100) / 100;
 
 // Payment Plan cards shown in the UI — Milestones is a disabled "coming soon"
 // card only (PMS-managed, no lifecycle/name/status owned by AR). The
@@ -1791,51 +1791,179 @@ function PaymentPlanSelector({ value, onChange }) {
   );
 }
 
-function PercentBadge({ value }) {
+// Eyebrow-style heading shared by every Milestone Plan section, so the form
+// reads as one workflow: Payment Plan → Schedule → Notes → Summary.
+function PlanSectionHeading({ title, description, aside }) {
   return (
-    <span className="inline-flex shrink-0 items-center rounded-full bg-[#0A0082]/10 px-2.5 py-0.5 text-xs font-bold text-[#0A0082]">
-      {value || 0}%
-    </span>
+    <div className="flex flex-wrap items-end justify-between gap-2">
+      <div>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">{title}</h3>
+        {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
+      </div>
+      {aside}
+    </div>
   );
 }
 
-// Shared bottom summary for both Full Payment and Installments — Project
-// Budget (via totalContractValue) is always the single source of truth, so
-// there is never a separate "Total Contract Value" input anywhere in this form.
-function PaymentSummaryPanel({ totalContractValue, allocated, remaining, totalPercentage, currency, showPercentage, isComplete }) {
+// One payment entry (Installment N, or the single Full Payment). The user
+// enters only the percentage and billing date — the amount is a read-only
+// preview of Total Value × % (the backend calculates and persists the real
+// amount). Desktop: Percentage | Amount | Billing Date | Remove; stacks on
+// narrow screens.
+function PaymentEntryCard({
+  index,
+  title,
+  percentage,
+  percentageEditable = true,
+  percentagePlaceholder,
+  amount,
+  billingDate,
+  errors = {},
+  currency,
+  onChange,
+  onRemove,
+}) {
+  const hasPercent = percentage !== "" && percentage !== null && percentage !== undefined;
+  const fieldLabel = "mb-1.5 block text-xs font-semibold text-slate-600";
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
-      <h3 className="mb-3 text-sm font-semibold text-slate-900">Payment Allocation</h3>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-500">Total Contract Value</span>
-          <span className="font-semibold text-slate-900">{formatCurrency(totalContractValue, currency)}</span>
-        </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-500">Allocated Amount</span>
-          <span className="font-semibold text-slate-900">{formatCurrency(allocated, currency)}</span>
-        </div>
-        <div className="flex items-center justify-between border-t border-slate-200 pt-2 text-sm">
-          <span className="font-semibold text-slate-700">Remaining Amount</span>
-          <span className={`font-bold ${isComplete ? "text-[#0A0082]" : "text-amber-600"}`}>
-            {formatCurrency(remaining, currency)}
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow sm:px-5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0A0082] text-xs font-bold tabular-nums text-white">
+            {formatSequence(index)}
           </span>
+          <span className="truncate text-sm font-semibold text-slate-900">{title}</span>
         </div>
-        {showPercentage && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">Total Percentage</span>
-            <span className={`font-semibold ${isComplete ? "text-slate-900" : "text-red-600"}`}>
-              {totalPercentage}%
+        <span className={`shrink-0 text-sm font-semibold tabular-nums ${hasPercent ? "text-[#0A0082]" : "text-slate-300"}`}>
+          {hasPercent ? `${Number(percentage)}%` : "—%"}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_auto] lg:items-start">
+        <div>
+          <label htmlFor={`paymentPercentage-${index}`} className={fieldLabel}>
+            Percentage <span className="text-red-500">*</span>
+          </label>
+          {percentageEditable ? (
+            <div className="relative">
+              <input
+                id={`paymentPercentage-${index}`}
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                inputMode="decimal"
+                value={percentage ?? ""}
+                placeholder={percentagePlaceholder || "Enter %"}
+                onChange={(event) => onChange({ percentage: event.target.value })}
+                onWheel={(event) => event.target.blur()}
+                aria-invalid={Boolean(errors.percentage)}
+                className={`h-[38px] w-full rounded-lg border pl-3 pr-8 text-sm font-semibold tabular-nums text-slate-900 shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20 ${
+                  errors.percentage ? "border-red-300 bg-red-50/40" : "border-slate-300"
+                }`}
+              />
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-medium text-slate-400">%</span>
+            </div>
+          ) : (
+            <div className="flex h-[38px] items-center rounded-lg bg-slate-50 px-3 text-sm font-semibold tabular-nums text-slate-900">100%</div>
+          )}
+          {errors.percentage && <p className="mt-1 text-xs text-red-600">{errors.percentage}</p>}
+        </div>
+
+        <div>
+          <span className={fieldLabel}>Payment Amount</span>
+          <div className="flex h-[38px] items-center justify-between gap-2 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3">
+            <span className="truncate text-sm font-bold tabular-nums text-slate-900">
+              {hasPercent ? formatCurrency(amount, currency) : "—"}
             </span>
+            <span className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-slate-400">Calculated</span>
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor={`paymentBillingDate-${index}`} className={fieldLabel}>
+            Billing Date <span className="text-red-500">*</span>
+          </label>
+          <input
+            id={`paymentBillingDate-${index}`}
+            type="date"
+            value={billingDate || ""}
+            onChange={(event) => onChange({ billingDate: event.target.value })}
+            aria-invalid={Boolean(errors.billingDate)}
+            className={`h-[38px] w-full rounded-lg border px-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20 ${
+              errors.billingDate ? "border-red-300 bg-red-50/40" : "border-slate-300"
+            }`}
+          />
+          {errors.billingDate && <p className="mt-1 text-xs text-red-600">{errors.billingDate}</p>}
+        </div>
+
+        {onRemove && (
+          <div className="flex justify-end sm:col-span-2 lg:col-span-1 lg:pt-[22px]">
+            <button
+              type="button"
+              onClick={onRemove}
+              className="inline-flex h-[38px] items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+              aria-label={`Remove ${title}`}
+            >
+              <Trash2 className="h-4 w-4" /> Remove
+            </button>
           </div>
         )}
       </div>
-      {!isComplete && (
-        <p className="mt-3 flex items-start gap-1.5 text-xs font-medium text-amber-700">
-          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          Payment plan is incomplete — allocate the remaining amount before saving.
-        </p>
-      )}
+    </div>
+  );
+}
+
+// Shared Payment Summary for Full Payment and Installments. Total Value is the
+// Project Budget (no separate contract-value input exists). Order is fixed:
+// Total Value → Scheduled Amount → Total Allocation → Remaining Amount (last,
+// emphasized). Allocation status is derived from the percentage total so
+// floating-point amount rounding never flips the state.
+function PaymentSummaryPanel({ totalValue, scheduledAmount, totalPercentage, currency }) {
+  const percentRemaining = roundPercent(100 - totalPercentage);
+  const status = Math.abs(percentRemaining) < 0.01 ? "complete" : percentRemaining > 0 ? "remaining" : "exceeded";
+  const remainingAmount = status === "complete" ? 0 : totalValue - scheduledAmount;
+
+  const remainingTone = {
+    complete: { tone: "text-emerald-700", icon: Check, text: "Fully scheduled" },
+    remaining: { tone: "text-amber-700", icon: AlertCircle, text: `${percentRemaining}% remaining to schedule` },
+    exceeded: { tone: "text-red-700", icon: AlertCircle, text: `Allocation exceeds 100% by ${Math.abs(percentRemaining)}%` },
+  }[status];
+  const StatusIcon = remainingTone.icon;
+
+  // Compact finance-style statement: labels left, amounts right, one rule
+  // above the emphasized Remaining Amount line.
+  const row = "flex items-baseline justify-between gap-4 py-1";
+  const label = "text-slate-600";
+  const amount = "font-medium tabular-nums text-slate-900";
+  return (
+    <div className="space-y-2">
+      <PlanSectionHeading title="Payment Summary" />
+      <dl className="rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm">
+        <div className={row}>
+          <dt className={label}>Total Value</dt>
+          <dd className={amount}>{formatCurrency(totalValue, currency)}</dd>
+        </div>
+        <div className={row}>
+          <dt className={label}>Scheduled Amount</dt>
+          <dd className={amount}>{formatCurrency(scheduledAmount, currency)}</dd>
+        </div>
+        <div className={row}>
+          <dt className={label}>Total Allocation</dt>
+          <dd className={`${amount} ${status === "complete" ? "" : remainingTone.tone}`}>{roundPercent(totalPercentage)}%</dd>
+        </div>
+        <div className="mt-1.5 border-t border-slate-200 pt-2" role="status">
+          <div className={row}>
+            <dt className="font-semibold text-slate-800">Remaining Amount</dt>
+            <dd className={`font-semibold tabular-nums ${status === "complete" ? "text-slate-900" : remainingTone.tone}`}>
+              {formatCurrency(remainingAmount, currency)}
+            </dd>
+          </div>
+          <p className={`flex items-center gap-1 text-xs font-medium ${remainingTone.tone}`}>
+            <StatusIcon className="h-3.5 w-3.5 shrink-0" /> {remainingTone.text}
+          </p>
+        </div>
+      </dl>
     </div>
   );
 }
@@ -1860,6 +1988,9 @@ function MilestonePlanForm({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const fetchedRef = useRef(null);
   const seededRef = useRef(false);
+  // Last plan persisted on the backend (loaded or just saved) — lets switching
+  // Payment Plan away and back restore the saved entries instead of resetting.
+  const savedPlanRef = useRef(null);
 
   const paymentStructure = value.paymentStructure || "FULL_PAYMENT";
   const isFullPayment = paymentStructure === "FULL_PAYMENT";
@@ -1921,6 +2052,7 @@ function MilestonePlanForm({
               };
             })
           : [];
+        savedPlanRef.current = { paymentStructure: record.paymentStructure || "FULL_PAYMENT", entries: loadedEntries };
         update({
           milestonePlanId: record.milestonePlanId || record.id || null,
           totalContractValue: record.totalContractValue ?? value.totalContractValue ?? "",
@@ -1955,14 +2087,18 @@ function MilestonePlanForm({
 
   // Switching Payment Structure must never leave stale entries from the other
   // structure behind (e.g. a 60/40 installment split lingering after switching
-  // to Full Payment) — always start the newly selected structure fresh.
+  // to Full Payment). The newly selected structure restores its saved entries
+  // when that is what's persisted, otherwise starts fresh: Full Payment as its
+  // single 100% entry, Installments as ONE empty row (never a prefilled split).
   const handlePaymentStructureChange = (next) => {
     if (next === paymentStructure) return;
+    const saved = savedPlanRef.current;
+    const savedEntries = saved?.paymentStructure === next && saved.entries.length > 0 ? saved.entries : null;
     update({
       paymentStructure: next,
-      // An installment plan normally requires multiple payments, so it
-      // starts with two evenly-split entries, not one.
-      entries: next === "FULL_PAYMENT" ? [{ ...EMPTY_FULL_PAYMENT_ENTRY }] : buildDefaultInstallmentEntries(),
+      entries:
+        savedEntries?.map((entry) => ({ ...entry })) ||
+        (next === "FULL_PAYMENT" ? [{ ...EMPTY_FULL_PAYMENT_ENTRY }] : [buildEmptyInstallmentEntry(1)]),
     });
   };
 
@@ -1971,18 +2107,10 @@ function MilestonePlanForm({
     update({ entries: [{ ...current, ...patch, sequence: 1, percentage: 100 }] });
   };
 
-  // Prefills the new row with whatever percentage is left unallocated (never
-  // negative) so reaching 100% usually takes less manual arithmetic — still
-  // freely editable.
+  // Appends an empty row — the remaining percentage is only suggested via the
+  // input's placeholder, never prefilled.
   const addInstallment = () => {
-    const allocated = entries.reduce((sum, entry) => sum + (Number(entry.percentage) || 0), 0);
-    const remaining = Math.max(0, Math.round((100 - allocated) * 100) / 100);
-    update({
-      entries: [
-        ...entries,
-        { sequence: entries.length + 1, percentage: remaining > 0 ? remaining : "", billingDate: "", remarks: "" },
-      ],
-    });
+    update({ entries: [...entries, buildEmptyInstallmentEntry(entries.length + 1)] });
   };
 
   const removeInstallment = (index) => {
@@ -2041,12 +2169,33 @@ function MilestonePlanForm({
     (sum, entry) => sum + ((Number(entry.percentage) || 0) / 100) * totalContractValueNum,
     0,
   );
-  const remainingAmount = totalContractValueNum - totalAllocated;
 
   const contractValueValid = totalContractValueNum > 0;
   const isInstallmentsValid = entries.length > 0 && !hasEntryErrors && totalPercentageValid;
   const isFullPaymentValid = Boolean(entries[0]?.billingDate) && !entryErrors[0]?.billingDate;
   const isFormValid = contractValueValid && (isFullPayment ? isFullPaymentValid : isInstallmentsValid);
+
+  // A fresh, still-empty row shouldn't light up red — inline errors show only
+  // for a value the user actually entered (e.g. 0 or >100). Anything still
+  // missing is listed once next to Save instead (saveBlockers).
+  const visibleEntryErrors = entries.map((entry, index) => ({
+    percentage:
+      entry.percentage === "" || entry.percentage === null || entry.percentage === undefined
+        ? ""
+        : entryErrors[index]?.percentage,
+  }));
+  const remainingPercent = roundPercent(100 - totalPercentage);
+  const saveBlockers = [];
+  if (!contractValueValid) saveBlockers.push("Project Budget is not available");
+  if (isFullPayment) {
+    if (!entries[0]?.billingDate) saveBlockers.push("Select the billing date");
+  } else {
+    if (entries.some((entry) => entry.percentage === "" || entry.percentage === null || entry.percentage === undefined)) {
+      saveBlockers.push("Enter a percentage for every installment");
+    }
+    if (entries.some((entry) => !entry.billingDate)) saveBlockers.push("Select a billing date for every installment");
+    if (!totalPercentageValid) saveBlockers.push("Allocate exactly 100%");
+  }
 
   const saveMilestonePlanConfig = async () => {
     if (!contractValueValid) {
@@ -2098,9 +2247,13 @@ function MilestonePlanForm({
       // sync by the effect above and can still be stale/blank at the moment Save
       // is clicked (e.g. right after the budget first loads). There is no separate
       // Total Contract Value input in this form.
+      // Entry-level remarks are no longer collected in the UI — Plan Notes
+      // (plan-level remarks) is the single notes field — so each entry's
+      // remarks is sent as "" per the existing API convention.
       const payload = buildMilestonePlanRequestPayload({
         ...value,
         totalContractValue: totalContractValueNum,
+        entries: entries.map((entry) => ({ ...entry, remarks: "" })),
       });
 
       // value.milestonePlanId can still be unset here if the wizard's own load
@@ -2125,25 +2278,28 @@ function MilestonePlanForm({
         value.milestonePlanId ||
         null;
 
+      // Reconcile with the backend-calculated amounts so the display reflects
+      // exactly what was persisted, falling back to what was just entered.
+      const savedEntries =
+        Array.isArray(saved?.entries) && saved.entries.length > 0
+          ? saved.entries.map((entry, index) => {
+              const normalized = normalizeMilestonePaymentEntry(entry);
+              return {
+                ...normalized,
+                sequence: normalized.sequence ?? index + 1,
+                percentage: normalized.percentage ?? entries[index]?.percentage ?? "",
+              };
+            })
+          : entries.map(normalizeMilestonePaymentEntry);
+      const savedPaymentStructure = saved?.paymentStructure || value.paymentStructure || "FULL_PAYMENT";
+      savedPlanRef.current = { paymentStructure: savedPaymentStructure, entries: savedEntries };
+
       update({
         milestonePlanId: savedMilestonePlanId,
         totalContractValue: saved?.totalContractValue ?? totalContractValueNum,
-        paymentStructure: saved?.paymentStructure || value.paymentStructure || "FULL_PAYMENT",
+        paymentStructure: savedPaymentStructure,
         remarks: saved?.remarks ?? value.remarks ?? "",
-        // Reconcile with the backend-calculated amounts so the display reflects
-        // exactly what was persisted, falling back to what was just entered.
-        entries:
-          Array.isArray(saved?.entries) && saved.entries.length > 0
-            ? saved.entries.map((entry, index) => {
-                const normalized = normalizeMilestonePaymentEntry(entry);
-                return {
-                  ...normalized,
-                  sequence: normalized.sequence ?? index + 1,
-                  percentage: normalized.percentage ?? entries[index]?.percentage ?? "",
-                  remarks: normalized.remarks || entries[index]?.remarks || "",
-                };
-              })
-            : entries.map(normalizeMilestonePaymentEntry),
+        entries: savedEntries,
       });
       showStatusToast("Milestone plan configuration saved", "success");
     } catch (error) {
@@ -2158,6 +2314,7 @@ function MilestonePlanForm({
 
   const requestRemoveMilestonePlanConfig = () => {
     if (!value.milestonePlanId) {
+      savedPlanRef.current = null;
       update({
         milestonePlanId: null,
         totalContractValue: "",
@@ -2178,6 +2335,7 @@ function MilestonePlanForm({
     setDeleting(true);
     try {
       await deleteMilestonePlanConfiguration(milestonePlanId);
+      savedPlanRef.current = null;
       update({
         milestonePlanId: null,
         totalContractValue: "",
@@ -2197,171 +2355,158 @@ function MilestonePlanForm({
 
   return (
     <div className="space-y-4">
-      <h2 className={Fonts.heading4}>Milestone Plan</h2>
+      <h2 className="text-base font-semibold text-slate-900">Milestone Plan</h2>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-slate-700">
-            Payment Plan <span className="text-red-500">*</span>
-          </label>
+      <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-sm">
+        {/* 1. Payment Plan — how the Total Value is paid */}
+        <section className="space-y-3 p-4 sm:px-6 sm:py-5">
+          <PlanSectionHeading
+            title="Payment Plan"
+            description="Choose how the project's total value will be billed."
+          />
           <PaymentPlanSelector value={paymentStructure} onChange={handlePaymentStructureChange} />
-        </div>
+        </section>
 
-        <div className="space-y-3 border-t border-slate-100 pt-5">
-          <h3 className="text-sm font-semibold text-slate-900">
-            {isFullPayment ? "Payment Schedule" : "Installment Schedule"}
-          </h3>
+        {/* 2. Schedule — how many payments, how much each, and when */}
+        <section className="space-y-3 bg-slate-50/40 p-4 sm:px-6 sm:py-5">
+          <PlanSectionHeading
+            title={isFullPayment ? "Payment Schedule" : "Installment Schedule"}
+            description={
+              isFullPayment
+                ? "The full value is billed in a single payment on the selected date."
+                : "Enter each installment's share of the total value and its billing date."
+            }
+            aside={
+              !isFullPayment && (
+                <span className="text-xs font-medium text-slate-500">
+                  {entries.length} {entries.length === 1 ? "installment" : "installments"}
+                </span>
+              )
+            }
+          />
 
           {isFullPayment ? (
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <span className="text-sm font-semibold text-slate-900">Payment 1</span>
-                <PercentBadge value={100} />
-              </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <ReadOnlyField label="Payment Amount" value={formatCurrency(totalContractValueNum, currency)} />
-                <FormDatePicker
-                  label="Billing Date *"
-                  name="milestonePlanBillingDate"
-                  value={entries[0]?.billingDate || ""}
-                  onChange={(event) => updateFullPaymentEntry({ billingDate: event.target.value })}
-                />
-                <div className="md:col-span-2">
-                  <FormInput
-                    label="Payment Notes"
-                    name="milestonePlanFullPaymentRemarks"
-                    value={entries[0]?.remarks || ""}
-                    onChange={(event) => updateFullPaymentEntry({ remarks: event.target.value })}
-                    placeholder="Optional notes about this payment"
-                  />
-                </div>
-              </div>
-            </div>
-          ) : entries.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-6 text-center">
-              <p className="text-sm text-slate-500">No installments yet. Add one to get started.</p>
-              <div className="mt-3 flex justify-center">
-                <Button variant="outline" size="small" onClick={addInstallment}>
-                  <Plus className="h-4 w-4" /> Add Installment
-                </Button>
-              </div>
-            </div>
+            <PaymentEntryCard
+              index={0}
+              title="Full Payment"
+              percentage={100}
+              percentageEditable={false}
+              amount={totalContractValueNum}
+              billingDate={entries[0]?.billingDate}
+              currency={currency}
+              onChange={updateFullPaymentEntry}
+            />
           ) : (
             <div className="space-y-3">
               {entries.map((entry, index) => {
                 const percentNum = Number(entry.percentage) || 0;
-                const amount = (percentNum / 100) * totalContractValueNum;
-                const errors = entryErrors[index] || {};
+                const isEmptyPercent = entry.percentage === "" || entry.percentage === null || entry.percentage === undefined;
                 return (
-                  <div key={index} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
-                          {index + 1}
-                        </span>
-                        <span className="text-sm font-semibold text-slate-900">Installment {index + 1}</span>
-                        <PercentBadge value={percentNum} />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeInstallment(index)}
-                        disabled={entries.length <= 1}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" /> Remove
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                      <FormInput
-                        label="Payment Percentage *"
-                        name={`installmentPercentage-${index}`}
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={entry.percentage ?? ""}
-                        onChange={(event) => updateInstallment(index, { percentage: event.target.value })}
-                        placeholder="e.g. 50"
-                        error={errors.percentage}
-                      />
-                      <ReadOnlyField label="Payment Amount" value={formatCurrency(amount, currency)} />
-                      <FormDatePicker
-                        label="Billing Date *"
-                        name={`installmentBillingDate-${index}`}
-                        value={entry.billingDate || ""}
-                        onChange={(event) => updateInstallment(index, { billingDate: event.target.value })}
-                        error={errors.billingDate}
-                      />
-                      <FormInput
-                        label="Payment Notes"
-                        name={`installmentRemarks-${index}`}
-                        value={entry.remarks || ""}
-                        onChange={(event) => updateInstallment(index, { remarks: event.target.value })}
-                        placeholder="Optional"
-                      />
-                    </div>
-                  </div>
+                  <PaymentEntryCard
+                    key={entry.clientKey || entry.paymentEntryId || `installment-${index}`}
+                    index={index}
+                    title={`Installment ${index + 1}`}
+                    percentage={entry.percentage}
+                    percentagePlaceholder={isEmptyPercent && remainingPercent > 0 ? `${remainingPercent} remaining` : "Enter %"}
+                    amount={(percentNum / 100) * totalContractValueNum}
+                    billingDate={entry.billingDate}
+                    errors={visibleEntryErrors[index]}
+                    currency={currency}
+                    onChange={(patch) => updateInstallment(index, patch)}
+                    onRemove={entries.length > 1 ? () => removeInstallment(index) : undefined}
+                  />
                 );
               })}
 
-              <div className="flex justify-center">
-                <Button variant="outline" size="small" onClick={addInstallment}>
-                  <Plus className="h-4 w-4" /> Add Installment
-                </Button>
-              </div>
+              <button
+                type="button"
+                onClick={addInstallment}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#0A0082]/40 bg-white px-4 py-3 text-sm font-semibold text-[#0A0082] transition-colors hover:border-[#0A0082] hover:bg-[#0A0082]/[0.04] focus:outline-none focus:ring-2 focus:ring-[#0A0082]/30"
+              >
+                <Plus className="h-4 w-4" /> Add Installment
+              </button>
             </div>
           )}
-        </div>
+        </section>
 
-        <PaymentSummaryPanel
-          totalContractValue={totalContractValueNum}
-          allocated={isFullPayment ? totalContractValueNum : totalAllocated}
-          remaining={isFullPayment ? 0 : remainingAmount}
-          totalPercentage={isFullPayment ? 100 : totalPercentage}
-          currency={currency}
-          showPercentage={!isFullPayment}
-          isComplete={isFullPayment ? true : totalPercentageValid}
-        />
-
-        <div className="border-t border-slate-100 pt-4">
-          <FormTextArea
-            label="Plan Remarks"
+        {/* 3. Plan Notes — the single notes field (plan-level remarks), part
+            of the configuration itself rather than appended after the summary */}
+        <section className="space-y-2 p-4 sm:px-6 sm:py-5">
+          <label htmlFor="milestonePlanRemarks" className="flex items-baseline gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Plan Notes</span>
+            <span className="text-xs font-normal text-slate-400">Optional</span>
+          </label>
+          <textarea
+            id="milestonePlanRemarks"
             name="milestonePlanRemarks"
             value={value.remarks || ""}
             onChange={(event) => update({ remarks: event.target.value })}
-            placeholder="Any additional notes about this milestone plan"
+            placeholder="Add any additional information about this payment plan, commercial agreement, or billing arrangement."
             rows={3}
+            className="block min-h-[76px] w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
           />
-        </div>
+        </section>
 
-        {loadingConfig ? (
-          <p className="text-sm text-slate-500">Loading saved milestone plan configuration…</p>
-        ) : (
-          <div className="flex items-center gap-2 border-t border-slate-100 pt-4">
-            <Button
-              variant="outline"
-              size="small"
-              onClick={saveMilestonePlanConfig}
-              loading={saving}
-              loadingText="Saving..."
-              disabled={!isFormValid}
-            >
-              <Check className="h-4 w-4" />
-              {value.milestonePlanId ? "Update Milestone Plan" : "Save Milestone Plan"}
-            </Button>
-            {value.milestonePlanId && (
-              <Button
-                variant="ghost"
-                size="small"
-                onClick={requestRemoveMilestonePlanConfig}
-                loading={deleting}
-                loadingText="Removing..."
-              >
-                <Trash2 className="h-4 w-4 text-red-500" /> Remove
-              </Button>
-            )}
-          </div>
-        )}
+        {/* 4. Payment Summary — overall allocation, Remaining Amount last */}
+        <section className="p-4 sm:px-6 sm:py-5">
+          <PaymentSummaryPanel
+            totalValue={totalContractValueNum}
+            scheduledAmount={isFullPayment ? totalContractValueNum : totalAllocated}
+            totalPercentage={isFullPayment ? 100 : totalPercentage}
+            currency={currency}
+          />
+        </section>
+
+        {/* 5. Actions — destructive Remove on the left, save status + primary on the right */}
+        <section className="flex flex-col-reverse gap-3 rounded-b-xl bg-slate-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          {loadingConfig ? (
+            <p className="flex items-center gap-2 text-sm text-slate-500">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading saved milestone plan…
+            </p>
+          ) : (
+            <>
+              <div className="shrink-0">
+                {value.milestonePlanId && (
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    onClick={requestRemoveMilestonePlanConfig}
+                    loading={deleting}
+                    loadingText="Removing..."
+                  >
+                    <Trash2 className="h-4 w-4 text-red-500" /> Remove
+                  </Button>
+                )}
+              </div>
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+                <div className="min-w-0 text-xs">
+                  {saveBlockers.length > 0 ? (
+                    <p className="flex items-start gap-1.5 font-medium text-slate-500">
+                      <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0 text-amber-500" />
+                      <span>To save: {saveBlockers.join(" · ")}</span>
+                    </p>
+                  ) : (
+                    <p className="flex items-center gap-1.5 font-medium text-emerald-700">
+                      <Check className="h-3.5 w-3.5 shrink-0" /> Ready to save
+                    </p>
+                  )}
+                </div>
+                <Button
+                  variant="primary"
+                  size="small"
+                  onClick={saveMilestonePlanConfig}
+                  loading={saving}
+                  loadingText="Saving..."
+                  disabled={!isFormValid}
+                  className="shrink-0 self-end sm:self-auto"
+                >
+                  <Check className="h-4 w-4" />
+                  {value.milestonePlanId ? "Update Milestone Plan" : "Save Milestone Plan"}
+                </Button>
+              </div>
+            </>
+          )}
+        </section>
       </div>
 
       <ConfirmationModal
@@ -2553,6 +2698,7 @@ function MilestoneForm({
             />
             {modalState.mode === "edit" && (
               <FormSelect
+                anchorOptions
                 label="Status"
                 name="status"
                 value={modalState.form.status}
@@ -3380,6 +3526,7 @@ function RecurringBillingForm({
                       placeholder={`e.g. 65000 (${currency})`}
                     />
                     <FormSelect
+                      anchorOptions
                       label="Billing Frequency *"
                       name="renewalBillingFrequencyId"
                       value={renewalBillingFrequencyId}
@@ -3695,6 +3842,7 @@ export default function BillingConfigurationStep({
             <ReadOnlyField label="Billing Currency *" value={currency} />
           ) : (
             <FormSelect
+              anchorOptions
               label="Billing Currency *"
               name="currency"
               value={currency}

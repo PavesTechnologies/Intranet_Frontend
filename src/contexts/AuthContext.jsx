@@ -75,19 +75,19 @@ export const AuthProvider = ({ children }) => {
     // first, which would otherwise silently skip the blacklist call below.
     const tokenAtLogout = localStorage.getItem("token");
 
-// blacklist both tokens on backend
+    // blacklist both tokens on backend
     if (tokenAtLogout) {
 
       axios.post(
-      `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/logout`,
-      {},
-      {
-        withCredentials: true,
-        headers: {
-          Authorization: `Bearer ${tokenAtLogout}`,
+        `${window.__APP_CONFIG__.USER_MANAGEMENT_URL}/auth/logout`,
+        {},
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${tokenAtLogout}`,
+          },
         },
-      },
-    )
+      )
         .then((res) => {
           // console.log("Logout:", res.data)
         })

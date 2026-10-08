@@ -16,8 +16,7 @@ const QUEUE_PAGE_SIZE = 20;
 
 export default function ApprovalsPage() {
   const { hasRole } = useAuth();
-  // Expense reports: "pending" | "approved" | "history". Cash advances: "pending" | "approved" | "rejected".
-  const [activeTab, setActiveTab] = useState("pending");
+  const [activeTab, setActiveTab] = useState("pending"); // "pending" | "approved" | "rejected"
   const [approvalCategory, setApprovalCategory] = useState("EXPENSE_REPORTS"); // "EXPENSE_REPORTS" | "CASH_ADVANCES"
   const [reloadKey, setReloadKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
@@ -64,6 +63,10 @@ export default function ApprovalsPage() {
     rejectedQuery.refetch();
   };
 
+  const handleSearch = (value) => {
+    setSearchTerm(value || "");
+  };
+
   const categoryOptions = [
     { label: "Expense Reports", value: "EXPENSE_REPORTS" },
     ...(isManager ? [{ label: "Cash Advances", value: "CASH_ADVANCES" }] : []),
@@ -71,17 +74,27 @@ export default function ApprovalsPage() {
 
   const activeCategory = isManager ? approvalCategory : "EXPENSE_REPORTS";
 
-  // Cash advances have no combined history view, so their third tab is Rejected.
-  const tabs = [
-    { key: "pending", label: "Pending", icon: Clock },
-    { key: "approved", label: "Approved", icon: CheckCircle2 },
-    activeCategory === "CASH_ADVANCES"
-      ? { key: "rejected", label: "Rejected", icon: XCircle }
-      : { key: "history", label: "History", icon: Layers },
+  const statusFilterOptions = [
+    { label: "Pending", value: "pending" },
+    { label: "Approved", value: "approved" },
+    { label: "Rejected", value: "rejected" },
   ];
 
   return (
     <div className="space-y-3 p-4 sm:p-6">
+      {/* Scope custom styles to hide child component breadcrumbs & headers, and remove child outer padding */}
+      <style>{`
+        .approvals-tab-container nav[aria-label="Breadcrumb"] {
+          display: none !important;
+        }
+        .approvals-tab-container h1 {
+          display: none !important;
+        }
+        .approvals-tab-container > div {
+          padding: 0 !important;
+        }
+      `}</style>
+
       <Breadcrumb items={breadcrumbs} />
 
       {/* Page Header */}
@@ -143,88 +156,51 @@ export default function ApprovalsPage() {
         </div>
       </div>
 
-      {/* Tabs + Search */}
+      {/* Filter and Search Card */}
       <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex space-x-1 rounded-lg bg-gray-50 p-1">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition ${
-                    isActive ? "bg-white text-blue-600 shadow-sm" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  }`}
-                >
-                  <Icon size={16} />
-                  {tab.label}
-                  {tab.key === "pending" && pendingCount > 0 && (
-                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isActive ? "bg-blue-100 text-blue-700" : "bg-gray-200 text-gray-600"}`}>
-                      {pendingCount}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="w-full lg:w-72">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+          <div className="lg:col-span-2">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
             <SearchInput
               value={searchTerm}
-              onSearch={(value) => setSearchTerm(value || "")}
-              placeholder={
-                activeCategory === "CASH_ADVANCES"
-                  ? "Search by advance number or purpose..."
-                  : "Search by report number or merchant/category..."
-              }
+              onSearch={handleSearch}
+              placeholder="Search by report/advance number or title/category..."
               className="!py-1.5 !px-3 !text-xs"
             />
           </div>
-          {categoryOptions.length > 1 && (
-            <div className="w-full lg:w-48">
-              <FormSelect
-                name="approvalCategory"
-                value={activeCategory}
-                onChange={(e) => {
-                  setApprovalCategory(e.target.value);
-                  setActiveTab("pending");
-                }}
-                options={categoryOptions}
-                buttonClassName="!h-9 !py-1.5 !px-3 !text-xs"
-              />
-            </div>
-          )}
+          <FormSelect
+            label="Type"
+            name="approvalCategory"
+            value={activeCategory}
+            onChange={(e) => setApprovalCategory(e.target.value)}
+            options={categoryOptions}
+            className="[&>label]:text-xs [&>label]:mb-1"
+            buttonClassName="!py-1.5 !px-3 !text-xs"
+          />
+          <FormSelect
+            label="Status"
+            name="activeTab"
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value)}
+            options={statusFilterOptions}
+            className="[&>label]:text-xs [&>label]:mb-1"
+            buttonClassName="!py-1.5 !px-3 !text-xs"
+          />
         </div>
       </div>
 
-      {/* Tab Content */}
-      {activeCategory === "CASH_ADVANCES" ? (
-        <CashAdvanceApprovalsList key={`cash-${activeTab}-${reloadKey}`} activeTab={activeTab} searchTerm={searchTerm} />
-      ) : activeTab === "pending" ? (
-        <PendingApprovalsPage key={`pending-${reloadKey}`} searchTerm={searchTerm} hideHeader noPadding />
-      ) : activeTab === "approved" ? (
-        <ApprovalHistoryPage
-          key={`approved-${reloadKey}`}
-          outcome="APPROVED"
-          title="Approved"
-          breadcrumbLabel="Approved"
-          searchTerm={searchTerm}
-          hideHeader
-          noPadding
-        />
-      ) : (
-        <ApprovalHistoryPage
-          key={`history-${reloadKey}`}
-          title="History"
-          breadcrumbLabel="History"
-          searchTerm={searchTerm}
-          hideHeader
-          noPadding
-          allowOutcomeFilter
-        />
-      )}
+      {/* Tab Content container */}
+      <div className="approvals-tab-container">
+        {activeCategory === "CASH_ADVANCES" ? (
+          <CashAdvanceApprovalsList key={`cash-${activeTab}-${reloadKey}`} activeTab={activeTab} searchTerm={searchTerm} />
+        ) : activeTab === "pending" ? (
+          <PendingApprovalsPage key={`pending-${reloadKey}`} searchTerm={searchTerm} />
+        ) : activeTab === "approved" ? (
+          <ApprovalHistoryPage key={`approved-${reloadKey}`} outcome="APPROVED" title="Approved" breadcrumbLabel="Approved" searchTerm={searchTerm} />
+        ) : (
+          <ApprovalHistoryPage key={`rejected-${reloadKey}`} outcome="REJECTED" title="Rejected" breadcrumbLabel="Rejected" searchTerm={searchTerm} />
+        )}
+      </div>
     </div>
   );
 }

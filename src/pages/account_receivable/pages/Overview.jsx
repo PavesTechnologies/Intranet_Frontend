@@ -68,6 +68,16 @@ const TABLE_ALIGNMENTS = {
   actions: "center",
 };
 
+const TABLE_HEADER_ALIGNMENTS = {
+  client: "center",
+  project: "center",
+  billingType: "center",
+  approvalStatus: "center",
+  configurationStatus: "center",
+  actions: "center",
+}
+
+
 export default function Overview() {
   const navigate = useNavigate();
 
@@ -323,13 +333,13 @@ export default function Overview() {
       isTotal: true,
     },
     {
-      key: "APPROVED",
-      label: "Approved",
+      key: "DRAFT",
+      label: "Draft",
       subLabel: null,
-      value: stats?.approved ?? configs.filter((c) => c.approvalStatus === "APPROVED").length,
-      icon: CheckCircle2,
-      color: "bg-teal-600 text-white",
-      active: approvalStatusFilter === "APPROVED" && configStatusFilter === "ALL",
+      value: stats?.draft ?? configs.filter((c) => c.approvalStatus === "DRAFT").length,
+      icon: FileText,
+      color: "bg-slate-400 text-white",
+      active: approvalStatusFilter === "DRAFT" && configStatusFilter === "ALL",
     },
     {
       key: "PENDING_APPROVAL",
@@ -341,13 +351,13 @@ export default function Overview() {
       active: approvalStatusFilter === "PENDING_APPROVAL" && configStatusFilter === "ALL",
     },
     {
-      key: "DRAFT",
-      label: "Draft",
+      key: "APPROVED",
+      label: "Approved",
       subLabel: null,
-      value: stats?.draft ?? configs.filter((c) => c.approvalStatus === "DRAFT").length,
-      icon: FileText,
-      color: "bg-slate-400 text-white",
-      active: approvalStatusFilter === "DRAFT" && configStatusFilter === "ALL",
+      value: stats?.approved ?? configs.filter((c) => c.approvalStatus === "APPROVED").length,
+      icon: CheckCircle2,
+      color: "bg-teal-600 text-white",
+      active: approvalStatusFilter === "APPROVED" && configStatusFilter === "ALL",
     },
     {
       key: "REJECTED",
@@ -553,6 +563,7 @@ export default function Overview() {
                 columns={TABLE_COLUMNS}
                 rows={tableRows}
                 alignments={TABLE_ALIGNMENTS}
+                headerAlignments={TABLE_HEADER_ALIGNMENTS}
                 loading={loadingConfigs}
               />
               <Pagination
