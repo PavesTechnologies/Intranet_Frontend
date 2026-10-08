@@ -20,10 +20,36 @@ const todayIso = () => {
 };
 
 /**
+ * Reference-number format per payment mode, keyed by the mode's *label* (normalized to
+ * uppercase/letters-only) rather than its backend `value` code — the metadata endpoint
+ * (usePaymentMetadata) sends payment modes fully dynamically with no frontend-side enum, and the
+ * only mode `value` confirmed against real data so far is "NEFT" (RecordPaymentModal.test.jsx);
+ * matching on the displayed label is the safer bet since every label here is taken directly off
+ * the actual dropdown. Patterns follow standard Indian banking reference conventions (NEFT/RTGS
+ * UTR: 16-char alphanumeric; IMPS/UPI RRN: 12-digit numeric; cheque/DD number: 6-digit numeric) —
+ * these are common conventions, not a confirmed backend contract, so treat a false-positive reject
+ * here as a reason to double check with the backend/finance team rather than as a bug in the
+ * invoice's actual reference. A mode with no entry here (e.g. "Bank Transfer", which has no fixed
+ * format) only gets the existing non-empty check.
+ */
+const REFERENCE_FORMAT_BY_MODE = {
+  NEFT: { pattern: /^[A-Za-z0-9]{16}$/, message: "NEFT UTR must be exactly 16 alphanumeric characters." },
+  RTGS: { pattern: /^[A-Za-z0-9]{16}$/, message: "RTGS UTR must be exactly 16 alphanumeric characters." },
+  IMPS: { pattern: /^\d{12}$/, message: "IMPS reference number (RRN) must be exactly 12 digits." },
+  UPI: { pattern: /^\d{12}$/, message: "UPI reference number (RRN) must be exactly 12 digits." },
+  CHEQUE: { pattern: /^\d{6}$/, message: "Cheque number must be exactly 6 digits." },
+  DEMANDDRAFT: { pattern: /^\d{6}$/, message: "Demand Draft number must be exactly 6 digits." },
+};
+
+function normalizeModeKey(label = "") {
+  return label.toUpperCase().replace(/[^A-Z]/g, "");
+}
+
+/**
  * Validates the form against the server-provided remaining payable. Returns {field: message}.
  * The backend re-validates everything (and is authoritative) — this only gives fast feedback.
  */
-export function validateRecordPayment(form, remaining, { receiptRequired = false } = {}) {
+export function validateRecordPayment(form, remaining, { receiptRequired = false, paymentModeLabel } = {}) {
   const errors = {};
   if (!form.paymentDate) errors.paymentDate = "Payment date is required.";
   else if (form.paymentDate > todayIso()) errors.paymentDate = "Payment date cannot be in the future.";
@@ -37,7 +63,13 @@ export function validateRecordPayment(form, remaining, { receiptRequired = false
   }
 
   if (!form.paymentMode) errors.paymentMode = "Payment mode is required.";
-  if (!form.referenceNumber?.trim()) errors.referenceNumber = "Reference is required.";
+  const reference = form.referenceNumber?.trim();
+  if (!reference) {
+    errors.referenceNumber = "Reference is required.";
+  } else {
+    const format = REFERENCE_FORMAT_BY_MODE[normalizeModeKey(paymentModeLabel)];
+    if (format && !format.pattern.test(reference)) errors.referenceNumber = format.message;
+  }
   if (form.receipt) {
     const fileError = validateDocumentFile(form.receipt);
     if (fileError) errors.receipt = fileError;
@@ -95,11 +127,15 @@ export default function RecordPaymentModal({ isOpen, onClose, invoice, onRecorde
   const modes = metadata?.paymentModes ?? [];
   const selectedMode = modes.find((m) => m.value === form.paymentMode);
   const referenceLabel = selectedMode?.referenceLabel || "UTR / Transaction Reference";
+  const referenceFormatHint = REFERENCE_FORMAT_BY_MODE[normalizeModeKey(selectedMode?.label)]?.message;
   const setField = (name, value) => setForm((current) => ({ ...current, [name]: value }));
   const submitting = recordPayment.isPending || uploadDocument.isPending;
 
   const handleSubmit = () => {
-    const validation = validateRecordPayment(form, remaining, { receiptRequired: metadata?.receiptRequired });
+    const validation = validateRecordPayment(form, remaining, {
+      receiptRequired: metadata?.receiptRequired,
+      paymentModeLabel: selectedMode?.label,
+    });
     setErrors(validation);
     if (Object.keys(validation).length) return;
 
@@ -206,14 +242,19 @@ export default function RecordPaymentModal({ isOpen, onClose, invoice, onRecorde
             />
             {errors.paymentMode && <p className="mt-1 text-xs text-red-500">{errors.paymentMode}</p>}
           </div>
-          <FormInput
-            label={`${referenceLabel} *`}
-            name="referenceNumber"
-            value={form.referenceNumber}
-            maxLength={100}
-            onChange={(e) => setField("referenceNumber", e.target.value)}
-            error={errors.referenceNumber}
-          />
+          <div>
+            <FormInput
+              label={`${referenceLabel} *`}
+              name="referenceNumber"
+              value={form.referenceNumber}
+              maxLength={100}
+              onChange={(e) => setField("referenceNumber", e.target.value)}
+              error={errors.referenceNumber}
+            />
+            {!errors.referenceNumber && referenceFormatHint && (
+              <p className="mt-1 text-xs text-gray-400">{referenceFormatHint}</p>
+            )}
+          </div>
         </div>
 
         <FormTextArea
