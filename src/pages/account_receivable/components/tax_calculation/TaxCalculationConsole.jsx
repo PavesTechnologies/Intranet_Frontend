@@ -124,33 +124,54 @@ export default function TaxCalculationConsole() {
       const loadedSnapshots = (
         await Promise.all(
           configs.map(async (cfg) => {
-            let snapStart = cfg.periodStart;
-            let snapEnd = cfg.periodEnd;
+            const savedMeta = cfg.projectId
+              ? getAcquiredSnapshotMetadata(cfg.projectId, cfg.billingConfigurationId)
+              : null;
+            const isMatchingConfig =
+              cfg.billingConfigurationId && savedMeta?.billingConfigurationId
+                ? String(savedMeta.billingConfigurationId) === String(cfg.billingConfigurationId)
+                : !cfg.billingConfigurationId && Boolean(savedMeta);
+            const validMeta = isMatchingConfig ? savedMeta : null;
 
-            const existingSnapshot = await getBillingSnapshotByPeriod(
-              cfg.projectId,
-              snapStart,
-              snapEnd
-            ).catch(() => null);
+            const snapStart =
+              cfg.billingPeriodStart ||
+              validMeta?.billingPeriodStart ||
+              cfg.periodStart ||
+              null;
+            const snapEnd =
+              cfg.billingPeriodEnd ||
+              validMeta?.billingPeriodEnd ||
+              cfg.periodEnd ||
+              null;
 
-            let snapshotId = existingSnapshot?.snapshotId || null;
-            let snapshotNumber = existingSnapshot?.snapshotNumber || null;
-            let snapshotStatus = existingSnapshot?.status || cfg.billingStatus || "READY_FOR_TAX";
+            let existingSnapshot = null;
+            if (cfg.projectId && snapStart && snapEnd) {
+              existingSnapshot = await getBillingSnapshotByPeriod(
+                cfg.projectId,
+                snapStart,
+                snapEnd,
+                cfg.billingConfigurationId
+              ).catch(() => null);
+            }
+
+            const snapshotId =
+              existingSnapshot?.snapshotId ||
+              validMeta?.snapshotId ||
+              cfg.snapshotId ||
+              null;
+            const snapshotNumber =
+              existingSnapshot?.snapshotNumber ||
+              validMeta?.snapshotNumber ||
+              cfg.snapshotNumber ||
+              null;
+            let snapshotStatus =
+              existingSnapshot?.status ||
+              validMeta?.status ||
+              (snapshotId ? "READY_FOR_TAX" : cfg.billingStatus || "NOT_ACQUIRED");
             let taxableAmount = existingSnapshot?.totalAmount ?? null;
             let totalTaxAmount = null;
             let grandTotal = null;
             let taxRegionName = cfg.taxRegionName || cfg.taxRegion || null;
-
-            if (cfg.projectId) {
-              const savedMeta = getAcquiredSnapshotMetadata(cfg.projectId);
-              if (savedMeta) {
-                if (savedMeta.snapshotId) snapshotId = savedMeta.snapshotId;
-                if (savedMeta.snapshotNumber) snapshotNumber = savedMeta.snapshotNumber;
-                if (savedMeta.status) snapshotStatus = savedMeta.status;
-                if (savedMeta.periodStart) snapStart = savedMeta.periodStart;
-                if (savedMeta.periodEnd) snapEnd = savedMeta.periodEnd;
-              }
-            }
 
             if (snapshotId) {
               const taxCalcData = await getTaxCalculation(snapshotId).catch(() => null);
@@ -175,7 +196,7 @@ export default function TaxCalculationConsole() {
               const invData = await getInvoice(snapshotId).catch(() => null);
               if (invData && (invData.invoiceNumber || invData.invoiceId)) {
                 snapshotStatus = "INVOICED";
-              } else if (savedMeta?.status === "INVOICED" || existingSnapshot?.status === "INVOICED") {
+              } else if (validMeta?.status === "INVOICED" || existingSnapshot?.status === "INVOICED") {
                 snapshotStatus = "INVOICED";
               }
             }
