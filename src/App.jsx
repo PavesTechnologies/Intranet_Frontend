@@ -30,6 +30,7 @@ import { FINANCE_ALL_ROLES, AR_MAKER_ROLES, AR_CHECKER_ROLES, AR_ALL_ROLES } fro
 import { AP_ROUTES } from "./pages/accounts-payable/constants/routes";
 import { AP_ALL_ROLES } from "./pages/accounts-payable/constants/apRoles";
 import APDashboardPage from "./pages/accounts-payable/dashboard/pages/APDashboardPage.jsx";
+import DashboardActivityPage from "./pages/accounts-payable/dashboard/pages/DashboardActivityPage.jsx";
 import VendorListPage from "./pages/accounts-payable/vendor/pages/VendorListPage.jsx";
 import VendorDetailPage from "./pages/accounts-payable/vendor/pages/VendorDetailPage.jsx";
 import VendorOnboardingPage from "./pages/accounts-payable/vendor/pages/VendorOnboardingPage.jsx";
@@ -508,6 +509,14 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path={AP_ROUTES.DASHBOARD_ACTIVITY}
+            element={
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+                <DashboardActivityPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path={AP_ROUTES.VENDOR_LIST}
             element={
               <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
@@ -856,7 +865,7 @@ const AppRoutes = () => {
             />
             <Route
               path="invoice-approval"
-              element={<ProtectedRoute allowedRoles={AR_ALL_ROLES}><InvoiceApproval /></ProtectedRoute>}
+              element={<ProtectedRoute allowedRoles={AR_CHECKER_ROLES}><InvoiceApproval /></ProtectedRoute>}
             />
             <Route
               path="invoices/:snapshotId"

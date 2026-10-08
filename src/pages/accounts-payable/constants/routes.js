@@ -2,6 +2,7 @@ const BASE = "/accounts-payable";
 
 export const AP_ROUTES = {
   DASHBOARD: `${BASE}/dashboard`,
+  DASHBOARD_ACTIVITY: `${BASE}/dashboard/activity`,
 
   // The single vendor onboarding entry point: Register Vendor (intake) followed by
   // Pre-Screen, both steps on this one route.

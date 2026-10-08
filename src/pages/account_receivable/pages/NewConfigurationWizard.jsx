@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Pencil, FolderKanban, Coins, Receipt, ShieldCheck } from "lucide-react";
+import { Pencil, FolderKanban, Coins, Receipt, ShieldCheck, Info } from "lucide-react";
 
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
@@ -398,6 +398,7 @@ export default function NewConfigurationWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [savedConfigId, setSavedConfigId] = useState(extractBillingConfigurationId(configId));
   const [approvalStatus, setApprovalStatus] = useState(null);
+  const [billingStatus, setBillingStatus] = useState(null);
   const [creatingDraft, setCreatingDraft] = useState(false);
   // Currency master list (real UUID currencyId per currency code) — the only
   // currency master source in this codebase, see toolPricingService.getActiveCurrencies.
@@ -406,6 +407,12 @@ export default function NewConfigurationWizard() {
   // Editing an already-submitted (non-Draft) configuration should only ever
   // update that record, never re-run the create/submit-for-approval flow.
   const isEditingExisting = Boolean(configId) && Boolean(approvalStatus) && approvalStatus !== "DRAFT";
+  // Re-approval workflow: saving an APPROVED configuration makes the backend
+  // snapshot the approved version and move it to PENDING_APPROVAL. The
+  // frontend keeps no versioning of its own — it only avoids the Draft-only
+  // endpoints for such a record (see ensureBillingConfigurationId) and tells
+  // the user the save starts a re-approval cycle.
+  const isEditingApproved = isEditingExisting && approvalStatus === "APPROVED";
 
   useEffect(() => {
     if (!configId) return;
@@ -418,15 +425,11 @@ export default function NewConfigurationWizard() {
 
         const { summary, detail } = result;
         if (detail) {
-          // getBillingConfigurationById already resolves the full project
-          // master data (projectName, projectCode, primaryLocation, email,
-          // phoneNumber, ...) against the client's unfiltered project list
-          // keyed by projectId — see the "resolve project master data for
-          // edit mode" block there. No further lookup needed here; redoing it
-          // against getAvailableProjectsForBillingConfiguration would be wrong
-          // for edit mode anyway, since that endpoint deliberately excludes
-          // any project that already has a billing configuration (i.e. it can
-          // never contain the very project this draft is bound to).
+          // detail.projectInfo already carries the canonical selected project
+          // for the saved projectId (getBillingConfigurationById resolves it
+          // through normalizeProject/mergeProjectSources — the same pipeline
+          // ProjectStep uses for a NEW configuration), so it is applied once
+          // here and nothing later re-initializes it.
           setWizardData((prev) => ({
             ...prev,
             ...detail,
@@ -434,6 +437,7 @@ export default function NewConfigurationWizard() {
         }
         setSavedConfigId(summary.id || configId);
         setApprovalStatus(summary.approvalStatus || null);
+        setBillingStatus(summary.billingStatus || null);
         setCurrentStep(summary.approvalStatus === "DRAFT" ? Math.min(summary.currentStep || 1, STEPS.length) : STEPS.length);
       } catch (error) {
         if (!isMounted) return;
@@ -608,6 +612,11 @@ export default function NewConfigurationWizard() {
   // rate card row (and deletes any absent from wizard state), which would race with
   // the single-row create/update the rate card button is about to perform itself.
   const ensureBillingConfigurationId = async () => {
+    // An APPROVED configuration is not a draft — never re-push it through
+    // PUT .../draft. Its parent record already exists with valid ids; its
+    // field changes are persisted (and snapshotted by the backend) by the
+    // final Update Billing Setup save.
+    if (savedConfigId && isEditingApproved) return savedConfigId;
     if (savedConfigId) {
       // The draft may have been created (below) before billingFrequencyId —
       // or a later billingTypeId change — was known; re-push the current
@@ -708,6 +717,17 @@ export default function NewConfigurationWizard() {
 
   const handleCancel = () => navigate(CONFIGURATIONS_PATH);
 
+  // The message follows the status the backend actually returned — e.g. an
+  // edited APPROVED configuration comes back PENDING_APPROVAL — rather than a
+  // status transition assumed here.
+  const getFinalSaveMessage = (response) => {
+    if (!isEditingExisting) return "Billing setup submitted for approval successfully.";
+    const resultingStatus = String(response?.approvalStatus || response?.data?.approvalStatus || "").trim().toUpperCase();
+    return resultingStatus === "PENDING_APPROVAL" && approvalStatus !== "PENDING_APPROVAL"
+      ? "Changes submitted for approval. Billing stays inactive until Finance approves them."
+      : "Billing setup updated successfully.";
+  };
+
   const handleFinalSubmit = async () => {
     // Fixed Price creation is its own flow: the Fixed Price record itself is already
     // saved (immediately, via the "Save Fixed Price Details" button on the Fixed
@@ -759,10 +779,7 @@ export default function NewConfigurationWizard() {
           await submitConfigurationForApproval(billingConfigurationId);
         }
 
-        showStatusToast(
-          isEditingExisting ? "Billing setup updated successfully." : "Billing setup submitted for approval successfully.",
-          "success"
-        );
+        showStatusToast(getFinalSaveMessage(configResponse), "success");
         navigate(CONFIGURATIONS_PATH);
         return;
       }
@@ -802,10 +819,7 @@ export default function NewConfigurationWizard() {
         await submitConfigurationForApproval(billingConfigurationId);
       }
 
-      showStatusToast(
-        isEditingExisting ? "Billing setup updated successfully." : "Billing setup submitted for approval successfully.",
-        "success"
-      );
+      showStatusToast(getFinalSaveMessage(saveResult), "success");
       navigate(CONFIGURATIONS_PATH);
     } catch (error) {
       const fallbackMessage = isFixedPriceCreate
@@ -832,24 +846,21 @@ export default function NewConfigurationWizard() {
   }
 
   if (viewOnly) {
+    // The review's own overview card is the page header — Back and Edit
+    // Configuration live inside it rather than in a separate header card.
     return (
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <div className="flex items-center gap-3">
-            <BackIconButton onClick={() => navigate(CONFIGURATIONS_PATH)} label="Back to Overview" />
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Billing Setup Record</span>
-              <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
-                {wizardData.projectInfo?.projectName || "Billing Configuration"}
-              </h1>
-            </div>
-          </div>
-          <Button variant="primary" size="small" onClick={() => setViewOnly(false)}>
-            <Pencil className="mr-1 h-4 w-4" /> Edit Configuration
-          </Button>
-        </div>
-
-        <ReviewActivateStep wizardData={wizardData} />
+      <div className="mx-auto w-full max-w-6xl">
+        <ReviewActivateStep
+          wizardData={wizardData}
+          // Backend-reported changes awaiting approval (empty unless pending).
+          pendingChanges={wizardData.changes}
+          leading={<BackIconButton onClick={() => navigate(CONFIGURATIONS_PATH)} label="Back to Overview" />}
+          headerActions={
+            <Button variant="primary" size="small" onClick={() => setViewOnly(false)}>
+              <Pencil className="h-3.5 w-3.5" /> Edit Configuration
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -886,7 +897,7 @@ export default function NewConfigurationWizard() {
   </div>
 
   {/* Active Form Step Container */}
-  <PageCard className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <PageCard className="rounded-2xl border border-slate-200 bg-white shadow-sm">
     <PageCardContent className="space-y-6 p-5 sm:p-6 lg:p-8">
       {currentStep === 1 && (
         <ProjectStep
@@ -914,10 +925,23 @@ export default function NewConfigurationWizard() {
       )}
 
       {currentStep === 4 && (
-        <ReviewActivateStep
-          wizardData={wizardData}
-          onEditStep={handleStepClick}
-        />
+        <div className="space-y-3">
+          {isEditingApproved && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-xs text-amber-900" role="note">
+              <Info className="mt-px h-4 w-4 shrink-0 text-amber-600" />
+              <span>
+                This configuration is <strong className="font-semibold">Approved</strong>
+                {billingStatus ? ` and ${String(billingStatus).charAt(0)}${String(billingStatus).slice(1).toLowerCase()}` : ""}. Saving these
+                changes sends them to Finance for re-approval — the configuration moves to Pending Approval and billing is
+                inactive until the changes are approved.
+              </span>
+            </div>
+          )}
+          <ReviewActivateStep
+            wizardData={wizardData}
+            onEditStep={handleStepClick}
+          />
+        </div>
       )}
 
       {/* Navigation — existing component and props unchanged */}
@@ -929,7 +953,9 @@ export default function NewConfigurationWizard() {
           nextIncomplete={nextIncomplete}
           finalLabel={isEditingExisting ? "Update Billing Setup" : "Create Billing Setup"}
           finalLoadingText={isEditingExisting ? "Updating..." : "Submitting..."}
-          showSaveDraft={currentStep > 1}
+          // Save Draft uses the Draft-only endpoint; an APPROVED configuration
+          // is saved once, via Update Billing Setup.
+          showSaveDraft={currentStep > 1 && !isEditingApproved}
           saving={saving}
           activating={submitting || creatingDraft}
           onBack={handleBack}

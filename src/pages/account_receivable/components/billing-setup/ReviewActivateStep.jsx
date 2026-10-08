@@ -1,12 +1,13 @@
-import { useMemo, useState } from "react";
-import { FolderKanban, Coins, Wallet, Receipt, Pencil, Search, ChevronRight, Building2, Calendar, ShieldCheck, CheckCircle2, Info } from "lucide-react";
+import { useContext, useMemo, useState } from "react";
+import { Wallet, Receipt, Pencil, Search, ChevronRight, Building2, Calendar, Info } from "lucide-react";
 
-import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
+import { PageCard } from "../../../../components/Cards/PageCard";
 import Modal from "../../../../components/Modal/modal";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { BILLING_MODE_LABELS } from "../../data/wizardOptions";
 import { getBillingTypeDisplayName } from "../../utils/billingType";
-import { formatCurrency, formatDisplayDate } from "../../utils/format";
+import { formatCurrency, formatDisplayDate, formatProjectDuration } from "../../utils/format";
+import ConfigurationChanges, { ChangedFieldsContext, ChangedIndicator, getChangedFieldLabels, useIsFieldChanged } from "./ConfigurationChanges";
 
 // Display-time safety net: a Project Code must never be the project's own
 // internal id — see the matching guard in ProjectStep.jsx / billingConfigurationService.js.
@@ -172,61 +173,114 @@ function getCommercialEffectiveDates(billingConfig) {
   return { from: null, to: null };
 }
 
-function CardShell({ icon, title, stepId, onEdit, children, headerAction }) {
+// --- Presentation primitives ----------------------------------------------
+// Compact, data-dense type scale: section titles 15px semibold, labels 12px
+// regular slate-500, values 13px medium; only money, status and the project
+// name are semibold/bold.
+
+// One review section: header (icon + title, plus the wizard's per-step
+// "Edit" link when reviewing inside the wizard) and a tight body.
+function ReviewSection({ icon, title, stepId, onEdit, children }) {
   const Icon = icon;
   return (
+    // Body is rendered directly in PageCard — PageCardContent always adds p-4,
+    // which would double the section padding.
     <PageCard className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <PageCardContent className="p-0">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#0A0082]/10 text-[#0A0082]">
-              <Icon className="h-3.5 w-3.5" />
-            </span>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">{title}</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            {headerAction}
-            {onEdit && stepId && (
-              <button
-                type="button"
-                onClick={() => onEdit(stepId)}
-                className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 transition-colors hover:bg-indigo-100"
-              >
-                <Pencil className="h-3 w-3" /> Edit
-              </button>
-            )}
-          </div>
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-2.5">
+        <div className="flex items-center gap-2">
+          <Icon className="h-4 w-4 text-[#0A0082]" />
+          <h3 className="text-[15px] font-semibold text-slate-900">{title}</h3>
         </div>
-        <div className="p-4">{children}</div>
-      </PageCardContent>
+        {onEdit && stepId && (
+          <button
+            type="button"
+            onClick={() => onEdit(stepId)}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium text-[#0A0082] transition-colors hover:bg-[#0A0082]/5"
+          >
+            <Pencil className="h-3 w-3" /> Edit
+          </button>
+        )}
+      </div>
+      <div className="px-5 py-3">{children}</div>
     </PageCard>
   );
 }
 
-function DataRow({ label, value, highlight = false }) {
+const VALUE_TONES = {
+  default: "text-slate-800",
+  money: "text-slate-900",
+  brand: "text-[#0A0082]",
+  success: "text-emerald-700",
+  warning: "text-amber-700",
+};
+
+// Label/value row. Values are right-aligned with tabular figures so amounts
+// line up; `money` makes the value semibold, `tone` colours it.
+function ReviewField({ label, value, money = false, tone, divider = true }) {
+  const isChanged = useIsFieldChanged(label);
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-slate-100 py-2.5 text-xs last:border-0">
-      <span className="font-medium text-slate-500">{label}</span>
-      <span className={`text-right font-bold ${highlight ? "text-[#0A0082] text-sm" : "text-slate-900"}`}>{value || "—"}</span>
+    <div className={`flex items-baseline justify-between gap-4 py-2 ${divider ? "border-b border-slate-100 last:border-0" : ""}`}>
+      <span className="flex shrink-0 items-center gap-1.5 text-xs text-slate-500">
+        {label}
+        {isChanged && <ChangedIndicator />}
+      </span>
+      <span
+        className={`min-w-0 break-words text-right text-[13px] tabular-nums ${money ? "font-semibold" : "font-medium"} ${
+          VALUE_TONES[tone || (money ? "money" : "default")]
+        }`}
+      >
+        {value ?? "—"}
+      </span>
     </div>
   );
 }
 
-function PricingTable({ rows }) {
+const fieldKey = (field, index) => `${typeof field.label === "string" ? field.label : "field"}-${index}`;
+
+// Single-column list of fields.
+function FieldList({ fields }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-100 bg-white">
-      <table className="w-full text-xs">
-        <tbody className="divide-y divide-slate-100">
-          {rows.map((row, index) => (
-            <tr key={`${row.label}-${index}`} className={row.highlight ? "bg-emerald-50/40" : ""}>
-              <td className="w-1/2 px-3.5 py-2.5 font-medium text-slate-600">{row.label}</td>
-              <td className={`w-1/2 px-3.5 py-2.5 text-right font-bold ${row.highlight ? "text-emerald-800 text-sm" : "text-slate-900"}`}>
-                {row.value ?? "—"}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div>
+      {fields.map((field, index) => (
+        <ReviewField key={fieldKey(field, index)} {...field} />
+      ))}
+    </div>
+  );
+}
+
+// Two-column field grid on desktop (stacks on mobile) — for short settings.
+// Rows are separated by spacing rather than rules so odd counts stay tidy.
+function FieldGrid({ fields }) {
+  return (
+    <div className="grid grid-cols-1 gap-x-10 sm:grid-cols-2">
+      {fields.map((field, index) => (
+        <ReviewField key={fieldKey(field, index)} {...field} divider={false} />
+      ))}
+    </div>
+  );
+}
+
+// Compact boxed metadata cells (label over value) — 2 columns on mobile, up
+// to 4 on desktop. Used by the overview summary and schedule metadata.
+function MetaGrid({ items }) {
+  const changed = useContext(ChangedFieldsContext);
+  return (
+    <div className={`grid grid-cols-2 gap-2 ${items.length >= 4 ? "lg:grid-cols-4" : items.length === 3 ? "sm:grid-cols-3" : ""}`}>
+      {items.map((item) => (
+        <div key={item.label} className="min-w-0 rounded-lg border border-slate-200/70 bg-slate-50/70 px-3 py-2">
+          <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            {item.label}
+            {changed.has(String(item.label).toLowerCase()) && <ChangedIndicator />}
+          </p>
+          <p
+            className={`mt-0.5 break-words text-[13px] tabular-nums ${
+              item.emphasize ? "font-semibold text-[#0A0082]" : item.strong ? "font-semibold text-slate-900" : "font-medium text-slate-800"
+            }`}
+          >
+            {item.value || "—"}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -236,20 +290,20 @@ function RoleRatesTable({ roles, currency }) {
     <div className="overflow-x-auto rounded-lg border border-slate-100">
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-            <th className="px-3.5 py-2.5">Role</th>
-            <th className="px-3.5 py-2.5">Rate</th>
-            <th className="px-3.5 py-2.5">Frequency</th>
-            <th className="px-3.5 py-2.5">Effective Period</th>
+          <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-[11px] font-medium text-slate-500">
+            <th className="px-3 py-2 font-medium">Role</th>
+            <th className="px-3 py-2 font-medium">Rate</th>
+            <th className="px-3 py-2 font-medium">Frequency</th>
+            <th className="px-3 py-2 font-medium">Effective Period</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-slate-100 text-[13px]">
           {roles.map((role, index) => (
             <tr key={`${role.role}-${index}`}>
-              <td className="px-3.5 py-2.5 font-bold text-slate-900">{role.role || "—"}</td>
-              <td className="px-3.5 py-2.5 font-bold text-slate-900">{formatMoney(role.rate, currency) || "—"}</td>
-              <td className="px-3.5 py-2.5 text-slate-600">{ratePeriodLabel(role.ratePeriod)}</td>
-              <td className="px-3.5 py-2.5 whitespace-nowrap text-slate-600">{rateDateRange(role) || "—"}</td>
+              <td className="px-3 py-2 font-medium text-slate-800">{role.role || "—"}</td>
+              <td className="px-3 py-2 font-semibold tabular-nums text-slate-900">{formatMoney(role.rate, currency) || "—"}</td>
+              <td className="px-3 py-2 text-slate-600">{ratePeriodLabel(role.ratePeriod)}</td>
+              <td className="whitespace-nowrap px-3 py-2 text-slate-600">{rateDateRange(role) || "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -303,7 +357,7 @@ function RoleRatesList({ roles, currency }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   if (roles.length === 0) {
-    return <DataRow label="Roles Configured" value="—" />;
+    return <ReviewField label="Roles Configured" value="—" />;
   }
 
   if (roles.length <= RATE_DISPLAY_LIMIT) {
@@ -316,7 +370,7 @@ function RoleRatesList({ roles, currency }) {
       <button
         type="button"
         onClick={() => setDrawerOpen(true)}
-        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 py-1.5 text-xs font-semibold text-[#0A0082] transition-colors hover:bg-[#0A0082]/5"
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 py-1.5 text-xs font-medium text-[#0A0082] transition-colors hover:bg-[#0A0082]/5"
       >
         View all {roles.length} rates <ChevronRight className="h-3.5 w-3.5" />
       </button>
@@ -325,13 +379,386 @@ function RoleRatesList({ roles, currency }) {
   );
 }
 
-export default function ReviewActivateStep({ wizardData, onEditStep }) {
+// Two amounts are the same business value when they're equal to the cent —
+// e.g. a Milestone Plan's Total Value that is sourced from the Project Budget.
+const isSameAmount = (a, b) => a !== null && b !== null && Math.abs(a - b) < 0.005;
+
+// Milestone Plan figures, computed once for both Billing & Pricing (summary)
+// and Payment Schedule (detail) so the two sections can never disagree.
+function buildMilestonePlanReview(wizardData, projectInfo) {
+  const { billingConfig = {} } = wizardData;
+  const milestonePlan =
+    billingConfig.milestonePlan ||
+    billingConfig.milestonePlanDetails ||
+    wizardData.milestonePlanDetails ||
+    wizardData.milestonePlan ||
+    {};
+  const totalValue = resolveMilestonePlanContractValue(milestonePlan, projectInfo, wizardData);
+  const rawEntries =
+    milestonePlan.entries ||
+    milestonePlan.paymentEntries ||
+    milestonePlan.installmentEntries ||
+    milestonePlan.milestonePlanEntries ||
+    wizardData.paymentEntries ||
+    [];
+  const paymentStructure =
+    milestonePlan.paymentStructure || (rawEntries.length > 1 ? "INSTALLMENTS" : "FULL_PAYMENT");
+  const isFullPayment = paymentStructure === "FULL_PAYMENT";
+
+  // Full Payment is always one 100% payment, even before an entry is saved.
+  // Installments show exactly what's configured — possibly nothing yet, or a
+  // partial allocation such as 55%.
+  const sourceEntries =
+    isFullPayment && rawEntries.length === 0
+      ? [{ sequence: 1, percentage: 100, billingDate: "", remarks: "" }]
+      : rawEntries;
+  const payments = [...sourceEntries]
+    .map((entry, index) => ({ ...entry, sequence: entry.sequence ?? index + 1 }))
+    .sort((a, b) => a.sequence - b.sequence)
+    .map((entry) => ({
+      ...entry,
+      percentage: parseNumericValue(entry.percentage) || 0,
+      amount: resolvePaymentEntryAmount(entry, totalValue),
+    }));
+
+  const allocationPercentage = Math.round(payments.reduce((sum, p) => sum + p.percentage, 0) * 100) / 100;
+  const scheduledTotal = payments.reduce((sum, p) => sum + p.amount, 0);
+  const remainingAmount = Math.max(0, totalValue - scheduledTotal);
+  const billingDates = payments.map((p) => p.billingDate).filter(Boolean).sort();
+
+  return {
+    milestonePlan,
+    totalValue,
+    isFullPayment,
+    paymentStructureLabel: isFullPayment ? "Full Payment" : "Installments",
+    payments,
+    allocationPercentage,
+    remainingAmount,
+    isFullyAllocated: Math.abs(allocationPercentage - 100) < 0.01,
+    firstPaymentDate: billingDates[0] || null,
+    lastPaymentDate: billingDates[billingDates.length - 1] || null,
+  };
+}
+
+// --- Page-level blocks -----------------------------------------------------
+
+// Primary card: project identity (Project Name/Code, Primary Location,
+// Project Duration) + status + actions, then the boxed billing summary. The
+// only place these, Billing Type/Frequency, Currency and Project Budget
+// appear. Shared with the Finance approval review (BillingApprovals.jsx) so
+// all screens present the project identically.
+export function ReviewHeader({ projectInfo, isProductService, approvalStatus, billingStatus, leading, actions, summary }) {
+  const projectCode = sanitizeProjectCode(projectInfo.projectCode, projectInfo.projectId);
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
+        <div className="flex min-w-0 items-start gap-3">
+          {leading}
+          <span className="mt-0.5 hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#0A0082]/10 text-[#0A0082] sm:flex">
+            <Building2 className="h-[18px] w-[18px]" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+              {projectInfo.clientName || "Client Unspecified"}
+            </p>
+            <h2 className="text-xl font-bold leading-tight text-slate-900 sm:text-2xl">
+              {isProductService ? projectInfo.productName || "Billing Setup" : projectInfo.projectName || "Billing Setup"}
+            </h2>
+            {isProductService ? (
+              <p className="mt-1 text-xs text-slate-500">
+                Product / Service Description: <span className="font-medium text-slate-700">{projectInfo.productDescription || "—"}</span>
+              </p>
+            ) : (
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
+                <span>
+                  Project Code: <span className="font-medium text-slate-700">{projectCode || "—"}</span>
+                </span>
+                <span>
+                  Primary Location: <span className="font-medium text-slate-700">{projectInfo.primaryLocation || "—"}</span>
+                </span>
+                <span>
+                  Project Duration: <span className="font-medium text-slate-700">{formatProjectDuration(projectInfo) || "—"}</span>
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end">
+          {(approvalStatus || billingStatus) && (
+            <div className="flex flex-wrap gap-1.5 sm:justify-end">
+              {approvalStatus && <StatusBadge label={labelizeStatus(approvalStatus)} size="sm" />}
+              {billingStatus && <StatusBadge label={labelizeStatus(billingStatus)} size="sm" />}
+            </div>
+          )}
+          {actions}
+        </div>
+      </div>
+
+      <div className="border-t border-slate-100 px-5 py-3">
+        <MetaGrid items={summary} />
+      </div>
+    </div>
+  );
+}
+
+function PaymentCard({ payment, index, currency }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3.5 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">Payment {index + 1}</span>
+        <span className="rounded bg-[#0A0082]/10 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-[#0A0082]">
+          {payment.percentage}%
+        </span>
+      </div>
+      <div className="mt-1.5 grid grid-cols-2 gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] text-slate-500">Payment Amount</p>
+          <p className="text-sm font-semibold tabular-nums text-slate-900">{formatMoney(payment.amount, currency) || "—"}</p>
+        </div>
+        <div className="min-w-0 text-right">
+          <p className="text-[11px] text-slate-500">Billing Date</p>
+          <p className="text-[13px] font-medium text-slate-800">{formatDisplayDate(payment.billingDate)}</p>
+        </div>
+      </div>
+      {payment.remarks && (
+        <p className="mt-2 border-t border-slate-100 pt-1.5 text-xs text-slate-600">
+          <span className="text-slate-500">Remarks: </span>
+          {payment.remarks}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PaymentSchedule({ review, currency }) {
+  const meta = review.isFullPayment
+    ? [{ label: "Schedule Type", value: "One-Time Payment" }]
+    : [
+        { label: "Schedule Type", value: "Custom Payment Dates" },
+        { label: "Number of Payments", value: String(review.payments.length) },
+        { label: "First Billing Date", value: formatDisplayDate(review.firstPaymentDate) },
+        { label: "Last Billing Date", value: formatDisplayDate(review.lastPaymentDate) },
+      ];
+  return (
+    <div className="space-y-3 py-1">
+      <MetaGrid items={meta} />
+      {review.payments.length > 0 ? (
+        <div className={`grid grid-cols-1 gap-2.5 sm:grid-cols-2 ${review.payments.length > 4 ? "xl:grid-cols-3" : ""}`}>
+          {review.payments.map((payment, index) => (
+            <PaymentCard key={payment.paymentEntryId || index} payment={payment} index={index} currency={currency} />
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-4 py-3 text-center text-xs text-slate-500">
+          No payments configured yet.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// --- Billing-type-specific content ---------------------------------------
+// Each returns the body of Billing & Pricing for its type; the shell
+// (header, sections, invoice settings) is shared by every billing type.
+
+function FixedPricePricing({ billingConfig, currency, projectBudgetValue }) {
+  const fixedPrice = billingConfig.fixedPrice || {};
+  const totalContractValue = Number(fixedPrice.totalContractValue) || 0;
+  const retentionPercent = Number(fixedPrice.retentionPercent) || 0;
+  const retentionAmountInput = Number(fixedPrice.retentionAmount) || 0;
+
+  const retentionAmount =
+    retentionAmountInput > 0
+      ? retentionAmountInput
+      : retentionPercent > 0 && totalContractValue > 0
+      ? (totalContractValue * retentionPercent) / 100
+      : 0;
+
+  const hasRetention = retentionAmount > 0 || retentionPercent > 0;
+
+  const billableAmount =
+    fixedPrice.billableAmount !== "" && fixedPrice.billableAmount !== null && fixedPrice.billableAmount !== undefined && Number(fixedPrice.billableAmount) > 0
+      ? Number(fixedPrice.billableAmount)
+      : totalContractValue - retentionAmount;
+
+  const advanceReceived = Number(fixedPrice.advanceReceived) || 0;
+  const hasAdvance = advanceReceived > 0;
+
+  const remainingAmount =
+    fixedPrice.remainingAmount !== "" && fixedPrice.remainingAmount !== null && fixedPrice.remainingAmount !== undefined && Number(fixedPrice.remainingAmount) > 0
+      ? Number(fixedPrice.remainingAmount)
+      : billableAmount - advanceReceived;
+
+  const pmsBudgetVal = parseNumericValue(fixedPrice.pmsProjectBudget) ?? projectBudgetValue;
+  // Contract Value is shown only when it is a different amount from the
+  // Project Budget already shown in the overview.
+  const isDifferentAmount = pmsBudgetVal !== null && pmsBudgetVal > 0 && !isSameAmount(totalContractValue, pmsBudgetVal);
+
+  return (
+    <div className="space-y-2.5 py-1">
+      <div className="flex flex-wrap items-center gap-1.5 rounded-lg bg-indigo-50/60 px-3 py-2 text-xs text-slate-700">
+        <span className="mr-1 text-[11px] text-slate-500">Financial Calculation Formula</span>
+        <span className="rounded border border-slate-200 bg-white px-1.5 py-0.5">Billable Amount</span>
+        <span className="text-slate-400">−</span>
+        <span className="rounded border border-slate-200 bg-white px-1.5 py-0.5">Retention Amount</span>
+        <span className="text-slate-400">−</span>
+        <span className="rounded border border-slate-200 bg-white px-1.5 py-0.5">Advance Received</span>
+        <span className="font-semibold text-indigo-600">=</span>
+        <span className="rounded bg-[#0A0082] px-1.5 py-0.5 font-medium text-white">Remaining Receivable</span>
+      </div>
+
+      {isDifferentAmount && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-xs text-amber-900">
+          <Info className="mt-px h-3.5 w-3.5 shrink-0 text-amber-600" />
+          <span>Contract Value is used for billing calculation because it differs from the Project Budget.</span>
+        </div>
+      )}
+
+      <FieldList
+        fields={[
+          ...(isDifferentAmount
+            ? [
+                {
+                  label: (
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span>Contract Value</span>
+                      <span className="rounded bg-indigo-50 px-1.5 py-px text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
+                        Billing Amount Used
+                      </span>
+                    </span>
+                  ),
+                  value: totalContractValue ? formatMoney(totalContractValue, currency) : "—",
+                  money: true,
+                },
+              ]
+            : []),
+          { label: "Retention %", value: hasRetention ? `${retentionPercent}%` : "0%" },
+          {
+            label: "Retention Amount",
+            value: hasRetention ? `-${formatMoney(retentionAmount, currency)}` : formatMoney(0, currency),
+            money: true,
+          },
+          { label: "Billable Amount", value: formatMoney(billableAmount, currency), money: true },
+          {
+            label: "Advance Received",
+            value: hasAdvance ? `-${formatMoney(advanceReceived, currency)}` : formatMoney(0, currency),
+            money: true,
+          },
+          ...(fixedPrice.remarks ? [{ label: "Remarks", value: fixedPrice.remarks }] : []),
+        ]}
+      />
+
+      {/* Remaining Receivable — the final financial result */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3.5 py-2">
+        <span className="text-[13px] font-medium text-emerald-900">
+          Remaining Receivable <span className="text-xs font-normal text-emerald-700">· Net outstanding balance to collect</span>
+        </span>
+        <span className="text-base font-semibold tabular-nums text-emerald-900">{formatMoney(remainingAmount, currency) || "—"}</span>
+      </div>
+    </div>
+  );
+}
+
+function TimeMaterialPricing({ billingConfig, currency }) {
+  const pricingModel = billingConfig.pricingModel || billingConfig.billingMode || "";
+  const roleRateRows = (billingConfig.timeAndMaterial?.roles || []).filter((roleRate) => roleRate.role || roleRate.rate);
+  const standardRate = billingConfig.timeAndMaterial || {};
+  return (
+    <div className="space-y-2">
+      <FieldList
+        fields={[
+          ...(pricingModel ? [{ label: "Pricing Mode", value: BILLING_MODE_LABELS[pricingModel] || pricingModel, tone: "brand" }] : []),
+          ...(pricingModel === "STANDARD" || !pricingModel
+            ? [
+                {
+                  label: "Standard Rate",
+                  value: `${formatMoney(standardRate.rate, currency) || "—"} ${ratePeriodSuffix(standardRate.ratePeriod)}`.trim(),
+                  money: true,
+                },
+              ]
+            : []),
+        ]}
+      />
+      {pricingModel === "ROLE_BASED" && (
+        <div className="pb-1">
+          <RoleRatesList roles={roleRateRows} currency={currency} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RecurringPricing({ billingConfig, currency, projectBudgetValue, isProductService }) {
+  const recurring = billingConfig.recurring || {};
+  const amount = parseNumericValue(recurring.contractValue);
+  const isPmsSource = recurring.contractValueSource === "PMS";
+  const budgetSourceLabel = isProductService ? "Manual" : isPmsSource ? "Project Budget" : "Manual";
+  const renewalModeLabel =
+    recurring.renewalMode === "CUSTOM" ? "Custom" : recurring.renewalMode === "SAME_AS_PREVIOUS" ? "Same as Previous" : "Not configured";
+  // Billing Frequency is already in the overview; Total Budget is shown only
+  // when it differs from the Project Budget shown there.
+  const showTotalBudget = !isSameAmount(amount, projectBudgetValue);
+
+  return (
+    <FieldList
+      fields={[
+        { label: "Billing Context", value: isProductService ? "Product / Service" : "Project" },
+        { label: "Budget Source", value: budgetSourceLabel },
+        ...(showTotalBudget ? [{ label: "Total Budget", value: amount ? formatMoney(amount, currency) : "—", money: true }] : []),
+        // Renewal is a Subscription (Product/Service) concept only — a
+        // project-based Recurring configuration is never renewed.
+        ...(isProductService ? [{ label: "Renewal", value: renewalModeLabel }] : []),
+        ...(recurring.remarks ? [{ label: "Remarks", value: recurring.remarks }] : []),
+      ]}
+    />
+  );
+}
+
+function MilestonePlanPricing({ review, currency, projectBudgetValue }) {
+  return (
+    <FieldList
+      fields={[
+        { label: "Payment Structure", value: review.paymentStructureLabel },
+        // Total Value is normally the Project Budget itself — shown only when
+        // it is a different amount.
+        ...(isSameAmount(review.totalValue, projectBudgetValue)
+          ? []
+          : [{ label: "Total Value", value: formatMoney(review.totalValue, currency), money: true }]),
+        {
+          label: "Allocation Percentage",
+          value: `${review.allocationPercentage}%`,
+          tone: review.isFullyAllocated ? undefined : "warning",
+        },
+        {
+          label: "Remaining Amount",
+          value: formatMoney(review.remainingAmount, currency),
+          money: true,
+          tone: review.remainingAmount > 0 ? "warning" : "success",
+        },
+        ...(review.milestonePlan.remarks ? [{ label: "Remarks", value: review.milestonePlan.remarks }] : []),
+      ]}
+    />
+  );
+}
+
+// Read-only review of a billing configuration — used as the wizard's final
+// step (onEditStep enables per-section "Edit" links) and as the standalone
+// Billing Configuration view (leading/headerActions place the Back button and
+// "Edit Configuration" inside the overview card).
+//
+// One business value -> one primary display: Currency and Project Budget
+// live only in the overview; lower sections show a total only when it is a
+// genuinely different amount, and individual payment amounts appear only in
+// Payment Schedule.
+export default function ReviewActivateStep({ wizardData, onEditStep, leading, headerActions, pendingChanges }) {
   const { projectInfo = {}, billingConfig = {}, controls = {}, approvalStatus, billingStatus } = wizardData;
 
   const billingContext = projectInfo.billingContext || "PROJECT";
   const isProductService = billingContext === "PRODUCT_SERVICE";
 
   const currency = projectInfo.projectBudgetCurrency || projectInfo.currency || "";
+  const projectBudgetValue = isProductService ? null : parseNumericValue(projectInfo.projectBudget);
 
   const frequencyNameCode = String(
     billingConfig.billingFrequencyName || billingConfig.billingFrequencyLabel || ""
@@ -339,6 +766,7 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
     .trim()
     .toUpperCase()
     .replace(/[\s-]+/g, "_");
+  const isOneTime = frequencyNameCode === "ONE_TIME";
 
   const isMilestonePlan =
     billingConfig.billingType === "MILESTONE_PLAN" ||
@@ -363,557 +791,122 @@ export default function ReviewActivateStep({ wizardData, onEditStep }) {
         isOneTime,
       );
 
-  const pricingModel = billingConfig.pricingModel || billingConfig.billingMode || "";
-  const roleRateRows = (billingConfig.timeAndMaterial?.roles || []).filter(
-    (roleRate) => roleRate.role || roleRate.rate
-  );
-  const standardRate = billingConfig.timeAndMaterial || {};
   const commercialEffectiveDates = getCommercialEffectiveDates(billingConfig);
+  // Billing dates only — never the project's own start/end (that is Project
+  // Duration, shown in the primary summary).
+  const hasSchedule = Boolean(commercialEffectiveDates.from || commercialEffectiveDates.to);
 
-  const hasSchedule = Boolean(
-    commercialEffectiveDates.from ||
-      commercialEffectiveDates.to ||
-      projectInfo.startDate ||
-      billingConfig.billingFrequency
-  );
+  const milestoneReview = isMilestonePlan ? buildMilestonePlanReview(wizardData, projectInfo) : null;
+  // Labels of fields the backend reports as changed — drives the subtle
+  // "Changed" chips on matching review rows. Empty outside the view page.
+  const changedFieldLabels = useMemo(() => getChangedFieldLabels(pendingChanges), [pendingChanges]);
+
+  const pricingProps = { billingConfig, currency, projectBudgetValue, isProductService };
+  let pricingContent = null;
+  if (milestoneReview) {
+    pricingContent = <MilestonePlanPricing review={milestoneReview} currency={currency} projectBudgetValue={projectBudgetValue} />;
+  } else if (billingConfig.billingType === "FIXED_PRICE") {
+    pricingContent = <FixedPricePricing {...pricingProps} />;
+  } else if (billingConfig.billingType === "TIME_MATERIAL") {
+    pricingContent = <TimeMaterialPricing {...pricingProps} />;
+  } else if (billingConfig.billingType === "RECURRING") {
+    pricingContent = <RecurringPricing {...pricingProps} />;
+  } else if (billingConfig.billingType === "MILESTONE") {
+    pricingContent = <FieldList fields={[{ label: "Milestones", value: `${(billingConfig.milestones || []).length} defined` }]} />;
+  }
+
+  const effectivePeriod = `${commercialEffectiveDates.from ? formatDisplayDate(commercialEffectiveDates.from) : "—"} – ${
+    commercialEffectiveDates.to ? formatDisplayDate(commercialEffectiveDates.to) : "Ongoing"
+  }`;
 
   return (
-    <div className="space-y-4">
-      {/* SECTION 1: Project Summary (Full-Width Header & Metric Cards) */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0A0082]/10 text-[#0A0082]">
-              <Building2 className="h-5.5 w-5.5" />
-            </span>
-            <div>
+    <ChangedFieldsContext.Provider value={changedFieldLabels}>
+      <div className="space-y-4">
+        {/* 1. Project / Configuration */}
+        <ReviewHeader
+          projectInfo={projectInfo}
+          isProductService={isProductService}
+          approvalStatus={approvalStatus}
+          billingStatus={billingStatus}
+          leading={leading}
+          actions={
+            (headerActions || onEditStep) && (
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  {projectInfo.clientName || "Client Unspecified"}
-                </span>
-              </div>
-              <h2 className="text-lg font-bold text-slate-900 sm:text-xl">
-                {isProductService ? projectInfo.productName || "Billing Setup" : projectInfo.projectName || "Billing Setup"}
-              </h2>
-              {isProductService ? (
-                <p className="text-xs font-medium text-slate-500">
-                  Product / Service Description:{" "}
-                  <span className="font-bold text-slate-800">{projectInfo.productDescription || "—"}</span>
-                </p>
-              ) : (
-                <>
-                  <p className="text-xs font-medium text-slate-500">
-                    Project Code: <span className="font-bold text-slate-800">{sanitizeProjectCode(projectInfo.projectCode, projectInfo.projectId) || "—"}</span>
-                  </p>
-                  <p className="text-xs font-medium text-slate-500">
-                    Primary Location: <span className="font-bold text-slate-800">{projectInfo.primaryLocation || "—"}</span>
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {(approvalStatus || billingStatus) && (
-              <div className="flex flex-wrap items-center gap-2">
-                {approvalStatus && <StatusBadge label={labelizeStatus(approvalStatus)} size="md" />}
-                {billingStatus && <StatusBadge label={labelizeStatus(billingStatus)} size="md" />}
-              </div>
-            )}
-            {onEditStep && (
-              <button
-                type="button"
-                onClick={() => onEditStep(1)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-              >
-                <Pencil className="h-3.5 w-3.5 text-slate-500" /> Edit Setup
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* 4 Summary Cards Grid */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-lg border border-slate-200/70 bg-slate-50/70 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Billing Type</p>
-            <p className="mt-0.5 text-xs font-bold text-slate-900">{billingTypeLabel || "—"}</p>
-          </div>
-          <div className="rounded-lg border border-slate-200/70 bg-slate-50/70 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Billing Frequency</p>
-            <p className="mt-0.5 text-xs font-bold text-slate-900">{billingFrequencyLabel || "—"}</p>
-          </div>
-          <div className="rounded-lg border border-slate-200/70 bg-slate-50/70 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Currency</p>
-            <p className="mt-0.5 text-xs font-bold text-slate-900">{currency || "—"}</p>
-          </div>
-          <div className="rounded-lg border border-slate-200/70 bg-slate-50/70 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Project Budget</p>
-            <p className="mt-0.5 text-xs font-bold text-[#0A0082]">{formatMoney(projectInfo.projectBudget, currency) || "—"}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* SECTION 2: Billing & Pricing (Full-Width Card) */}
-      <CardShell icon={Wallet} title="Billing & Pricing" stepId={2} onEdit={onEditStep}>
-        <div className="space-y-3.5">
-          {billingConfig.billingType === "FIXED_PRICE" && (() => {
-            const fixedPrice = billingConfig.fixedPrice || {};
-            const totalContractValue = Number(fixedPrice.totalContractValue) || 0;
-            const retentionPercent = Number(fixedPrice.retentionPercent) || 0;
-            const retentionAmountInput = Number(fixedPrice.retentionAmount) || 0;
-
-            const retentionAmount =
-              retentionAmountInput > 0
-                ? retentionAmountInput
-                : retentionPercent > 0 && totalContractValue > 0
-                ? (totalContractValue * retentionPercent) / 100
-                : 0;
-
-            const hasRetention = retentionAmount > 0 || retentionPercent > 0;
-
-            const billableAmount =
-              fixedPrice.billableAmount !== "" && fixedPrice.billableAmount !== null && fixedPrice.billableAmount !== undefined && Number(fixedPrice.billableAmount) > 0
-                ? Number(fixedPrice.billableAmount)
-                : totalContractValue - retentionAmount;
-
-            const advanceReceived = Number(fixedPrice.advanceReceived) || 0;
-            const hasAdvance = advanceReceived > 0;
-
-            const remainingAmount =
-              fixedPrice.remainingAmount !== "" && fixedPrice.remainingAmount !== null && fixedPrice.remainingAmount !== undefined && Number(fixedPrice.remainingAmount) > 0
-                ? Number(fixedPrice.remainingAmount)
-                : billableAmount - advanceReceived;
-
-            const pmsBudgetVal =
-              fixedPrice.pmsProjectBudget !== "" && fixedPrice.pmsProjectBudget !== null && fixedPrice.pmsProjectBudget !== undefined
-                ? Number(fixedPrice.pmsProjectBudget)
-                : projectInfo.projectBudget !== "" && projectInfo.projectBudget !== null && projectInfo.projectBudget !== undefined
-                ? Number(projectInfo.projectBudget)
-                : null;
-
-            const hasPmsBudget = pmsBudgetVal !== null && pmsBudgetVal !== undefined && !isNaN(pmsBudgetVal) && pmsBudgetVal > 0;
-            const isSameAmount = hasPmsBudget && totalContractValue === pmsBudgetVal;
-            const isDifferentAmount = hasPmsBudget && totalContractValue !== pmsBudgetVal;
-
-            let contractBudgetRows = [];
-            if (isSameAmount) {
-              contractBudgetRows = [
-                {
-                  label: "Contract / Project Budget",
-                  value: totalContractValue ? formatMoney(totalContractValue, currency) : "—",
-                },
-              ];
-            } else if (isDifferentAmount) {
-              contractBudgetRows = [
-                {
-                  label: (
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <span>Contract Value</span>
-                      <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200">
-                        Billing Amount Used
-                      </span>
-                    </span>
-                  ),
-                  value: totalContractValue ? formatMoney(totalContractValue, currency) : "—",
-                },
-                {
-                  label: "PMS Project Budget",
-                  value: formatMoney(pmsBudgetVal, currency),
-                },
-              ];
-            } else {
-              contractBudgetRows = [
-                {
-                  label: "Contract Value",
-                  value: totalContractValue ? formatMoney(totalContractValue, currency) : "—",
-                },
-              ];
-            }
-
-            return (
-              <div className="space-y-3.5">
-                {/* Visual Calculation Formula Banner */}
-                <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 text-xs">
-                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Financial Calculation Formula
-                  </span>
-                  <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold text-slate-800">
-                    <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 shadow-2xs">Billable Amount</span>
-                    <span className="text-slate-400">−</span>
-                    <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 shadow-2xs">Retention Amount</span>
-                    <span className="text-slate-400">−</span>
-                    <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 shadow-2xs">Advance Received</span>
-                    <span className="font-extrabold text-indigo-600">=</span>
-                    <span className="rounded-md bg-[#0A0082] px-2 py-0.5 font-extrabold text-white shadow-2xs">
-                      Remaining Receivable
-                    </span>
-                  </div>
-                </div>
-
-                {/* Primary Highlighted Remaining Receivable Card */}
-                <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
-                  <div>
-                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
-                      Remaining Receivable
-                    </span>
-                    <span className="block text-[11px] text-emerald-600">Net outstanding balance to collect</span>
-                  </div>
-                  <span className="text-xl font-black text-emerald-900 sm:text-2xl">
-                    {formatMoney(remainingAmount, currency) || "—"}
-                  </span>
-                </div>
-
-                {/* Contract Value & PMS Budget Supporting Note Banner */}
-                {isSameAmount && (
-                  <div className="flex items-center gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/70 px-3.5 py-2 text-xs font-medium text-emerald-900">
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                    <span>Contract Value and PMS Project Budget are the same ({formatMoney(totalContractValue, currency)}).</span>
-                  </div>
-                )}
-                {isDifferentAmount && (
-                  <div className="flex items-center gap-2 rounded-lg border border-amber-200/80 bg-amber-50/70 px-3.5 py-2 text-xs font-medium text-amber-900">
-                    <Info className="h-4 w-4 shrink-0 text-amber-600" />
-                    <span>
-                      Contract Value ({formatMoney(totalContractValue, currency)}) is used for billing calculation because it differs from the PMS Project Budget ({formatMoney(pmsBudgetVal, currency)}).
-                    </span>
-                  </div>
-                )}
-
-                {/* Financial Breakdown Table */}
-                <PricingTable
-                  rows={[
-                    ...contractBudgetRows,
-                    { label: "Retention %", value: hasRetention ? `${retentionPercent}%` : "0%" },
-                    {
-                      label: "Retention Amount",
-                      value: hasRetention ? `-${formatMoney(retentionAmount, currency)}` : formatMoney(0, currency),
-                    },
-                    { label: "Billable Amount", value: formatMoney(billableAmount, currency) },
-                    {
-                      label: "Advance Received",
-                      value: hasAdvance ? `-${formatMoney(advanceReceived, currency)}` : formatMoney(0, currency),
-                    },
-                    { label: "Remaining Receivable", value: formatMoney(remainingAmount, currency), highlight: true },
-                    ...(fixedPrice.remarks ? [{ label: "Remarks", value: fixedPrice.remarks }] : []),
-                  ]}
-                />
-              </div>
-            );
-          })()}
-
-          {billingConfig.billingType === "TIME_MATERIAL" && (
-            <div className="space-y-3">
-              {pricingModel && (
-                <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs">
-                  <span className="font-semibold text-slate-600">Pricing Mode:</span>
-                  <span className="font-bold text-[#0A0082]">
-                    {BILLING_MODE_LABELS[pricingModel] || pricingModel}
-                  </span>
-                </div>
-              )}
-
-              {(pricingModel === "STANDARD" || !pricingModel) && (
-                <PricingTable
-                  rows={[
-                    {
-                      label: "Standard Rate",
-                      value: `${formatMoney(standardRate.rate, currency) || "—"} ${ratePeriodSuffix(standardRate.ratePeriod)}`,
-                    },
-                  ]}
-                />
-              )}
-
-              {pricingModel === "ROLE_BASED" && <RoleRatesList roles={roleRateRows} currency={currency} />}
-            </div>
-          )}
-
-          {billingConfig.billingType === "RECURRING" && (() => {
-            const recurring = billingConfig.recurring || {};
-            const amount = Number(recurring.contractValue) || 0;
-            const isPmsSource = recurring.contractValueSource === "PMS";
-            const budgetSourceLabel = isProductService ? "Manual" : isPmsSource ? "Project Budget" : "Manual";
-            const renewalModeLabel = recurring.renewalMode === "CUSTOM" ? "Custom" : recurring.renewalMode === "SAME_AS_PREVIOUS" ? "Same as Previous" : "Not configured";
-
-            return (
-              <div className="space-y-3">
-                <PricingTable
-                  rows={[
-                    { label: "Billing Context", value: isProductService ? "Product / Service" : "Project" },
-                    { label: "Budget Source", value: budgetSourceLabel },
-                    { label: "Total Budget", value: amount ? formatMoney(amount, currency) : "—" },
-                    { label: "Billing Frequency", value: billingFrequencyLabel },
-                    // Renewal is a Subscription (Product/Service) concept only —
-                    // a project-based Recurring configuration is never renewed.
-                    ...(isProductService ? [{ label: "Renewal", value: renewalModeLabel }] : []),
-                    ...(recurring.remarks ? [{ label: "Remarks", value: recurring.remarks }] : []),
-                  ]}
-                />
-              </div>
-            );
-          })()}
-
-          {billingConfig.billingType === "MILESTONE" && !isMilestonePlan && (
-            <PricingTable rows={[{ label: "Milestones", value: `${(billingConfig.milestones || []).length} defined` }]} />
-          )}
-
-          {isMilestonePlan && (() => {
-            const milestonePlan =
-              billingConfig.milestonePlan ||
-              billingConfig.milestonePlanDetails ||
-              wizardData.milestonePlanDetails ||
-              wizardData.milestonePlan ||
-              {};
-            const totalContractValue = resolveMilestonePlanContractValue(milestonePlan, projectInfo, wizardData);
-            const rawEntries =
-              milestonePlan.entries ||
-              milestonePlan.paymentEntries ||
-              milestonePlan.installmentEntries ||
-              milestonePlan.milestonePlanEntries ||
-              wizardData.paymentEntries ||
-              [];
-            const paymentStructure =
-              milestonePlan.paymentStructure ||
-              (rawEntries.length > 1 ? "INSTALLMENTS" : "FULL_PAYMENT");
-            const isFullPayment = paymentStructure === "FULL_PAYMENT";
-            const paymentStructureLabel = isFullPayment ? "Full Payment" : "Installments";
-            const entries =
-              rawEntries.length > 0
-                ? rawEntries
-                : [{ sequence: 1, percentage: 100, billingDate: "", remarks: "" }];
-
-            const allocatedAmount = entries.reduce(
-              (sum, entry) => sum + resolvePaymentEntryAmount(entry, totalContractValue),
-              0,
-            );
-            const remainingAmount = Math.max(0, totalContractValue - allocatedAmount);
-
-            const rows = [
-              { label: "Payment Structure", value: paymentStructureLabel },
-              { label: "Total Contract Value", value: formatMoney(totalContractValue, currency) },
-              { label: "Allocated Amount", value: formatMoney(allocatedAmount || totalContractValue, currency) },
-              { label: "Remaining Amount", value: formatMoney(remainingAmount, currency) },
-            ];
-
-            if (isFullPayment && entries[0]?.billingDate) {
-              rows.push({
-                label: "Billing Date",
-                value: formatDisplayDate(entries[0].billingDate),
-              });
-            }
-
-            if (milestonePlan.remarks) {
-              rows.push({ label: "Remarks", value: milestonePlan.remarks });
-            }
-
-            return (
-              <div className="space-y-3">
-                <PricingTable rows={rows} />
-              </div>
-            );
-          })()}
-        </div>
-      </CardShell>
-
-      {/* SECTION 3: Billing Schedule / Payment Schedule (Full-Width Card) */}
-      {isMilestonePlan ? (() => {
-        const milestonePlan =
-          billingConfig.milestonePlan ||
-          billingConfig.milestonePlanDetails ||
-          wizardData.milestonePlanDetails ||
-          wizardData.milestonePlan ||
-          {};
-        const totalContractValue = resolveMilestonePlanContractValue(milestonePlan, projectInfo, wizardData);
-        const rawEntries =
-          milestonePlan.entries ||
-          milestonePlan.paymentEntries ||
-          milestonePlan.installmentEntries ||
-          milestonePlan.milestonePlanEntries ||
-          wizardData.paymentEntries ||
-          [];
-        const paymentStructure =
-          milestonePlan.paymentStructure ||
-          (rawEntries.length > 1 ? "INSTALLMENTS" : "FULL_PAYMENT");
-        const isFullPayment = paymentStructure === "FULL_PAYMENT";
-        const paymentStructureLabel = isFullPayment ? "Full Payment" : "Installments";
-        const entries =
-          rawEntries.length > 0
-            ? rawEntries
-            : [{ sequence: 1, percentage: 100, billingDate: "", remarks: "" }];
-
-        const validDates = entries
-          .map((e) => e.billingDate)
-          .filter(Boolean);
-        const firstPaymentDate = validDates[0] || null;
-        const lastPaymentDate = validDates.length > 1 ? validDates[validDates.length - 1] : validDates[0] || null;
-
-        return (
-          <CardShell icon={Calendar} title="Payment Schedule" stepId={2} onEdit={onEditStep}>
-            <div className="space-y-3.5">
-              <div className="space-y-1">
-                <DataRow label="Payment Structure" value={paymentStructureLabel} />
-                {isFullPayment ? (
-                  <>
-                    <DataRow label="Schedule Type" value="One-Time Payment" />
-                    <DataRow label="Billing Date" value={formatDisplayDate(entries[0]?.billingDate)} />
-                  </>
-                ) : (
-                  <>
-                    <DataRow label="Schedule Type" value="Custom Payment Dates" />
-                    <DataRow label="Number of Payments" value={String(entries.length)} />
-                    {firstPaymentDate && <DataRow label="First Payment" value={formatDisplayDate(firstPaymentDate)} />}
-                    {lastPaymentDate && <DataRow label="Last Payment" value={formatDisplayDate(lastPaymentDate)} />}
-                  </>
+                {headerActions}
+                {onEditStep && (
+                  <button
+                    type="button"
+                    onClick={() => onEditStep(1)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <Pencil className="h-3.5 w-3.5 text-slate-500" /> Edit Setup
+                  </button>
                 )}
               </div>
+            )
+          }
+          summary={[
+            { label: "Billing Type", value: billingTypeLabel, strong: true },
+            { label: "Billing Frequency", value: billingFrequencyLabel },
+            { label: "Currency", value: currency },
+            { label: "Project Budget", value: isProductService ? "—" : formatMoney(projectInfo.projectBudget, currency), emphasize: true },
+          ]}
+        />
 
-              {isFullPayment ? (
-                <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700">Payment 1</span>
-                    <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200">
-                      100%
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 pt-1">
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Payment Amount</span>
-                      <p className="mt-0.5 text-sm font-bold text-slate-900">
-                        {formatMoney(resolvePaymentEntryAmount(entries[0], totalContractValue), currency) || "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Percentage</span>
-                      <p className="mt-0.5 text-xs font-bold text-slate-900">100%</p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Billing Date</span>
-                      <p className="mt-0.5 text-xs font-bold text-slate-900">{formatDisplayDate(entries[0]?.billingDate)}</p>
-                    </div>
-                  </div>
-                  {(entries[0]?.remarks || milestonePlan.remarks) && (
-                    <div className="pt-2 border-t border-slate-200/60 text-xs text-slate-600">
-                      <span className="font-semibold text-slate-500">Remarks: </span>
-                      <span>{entries[0]?.remarks || milestonePlan.remarks}</span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {entries.map((entry, index) => {
-                    const percentNum = parseNumericValue(entry.percentage) || 0;
-                    const amount = resolvePaymentEntryAmount(entry, totalContractValue);
+        {/* Changes Pending Approval — backend change snapshot (previous approved
+            -> new proposed), shown before the details it affects. */}
+        {pendingChanges !== undefined && (
+          <ConfigurationChanges changes={pendingChanges} currency={currency} />
+        )}
 
-                    return (
-                      <div
-                        key={entry.paymentEntryId || index}
-                        className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3.5 space-y-2"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Payment {entry.sequence || index + 1}
-                          </span>
-                          <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-200">
-                            {percentNum}%
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 pt-0.5">
-                          <div>
-                            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Payment Amount</span>
-                            <p className="mt-0.5 text-xs font-bold text-slate-900">{formatMoney(amount, currency) || "—"}</p>
-                          </div>
-                          <div>
-                            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Billing Date</span>
-                            <p className="mt-0.5 text-xs font-bold text-slate-900">{formatDisplayDate(entry.billingDate)}</p>
-                          </div>
-                        </div>
-                        {entry.remarks && (
-                          <div className="pt-1.5 border-t border-slate-200/60 text-xs text-slate-600">
-                            <span className="font-semibold text-slate-500">Remarks: </span>
-                            <span>{entry.remarks}</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </CardShell>
-        );
-      })() : (
-        <CardShell icon={Calendar} title="Billing Schedule" stepId={2} onEdit={onEditStep}>
-          {hasSchedule ? (
-            <div className="space-y-1">
-              <DataRow label="Billing Frequency" value={billingFrequencyLabel} />
-              <DataRow
-                label="Effective Period"
-                value={(() => {
-                  const from = commercialEffectiveDates.from
-                    ? formatDisplayDate(commercialEffectiveDates.from)
-                    : projectInfo.startDate
-                    ? formatDisplayDate(projectInfo.startDate)
-                    : "—";
-                  const to = commercialEffectiveDates.to
-                    ? formatDisplayDate(commercialEffectiveDates.to) || "Ongoing"
-                    : projectInfo.endDate
-                    ? formatDisplayDate(projectInfo.endDate) || "Ongoing"
-                    : "Ongoing";
-                  return `${from} – ${to}`;
-                })()}
-              />
-              {!isProductService && (
-                <DataRow
-                  label="Project Duration"
-                  value={
-                    projectInfo.startDate
-                      ? `${formatDisplayDate(projectInfo.startDate)} – ${formatDisplayDate(projectInfo.endDate) || "Ongoing"}`
-                      : "—"
-                  }
-                />
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 py-6 text-center">
-              <Calendar className="mb-2 h-8 w-8 text-slate-300" />
-              <p className="text-xs font-semibold text-slate-600">Billing schedule not applicable</p>
-              <p className="mt-0.5 text-[11px] text-slate-400">
-                This billing configuration type does not require a recurring schedule.
+        {/* 2. Billing & Pricing — billing-type-specific commercial details */}
+        <ReviewSection icon={Wallet} title="Billing & Pricing" stepId={2} onEdit={onEditStep}>
+          {pricingContent || <FieldList fields={[{ label: "Billing Type", value: "—" }]} />}
+        </ReviewSection>
+
+        {/* 3. Payment / Billing Schedule — billing-type aware */}
+        {milestoneReview ? (
+          <ReviewSection icon={Calendar} title="Payment Schedule" stepId={2} onEdit={onEditStep}>
+            <PaymentSchedule review={milestoneReview} currency={currency} />
+          </ReviewSection>
+        ) : (
+          <ReviewSection icon={Calendar} title="Billing Schedule" stepId={2} onEdit={onEditStep}>
+            {/* Billing dates only — Project Duration (the PMS project period)
+                lives in the primary summary. */}
+            {hasSchedule ? (
+              <FieldList fields={[{ label: "Effective Period", value: effectivePeriod }]} />
+            ) : (
+              <p className="flex items-center gap-2 py-1.5 text-xs text-slate-500">
+                <Calendar className="h-4 w-4 text-slate-300" />
+                Billing schedule not applicable — this billing configuration type does not require a recurring schedule.
               </p>
-            </div>
-          )}
-        </CardShell>
-      )}
+            )}
+          </ReviewSection>
+        )}
 
-      {/* SECTION 4: Invoice & Control Settings (Full-Width Card) */}
-      <CardShell icon={Receipt} title="Invoice & Control Settings" stepId={3} onEdit={onEditStep}>
-        <div className="space-y-1">
-          <DataRow
-            label="Invoice Generation"
-            value={
-              controls.autoInvoiceGeneration === true
-                ? "Automatic"
-                : controls.autoInvoiceGeneration === false
-                ? "Manual"
-                : "—"
-            }
+        {/* 4. Invoice & Control Settings */}
+        <ReviewSection icon={Receipt} title="Invoice & Control Settings" stepId={3} onEdit={onEditStep}>
+          <FieldGrid
+            fields={[
+              {
+                label: "Invoice Generation",
+                value:
+                  controls.autoInvoiceGeneration === true
+                    ? "Automatic"
+                    : controls.autoInvoiceGeneration === false
+                    ? "Manual"
+                    : "—",
+              },
+              ...(controls.autoInvoiceGeneration === true
+                ? [{ label: "Generation Day", value: controls.invoiceGenerationDay ? `Day ${controls.invoiceGenerationDay}` : "—" }]
+                : []),
+              { label: "Payment Terms", value: controls.paymentTermName || controls.paymentTerms || controls.paymentTermId || "—" },
+              { label: "Tax Region", value: controls.taxRegionName || controls.taxRegionId || "—" },
+              { label: "Expense Billing Eligibility", value: controls.expenseBillingEligible ? "Eligible" : "Not Eligible" },
+            ]}
           />
-          {controls.autoInvoiceGeneration === true && (
-            <DataRow
-              label="Generation Day"
-              value={controls.invoiceGenerationDay ? `Day ${controls.invoiceGenerationDay}` : "—"}
-            />
-          )}
-          <DataRow
-            label="Payment Terms"
-            value={controls.paymentTermName || controls.paymentTerms || controls.paymentTermId || "—"}
-          />
-          <DataRow label="Tax Region" value={controls.taxRegionName || controls.taxRegionId || "—"} />
-          <DataRow
-            label="Expense Billing Eligibility"
-            value={controls.expenseBillingEligible ? "Eligible" : "Not Eligible"}
-          />
-        </div>
-      </CardShell>
-    </div>
+        </ReviewSection>
+      </div>
+    </ChangedFieldsContext.Provider>
   );
 }

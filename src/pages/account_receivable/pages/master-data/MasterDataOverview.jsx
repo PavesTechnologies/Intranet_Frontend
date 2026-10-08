@@ -200,10 +200,9 @@ export default function MasterDataOverview() {
   return (
     <div className="w-full space-y-6">
       <div className="flex items-center gap-3">
-        <BackIconButton onClick={() => navigate("/account-receivable/dashboard")} label="Back to Dashboard" />
         <div className="flex-1">
           <PageHeader
-            title="Configurations"
+            title="Configuration"
             subtitle="Manage the foundational configuration used across AR & Billing"
           />
         </div>

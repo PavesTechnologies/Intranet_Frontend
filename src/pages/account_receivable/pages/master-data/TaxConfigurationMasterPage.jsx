@@ -1,33 +1,46 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  Search,
   Plus,
   Eye,
   Pencil,
   Trash2,
   Landmark,
   CheckCircle2,
+  XCircle,
   Receipt,
-  Coins,
   ShieldAlert,
+  FilterX,
 } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import PageHeader from "../../../../components/ui/PageHeader";
-import { PageCard } from "../../../../components/Cards/PageCard";
+import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Button from "../../../../components/Button/Button";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { showStatusToast } from "../../../../components/toastfy/toast";
+import SearchInput from "../../../../components/filter/Searchbar";
+import FilterListbox from "../../../../components/filter/FilterListbox";
+import Pagination from "../../../../components/Pagination/pagination";
 import ARTable from "../../components/common/ARTable";
 import ActionMenu from "../../components/common/ActionMenu";
-import MasterStatCards from "../../components/common/MasterStatCards";
-import MasterStatusTabs from "../../components/common/MasterStatusTabs";
+import ARKPICard from "../../components/common/ARKPICard";
 import BackIconButton from "../../components/common/BackIconButton";
 import TaxRegionFormModal from "../../components/master-data/TaxRegionFormModal";
 import { deriveTaxComponentRows } from "../../utils/taxRuleComponents";
 import { getTaxRegions, deleteTaxRegion, getApiErrorMessage } from "../../services/taxRegionService";
 import { getTaxRateConfigurations } from "../../services/taxRateConfigurationService";
+
+const PAGE_SIZE = 8;
+const ALL_FILTER_OPTION = { label: "All", value: "ALL" };
+
+const formatDateValue = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en", { day: "2-digit", month: "short", year: "numeric" }).format(date);
+};
 
 export default function TaxConfigurationMasterPage() {
   const navigate = useNavigate();
@@ -39,7 +52,10 @@ export default function TaxConfigurationMasterPage() {
   const [permissionError, setPermissionError] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("ACTIVE");
+  const [activeKpi, setActiveKpi] = useState("ALL");
+  const [currencyFilter, setCurrencyFilter] = useState("ALL");
+  const [regimeFilter, setRegimeFilter] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -86,7 +102,7 @@ export default function TaxConfigurationMasterPage() {
   const rulesByRegion = useMemo(() => {
     const map = new Map();
     taxRuleRows.forEach((row) => {
-      const key = row.source.taxRegionId;
+      const key = String(row.source.taxRegionId);
       map.set(key, (map.get(key) || 0) + 1);
     });
     return map;
@@ -95,28 +111,39 @@ export default function TaxConfigurationMasterPage() {
   const stats = useMemo(() => {
     const totalRegions = taxRegions.length;
     const activeRegions = taxRegions.filter((item) => item.isActive).length;
-    const distinctCurrencies = new Set(taxRegions.map((item) => item.currencyCode).filter(Boolean)).size;
+    const regionsWithRules = taxRegions.filter(
+      (item) => (rulesByRegion.get(String(item.taxRegionId)) || 0) > 0
+    ).length;
     return {
       totalRegions,
       activeRegions,
       inactiveRegions: totalRegions - activeRegions,
       totalTaxRules: taxRuleRows.length,
-      distinctCurrencies,
+      regionsWithRules,
     };
-  }, [taxRegions, taxRuleRows]);
+  }, [taxRegions, taxRuleRows, rulesByRegion]);
 
-  const statusTabs = useMemo(
-    () => [
-      { key: "ALL", label: "All", count: stats.totalRegions },
-      { key: "ACTIVE", label: "Active", count: stats.activeRegions },
-      { key: "INACTIVE", label: "Inactive", count: stats.inactiveRegions },
-    ],
-    [stats]
-  );
+  const currencyOptions = useMemo(() => [
+    ALL_FILTER_OPTION,
+    ...[...new Set(taxRegions.map((item) => item.currencyCode).filter(Boolean))]
+      .sort()
+      .map((value) => ({ label: value, value })),
+  ], [taxRegions]);
+
+  const regimeOptions = useMemo(() => [
+    ALL_FILTER_OPTION,
+    ...[...new Set(taxRegions.map((item) => item.taxRegime).filter(Boolean))]
+      .sort()
+      .map((value) => ({ label: value, value })),
+  ], [taxRegions]);
 
   const filteredItems = useMemo(() => {
     return taxRegions.filter((item) => {
-      if (activeTab !== "ALL" && item.status !== activeTab) return false;
+      if (activeKpi === "ACTIVE" && !item.isActive) return false;
+      if (activeKpi === "INACTIVE" && item.isActive) return false;
+      if (activeKpi === "WITH_RULES" && !(rulesByRegion.get(String(item.taxRegionId)) > 0)) return false;
+      if (currencyFilter !== "ALL" && item.currencyCode !== currencyFilter) return false;
+      if (regimeFilter !== "ALL" && item.taxRegime !== regimeFilter) return false;
 
       const query = searchQuery.trim().toLowerCase();
       if (query) {
@@ -126,9 +153,35 @@ export default function TaxConfigurationMasterPage() {
 
       return true;
     });
-  }, [taxRegions, searchQuery, activeTab]);
+  }, [taxRegions, searchQuery, activeKpi, currencyFilter, regimeFilter, rulesByRegion]);
 
-  const hasActiveFilters = Boolean(searchQuery);
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    return filteredItems.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [filteredItems, currentPage]);
+
+  const hasActiveFilters = Boolean(
+    searchQuery || activeKpi !== "ALL" || currencyFilter !== "ALL" || regimeFilter !== "ALL"
+  );
+
+  const handleKpiClick = (key) => {
+    setActiveKpi((current) => (key === "ALL" || current === key ? "ALL" : key));
+    setCurrentPage(1);
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setActiveKpi("ALL");
+    setCurrencyFilter("ALL");
+    setRegimeFilter("ALL");
+    setCurrentPage(1);
+  };
 
   const handleOpenEditModal = (item) => {
     setEditingItem(item);
@@ -162,28 +215,30 @@ export default function TaxConfigurationMasterPage() {
     }
   };
 
-  const tableHeaders = ["Tax Region", "Code", "Currency", "Tax Regime", "Tax Rules", "Status", "Actions"];
-  const tableColumns = ["taxRegion", "code", "currency", "taxRegime", "taxRules", "status", "actions"];
+  const tableHeaders = ["Tax Region", "Code", "Currency", "Tax Regime", "Rules", "Last Updated", "Status", "Actions"];
+  const tableColumns = ["taxRegion", "code", "currency", "taxRegime", "taxRules", "updated", "status", "actions"];
 
   const tableRows = useMemo(() => {
-    return filteredItems.map((item) => ({
+    return paginatedItems.map((item) => ({
       taxRegion: (
         <button
           type="button"
           onClick={() => handleGoToRegion(item)}
-          className="font-semibold text-[#0A0082] hover:underline"
+          className="text-left font-semibold text-slate-900 transition-colors hover:text-[#0A0082] hover:underline"
         >
-          {item.taxRegionName}
+          <span className="block">{item.taxRegionName}</span>
+          {item.description && <span className="mt-0.5 block max-w-xs truncate text-xs font-normal text-slate-500">{item.description}</span>}
         </button>
       ),
-      code: <span className="text-slate-600">{item.taxRegionCode}</span>,
-      currency: <span className="text-slate-600">{item.currencyCode}</span>,
-      taxRegime: <span className="text-slate-600">{item.taxRegime}</span>,
+      code: <span className="font-mono text-xs font-medium text-slate-600">{item.taxRegionCode || "—"}</span>,
+      currency: <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{item.currencyCode || "—"}</span>,
+      taxRegime: <span className="text-slate-600">{item.taxRegime || "—"}</span>,
       taxRules: (
-        <span className="text-slate-600">
-          {rulesByRegion.get(item.taxRegionId) || 0} Rules
+        <span className="inline-flex min-w-8 justify-center rounded-full bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700">
+          {rulesByRegion.get(String(item.taxRegionId)) || 0}
         </span>
       ),
+      updated: <span className="whitespace-nowrap text-xs text-slate-500">{formatDateValue(item.updatedAt || item.createdAt)}</span>,
       status: <StatusBadge label={item.status} size="sm" />,
       actions: (
         <div className="flex items-center justify-center">
@@ -210,7 +265,14 @@ export default function TaxConfigurationMasterPage() {
         </div>
       ),
     }));
-  }, [filteredItems, rulesByRegion]);
+  }, [paginatedItems, rulesByRegion]);
+
+  const kpis = [
+    { key: "ALL", label: "Total Regions", value: stats.totalRegions, icon: Landmark, color: "bg-[#0A0082] text-white" },
+    { key: "ACTIVE", label: "Active Regions", value: stats.activeRegions, icon: CheckCircle2, color: "bg-emerald-600 text-white" },
+    { key: "INACTIVE", label: "Inactive Regions", value: stats.inactiveRegions, icon: XCircle, color: "bg-rose-600 text-white" },
+    { key: "WITH_RULES", label: "Regions With Rules", value: stats.regionsWithRules, icon: Receipt, color: "bg-amber-500 text-white" },
+  ];
 
   return (
     <div className="w-full space-y-6">
@@ -237,54 +299,115 @@ export default function TaxConfigurationMasterPage() {
         </div>
       )}
 
-      <MasterStatCards
-        items={[
-          { label: "Total Regions", value: stats.totalRegions, icon: <Landmark className="h-5 w-5" /> },
-          { label: "Active Regions", value: stats.activeRegions, tone: "success", icon: <CheckCircle2 className="h-5 w-5" /> },
-          { label: "Total Tax Rules", value: stats.totalTaxRules, icon: <Receipt className="h-5 w-5" /> },
-          { label: "Currencies", value: stats.distinctCurrencies, icon: <Coins className="h-5 w-5" /> },
-        ]}
-      />
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <MasterStatusTabs tabs={statusTabs} activeKey={activeTab} onChange={setActiveTab} />
-
-        <div className="flex items-center gap-2">
-          <div className="relative w-full sm:w-[380px]">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search tax regions..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {kpis.map((kpi) => (
+          <button
+            key={kpi.key}
+            type="button"
+            onClick={() => handleKpiClick(kpi.key)}
+            aria-pressed={activeKpi === kpi.key}
+            className="rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082] focus-visible:ring-offset-2"
+          >
+            <ARKPICard
+              label={kpi.label}
+              value={loading ? "…" : kpi.value}
+              icon={<kpi.icon className="h-5 w-5" />}
+              color={kpi.color}
+              active={activeKpi === kpi.key}
+              className={cn(
+                "h-full w-full cursor-pointer bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md",
+                activeKpi === kpi.key && "border-[#0A0082]/40 ring-1 ring-[#0A0082]/15"
+              )}
             />
-          </div>
-
-          {hasActiveFilters && (
-            <Button
-              variant="ghost"
-              size="small"
-              onClick={() => setSearchQuery("")}
-              className="text-xs text-slate-500 hover:text-slate-700"
-            >
-              Clear Filters
-            </Button>
-          )}
-        </div>
+          </button>
+        ))}
       </div>
 
-      <ARTable
-        headers={tableHeaders}
-        columns={tableColumns}
-        rows={tableRows}
-        loading={loading}
-        emptyMessage={
-          hasActiveFilters
-            ? "No tax regions match your search."
-            : "No Tax Regions Found. Create your first tax region to start configuring tax rules."
-        }
-      />
+      <PageCard className="overflow-hidden">
+        <PageCardContent className="space-y-4 p-4 sm:p-5">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Tax Regions</h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {stats.totalTaxRules} tax rules across {currencyOptions.length - 1} currencies
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:flex xl:items-center">
+              <div className="w-full xl:w-64">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={(event) => {
+                    setSearchQuery(event.target.value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Search tax regions..."
+                />
+              </div>
+              <div className="w-full sm:w-44">
+                <FilterListbox
+                  options={currencyOptions}
+                  value={currencyFilter}
+                  onChange={(value) => {
+                    setCurrencyFilter(value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="All currencies"
+                />
+              </div>
+              <div className="w-full sm:w-44">
+                <FilterListbox
+                  options={regimeOptions}
+                  value={regimeFilter}
+                  onChange={(value) => {
+                    setRegimeFilter(value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="All regimes"
+                />
+              </div>
+              {hasActiveFilters && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="small"
+                  onClick={handleResetFilters}
+                  className="flex items-center justify-center gap-1.5 whitespace-nowrap text-xs text-slate-600"
+                >
+                  <FilterX className="h-3.5 w-3.5" /> Clear
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <ARTable
+            headers={tableHeaders}
+            columns={tableColumns}
+            rows={tableRows}
+            alignments={{ taxRules: "center", updated: "left", status: "center", actions: "center" }}
+            loading={loading}
+            emptyMessage={
+              hasActiveFilters
+                ? "No tax regions match the selected filters."
+                : "No tax regions found. Add a region to start configuring tax rules."
+            }
+          />
+
+          {!loading && filteredItems.length > 0 && (
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-slate-500">
+                Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filteredItems.length)} of {filteredItems.length} regions
+              </p>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+                onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+                className="py-0"
+              />
+            </div>
+          )}
+        </PageCardContent>
+      </PageCard>
 
       <TaxRegionFormModal
         isOpen={isFormOpen}

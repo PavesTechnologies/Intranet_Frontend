@@ -348,6 +348,10 @@ export const normalizeBillingConfiguration = (config = {}) => {
     setupMode,
     approvalStatus,
     approvalStatusLabel: labelize(approvalStatus),
+    // Re-approval change tracking (backend change snapshot) — preserved as-is.
+    changes: Array.isArray(config.changes) ? config.changes : [],
+    previousApprovalStatus: String(config.previousApprovalStatus || "").trim().toUpperCase(),
+    previousBillingStatus: String(config.previousBillingStatus || "").trim().toUpperCase(),
     billingStatus,
     billingStatusLabel: labelize(billingStatus),
     toolBillingEnabled:
@@ -599,6 +603,18 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
   );
 
   const resolvedProjectId = firstPresent(rawProjectInfo.projectId, config.projectId, rawProjectInfo.id) || "";
+  // The flat GET .../{id} DTO is itself project-shaped (projectId,
+  // projectName, projectBudget, primaryLocation, countryCode, ...), so it goes
+  // through the same canonical normalizeProject as /available-projects — never
+  // a separate hand-written mapping that can drift. A nested projectInfo (this
+  // function's own output round-tripping) takes precedence over the flat
+  // fields. getBillingConfigurationById then merges in the master project
+  // record for this projectId — see resolveConfigurationProject.
+  const detailProject = toProjectInfoFields(
+    // id/value cleared: on a configuration DTO those are the configuration's
+    // own identifiers, never a project id (Product/Service has no project).
+    normalizeProject({ ...config, ...rawProjectInfo, id: undefined, value: undefined, projectId: resolvedProjectId }),
+  );
 
   return {
     ...config,
@@ -616,48 +632,15 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
         rawProjectInfo.client?.name,
         normalized.client,
       ) || "",
-      projectId: resolvedProjectId,
-      // Deliberately NOT falling back to the generic rawProjectInfo.name/.code
-      // keys — on the flat BillingConfiguration DTO those are ambiguous (e.g.
-      // could be a record title that defaults to the client's name, or an
-      // unrelated status code) and have been seen to leak the client's name
-      // into Project Name / blank out Project Code. getBillingConfigurationById
-      // resolves the authoritative values for these from the client's project
-      // list (by projectId) right after this normalization runs — see the
-      // "resolve project master data for edit mode" block there.
-      projectName: firstPresent(rawProjectInfo.projectName, config.projectName) || "",
-      // sanitizeProjectCode strips the value if it turns out to literally
-      // equal the projectId — a stale/legacy record can have persisted the
-      // id itself into this field before this mapping was fixed; never
-      // display that as the Project Code.
-      projectCode: sanitizeProjectCode(
-        firstPresent(
-          rawProjectInfo.projectCode,
-          config.projectCode,
-          rawProjectInfo.project_code,
-          rawProjectInfo.projectKey,
-          config.project_code,
-        ) || "",
-        resolvedProjectId,
-      ),
-      // The flat GET .../{id} DTO carries this at the top level (config.primaryLocation),
-      // not nested under projectInfo/project — without this fallback, editing an existing
-      // configuration always showed a blank Primary Location even though the backend
-      // returned it, since the spread above only pulls from rawProjectInfo.
-      primaryLocation: firstPresent(rawProjectInfo.primaryLocation, config.primaryLocation, rawProjectInfo.location, config.location) || "",
-      // Same flat-DTO story as primaryLocation above — the GET .../{id} response
-      // carries these at the top level (config.countryCode/email/phoneNumber), not
-      // nested under projectInfo/project. Without these fallbacks, re-opening an
-      // existing (e.g. Draft) configuration for edit always showed a blank Email
-      // and Phone Number on the Project step even though the backend returned them.
-      countryCode: firstPresent(rawProjectInfo.countryCode, config.countryCode) || "",
-      email: firstPresent(rawProjectInfo.email, config.email) || "",
-      phoneNumber: firstPresent(rawProjectInfo.phoneNumber, config.phoneNumber) || "",
-      projectBudget: firstPresent(rawProjectInfo.projectBudget, config.projectBudget, rawProjectInfo.budget, rawProjectInfo.budgetAmount) || "",
-      projectBudgetCurrency: currency,
-      currency,
-      startDate: toLocalDateString(firstPresent(rawProjectInfo.startDate, rawProjectInfo.projectStartDate, config.effectiveFrom, config.startDate)) || effectiveFrom,
-      endDate: toLocalDateString(firstPresent(rawProjectInfo.endDate, rawProjectInfo.projectEndDate, config.effectiveTo, config.endDate)) || effectiveTo,
+      ...detailProject,
+      // Billing Currency is the project's budget currency; `currency` (which
+      // also checks the DTO's billing currencyCode) is only the fallback.
+      projectBudgetCurrency: normalizeCurrencyCode(detailProject.projectBudgetCurrency, currency),
+      currency: normalizeCurrencyCode(detailProject.projectBudgetCurrency, currency),
+      // startDate/endDate come from detailProject above — project dates only.
+      // Billing effectiveFrom/effectiveTo are a different concept and must
+      // never stand in for the project period (Project Duration, and the
+      // "within project duration" checks in BillingConfigurationStep).
     },
     billingConfig: {
       ...rawBillingConfig,
@@ -808,6 +791,64 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
   };
 };
 
+// --- Canonical project model --------------------------------------------
+//
+// normalizeProject is the ONE mapping from any backend project-shaped payload
+// (/available-projects, /projects/{clientId}, or the flat
+// GET /billing-configurations/{id} DTO) to the canonical project:
+//   { projectId, projectName, projectCode, projectDuration, projectBudget,
+//     projectBudgetCurrency, primaryLocation, countryCode, email, phoneNumber,
+//     startDate, endDate }
+// New and Edit both produce the selected project through it, and
+// toProjectInfoFields copies exactly those fields onto wizard projectInfo, so
+// Step 1 renders identically regardless of where the project came from.
+//
+// TEMPORARY migration compatibility — the ONLY place these aliases are read:
+// the billing-configuration detail DTO currently names two fields
+// differently from every other project API ("projectcode", "phone"). Remove
+// these two aliases once the backend returns projectCode/phoneNumber there.
+const DETAIL_DTO_PROJECT_CODE_ALIAS = "projectcode";
+const DETAIL_DTO_PHONE_ALIAS = "phone";
+
+const CANONICAL_PROJECT_FIELDS = [
+  "projectId",
+  "projectName",
+  "projectCode",
+  "projectDuration",
+  "projectBudget",
+  "projectBudgetCurrency",
+  "primaryLocation",
+  "countryCode",
+  "email",
+  "phoneNumber",
+  "startDate",
+  "endDate",
+];
+
+// Combines several canonical project objects for the SAME projectId,
+// field-by-field in priority order (first non-blank wins) — e.g. the
+// /available-projects record, then /projects/{clientId}, then the
+// configuration's own detail DTO. Blank sources (null) are skipped.
+export const mergeProjectSources = (...sources) => {
+  const present = sources.filter(Boolean);
+  return CANONICAL_PROJECT_FIELDS.reduce((merged, field) => {
+    merged[field] = firstPresent(...present.map((source) => source[field])) ?? "";
+    return merged;
+  }, {});
+};
+
+// Canonical project -> the project fields stored on wizard projectInfo.
+// Billing Currency (projectInfo.currency) is always the project's budget
+// currency.
+export const toProjectInfoFields = (project = {}) => {
+  const fields = mergeProjectSources(project);
+  return {
+    ...fields,
+    projectCode: sanitizeProjectCode(fields.projectCode, fields.projectId),
+    currency: fields.projectBudgetCurrency,
+  };
+};
+
 export const normalizeProject = (project = {}) => {
   const id = project.projectId || project.id || project.value;
   const projectDuration = project.projectDuration || project.duration || "";
@@ -837,7 +878,10 @@ export const normalizeProject = (project = {}) => {
     // been seen to leak a wrong value into Project Name/Project Code. Only
     // unambiguous, explicitly project-prefixed keys are used here.
     projectName: project.projectName || "",
-    projectCode: sanitizeProjectCode(project.projectCode || project.projectKey || project.project_code || "", id),
+    projectCode: sanitizeProjectCode(
+      firstPresent(project.projectCode, project[DETAIL_DTO_PROJECT_CODE_ALIAS], project.projectKey, project.project_code) || "",
+      id,
+    ),
     contractNumber: project.contractNumber || project.contractReference || "",
     currency: currencyCode || projectBudgetCurrency || "",
     billingType: project.billingType || "",
@@ -846,11 +890,12 @@ export const normalizeProject = (project = {}) => {
     projectDuration,
     projectBudget,
     projectBudgetCurrency,
-    // RMS-sourced client contact fields carried straight through from the
-    // available-projects response — never re-derived or hardcoded here.
+    // RMS-sourced contact fields carried straight through from the backend
+    // project payload — never re-derived, hardcoded, or taken from the client.
+    primaryLocation: project.primaryLocation || "",
     countryCode: project.countryCode || "",
     email: project.email || "",
-    phoneNumber: project.phoneNumber || "",
+    phoneNumber: firstPresent(project.phoneNumber, project[DETAIL_DTO_PHONE_ALIAS]) || "",
     // Normalized to a plain yyyy-mm-dd (never a raw datetime/timestamp string) —
     // every date-range check downstream (Recurring's Billing Start/End Date
     // validation, Fixed Price's Effective From/To) does lexical string
@@ -902,6 +947,42 @@ export const getBillingConfigurations = async () => {
   }
 };
 
+// Flat BillingConfigurationResponseDto -> its canonical project (plus
+// clientId for resolution). id/value are cleared: on this DTO they are the
+// configuration's own identifiers, never a project id.
+export const getConfigurationDetailProject = (record = {}) => ({
+  ...toProjectInfoFields(normalizeProject({ ...record, id: undefined, value: undefined, projectId: record.projectId || "" })),
+  clientId: record.clientId || "",
+});
+
+// Resolves the canonical project for a saved configuration's projectId —
+// the /available-projects record first (same source New uses), then
+// /projects/{clientId}, then the configuration's own detail project
+// (`detailProject`, already normalized) for anything neither master record
+// provides (e.g. a project excluded from /available-projects by
+// new-configuration eligibility rules). Shared by the wizard's edit/view
+// hydration and the Finance approval review, so both show the same project.
+export const resolveConfigurationProject = async (detailProject = {}) => {
+  const { clientId, projectId } = detailProject;
+  // No project to resolve (e.g. Product/Service billing) — leave as-is.
+  if (!clientId || !projectId) return {};
+
+  const findMatch = (list) => (list || []).find((p) => String(p.projectId || p.id) === String(projectId));
+  const [availableProjects, clientProjects] = await Promise.all([
+    getAvailableProjectsForBillingConfiguration(clientId).catch((err) => {
+      console.warn("Unable to resolve project master data from available projects", err);
+      return [];
+    }),
+    getBillingConfigurationProjectsByClient(clientId).catch((err) => {
+      console.warn("Unable to resolve project master data from client project list", err);
+      return [];
+    }),
+  ]);
+
+  const selectedProject = mergeProjectSources(findMatch(availableProjects), findMatch(clientProjects), detailProject);
+  return toProjectInfoFields({ ...selectedProject, projectId });
+};
+
 export const getBillingConfigurationById = async (billingConfigurationId) => {
   const response = await api.get(`${BILLING_CONFIGURATIONS_URL}/${billingConfigurationId}`);
   const config = unwrapData(response);
@@ -949,103 +1030,12 @@ export const getBillingConfigurationById = async (billingConfigurationId) => {
     }
   }
 
-  // Resolve the authoritative project master data (projectName, projectCode,
-  // primaryLocation, countryCode, email, phoneNumber, startDate/endDate, ...)
-  // for edit mode, keyed strictly by projectId — never inferred from the
-  // client object. The flat GET .../{id} DTO frequently omits these entirely
-  // (or, for legacy records, carries a stale/wrong projectCode).
-  //
-  // getAvailableProjectsForBillingConfiguration (/available-projects) is the
-  // richest source — it's the one that actually carries primaryLocation/
-  // countryCode/email/phoneNumber — and in practice still includes a project
-  // that already has a DRAFT configuration (eligibility filtering only
-  // appears to bite once a configuration moves past Draft), so it's tried
-  // first. getBillingConfigurationProjectsByClient (/projects/{clientId}, no
-  // eligibility filtering at all) is the fallback for the case where the
-  // project genuinely isn't in the available list any more (e.g. the
-  // configuration has since moved past Draft) — it may carry a narrower set
-  // of fields (it was built for the older enterprise-project picker, which
-  // never needed contact info), so it only fills in whatever
-  // /available-projects didn't already provide.
-  //
-  // This only ever runs here, for hydrating an existing configuration; it
-  // never touches/replaces the eligibility list ProjectStep uses when
-  // creating a NEW configuration.
-  if (detail.projectInfo?.clientId && detail.projectInfo?.projectId) {
-    try {
-      const findMatch = (list) =>
-        (list || []).find((p) => String(p.projectId || p.id) === String(detail.projectInfo.projectId));
-
-      const [availableProjects, clientProjects] = await Promise.all([
-        getAvailableProjectsForBillingConfiguration(detail.projectInfo.clientId).catch((err) => {
-          console.warn("Unable to resolve project master data from available projects", err);
-          return [];
-        }),
-        getBillingConfigurationProjectsByClient(detail.projectInfo.clientId).catch((err) => {
-          console.warn("Unable to resolve project master data from client project list", err);
-          return [];
-        }),
-      ]);
-
-      const primaryMatch = findMatch(availableProjects);
-      const secondaryMatch = findMatch(clientProjects);
-
-      // Field-by-field: prefer the richer /available-projects record, then
-      // the narrower /projects/{clientId} record, then whatever the flat
-      // config DTO already had — never the client object.
-      const pick = (field) =>
-        firstPresent(primaryMatch?.[field], secondaryMatch?.[field], detail.projectInfo[field]) || "";
-
-      // No master-data match at all (neither endpoint had this projectId) —
-      // the only remaining source is the flat config DTO, which on a legacy
-      // record can carry a stale projectName that was actually saved as the
-      // client's name (the exact bug this whole resolution step exists to
-      // fix). If that's what we're about to fall back to, treat it as
-      // unknown rather than display a value that is actually the client's
-      // name under the Project Name label.
-      const fallbackProjectName = detail.projectInfo.projectName;
-      const looksLikeClientNameLeak =
-        !primaryMatch &&
-        !secondaryMatch &&
-        fallbackProjectName &&
-        detail.projectInfo.clientName &&
-        fallbackProjectName.trim().toLowerCase() === detail.projectInfo.clientName.trim().toLowerCase();
-
-      detail.projectInfo = {
-        ...detail.projectInfo,
-        projectName: looksLikeClientNameLeak ? "" : pick("projectName"),
-        // Final defense-in-depth: even though primaryMatch/secondaryMatch
-        // already went through normalizeProject's own sanitizeProjectCode,
-        // and detail.projectInfo.projectCode already went through
-        // normalizeWizardDetail's, never let this field end up equal to
-        // the projectId no matter which of the three it was picked from.
-        projectCode: sanitizeProjectCode(pick("projectCode"), detail.projectInfo.projectId),
-        // projectDuration intentionally left alone here — detail.projectInfo
-        // already carries clean ISO startDate/endDate (below), and ProjectStep
-        // derives its display label from those when projectDuration is blank;
-        // the master records' projectDuration is a differently-formatted raw
-        // string (e.g. "23-Jul-2026 to 01-Oct-2026") that would make edit mode
-        // inconsistent with the date-based label shown everywhere else.
-        projectBudget: firstPresent(primaryMatch?.projectBudget, secondaryMatch?.projectBudget, detail.projectInfo.projectBudget) ?? "",
-        projectBudgetCurrency:
-          firstPresent(
-            primaryMatch?.projectBudgetCurrency,
-            primaryMatch?.currency,
-            secondaryMatch?.projectBudgetCurrency,
-            secondaryMatch?.currency,
-            detail.projectInfo.projectBudgetCurrency,
-          ) || "",
-        primaryLocation: pick("primaryLocation"),
-        countryCode: pick("countryCode"),
-        email: pick("email"),
-        phoneNumber: pick("phoneNumber"),
-        startDate: pick("startDate"),
-        endDate: pick("endDate"),
-      };
-    } catch (err) {
-      console.warn("Unable to resolve project master data for edit mode", err);
-    }
-  }
+  // Resolve the canonical project master data for the saved projectId —
+  // never inferred from the client object. See resolveConfigurationProject.
+  detail.projectInfo = {
+    ...detail.projectInfo,
+    ...(await resolveConfigurationProject(detail.projectInfo)),
+  };
 
   if (detail.billingConfig?.billingType === "RECURRING" && configId) {
     try {

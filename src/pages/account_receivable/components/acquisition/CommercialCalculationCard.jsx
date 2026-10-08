@@ -33,7 +33,7 @@ export default function CommercialCalculationCard({
           <span className="font-mono font-semibold text-slate-800">{fmt(expenseAmount, currency)}</span>
         </div>
         <div className="flex items-center justify-between border-t border-slate-200 pt-2 font-bold text-slate-900">
-          <span>Taxable Amount</span>
+          <span>Total Amount</span>
           <span className="font-mono text-base text-indigo-900">{fmt(taxableAmount, currency)}</span>
         </div>
       </div>

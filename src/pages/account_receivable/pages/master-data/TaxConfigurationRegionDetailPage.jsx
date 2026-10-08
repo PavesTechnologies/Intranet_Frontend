@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Plus, Pencil, Ban, ShieldAlert } from "lucide-react";
+import { Plus, Pencil, Ban, ShieldAlert, Layers, Eye } from "lucide-react";
 
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
@@ -15,7 +15,7 @@ import MasterStatCards from "../../components/common/MasterStatCards";
 import BackIconButton from "../../components/common/BackIconButton";
 import TaxRegionFormModal from "../../components/master-data/TaxRegionFormModal";
 import TaxRuleFormModal from "../../components/master-data/TaxRuleFormModal";
-import { deriveTaxComponentRows } from "../../utils/taxRuleComponents";
+import TaxComponentManagementModal from "../../components/master-data/TaxComponentManagementModal";
 import { getTaxRegionById, getApiErrorMessage as getRegionErrorMessage } from "../../services/taxRegionService";
 import {
   getTaxRateConfigurationsByTaxRegion,
@@ -46,7 +46,7 @@ const formatRateDisplay = (rate) => {
 
 const TABS = [
   { key: "details", label: "Region Details" },
-  { key: "rules", label: "Tax Rules" },
+  { key: "rules", label: "Tax Configurations & Rules" },
 ];
 
 export default function TaxConfigurationRegionDetailPage() {
@@ -65,6 +65,9 @@ export default function TaxConfigurationRegionDetailPage() {
   const [isRegionFormOpen, setIsRegionFormOpen] = useState(false);
   const [isRuleFormOpen, setIsRuleFormOpen] = useState(false);
   const [editingRuleConfig, setEditingRuleConfig] = useState(null);
+
+  const [selectedConfigForComponents, setSelectedConfigForComponents] = useState(null);
+  const [isComponentModalOpen, setIsComponentModalOpen] = useState(false);
 
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [deactivating, setDeactivating] = useState(false);
@@ -87,7 +90,7 @@ export default function TaxConfigurationRegionDetailPage() {
       } else {
         setRegion(regionData);
       }
-      setConfigs(configsData);
+      setConfigs(configsData || []);
       setTaxTypes(taxTypesData || []);
     } catch (error) {
       if (error?.response?.status === 403) {
@@ -107,13 +110,17 @@ export default function TaxConfigurationRegionDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taxRegionId]);
 
-  const ruleRows = useMemo(() => deriveTaxComponentRows(configs), [configs]);
-
-  const ruleStats = useMemo(() => {
-    const totalRules = ruleRows.length;
-    const activeRules = ruleRows.filter((row) => row.source.active).length;
-    return { totalRules, activeRules, inactiveRules: totalRules - activeRules };
-  }, [ruleRows]);
+  const configStats = useMemo(() => {
+    const totalConfigs = configs.length;
+    const activeConfigs = configs.filter((c) => c.status === "ACTIVE" || c.active).length;
+    const totalComponents = configs.reduce((sum, c) => sum + (Array.isArray(c.components) ? c.components.length : 0), 0);
+    return {
+      totalConfigs,
+      activeConfigs,
+      inactiveConfigs: totalConfigs - activeConfigs,
+      totalComponents,
+    };
+  }, [configs]);
 
   const handleOpenCreateRule = () => {
     setEditingRuleConfig(null);
@@ -123,6 +130,11 @@ export default function TaxConfigurationRegionDetailPage() {
   const handleOpenEditRule = (config) => {
     setEditingRuleConfig(config);
     setIsRuleFormOpen(true);
+  };
+
+  const handleOpenManageComponents = (config) => {
+    setSelectedConfigForComponents(config);
+    setIsComponentModalOpen(true);
   };
 
   const handleRuleSaved = () => {
@@ -138,51 +150,98 @@ export default function TaxConfigurationRegionDetailPage() {
     setDeactivating(true);
     try {
       await deactivateTaxRateConfiguration(deactivateTarget.id);
-      showStatusToast("Tax rule deactivated successfully.", "success");
+      showStatusToast("Tax configuration deactivated successfully.", "success");
       setDeactivateTarget(null);
       await loadData();
     } catch (error) {
-      showStatusToast(getRuleErrorMessage(error, "Failed to deactivate tax rule."), "error");
+      showStatusToast(getRuleErrorMessage(error, "Failed to deactivate tax configuration."), "error");
     } finally {
       setDeactivating(false);
     }
   };
 
-  const ruleTableHeaders = ["Tax Component", "CGST Rate", "SGST Rate", "IGST Rate", "Effective From", "Effective To", "Status", "Actions"];
-  const ruleTableColumns = ["component", "cgst", "sgst", "igst", "from", "to", "status", "actions"];
+  const configTableHeaders = [
+    "Tax Region",
+    "Tax Regime",
+    "Effective From",
+    "Effective To",
+    "Components",
+    "Status",
+    "Actions",
+  ];
+  const configTableColumns = ["region", "regime", "from", "to", "components", "status", "actions"];
 
-  const ruleTableRows = useMemo(() => {
-    return ruleRows.map((row, idx) => ({
-      component: <span className="font-semibold text-slate-800">{row.component}</span>,
-      cgst: formatRateDisplay(row.cgstRate),
-      sgst: formatRateDisplay(row.sgstRate),
-      igst: formatRateDisplay(row.igstRate),
-      from: <span className="text-slate-600">{formatDateValue(row.source.effectiveFrom)}</span>,
-      to: <span className="text-slate-600">{formatDateValue(row.source.effectiveTo)}</span>,
-      status: <StatusBadge label={row.source.status} size="sm" />,
-      actions: (
-        <div className="flex items-center justify-center">
-          <ActionMenu
-            items={[
-              {
-                label: "Edit",
-                icon: <Pencil className="h-4 w-4 text-slate-600" />,
-                onClick: () => handleOpenEditRule(row.source),
-              },
-              {
-                label: "Deactivate",
-                icon: <Ban className="h-4 w-4 text-rose-600" />,
-                danger: true,
-                hidden: row.source.status !== "ACTIVE",
-                onClick: () => setDeactivateTarget(row.source),
-              },
-            ]}
-          />
-        </div>
-      ),
-      key: `${row.source.id}-${row.component}-${idx}`,
-    }));
-  }, [ruleRows]);
+  const configTableRows = useMemo(() => {
+    return configs.map((config) => {
+      const compList = Array.isArray(config.components) ? config.components : [];
+      return {
+        region: (
+          <span className="font-semibold text-slate-800">
+            {region?.taxRegionName} ({region?.taxRegionCode})
+          </span>
+        ),
+        regime: <span className="font-medium text-slate-700">{config.taxRegime}</span>,
+        from: <span className="text-slate-600">{formatDateValue(config.effectiveFrom)}</span>,
+        to: <span className="text-slate-600">{formatDateValue(config.effectiveTo)}</span>,
+        components: (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => handleOpenManageComponents(config)}
+              className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition border border-indigo-200"
+              title="Click to manage components"
+            >
+              <Layers className="h-3 w-3" />
+              {compList.length} {compList.length === 1 ? "Component" : "Components"}
+            </button>
+            {compList.slice(0, 3).map((comp, idx) => (
+              <span
+                key={comp.id || idx}
+                className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600"
+              >
+                {comp.taxTypeCode}: {comp.taxRate}%
+              </span>
+            ))}
+            {compList.length > 3 && (
+              <span className="text-[10px] text-slate-400">+{compList.length - 3} more</span>
+            )}
+          </div>
+        ),
+        status: <StatusBadge label={config.status || (config.active ? "ACTIVE" : "INACTIVE")} size="sm" />,
+        actions: (
+          <div className="flex items-center justify-center">
+            <ActionMenu
+              items={[
+                {
+                  label: "Manage Components",
+                  icon: <Layers className="h-4 w-4 text-[#0A0082]" />,
+                  onClick: () => handleOpenManageComponents(config),
+                },
+                {
+                  label: "View Details",
+                  icon: <Eye className="h-4 w-4 text-slate-600" />,
+                  onClick: () => handleOpenManageComponents(config),
+                },
+                {
+                  label: "Edit Configuration",
+                  icon: <Pencil className="h-4 w-4 text-slate-600" />,
+                  onClick: () => handleOpenEditRule(config),
+                },
+                {
+                  label: "Deactivate",
+                  icon: <Ban className="h-4 w-4 text-rose-600" />,
+                  danger: true,
+                  hidden: config.status !== "ACTIVE" && !config.active,
+                  onClick: () => setDeactivateTarget(config),
+                },
+              ]}
+            />
+          </div>
+        ),
+        key: config.id,
+      };
+    });
+  }, [configs, region]);
 
   if (loading) {
     return (
@@ -262,7 +321,7 @@ export default function TaxConfigurationRegionDetailPage() {
             actions={
               <Button onClick={handleOpenCreateRule} className="flex items-center gap-1.5">
                 <Plus className="h-4 w-4" />
-                Add Tax Rule
+                Add Tax Configuration
               </Button>
             }
           />
@@ -325,20 +384,20 @@ export default function TaxConfigurationRegionDetailPage() {
         <div className="space-y-6">
           <MasterStatCards
             items={[
-              { label: "Total Rules", value: ruleStats.totalRules },
-              { label: "Active Rules", value: ruleStats.activeRules, tone: "success" },
-              { label: "Inactive Rules", value: ruleStats.inactiveRules, tone: "danger" },
+              { label: "Total Configurations", value: configStats.totalConfigs },
+              { label: "Active Configurations", value: configStats.activeConfigs, tone: "success" },
+              { label: "Total Components", value: configStats.totalComponents, tone: "neutral" },
               { label: "Currency", value: region.currencyCode },
               { label: "Tax Regime", value: region.taxRegime },
             ]}
           />
 
           <ARTable
-            headers={ruleTableHeaders}
-            columns={ruleTableColumns}
-            rows={ruleTableRows}
+            headers={configTableHeaders}
+            columns={configTableColumns}
+            rows={configTableRows}
             loading={false}
-            emptyMessage="No tax rules configured for this region yet."
+            emptyMessage="No tax configurations configured for this region yet. Click 'Add Tax Configuration' to create one."
           />
         </div>
       )}
@@ -355,6 +414,19 @@ export default function TaxConfigurationRegionDetailPage() {
         onClose={() => setIsRuleFormOpen(false)}
         region={region}
         editingConfig={editingRuleConfig}
+        existingConfigs={configs}
+        onOpenManageExisting={(existingConfig) => handleOpenManageComponents(existingConfig)}
+        onSaved={handleRuleSaved}
+      />
+
+      <TaxComponentManagementModal
+        isOpen={isComponentModalOpen}
+        onClose={() => {
+          setIsComponentModalOpen(false);
+          setSelectedConfigForComponents(null);
+        }}
+        configuration={selectedConfigForComponents}
+        region={region}
         taxTypes={taxTypes}
         onSaved={handleRuleSaved}
       />
@@ -363,8 +435,8 @@ export default function TaxConfigurationRegionDetailPage() {
         isOpen={Boolean(deactivateTarget)}
         onCancel={() => setDeactivateTarget(null)}
         onConfirm={handleConfirmDeactivate}
-        title="Deactivate Tax Rule"
-        message="Are you sure you want to deactivate this tax rule? Inactive rules will not be applied to new transactions."
+        title="Deactivate Tax Configuration"
+        message="Are you sure you want to deactivate this tax configuration? Inactive configurations will not be applied to new transactions."
         confirmText="Deactivate"
         variant="danger"
         isLoading={deactivating}

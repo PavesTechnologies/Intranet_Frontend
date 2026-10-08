@@ -1,3 +1,9 @@
+/**
+ * NOT USED AT RUNTIME ANYMORE. APDashboardPage.jsx no longer imports anything from this file —
+ * it renders entirely from the real GET /apm/dashboard/summary response instead (see
+ * dashboard/components/DashboardWidgets.jsx, dashboard/hooks/useDashboardSummary.js). Kept only
+ * for reference (e.g. visual tone/icon conventions); safe to delete once no longer useful as one.
+ */
 import {
   AlertCircle,
   ChevronDown,

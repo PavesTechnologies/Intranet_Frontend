@@ -3,34 +3,30 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   FileText,
   ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
-  AlertTriangle,
-  Loader2,
   RefreshCw,
+  Loader2,
   Send,
-  Eye,
-  Clock,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
-
-import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
+ 
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
 import StatusBadge from "../../../components/status/statusbadge";
 import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
 import { showStatusToast } from "../../../components/toastfy/toast";
-import { formatCurrency, formatDisplayDate } from "../utils/format";
-import InvoiceDocument from "../components/invoice/InvoiceDocument";
 import { getActiveCompanyProfile } from "../services/companyProfileService";
-
+ 
+import InvoiceContextCards from "../components/invoice/InvoiceContextCards";
+import InvoiceDraftBanner from "../components/invoice/InvoiceDraftBanner";
+import InvoicePreviewDocument from "../components/invoice/InvoicePreviewDocument";
+import InvoiceLifecycleStepper from "../components/invoice/InvoiceLifecycleStepper";
+import InvoiceGenerationModal from "../components/invoice/InvoiceGenerationModal";
+ 
 import {
   getTaxCalculation,
-  getTaxCalculationErrorMessage,
 } from "../services/taxCalculationService";
 import {
   getInvoice,
+  previewInvoice as previewInvoiceApi,
   generateInvoice,
   generateInvoiceForOccurrence,
   submitInvoiceForApproval,
@@ -40,112 +36,90 @@ import {
   getBillingOccurrence,
   getOccurrenceTaxCalculation,
   getOccurrenceErrorMessage,
+  mergeOccurrenceWithTaxCalc,
 } from "../services/billingOccurrenceService";
 import {
-  getBillingSnapshotByPeriod,
-  fetchActiveBillingConfigurations,
-  saveAcquiredSnapshotMetadata,
   formatBillingPeriod,
   toIsoDateOnly,
 } from "../services/billingDataAcquisitionService";
+import { formatPaymentTerms } from "../utils/invoicePresentation";
 
-
-const INVOICE_WORKSPACE_PATH = "/account-receivable/invoice-generation";
-const INVOICE_APPROVAL_PATH = "/account-receivable/invoice-approval";
-
-
-function Field({
-  label,
-  children,
-  truncate = true,
-  className = "",
-}) {
-  return (
-    <div className={className}>
-      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-        {label}
-      </span>
-      <span
-        className={`mt-0.5 block text-sm font-semibold text-slate-800 ${truncate ? "truncate" : "whitespace-nowrap"}`}
-        title={typeof children === "string" ? children : undefined}
-      >
-        {children || "—"}
-      </span>
-    </div>
-  );
-}
-
-export default function InvoiceGenerationDetail() {
+export const DEFAULT_MIN_PRESENTATION_MS = typeof process !== "undefined" && process.env?.NODE_ENV === "test" ? 0 : 300;
+ 
+export default function InvoiceGenerationDetail({ minPresentationDuration = DEFAULT_MIN_PRESENTATION_MS } = {}) {
   const { snapshotId, occurrenceId: paramOccurrenceId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-
+ 
   const passedState = location.state || {};
-
+ 
   const effectiveOccurrenceId =
     paramOccurrenceId ||
     passedState.occurrenceId ||
     passedState.billingScheduleId ||
     passedState.occurrence?.billingScheduleId ||
     null;
-
+ 
   const isOccurrenceMode = Boolean(
     effectiveOccurrenceId ||
     (!snapshotId && passedState.occurrence) ||
     location.pathname.includes("/occurrence/")
   );
-
+ 
   const effectiveSnapshotId = isOccurrenceMode ? null : (snapshotId || passedState.snapshotId || null);
   const effectiveId = isOccurrenceMode ? effectiveOccurrenceId : effectiveSnapshotId;
-
+ 
+  const backToTaxUrl = isOccurrenceMode
+    ? `/account-receivable/tax-calculation/occurrence/${effectiveOccurrenceId}`
+    : `/account-receivable/tax-calculation/${effectiveSnapshotId || snapshotId}`;
+ 
+  const canonicalInvoiceUrl = isOccurrenceMode
+    ? `/account-receivable/invoices/occurrence/${effectiveOccurrenceId}`
+    : `/account-receivable/invoices/${effectiveSnapshotId || snapshotId}`;
+ 
   // Loaded states
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [isGenerationCompleted, setIsGenerationCompleted] = useState(false);
+  const [submittingForApproval, setSubmittingForApproval] = useState(false);
+  const [generateError, setGenerateError] = useState("");
+  const isGeneratingRef = useRef(false);
   const [errorMsg, setErrorMsg] = useState("");
-
+ 
+  const [generationModalOpen, setGenerationModalOpen] = useState(false);
+  const [generationModalState, setGenerationModalState] = useState("GENERATING");
+ 
   // Data states
   const [taxCalc, setTaxCalc] = useState(passedState.taxCalculation || null);
   const [invoice, setInvoice] = useState(null);
+  const [previewData, setPreviewData] = useState(null);
   const [snapshotData, setSnapshotData] = useState(passedState.config || null);
   const [occurrenceData, setOccurrenceData] = useState(passedState.occurrence || null);
   const [items, setItems] = useState([]);
-
-  // Persistent Preview state and ref for smooth scroll
-  const [isPreviewExpanded, setIsPreviewExpanded] = useState(true);
-  const previewSectionRef = useRef(null);
   const [companyProfile, setCompanyProfile] = useState(null);
-
-  const handleScrollToPreview = () => {
-    setIsPreviewExpanded(true);
-    setTimeout(() => {
-      previewSectionRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-    }, 50);
-  };
-
+ 
   const loadData = async (isManual = false) => {
     if (!effectiveId) {
       setErrorMsg(isOccurrenceMode ? "Billing occurrence identifier is required." : "Billing snapshot identifier is required.");
       setLoading(false);
       return;
     }
-
+ 
     if (isManual) setRefreshing(true);
     else setLoading(true);
     setErrorMsg("");
-
-    // Fetch active seller company profile for Invoice Preview
-    try {
-      const profile = await getActiveCompanyProfile();
-      setCompanyProfile(profile);
-    } catch (profErr) {
-      console.warn("[InvoiceGenerationDetail] Company profile notice:", profErr?.message);
-    }
-
-    try {
+     try {
       if (isOccurrenceMode) {
-        // 1. Check if invoice has ALREADY been generated for this occurrence
+        // Fetch active seller company profile for Occurrence mode
+        try {
+          const profile = await getActiveCompanyProfile();
+          setCompanyProfile(profile);
+        } catch (profErr) {
+          console.warn("[InvoiceGenerationDetail] Company profile notice:", profErr?.message);
+        }
+        // Check if invoice has ALREADY been generated for this occurrence
         let existingInvoice = null;
         try {
           existingInvoice = await getInvoice(effectiveOccurrenceId);
@@ -162,8 +136,8 @@ export default function InvoiceGenerationDetail() {
           }
           setInvoice(null);
         }
-
-        // 2. Fetch completed tax calculation / occurrence details
+ 
+        // Fetch completed tax calculation / occurrence details
         let occ = occurrenceData || passedState.occurrence;
         try {
           const fetchedOcc = await getBillingOccurrence(effectiveOccurrenceId);
@@ -171,134 +145,53 @@ export default function InvoiceGenerationDetail() {
         } catch (occErr) {
           console.warn("[InvoiceGenerationDetail] Fetch occurrence notice:", occErr?.message);
         }
-
+ 
         try {
           const occTax = await getOccurrenceTaxCalculation(effectiveOccurrenceId);
           if (occTax) {
-            occ = occ ? { ...occ, ...occTax } : occTax;
+            // Field-aware merge: a plain spread let the tax-calculation
+            // response's null configuration ids / periodNumber / billingDate
+            // overwrite the occurrence's, losing its billing type.
+            occ = occ ? mergeOccurrenceWithTaxCalc(occ, occTax) : occTax;
           }
         } catch (taxErr) {
           console.warn("[InvoiceGenerationDetail] Occurrence tax calculation notice:", taxErr?.message);
         }
-
+ 
         setOccurrenceData(occ);
-
-        // 3. Hydrate line items if not already loaded from existing invoice
+ 
+        // No resource-style placeholder line here: before generation the
+        // invoice document builds the Milestone Plan / Recurring / Fixed Price
+        // line from the occurrence itself (utils/invoicePresentation).
         if (!existingInvoice || !existingInvoice.items || existingInvoice.items.length === 0) {
-          const rateAmt = occ?.billingAmount ?? occ?.taxableAmount ?? 0;
-          const itemName = occ?.projectName
-            ? `${occ.projectName} - Fixed Price Billing`
-            : "Fixed Price Billing";
-          const role = "Fixed Price Milestone";
-          const workDate = toIsoDateOnly(occ?.billingDate || occ?.periodEndDate);
-
-          const fixedItem = {
-            id: `fixed-price-${effectiveOccurrenceId}`,
-            itemName,
-            role,
-            workDate,
-            quantity: 1,
-            rate: rateAmt,
-            amount: rateAmt,
-            itemType: "FIXED_PRICE",
-          };
-
-          setItems([fixedItem]);
+          setItems([]);
         }
       } else {
-        // 1. Check if invoice has ALREADY been generated for this snapshot
-        let existingInvoice = null;
-        try {
-          existingInvoice = await getInvoice(effectiveSnapshotId);
-          if (existingInvoice && (existingInvoice.invoiceId || existingInvoice.invoiceNumber)) {
-            setInvoice(existingInvoice);
-            if (Array.isArray(existingInvoice.items) && existingInvoice.items.length > 0) {
-              setItems(existingInvoice.items);
-            }
-          }
-        } catch (invErr) {
-          const isNotFound = invErr?.response?.status === 404;
-          if (!isNotFound) {
-            console.warn("[InvoiceGenerationDetail] Invoice check notice:", invErr?.message);
-          }
-          setInvoice(null);
-        }
-
-        // 2. Fetch completed tax calculation for this snapshot
-        let calc = taxCalc;
-        try {
-          calc = await getTaxCalculation(effectiveSnapshotId);
-          if (calc) {
-            setTaxCalc(calc);
-          }
-        } catch (calcErr) {
-          console.warn("[InvoiceGenerationDetail] Tax calculation fetch notice:", calcErr?.message);
-        }
-
-        // 3. Hydrate line items if not already loaded from existing invoice
-        if (!existingInvoice || !existingInvoice.items || existingInvoice.items.length === 0) {
-          let loadedItems = [];
-
-          // Check if labor items were passed via location.state
-          const passedLabor = passedState.acquisitionResults?.labor;
-          if (passedLabor && Array.isArray(passedLabor.timesheets) && passedLabor.timesheets.length > 0) {
-            loadedItems = passedLabor.timesheets.map((t, idx) => ({
-              id: t.sourceReferenceId || `item-${idx}`,
-              itemName: t.employee || t.itemName || "Timesheet Entry",
-              role: t.role || "Consultant",
-              workDate: toIsoDateOnly(t.workDate),
-              quantity: t.hours || t.quantity || 0,
-              rate: t.rate || 0,
-              amount: t.amount || 0,
-            }));
+        // Authoritative Invoice Preview API: GET /api/v1/billing-snapshots/{snapshotId}/invoice-preview
+        const preview = await previewInvoiceApi(effectiveSnapshotId);
+        if (preview) {
+          setPreviewData(preview);
+          if (preview.generated) {
+            setInvoice(preview);
           } else {
-            // Attempt to fetch from billing-snapshots/by-period if projectId and dates are known
-            const pId = calc?.projectId || snapshotData?.projectId || passedState.projectId;
-            const pStart = toIsoDateOnly(calc?.billingPeriodStart || snapshotData?.billingPeriodStart);
-            const pEnd = toIsoDateOnly(calc?.billingPeriodEnd || snapshotData?.billingPeriodEnd);
-
-            if (pId && pStart && pEnd) {
-              try {
-                const snap = await getBillingSnapshotByPeriod(pId, pStart, pEnd);
-                if (snap && Array.isArray(snap.laborRecords) && snap.laborRecords.length > 0) {
-                  loadedItems = snap.laborRecords.map((t, idx) => ({
-                    id: t.id || `item-${idx}`,
-                    itemName: t.employee || "Timesheet Entry",
-                    role: t.role || "Consultant",
-                    workDate: t.workDate,
-                    quantity: t.hours || 0,
-                    rate: t.rate || 0,
-                    amount: t.amount || 0,
-                  }));
-                }
-              } catch (snapErr) {
-                console.warn("[InvoiceGenerationDetail] Snapshot items fetch notice:", snapErr?.message);
-              }
-            }
+            setInvoice(null);
           }
-
-          // Fallback: if no detailed line items, represent the billable labor total from taxCalc/snapshot
-          if (loadedItems.length === 0) {
-            const subtotalAmt = calc?.taxableAmount ?? snapshotData?.totalAmount ?? 0;
-            if (subtotalAmt > 0) {
-              loadedItems = [
-                {
-                  id: "labor-summary-1",
-                  itemName: `${calc?.projectName || snapshotData?.projectName || "Project"} Billable Services`,
-                  role: "Consultant / Engineering",
-                  workDate: toIsoDateOnly(calc?.billingPeriodEnd || snapshotData?.billingPeriodEnd),
-                  quantity: 1,
-                  rate: subtotalAmt,
-                  amount: subtotalAmt,
-                },
-              ];
-            }
+          if (Array.isArray(preview.items) && preview.items.length > 0) {
+            setItems(preview.items);
           }
+        }
 
-          setItems(loadedItems);
+        // Fetch active seller company profile only if seller info not returned in preview
+        if (!preview?.sellerName && !preview?.sellerLegalName) {
+          try {
+            const profile = await getActiveCompanyProfile();
+            setCompanyProfile(profile);
+          } catch (profErr) {
+            console.warn("[InvoiceGenerationDetail] Company profile notice:", profErr?.message);
+          }
         }
       }
-
+ 
       if (isManual) {
         showStatusToast("Invoice generation details refreshed.", "success");
       }
@@ -314,168 +207,75 @@ export default function InvoiceGenerationDetail() {
       setRefreshing(false);
     }
   };
-
+ 
   useEffect(() => {
     loadData();
   }, [effectiveId]);
-
-  // Primary Action: Generate Invoice
-  const handleGenerateInvoice = async () => {
-    const targetId = isOccurrenceMode ? effectiveOccurrenceId : effectiveSnapshotId;
-    const alreadyGenerated = Boolean(invoice && (invoice.invoiceId || invoice.invoiceNumber));
-    if (!targetId || generating || alreadyGenerated) return;
-
-    setGenerating(true);
-    try {
-      let generated = null;
-      if (isOccurrenceMode) {
-        generated = await generateInvoiceForOccurrence(effectiveOccurrenceId);
-      } else {
-        generated = await generateInvoice(effectiveSnapshotId);
-      }
-
-      setInvoice(generated);
-      setIsPreviewExpanded(true);
-      if (Array.isArray(generated?.items) && generated.items.length > 0) {
-        setItems(generated.items);
-      }
-
-      if (!isOccurrenceMode) {
-        const pId = generated?.projectId || taxCalc?.projectId || snapshotData?.projectId;
-        if (pId) {
-          saveAcquiredSnapshotMetadata(pId, {
-            status: "INVOICED",
-            invoiceNumber: generated.invoiceNumber,
-          });
-        }
-      }
-
-      showStatusToast("Invoice generated successfully.", "success");
-      setTimeout(() => {
-        previewSectionRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-      }, 100);
-    } catch (err) {
-      const status = err?.response?.status;
-      const msg = (err?.response?.data?.message || err?.message || "").toLowerCase();
-
-      // Handle 409 conflict gracefully: invoice was already generated
-      if (status === 409 || msg.includes("already")) {
-        showStatusToast("Invoice already exists for this record.", "info");
-        try {
-          const existing = await getInvoice(targetId);
-          if (existing) {
-            setInvoice(existing);
-            setIsPreviewExpanded(true);
-            if (Array.isArray(existing.items) && existing.items.length > 0) {
-              setItems(existing.items);
-            }
-            return;
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      const errorText = isOccurrenceMode
-        ? getOccurrenceErrorMessage(err, "Failed to generate invoice for billing occurrence.")
-        : getInvoiceErrorMessage(err, "Failed to generate invoice.");
-      showStatusToast(errorText, "error");
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  // Submit for Approval action
-  const handleSubmitForApproval = async () => {
-    if (!invoice?.invoiceId || submitting) return;
-
-    setSubmitting(true);
-    try {
-      const updated = await submitInvoiceForApproval(invoice.invoiceId);
-      showStatusToast("Invoice submitted for approval successfully.", "success");
-
-      // Authoritative reload of invoice from backend
-      try {
-        const refreshed = await getInvoice(effectiveId);
-        if (refreshed && (refreshed.invoiceId || refreshed.invoiceNumber)) {
-          setInvoice(refreshed);
-          if (Array.isArray(refreshed.items) && refreshed.items.length > 0) {
-            setItems(refreshed.items);
-          }
-        } else if (updated) {
-          setInvoice((prev) => ({
-            ...prev,
-            invoiceStatus: updated.invoiceStatus || "PENDING_APPROVAL",
-          }));
-        }
-      } catch {
-        if (updated) {
-          setInvoice((prev) => ({
-            ...prev,
-            invoiceStatus: updated.invoiceStatus || "PENDING_APPROVAL",
-          }));
-        } else {
-          setInvoice((prev) => ({
-            ...prev,
-            invoiceStatus: "PENDING_APPROVAL",
-          }));
-        }
-      }
-    } catch (err) {
-      console.error("[InvoiceGenerationDetail] Error submitting for approval:", err);
-      const msg = getInvoiceErrorMessage(err, "Failed to submit invoice for approval.");
-      showStatusToast(msg, "error");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-
-  if (loading && !refreshing) {
-    return (
-      <div className="flex h-80 items-center justify-center">
-        <Loader size="lg" text="Loading Invoice Generation workspace..." />
-      </div>
-    );
-  }
-
-  // Derived contextual fields (Authoritative from backend tax calculation, occurrence, or invoice)
-  const isInvoiceGenerated = Boolean(invoice && (invoice.invoiceId || invoice.invoiceNumber));
-  const invoiceStatus = (invoice?.invoiceStatus || (isInvoiceGenerated ? "GENERATED" : "TAX_COMPLETED")).toUpperCase();
-
+ 
+  // Authoritative tax and invoice state flags
+  const isInvoiceGenerated = Boolean(
+    (invoice && (invoice.invoiceId || invoice.invoiceNumber) && invoice.invoiceNumber !== "Assigned on generation") ||
+    (previewData?.generated && previewData?.invoiceNumber && previewData.invoiceNumber !== "Assigned on generation")
+  );
+  const isTaxCompleted = isOccurrenceMode
+    ? Boolean(
+        occurrenceData?.taxCalculationStatus === "COMPLETED" ||
+        occurrenceData?.taxStatus === "COMPLETED" ||
+        occurrenceData?.taxCalculated ||
+        occurrenceData?.totalTaxAmount !== undefined ||
+        occurrenceData?.grandTotal !== undefined
+      )
+    : Boolean(
+        previewData?.taxComponents?.length > 0 ||
+        previewData?.totalTax !== undefined ||
+        previewData?.grandTotal !== undefined ||
+        taxCalc?.taxCalculationStatus === "COMPLETED" ||
+        taxCalc?.grandTotal !== undefined
+      );
+ 
+  // Derived contextual fields
+  const invoiceStatus = isInvoiceGenerated
+    ? (invoice?.invoiceStatus || invoice?.status || previewData?.status || "GENERATED").toUpperCase()
+    : "Draft Preview";
+ 
   const projectName =
     invoice?.projectName ||
+    previewData?.projectName ||
     taxCalc?.projectName ||
     occurrenceData?.projectName ||
     snapshotData?.projectName ||
-    "Not provided";
-
+    "—";
+ 
   const projectCode =
     invoice?.projectCode ||
+    previewData?.projectCode ||
     snapshotData?.projectCode ||
     taxCalc?.projectCode ||
     occurrenceData?.projectCode ||
     "Not provided";
-
+ 
   const clientName =
     invoice?.clientName ||
+    previewData?.clientName ||
     taxCalc?.clientName ||
     occurrenceData?.clientName ||
     snapshotData?.clientName ||
-    "Not provided";
-
+    "—";
+ 
   const recordLabel = isOccurrenceMode
     ? (occurrenceData?.periodNumber ? `Occurrence #${occurrenceData.periodNumber}` : (effectiveOccurrenceId || "Billing Occurrence"))
-    : (invoice?.snapshotNumber || invoice?.billingSnapshotNumber || taxCalc?.snapshotNumber || snapshotData?.snapshotNumber || snapshotId);
+    : (invoice?.snapshotNumber || invoice?.billingSnapshotNumber || previewData?.snapshotNumber || previewData?.billingSnapshotNumber || taxCalc?.snapshotNumber || snapshotData?.snapshotNumber || snapshotId);
 
   const rawStart =
     invoice?.billingPeriodStart ||
+    previewData?.billingPeriodStart ||
     taxCalc?.billingPeriodStart ||
     occurrenceData?.periodStartDate ||
     snapshotData?.billingPeriodStart;
 
   const rawEnd =
     invoice?.billingPeriodEnd ||
+    previewData?.billingPeriodEnd ||
     taxCalc?.billingPeriodEnd ||
     occurrenceData?.periodEndDate ||
     snapshotData?.billingPeriodEnd;
@@ -483,27 +283,28 @@ export default function InvoiceGenerationDetail() {
   const billingPeriod =
     rawStart && rawEnd
       ? formatBillingPeriod(rawStart, rawEnd)
-      : invoice?.billingPeriod || taxCalc?.billingPeriod || occurrenceData?.period || snapshotData?.billingPeriod || "—";
+      : invoice?.billingPeriod || previewData?.billingPeriod || taxCalc?.billingPeriod || occurrenceData?.period || snapshotData?.billingPeriod || "—";
 
   const currency =
     invoice?.currency ||
+    previewData?.currency ||
     taxCalc?.currencyCode ||
     occurrenceData?.currencyCode ||
     snapshotData?.currency ||
     "USD";
 
   const paymentTerms =
-    invoice?.paymentTermName ||
-    snapshotData?.paymentTermName ||
-    taxCalc?.paymentTermName ||
-    (invoice?.paymentTermCode ? `${invoice.paymentTermCode} Days` : null) ||
-    (snapshotData?.paymentTermCode ? `${snapshotData.paymentTermCode} Days` : null) ||
-    (taxCalc?.paymentTermCode ? `${taxCalc.paymentTermCode} Days` : null) ||
+    formatPaymentTerms(invoice || {}) ||
+    formatPaymentTerms(previewData || {}) ||
+    previewData?.paymentTerms ||
+    formatPaymentTerms(snapshotData || {}) ||
+    formatPaymentTerms(taxCalc || {}) ||
+    formatPaymentTerms(occurrenceData || {}) ||
     "Not provided";
 
-  // Financial Totals: Strictly backend authoritative
   const subtotal =
     invoice?.subtotal ??
+    previewData?.subtotal ??
     taxCalc?.taxableAmount ??
     occurrenceData?.taxableAmount ??
     occurrenceData?.billingAmount ??
@@ -512,534 +313,424 @@ export default function InvoiceGenerationDetail() {
 
   const totalTax =
     invoice?.totalTax ??
+    previewData?.totalTax ??
+    previewData?.totalTaxAmount ??
     taxCalc?.totalTaxAmount ??
     occurrenceData?.totalTaxAmount ??
     0;
 
   const grandTotal =
     invoice?.grandTotal ??
+    previewData?.grandTotal ??
     taxCalc?.grandTotal ??
     occurrenceData?.grandTotal ??
     (subtotal + totalTax);
 
-  const backToTaxUrl = isOccurrenceMode
-    ? `/account-receivable/tax-calculation/occurrence/${effectiveOccurrenceId}`
-    : `/account-receivable/tax-calculation/${effectiveSnapshotId || snapshotId}`;
+  // Authoritative Preview Invoice object for rendering before backend persistence
+  const previewInvoice = useMemo(() => {
+    if (invoice && invoice.invoiceId && invoice.invoiceNumber && invoice.invoiceNumber !== "Assigned on generation") {
+      return invoice;
+    }
+    if (previewData) {
+      const isOfficial = Boolean(previewData.generated);
+      return {
+        ...previewData,
+        invoiceId: isOfficial ? previewData.invoiceId : null,
+        invoiceNumber: isOfficial ? previewData.invoiceNumber : "Assigned on generation",
+        invoiceDate: isOfficial ? previewData.invoiceDate : null,
+        dueDate: isOfficial ? previewData.dueDate : null,
+        invoiceStatus: isOfficial ? (previewData.status || previewData.invoiceStatus || "GENERATED") : "Draft Preview",
+        isDraftPreview: !isOfficial,
+        generated: isOfficial,
+        snapshotId: effectiveSnapshotId,
+        billingSnapshotId: effectiveSnapshotId,
+        billingScheduleId: effectiveOccurrenceId,
+        snapshotNumber: recordLabel,
+        billingSnapshotNumber: recordLabel,
+        projectId: previewData.projectId,
+        projectCode: previewData.projectCode || projectCode,
+        projectName: previewData.projectName || projectName,
+        clientName: previewData.clientName || clientName,
+        billingPeriod: previewData.billingPeriod || billingPeriod,
+        billingPeriodStart: rawStart,
+        billingPeriodEnd: rawEnd,
+        currency,
+        paymentTermName: previewData.paymentTermName || paymentTerms,
+        paymentTerms: previewData.paymentTerms || previewData.paymentTermName || paymentTerms,
+        billingAddress: previewData.billingAddress || null,
+        email: previewData.email || null,
+        phone: previewData.phone || null,
+        gstinOrTaxId: previewData.gstinOrTaxId || previewData.gstin || null,
+        subtotal: previewData.subtotal ?? subtotal,
+        totalTax: previewData.totalTax ?? totalTax,
+        grandTotal: previewData.grandTotal ?? grandTotal,
+        taxComponents: previewData.taxComponents || previewData.taxBreakdown || [],
+        taxBreakdown: previewData.taxBreakdown || previewData.taxComponents || [],
+        items: Array.isArray(previewData.items) && previewData.items.length > 0 ? previewData.items : items,
+        sellerName: previewData.sellerName || previewData.sellerLegalName || companyProfile?.legalName || companyProfile?.companyName,
+        sellerAddress: previewData.sellerAddress || companyProfile?.address,
+        sellerGstin: previewData.sellerGstin || companyProfile?.taxRegistrationNumber || companyProfile?.gstin,
+        sellerEmail: previewData.sellerEmail || companyProfile?.email,
+        sellerPhone: previewData.sellerPhone || companyProfile?.phoneNumber || companyProfile?.phone,
+        sellerLogoReference: previewData.sellerLogoReference || companyProfile?.logoUrl,
+        sellerInfo: previewData.sellerInfo || (companyProfile ? {
+          legalName: companyProfile.legalName || companyProfile.companyName,
+          address: companyProfile.address,
+          gstin: companyProfile.taxRegistrationNumber || companyProfile.gstin,
+          email: companyProfile.email,
+          phone: companyProfile.phoneNumber || companyProfile.phone,
+          logoUrl: companyProfile.logoUrl,
+        } : null),
+        clientInfo: {
+          clientName: previewData.clientName || clientName,
+          billingAddress: previewData.billingAddress,
+          country: previewData.country,
+          email: previewData.email,
+          phone: previewData.phone,
+          taxId: previewData.gstinOrTaxId || previewData.gstin,
+        },
+      };
+    }
+    if (invoice) return invoice;
+    return {
+      invoiceId: null,
+      invoiceNumber: "Assigned on generation",
+      invoiceDate: null,
+      dueDate: null,
+      invoiceStatus: "Draft Preview",
+      isDraftPreview: true,
+      generated: false,
+      snapshotId: effectiveSnapshotId,
+      billingSnapshotId: effectiveSnapshotId,
+      billingScheduleId: effectiveOccurrenceId,
+      snapshotNumber: recordLabel,
+      billingSnapshotNumber: recordLabel,
+      projectId: taxCalc?.projectId || occurrenceData?.projectId || snapshotData?.projectId,
+      projectCode,
+      projectName,
+      projectStartDate: taxCalc?.projectStartDate || occurrenceData?.projectStartDate || snapshotData?.projectStartDate,
+      projectEndDate: taxCalc?.projectEndDate || occurrenceData?.projectEndDate || snapshotData?.projectEndDate,
+      clientName,
+      billingPeriod,
+      billingPeriodStart: rawStart,
+      billingPeriodEnd: rawEnd,
+      currency,
+      paymentTermName: paymentTerms !== "Not provided" ? paymentTerms : (snapshotData?.paymentTermName || null),
+      paymentTerms: paymentTerms !== "Not provided" ? paymentTerms : (snapshotData?.paymentTermName || null),
+      billingAddress: snapshotData?.billingAddress || taxCalc?.billingAddress || occurrenceData?.billingAddress || null,
+      email: snapshotData?.clientEmail || taxCalc?.clientEmail || occurrenceData?.clientEmail || null,
+      phone: snapshotData?.clientPhone || taxCalc?.clientPhone || occurrenceData?.clientPhone || null,
+      gstinOrTaxId: snapshotData?.clientTaxId || taxCalc?.clientTaxId || occurrenceData?.clientTaxId || null,
+      subtotal,
+      totalTax,
+      grandTotal,
+      taxComponents: taxCalc?.taxComponents || taxCalc?.taxBreakdown || occurrenceData?.taxComponents || [],
+      taxBreakdown: taxCalc?.taxComponents || taxCalc?.taxBreakdown || occurrenceData?.taxComponents || [],
+      items,
+      sellerName: companyProfile?.legalName || companyProfile?.companyName,
+      sellerAddress: companyProfile?.address,
+      sellerGstin: companyProfile?.taxRegistrationNumber || companyProfile?.gstin,
+      sellerEmail: companyProfile?.email,
+      sellerPhone: companyProfile?.phoneNumber || companyProfile?.phone,
+      sellerInfo: companyProfile
+        ? {
+            legalName: companyProfile.legalName || companyProfile.companyName,
+            address: companyProfile.address,
+            gstin: companyProfile.taxRegistrationNumber || companyProfile.gstin,
+            email: companyProfile.email,
+            phone: companyProfile.phoneNumber || companyProfile.phone,
+            logoUrl: companyProfile.logoUrl,
+          }
+        : null,
+      clientInfo: {
+        clientName,
+        billingAddress: snapshotData?.billingAddress || taxCalc?.billingAddress || occurrenceData?.billingAddress || null,
+        country: snapshotData?.country || taxCalc?.country || occurrenceData?.country || null,
+        email: snapshotData?.clientEmail || taxCalc?.clientEmail || occurrenceData?.clientEmail || null,
+        phone: snapshotData?.clientPhone || taxCalc?.clientPhone || occurrenceData?.clientPhone || null,
+        taxId: snapshotData?.clientTaxId || taxCalc?.clientTaxId || occurrenceData?.clientTaxId || null,
+      },
+    };
+  }, [
+    invoice,
+    previewData,
+    effectiveSnapshotId,
+    effectiveOccurrenceId,
+    recordLabel,
+    taxCalc,
+    occurrenceData,
+    snapshotData,
+    projectCode,
+    projectName,
+    clientName,
+    billingPeriod,
+    rawStart,
+    rawEnd,
+    currency,
+    paymentTerms,
+    subtotal,
+    totalTax,
+    grandTotal,
+    items,
+    companyProfile,
+  ]);
 
-  const canonicalInvoiceUrl = isOccurrenceMode
-    ? `/account-receivable/invoices/occurrence/${effectiveOccurrenceId}`
-    : `/account-receivable/invoices/${effectiveSnapshotId || snapshotId}`;
-
+  // Explicit Invoice Generation action triggered ONLY by user clicking Generate Official Invoice
+  const handleGenerateInvoice = async () => {
+    if (isGeneratingRef.current || generating) return;
+ 
+    if (!isTaxCompleted) {
+      const msg = "Tax calculation must be completed before generating an invoice.";
+      setGenerateError(msg);
+      showStatusToast(msg, "warning");
+      return;
+    }
+ 
+    if (isInvoiceGenerated) {
+      showStatusToast("Invoice has already been generated for this snapshot.", "info");
+      return;
+    }
+ 
+    isGeneratingRef.current = true;
+    setGenerating(true);
+    setIsGenerationCompleted(false);
+    setGenerateError("");
+    setGenerationModalOpen(true);
+    setGenerationModalState("GENERATING");
+ 
+    let timerId = null;
+ 
+    try {
+      const minDelayPromise = new Promise((resolve) => {
+        timerId = setTimeout(resolve, minPresentationDuration);
+      });
+ 
+      const apiPromise = isOccurrenceMode
+        ? generateInvoiceForOccurrence(effectiveOccurrenceId)
+        : generateInvoice(effectiveSnapshotId);
+ 
+      // Coordinate single backend POST with minimum presentation duration:
+      // - Fast API response (< minPresentationDuration) waits for min presentation duration
+      // - Slower API response (> minPresentationDuration) resolves immediately upon API response without extra delay
+      // - API failure rejects immediately via Promise.all without waiting for min presentation duration
+      const [createdInvoice] = await Promise.all([apiPromise, minDelayPromise]);
+ 
+      // Complete visual progress state (all 4 steps show checkmarks)
+      setIsGenerationCompleted(true);
+      await new Promise((r) => setTimeout(r, 250));
+ 
+      // Persist the authoritative generated invoice into local state — DO NOT NAVIGATE AWAY!
+      setInvoice(createdInvoice);
+      if (Array.isArray(createdInvoice?.items) && createdInvoice.items.length > 0) {
+        setItems(createdInvoice.items);
+      }
+ 
+      setGenerationModalState("GENERATED");
+      showStatusToast("Invoice generated successfully.", "success");
+    } catch (err) {
+      console.error("[InvoiceGenerationDetail] Error generating invoice:", err);
+      if (err?.response?.status === 409) {
+        showStatusToast("Invoice has already been generated for this snapshot.", "info");
+        try {
+          const existing = await getInvoice(effectiveId);
+          if (existing && (existing.invoiceId || existing.invoiceNumber)) {
+            setInvoice(existing);
+            if (Array.isArray(existing.items) && existing.items.length > 0) {
+              setItems(existing.items);
+            }
+            setGenerationModalState("GENERATED");
+            return;
+          }
+        } catch (_) {}
+      }
+ 
+      const msg = isOccurrenceMode
+        ? getOccurrenceErrorMessage(err, "Failed to generate invoice for occurrence.")
+        : getInvoiceErrorMessage(err, "Failed to generate invoice.");
+      setGenerateError(msg);
+      setGenerationModalState("ERROR");
+      showStatusToast(msg, "error");
+    } finally {
+      if (timerId) {
+        clearTimeout(timerId);
+      }
+      setGenerating(false);
+      setIsGenerationCompleted(false);
+      isGeneratingRef.current = false;
+    }
+  };
+ 
+  // Submit for Approval action after generation
+  const handleSubmitForApproval = async () => {
+    if (!invoice?.invoiceId || submittingForApproval) return;
+    setSubmittingForApproval(true);
+    try {
+      const updated = await submitInvoiceForApproval(invoice.invoiceId);
+      showStatusToast("Invoice submitted for approval successfully.", "success");
+      if (updated) {
+        setInvoice((prev) => ({
+          ...prev,
+          ...updated,
+          invoiceStatus: updated.invoiceStatus || "PENDING_APPROVAL",
+        }));
+      } else {
+        setInvoice((prev) => ({
+          ...prev,
+          invoiceStatus: "PENDING_APPROVAL",
+        }));
+      }
+    } catch (err) {
+      console.error("[InvoiceGenerationDetail] Error submitting invoice for approval:", err);
+      const msg = getInvoiceErrorMessage(err, "Failed to submit invoice for approval.");
+      showStatusToast(msg, "error");
+    } finally {
+      setSubmittingForApproval(false);
+    }
+  };
+ 
+  if (loading && !refreshing) {
+    return (
+      <div className="flex h-80 items-center justify-center">
+        <Loader size="lg" text="Loading Invoice Generation draft preview..." />
+      </div>
+    );
+  }
+ 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
-      {/* Breadcrumb */}
-      <Breadcrumb
-        items={
-          isOccurrenceMode
-            ? [
-                { label: "Tax Calculation", to: backToTaxUrl },
-                { label: "Invoice Generation" },
-                { label: isInvoiceGenerated ? (invoice?.invoiceNumber || recordLabel) : recordLabel },
-              ]
-            : [
-                { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" },
-                { label: "Tax Calculation", to: backToTaxUrl },
-                { label: "Invoice Generation" },
-                { label: isInvoiceGenerated ? (invoice?.invoiceNumber || recordLabel) : recordLabel },
-              ]
-        }
-      />
-
-      {/* Header Bar */}
+      
+      {/* Page Header */}
       <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Invoice Generation</h1>
-            <StatusBadge label={invoiceStatus} size="sm" />
+            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
+              Invoice Generation
+            </h1>
+            <StatusBadge
+              label={
+                generating
+                  ? "GENERATING"
+                  : isInvoiceGenerated
+                  ? (invoice?.invoiceStatus === "GENERATED" || !invoice?.invoiceStatus ? "INVOICE GENERATED" : invoiceStatus)
+                  : (taxCalc?.status === "TAX_COMPLETED" || snapshotData?.status === "TAX_COMPLETED" ? "Tax Completed" : "Draft Preview")
+              }
+              size="sm"
+            />
+            {isInvoiceGenerated && (
+              <span
+                className="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-emerald-800"
+              >
+                INVOICE GENERATED
+              </span>
+            )}
           </div>
           <p className="text-sm text-slate-600">
-            {isOccurrenceMode ? "Occurrence: " : "Snapshot: "}
-            <span className="font-mono font-bold text-indigo-700">{recordLabel}</span>
-            {isInvoiceGenerated && invoice?.invoiceNumber && (
-              <>
-                <span className="mx-2 text-slate-300">&middot;</span>
-                Invoice: <span className="font-mono font-bold text-emerald-700">{invoice.invoiceNumber}</span>
-              </>
-            )}
-          </p>
-          <p className="text-sm text-slate-600">
-            <span className="font-semibold text-slate-800">{projectName}</span>
-            <span className="mx-1.5 text-slate-300">&middot;</span>
-            <span>{clientName}</span>
+            {generating
+              ? "Creating your official invoice..."
+              : isInvoiceGenerated
+              ? (
+                <span>
+                  Official authoritative invoice created.
+                  {invoice?.invoiceNumber && (
+                    <span className="font-mono font-bold text-indigo-700 ml-1.5">
+                      {invoice.invoiceNumber}
+                    </span>
+                  )}
+                </span>
+              )
+              : "Review the invoice details before generating the official invoice."}
           </p>
         </div>
-
-        {/* Header Actions */}
+ 
+        {/* Top-Right Actions */}
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="small"
             onClick={() => navigate(backToTaxUrl)}
-            className="flex items-center gap-1.5 text-xs text-slate-600"
+            className="flex items-center gap-1.5 text-xs text-slate-700"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Tax Calculation
           </Button>
+ 
 
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => navigate(INVOICE_WORKSPACE_PATH)}
-            className="flex items-center gap-1.5 text-xs text-slate-600"
-          >
-            Invoice Generation Dashboard
-          </Button>
-
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => loadData(true)}
-            disabled={refreshing || generating || submitting}
-            className="flex items-center gap-1.5 text-xs"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Refresh
-          </Button>
         </div>
       </div>
 
-      {/* Workflow Guidance Banner */}
-      {!isInvoiceGenerated ? (
-        /* State A: Ready to Generate */
-        <div className="flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50/70 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-indigo-950">Tax Calculation Verified</h3>
-                <span className="text-xs font-semibold text-indigo-600">&rarr;</span>
-                <span className="text-xs font-bold text-indigo-800">Ready to Generate Invoice</span>
-              </div>
-              <p className="text-xs text-indigo-700 mt-0.5">
-                Review invoice context, line items, and summary below. Click "Generate Invoice" to create the authoritative invoice.
-              </p>
-            </div>
-          </div>
+      {/* Draft status and errors belong above the preview. */}
+      {!generating && (
+        <InvoiceDraftBanner
+          isInvoiceGenerated={isInvoiceGenerated}
+          invoiceStatus={invoiceStatus}
+          invoiceNumber={invoice?.invoiceNumber}
+          isTaxCompleted={isTaxCompleted}
+          generating={generating}
+          generateError={generateError}
+          onGenerateInvoice={handleGenerateInvoice}
+          showGenerateAction={false}
+          onSubmitForApproval={handleSubmitForApproval}
+          submittingForApproval={submittingForApproval}
+          onViewInvoice={() => {
+            setGenerationModalState("GENERATED");
+            setGenerationModalOpen(true);
+          }}
+          onBackToTax={() => navigate(backToTaxUrl)}
+        />
+      )}
 
+
+      {/* Preview keeps the richer cards and tables for review before generation. */}
+      <InvoicePreviewDocument
+        invoice={invoice || previewInvoice}
+        snapshotId={effectiveId}
+        taxCalc={taxCalc || occurrenceData}
+        snapshotData={snapshotData || occurrenceData}
+        occurrence={isOccurrenceMode ? occurrenceData : null}
+        companyProfile={companyProfile}
+        isGenerating={generating}
+      />
+
+      {!isInvoiceGenerated && (
+        <div className="flex justify-end">
           <Button
             variant="primary"
             size="small"
             onClick={handleGenerateInvoice}
-            disabled={generating || isInvoiceGenerated}
-            className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center justify-center gap-1.5 text-xs font-semibold shadow-sm shrink-0"
+            disabled={generating || !isTaxCompleted}
+            className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center justify-center gap-2 text-xs font-semibold shadow-xs px-4 py-2"
           >
             {generating ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating Invoice...
+                <Loader2 className="h-4 w-4 animate-spin" /> Generating Official Invoice...
               </>
             ) : (
               <>
-                <FileText className="h-3.5 w-3.5" /> Generate Invoice
+                <FileText className="h-4 w-4" /> Generate Official Invoice
               </>
             )}
           </Button>
         </div>
-      ) : invoiceStatus === "GENERATED" ? (
-        /* State B: Invoice Generated */
-        <div className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-emerald-950">Invoice Generated Successfully</h3>
-                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded">
-                  {invoice?.invoiceNumber}
-                </span>
-                <StatusBadge label={invoiceStatus} size="sm" />
-              </div>
-              <p className="text-xs text-emerald-800 mt-0.5">
-                Authoritative invoice created. Preview the document below and submit for approval.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="small"
-              onClick={handleScrollToPreview}
-              className="bg-white text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 text-xs font-semibold"
-            >
-              <Eye className="h-3.5 w-3.5 text-slate-600" /> Preview Invoice
-            </Button>
-
-            <Button
-              variant="primary"
-              size="small"
-              onClick={handleSubmitForApproval}
-              disabled={submitting}
-              className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold shadow-sm"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Submitting...
-                </>
-              ) : (
-                <>
-                  <Send className="h-3.5 w-3.5" /> Submit for Approval
-                </>
-              )}
-            </Button>
-
-            <Button
-              variant="outline"
-              size="small"
-              onClick={() => navigate(canonicalInvoiceUrl)}
-              className="bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 flex items-center gap-1.5 text-xs font-semibold"
-            >
-              Open in Invoice Detail <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-      ) : invoiceStatus === "PENDING_APPROVAL" ? (
-        /* State C: Pending Approval */
-        <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-              <Clock className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-amber-950">Invoice Submitted for Approval</h3>
-                <span className="font-mono text-xs font-bold text-amber-800 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded">
-                  {invoice?.invoiceNumber}
-                </span>
-                <StatusBadge label={invoiceStatus} size="sm" />
-              </div>
-              <p className="text-xs text-amber-800 mt-0.5">
-                This invoice has been submitted to the Invoice Approval workflow.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="small"
-              onClick={handleScrollToPreview}
-              className="bg-white text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 text-xs font-semibold"
-            >
-              <Eye className="h-3.5 w-3.5 text-slate-600" /> Preview Invoice
-            </Button>
-
-            <Button
-              variant="primary"
-              size="small"
-              onClick={() => navigate(INVOICE_APPROVAL_PATH)}
-              className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold shadow-sm"
-            >
-              Go to Invoice Approval <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-
-            <Button
-              variant="outline"
-              size="small"
-              onClick={() => navigate(canonicalInvoiceUrl)}
-              className="bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 flex items-center gap-1.5 text-xs font-semibold"
-            >
-              Open in Invoice Detail <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-      ) : invoiceStatus === "APPROVED" ? (
-        /* State D: Approved */
-        <div className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-emerald-950">Invoice Approved</h3>
-                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded">
-                  {invoice?.invoiceNumber}
-                </span>
-                <StatusBadge label={invoiceStatus} size="sm" />
-              </div>
-              <p className="text-xs text-emerald-800 mt-0.5">
-                This invoice is approved. Use Canonical Invoice Detail to execute final delivery actions (Send to Client).
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="small"
-              onClick={handleScrollToPreview}
-              className="bg-white text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 text-xs font-semibold"
-            >
-              <Eye className="h-3.5 w-3.5 text-slate-600" /> Preview Invoice
-            </Button>
-
-            <Button
-              variant="primary"
-              size="small"
-              onClick={() => navigate(canonicalInvoiceUrl)}
-              className="bg-teal-700 hover:bg-teal-800 text-white flex items-center gap-1.5 text-xs font-semibold shadow-sm"
-            >
-              Go to Invoice Detail <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-      ) : (
-        /* State E: Rejected or Other Status */
-        <div className="flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50/70 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-700">
-              <AlertTriangle className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-rose-950">Invoice Status: {invoiceStatus}</h3>
-                <span className="font-mono text-xs font-bold text-rose-800 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded">
-                  {invoice?.invoiceNumber}
-                </span>
-                <StatusBadge label={invoiceStatus} size="sm" />
-              </div>
-              <p className="text-xs text-rose-800 mt-0.5">
-                Review this record in Canonical Invoice Detail for corrections and lifecycle actions.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="small"
-              onClick={handleScrollToPreview}
-              className="bg-white text-slate-700 border-slate-300 hover:bg-slate-50 flex items-center gap-1.5 text-xs font-semibold"
-            >
-              <Eye className="h-3.5 w-3.5 text-slate-600" /> Preview Invoice
-            </Button>
-
-            <Button
-              variant="primary"
-              size="small"
-              onClick={() => navigate(canonicalInvoiceUrl)}
-              className="bg-rose-700 hover:bg-rose-800 text-white flex items-center gap-1.5 text-xs font-semibold shadow-sm"
-            >
-              Go to Invoice Detail <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
       )}
 
-      {/* Main Container Card */}
-      <PageCard className="overflow-hidden border border-slate-200 shadow-sm">
-        {/* Section 1: Invoice Context */}
-        <div className="border-b border-slate-200 bg-slate-50/50 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Invoice Context
-            </span>
-            {isInvoiceGenerated && (
-              <StatusBadge label={invoiceStatus} size="sm" />
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-12">
-            <Field label="Project" className="lg:col-span-2">{projectName}</Field>
-            <Field label="Project Code" className="lg:col-span-2">{projectCode}</Field>
-            <Field label="Client" className="lg:col-span-2">{clientName}</Field>
-            <Field label="Billing Period" className="lg:col-span-3" truncate={false}>
-              {billingPeriod}
-            </Field>
-            <Field label="Currency" className="lg:col-span-1">{currency}</Field>
-            <Field label="Payment Terms" className="lg:col-span-2">{paymentTerms}</Field>
-          </div>
-
-          {isInvoiceGenerated && (
-            <div className="mt-3 pt-3 border-t border-slate-200 grid grid-cols-2 gap-4 sm:grid-cols-3">
-              <Field label="Invoice Number">{invoice?.invoiceNumber}</Field>
-              <Field label="Invoice Date">
-                {invoice?.invoiceDate ? formatDisplayDate(invoice.invoiceDate) : "—"}
-              </Field>
-              <Field label="Due Date">
-                {invoice?.dueDate ? formatDisplayDate(invoice.dueDate) : "—"}
-              </Field>
-            </div>
-          )}
-        </div>
-
-        {/* Section 2: Invoice Line Items */}
-        <div className="border-b border-slate-200 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-              <FileText className="h-3.5 w-3.5 text-indigo-600" /> Invoice Line Items
-            </span>
-            <span className="text-[11px] font-medium text-slate-400">
-              {items.length} {items.length === 1 ? "Item" : "Items"}
-            </span>
-          </div>
-
-          {items.length === 0 ? (
-            <div className="rounded-lg bg-slate-50 p-6 text-center text-xs text-slate-500">
-              No line items recorded for this billing snapshot.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    <th className="pb-2 pr-3 font-bold">Resource / Item</th>
-                    <th className="pb-2 px-3 font-bold">Role</th>
-                    <th className="pb-2 px-3 font-bold">Work Date</th>
-                    <th className="pb-2 px-3 text-right font-bold">Hours / Qty</th>
-                    <th className="pb-2 px-3 text-right font-bold">Rate</th>
-                    <th className="pb-2 pl-3 text-right font-bold">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {items.map((it) => (
-                    <tr key={it.id}>
-                      <td className="py-3 pr-3 font-semibold text-slate-800">
-                        {it.itemName || it.item || "—"}
-                      </td>
-                      <td className="py-3 px-3 text-slate-600">
-                        {it.role || "—"}
-                      </td>
-                      <td className="py-3 px-3 font-mono text-xs text-slate-500">
-                        {it.workDate ? formatDisplayDate(it.workDate) : "—"}
-                      </td>
-                      <td className="py-3 px-3 text-right font-mono text-slate-700">
-                        {it.quantity !== undefined && it.quantity !== null ? Number(it.quantity).toFixed(2) : "—"}
-                      </td>
-                      <td className="py-3 px-3 text-right font-mono text-slate-700">
-                        {formatCurrency(it.rate, currency)}
-                      </td>
-                      <td className="py-3 pl-3 text-right font-mono font-bold text-slate-900">
-                        {formatCurrency(it.amount, currency)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Section 3: Compact Invoice Summary */}
-        <div className="bg-slate-50/50 p-5">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
-            <div className="space-y-1.5 max-w-sm">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
-                Invoice Summary
-              </span>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Tax calculated and verified in Tax Calculation. Financial values are authoritative from the billing snapshot.
-              </p>
-            </div>
-
-            <div className="w-full sm:w-80 rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-600 font-medium">Subtotal</span>
-                <span className="font-mono font-bold text-slate-800">
-                  {formatCurrency(subtotal, currency)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-600 font-medium">Tax</span>
-                <span className="font-mono font-bold text-slate-800">
-                  {formatCurrency(totalTax, currency)}
-                </span>
-              </div>
-              <div className="border-t border-slate-200 pt-2.5 flex items-center justify-between">
-                <span className="text-sm font-bold text-slate-900">Grand Total</span>
-                <span className="font-mono text-base font-extrabold text-indigo-950">
-                  {formatCurrency(grandTotal, currency)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 4: Action Footer */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white p-5">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="small"
-              onClick={() => navigate(backToTaxUrl)}
-              className="text-xs text-slate-700"
-            >
-              <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back to Tax Calculation
-            </Button>
-          </div>
-
-
-        </div>
-      </PageCard>
-
-      {/* Persistent Invoice Document Preview */}
-      {isInvoiceGenerated && (
-        <div id="invoice-document-preview" ref={previewSectionRef} className="space-y-3">
-          <PageCard className="overflow-hidden border border-slate-200 shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-3.5">
-              <div className="flex items-center gap-2.5">
-                <FileText className="h-4 w-4 text-indigo-700" />
-                <h3 className="text-sm font-bold text-slate-800">
-                  Authoritative Invoice Document Preview
-                </h3>
-                <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
-                  {invoice?.invoiceNumber}
-                </span>
-                <StatusBadge label={invoiceStatus} size="sm" />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="small"
-                  onClick={() => setIsPreviewExpanded((prev) => !prev)}
-                  className="text-xs text-slate-600 bg-white flex items-center gap-1"
-                >
-                  {isPreviewExpanded ? (
-                    <>
-                      <ChevronUp className="h-3.5 w-3.5" /> Collapse Document
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="h-3.5 w-3.5" /> Expand Document
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="small"
-                  onClick={() => navigate(canonicalInvoiceUrl)}
-                  className="text-xs text-indigo-700 bg-white border-indigo-200 hover:bg-indigo-50 flex items-center gap-1"
-                >
-                  Open in Invoice Detail <ArrowRight className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-
-            {isPreviewExpanded && (
-              <div className="p-4 sm:p-6 bg-slate-100/60">
-                <InvoiceDocument
-                  invoice={invoice}
-                  snapshotId={effectiveId}
-                  taxCalc={taxCalc || occurrenceData}
-                  snapshotData={snapshotData || occurrenceData}
-                  companyProfile={companyProfile}
-                />
-              </div>
-            )}
-          </PageCard>
-        </div>
-      )}
+      {/* E. Generation Modal (GENERATING -> GENERATED -> ERROR) */}
+      <InvoiceGenerationModal
+        isOpen={generationModalOpen}
+        modalState={generationModalState}
+        invoice={invoice}
+        projectName={projectName}
+        clientName={clientName}
+        snapshotId={effectiveId}
+        taxCalc={taxCalc || occurrenceData}
+        snapshotData={snapshotData || occurrenceData}
+        occurrence={isOccurrenceMode ? occurrenceData : null}
+        companyProfile={companyProfile}
+        generateError={generateError}
+        submittingForApproval={submittingForApproval}
+        isGenerationCompleted={isGenerationCompleted}
+        onClose={() => setGenerationModalOpen(false)}
+        onRetry={handleGenerateInvoice}
+        onSubmitForApproval={handleSubmitForApproval}
+      />
     </div>
   );
 }
+ 

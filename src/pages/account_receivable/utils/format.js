@@ -130,3 +130,38 @@ export function formatDisplayDateTime(value) {
     minute: "2-digit",
   });
 }
+
+// PMS formats project-duration dates as "09-Sep-2026" (see the
+// /available-projects projectDuration string) — normalized to the
+// application's "DD MMM YYYY"; anything else goes through formatDisplayDate.
+const PMS_DURATION_DATE = /^(\d{1,2})[-\s/]([A-Za-z]{3})[A-Za-z]*[-\s/](\d{4})$/;
+
+function formatDurationDate(value) {
+  const match = String(value).trim().match(PMS_DURATION_DATE);
+  if (!match) return formatDisplayDate(value);
+  const [, day, month, year] = match;
+  return `${day.padStart(2, "0")} ${month.charAt(0).toUpperCase()}${month.slice(1).toLowerCase()} ${year}`;
+}
+
+/**
+ * Project Duration — the PMS project period (never billing/payment dates).
+ * Prefers the project's own projectDuration string ("09-Sep-2026 to
+ * 23-Dec-2026"), falling back to its startDate/endDate. Returns
+ * "09 Sep 2026 – 23 Dec 2026", or "" when the project has no duration.
+ */
+export function formatProjectDuration(project = {}) {
+  const { projectDuration, startDate, endDate } = project || {};
+  if (typeof projectDuration === "string" && projectDuration.trim()) {
+    const parts = projectDuration
+      .split(/\s+to\s+|\s+[–-]\s+/i)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    return parts.length === 2
+      ? `${formatDurationDate(parts[0])} – ${formatDurationDate(parts[1])}`
+      : projectDuration.trim();
+  }
+  if (startDate || endDate) {
+    return `${startDate ? formatDisplayDate(startDate) : "—"} – ${endDate ? formatDisplayDate(endDate) : "Ongoing"}`;
+  }
+  return "";
+}
