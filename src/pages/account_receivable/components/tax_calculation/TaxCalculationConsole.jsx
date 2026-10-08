@@ -26,7 +26,7 @@ import { getActiveTaxRegions } from "../../services/taxRateConfigurationService"
 import { getBillingOccurrences } from "../../services/billingOccurrenceService";
 import {
   PIPELINE_STAGES,
-  PIPELINE_STAGE_ORDER,
+  countPipelineStages,
   toSnapshotPipelineRecord,
   toOccurrencePipelineRecord,
   comparePipelineRecords,
@@ -56,49 +56,32 @@ export default function TaxCalculationConsole() {
   const [refreshing, setRefreshing] = useState(false);
   const [stage, setStage] = useState(ALL);
 
-  // Billing Occurrences — Milestone Plan / Recurring records
-  // feeding this same Tax Calculation workspace. Each bucket is fetched by the
-  // exact backend status it represents; the frontend never re-derives
-  // eligibility.
+  // Billing Occurrences — Milestone Plan / Recurring records feeding this
+  // same Tax Calculation workspace. Every occurrence's stage comes from
+  // getTaxPipelineStatus on its own fields, never from the query it was
+  // fetched by.
   const [occLoading, setOccLoading] = useState(true);
-  const [readyOccurrences, setReadyOccurrences] = useState([]);
-  const [upcomingOccurrences, setUpcomingOccurrences] = useState([]);
-  const [processedOccurrences, setProcessedOccurrences] = useState([]);
-  const [invoicedOccurrences, setInvoicedOccurrences] = useState([]);
+  const [occurrences, setOccurrences] = useState([]);
 
   const loadOccurrences = async () => {
     setOccLoading(true);
     try {
-      // periodStatus and taxStatus are two separate backend fields (never
-      // assume they're the same) -- periodStatus is the occurrence's own
-      // lifecycle (SCHEDULED -> TAX_PENDING -> TAX_CALCULATED, advanced only
-      // by the backend scheduler) and is what both bucket membership here
-      // and calculate-tax eligibility are keyed on.
-      const [ready, upcoming, processed] = await Promise.all([
-        getBillingOccurrences({ periodStatus: "TAX_PENDING" }).catch(() => []),
-        getBillingOccurrences({ periodStatus: "SCHEDULED" }).catch(() => []),
-        getBillingOccurrences({ periodStatus: "TAX_CALCULATED" }).catch(() => []),
-      ]);
+      // periodStatus is the occurrence's own lifecycle (SCHEDULED ->
+      // TAX_PENDING -> TAX_CALCULATED, advanced only by the backend
+      // scheduler). The list endpoint has no invoice filter, so invoiced
+      // occurrences arrive inside these lists and are told apart by their
+      // isInvoiced field.
+      const lists = await Promise.all(
+        ["SCHEDULED", "TAX_PENDING", "TAX_CALCULATED"].map((periodStatus) =>
+          getBillingOccurrences({ periodStatus }).catch(() => [])
+        )
+      );
 
-      const [invoicedReady, invoicedProcessed] = await Promise.all([
-        getBillingOccurrences({ periodStatus: "TAX_PENDING", isInvoiced: true }).catch(() => []),
-        getBillingOccurrences({ periodStatus: "TAX_CALCULATED", isInvoiced: true }).catch(() => []),
-      ]);
-
-      const invoicedMap = new Map();
-      [...(invoicedReady || []), ...(invoicedProcessed || [])].forEach((o) => {
-        if (o?.billingScheduleId) invoicedMap.set(o.billingScheduleId, o);
+      const byId = new Map();
+      lists.flat().forEach((o) => {
+        if (o?.billingScheduleId) byId.set(o.billingScheduleId, o);
       });
-      const invoicedList = Array.from(invoicedMap.values());
-
-      setReadyOccurrences(
-        (ready || []).filter((o) => !invoicedMap.has(o.billingScheduleId))
-      );
-      setUpcomingOccurrences(upcoming || []);
-      setProcessedOccurrences(
-        (processed || []).filter((o) => !invoicedMap.has(o.billingScheduleId))
-      );
-      setInvoicedOccurrences(invoicedList);
+      setOccurrences(Array.from(byId.values()));
     } catch (err) {
       console.error("[TaxCalculationConsole] Error loading occurrences:", err);
     } finally {
@@ -133,12 +116,12 @@ export default function TaxCalculationConsole() {
                 : !cfg.billingConfigurationId && Boolean(savedMeta);
             const validMeta = isMatchingConfig ? savedMeta : null;
 
-            const snapStart =
+            let snapStart =
               cfg.billingPeriodStart ||
               validMeta?.billingPeriodStart ||
               cfg.periodStart ||
               null;
-            const snapEnd =
+            let snapEnd =
               cfg.billingPeriodEnd ||
               validMeta?.billingPeriodEnd ||
               cfg.periodEnd ||
@@ -154,12 +137,12 @@ export default function TaxCalculationConsole() {
               ).catch(() => null);
             }
 
-            const snapshotId =
+            let snapshotId =
               existingSnapshot?.snapshotId ||
               validMeta?.snapshotId ||
               cfg.snapshotId ||
               null;
-            const snapshotNumber =
+            let snapshotNumber =
               existingSnapshot?.snapshotNumber ||
               validMeta?.snapshotNumber ||
               cfg.snapshotNumber ||
@@ -172,6 +155,18 @@ export default function TaxCalculationConsole() {
             let totalTaxAmount = null;
             let grandTotal = null;
             let taxRegionName = cfg.taxRegionName || cfg.taxRegion || null;
+            let invoiceId = null;
+
+            if (cfg.projectId) {
+              const savedMeta = getAcquiredSnapshotMetadata(cfg.projectId);
+              if (savedMeta) {
+                if (savedMeta.snapshotId) snapshotId = savedMeta.snapshotId;
+                if (savedMeta.snapshotNumber) snapshotNumber = savedMeta.snapshotNumber;
+                if (savedMeta.status) snapshotStatus = savedMeta.status;
+                if (savedMeta.periodStart) snapStart = savedMeta.periodStart;
+                if (savedMeta.periodEnd) snapEnd = savedMeta.periodEnd;
+              }
+            }
 
             if (snapshotId) {
               const taxCalcData = await getTaxCalculation(snapshotId).catch(() => null);
@@ -192,11 +187,13 @@ export default function TaxCalculationConsole() {
                 grandTotal = taxCalcData.grandTotal ?? null;
               }
 
-              // Check if invoice exists for this snapshot
+              // Invoiced only when the backend returns a persisted invoice for
+              // this snapshot — a stored/snapshot status of "INVOICED" is not proof.
               const invData = await getInvoice(snapshotId).catch(() => null);
+              if (invData?.invoiceId) invoiceId = invData.invoiceId;
               if (invData && (invData.invoiceNumber || invData.invoiceId)) {
                 snapshotStatus = "INVOICED";
-              } else if (validMeta?.status === "INVOICED" || existingSnapshot?.status === "INVOICED") {
+              } else if (savedMeta?.status === "INVOICED" || existingSnapshot?.status === "INVOICED") {
                 snapshotStatus = "INVOICED";
               }
             }
@@ -213,8 +210,6 @@ export default function TaxCalculationConsole() {
               snapshotStatus = "READY_FOR_TAX";
             } else if (stUpper === "CALCULATED") {
               snapshotStatus = "TAX_COMPLETED";
-            } else if (stUpper === "INVOICED") {
-              snapshotStatus = "INVOICED";
             }
 
             const displayPeriod =
@@ -238,6 +233,7 @@ export default function TaxCalculationConsole() {
               totalTaxAmount,
               grandTotal,
               status: snapshotStatus,
+              invoiceId,
               config: {
                 ...cfg,
                 snapshotPeriodStart: snapStart,
@@ -277,31 +273,16 @@ export default function TaxCalculationConsole() {
 
   // One display model for every billing type — T&M snapshots and billing
   // occurrences become identical pipeline records.
-  const records = useMemo(() => {
-    const occurrenceBuckets = [
-      [upcomingOccurrences, PIPELINE_STAGES.UPCOMING],
-      [readyOccurrences, PIPELINE_STAGES.READY_FOR_TAX],
-      [processedOccurrences, PIPELINE_STAGES.TAX_CALCULATED],
-      [invoicedOccurrences, PIPELINE_STAGES.INVOICED],
-    ];
-    return [
-      ...snapshots.map(toSnapshotPipelineRecord).filter(Boolean),
-      ...occurrenceBuckets.flatMap(([list, bucketStage]) =>
-        list.map((occ) => toOccurrencePipelineRecord(occ, bucketStage))
-      ),
-    ].sort(comparePipelineRecords);
-  }, [snapshots, upcomingOccurrences, readyOccurrences, processedOccurrences, invoicedOccurrences]);
+  const records = useMemo(
+    () =>
+      [
+        ...snapshots.map(toSnapshotPipelineRecord).filter(Boolean),
+        ...occurrences.map(toOccurrencePipelineRecord),
+      ].sort(comparePipelineRecords),
+    [snapshots, occurrences]
+  );
 
-  const stageCounts = useMemo(() => {
-    const counts = { [ALL]: records.length };
-    PIPELINE_STAGE_ORDER.forEach((s) => {
-      counts[s] = 0;
-    });
-    records.forEach((r) => {
-      counts[r.stage] += 1;
-    });
-    return counts;
-  }, [records]);
+  const stageCounts = useMemo(() => countPipelineStages(records), [records]);
 
   const pipelineLoading = (loading && !refreshing) || occLoading;
 

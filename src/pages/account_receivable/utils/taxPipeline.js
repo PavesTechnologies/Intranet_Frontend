@@ -37,20 +37,51 @@ export const PIPELINE_EMPTY_MESSAGES = {
   [PIPELINE_STAGES.INVOICED]: "No invoiced billing records.",
 };
 
+// Status values that mean tax has been calculated. IN_TAX (T&M calculation
+// running on the backend) sits with Tax Calculated; the row badge still
+// shows "Tax in Progress" so it is never presented as finished.
+const TAX_CALCULATED_STATUSES = new Set(["TAX_CALCULATED", "CALCULATED", "TAX_COMPLETED", "IN_TAX"]);
+// Status values that mean the record is eligible and waiting for tax.
+const TAX_PENDING_STATUSES = new Set(["TAX_PENDING", "READY_FOR_TAX", "READY_TO_TAX", "READY"]);
+
+const recordStatuses = (record) =>
+  [record?.periodStatus, record?.taxStatus, record?.taxCalculationStatus, record?.status].map((s) =>
+    String(s || "").toUpperCase()
+  );
+
 /**
- * T&M billing snapshot status -> pipeline stage. IN_TAX (calculation running
- * on the backend) sits with Tax Calculated; the row badge still shows the
- * real backend status so it is never presented as finished.
- * Returns null for statuses that don't belong in the tax workspace
- * (e.g. NOT_ACQUIRED).
+ * True only when an invoice has actually been generated for the record:
+ * the backend's persisted per-occurrence `isInvoiced` flag (strictly true),
+ * or the id of a persisted invoice. A status string such as "INVOICED" on
+ * a billing/snapshot/occurrence status is deliberately NOT proof.
  */
-export function getSnapshotStage(status) {
-  const st = String(status || "").toUpperCase();
-  if (st === "READY_TO_TAX" || st === "READY_FOR_TAX" || st === "READY") return PIPELINE_STAGES.READY_FOR_TAX;
-  if (st === "IN_TAX" || st === "TAX_COMPLETED" || st === "CALCULATED") return PIPELINE_STAGES.TAX_CALCULATED;
-  if (st === "INVOICED") return PIPELINE_STAGES.INVOICED;
-  return null;
+export function hasGeneratedInvoice(record) {
+  return record?.isInvoiced === true || Boolean(record?.invoiceId);
 }
+
+/**
+ * The ONE pipeline status for any Tax Calculation record (billing
+ * occurrence or T&M snapshot). Summary counts, stage tabs/filters, the
+ * table Status column and the detail badge all read this value.
+ *
+ *   1. INVOICED        — an invoice was actually generated
+ *   2. TAX_CALCULATED  — tax calculated, no invoice yet
+ *   3. READY_FOR_TAX   — eligible and TAX_PENDING (periodStatus/taxStatus)
+ *   4. UPCOMING        — not yet eligible (e.g. periodStatus SCHEDULED)
+ */
+export function getTaxPipelineStatus(record) {
+  if (hasGeneratedInvoice(record)) return PIPELINE_STAGES.INVOICED;
+  const statuses = recordStatuses(record);
+  if (statuses.some((s) => TAX_CALCULATED_STATUSES.has(s))) return PIPELINE_STAGES.TAX_CALCULATED;
+  if (statuses.some((s) => TAX_PENDING_STATUSES.has(s))) return PIPELINE_STAGES.READY_FOR_TAX;
+  return PIPELINE_STAGES.UPCOMING;
+}
+
+// A T&M snapshot only belongs in the tax workspace once it has been acquired
+// into a tax status (or invoiced) — e.g. NOT_ACQUIRED stays out.
+const isSnapshotInTaxWorkspace = (snapshot) =>
+  hasGeneratedInvoice(snapshot) ||
+  recordStatuses(snapshot).some((s) => TAX_CALCULATED_STATUSES.has(s) || TAX_PENDING_STATUSES.has(s));
 
 // Billing Type is a display label only. The backend's billing type name wins
 // when the occurrence carries one (mapped through the app-wide
@@ -69,30 +100,6 @@ export function getOccurrenceBillingType(occurrence) {
   if (occurrence?.recurringConfigurationId) return "Recurring";
   if (raw || occurrence?.billingConfigurationId) return "Milestone Plan";
   return "Billing Occurrence";
-}
-
-/**
- * Single display stage for a billing occurrence, using the same backend
- * fields the detail page has always keyed on (isInvoiced, periodStatus,
- * taxStatus, taxCalculationStatus) — collapsed into one status so the UI
- * never shows Tax Status and Tax Calculation Status side by side.
- */
-export function getOccurrenceStage(occurrence) {
-  const periodStatus = String(occurrence?.periodStatus || "").toUpperCase();
-  const taxStatus = String(occurrence?.taxStatus || "").toUpperCase();
-  const calcStatus = String(occurrence?.taxCalculationStatus || occurrence?.status || "").toUpperCase();
-  if (occurrence?.isInvoiced) return PIPELINE_STAGES.INVOICED;
-  if (
-    periodStatus === "TAX_CALCULATED" ||
-    taxStatus === "TAX_CALCULATED" ||
-    taxStatus === "CALCULATED" ||
-    calcStatus === "CALCULATED"
-  ) {
-    return PIPELINE_STAGES.TAX_CALCULATED;
-  }
-  if (periodStatus === "TAX_PENDING" || taxStatus === "TAX_PENDING") return PIPELINE_STAGES.READY_FOR_TAX;
-  if (periodStatus === "SCHEDULED") return PIPELINE_STAGES.UPCOMING;
-  return null;
 }
 
 const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -145,16 +152,16 @@ const toNumberOrNull = (value) => {
 
 /**
  * Snapshot row (as built by TaxCalculationConsole from the T&M APIs) ->
- * pipeline record. Returns null when the snapshot has no pipeline stage.
+ * pipeline record. Returns null when the snapshot is not in the tax workspace.
  */
 export function toSnapshotPipelineRecord(snapshot) {
-  const stage = getSnapshotStage(snapshot?.status);
-  if (!stage) return null;
+  if (!snapshot || !isSnapshotInTaxWorkspace(snapshot)) return null;
+  const stage = getTaxPipelineStatus(snapshot);
 
   // A snapshot carries no separate billing date; its period end is the
   // date it was billed up to.
   const billingDate = snapshot.billingDate || snapshot.periodEnd || null;
-  const isInTax = String(snapshot.status || "").toUpperCase() === "IN_TAX";
+  const isInTax = stage === PIPELINE_STAGES.TAX_CALCULATED && String(snapshot.status || "").toUpperCase() === "IN_TAX";
 
   return {
     key: `snapshot-${snapshot.id}`,
@@ -173,7 +180,7 @@ export function toSnapshotPipelineRecord(snapshot) {
     taxRegion: snapshot.taxRegion || "",
     stage,
     statusLabel: isInTax ? "Tax in Progress" : PIPELINE_STAGE_LABELS[stage],
-    rawStatus: snapshot.status,
+    rawStatus: stage === PIPELINE_STAGES.INVOICED ? "INVOICED" : snapshot.status,
     searchText: [snapshot.client, snapshot.projectName, snapshot.projectCode, snapshot.snapshotNumber]
       .filter(Boolean)
       .join(" ")
@@ -183,10 +190,11 @@ export function toSnapshotPipelineRecord(snapshot) {
 }
 
 /**
- * Normalized billing occurrence -> pipeline record. `stage` is the bucket
- * the occurrence was fetched into (by backend periodStatus / isInvoiced).
+ * Normalized billing occurrence -> pipeline record. The stage always comes
+ * from getTaxPipelineStatus, never from the query bucket it was fetched by.
  */
-export function toOccurrencePipelineRecord(occurrence, stage) {
+export function toOccurrencePipelineRecord(occurrence) {
+  const stage = getTaxPipelineStatus(occurrence);
   const amount = toNumberOrNull(occurrence.billingAmount ?? occurrence.taxableAmount);
   const reference = occurrence.periodNumber ? `Period ${occurrence.periodNumber}` : "";
 
@@ -207,13 +215,31 @@ export function toOccurrencePipelineRecord(occurrence, stage) {
     taxRegion: occurrence.taxRegionName || "",
     stage,
     statusLabel: PIPELINE_STAGE_LABELS[stage],
-    rawStatus: occurrence.isInvoiced ? "INVOICED" : occurrence.periodStatus || occurrence.taxStatus,
+    rawStatus: stage === PIPELINE_STAGES.INVOICED ? "INVOICED" : occurrence.periodStatus || occurrence.taxStatus,
     searchText: [occurrence.clientName, occurrence.projectName, reference]
       .filter(Boolean)
       .join(" ")
       .toLowerCase(),
     original: occurrence,
   };
+}
+
+// { ALL, UPCOMING, READY_FOR_TAX, TAX_CALCULATED, INVOICED } counts from the
+// records' normalized stage — shared by the summary cards and stage tabs.
+export function countPipelineStages(records = []) {
+  const counts = { ALL: records.length };
+  PIPELINE_STAGE_ORDER.forEach((s) => {
+    counts[s] = 0;
+  });
+  records.forEach((r) => {
+    if (r.stage in counts) counts[r.stage] += 1;
+  });
+  return counts;
+}
+
+// Records shown under a stage tab/filter ("ALL" shows every record).
+export function filterByPipelineStage(records = [], stage = "ALL") {
+  return stage === "ALL" ? records : records.filter((r) => r.stage === stage);
 }
 
 // Pipeline order first (Upcoming -> Invoiced), then billing date ascending.

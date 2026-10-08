@@ -36,12 +36,14 @@ import {
   getBillingOccurrence,
   getOccurrenceTaxCalculation,
   getOccurrenceErrorMessage,
+  mergeOccurrenceWithTaxCalc,
 } from "../services/billingOccurrenceService";
 import {
   formatBillingPeriod,
   toIsoDateOnly,
 } from "../services/billingDataAcquisitionService";
- 
+import { formatPaymentTerms } from "../utils/invoicePresentation";
+
 export const DEFAULT_MIN_PRESENTATION_MS = typeof process !== "undefined" && process.env?.NODE_ENV === "test" ? 0 : 300;
  
 export default function InvoiceGenerationDetail({ minPresentationDuration = DEFAULT_MIN_PRESENTATION_MS } = {}) {
@@ -147,7 +149,10 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
         try {
           const occTax = await getOccurrenceTaxCalculation(effectiveOccurrenceId);
           if (occTax) {
-            occ = occ ? { ...occ, ...occTax } : occTax;
+            // Field-aware merge: a plain spread let the tax-calculation
+            // response's null configuration ids / periodNumber / billingDate
+            // overwrite the occurrence's, losing its billing type.
+            occ = occ ? mergeOccurrenceWithTaxCalc(occ, occTax) : occTax;
           }
         } catch (taxErr) {
           console.warn("[InvoiceGenerationDetail] Occurrence tax calculation notice:", taxErr?.message);
@@ -155,28 +160,11 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
  
         setOccurrenceData(occ);
  
-        // Hydrate line items if not already loaded from existing invoice
+        // No resource-style placeholder line here: before generation the
+        // invoice document builds the Milestone Plan / Recurring / Fixed Price
+        // line from the occurrence itself (utils/invoicePresentation).
         if (!existingInvoice || !existingInvoice.items || existingInvoice.items.length === 0) {
-          const rateAmt = occ?.billingAmount ?? occ?.taxableAmount ?? 0;
-          const itemName = occ?.projectName
-            ? `${occ.projectName} - Fixed Price Billing`
-            : "Fixed Price Billing";
-          const role = "Fixed Price Milestone";
-          const workDate = toIsoDateOnly(occ?.billingDate || occ?.periodEndDate);
- 
-          const fixedItem = {
-            id: `fixed-price-${effectiveOccurrenceId}`,
-            resourceName: itemName,
-            itemName,
-            role,
-            workDate,
-            quantity: 1,
-            rate: rateAmt,
-            amount: rateAmt,
-            itemType: "FIXED_PRICE",
-          };
- 
-          setItems([fixedItem]);
+          setItems([]);
         }
       } else {
         // Authoritative Invoice Preview API: GET /api/v1/billing-snapshots/{snapshotId}/invoice-preview
@@ -306,14 +294,12 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
     "USD";
 
   const paymentTerms =
-    invoice?.paymentTermName ||
-    previewData?.paymentTermName ||
+    formatPaymentTerms(invoice || {}) ||
+    formatPaymentTerms(previewData || {}) ||
     previewData?.paymentTerms ||
-    snapshotData?.paymentTermName ||
-    taxCalc?.paymentTermName ||
-    (invoice?.paymentTermCode ? `${invoice.paymentTermCode} Days` : null) ||
-    (snapshotData?.paymentTermCode ? `${snapshotData.paymentTermCode} Days` : null) ||
-    (taxCalc?.paymentTermCode ? `${taxCalc.paymentTermCode} Days` : null) ||
+    formatPaymentTerms(snapshotData || {}) ||
+    formatPaymentTerms(taxCalc || {}) ||
+    formatPaymentTerms(occurrenceData || {}) ||
     "Not provided";
 
   const subtotal =
@@ -422,6 +408,8 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
       projectId: taxCalc?.projectId || occurrenceData?.projectId || snapshotData?.projectId,
       projectCode,
       projectName,
+      projectStartDate: taxCalc?.projectStartDate || occurrenceData?.projectStartDate || snapshotData?.projectStartDate,
+      projectEndDate: taxCalc?.projectEndDate || occurrenceData?.projectEndDate || snapshotData?.projectEndDate,
       clientName,
       billingPeriod,
       billingPeriodStart: rawStart,
@@ -696,6 +684,7 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
         snapshotId={effectiveId}
         taxCalc={taxCalc || occurrenceData}
         snapshotData={snapshotData || occurrenceData}
+        occurrence={isOccurrenceMode ? occurrenceData : null}
         companyProfile={companyProfile}
         isGenerating={generating}
       />
@@ -732,6 +721,7 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
         snapshotId={effectiveId}
         taxCalc={taxCalc || occurrenceData}
         snapshotData={snapshotData || occurrenceData}
+        occurrence={isOccurrenceMode ? occurrenceData : null}
         companyProfile={companyProfile}
         generateError={generateError}
         submittingForApproval={submittingForApproval}

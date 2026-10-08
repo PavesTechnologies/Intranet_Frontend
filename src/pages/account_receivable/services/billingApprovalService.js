@@ -278,8 +278,8 @@ const buildMilestonePlanReview = (milestonePlanRecord) => {
         : [
             { label: "Schedule Type", value: "Installments" },
             { label: "Number of Payments", value: String(payments.length) },
-            { label: "First Payment", value: payments[0].billingDate, isDate: true },
-            { label: "Last Payment", value: payments[payments.length - 1].billingDate, isDate: true },
+            { label: "First Billing Date", value: payments[0].billingDate, isDate: true },
+            { label: "Last Billing Date", value: payments[payments.length - 1].billingDate, isDate: true },
           ];
   }
 

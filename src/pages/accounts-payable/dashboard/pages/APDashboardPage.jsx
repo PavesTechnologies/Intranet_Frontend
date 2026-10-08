@@ -12,7 +12,7 @@ import {
   StatusSummaryChart,
   FinancialSummaryCards,
   DashboardTrendChart,
-  RecentActivityList,
+  RecentActivityCard,
 } from "../components/DashboardWidgets";
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
 import { getApiErrorMessage } from "../../utils/apiError";
@@ -151,9 +151,7 @@ export default function APDashboardPage() {
           </div>
 
           {data.recent_activity?.length > 0 && (
-            <ChartCard title="Recent Activity">
-              <RecentActivityList items={data.recent_activity} />
-            </ChartCard>
+            <RecentActivityCard items={data.recent_activity} period={data.period} />
           )}
         </div>
       )}
