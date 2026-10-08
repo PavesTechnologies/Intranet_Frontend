@@ -6,15 +6,8 @@ import ApprovalHistoryPage from "./ApprovalHistoryPage";
 import CashAdvanceApprovalsList from "../components/CashAdvanceApprovalsList";
 import { useMyQueue, useMyHistory } from "../hooks/useApprovalWorkflow";
 import SearchInput from "@/components/filter/Searchbar";
-<<<<<<< HEAD
 import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
-
-export default function ApprovalsPage() {
-  const { hasRole } = useAuth();
-  const [activeTab, setActiveTab] = useState("pending"); // "pending" | "approved" | "rejected"
-  const [approvalCategory, setApprovalCategory] = useState("EXPENSE_REPORTS"); // "EXPENSE_REPORTS" | "CASH_ADVANCES"
-=======
 
 // Shared with PendingApprovalsPage/ApprovalHistoryPage's own content fetch: same (page, size) means
 // react-query serves both the summary-card count here AND the active tab's content from the exact
@@ -22,8 +15,10 @@ export default function ApprovalsPage() {
 const QUEUE_PAGE_SIZE = 20;
 
 export default function ApprovalsPage() {
-  const [activeTab, setActiveTab] = useState("pending"); // "pending" | "approved" | "history"
->>>>>>> 6a1e43b2b17d8368043b7d5982e4776d74ad1373
+  const { hasRole } = useAuth();
+  // Expense reports: "pending" | "approved" | "history". Cash advances: "pending" | "approved" | "rejected".
+  const [activeTab, setActiveTab] = useState("pending");
+  const [approvalCategory, setApprovalCategory] = useState("EXPENSE_REPORTS"); // "EXPENSE_REPORTS" | "CASH_ADVANCES"
   const [reloadKey, setReloadKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -69,11 +64,6 @@ export default function ApprovalsPage() {
     rejectedQuery.refetch();
   };
 
-<<<<<<< HEAD
-  const handleSearch = (value) => {
-    setSearchTerm(value || "");
-  };
-
   const categoryOptions = [
     { label: "Expense Reports", value: "EXPENSE_REPORTS" },
     ...(isManager ? [{ label: "Cash Advances", value: "CASH_ADVANCES" }] : []),
@@ -81,16 +71,13 @@ export default function ApprovalsPage() {
 
   const activeCategory = isManager ? approvalCategory : "EXPENSE_REPORTS";
 
-  const statusFilterOptions = [
-    { label: "Pending", value: "pending" },
-    { label: "Approved", value: "approved" },
-    { label: "Rejected", value: "rejected" },
-=======
+  // Cash advances have no combined history view, so their third tab is Rejected.
   const tabs = [
     { key: "pending", label: "Pending", icon: Clock },
     { key: "approved", label: "Approved", icon: CheckCircle2 },
-    { key: "history", label: "History", icon: Layers },
->>>>>>> 6a1e43b2b17d8368043b7d5982e4776d74ad1373
+    activeCategory === "CASH_ADVANCES"
+      ? { key: "rejected", label: "Rejected", icon: XCircle }
+      : { key: "history", label: "History", icon: Layers },
   ];
 
   return (
@@ -186,56 +173,36 @@ export default function ApprovalsPage() {
           <div className="w-full lg:w-72">
             <SearchInput
               value={searchTerm}
-<<<<<<< HEAD
-              onSearch={handleSearch}
-              placeholder="Search by report/advance number or title/category..."
-              className="!py-1.5 !px-3 !text-xs"
-            />
-          </div>
-          <FormSelect
-            label="Type"
-            name="approvalCategory"
-            value={activeCategory}
-            onChange={(e) => setApprovalCategory(e.target.value)}
-            options={categoryOptions}
-            className="[&>label]:text-xs [&>label]:mb-1"
-            buttonClassName="!py-1.5 !px-3 !text-xs"
-          />
-          <FormSelect
-            label="Status"
-            name="activeTab"
-            value={activeTab}
-            onChange={(e) => setActiveTab(e.target.value)}
-            options={statusFilterOptions}
-            className="[&>label]:text-xs [&>label]:mb-1"
-            buttonClassName="!py-1.5 !px-3 !text-xs"
-          />
-        </div>
-      </div>
-
-      {/* Tab Content container */}
-      <div className="approvals-tab-container">
-        {activeCategory === "CASH_ADVANCES" ? (
-          <CashAdvanceApprovalsList key={`cash-${activeTab}-${reloadKey}`} activeTab={activeTab} searchTerm={searchTerm} />
-        ) : activeTab === "pending" ? (
-          <PendingApprovalsPage key={`pending-${reloadKey}`} searchTerm={searchTerm} />
-        ) : activeTab === "approved" ? (
-          <ApprovalHistoryPage key={`approved-${reloadKey}`} outcome="APPROVED" title="Approved" breadcrumbLabel="Approved" searchTerm={searchTerm} />
-        ) : (
-          <ApprovalHistoryPage key={`rejected-${reloadKey}`} outcome="REJECTED" title="Rejected" breadcrumbLabel="Rejected" searchTerm={searchTerm} />
-        )}
-      </div>
-=======
               onSearch={(value) => setSearchTerm(value || "")}
-              placeholder="Search by report number or merchant/category..."
+              placeholder={
+                activeCategory === "CASH_ADVANCES"
+                  ? "Search by advance number or purpose..."
+                  : "Search by report number or merchant/category..."
+              }
               className="!py-1.5 !px-3 !text-xs"
             />
           </div>
+          {categoryOptions.length > 1 && (
+            <div className="w-full lg:w-48">
+              <FormSelect
+                name="approvalCategory"
+                value={activeCategory}
+                onChange={(e) => {
+                  setApprovalCategory(e.target.value);
+                  setActiveTab("pending");
+                }}
+                options={categoryOptions}
+                buttonClassName="!h-9 !py-1.5 !px-3 !text-xs"
+              />
+            </div>
+          )}
         </div>
       </div>
 
       {/* Tab Content */}
-      {activeTab === "pending" ? (
+      {activeCategory === "CASH_ADVANCES" ? (
+        <CashAdvanceApprovalsList key={`cash-${activeTab}-${reloadKey}`} activeTab={activeTab} searchTerm={searchTerm} />
+      ) : activeTab === "pending" ? (
         <PendingApprovalsPage key={`pending-${reloadKey}`} searchTerm={searchTerm} hideHeader noPadding />
       ) : activeTab === "approved" ? (
         <ApprovalHistoryPage
@@ -258,7 +225,6 @@ export default function ApprovalsPage() {
           allowOutcomeFilter
         />
       )}
->>>>>>> 6a1e43b2b17d8368043b7d5982e4776d74ad1373
     </div>
   );
 }

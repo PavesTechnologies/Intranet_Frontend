@@ -507,9 +507,12 @@ export default function ExpenseReportDetailPage() {
               taxWarning = "Low-confidence scan. Check the GST against the receipt.";
             }
 
-            // Pre-match category name if present in active categories list
+            // Pre-select the category the server suggested from the receipt text (it is always an
+            // active category); fall back to matching by name/code.
             let categoryIdVal = "";
-            if (responsePayload.categoryName) {
+            if (responsePayload.categoryId && categories.some((c) => c.categoryId === responsePayload.categoryId)) {
+              categoryIdVal = responsePayload.categoryId;
+            } else if (responsePayload.categoryName) {
               const matchedCat = categories.find(
                 (c) => c.categoryName?.toLowerCase() === responsePayload.categoryName.toLowerCase() ||
                        c.categoryCode?.toLowerCase() === responsePayload.categoryName.toLowerCase()
