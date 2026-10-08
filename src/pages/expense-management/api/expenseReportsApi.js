@@ -233,6 +233,13 @@ export const notificationService = {
   markAllRead: () => api.post("/xms/notifications/read-all", {}, { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
 };
 
+// Audit trail (AuditLogController, Admin only, read-only): newest first.
+export const auditLogService = {
+  // params: entityName, entityId, action, performedBy, source, from, to (yyyy-mm-dd), q, page, size
+  search: (params) => api.get("/xms/admin/audit-logs", { baseURL: EXPENSE_API_BASE, params, headers: authHeaders() }),
+  facets: () => api.get("/xms/admin/audit-logs/facets", { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+};
+
 export const lookupService = {
   getActiveCostCenters: async () => {
     const res = await api.get("/xms/admin/cost-centers", {
