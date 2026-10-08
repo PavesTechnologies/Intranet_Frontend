@@ -84,6 +84,14 @@ export const lineItemService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
+  // The employee's explanation of one policy violation (min 20 characters). Returns the updated
+  // PolicyWarningResponse; the report must be editable (Draft / Awaiting Correction / Query Raised).
+  justifyPolicyWarning: (reportId, lineItemId, violationId, justification) =>
+    api.post(
+      `/xms/employee/expense-reports/${reportId}/line-items/${lineItemId}/policy-warnings/${violationId}/justify`,
+      { justification },
+      { baseURL: EXPENSE_API_BASE, headers: authHeaders() }
+    ),
 };
 
 // Whole-set replace, not per-row CRUD — PUT always sends the complete split list for the line
