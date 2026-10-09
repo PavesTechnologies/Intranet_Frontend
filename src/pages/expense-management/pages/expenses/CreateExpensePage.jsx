@@ -671,61 +671,68 @@ export default function CreateExpensePage() {
 
 
   const cashAdvanceOptions = useMemo(() => {
-    return cashAdvances.map((a) => {
-      const rawId = String(
-        a.advanceId ||
-          a.id ||
-          a.cashAdvanceId ||
-          ""
-      );
+    return cashAdvances
+      .filter((a) => {
+        // Only show DISBURSED or IN_PROGRESS advances
+        const status = String(a.status || "").toUpperCase();
+        return ["DISBURSED", "IN_PROGRESS", "IN PROGRESS"].includes(status) &&
+               Number(a.outstandingBalance ?? a.remainingBalance ?? a.balance ?? 0) > 0;
+      })
+      .map((a) => {
+        const rawId = String(
+          a.advanceId ||
+            a.id ||
+            a.cashAdvanceId ||
+            ""
+        );
 
 
-      const formattedId =
-        rawId.startsWith("ADV-")
-          ? rawId
-          : `ADV-${rawId.slice(0, 8)}`;
+        const formattedId =
+          rawId.startsWith("ADV-")
+            ? rawId
+            : `ADV-${rawId.slice(0, 8)}`;
 
 
-      const title =
-        a.title ||
-        a.purpose ||
-        a.businessPurpose ||
-        "Cash Advance";
+        const title =
+          a.title ||
+          a.purpose ||
+          a.businessPurpose ||
+          "Cash Advance";
 
 
-      const amount = Number(
-        a.amount ??
-          a.advanceAmount ??
-          a.disbursedAmount ??
-          0
-      );
+        const amount = Number(
+          a.amount ??
+            a.advanceAmount ??
+            a.disbursedAmount ??
+            0
+        );
 
 
-      const currency =
-        a.currencyCode ||
-        a.currency ||
-        "INR";
+        const currency =
+          a.currencyCode ||
+          a.currency ||
+          "INR";
 
 
-      const outstanding = Number(
-        a.outstandingBalance ??
-          a.remainingBalance ??
-          a.balance ??
-          amount
-      );
+        const outstanding = Number(
+          a.outstandingBalance ??
+            a.remainingBalance ??
+            a.balance ??
+            amount
+        );
 
 
-      return {
-        value: rawId,
+        return {
+          value: rawId,
 
-        label:
-          `${formattedId} (${title}) - ` +
-          `Amount: ${amount} ${currency} ` +
-          `(Outstanding: ${outstanding} ${currency})`,
+          label:
+            `${formattedId} (${title}) - ` +
+            `Amount: ${amount} ${currency} ` +
+            `(Outstanding: ${outstanding} ${currency})`,
 
-        advance: a,
-      };
-    });
+          advance: a,
+        };
+      });
   }, [cashAdvances]);
 
 
