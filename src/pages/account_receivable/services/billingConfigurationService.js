@@ -1,5 +1,6 @@
 import api from "../../../api/axiosInstance";
 import { fetchActiveBillingConfigurations } from "./billingDataAcquisitionService";
+export { fetchActiveBillingConfigurations };
 import { getActiveBillingFrequencies, normalizeBillingFrequency } from "./billingFrequencyService";
 import { getActivePaymentTerms, normalizePaymentTerm } from "./paymentTermsService";
 import { getActiveTaxRegions, normalizeTaxRegion } from "./taxRegionService";

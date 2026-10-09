@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { RefreshCw } from "lucide-react";
 
 import { PageCard } from "../../../../components/Cards/PageCard";
 import Button from "../../../../components/Button/Button";
@@ -185,13 +184,21 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
   const totalTaxAmount = occurrence.totalTaxAmount ?? 0;
   const grandTotal = occurrence.grandTotal ?? (isTaxCompleted ? taxableAmount + totalTaxAmount : null);
 
+  const resolvedTaxRegion =
+    occurrence.taxRegionName ||
+    occurrence.taxRegion ||
+    occurrence.taxRegionCode ||
+    taxConfig?.taxRegionLabel ||
+    taxConfig?.taxRegionName ||
+    "India (Standard)";
+
   // Project Duration (project lifecycle) and Billing Period (this occurrence)
   // come from separate backend fields and are never substituted for each other.
   const contextFields = [
     { label: "Project Duration", value: formatFullPeriod(occurrence.projectStartDate, occurrence.projectEndDate) },
     { label: "Billing Period", value: formatFullPeriod(occurrence.periodStartDate, occurrence.periodEndDate) },
     { label: "Billing Date", value: formatDisplayDate(occurrence.billingDate) },
-    { label: "Tax Region", value: occurrence.taxRegionName },
+    { label: "Tax Region", value: resolvedTaxRegion },
   ];
   const extraContextFields = [
     occurrence.primaryLocation && { label: "Primary Location", value: occurrence.primaryLocation },
@@ -200,7 +207,7 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
   // Applicable tax configuration (read-only preview) for a record awaiting calculation.
   const configParts = isReady
     ? [
-        occurrence.taxRegionName || taxConfig?.taxRegionLabel,
+        resolvedTaxRegion,
         taxConfig?.taxRegime,
         ...(taxConfig?.components || []).map((comp) => `${comp.taxTypeCode || comp.taxTypeName} ${comp.taxRate}%`),
       ].filter(Boolean)
@@ -240,16 +247,6 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
   return (
     <TaxCalculationDetailView
       onBack={() => navigate(CONSOLE_PATH)}
-      headerActions={
-        <Button
-          variant="outline"
-          size="small"
-          onClick={loadOccurrenceDetail}
-          className="flex items-center gap-1.5 text-xs text-slate-600"
-        >
-          <RefreshCw className="h-3.5 w-3.5" /> Refresh
-        </Button>
-      }
       billingType={billingType}
       stage={stage}
       project={occurrence.projectName}
