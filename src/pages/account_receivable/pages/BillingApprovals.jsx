@@ -33,6 +33,9 @@ import ConfigurationChanges, {
 import { BILLING_MODE_LABELS } from "../data/wizardOptions";
 import { getBillingTypeDisplayName } from "../utils/billingType";
 import { formatCurrency, formatDisplayDate } from "../utils/format";
+import { RECORD_LOCK_ACTION, RECORD_LOCK_RESOURCE } from "../services/recordLockService";
+import useRecordLock from "../hooks/useRecordLock";
+import { RecordLockOwnIndicator } from "../components/common/RecordLockNotice";
 
 const PAGE_SIZE = 5;
 
@@ -504,8 +507,35 @@ export default function BillingApprovals() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejectLoading, setRejectLoading] = useState(false);
 
-  const loadAllApprovals = async () => {
-    setLoading(true);
+  // Opening Review only READS the lock status (GET) — it never takes a lock,
+  // so viewing stays available to everyone. Lock status is checked automatically on
+  // open and polled every 12s via useRecordLock. When Approve/Reject is clicked,
+  // the APPROVAL lock is acquired automatically via ensureReviewLock.
+  const recordLock = useRecordLock(RECORD_LOCK_RESOURCE.BILLING_CONFIGURATION, {
+    watchResourceId: reviewTarget?.approvalStatus === "PENDING_APPROVAL" ? (reviewTarget.billingConfigurationId || reviewTarget.id) : null,
+  });
+  const reviewLockId = rejectTarget?.billingConfigurationId || rejectTarget?.id || reviewTarget?.billingConfigurationId || reviewTarget?.id;
+  const isBlockedByOtherLock = Boolean(
+    (recordLock.conflict && !recordLock.conflict.isCurrentUser) ||
+    recordLock.isLockedByOther(reviewLockId)
+  );
+  const ownReviewLockAction = recordLock.ownLockAction(reviewLockId);
+
+  // POST is authoritative: Approve/Reject re-run it (a no-op while held) so a
+  // stale enabled button can never bypass the backend lock check.
+  const ensureReviewLock = async () => {
+    if (!reviewLockId) return false;
+    const result = await recordLock.acquire(reviewLockId, RECORD_LOCK_ACTION.APPROVAL);
+    return result.acquired;
+  };
+
+  const handleMutationError = (error, fallback) => {
+    showStatusToast(getApiErrorMessage(error, fallback), "error");
+    if (error?.response?.status === 409 && reviewLockId) recordLock.handleMutationConflict(reviewLockId);
+  };
+
+  const loadAllApprovals = async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
       const [pendingResult, allConfigs] = await Promise.allSettled([
         getPendingApprovalConfigurations(),
@@ -547,15 +577,57 @@ export default function BillingApprovals() {
 
       setConfigs(Array.from(combinedMap.values()));
     } catch (error) {
-      showStatusToast(getApiErrorMessage(error, "Failed to load billing configuration approvals."), "error");
+      if (!silent) {
+        showStatusToast(getApiErrorMessage(error, "Failed to load billing configuration approvals."), "error");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadAllApprovals();
   }, []);
+
+  // Background polling for approval requests list (every 12 seconds while active)
+  useEffect(() => {
+    const refreshList = () => {
+      if (document.visibilityState !== "hidden") {
+        loadAllApprovals({ silent: true });
+      }
+    };
+
+    const interval = setInterval(refreshList, 12_000);
+    window.addEventListener("focus", refreshList);
+    document.addEventListener("visibilitychange", refreshList);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", refreshList);
+      document.removeEventListener("visibilitychange", refreshList);
+    };
+  }, []);
+
+  // Background polling for active review target details (every 12 seconds while modal is open)
+  useEffect(() => {
+    if (!reviewTarget?.billingConfigurationId) return undefined;
+    const targetId = reviewTarget.billingConfigurationId;
+
+    const refreshReviewDetail = async () => {
+      if (document.visibilityState === "hidden" || approveLoading || rejectLoading) return;
+      try {
+        const latestDetail = await getBillingConfigurationForApproval(targetId);
+        if (latestDetail) {
+          setReviewTarget((prev) => (prev?.billingConfigurationId === targetId ? latestDetail : prev));
+        }
+      } catch (error) {
+        // Silent polling: errors / conflicts caught by lock hook
+      }
+    };
+
+    const interval = setInterval(refreshReviewDetail, 12_000);
+    return () => clearInterval(interval);
+  }, [reviewTarget?.billingConfigurationId, approveLoading, rejectLoading]);
 
   const tabCounts = useMemo(() => {
     return {
@@ -638,9 +710,11 @@ export default function BillingApprovals() {
   const closeReview = () => {
     if (approveLoading) return;
     setReviewTarget(null);
+    recordLock.release();
   };
 
-  const openRejectModal = () => {
+  const openRejectModal = async () => {
+    if (!(await ensureReviewLock())) return;
     setRejectTarget(reviewTarget);
     setRejectionReason("");
     setReviewTarget(null);
@@ -650,6 +724,7 @@ export default function BillingApprovals() {
     if (rejectLoading) return;
     setRejectTarget(null);
     setRejectionReason("");
+    recordLock.release();
   };
 
   // Approving is a single click from the review screen — no extra "are you
@@ -672,14 +747,19 @@ export default function BillingApprovals() {
   const handleApprove = async () => {
     if (!reviewTarget) return;
     setApproveLoading(true);
+    if (!(await ensureReviewLock())) {
+      setApproveLoading(false);
+      return;
+    }
     try {
       const { billingConfigurationId } = reviewTarget;
       const hadChanges = (reviewTarget.changes || []).length > 0;
       await approveBillingConfigurationRequest(billingConfigurationId);
+      recordLock.release();
       showStatusToast(hadChanges ? "Changes approved successfully." : "Billing Configuration approved successfully.", "success");
       await Promise.all([loadAllApprovals(), showRefreshedReview(billingConfigurationId)]);
     } catch (error) {
-      showStatusToast(getApiErrorMessage(error, "Failed to approve billing configuration."), "error");
+      handleMutationError(error, "Failed to approve billing configuration.");
     } finally {
       setApproveLoading(false);
     }
@@ -694,9 +774,11 @@ export default function BillingApprovals() {
 
     setRejectLoading(true);
     try {
+      if (!(await ensureReviewLock())) return;
       const { billingConfigurationId } = rejectTarget;
       const hadChanges = (rejectTarget.changes || []).length > 0;
       await rejectBillingConfigurationRequest(billingConfigurationId, rejectionReason.trim());
+      recordLock.release();
       setRejectTarget(null);
       setRejectionReason("");
       const [, refreshed] = await Promise.all([loadAllApprovals(), showRefreshedReview(billingConfigurationId)]);
@@ -709,7 +791,7 @@ export default function BillingApprovals() {
         "success"
       );
     } catch (error) {
-      showStatusToast(getApiErrorMessage(error, "Failed to reject billing configuration."), "error");
+      handleMutationError(error, "Failed to reject billing configuration.");
     } finally {
       setRejectLoading(false);
     }
@@ -884,7 +966,13 @@ export default function BillingApprovals() {
             <div className="flex justify-end gap-2">
               {reviewTarget.approvalStatus === "PENDING_APPROVAL" ? (
                 <>
-                  <Button variant="danger" size="small" onClick={openRejectModal} disabled={approveLoading}>
+                  <Button
+                    variant="danger"
+                    size="small"
+                    onClick={openRejectModal}
+                    disabled={approveLoading || isBlockedByOtherLock}
+                    title={isBlockedByOtherLock ? "This configuration is currently being edited by another user." : ""}
+                  >
                     <XCircle className="h-4 w-4" /> Reject Configuration
                   </Button>
                   <Button
@@ -893,6 +981,8 @@ export default function BillingApprovals() {
                     onClick={handleApprove}
                     loading={approveLoading}
                     loadingText="Approving..."
+                    disabled={approveLoading || isBlockedByOtherLock}
+                    title={isBlockedByOtherLock ? "This configuration is currently being edited by another user." : ""}
                   >
                     <CheckCircle2 className="h-4 w-4" /> Approve Configuration
                   </Button>
@@ -906,6 +996,9 @@ export default function BillingApprovals() {
           )
         }
       >
+        {reviewTarget?.approvalStatus === "PENDING_APPROVAL" && ownReviewLockAction && (
+          <RecordLockOwnIndicator actionType={ownReviewLockAction} className="mb-4" />
+        )}
         {reviewTarget && <ApprovalReviewDetails config={reviewTarget} />}
       </Modal>
 

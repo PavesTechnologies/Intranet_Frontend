@@ -1,4 +1,4 @@
-import { useContext, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { Wallet, Receipt, Pencil, ChevronRight, Building2, Calendar, Info } from "lucide-react";
 
 import { PageCard } from "../../../../components/Cards/PageCard";
@@ -9,6 +9,11 @@ import { BILLING_MODE_LABELS } from "../../data/wizardOptions";
 import { getBillingTypeDisplayName } from "../../utils/billingType";
 import { formatCurrency, formatDisplayDate, formatProjectDuration } from "../../utils/format";
 import ConfigurationChanges, { ChangedFieldsContext, ChangedIndicator, getChangedFieldLabels, useIsFieldChanged } from "./ConfigurationChanges";
+import {
+  getApiErrorMessage,
+  getBillingRecurringSchedule,
+  getBillingRecurringScheduleByBillingConfigurationId,
+} from "../../services/billingConfigurationService";
 
 // Display-time safety net: a Project Code must never be the project's own
 // internal id — see the matching guard in ProjectStep.jsx / billingConfigurationService.js.
@@ -128,9 +133,8 @@ function ratePeriodLabel(period) {
 
 function rateDateRange(role) {
   if (!role.effectiveFrom && !role.effectiveTo) return null;
-  return `${role.effectiveFrom ? formatDisplayDate(role.effectiveFrom) : "—"} – ${
-    role.effectiveTo ? formatDisplayDate(role.effectiveTo) : "Ongoing"
-  }`;
+  return `${role.effectiveFrom ? formatDisplayDate(role.effectiveFrom) : "—"} – ${role.effectiveTo ? formatDisplayDate(role.effectiveTo) : "Ongoing"
+    }`;
 }
 
 function getCommercialEffectiveDates(billingConfig) {
@@ -226,9 +230,8 @@ function ReviewField({ label, value, money = false, tone, divider = true }) {
         {isChanged && <ChangedIndicator />}
       </span>
       <span
-        className={`min-w-0 break-words text-right text-[13px] tabular-nums ${money ? "font-semibold" : "font-medium"} ${
-          VALUE_TONES[tone || (money ? "money" : "default")]
-        }`}
+        className={`min-w-0 break-words text-right text-[13px] tabular-nums ${money ? "font-semibold" : "font-medium"} ${VALUE_TONES[tone || (money ? "money" : "default")]
+          }`}
       >
         {value ?? "—"}
       </span>
@@ -274,9 +277,8 @@ function MetaGrid({ items }) {
             {changed.has(String(item.label).toLowerCase()) && <ChangedIndicator />}
           </p>
           <p
-            className={`mt-0.5 break-words text-[13px] tabular-nums ${
-              item.emphasize ? "font-semibold text-[#0A0082]" : item.strong ? "font-semibold text-slate-900" : "font-medium text-slate-800"
-            }`}
+            className={`mt-0.5 break-words text-[13px] tabular-nums ${item.emphasize ? "font-semibold text-[#0A0082]" : item.strong ? "font-semibold text-slate-900" : "font-medium text-slate-800"
+              }`}
           >
             {item.value || "—"}
           </p>
@@ -309,6 +311,90 @@ function RoleRatesTable({ roles, currency }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// Recurring billing occurrences — read-only view of the backend-generated
+// BillingSchedule (the same API and DTO mapping as the Recurring form's
+// "Billing Schedule (Preview)"). Periods, partial final period and amounts
+// all come from the backend; nothing is calculated here.
+function RecurringOccurrences({ recurringConfigurationId, billingConfigurationId, currency }) {
+  const [periods, setPeriods] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!recurringConfigurationId && !billingConfigurationId) {
+      setPeriods([]);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    const request = recurringConfigurationId
+      ? getBillingRecurringSchedule(recurringConfigurationId)
+      : getBillingRecurringScheduleByBillingConfigurationId(billingConfigurationId);
+
+    request
+      .then((result) => {
+        if (!cancelled) setPeriods(Array.isArray(result) ? result : []);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPeriods([]);
+        setError(getApiErrorMessage(err, "Unable to load billing occurrences."));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [recurringConfigurationId, billingConfigurationId]);
+
+  return (
+    <div className="space-y-2 pt-2">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+        Billing Occurrences{periods.length > 0 ? ` (${periods.length})` : ""}
+      </p>
+      {loading ? (
+        <p className="py-1.5 text-xs text-slate-500">Loading billing occurrences…</p>
+      ) : error ? (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>
+      ) : periods.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-slate-200 px-3 py-3 text-center text-xs text-slate-500">
+          No billing occurrences have been generated yet.
+        </p>
+      ) : (
+        <div className="max-h-80 overflow-auto rounded-lg border border-slate-100">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-[11px] font-medium text-slate-500">
+                <th className="px-3 py-2 font-medium">#</th>
+                <th className="px-3 py-2 font-medium">Billing Period</th>
+                <th className="px-3 py-2 text-right font-medium">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-[13px]">
+              {periods.map((period, index) => (
+                <tr key={period.periodNumber || index}>
+                  <td className="px-3 py-2 tabular-nums text-slate-500">{period.periodNumber || index + 1}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-slate-700">
+                    {formatDisplayDate(period.periodStartDate) || "—"} – {formatDisplayDate(period.periodEndDate) || "—"}
+                    {period.isPartialPeriod && <span className="ml-2 text-[11px] text-slate-400">(Partial)</span>}
+                  </td>
+                  <td className="px-3 py-2 text-right font-semibold tabular-nums text-slate-900">
+                    {formatMoney(period.billingAmount, currency) || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -533,11 +619,11 @@ function PaymentSchedule({ review, currency }) {
   const meta = review.isFullPayment
     ? [{ label: "Schedule Type", value: "One-Time Payment" }]
     : [
-        { label: "Schedule Type", value: "Custom Payment Dates" },
-        { label: "Number of Payments", value: String(review.payments.length) },
-        { label: "First Billing Date", value: formatDisplayDate(review.firstPaymentDate) },
-        { label: "Last Billing Date", value: formatDisplayDate(review.lastPaymentDate) },
-      ];
+      { label: "Schedule Type", value: "Custom Payment Dates" },
+      { label: "Number of Payments", value: String(review.payments.length) },
+      { label: "First Billing Date", value: formatDisplayDate(review.firstPaymentDate) },
+      { label: "Last Billing Date", value: formatDisplayDate(review.lastPaymentDate) },
+    ];
   return (
     <div className="space-y-3 py-1">
       <MetaGrid items={meta} />
@@ -570,8 +656,8 @@ function FixedPricePricing({ billingConfig, currency, projectBudgetValue }) {
     retentionAmountInput > 0
       ? retentionAmountInput
       : retentionPercent > 0 && totalContractValue > 0
-      ? (totalContractValue * retentionPercent) / 100
-      : 0;
+        ? (totalContractValue * retentionPercent) / 100
+        : 0;
 
   const hasRetention = retentionAmount > 0 || retentionPercent > 0;
 
@@ -617,19 +703,19 @@ function FixedPricePricing({ billingConfig, currency, projectBudgetValue }) {
         fields={[
           ...(isDifferentAmount
             ? [
-                {
-                  label: (
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <span>Contract Value</span>
-                      <span className="rounded bg-indigo-50 px-1.5 py-px text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
-                        Billing Amount Used
-                      </span>
+              {
+                label: (
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span>Contract Value</span>
+                    <span className="rounded bg-indigo-50 px-1.5 py-px text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
+                      Billing Amount Used
                     </span>
-                  ),
-                  value: totalContractValue ? formatMoney(totalContractValue, currency) : "—",
-                  money: true,
-                },
-              ]
+                  </span>
+                ),
+                value: totalContractValue ? formatMoney(totalContractValue, currency) : "—",
+                money: true,
+              },
+            ]
             : []),
           { label: "Retention %", value: hasRetention ? `${retentionPercent}%` : "0%" },
           {
@@ -669,12 +755,12 @@ function TimeMaterialPricing({ billingConfig, currency }) {
           ...(pricingModel ? [{ label: "Pricing Mode", value: BILLING_MODE_LABELS[pricingModel] || pricingModel, tone: "brand" }] : []),
           ...(pricingModel === "STANDARD" || !pricingModel
             ? [
-                {
-                  label: "Standard Rate",
-                  value: `${formatMoney(standardRate.rate, currency) || "—"} ${ratePeriodSuffix(standardRate.ratePeriod)}`.trim(),
-                  money: true,
-                },
-              ]
+              {
+                label: "Standard Rate",
+                value: `${formatMoney(standardRate.rate, currency) || "—"} ${ratePeriodSuffix(standardRate.ratePeriod)}`.trim(),
+                money: true,
+              },
+            ]
             : []),
         ]}
       />
@@ -775,19 +861,19 @@ export default function ReviewActivateStep({ wizardData, onEditStep, leading, he
 
   const billingTypeLabel = getBillingTypeDisplayName(
     billingConfig.billingTypeName ||
-      billingConfig.billingTypeLabel ||
-      billingConfig.billingType ||
-      "—",
+    billingConfig.billingTypeLabel ||
+    billingConfig.billingType ||
+    "—",
   );
 
   const billingFrequencyLabel = isMilestonePlan
     ? "One-Time"
     : formatFrequencyLabel(
-        billingConfig.billingFrequency,
-        billingConfig.billingFrequencyName,
-        billingConfig.billingFrequencyLabel,
-        isOneTime,
-      );
+      billingConfig.billingFrequency,
+      billingConfig.billingFrequencyName,
+      billingConfig.billingFrequencyLabel,
+      isOneTime,
+    );
 
   const commercialEffectiveDates = getCommercialEffectiveDates(billingConfig);
   // Billing dates only — never the project's own start/end (that is Project
@@ -813,9 +899,8 @@ export default function ReviewActivateStep({ wizardData, onEditStep, leading, he
     pricingContent = <FieldList fields={[{ label: "Milestones", value: `${(billingConfig.milestones || []).length} defined` }]} />;
   }
 
-  const effectivePeriod = `${commercialEffectiveDates.from ? formatDisplayDate(commercialEffectiveDates.from) : "—"} – ${
-    commercialEffectiveDates.to ? formatDisplayDate(commercialEffectiveDates.to) : "Ongoing"
-  }`;
+  const effectivePeriod = `${commercialEffectiveDates.from ? formatDisplayDate(commercialEffectiveDates.from) : "—"} – ${commercialEffectiveDates.to ? formatDisplayDate(commercialEffectiveDates.to) : "Ongoing"
+    }`;
 
   return (
     <ChangedFieldsContext.Provider value={changedFieldLabels}>
@@ -872,7 +957,16 @@ export default function ReviewActivateStep({ wizardData, onEditStep, leading, he
             {/* Billing dates only — Project Duration (the PMS project period)
                 lives in the primary summary. */}
             {hasSchedule ? (
-              <FieldList fields={[{ label: "Effective Period", value: effectivePeriod }]} />
+              <>
+                <FieldList fields={[{ label: "Effective Period", value: effectivePeriod }]} />
+                {billingConfig.billingType === "RECURRING" && (
+                  <RecurringOccurrences
+                    recurringConfigurationId={billingConfig.recurring?.recurringConfigurationId}
+                    billingConfigurationId={billingConfig.billingConfigurationId || wizardData.billingConfigurationId}
+                    currency={currency}
+                  />
+                )}
+              </>
             ) : (
               <p className="flex items-center gap-2 py-1.5 text-xs text-slate-500">
                 <Calendar className="h-4 w-4 text-slate-300" />
@@ -892,8 +986,8 @@ export default function ReviewActivateStep({ wizardData, onEditStep, leading, he
                   controls.autoInvoiceGeneration === true
                     ? "Automatic"
                     : controls.autoInvoiceGeneration === false
-                    ? "Manual"
-                    : "—",
+                      ? "Manual"
+                      : "—",
               },
               ...(controls.autoInvoiceGeneration === true
                 ? [{ label: "Generation Day", value: controls.invoiceGenerationDay ? `Day ${controls.invoiceGenerationDay}` : "—" }]
