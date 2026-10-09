@@ -10,6 +10,7 @@ import useApLookups from "../../hooks/useApLookups";
 import VendorAddressForm, { DEFAULT_ADDRESS_FORM } from "./VendorAddressForm";
 import VendorTaxList from "./VendorTaxList";
 import { useCreateAddress, useUpdateAddress, useDeleteAddress } from "../hooks/useVendorMutations";
+import { useApPermissions } from "../../hooks/useApPermissions";
 
 const validateAddressForm = (formData) => {
   const errors = {};
@@ -31,6 +32,7 @@ const buildAddressPayload = (formData) => ({
 });
 
 const VendorAddressList = ({ vendorId, addresses = [] }) => {
+  const { canEditVendor } = useApPermissions();
   const { countries } = useApLookups();
   const countryNameById = new Map(countries.map((c) => [c.country_id, c.country_name]));
 
@@ -105,11 +107,13 @@ const VendorAddressList = ({ vendorId, addresses = [] }) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button onClick={openAdd}>
-          <Plus className="h-4 w-4" /> Add Address
-        </Button>
-      </div>
+      {canEditVendor && (
+        <div className="flex justify-end">
+          <Button onClick={openAdd}>
+            <Plus className="h-4 w-4" /> Add Address
+          </Button>
+        </div>
+      )}
 
       {addresses.length === 0 ? (
         <PageCard>
@@ -140,14 +144,14 @@ const VendorAddressList = ({ vendorId, addresses = [] }) => {
                     {countryNameById.get(address.country_id) || `Country #${address.country_id}`}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                {canEditVendor && <div className="flex gap-2">
                   <Button size="small" variant="outline" onClick={() => openEdit(address)}>
                     <Pencil className="h-3.5 w-3.5" /> Edit
                   </Button>
                   <Button size="small" variant="outline" onClick={() => setDeleteTarget(address)}>
                     <Trash2 className="h-3.5 w-3.5" /> Delete
                   </Button>
-                </div>
+                </div>}
               </div>
 
               <VendorTaxList vendorId={vendorId} address={address} />
