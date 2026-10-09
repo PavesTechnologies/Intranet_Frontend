@@ -95,6 +95,38 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }),
 
+  // Settlement / repayment endpoints
+  getSettlement: (advanceId) =>
+    api.get(`/xms/employee/cash-advances/${advanceId}/settlement`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+
+  repay: (advanceId, payload) =>
+    api.post(`/xms/employee/cash-advances/${advanceId}/repayments`, {
+      advanceId,
+      ...payload,
+    }, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+
+  // EP04-S4: apply verified expense amount against outstanding cash advance
+  // REST contract: POST /api/v1/expense-reports/{id}/apply-advance-offset
+  applyAdvanceOffset: (expenseReportId, payload = {}) =>
+    api.post(`/api/v1/expense-reports/${expenseReportId}/apply-advance-offset`, payload, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+
+  // EP04-S5: initiate outstanding advance recovery
+  // REST contract: POST /api/v1/cash-advances/{id}/initiate-recovery
+  initiateRecovery: (advanceId, payload = {}) =>
+    api.post(`/api/v1/cash-advances/${advanceId}/initiate-recovery`, payload, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+
   // Settlement / Reimbursement Adjustment Endpoints (/xms/finance/reimbursements)
   getReimbursementAdjustments: (params) =>
     api.get("/xms/finance/reimbursements", {

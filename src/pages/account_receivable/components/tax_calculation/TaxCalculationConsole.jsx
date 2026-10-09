@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 import PageHeader from "../../../../components/ui/PageHeader";
-import { KPICard } from "../../../../components/kpi/KPI";
+import ARKPICard from "../common/ARKPICard";
 import Button from "../../../../components/Button/Button";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 
@@ -107,18 +107,50 @@ export default function TaxCalculationConsole() {
       const loadedSnapshots = (
         await Promise.all(
           configs.map(async (cfg) => {
-            let snapStart = cfg.periodStart;
-            let snapEnd = cfg.periodEnd;
+            const savedMeta = cfg.projectId
+              ? getAcquiredSnapshotMetadata(cfg.projectId, cfg.billingConfigurationId)
+              : null;
+            const isMatchingConfig =
+              cfg.billingConfigurationId && savedMeta?.billingConfigurationId
+                ? String(savedMeta.billingConfigurationId) === String(cfg.billingConfigurationId)
+                : !cfg.billingConfigurationId && Boolean(savedMeta);
+            const validMeta = isMatchingConfig ? savedMeta : null;
 
-            const existingSnapshot = await getBillingSnapshotByPeriod(
-              cfg.projectId,
-              snapStart,
-              snapEnd
-            ).catch(() => null);
+            let snapStart =
+              cfg.billingPeriodStart ||
+              validMeta?.billingPeriodStart ||
+              cfg.periodStart ||
+              null;
+            let snapEnd =
+              cfg.billingPeriodEnd ||
+              validMeta?.billingPeriodEnd ||
+              cfg.periodEnd ||
+              null;
 
-            let snapshotId = existingSnapshot?.snapshotId || null;
-            let snapshotNumber = existingSnapshot?.snapshotNumber || null;
-            let snapshotStatus = existingSnapshot?.status || cfg.billingStatus || "READY_FOR_TAX";
+            let existingSnapshot = null;
+            if (cfg.projectId && snapStart && snapEnd) {
+              existingSnapshot = await getBillingSnapshotByPeriod(
+                cfg.projectId,
+                snapStart,
+                snapEnd,
+                cfg.billingConfigurationId
+              ).catch(() => null);
+            }
+
+            let snapshotId =
+              existingSnapshot?.snapshotId ||
+              validMeta?.snapshotId ||
+              cfg.snapshotId ||
+              null;
+            let snapshotNumber =
+              existingSnapshot?.snapshotNumber ||
+              validMeta?.snapshotNumber ||
+              cfg.snapshotNumber ||
+              null;
+            let snapshotStatus =
+              existingSnapshot?.status ||
+              validMeta?.status ||
+              (snapshotId ? "READY_FOR_TAX" : cfg.billingStatus || "NOT_ACQUIRED");
             let taxableAmount = existingSnapshot?.totalAmount ?? null;
             let totalTaxAmount = null;
             let grandTotal = null;
@@ -159,6 +191,11 @@ export default function TaxCalculationConsole() {
               // this snapshot — a stored/snapshot status of "INVOICED" is not proof.
               const invData = await getInvoice(snapshotId).catch(() => null);
               if (invData?.invoiceId) invoiceId = invData.invoiceId;
+              if (invData && (invData.invoiceNumber || invData.invoiceId)) {
+                snapshotStatus = "INVOICED";
+              } else if (savedMeta?.status === "INVOICED" || existingSnapshot?.status === "INVOICED") {
+                snapshotStatus = "INVOICED";
+              }
             }
 
             if (typeof taxRegionName === "string" && taxRegionName.includes("-") && taxRegionName.length > 30) {
@@ -309,15 +346,15 @@ export default function TaxCalculationConsole() {
             type="button"
             onClick={() => handleKpiClick(kpi.key)}
             title={`Show ${kpi.label}`}
-            className="rounded-xl text-left outline-none focus:outline-none focus-visible:outline-none"
+            className="w-full rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
           >
-            <KPICard
+            <ARKPICard
               label={kpi.label}
               value={pipelineLoading ? "…" : stageCounts[kpi.key]}
               icon={<kpi.icon className="h-5 w-5" />}
               color={kpi.color}
               active={stage === kpi.key}
-              className="h-full w-full cursor-pointer bg-white shadow-sm border border-slate-200 transition-all hover:shadow-md !ring-0 !outline-none focus:!ring-0 focus:!outline-none focus-visible:!ring-0 focus-visible:!outline-none"
+              className="h-full w-full"
             />
           </button>
         ))}

@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Layers, Play, Eye, RotateCcw, FilterX } from "lucide-react";
+import { Layers, Play, Eye } from "lucide-react";
 import StatusBadge from "../../../../components/status/statusbadge";
 import SearchInput from "../../../../components/filter/Searchbar";
+import ARClearFiltersButton from "../common/ARClearFiltersButton";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -36,16 +37,6 @@ const TABLE_ALIGNMENTS = {
   billingPeriod: "left",
   status: "center",
   reference: "left",
-  actions: "center",
-};
-
-const TABLE_HEADER_ALIGNMENTS = {
-  client: "center",
-  project: "center",
-  billingType: "center",
-  billingPeriod: "center",
-  status: "center",
-  reference: "center",
   actions: "center",
 };
 
@@ -210,7 +201,7 @@ export default function AcquisitionQueue({
             </div>
           ),
           billingPeriod: (
-            <div className="flex items-center justify-center font-mono text-xs text-slate-600">
+            <div className="flex items-center justify-start font-mono text-xs text-slate-600">
               {cfg.billingPeriod}
             </div>
           ),
@@ -288,15 +279,7 @@ export default function AcquisitionQueue({
             </div>
 
             {isFilterActive && (
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                title="Clear all search and status filters"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
-              >
-                <FilterX className="h-3.5 w-3.5 text-slate-500" />
-                <span>Clear</span>
-              </button>
+              <ARClearFiltersButton onClick={handleResetFilters} title="Clear all search and status filters" />
             )}
           </div>
         </div>
@@ -318,13 +301,7 @@ export default function AcquisitionQueue({
               </p>
             </div>
             {isFilterActive && (
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 transition-colors hover:text-indigo-800"
-              >
-                <RotateCcw className="h-3 w-3" /> clear to show all projects
-              </button>
+              <ARClearFiltersButton onClick={handleResetFilters} label="Clear to show all projects" />
             )}
           </div>
         ) : (
@@ -334,7 +311,6 @@ export default function AcquisitionQueue({
               columns={TABLE_COLUMNS}
               rows={tableRows}
               alignments={TABLE_ALIGNMENTS}
-              headerAlignments={TABLE_HEADER_ALIGNMENTS}
               loading={loading}
               emptyMessage="No matching projects. Adjust your search or status filter."
             />

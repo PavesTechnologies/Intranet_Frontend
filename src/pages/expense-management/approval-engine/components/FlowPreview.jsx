@@ -1,5 +1,5 @@
 import React from "react";
-import { ChevronDown, User, CheckCircle2, Landmark } from "lucide-react";
+import { ChevronDown, User, CheckCircle2, Landmark, Wallet } from "lucide-react";
 import { useEmployeeDirectory } from "../hooks/useEmployeeDirectory";
 import { describeLevel, QUORUM_LABELS } from "../constants/approvalLabels";
 
@@ -43,11 +43,18 @@ const levelBadge = (level, idx) =>
  * configured) -> Approved. Reads the builder's own local `levels` shape (LevelsBuilder.jsx /
  * ApprovalFlowBuilderPage.jsx state, each carrying its own `levelType`) so it updates live as the
  * admin edits, no save round-trip required.
+ * <p>
+ * Finance Verification is mandatory: when a flow has no Finance Verification level of its own, the
+ * backend appends the Catch-All flow's one at submission (ApprovalWorkflowServiceImpl
+ * .materializeChain), and every approved report then goes to AP for payment. Both are shown here so
+ * the preview matches what will actually happen. Pass autoFinance={false} for the Catch-All flow
+ * itself, which is where that Finance level is configured.
  */
-export default function FlowPreview({ whenLabel, levels }) {
+export default function FlowPreview({ whenLabel, levels, autoFinance = true }) {
   const { data: directory } = useEmployeeDirectory();
   const employeeNameById = nameMap(directory);
   const configuredLevels = (levels || []).filter((l) => l.approvers?.length);
+  const hasFinanceLevel = (levels || []).some((l) => l.levelType === "FINANCE_VERIFICATION");
 
   return (
     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
@@ -79,7 +86,30 @@ export default function FlowPreview({ whenLabel, levels }) {
         ))
       )}
 
+      {autoFinance && !hasFinanceLevel && (
+        <>
+          <Chip
+            icon={levelBadge({ levelType: "FINANCE_VERIFICATION" })}
+            title="Finance Verification"
+            subtitle="Added automatically - same approvers as the Catch-All flow's Finance level"
+            tone="bg-blue-50 border-blue-200 border-dashed"
+          />
+          <Arrow />
+        </>
+      )}
+
       <Chip icon={<CheckCircle2 className="h-4 w-4 text-emerald-500" />} title="Approved" tone="bg-emerald-50 border-emerald-100" />
+      {(hasFinanceLevel || autoFinance) && (
+        <>
+          <Arrow />
+          <Chip
+            icon={<Wallet className="h-4 w-4 text-emerald-600" />}
+            title="AP Payment"
+            subtitle="Accounts Payable pays the employee"
+            tone="bg-white border-emerald-200 border-dashed"
+          />
+        </>
+      )}
     </div>
   );
 }

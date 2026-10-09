@@ -467,6 +467,8 @@ export async function fetchActiveBillingConfigurations() {
         projectId: cfg.projectId,
         projectCode: cfg.projectCode ?? `PRJ-${cfg.projectId}`,
         projectName: cfg.projectName ?? "\u2014",
+        snapshotId: cfg.snapshotId || validMeta?.snapshotId || null,
+        snapshotNumber: cfg.snapshotNumber || validMeta?.snapshotNumber || null,
 
         // Client
         client: cfg.clientName ?? "\u2014",

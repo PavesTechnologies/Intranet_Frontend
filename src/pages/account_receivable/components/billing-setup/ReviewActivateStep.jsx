@@ -1,7 +1,8 @@
 import { useContext, useEffect, useMemo, useState } from "react";
-import { Wallet, Receipt, Pencil, Search, ChevronRight, Building2, Calendar, Info } from "lucide-react";
+import { Wallet, Receipt, Pencil, ChevronRight, Building2, Calendar, Info } from "lucide-react";
 
 import { PageCard } from "../../../../components/Cards/PageCard";
+import SearchInput from "../../../../components/filter/Searchbar";
 import Modal from "../../../../components/Modal/modal";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { BILLING_MODE_LABELS } from "../../data/wizardOptions";
@@ -132,9 +133,8 @@ function ratePeriodLabel(period) {
 
 function rateDateRange(role) {
   if (!role.effectiveFrom && !role.effectiveTo) return null;
-  return `${role.effectiveFrom ? formatDisplayDate(role.effectiveFrom) : "—"} – ${
-    role.effectiveTo ? formatDisplayDate(role.effectiveTo) : "Ongoing"
-  }`;
+  return `${role.effectiveFrom ? formatDisplayDate(role.effectiveFrom) : "—"} – ${role.effectiveTo ? formatDisplayDate(role.effectiveTo) : "Ongoing"
+    }`;
 }
 
 function getCommercialEffectiveDates(billingConfig) {
@@ -230,9 +230,8 @@ function ReviewField({ label, value, money = false, tone, divider = true }) {
         {isChanged && <ChangedIndicator />}
       </span>
       <span
-        className={`min-w-0 break-words text-right text-[13px] tabular-nums ${money ? "font-semibold" : "font-medium"} ${
-          VALUE_TONES[tone || (money ? "money" : "default")]
-        }`}
+        className={`min-w-0 break-words text-right text-[13px] tabular-nums ${money ? "font-semibold" : "font-medium"} ${VALUE_TONES[tone || (money ? "money" : "default")]
+          }`}
       >
         {value ?? "—"}
       </span>
@@ -278,9 +277,8 @@ function MetaGrid({ items }) {
             {changed.has(String(item.label).toLowerCase()) && <ChangedIndicator />}
           </p>
           <p
-            className={`mt-0.5 break-words text-[13px] tabular-nums ${
-              item.emphasize ? "font-semibold text-[#0A0082]" : item.strong ? "font-semibold text-slate-900" : "font-medium text-slate-800"
-            }`}
+            className={`mt-0.5 break-words text-[13px] tabular-nums ${item.emphasize ? "font-semibold text-[#0A0082]" : item.strong ? "font-semibold text-slate-900" : "font-medium text-slate-800"
+              }`}
           >
             {item.value || "—"}
           </p>
@@ -421,13 +419,10 @@ function RoleRatesDrawer({ isOpen, onClose, roles, currency }) {
     >
       <div className="border-b border-slate-100 p-4">
         <div className="relative max-w-md">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
+          <SearchInput
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search role..."
-            className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-xs shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
           />
         </div>
       </div>
@@ -624,11 +619,11 @@ function PaymentSchedule({ review, currency }) {
   const meta = review.isFullPayment
     ? [{ label: "Schedule Type", value: "One-Time Payment" }]
     : [
-        { label: "Schedule Type", value: "Custom Payment Dates" },
-        { label: "Number of Payments", value: String(review.payments.length) },
-        { label: "First Billing Date", value: formatDisplayDate(review.firstPaymentDate) },
-        { label: "Last Billing Date", value: formatDisplayDate(review.lastPaymentDate) },
-      ];
+      { label: "Schedule Type", value: "Custom Payment Dates" },
+      { label: "Number of Payments", value: String(review.payments.length) },
+      { label: "First Billing Date", value: formatDisplayDate(review.firstPaymentDate) },
+      { label: "Last Billing Date", value: formatDisplayDate(review.lastPaymentDate) },
+    ];
   return (
     <div className="space-y-3 py-1">
       <MetaGrid items={meta} />
@@ -661,8 +656,8 @@ function FixedPricePricing({ billingConfig, currency, projectBudgetValue }) {
     retentionAmountInput > 0
       ? retentionAmountInput
       : retentionPercent > 0 && totalContractValue > 0
-      ? (totalContractValue * retentionPercent) / 100
-      : 0;
+        ? (totalContractValue * retentionPercent) / 100
+        : 0;
 
   const hasRetention = retentionAmount > 0 || retentionPercent > 0;
 
@@ -708,19 +703,19 @@ function FixedPricePricing({ billingConfig, currency, projectBudgetValue }) {
         fields={[
           ...(isDifferentAmount
             ? [
-                {
-                  label: (
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <span>Contract Value</span>
-                      <span className="rounded bg-indigo-50 px-1.5 py-px text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
-                        Billing Amount Used
-                      </span>
+              {
+                label: (
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span>Contract Value</span>
+                    <span className="rounded bg-indigo-50 px-1.5 py-px text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
+                      Billing Amount Used
                     </span>
-                  ),
-                  value: totalContractValue ? formatMoney(totalContractValue, currency) : "—",
-                  money: true,
-                },
-              ]
+                  </span>
+                ),
+                value: totalContractValue ? formatMoney(totalContractValue, currency) : "—",
+                money: true,
+              },
+            ]
             : []),
           { label: "Retention %", value: hasRetention ? `${retentionPercent}%` : "0%" },
           {
@@ -760,12 +755,12 @@ function TimeMaterialPricing({ billingConfig, currency }) {
           ...(pricingModel ? [{ label: "Pricing Mode", value: BILLING_MODE_LABELS[pricingModel] || pricingModel, tone: "brand" }] : []),
           ...(pricingModel === "STANDARD" || !pricingModel
             ? [
-                {
-                  label: "Standard Rate",
-                  value: `${formatMoney(standardRate.rate, currency) || "—"} ${ratePeriodSuffix(standardRate.ratePeriod)}`.trim(),
-                  money: true,
-                },
-              ]
+              {
+                label: "Standard Rate",
+                value: `${formatMoney(standardRate.rate, currency) || "—"} ${ratePeriodSuffix(standardRate.ratePeriod)}`.trim(),
+                money: true,
+              },
+            ]
             : []),
         ]}
       />
@@ -866,19 +861,19 @@ export default function ReviewActivateStep({ wizardData, onEditStep, leading, he
 
   const billingTypeLabel = getBillingTypeDisplayName(
     billingConfig.billingTypeName ||
-      billingConfig.billingTypeLabel ||
-      billingConfig.billingType ||
-      "—",
+    billingConfig.billingTypeLabel ||
+    billingConfig.billingType ||
+    "—",
   );
 
   const billingFrequencyLabel = isMilestonePlan
     ? "One-Time"
     : formatFrequencyLabel(
-        billingConfig.billingFrequency,
-        billingConfig.billingFrequencyName,
-        billingConfig.billingFrequencyLabel,
-        isOneTime,
-      );
+      billingConfig.billingFrequency,
+      billingConfig.billingFrequencyName,
+      billingConfig.billingFrequencyLabel,
+      isOneTime,
+    );
 
   const commercialEffectiveDates = getCommercialEffectiveDates(billingConfig);
   // Billing dates only — never the project's own start/end (that is Project
@@ -904,9 +899,8 @@ export default function ReviewActivateStep({ wizardData, onEditStep, leading, he
     pricingContent = <FieldList fields={[{ label: "Milestones", value: `${(billingConfig.milestones || []).length} defined` }]} />;
   }
 
-  const effectivePeriod = `${commercialEffectiveDates.from ? formatDisplayDate(commercialEffectiveDates.from) : "—"} – ${
-    commercialEffectiveDates.to ? formatDisplayDate(commercialEffectiveDates.to) : "Ongoing"
-  }`;
+  const effectivePeriod = `${commercialEffectiveDates.from ? formatDisplayDate(commercialEffectiveDates.from) : "—"} – ${commercialEffectiveDates.to ? formatDisplayDate(commercialEffectiveDates.to) : "Ongoing"
+    }`;
 
   return (
     <ChangedFieldsContext.Provider value={changedFieldLabels}>
@@ -992,8 +986,8 @@ export default function ReviewActivateStep({ wizardData, onEditStep, leading, he
                   controls.autoInvoiceGeneration === true
                     ? "Automatic"
                     : controls.autoInvoiceGeneration === false
-                    ? "Manual"
-                    : "—",
+                      ? "Manual"
+                      : "—",
               },
               ...(controls.autoInvoiceGeneration === true
                 ? [{ label: "Generation Day", value: controls.invoiceGenerationDay ? `Day ${controls.invoiceGenerationDay}` : "—" }]

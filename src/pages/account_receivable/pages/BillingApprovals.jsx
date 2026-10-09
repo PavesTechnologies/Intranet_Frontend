@@ -192,7 +192,7 @@ function ReviewTable({ title, headers, rows, emptyMessage }) {
               <thead>
                 <tr>
                   {headers.map((header) => (
-                    <th key={header} className="px-3 py-2 text-left font-semibold text-slate-500">{header}</th>
+                    <th key={header} className={`px-3 py-2 font-semibold text-slate-500 ${/status|action/i.test(String(header)) ? "text-center" : "text-left"}`}>{header}</th>
                   ))}
                 </tr>
               </thead>
@@ -200,7 +200,7 @@ function ReviewTable({ title, headers, rows, emptyMessage }) {
                 {rows.map((row) => (
                   <tr key={row.key}>
                     {row.cells.map((cell, index) => (
-                      <td key={index} className={`px-3 py-2 text-left ${index === 0 ? "font-medium text-slate-700" : "text-slate-900"}`}>
+                      <td key={index} className={`px-3 py-2 ${/status|action/i.test(String(headers[index])) ? "text-center" : "text-left"} ${index === 0 ? "font-medium text-slate-700" : "text-slate-900"}`}>
                         {cell ?? "—"}
                       </td>
                     ))}
