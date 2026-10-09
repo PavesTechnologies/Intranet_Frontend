@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { DollarSign, CheckCircle2, RefreshCw, Eye, CheckCircle, Clock, FileText, AlertCircle, Layers, ArrowUpRight, ArrowDownLeft, CreditCard, XCircle } from "lucide-react";
+import { DollarSign, CheckCircle2, RefreshCw, Eye, CheckCircle, Clock, FileText, AlertCircle, Layers, ArrowUpRight, ArrowDownLeft, CreditCard, XCircle, Loader2 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
@@ -89,6 +89,7 @@ export default function SettlementPage() {
   }, [user, hasRole]);
 
   const [selectedAdvance, setSelectedAdvance] = useState(null);
+  const [disbursing, setDisbursing] = useState(null);
   const [settlingAdvance, setSettlingAdvance] = useState(null);
   const [settlementAction, setSettlementAction] = useState("SETTLE");
   const [settlementNotes, setSettlementNotes] = useState("");
@@ -208,13 +209,15 @@ export default function SettlementPage() {
       const statusUpper = (adv.status || "").toUpperCase();
 
       let matchStatus = true;
-      if (statusFilter === "DISBURSED" || statusFilter === "IN_PROGRESS") {
+      if (statusFilter === "APPROVED") {
+        matchStatus = ["APPROVED"].includes(statusUpper);
+      } else if (statusFilter === "DISBURSED" || statusFilter === "IN_PROGRESS") {
         matchStatus = [
           "DISBURSED", "IN_PROGRESS", "IN PROGRESS",
           "RECONCILIATION_PENDING", "RECONCILIATION PENDING",
           "SUBMITTED_FOR_REVIEW", "SUBMITTED FOR REVIEW", "EXPENSE_SUBMITTED",
           "UNDER_REVIEW", "UNDER REVIEW",
-          "APPROVED", "EXPENSE_VERIFIED",
+          "EXPENSE_VERIFIED",
           "SETTLEMENT_PENDING", "SETTLEMENT PENDING", "PARTIALLY_SETTLED", "PARTIALLY_ADJUSTED"
         ].includes(statusUpper);
       } else if (statusFilter === "SETTLED" || statusFilter === "CLOSED") {
@@ -248,6 +251,33 @@ export default function SettlementPage() {
 
     return { totalDisbursedCount, totalOutstanding, totalSettled };
   }, [advances]);
+
+  const handleDisburse = (adv) => {
+    if (!isFinanceExecutive) return;
+    setDisbursing(adv);
+  };
+
+  const handleConfirmDisburse = async (e) => {
+    e?.preventDefault?.();
+    if (!disbursing) return;
+    const advanceId = disbursing.advanceId || disbursing.id;
+
+    setSubmitting(true);
+    try {
+      await cashAdvanceApi.disburse(advanceId);
+      showStatusToast(`Cash advance #${String(advanceId).slice(0, 8)} disbursed successfully!`, "success");
+      setDisbursing(null);
+      fetchSettlementAdvances();
+    } catch (err) {
+      console.error("Disbursement error:", err);
+      showStatusToast(
+        err?.response?.data?.message || "Failed to disburse cash advance",
+        "error"
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleOpenSettle = (adv) => {
     if (!isFinanceExecutive) return;
@@ -349,6 +379,7 @@ export default function SettlementPage() {
 
   const statusOptions = [
     { label: "All Advances", value: "ALL" },
+    { label: "Approved (Awaiting Disbursement)", value: "APPROVED" },
     { label: "Disbursed / Outstanding", value: "DISBURSED" },
     { label: "Fully Settled", value: "SETTLED" },
   ];
@@ -532,15 +563,32 @@ export default function SettlementPage() {
                             <Eye size={15} />
                           </button>
 
-                          {!isSettled && isFinanceExecutive && (
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              onClick={() => handleOpenSettle(adv)}
-                              className="!py-1 !px-2.5 !text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white"
-                            >
-                              Settle Advance
-                            </Button>
+                          {isFinanceExecutive && (
+                            <>
+                              {statusUpper === "APPROVED" && (
+                                <Button
+                                  size="sm"
+                                  variant="primary"
+                                  onClick={() => handleDisburse(adv)}
+                                  disabled={submitting}
+                                  className="!py-1 !px-2.5 !text-[11px] bg-blue-600 hover:bg-blue-700 text-white"
+                                  title="Initiate payment disbursement"
+                                >
+                                  {submitting ? <Loader2 size={12} className="animate-spin mr-1" /> : null}
+                                  Disburse
+                                </Button>
+                              )}
+                              {!isSettled && statusUpper !== "APPROVED" && (
+                                <Button
+                                  size="sm"
+                                  variant="primary"
+                                  onClick={() => handleOpenSettle(adv)}
+                                  className="!py-1 !px-2.5 !text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white"
+                                >
+                                  Settle Advance
+                                </Button>
+                              )}
+                            </>
                           )}
                         </div>
                       </td>
@@ -616,6 +664,52 @@ export default function SettlementPage() {
       )}
 
       {/* Settle Advance Details Modal / Panel */}
+      {/* Disbursement Confirmation Modal */}
+      {isFinanceExecutive && disbursing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50">
+              <h3 className="font-bold text-gray-900 text-sm">Disburse Cash Advance</h3>
+              <button onClick={() => setDisbursing(null)} className="text-gray-400 hover:text-gray-600 p-1">
+                <XCircle size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleConfirmDisburse} className="p-5 space-y-4">
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                <p className="text-xs text-blue-700">
+                  You are about to <strong>disburse</strong> cash advance request <strong className="text-blue-900">#{String(disbursing.advanceId || disbursing.id).slice(0, 8)}</strong> for <strong className="text-blue-900">{formatMoney(disbursing.amount, disbursing.currencyCode || "INR")}</strong>.
+                </p>
+              </div>
+
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-xs font-medium text-gray-600">Requested Amount:</span>
+                  <span className="text-xs font-bold text-gray-900">{formatMoney(disbursing.amount, disbursing.currencyCode || "INR")}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-xs font-medium text-gray-600">Outstanding Balance:</span>
+                  <span className="text-xs font-bold text-gray-900">{formatMoney(disbursing.outstandingBalance || disbursing.amount, disbursing.currencyCode || "INR")}</span>
+                </div>
+              </div>
+
+              <div className="text-xs text-gray-600 p-2.5 bg-amber-50 rounded-lg border border-amber-200">
+                <p className="font-medium text-amber-900 mb-1">Payment will be initiated to:</p>
+                <p className="text-amber-800">{disbursing.employeeName || `Employee ID: ${disbursing.employeeId || disbursing.employee_id}`}</p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                <Button type="button" variant="outline" onClick={() => setDisbursing(null)} disabled={submitting} className="text-xs">
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" disabled={submitting} className="text-xs bg-blue-600 hover:bg-blue-700">
+                  {submitting ? <LoadingSpinner size="sm" className="mr-1.5" /> : "Confirm Disburse"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {isFinanceExecutive && settlingAdvance && (() => {
         const advAmt = Number(settlingAdvance.amount) || 0;
         const expAmt = Number(
