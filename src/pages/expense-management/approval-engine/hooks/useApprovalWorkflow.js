@@ -65,6 +65,8 @@ const invalidateApprovalCaches = (qc, reportId) => {
     qc.invalidateQueries({ queryKey: ["reportLineItems", reportId] });
     qc.invalidateQueries({ queryKey: ["reportReviews", reportId] });
     qc.invalidateQueries({ queryKey: ["financeReviews", reportId] });
+    // The review panels' own copy of the report (status pill, Approval Progress fallback).
+    qc.invalidateQueries({ queryKey: ["expenseReviewReport", reportId] });
   }
 };
 

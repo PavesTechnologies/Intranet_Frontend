@@ -26,6 +26,7 @@ export function useApprovalLiveSync() {
       if (event?.reportId) {
         qc.invalidateQueries({ queryKey: APPROVAL_STATUS_KEY(event.reportId) });
         qc.invalidateQueries({ queryKey: LINE_ITEM_REVIEWS_KEY(event.reportId) });
+        qc.invalidateQueries({ queryKey: ["expenseReviewReport", event.reportId] });
       }
       qc.invalidateQueries({ queryKey: ["approvalMyHistory"] });
       qc.invalidateQueries({ queryKey: ["financeQueue"] });

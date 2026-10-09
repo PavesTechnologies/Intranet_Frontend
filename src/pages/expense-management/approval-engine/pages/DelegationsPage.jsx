@@ -6,6 +6,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import Modal from "@/components/Modal/modal";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import FormInput from "@/components/forms/FormInput";
+import { Fonts } from "@/components/Fonts/Fonts";
 import { showStatusToast } from "@/components/toastfy/toast";
 import {
   useApprovalDelegations,
@@ -13,6 +14,8 @@ import {
   useDeleteApprovalDelegation,
 } from "../hooks/useApprovalDelegations";
 import EmployeeLabel from "../components/EmployeeLabel";
+import EmployeeSelect from "../components/EmployeeSelect";
+import { useEmployeeDirectory, resolveEmployeeName } from "../hooks/useEmployeeDirectory";
 import { formatDate } from "../constants/approvalLabels";
 import { useClientPagination } from "@/pages/expense-management/components/common/pagination";
 import Pagination from "@/components/Pagination/pagination";
@@ -30,6 +33,7 @@ export default function DelegationsPage() {
   const { pageItems: pageDelegations, paginationProps } = useClientPagination(delegations || []);
   const saveDelegation = useSaveApprovalDelegation();
   const deleteDelegation = useDeleteApprovalDelegation();
+  const { data: directory } = useEmployeeDirectory();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -47,14 +51,22 @@ export default function DelegationsPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.delegatorId.trim() || !form.delegateId.trim() || !form.startDate || !form.endDate) {
+    if (!form.delegatorId || !form.delegateId || !form.startDate || !form.endDate) {
       showStatusToast("Delegator, delegate, start date, and end date are all required.", "error");
+      return;
+    }
+    if (form.delegatorId === form.delegateId) {
+      showStatusToast("An approver can't delegate to themselves.", "error");
+      return;
+    }
+    if (form.endDate < form.startDate) {
+      showStatusToast("End date can't be before the start date.", "error");
       return;
     }
     saveDelegation.mutate(
       {
         id: form.delegationId,
-        payload: { delegatorId: form.delegatorId.trim(), delegateId: form.delegateId.trim(), startDate: form.startDate, endDate: form.endDate, status: form.status },
+        payload: { delegatorId: form.delegatorId, delegateId: form.delegateId, startDate: form.startDate, endDate: form.endDate, status: form.status },
       },
       {
         onSuccess: () => {
@@ -187,20 +199,33 @@ export default function DelegationsPage() {
         }
       >
         <form id="delegation-form" onSubmit={handleSubmit} className="space-y-4">
-          <FormInput
-            label="Delegator Employee ID"
-            name="delegatorId"
-            value={form.delegatorId}
-            onChange={(e) => setForm((f) => ({ ...f, delegatorId: e.target.value }))}
-            requiredMark
-          />
-          <FormInput
-            label="Delegate Employee ID"
-            name="delegateId"
-            value={form.delegateId}
-            onChange={(e) => setForm((f) => ({ ...f, delegateId: e.target.value }))}
-            requiredMark
-          />
+          <div>
+            <label htmlFor="delegation-delegator" className={Fonts.label}>
+              Approver (Delegator)
+              <span className="ml-1 text-red-500">*</span>
+            </label>
+            <EmployeeSelect
+              inputId="delegation-delegator"
+              value={form.delegatorId}
+              onChange={(delegatorId) => setForm((f) => ({ ...f, delegatorId }))}
+              excludeIds={form.delegateId ? [form.delegateId] : []}
+              isDisabled={saveDelegation.isPending}
+            />
+          </div>
+          <div>
+            <label htmlFor="delegation-delegate" className={Fonts.label}>
+              Delegate
+              <span className="ml-1 text-red-500">*</span>
+            </label>
+            <EmployeeSelect
+              inputId="delegation-delegate"
+              value={form.delegateId}
+              onChange={(delegateId) => setForm((f) => ({ ...f, delegateId }))}
+              excludeIds={form.delegatorId ? [form.delegatorId] : []}
+              isDisabled={saveDelegation.isPending}
+            />
+            <p className="mt-1 text-xs text-gray-500">The approver's assignments route to this person while the delegation is active.</p>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <FormInput
               label="Start Date"
@@ -216,6 +241,7 @@ export default function DelegationsPage() {
               type="date"
               value={form.endDate}
               onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
+              min={form.startDate || undefined}
               requiredMark
             />
           </div>
@@ -236,7 +262,7 @@ export default function DelegationsPage() {
       <ConfirmationModal
         isOpen={!!toDelete}
         title="Delete Delegation"
-        message={`Delete the delegation from ${toDelete?.delegatorId} to ${toDelete?.delegateId}?`}
+        message={`Delete the delegation from ${resolveEmployeeName(directory, toDelete?.delegatorId)} to ${resolveEmployeeName(directory, toDelete?.delegateId)}?`}
         confirmText="Delete"
         onConfirm={handleDeleteConfirm}
         onCancel={() => setToDelete(null)}

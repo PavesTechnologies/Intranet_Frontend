@@ -22,63 +22,63 @@ import {
 } from "@/pages/expense-management/api/expenseReportsApi";
 import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
 import Pagination from "@/components/Pagination/pagination";
-
+ 
 const ITEMS_PER_PAGE = 10;
-
+ 
 const formatDate = (value) => {
   if (!value) return "—";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "2-digit" });
 };
-
+ 
 const formatAmount = (value) =>
   (Number(value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
+ 
 const breadcrumbs = [
   { label: "Expense Management", to: "/expense-management/dashboard" },
   { label: "Expenses", to: "/expense-management/expenses/my" },
   { label: "My Expenses" },
 ];
-
+ 
 const emptyReportForm = {
   title: "",
   businessPurpose: "",
   costCenterId: "",
   currencyId: "",
 };
-
+ 
 export default function MyExpensesPage() {
   const navigate = useNavigate();
   const { hasRole } = useAuth();
   // Manager is read-only on the backend for report writes (ExpenseReportController
   // allows only ADMIN/GENERAL to create/update/delete/submit) — don't show write actions.
   const canManage = hasRole(["General"]);
-
+ 
   const [reports, setReports] = useState([]);
   const [isServerPaginated, setIsServerPaginated] = useState(false);
   const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-
+ 
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-
+ 
   const [costCenters, setCostCenters] = useState([]);
   const [currencies, setCurrencies] = useState([]);
-
+ 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState("create"); // "create" or "edit"
   const [currentReport, setCurrentReport] = useState(null);
   const [formData, setFormData] = useState(emptyReportForm);
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
-
+ 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [reportToDelete, setReportToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
-
+ 
   const fetchLookups = useCallback(async () => {
     try {
       const [costCenterList, currencyList] = await Promise.all([
@@ -91,7 +91,7 @@ export default function MyExpensesPage() {
       console.error("Failed to load lookups:", err);
     }
   }, []);
-
+ 
   const fetchReports = useCallback(async () => {
     try {
       setLoading(true);
@@ -106,9 +106,9 @@ export default function MyExpensesPage() {
         sortDirection: "desc",
       };
       const res = await expenseReportService.getAll(params);
-
+ 
       const payload = res.data?.data;
-
+ 
       if (payload && typeof payload === "object" && !Array.isArray(payload)) {
         const items = payload.reports || payload.expenseReports || payload.content || payload.data || [];
         const total = payload.total !== undefined ? payload.total : payload.totalElements ?? items.length ?? 0;
@@ -143,15 +143,15 @@ export default function MyExpensesPage() {
       setLoading(false);
     }
   }, [currentPage, searchTerm, statusFilter]);
-
+ 
   useEffect(() => {
     fetchLookups();
   }, [fetchLookups]);
-
+ 
   useEffect(() => {
     fetchReports();
   }, [fetchReports]);
-
+ 
   const matchesFilters = useCallback(
     (r) => {
       const title = (r.title || "").toLowerCase();
@@ -163,7 +163,7 @@ export default function MyExpensesPage() {
     },
     [searchTerm, statusFilter]
   );
-
+ 
   const displayedReports = isServerPaginated
     ? reports
     : (() => {
@@ -171,36 +171,36 @@ export default function MyExpensesPage() {
         const start = (currentPage - 1) * ITEMS_PER_PAGE;
         return filtered.slice(start, start + ITEMS_PER_PAGE);
       })();
-
+ 
   const totalCount = isServerPaginated ? totalItems : reports.filter(matchesFilters).length;
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE) || 0;
-
+ 
   const allReportsForStats = isServerPaginated ? reports : reports.filter(matchesFilters);
   const totalReportsCount = isServerPaginated ? totalItems : reports.filter(matchesFilters).length;
   const draftCount = allReportsForStats.filter((r) => (r.reportStatus || "").toUpperCase() === "DRAFT").length;
   const totalReimbursable = allReportsForStats.reduce((sum, r) => sum + (Number(r.reimbursableAmount) || 0), 0);
-
+ 
   const handleSearch = useCallback((value) => {
     setSearchTerm(value || "");
     setCurrentPage(1);
   }, []);
-
+ 
   const handleStatusFilterChange = (e) => {
     setStatusFilter(e.target.value);
     setCurrentPage(1);
   };
-
+ 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: "" }));
   };
-
+ 
   const handleSelectChange = (name, value) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: "" }));
   };
-
+ 
   const validateForm = () => {
     const errors = {};
     if (!formData.title.trim()) {
@@ -215,7 +215,7 @@ export default function MyExpensesPage() {
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
-
+ 
   const handleCreateClick = () => {
     setDrawerMode("create");
     setCurrentReport(null);
@@ -223,7 +223,7 @@ export default function MyExpensesPage() {
     setFormErrors({});
     setIsModalOpen(true);
   };
-
+ 
   const handleEditClick = (report) => {
     setDrawerMode("edit");
     setCurrentReport(report);
@@ -236,18 +236,18 @@ export default function MyExpensesPage() {
     setFormErrors({});
     setIsModalOpen(true);
   };
-
+ 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
-
+ 
     const payload = {
       title: formData.title.trim(),
       businessPurpose: formData.businessPurpose ? formData.businessPurpose.trim() : "",
       costCenterId: formData.costCenterId,
       currencyId: formData.currencyId,
     };
-
+ 
     try {
       setSubmitting(true);
       if (drawerMode === "create") {
@@ -274,12 +274,12 @@ export default function MyExpensesPage() {
       setSubmitting(false);
     }
   };
-
+ 
   const handleDeleteClick = (report) => {
     setReportToDelete(report);
     setIsConfirmOpen(true);
   };
-
+ 
   const handleDeleteConfirm = async () => {
     if (!reportToDelete) return;
     try {
@@ -301,7 +301,7 @@ export default function MyExpensesPage() {
       setDeleting(false);
     }
   };
-
+ 
   const costCenterOptions = costCenters.map((c) => ({
     value: c.costCenterId,
     label: `${c.costCenterCode} - ${c.costCenterName}`,
@@ -312,7 +312,7 @@ export default function MyExpensesPage() {
   }));
   const headers = ["S.No", "Title", "Cost Center", "Currency", "Total Amount", "Status", "Created", "Actions"];
   const columns = ["serial_no", "title", "costCenter", "currency", "totalAmount", "status", "created", "actions"];
-
+ 
   const tableRows = displayedReports.map((r, index) => ({
     serial_no: ((currentPage - 1) * ITEMS_PER_PAGE + index + 1).toString(),
     reportNumber: <span className="font-mono text-[11px] font-semibold text-gray-700">{r.reportNumber || "—"}</span>,
@@ -370,7 +370,7 @@ export default function MyExpensesPage() {
       </div>
     ),
   }));
-
+ 
   const statusFilterOptions = [
     { label: "All Statuses", value: "" },
     { label: "Draft", value: "DRAFT" },
@@ -385,17 +385,17 @@ export default function MyExpensesPage() {
     { label: "Reimbursed", value: "REIMBURSED" },
     { label: "Closed", value: "CLOSED" },
   ];
-
+ 
   return (
     <div className="space-y-3">
       <Breadcrumb items={breadcrumbs} />
-
+ 
       <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm sm:p-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <h1 className="text-lg font-bold text-[#0a174e]">My Expense Reports</h1>
           <p className="text-xs text-gray-500 mt-0.5">Track and manage the expense reports you've created.</p>
         </div>
-
+ 
         {canManage && (
           <Button
             onClick={handleCreateClick}
@@ -408,7 +408,7 @@ export default function MyExpensesPage() {
           </Button>
         )}
       </div>
-
+ 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
           <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
@@ -419,7 +419,7 @@ export default function MyExpensesPage() {
             <p className="text-xl font-bold text-gray-900 mt-0.5">{totalReportsCount}</p>
           </div>
         </div>
-
+ 
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
           <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
             <FilePlus2 size={18} />
@@ -429,7 +429,7 @@ export default function MyExpensesPage() {
             <p className="text-xl font-bold text-amber-600 mt-0.5">{draftCount}</p>
           </div>
         </div>
-
+ 
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
           <div className="p-2.5 bg-green-50 text-green-600 rounded-lg">
             <Landmark size={18} />
@@ -440,7 +440,7 @@ export default function MyExpensesPage() {
           </div>
         </div>
       </div>
-
+ 
       <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
           <div className="lg:col-span-2">
@@ -463,7 +463,7 @@ export default function MyExpensesPage() {
           />
         </div>
       </div>
-
+ 
       <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
         {loading ? (
           <div className="py-16">
@@ -512,16 +512,16 @@ export default function MyExpensesPage() {
           </>
         )}
       </div>
-
+ 
       {isModalOpen && createPortal(
         <>
           {/* Backdrop overlay */}
-          <div 
+          <div
             className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] animate-in fade-in duration-200"
             onClick={() => setIsModalOpen(false)}
           />
           {/* Drawer Panel */}
-          <div 
+          <div
             className="fixed inset-y-0 right-0 z-[10000] w-full max-w-lg bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
             onClick={(e) => e.stopPropagation()}
           >
@@ -545,7 +545,7 @@ export default function MyExpensesPage() {
                 <X size={18} />
               </button>
             </div>
-
+ 
             {/* Scrollable Form Content */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <form id="report-edit-form" onSubmit={handleFormSubmit} className="py-2">
@@ -560,7 +560,7 @@ export default function MyExpensesPage() {
                 />
               </form>
             </div>
-
+ 
             {/* Footer */}
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end px-6 py-4 border-t border-gray-100 bg-gray-50 shrink-0">
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={submitting} className="w-full sm:w-auto">
@@ -574,7 +574,7 @@ export default function MyExpensesPage() {
         </>,
         document.body
       )}
-
+ 
       <ConfirmationModal
         isOpen={isConfirmOpen}
         title="Delete Expense Report"
@@ -592,3 +592,4 @@ export default function MyExpensesPage() {
     </div>
   );
 }
+ 

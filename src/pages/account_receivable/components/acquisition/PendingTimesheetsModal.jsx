@@ -70,7 +70,7 @@ export default function PendingTimesheetsModal({
               <tr>
                 <th className="px-4 py-3 text-left">Employee</th>
                 <th className="px-4 py-3 text-left">Work Date</th>
-                <th className="px-4 py-3 text-center">Hours</th>
+                <th className="px-4 py-3 text-left">Hours</th>
                 <th className="px-4 py-3 text-left">Role</th>
                 <th className="px-4 py-3 text-center">Status</th>
               </tr>
@@ -81,7 +81,7 @@ export default function PendingTimesheetsModal({
                   <tr key={t.id || idx} className="hover:bg-slate-50">
                     <td className="px-4 py-2.5 font-semibold text-slate-900">{t.employee}</td>
                     <td className="px-4 py-2.5 font-mono text-slate-600">{t.workDate}</td>
-                    <td className="px-4 py-2.5 text-center font-semibold font-mono text-amber-800">{t.hours} hrs</td>
+                    <td className="px-4 py-2.5 text-left font-semibold font-mono text-amber-800">{t.hours} hrs</td>
                     <td className="px-4 py-2.5 text-slate-500">{t.role || "Software Engineer"}</td>
                     <td className="px-4 py-2.5 text-center">
                       <StatusBadge label={t.approvalStatus || "Pending Approval"} size="sm" />
