@@ -13,6 +13,8 @@
  *     on a nav item whose page will just 403.
  *   - Items with children                → children are filtered first; the parent is
  *                                          suppressed automatically if no children survive.
+ *   - collapseSingleChild: true          → when exactly one child survives, the parent renders as
+ *                                          a plain link to that child instead of a one-item submenu.
  *
  * @param {Array}    items              - Menu config items (from sidebarConfig.js)
  * @param {Function} hasRole            - hasRole(rolesArray: string[]) from useAuth()
@@ -29,7 +31,10 @@ export function filterMenuByRole(items, hasRole, hasAnyPermission = () => true) 
 
     if (item.children?.length) {
       const visibleChildren = filterMenuByRole(item.children, hasRole, hasAnyPermission);
-      if (visibleChildren.length > 0) {
+      if (item.collapseSingleChild && visibleChildren.length === 1) {
+        const { children: _children, ...link } = item;
+        acc.push({ ...link, to: visibleChildren[0].to });
+      } else if (visibleChildren.length > 0) {
         acc.push({ ...item, children: visibleChildren });
       }
       // parent suppressed when all children are hidden for this role
