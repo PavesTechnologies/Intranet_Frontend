@@ -193,8 +193,10 @@ export const XMS_SUBMENU = [
     label: "Expenses",
     to: "/expense-management/expenses/my",
     allowedRoles: [...XMS_EMPLOYEE, ...XMS_MANAGER],
+    // No "Create Expense" entry: My Expenses has its own create button. Employees therefore see a
+    // single child, which collapses to a plain "Expenses" link; managers keep the submenu.
+    collapseSingleChild: true,
     children: [
-      { label: "Create Expense",  to: "/expense-management/expenses/create" },
       { label: "My Expenses",     to: "/expense-management/expenses/my" },
       { label: "All Expenses",    to: "/expense-management/expenses/all",     allowedRoles: XMS_MANAGER },
       { label: "Expense Reports", to: "/expense-management/expenses/reports", allowedRoles: XMS_MANAGER },
@@ -275,11 +277,12 @@ export const XMS_SUBMENU = [
       { label: "Version History",     to: "/expense-management/policy-engine/versions" },
     ],
   },
-  // {
-  //   label: "Reports",
-  //   to: "/expense-management/reports",
-  //   allowedRoles: XMS_REPORT_VIEWERS,
-  // },
+  {
+    // Organization-wide for Finance/Admin; a manager sees their own team (ExpenseReportingController).
+    label: "Reports",
+    to: "/expense-management/reports",
+    allowedRoles: XMS_REPORT_VIEWERS,
+  },
   // {
   //   label: "Activity",
   //   to: "/expense-management/activity/notifications",
@@ -289,11 +292,11 @@ export const XMS_SUBMENU = [
   //     { label: "Audit Logs",    to: "/expense-management/activity/audit-logs", allowedRoles: XMS_ADMIN },
   //   ],
   // },
-  // {
-  //   label: "Settings",
-  //   to: "/expense-management/settings",
-  //   allowedRoles: XMS_ADMIN,
-  // },
+  {
+    label: "Settings",
+    to: "/expense-management/settings",
+    allowedRoles: XMS_ADMIN,
+  },
 ];
 
 /**
