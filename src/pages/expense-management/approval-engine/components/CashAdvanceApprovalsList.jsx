@@ -290,6 +290,10 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
   const [selectedAdvance, setSelectedAdvance] = useState(null);
   const [costCentersMap, setCostCentersMap] = useState(new Map());
 
+  // Approve Confirmation Modal
+  const [approvingAdvance, setApprovingAdvance] = useState(null);
+  const [approvalRemarks, setApprovalRemarks] = useState("");
+
   // Reject Modal
   const [rejectingAdvance, setRejectingAdvance] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
@@ -395,12 +399,22 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
     });
   }, [advances, activeTab, searchTerm]);
 
-  const handleApprove = async (adv) => {
-    const advanceId = adv.advanceId || adv.id;
+  const handleApprove = (adv) => {
+    setApprovingAdvance(adv);
+    setApprovalRemarks("");
+  };
+
+  const handleConfirmApprove = async (e) => {
+    e.preventDefault();
+    if (!approvingAdvance) return;
+
+    const advanceId = approvingAdvance.advanceId || approvingAdvance.id;
     setActionLoading(true);
     try {
       await cashAdvanceApi.approve(advanceId);
-      showStatusToast(`Cash advance ${formatAdvanceNumber(adv)} approved successfully!`, "success");
+      showStatusToast(`Cash advance ${formatAdvanceNumber(approvingAdvance)} approved successfully!`, "success");
+      setApprovingAdvance(null);
+      setApprovalRemarks("");
       fetchAdvances();
     } catch (err) {
       showStatusToast(err.response?.data?.message || "Failed to approve cash advance", "error");
@@ -603,6 +617,47 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                 Close
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approve Confirmation Modal */}
+      {approvingAdvance && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50">
+              <h3 className="font-bold text-gray-900 text-sm">Approve Cash Advance Request</h3>
+              <button onClick={() => setApprovingAdvance(null)} className="text-gray-400 hover:text-gray-600 p-1">
+                <XCircle size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleConfirmApprove} className="p-5 space-y-4">
+              <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                <p className="text-xs text-emerald-700">
+                  You are about to <strong>approve</strong> cash advance request <strong className="text-emerald-900">{formatAdvanceNumber(approvingAdvance)}</strong> for <strong className="text-emerald-900">{formatMoney(approvingAdvance.amount, approvingAdvance.currencyCode || "INR")}</strong>.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Approval Remarks <span className="text-gray-400 text-[11px]">(Optional)</span>
+                </label>
+                <textarea
+                  value={approvalRemarks}
+                  onChange={(e) => setApprovalRemarks(e.target.value)}
+                  placeholder="Add any approval remarks or conditions (optional)..."
+                  rows={2}
+                  className="w-full rounded-md border border-gray-300 p-2.5 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                <Button type="button" variant="outline" onClick={() => setApprovingAdvance(null)} disabled={actionLoading} className="text-xs">
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" disabled={actionLoading} className="text-xs bg-emerald-600 hover:bg-emerald-700">
+                  {actionLoading ? <LoadingSpinner size="sm" className="mr-1.5" /> : "Confirm Approve"}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}
