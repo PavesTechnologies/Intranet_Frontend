@@ -66,6 +66,8 @@ const invalidateFinanceCaches = (qc, reportId) => {
   if (reportId) {
     qc.invalidateQueries({ queryKey: FINANCE_STATUS_KEY(reportId) });
     qc.invalidateQueries({ queryKey: FINANCE_REVIEWS_KEY(reportId) });
+    // The review panel's own copy of the report (status pill, whether Finance can still act).
+    qc.invalidateQueries({ queryKey: ["expenseReviewReport", reportId] });
   }
 };
 

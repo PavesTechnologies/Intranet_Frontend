@@ -39,6 +39,8 @@ const INITIAL_WIZARD_DATA = {
     billingType: "",
     billingMode: "",
     billingFrequency: "",
+    billingFrequencyId: "",
+    billingFrequencyName: "",
     timeAndMaterial: {
       rateCard: "",
       rate: "",
@@ -552,6 +554,12 @@ export default function NewConfigurationWizard() {
   const handleProjectInfoChange = (projectInfo) => {
     setWizardData((prev) => {
       const setupMode = projectInfo.projectSource === "ENTERPRISE" ? "EXISTING" : "STANDALONE";
+      const nextBillingType = projectInfo.billingType || prev.billingConfig.billingType;
+      const projectChanged =
+        String(projectInfo.projectId || "") !== String(prev.projectInfo.projectId || "");
+      const resetRecurringFrequency =
+        nextBillingType === "RECURRING" &&
+        (prev.billingConfig.billingType !== "RECURRING" || projectChanged);
 
       // We do not preselect any billingMode. Let the user explicitly choose it on Step 2.
       let billingMode = prev.billingConfig.billingMode;
@@ -565,8 +573,16 @@ export default function NewConfigurationWizard() {
         projectInfo,
         billingConfig: {
           ...prev.billingConfig,
-          billingType: projectInfo.billingType || prev.billingConfig.billingType,
-          billingFrequency: projectInfo.billingFrequency || prev.billingConfig.billingFrequency,
+          billingType: nextBillingType,
+          billingFrequency:
+            nextBillingType === "RECURRING"
+              ? resetRecurringFrequency
+                ? ""
+                : prev.billingConfig.billingFrequency || ""
+              : projectInfo.billingFrequency || prev.billingConfig.billingFrequency,
+          ...(resetRecurringFrequency
+            ? { billingFrequencyId: "", billingFrequencyName: "" }
+            : {}),
           billingMode,
         },
       };

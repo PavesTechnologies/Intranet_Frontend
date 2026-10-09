@@ -184,8 +184,8 @@ export default function TaxCalculationDetailView({
                   <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
                     <th className="px-3 py-2 text-left font-semibold">Tax Component</th>
                     <th className="px-3 py-2 text-left font-semibold">Applicability</th>
-                    <th className="px-3 py-2 text-right font-semibold">Rate</th>
-                    <th className="px-3 py-2 text-right font-semibold">Amount</th>
+                    <th className="px-3 py-2 text-left font-semibold">Rate</th>
+                    <th className="px-3 py-2 text-left font-semibold">Amount</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -202,10 +202,10 @@ export default function TaxCalculationDetailView({
                         )}
                       </td>
                       <td className="px-3 py-2 text-slate-600">{humanizeApplicability(component.applicabilityType)}</td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700">
+                      <td className="px-3 py-2 text-left font-mono tabular-nums text-slate-700">
                         {formatRatePercentage(component.appliedRate) ?? "—"}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-900">
+                      <td className="px-3 py-2 text-left font-mono tabular-nums text-slate-900">
                         {formatCurrency(component.taxAmount, currency)}
                       </td>
                     </tr>

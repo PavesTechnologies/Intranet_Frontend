@@ -118,7 +118,7 @@ export default function CatchAllFlowPage() {
 
         <div className="lg:sticky lg:top-4">
           <h2 className="text-sm font-semibold text-gray-900 mb-2">Flow Preview</h2>
-          <FlowPreview whenLabel="Always (no other flow matched)" levels={levels} />
+          <FlowPreview whenLabel="Always (no other flow matched)" levels={levels} autoFinance={false} />
         </div>
       </div>
     </div>

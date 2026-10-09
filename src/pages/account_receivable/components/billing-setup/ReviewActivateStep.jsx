@@ -1,7 +1,8 @@
 import { useContext, useMemo, useState } from "react";
-import { Wallet, Receipt, Pencil, Search, ChevronRight, Building2, Calendar, Info } from "lucide-react";
+import { Wallet, Receipt, Pencil, ChevronRight, Building2, Calendar, Info } from "lucide-react";
 
 import { PageCard } from "../../../../components/Cards/PageCard";
+import SearchInput from "../../../../components/filter/Searchbar";
 import Modal from "../../../../components/Modal/modal";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { BILLING_MODE_LABELS } from "../../data/wizardOptions";
@@ -332,13 +333,10 @@ function RoleRatesDrawer({ isOpen, onClose, roles, currency }) {
     >
       <div className="border-b border-slate-100 p-4">
         <div className="relative max-w-md">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
+          <SearchInput
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search role..."
-            className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-xs shadow-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
           />
         </div>
       </div>

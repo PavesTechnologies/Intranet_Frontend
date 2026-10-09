@@ -14,6 +14,7 @@ import {
   FileText,
   Calendar,
   AlertCircle,
+  AlertTriangle,
   Wallet,
   PiggyBank,
   TrendingDown,
@@ -131,6 +132,19 @@ const employeeService = {
 const ITEMS_PER_PAGE = 10;
 const STATS_LIMIT = 1000;
 
+const EMPTY_BUDGET_FORM = {
+  costCenterId: "",
+  fiscalYear: "",
+  budgetAmount: "",
+  availableBudget: "",
+  rolloverFromPrevious: "",
+  // Request-only: the backend validates the rollover against this budget but never stores it.
+  rolloverSourceBudgetId: "",
+  allowRollover: false,
+  rolloverCap: "",
+  warningThreshold: "",
+};
+
 const customSelectStyles = {
   control: (base, state) => ({
     ...base,
@@ -162,6 +176,35 @@ const formatAmount = (value) => {
   if (Number.isNaN(num)) return "—";
   return num.toLocaleString("en-IN", { maximumFractionDigits: 2 });
 };
+
+// "" / null / undefined mean "not supplied" - sent to the API as null rather than 0.
+const toOptionalNumber = (value) => (value === "" || value === null || value === undefined ? null : Number(value));
+
+// Total spendable pool for a fiscal year: the allocation plus any rollover carried in from a prior year.
+const getTotalPool = (b) => Number(b?.budgetAmount || 0) + Number(b?.rolloverFromPrevious || 0);
+
+// A source budget's true unencumbered remainder - what the backend checks a rollover against.
+const getUnencumbered = (b) => Number(b?.effectiveAvailable ?? b?.availableBudget ?? 0);
+
+const isBelowWarningThreshold = (b) =>
+  b?.warningThreshold !== null && b?.warningThreshold !== undefined && getUnencumbered(b) < Number(b.warningThreshold);
+
+const CheckboxField = ({ label, description, name, checked, onChange, disabled }) => (
+  <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
+    <input
+      type="checkbox"
+      name={name}
+      checked={checked}
+      onChange={onChange}
+      disabled={disabled}
+      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+    />
+    <span>
+      <span className="block text-sm font-medium text-gray-700">{label}</span>
+      {description && <span className="block text-xs text-gray-500 mt-0.5">{description}</span>}
+    </span>
+  </label>
+);
 
 const DetailRow = ({ icon, label, value, breakAll = false }) => (
   <div className="flex items-start gap-3 rounded-xl bg-gray-50 p-3">
@@ -229,6 +272,7 @@ export default function CostCenterManagementPage() {
     description: "",
     ownerEmployeeId: "",
     status: "ACTIVE",
+    allowUnbudgeted: false,
   });
   const [ccFormErrors, setCcFormErrors] = useState({});
   const [isCcViewOpen, setIsCcViewOpen] = useState(false);
@@ -253,12 +297,7 @@ export default function CostCenterManagementPage() {
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [currentBudget, setCurrentBudget] = useState(null);
   const [availableBudgetTouched, setAvailableBudgetTouched] = useState(false);
-  const [budgetFormData, setBudgetFormData] = useState({
-    costCenterId: "",
-    fiscalYear: "",
-    budgetAmount: "",
-    availableBudget: "",
-  });
+  const [budgetFormData, setBudgetFormData] = useState(EMPTY_BUDGET_FORM);
   const [budgetFormErrors, setBudgetFormErrors] = useState({});
   const [isBudgetViewOpen, setIsBudgetViewOpen] = useState(false);
   const [viewBudget, setViewBudget] = useState(null);
@@ -486,7 +525,7 @@ export default function CostCenterManagementPage() {
     (b) => {
       const cc = resolveCostCenter(b.costCenterId);
       const code = (cc?.costCenterCode || "").toLowerCase();
-      const name = (cc?.costCenterName || "").toLowerCase();
+      const name = (cc?.costCenterName || b.costCenterName || "").toLowerCase();
       const fiscalYear = (b.fiscalYear || "").toLowerCase();
       const q = budgetSearchTerm.toLowerCase();
       const matchesSearch = !q || code.includes(q) || name.includes(q) || fiscalYear.includes(q);
@@ -525,12 +564,12 @@ export default function CostCenterManagementPage() {
 
   const getConsumed = (b) => {
     if (b.consumedBudget !== undefined && b.consumedBudget !== null) return Number(b.consumedBudget);
-    return Number(b.budgetAmount || 0) - Number(b.availableBudget || 0);
+    return getTotalPool(b) - Number(b.availableBudget || 0);
   };
 
   const totalBudgetsCount = statsBudgets.length;
-  const totalAllocatedBudget = statsBudgets.reduce((sum, b) => sum + Number(b.budgetAmount || 0), 0);
-  const totalAvailableBudget = statsBudgets.reduce((sum, b) => sum + Number(b.availableBudget || 0), 0);
+  const totalAllocatedBudget = statsBudgets.reduce((sum, b) => sum + getTotalPool(b), 0);
+  const totalAvailableBudget = statsBudgets.reduce((sum, b) => sum + Number(b.effectiveAvailable ?? b.availableBudget ?? 0), 0);
   const totalConsumedBudget = statsBudgets.reduce((sum, b) => sum + getConsumed(b), 0);
 
   const fiscalYearOptions = Array.from(new Set(statsBudgets.map((b) => b.fiscalYear).filter(Boolean))).sort();
@@ -604,24 +643,44 @@ export default function CostCenterManagementPage() {
     }
   };
 
+  const handleCcCheckboxChange = (e) => {
+    const { name, checked } = e.target;
+    setCcFormData((prev) => ({ ...prev, [name]: checked }));
+  };
+
   const handleBudgetSelectChange = (name, value) => {
-    setBudgetFormData((prev) => ({ ...prev, [name]: value }));
+    setBudgetFormData((prev) => {
+      const next = { ...prev, [name]: value };
+      // A rollover source must belong to the same cost center.
+      if (name === "costCenterId" && value !== prev.costCenterId) {
+        next.rolloverSourceBudgetId = "";
+      }
+      return next;
+    });
     if (budgetFormErrors[name]) {
       setBudgetFormErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
-  const handleBudgetAmountChange = (e) => {
-    const { value } = e.target;
+  const handleBudgetCheckboxChange = (e) => {
+    const { name, checked } = e.target;
+    setBudgetFormData((prev) => ({ ...prev, [name]: checked }));
+  };
+
+  // On create, available budget tracks the full pool (amount + rollover) until edited by hand -
+  // the same default the backend applies when availableBudget is omitted.
+  const handlePoolFieldChange = (e) => {
+    const { name, value } = e.target;
     setBudgetFormData((prev) => {
-      const next = { ...prev, budgetAmount: value };
+      const next = { ...prev, [name]: value };
       if (!currentBudget && !availableBudgetTouched) {
-        next.availableBudget = value;
+        const pool = getTotalPool(next);
+        next.availableBudget = next.budgetAmount === "" && next.rolloverFromPrevious === "" ? "" : String(pool);
       }
       return next;
     });
-    if (budgetFormErrors.budgetAmount) {
-      setBudgetFormErrors((prev) => ({ ...prev, budgetAmount: "" }));
+    if (budgetFormErrors[name]) {
+      setBudgetFormErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
@@ -689,11 +748,41 @@ export default function CostCenterManagementPage() {
       errors.budgetAmount = "Budget amount must be greater than 0.";
     }
 
+    const rollover = toOptionalNumber(budgetFormData.rolloverFromPrevious);
+    const rolloverCap = toOptionalNumber(budgetFormData.rolloverCap);
+    if (rolloverCap !== null && (Number.isNaN(rolloverCap) || rolloverCap < 0)) {
+      errors.rolloverCap = "Rollover cap must be 0 or greater.";
+    }
+
+    if (rollover !== null && (Number.isNaN(rollover) || rollover < 0)) {
+      errors.rolloverFromPrevious = "Rollover must be 0 or greater.";
+    } else if (rollover > 0) {
+      // Mirrors the backend: rollover <= MIN(source's unencumbered remainder, rollover cap).
+      const source = statsBudgets.find((b) => b.budgetId === budgetFormData.rolloverSourceBudgetId);
+      if (!source) {
+        errors.rolloverSourceBudgetId = "Select the budget this rollover is carried from.";
+      } else {
+        const remainder = getUnencumbered(source);
+        const ceiling = rolloverCap !== null && !Number.isNaN(rolloverCap) ? Math.min(remainder, rolloverCap) : remainder;
+        if (rollover > ceiling) {
+          errors.rolloverFromPrevious = `Rollover cannot exceed ${formatAmount(ceiling)} (${
+            ceiling === remainder ? "the source budget's unencumbered remainder" : "the rollover cap"
+          }).`;
+        }
+      }
+    }
+
+    const warningThreshold = toOptionalNumber(budgetFormData.warningThreshold);
+    if (warningThreshold !== null && (Number.isNaN(warningThreshold) || warningThreshold < 0)) {
+      errors.warningThreshold = "Warning threshold must be 0 or greater.";
+    }
+
+    const totalPool = budgetAmount + (rollover > 0 ? rollover : 0);
     const availableBudget = Number(budgetFormData.availableBudget);
     if (budgetFormData.availableBudget === "" || Number.isNaN(availableBudget) || availableBudget < 0) {
       errors.availableBudget = "Available budget must be 0 or greater.";
-    } else if (!Number.isNaN(budgetAmount) && availableBudget > budgetAmount) {
-      errors.availableBudget = "Available budget cannot exceed the budget amount.";
+    } else if (!Number.isNaN(totalPool) && availableBudget > totalPool) {
+      errors.availableBudget = "Available budget cannot exceed the budget amount plus rollover.";
     }
 
     setBudgetFormErrors(errors);
@@ -711,6 +800,7 @@ export default function CostCenterManagementPage() {
       description: "",
       ownerEmployeeId: "",
       status: "ACTIVE",
+      allowUnbudgeted: false,
     });
     setCcFormErrors({});
     setIsCcModalOpen(true);
@@ -726,6 +816,7 @@ export default function CostCenterManagementPage() {
       description: cc.description || "",
       ownerEmployeeId: cc.ownerEmployeeId != null ? String(cc.ownerEmployeeId) : "",
       status: cc.status || "ACTIVE",
+      allowUnbudgeted: cc.allowUnbudgeted === true,
     });
     setCcFormErrors({});
     setIsCcModalOpen(true);
@@ -746,7 +837,7 @@ export default function CostCenterManagementPage() {
     if (!isAdmin) return;
     setCurrentBudget(null);
     setAvailableBudgetTouched(false);
-    setBudgetFormData({ costCenterId: "", fiscalYear: "", budgetAmount: "", availableBudget: "" });
+    setBudgetFormData(EMPTY_BUDGET_FORM);
     setBudgetFormErrors({});
     setIsBudgetModalOpen(true);
   };
@@ -760,6 +851,11 @@ export default function CostCenterManagementPage() {
       fiscalYear: b.fiscalYear || "",
       budgetAmount: b.budgetAmount != null ? String(b.budgetAmount) : "",
       availableBudget: b.availableBudget != null ? String(b.availableBudget) : "",
+      rolloverFromPrevious: b.rolloverFromPrevious != null ? String(b.rolloverFromPrevious) : "",
+      rolloverSourceBudgetId: "",
+      allowRollover: b.allowRollover === true,
+      rolloverCap: b.rolloverCap != null ? String(b.rolloverCap) : "",
+      warningThreshold: b.warningThreshold != null ? String(b.warningThreshold) : "",
     });
     setBudgetFormErrors({});
     setIsBudgetModalOpen(true);
@@ -788,6 +884,7 @@ export default function CostCenterManagementPage() {
       description: ccFormData.description ? ccFormData.description.trim() : "",
       ownerEmployeeId: ccFormData.ownerEmployeeId,
       status: ccFormData.status,
+      allowUnbudgeted: ccFormData.allowUnbudgeted,
     };
 
     try {
@@ -818,11 +915,17 @@ export default function CostCenterManagementPage() {
     e.preventDefault();
     if (!validateBudgetForm()) return;
 
+    const rolloverFromPrevious = toOptionalNumber(budgetFormData.rolloverFromPrevious);
     const payload = {
       costCenterId: budgetFormData.costCenterId,
       fiscalYear: budgetFormData.fiscalYear.trim(),
       budgetAmount: Number(budgetFormData.budgetAmount),
       availableBudget: Number(budgetFormData.availableBudget),
+      rolloverFromPrevious,
+      rolloverSourceBudgetId: rolloverFromPrevious > 0 ? budgetFormData.rolloverSourceBudgetId : null,
+      allowRollover: budgetFormData.allowRollover,
+      rolloverCap: toOptionalNumber(budgetFormData.rolloverCap),
+      warningThreshold: toOptionalNumber(budgetFormData.warningThreshold),
     };
 
     try {
@@ -855,7 +958,7 @@ export default function CostCenterManagementPage() {
       setSubmitting(true);
       if (deleteTarget.type === "cc") {
         await costCenterService.delete(deleteTarget.data.costCenterId);
-        showStatusToast("Cost Center deleted successfully!", "success");
+        showStatusToast("Cost Center marked Inactive.", "success");
 
         setIsConfirmOpen(false);
         setDeleteTarget(null);
@@ -994,8 +1097,9 @@ export default function CostCenterManagementPage() {
     "Department",
     "Fiscal Year",
     "Budget Amount",
-    "Available Budget",
-    "Consumed Budget",
+    "Available to Spend",
+    "Consumed (Paid)",
+    "Reserved",
     "Utilization",
     "Created Date",
     "Actions",
@@ -1009,6 +1113,7 @@ export default function CostCenterManagementPage() {
     "budgetAmount",
     "availableBudget",
     "consumedBudget",
+    "reserved",
     "utilization",
     "createdDate",
     "actions",
@@ -1017,16 +1122,44 @@ export default function CostCenterManagementPage() {
   const budgetTableRows = displayedBudgets.map((b, index) => {
     const cc = resolveCostCenter(b.costCenterId);
     const consumed = getConsumed(b);
-    const utilizationPercent = Number(b.budgetAmount) > 0 ? (consumed / Number(b.budgetAmount)) * 100 : 0;
+    const totalPool = getTotalPool(b);
+    const utilizationPercent = totalPool > 0 ? (consumed / totalPool) * 100 : 0;
+    const belowWarning = isBelowWarningThreshold(b);
 
     return {
       serial_no: ((budgetCurrentPage - 1) * ITEMS_PER_PAGE + index + 1).toString(),
-      costCenter: cc ? `${cc.costCenterCode} - ${cc.costCenterName}` : b.costCenterId || "N/A",
+      costCenter: cc ? `${cc.costCenterCode} - ${cc.costCenterName}` : b.costCenterName || b.costCenterId || "N/A",
       department: cc ? resolveDepartmentName(cc.departmentUuid) : "—",
       fiscalYear: b.fiscalYear || "N/A",
-      budgetAmount: formatAmount(b.budgetAmount),
-      availableBudget: formatAmount(b.availableBudget),
+      budgetAmount: (
+        <div>
+          <span>{formatAmount(b.budgetAmount)}</span>
+          {Number(b.rolloverFromPrevious) > 0 && (
+            <span className="block text-xs text-indigo-600">+{formatAmount(b.rolloverFromPrevious)} rollover</span>
+          )}
+        </div>
+      ),
+      // What a new submission can still use: left after payments, less what submitted-but-unpaid
+      // reports have reserved - the same figure the submission-time budget check enforces.
+      availableBudget: (
+        <span
+          title={
+            belowWarning
+              ? `Below the warning threshold of ${formatAmount(b.warningThreshold)}`
+              : `${formatAmount(b.availableBudget)} left after payments`
+          }
+          className={`inline-flex items-center gap-1 font-semibold ${belowWarning ? "text-amber-600" : ""}`}
+        >
+          {belowWarning && <AlertTriangle size={14} />}
+          {formatAmount(b.effectiveAvailable ?? b.availableBudget)}
+        </span>
+      ),
       consumedBudget: formatAmount(consumed),
+      reserved: (
+        <span title="Held by reports in approval, Finance verification, or approved and awaiting payment" className="text-amber-700">
+          {formatAmount(b.reservedAmount ?? 0)}
+        </span>
+      ),
       utilization: <UtilizationBar percent={utilizationPercent} />,
       createdDate: formatDate(b.createdDate || b.createdAt),
       actions: (
@@ -1101,12 +1234,31 @@ export default function CostCenterManagementPage() {
     { label: "Inactive", value: "INACTIVE" },
   ];
 
-  const costCenterOptions = getCostCenterList().map((cc) => ({
-    value: cc.costCenterId,
-    label: `${cc.costCenterCode} - ${cc.costCenterName} (${resolveDepartmentName(cc.departmentUuid)})`,
-  }));
+  // The backend only accepts budgets for Active cost centers; keep the current one when editing.
+  const costCenterOptions = getCostCenterList()
+    .filter(
+      (cc) => (cc.status || "").toUpperCase() === "ACTIVE" || cc.costCenterId === budgetFormData.costCenterId
+    )
+    .map((cc) => ({
+      value: cc.costCenterId,
+      label: `${cc.costCenterCode} - ${cc.costCenterName} (${resolveDepartmentName(cc.departmentUuid)})`,
+    }));
   const selectedCostCenterOption = costCenterOptions.find((o) => o.value === budgetFormData.costCenterId) || null;
   const selectedCostCenterForForm = resolveCostCenter(budgetFormData.costCenterId);
+
+  // Rollover can only come from another fiscal year of the same cost center.
+  const rolloverSourceOptions = statsBudgets
+    .filter((b) => b.costCenterId === budgetFormData.costCenterId && b.budgetId !== currentBudget?.budgetId)
+    .map((b) => ({
+      value: b.budgetId,
+      label: `${b.fiscalYear} — ${formatAmount(getUnencumbered(b))} unencumbered`,
+      budget: b,
+    }));
+  const selectedRolloverSourceOption =
+    rolloverSourceOptions.find((o) => o.value === budgetFormData.rolloverSourceBudgetId) || null;
+  const selectedRolloverSource = selectedRolloverSourceOption?.budget;
+  const hasRollover = Number(budgetFormData.rolloverFromPrevious) > 0;
+  const formTotalPool = getTotalPool(budgetFormData);
 
   const budgetDepartmentFilterOptions = [
     { label: "All Departments", value: "" },
@@ -1119,6 +1271,7 @@ export default function CostCenterManagementPage() {
 
   const viewCostCenterForBudget = viewBudget ? resolveCostCenter(viewBudget.costCenterId) : null;
   const viewConsumed = viewBudget ? getConsumed(viewBudget) : 0;
+  const formatOptionalAmount = (value) => (value === null || value === undefined ? "Not set" : formatAmount(value));
 
   const breadcrumbs = [
     { label: "Expense Management", to: "/expense-management/dashboard" },
@@ -1259,7 +1412,7 @@ export default function CostCenterManagementPage() {
                 <PiggyBank size={24} />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Available Budget</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Available to Spend</p>
                 <p className="text-2xl font-bold text-green-600 mt-1 truncate">{formatAmount(totalAvailableBudget)}</p>
               </div>
             </div>
@@ -1598,6 +1751,15 @@ export default function CostCenterManagementPage() {
               { label: "Inactive", value: "INACTIVE" },
             ]}
           />
+
+          <CheckboxField
+            label="Allow unbudgeted spend"
+            description="Lets reports be submitted against this cost center when it has no budget for the fiscal year. It never overrides an insufficient-budget block on an existing budget."
+            name="allowUnbudgeted"
+            checked={ccFormData.allowUnbudgeted}
+            onChange={handleCcCheckboxChange}
+            disabled={submitting}
+          />
         </form>
       </Modal>
 
@@ -1685,7 +1847,7 @@ export default function CostCenterManagementPage() {
               step="0.01"
               placeholder="e.g. 500000"
               value={budgetFormData.budgetAmount}
-              onChange={handleBudgetAmountChange}
+              onChange={handlePoolFieldChange}
               requiredMark
               disabled={submitting}
               error={budgetFormErrors.budgetAmount}
@@ -1705,11 +1867,109 @@ export default function CostCenterManagementPage() {
               error={budgetFormErrors.availableBudget}
             />
           </div>
-          {!currentBudget && (
-            <p className="text-xs text-gray-400 -mt-2">
-              Available budget defaults to the budget amount unless you change it manually.
-            </p>
-          )}
+          <p className="text-xs text-gray-400 -mt-2">
+            {currentBudget
+              ? `Total pool (budget + rollover): ${formatAmount(formTotalPool)}. Available budget cannot exceed it.`
+              : "Available budget defaults to the budget amount plus rollover unless you change it manually."}
+          </p>
+
+          <div className="rounded-xl border border-gray-200 p-4 space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800">Rollover</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Carry unused budget in from another fiscal year of this cost center.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormInput
+                label="Rollover From Previous"
+                name="rolloverFromPrevious"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="e.g. 25000"
+                value={budgetFormData.rolloverFromPrevious}
+                onChange={handlePoolFieldChange}
+                disabled={submitting}
+                error={budgetFormErrors.rolloverFromPrevious}
+              />
+
+              <FormInput
+                label="Rollover Cap"
+                name="rolloverCap"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="No cap"
+                value={budgetFormData.rolloverCap}
+                onChange={handleBudgetInputChange}
+                disabled={submitting}
+                error={budgetFormErrors.rolloverCap}
+              />
+            </div>
+
+            {hasRollover && (
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  Rollover Source Budget <span className="text-red-500">*</span>
+                </label>
+                <Select
+                  options={rolloverSourceOptions}
+                  value={selectedRolloverSourceOption}
+                  onChange={(opt) => handleBudgetSelectChange("rolloverSourceBudgetId", opt ? opt.value : "")}
+                  placeholder={
+                    budgetFormData.costCenterId
+                      ? "Select the fiscal year the rollover comes from..."
+                      : "Select a cost center first"
+                  }
+                  noOptionsMessage={() => "No other budgets exist for this cost center"}
+                  isClearable
+                  styles={customSelectStyles}
+                  isDisabled={submitting || !budgetFormData.costCenterId}
+                />
+                {budgetFormErrors.rolloverSourceBudgetId && (
+                  <span className="text-xs text-red-600 block mt-1">{budgetFormErrors.rolloverSourceBudgetId}</span>
+                )}
+                {selectedRolloverSource && selectedRolloverSource.allowRollover === false && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    The {selectedRolloverSource.fiscalYear} budget is not marked as eligible for rollover.
+                  </p>
+                )}
+                {currentBudget && !budgetFormData.rolloverSourceBudgetId && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    The source budget isn't saved with the rollover, so select it again to keep this rollover.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <CheckboxField
+              label="Allow rollover"
+              description="Marks this budget's unused balance as eligible to be carried into a following fiscal year."
+              name="allowRollover"
+              checked={budgetFormData.allowRollover}
+              onChange={handleBudgetCheckboxChange}
+              disabled={submitting}
+            />
+          </div>
+
+          <FormInput
+            label="Warning Threshold"
+            name="warningThreshold"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="No warning"
+            value={budgetFormData.warningThreshold}
+            onChange={handleBudgetInputChange}
+            disabled={submitting}
+            error={budgetFormErrors.warningThreshold}
+          />
+          <p className="text-xs text-gray-400 -mt-2">
+            The cost center owner is warned at approval when the available budget drops below this amount. It never
+            blocks a submission.
+          </p>
         </form>
       </Modal>
 
@@ -1746,6 +2006,16 @@ export default function CostCenterManagementPage() {
               label="Created Date"
               value={formatDate(viewCostCenter.createdDate || viewCostCenter.createdAt)}
             />
+            <DetailRow
+              icon={<Wallet className="h-5 w-5" />}
+              label="Unbudgeted Spend"
+              value={viewCostCenter.allowUnbudgeted ? "Allowed" : "Not allowed"}
+            />
+            <DetailRow
+              icon={<Calendar className="h-5 w-5" />}
+              label="Updated Date"
+              value={formatDate(viewCostCenter.updatedDate || viewCostCenter.updatedAt)}
+            />
             <div className="sm:col-span-2">
               <DetailRow
                 icon={<FileText className="h-5 w-5" />}
@@ -1772,7 +2042,11 @@ export default function CostCenterManagementPage() {
             <DetailRow
               icon={<Briefcase className="h-5 w-5" />}
               label="Cost Center"
-              value={viewCostCenterForBudget ? `${viewCostCenterForBudget.costCenterCode} - ${viewCostCenterForBudget.costCenterName}` : viewBudget.costCenterId}
+              value={
+                viewCostCenterForBudget
+                  ? `${viewCostCenterForBudget.costCenterCode} - ${viewCostCenterForBudget.costCenterName}`
+                  : viewBudget.costCenterName || viewBudget.costCenterId
+              }
             />
             <DetailRow
               icon={<Briefcase className="h-5 w-5" />}
@@ -1781,8 +2055,31 @@ export default function CostCenterManagementPage() {
             />
             <DetailRow icon={<Calendar className="h-5 w-5" />} label="Fiscal Year" value={viewBudget.fiscalYear} />
             <DetailRow icon={<Wallet className="h-5 w-5" />} label="Budget Amount" value={formatAmount(viewBudget.budgetAmount)} />
-            <DetailRow icon={<PiggyBank className="h-5 w-5" />} label="Available Budget" value={formatAmount(viewBudget.availableBudget)} />
+            <DetailRow
+              icon={<RefreshCw className="h-5 w-5" />}
+              label="Rollover From Previous"
+              value={formatAmount(viewBudget.rolloverFromPrevious ?? 0)}
+            />
+            <DetailRow icon={<Layers className="h-5 w-5" />} label="Total Pool (Budget + Rollover)" value={formatAmount(getTotalPool(viewBudget))} />
+            <DetailRow
+              icon={isBelowWarningThreshold(viewBudget) ? <AlertTriangle className="h-5 w-5 text-amber-600" /> : <PiggyBank className="h-5 w-5" />}
+              label={isBelowWarningThreshold(viewBudget) ? "Available to Spend (below warning threshold)" : "Available to Spend"}
+              value={formatAmount(viewBudget.effectiveAvailable ?? viewBudget.availableBudget)}
+            />
+            <DetailRow icon={<PiggyBank className="h-5 w-5" />} label="Left After Payments" value={formatAmount(viewBudget.availableBudget)} />
+            <DetailRow icon={<TrendingDown className="h-5 w-5" />} label="Reserved (awaiting approval or payment)" value={formatAmount(viewBudget.reservedAmount ?? 0)} />
             <DetailRow icon={<TrendingDown className="h-5 w-5" />} label="Consumed Budget" value={formatAmount(viewConsumed)} />
+            <DetailRow
+              icon={<AlertTriangle className="h-5 w-5" />}
+              label="Warning Threshold"
+              value={formatOptionalAmount(viewBudget.warningThreshold)}
+            />
+            <DetailRow icon={<Hash className="h-5 w-5" />} label="Rollover Cap" value={formatOptionalAmount(viewBudget.rolloverCap)} />
+            <DetailRow
+              icon={<CheckCircle2 className="h-5 w-5" />}
+              label="Allow Rollover"
+              value={viewBudget.allowRollover ? "Yes" : "No"}
+            />
             <DetailRow
               icon={<Calendar className="h-5 w-5" />}
               label="Created Date"
@@ -1803,7 +2100,7 @@ export default function CostCenterManagementPage() {
         title={deleteTarget?.type === "cc" ? "Delete Cost Center" : "Delete Cost Center Budget"}
         message={
           deleteTarget?.type === "cc"
-            ? `Are you sure you want to delete the cost center "${deleteTarget.data?.costCenterCode} - ${deleteTarget.data?.costCenterName}"? This action cannot be undone.`
+            ? `Are you sure you want to delete the cost center "${deleteTarget.data?.costCenterCode} - ${deleteTarget.data?.costCenterName}"? It will be marked Inactive and can be reactivated later by editing its status.`
             : `Are you sure you want to delete the budget for "${
                 resolveCostCenter(deleteTarget?.data?.costCenterId)?.costCenterName || deleteTarget?.data?.costCenterId
               }" (${deleteTarget?.data?.fiscalYear})? This action cannot be undone.`

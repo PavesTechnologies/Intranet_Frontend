@@ -366,7 +366,7 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
                 </Section>
 
                 {selectedViolations.length > 0 && (
-                  <PolicyResultBanner lineStatus={selectedLine.lineStatus} policyWarnings={selectedViolations} />
+                  <PolicyResultBanner lineStatus={selectedLine.lineStatus} policyWarnings={selectedViolations} audience="reviewer" />
                 )}
               </>
             ) : (

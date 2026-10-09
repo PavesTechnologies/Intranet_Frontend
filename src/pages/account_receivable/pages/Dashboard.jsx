@@ -12,7 +12,7 @@ import {
 
 import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
-import { KPICard } from "../../../components/kpi/KPI";
+import ARKPICard from "../components/common/ARKPICard";
 import Button from "../../../components/Button/Button";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import {
@@ -188,17 +188,15 @@ export default function AccountReceivableDashboard() {
               type="button"
               onClick={() => handleKpiClick(kpi.key)}
               title={`Filter by ${kpi.label}`}
-              className="text-left rounded-xl border-0 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 active:ring-0 active:outline-none appearance-none"
-              style={{ outline: "none", boxShadow: "none" }}
+              className="w-full rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
             >
-              <KPICard
+              <ARKPICard
                 label={kpi.label}
                 value={loading ? "…" : kpi.value}
                 icon={<kpi.icon className="h-5 w-5" />}
                 color={kpi.color}
                 active={isActive}
-                className="h-full w-full cursor-pointer bg-white shadow-sm border border-slate-200 transition-all hover:shadow-md !outline-none !ring-0 !ring-offset-0 focus:!outline-none focus:!ring-0 focus:!ring-offset-0 focus-visible:!outline-none focus-visible:!ring-0 focus-visible:!ring-offset-0 active:!ring-0 active:!outline-none"
-                style={{ outline: "none", boxShadow: "none" }}
+                className="h-full w-full"
               />
             </button>
           );

@@ -10,7 +10,6 @@ import {
   XCircle,
   Receipt,
   ShieldAlert,
-  FilterX,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -21,6 +20,7 @@ import ConfirmationModal from "../../../../components/confirmation_modal/Confirm
 import StatusBadge from "../../../../components/status/statusbadge";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import SearchInput from "../../../../components/filter/Searchbar";
+import ARClearFiltersButton from "../../components/common/ARClearFiltersButton";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import Pagination from "../../../../components/Pagination/pagination";
 import ARTable from "../../components/common/ARTable";
@@ -299,14 +299,14 @@ export default function TaxConfigurationMasterPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {kpis.map((kpi) => (
           <button
             key={kpi.key}
             type="button"
             onClick={() => handleKpiClick(kpi.key)}
             aria-pressed={activeKpi === kpi.key}
-            className="rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0082] focus-visible:ring-offset-2"
+            className="w-full rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
           >
             <ARKPICard
               label={kpi.label}
@@ -314,10 +314,7 @@ export default function TaxConfigurationMasterPage() {
               icon={<kpi.icon className="h-5 w-5" />}
               color={kpi.color}
               active={activeKpi === kpi.key}
-              className={cn(
-                "h-full w-full cursor-pointer bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md",
-                activeKpi === kpi.key && "border-[#0A0082]/40 ring-1 ring-[#0A0082]/15"
-              )}
+              className="h-full w-full"
             />
           </button>
         ))}
@@ -366,15 +363,7 @@ export default function TaxConfigurationMasterPage() {
                 />
               </div>
               {hasActiveFilters && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="small"
-                  onClick={handleResetFilters}
-                  className="flex items-center justify-center gap-1.5 whitespace-nowrap text-xs text-slate-600"
-                >
-                  <FilterX className="h-3.5 w-3.5" /> Clear
-                </Button>
+                <ARClearFiltersButton onClick={handleResetFilters} />
               )}
             </div>
           </div>
@@ -402,7 +391,6 @@ export default function TaxConfigurationMasterPage() {
                 totalPages={totalPages}
                 onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
                 onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
-                className="py-0"
               />
             </div>
           )}

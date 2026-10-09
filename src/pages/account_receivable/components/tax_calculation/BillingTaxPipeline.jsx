@@ -1,8 +1,10 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { ChevronRight, Inbox, Search } from "lucide-react";
+import { Calculator, ChevronRight, Eye, Inbox } from "lucide-react";
 
 import { PageCard } from "../../../../components/Cards/PageCard";
 import SearchInput from "../../../../components/filter/Searchbar";
+import ARClearFiltersButton from "../common/ARClearFiltersButton";
+import ActionMenu from "../common/ActionMenu";
 import FilterListbox from "../../../../components/filter/FilterListbox";
 import Pagination from "../../../../components/Pagination/pagination";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
@@ -30,12 +32,12 @@ const COLUMNS = [
   { key: "project", label: "Project", align: "left", width: "18%" },
   { key: "billingType", label: "Billing Type", align: "left", width: "15%" },
   { key: "billingPeriod", label: "Billing Period", align: "left", width: "17%" },
-  { key: "amount", label: "Amount", align: "right", width: "13%" },
+  { key: "amount", label: "Amount", align: "left", width: "13%" },
   { key: "status", label: "Status", align: "center", width: "12%" },
-  { key: "action", label: "Action", align: "right", width: "10%" },
+  { key: "action", label: "Action", align: "center", width: "10%" },
 ];
 
-const ALIGN_CLASS = { left: "text-left", right: "text-right", center: "text-center" };
+const ALIGN_CLASS = { left: "text-left", right: "text-left", center: "text-center" };
 
 // Same horizontal rhythm for header and body cells; outer columns line up
 // with the card's 20px content gutter.
@@ -43,7 +45,6 @@ const cellPadding = (idx) =>
   `px-4 ${idx === 0 ? "pl-4 sm:pl-5" : ""} ${idx === COLUMNS.length - 1 ? "pr-4 sm:pr-5" : ""}`;
 
 // Compact, equal-height toolbar controls (search input and listboxes).
-const CONTROL_HEIGHT = "!h-9";
 const LISTBOX_BUTTON_CLASS =
   "relative h-9 w-full cursor-default rounded-lg border border-gray-300 bg-white pl-3 pr-8 text-left text-[13px] text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20";
 
@@ -191,13 +192,11 @@ export default function BillingTaxPipeline({
       <div className="px-4 py-3 sm:px-5">
         <div className="grid grid-cols-1 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:grid-cols-3 lg:grid-cols-[minmax(0,2.1fr)_repeat(3,minmax(0,1fr))_auto]">
           <div className="relative sm:col-span-3 lg:col-span-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
             <SearchInput
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onSearch={(val) => setSearchQuery(val)}
               placeholder="Search by project, client, snapshot number..."
-              className={`${CONTROL_HEIGHT} !pl-8 !text-[13px] !shadow-none`}
             />
           </div>
           <FilterListbox
@@ -222,14 +221,11 @@ export default function BillingTaxPipeline({
             buttonClassName={LISTBOX_BUTTON_CLASS}
           />
           {hasActiveFilters && (
-            <Button
-              variant="link"
-              size="small"
+            <ARClearFiltersButton
               onClick={clearFilters}
-              className="justify-self-end whitespace-nowrap px-2 text-xs sm:col-span-3 lg:col-span-1"
-            >
-              Clear filters
-            </Button>
+              label="Clear filters"
+              className="justify-self-end sm:col-span-3 lg:col-span-1"
+            />
           )}
         </div>
       </div>
@@ -277,39 +273,44 @@ export default function BillingTaxPipeline({
                       className={`h-12 align-middle transition-colors hover:bg-slate-50 ${clickable ? "cursor-pointer" : ""}`}
                     >
                       {/* max-w-0 lets the % width win so long names truncate instead of widening the column */}
-                      <td className={`max-w-0 py-2 font-medium text-slate-800 ${cellPadding(0)}`}>
+                      <td className={`max-w-0 py-2 text-left font-medium text-slate-800 ${cellPadding(0)}`}>
                         <div className="truncate" title={record.client}>{record.client}</div>
                       </td>
-                      <td className={`max-w-0 py-2 ${cellPadding(1)}`}>
+                      <td className={`max-w-0 py-2 text-left ${cellPadding(1)}`}>
                         <div className="truncate font-semibold text-slate-900" title={record.project}>{record.project}</div>
                       </td>
-                      <td className={`py-2 ${cellPadding(2)}`}>
+                      <td className={`py-2 text-left ${cellPadding(2)}`}>
                         <BillingTypeBadge label={record.billingType} />
                       </td>
-                      <td className={`whitespace-nowrap py-2 text-slate-700 ${cellPadding(3)}`}>
+                      <td className={`whitespace-nowrap py-2 text-left text-slate-700 ${cellPadding(3)}`}>
                         {record.billingPeriod}
                         {/* An upcoming occurrence is identified by when it will bill */}
                         {record.stage === PIPELINE_STAGES.UPCOMING && record.billingDate && (
                           <div className="text-[11px] leading-4 text-slate-400">Bills {formatDisplayDate(record.billingDate)}</div>
                         )}
                       </td>
-                      <td className={`py-2 text-right ${cellPadding(4)}`}>
+                      <td className={`py-2 text-left ${cellPadding(4)}`}>
                         <Money value={record.amount} currency={record.currency} />
                       </td>
                       <td className={`py-2 text-center ${cellPadding(5)}`}>
                         <StageBadge stage={record.stage} label={record.statusLabel} title={record.rawStatus} />
                       </td>
-                      <td className={`py-2 text-right ${cellPadding(6)}`} onClick={(e) => e.stopPropagation()}>
+                      <td className={`py-2 text-center ${cellPadding(6)}`} onClick={(e) => e.stopPropagation()}>
                         {action && (
-                          <Button
-                            variant={action.emphasis ? "primary" : "outline"}
-                            size="small"
-                            onClick={action.onClick}
-                            disabled={action.disabled}
-                            className="whitespace-nowrap text-xs font-semibold"
-                          >
-                            {action.label}
-                          </Button>
+                          <ActionMenu
+                            items={[
+                              {
+                                label: action.label,
+                                icon: action.emphasis ? (
+                                  <Calculator className="h-4 w-4 text-amber-600" />
+                                ) : (
+                                  <Eye className="h-4 w-4 text-slate-600" />
+                                ),
+                                disabled: action.disabled,
+                                onClick: action.onClick,
+                              },
+                            ]}
+                          />
                         )}
                       </td>
                     </tr>

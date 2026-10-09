@@ -561,9 +561,9 @@ export default function TaxComponentManagementModal({
             <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-4 py-3">Tax Type</th>
-                <th className="px-4 py-3 text-right">Tax Rate</th>
+                <th className="px-4 py-3 text-left">Tax Rate</th>
                 <th className="px-4 py-3">Applicability</th>
-                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-center">Status</th>
                 <th className="px-4 py-3 text-center">Actions</th>
               </tr>
             </thead>
@@ -596,7 +596,7 @@ export default function TaxComponentManagementModal({
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">
+                    <td className="px-4 py-3 text-left font-mono font-bold text-slate-800">
                       {comp.taxRate !== undefined && comp.taxRate !== null ? `${comp.taxRate}%` : "—"}
                     </td>
                     <td className="px-4 py-3">
@@ -604,7 +604,7 @@ export default function TaxComponentManagementModal({
                         {getApplicabilityLabel(comp.applicabilityType)}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 text-center">
                       <StatusBadge label={comp.status || (comp.isActive ? "ACTIVE" : "INACTIVE")} size="sm" />
                     </td>
                     <td className="px-4 py-3 text-center">

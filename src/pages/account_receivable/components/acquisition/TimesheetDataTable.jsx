@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
-import { Search, ArrowUpDown, Info, CheckCircle2, Clock, FileSpreadsheet } from "lucide-react";
+import { ArrowUpDown, Info, CheckCircle2, Clock, FileSpreadsheet } from "lucide-react";
 import StatusBadge from "../../../../components/status/statusbadge";
 import Loader from "../../../../components/ui/Loader";
+import SearchInput from "../../../../components/filter/Searchbar";
 
 export default function TimesheetDataTable({
   records = [],
@@ -80,13 +81,10 @@ export default function TimesheetDataTable({
 
         <div className="flex items-center gap-3">
           <div className="relative w-48">
-            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
-            <input
-              type="text"
+            <SearchInput
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search employee / role..."
-              className="w-full rounded-lg border border-slate-200 bg-white py-1 pl-8 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-100"
             />
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 font-mono text-xs font-semibold text-slate-600">
@@ -131,7 +129,7 @@ export default function TimesheetDataTable({
               </th>
               <th
                 onClick={() => handleSort("hours")}
-                className="cursor-pointer select-none px-4 py-3 text-center font-semibold transition-colors hover:bg-slate-100"
+                className="cursor-pointer select-none px-4 py-3 text-left font-semibold transition-colors hover:bg-slate-100"
               >
                 <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
                   <span>Hours</span>
@@ -142,12 +140,12 @@ export default function TimesheetDataTable({
                   />
                 </span>
               </th>
-              <th className="px-4 py-3 text-right font-semibold">
+              <th className="px-4 py-3 text-left font-semibold">
                 <span className="whitespace-nowrap">Hourly Rate</span>
               </th>
               <th
                 onClick={() => handleSort("amount")}
-                className="cursor-pointer select-none px-4 py-3 text-right font-semibold transition-colors hover:bg-slate-100"
+                className="cursor-pointer select-none px-4 py-3 text-left font-semibold transition-colors hover:bg-slate-100"
               >
                 <span className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
                   <span>Commercial Amount</span>
@@ -170,11 +168,11 @@ export default function TimesheetDataTable({
                   <td className="px-4 py-2.5 font-semibold text-slate-900">{rec.employee || "Employee"}</td>
                   <td className="px-4 py-2.5 font-mono text-slate-600">{rec.workDate}</td>
                   <td className="px-4 py-2.5 text-slate-500">{rec.role || "Software Engineer"}</td>
-                  <td className="px-4 py-2.5 text-center font-semibold text-slate-900">{rec.hours} hrs</td>
-                  <td className="px-4 py-2.5 text-right font-mono tabular-nums text-slate-700">
+                  <td className="px-4 py-2.5 text-left font-semibold text-slate-900">{rec.hours} hrs</td>
+                  <td className="px-4 py-2.5 text-left font-mono tabular-nums text-slate-700">
                     {currency} {Number(rec.rate || 0).toLocaleString()}
                   </td>
-                  <td className="px-4 py-2.5 text-right font-mono tabular-nums font-semibold text-indigo-900">
+                  <td className="px-4 py-2.5 text-left font-mono tabular-nums font-semibold text-indigo-900">
                     {currency} {Number(rec.amount || rec.hours * rec.rate || 0).toLocaleString()}
                   </td>
                   <td className="px-4 py-2.5 text-center">

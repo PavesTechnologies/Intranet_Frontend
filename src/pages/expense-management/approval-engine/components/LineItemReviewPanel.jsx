@@ -64,6 +64,13 @@ export default function LineItemReviewPanel({ reportId, relevantLines, onApprove
                         <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
                         <div className="min-w-0">
                           <span>{v.message}</span>
+                          {v.justification && String(v.justification).trim() ? (
+                            <p className="mt-0.5 whitespace-pre-wrap break-words text-gray-700">
+                              <span className="font-semibold text-sky-700">Employee's justification:</span> {v.justification}
+                            </p>
+                          ) : (
+                            <p className="mt-0.5 italic text-gray-500">No justification provided.</p>
+                          )}
                           {v.approverJustifiedAt ? (
                             <p className="mt-0.5 flex items-center gap-1 text-emerald-700">
                               <ShieldCheck className="h-3 w-3 flex-shrink-0" />

@@ -4,7 +4,6 @@ import {
   Plus,
   Pencil,
   Trash2,
-  Search,
   RefreshCw,
   Eye,
   ArrowUpDown,
@@ -16,6 +15,7 @@ import {
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
+import SearchInput from "../../../components/filter/Searchbar";
 import { PageCard } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
@@ -461,7 +461,7 @@ export default function Configurations() {
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
-              size="sm"
+              size="small"
               onClick={loadData}
               disabled={loading}
               className="flex items-center gap-1.5"
@@ -510,13 +510,10 @@ export default function Configurations() {
             <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
               {/* Text Search Input */}
               <div className="relative min-w-[280px] flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
+                <SearchInput
                   placeholder={`Search ${activeSchema.title.toLowerCase()}...`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
                 />
               </div>
 
@@ -538,7 +535,7 @@ export default function Configurations() {
             {(searchQuery || statusFilter) && (
               <Button
                 variant="ghost"
-                size="sm"
+                size="small"
                 onClick={() => {
                   setSearchQuery("");
                   setStatusFilter("");
@@ -580,7 +577,7 @@ export default function Configurations() {
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
                 variant="outline"
-                size="sm"
+                size="small"
               >
                 Previous
               </Button>
@@ -588,7 +585,7 @@ export default function Configurations() {
                 onClick={() => setCurrentPage((prev) => Math.min(prev + 1, pageCount))}
                 disabled={currentPage === pageCount}
                 variant="outline"
-                size="sm"
+                size="small"
               >
                 Next
               </Button>

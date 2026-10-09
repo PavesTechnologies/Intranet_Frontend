@@ -1,17 +1,32 @@
 import React, { useEffect, useRef, useState } from "react";
+
 import { useLocation, useNavigate } from "react-router-dom";
-import { LogOut, User, Menu, X, Eye, EyeOff, KeyRound, ChevronDown, Building2, Landmark, Check } from "lucide-react";
+
+import {
+  LogOut,
+  User,
+  Menu,
+  X,
+  Eye,
+  EyeOff,
+  KeyRound,
+  ChevronDown,
+  Building2,
+  Landmark,
+  Check,
+} from "lucide-react";
+
 import { useAuth } from "../../contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { FINANCE_ALL_ROLES } from "../../config/sidebarConfig";
 import { APPLICATIONS, isFinanceEnabled } from "../../utils/applicationRoutes";
 
 import Modal from "../Modal/modal";
-// Two separate, module-scoped notification bells — see the JSX usage below for why both are
-// rendered: ApNotificationBell self-gates internally (returns null outside /accounts-payable),
-// EmNotificationBell is gated externally by isExpenseManagement, same as before this merge.
-import EmNotificationBell from "../../pages/expense-management/components/notifications/NotificationBell";
-import ApNotificationBell from "../../pages/accounts-payable/notifications/components/NotificationBell";
+
+import ExpenseNotificationBell from "../../pages/expense-management/components/notifications/NotificationBell";
+
+import AccountsPayableNotificationBell from "../../pages/accounts-payable/notifications/components/NotificationBell";
+
 import api from "../../api/axiosInstance";
 import { showStatusToast } from "../toastfy/toast";
 
@@ -230,11 +245,10 @@ const Header = ({ onToggleSidebar, isSidebarOpen, activeApplication }) => {
           {/* ── Right: application switcher + notifications + profile ── */}
           <div className="flex items-center space-x-4">
             {/* Expense Management notifications - unread badge, dropdown, live updates */}
-            {isExpenseManagement && <EmNotificationBell />}
-
-            {/* AP notification bell. Renders itself only inside Accounts Payable, where the
-                notifications come from — see ApNotificationBell's own isAccountsPayable check. */}
-            <ApNotificationBell />
+            {isExpenseManagement && <ExpenseNotificationBell />}
+            {/* Notification bell. Renders itself only inside Accounts Payable, where the
+                notifications come from — see NotificationBell. */}
+            <AccountsPayableNotificationBell />
 
             {/* Application Switcher — fully hidden when FINANCE_TOGGLE is off (public/config.js) */}
             {financeEnabled && (

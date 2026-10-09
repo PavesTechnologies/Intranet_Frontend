@@ -11,7 +11,6 @@ import {
   ArrowRightCircle,
   Ban,
   Trash2,
-  FilterX,
   AlertTriangle,
 } from "lucide-react";
 
@@ -21,6 +20,7 @@ import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import ARKPICard from "../components/common/ARKPICard";
 import Button from "../../../components/Button/Button";
 import SearchInput from "../../../components/filter/Searchbar";
+import ARClearFiltersButton from "../components/common/ARClearFiltersButton";
 import FilterListbox from "../../../components/filter/FilterListbox";
 import ARTable from "../components/common/ARTable";
 import Pagination from "../../../components/Pagination/pagination";
@@ -325,7 +325,7 @@ export default function Overview() {
     {
       key: "TOTAL",
       label: "Total Billing",
-      subLabel: "Configurations",
+      subLabel: null,
       value: stats?.total ?? configs.length,
       icon: FolderKanban,
       color: "bg-[#0A0082] text-white",
@@ -429,7 +429,7 @@ export default function Overview() {
                 key={kpi.key}
                 type="button"
                 onClick={() => handleKpiClick(kpi.key)}
-                className="text-left rounded-xl transition-transform active:scale-[0.99] focus:outline-none"
+                className="w-full rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
               >
                 <ARKPICard
                   label={kpi.label}
@@ -438,10 +438,7 @@ export default function Overview() {
                   icon={<kpi.icon className="h-5 w-5" />}
                   color={kpi.color}
                   active={kpi.active}
-                  className={cn(
-                    "h-full w-full cursor-pointer bg-white shadow-sm transition-all hover:shadow-md",
-                    kpi.isTotal && !kpi.active && "border-indigo-200/80 bg-gradient-to-br from-indigo-50/30 to-white"
-                  )}
+                  className="h-full w-full"
                 />
               </button>
             ))}
@@ -459,7 +456,7 @@ export default function Overview() {
                 key={kpi.key}
                 type="button"
                 onClick={() => handleKpiClick(kpi.key)}
-                className="text-left rounded-xl transition-transform active:scale-[0.99] focus:outline-none"
+                className="w-full rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
               >
                 <ARKPICard
                   label={kpi.label}
@@ -468,7 +465,7 @@ export default function Overview() {
                   icon={<kpi.icon className="h-5 w-5" />}
                   color={kpi.color}
                   active={kpi.active}
-                  className="h-full w-full cursor-pointer bg-white shadow-sm transition-all hover:shadow-md"
+                  className="h-full w-full"
                 />
               </button>
             ))}
@@ -531,15 +528,7 @@ export default function Overview() {
               </div>
 
               {(approvalStatusFilter !== "ALL" || configStatusFilter !== "ALL" || filters.search) && (
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  title="Clear all search and status filters"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
-                >
-                  <FilterX className="h-3.5 w-3.5 text-slate-500" />
-                  <span>Clear</span>
-                </button>
+                <ARClearFiltersButton onClick={handleResetFilters} title="Clear all search and status filters" />
               )}
             </div>
           </div>

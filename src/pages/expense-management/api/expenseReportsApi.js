@@ -84,6 +84,14 @@ export const lineItemService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
+  // The employee's explanation of one policy violation (min 20 characters). Returns the updated
+  // PolicyWarningResponse; the report must be editable (Draft / Awaiting Correction / Query Raised).
+  justifyPolicyWarning: (reportId, lineItemId, violationId, justification) =>
+    api.post(
+      `/xms/employee/expense-reports/${reportId}/line-items/${lineItemId}/policy-warnings/${violationId}/justify`,
+      { justification },
+      { baseURL: EXPENSE_API_BASE, headers: authHeaders() }
+    ),
 };
 
 // Whole-set replace, not per-row CRUD — PUT always sends the complete split list for the line
@@ -231,6 +239,13 @@ export const notificationService = {
   unreadCount: () => api.get("/xms/notifications/unread-count", { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
   markRead: (id) => api.post(`/xms/notifications/${id}/read`, {}, { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
   markAllRead: () => api.post("/xms/notifications/read-all", {}, { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
+};
+
+// Audit trail (AuditLogController, Admin only, read-only): newest first.
+export const auditLogService = {
+  // params: entityName, entityId, action, performedBy, source, from, to (yyyy-mm-dd), q, page, size
+  search: (params) => api.get("/xms/admin/audit-logs", { baseURL: EXPENSE_API_BASE, params, headers: authHeaders() }),
+  facets: () => api.get("/xms/admin/audit-logs/facets", { baseURL: EXPENSE_API_BASE, headers: authHeaders() }),
 };
 
 export const lookupService = {

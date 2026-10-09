@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Receipt,
   ShieldAlert,
-  FilterX,
 } from "lucide-react";
 
 import PageHeader from "../../../../components/ui/PageHeader";
@@ -20,6 +19,7 @@ import ConfirmationModal from "../../../../components/confirmation_modal/Confirm
 import StatusBadge from "../../../../components/status/statusbadge";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import SearchInput from "../../../../components/filter/Searchbar";
+import ARClearFiltersButton from "../../components/common/ARClearFiltersButton";
 import Pagination from "../../../../components/Pagination/pagination";
 import ARTable from "../../components/common/ARTable";
 import ActionMenu from "../../components/common/ActionMenu";
@@ -351,9 +351,7 @@ export default function PaymentTermsMasterPage() {
                 />
               </div>
               {hasActiveFilters && (
-                <Button type="button" variant="ghost" size="small" onClick={handleResetFilters} className="flex items-center justify-center gap-1.5 whitespace-nowrap text-xs text-slate-600">
-                  <FilterX className="h-3.5 w-3.5" /> clear
-                </Button>
+                <ARClearFiltersButton onClick={handleResetFilters} />
               )}
             </div>
           </div>
@@ -381,7 +379,6 @@ export default function PaymentTermsMasterPage() {
                 totalPages={totalPages}
                 onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
                 onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
-                className="py-0"
               />
             </div>
           )}
