@@ -530,7 +530,7 @@ export default function CostCenterManagementPage() {
 
   const totalBudgetsCount = statsBudgets.length;
   const totalAllocatedBudget = statsBudgets.reduce((sum, b) => sum + Number(b.budgetAmount || 0), 0);
-  const totalAvailableBudget = statsBudgets.reduce((sum, b) => sum + Number(b.availableBudget || 0), 0);
+  const totalAvailableBudget = statsBudgets.reduce((sum, b) => sum + Number(b.effectiveAvailable ?? b.availableBudget ?? 0), 0);
   const totalConsumedBudget = statsBudgets.reduce((sum, b) => sum + getConsumed(b), 0);
 
   const fiscalYearOptions = Array.from(new Set(statsBudgets.map((b) => b.fiscalYear).filter(Boolean))).sort();
@@ -994,8 +994,9 @@ export default function CostCenterManagementPage() {
     "Department",
     "Fiscal Year",
     "Budget Amount",
-    "Available Budget",
-    "Consumed Budget",
+    "Available to Spend",
+    "Consumed (Paid)",
+    "Reserved",
     "Utilization",
     "Created Date",
     "Actions",
@@ -1009,6 +1010,7 @@ export default function CostCenterManagementPage() {
     "budgetAmount",
     "availableBudget",
     "consumedBudget",
+    "reserved",
     "utilization",
     "createdDate",
     "actions",
@@ -1025,8 +1027,19 @@ export default function CostCenterManagementPage() {
       department: cc ? resolveDepartmentName(cc.departmentUuid) : "—",
       fiscalYear: b.fiscalYear || "N/A",
       budgetAmount: formatAmount(b.budgetAmount),
-      availableBudget: formatAmount(b.availableBudget),
+      // What a new submission can still use: left after payments, less what submitted-but-unpaid
+      // reports have reserved - the same figure the submission-time budget check enforces.
+      availableBudget: (
+        <span title={`${formatAmount(b.availableBudget)} left after payments`} className="font-semibold">
+          {formatAmount(b.effectiveAvailable ?? b.availableBudget)}
+        </span>
+      ),
       consumedBudget: formatAmount(consumed),
+      reserved: (
+        <span title="Held by reports in approval, Finance verification, or approved and awaiting payment" className="text-amber-700">
+          {formatAmount(b.reservedAmount ?? 0)}
+        </span>
+      ),
       utilization: <UtilizationBar percent={utilizationPercent} />,
       createdDate: formatDate(b.createdDate || b.createdAt),
       actions: (
@@ -1259,7 +1272,7 @@ export default function CostCenterManagementPage() {
                 <PiggyBank size={24} />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Available Budget</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Available to Spend</p>
                 <p className="text-2xl font-bold text-green-600 mt-1 truncate">{formatAmount(totalAvailableBudget)}</p>
               </div>
             </div>
@@ -1781,7 +1794,9 @@ export default function CostCenterManagementPage() {
             />
             <DetailRow icon={<Calendar className="h-5 w-5" />} label="Fiscal Year" value={viewBudget.fiscalYear} />
             <DetailRow icon={<Wallet className="h-5 w-5" />} label="Budget Amount" value={formatAmount(viewBudget.budgetAmount)} />
-            <DetailRow icon={<PiggyBank className="h-5 w-5" />} label="Available Budget" value={formatAmount(viewBudget.availableBudget)} />
+            <DetailRow icon={<PiggyBank className="h-5 w-5" />} label="Available to Spend" value={formatAmount(viewBudget.effectiveAvailable ?? viewBudget.availableBudget)} />
+            <DetailRow icon={<PiggyBank className="h-5 w-5" />} label="Left After Payments" value={formatAmount(viewBudget.availableBudget)} />
+            <DetailRow icon={<TrendingDown className="h-5 w-5" />} label="Reserved (awaiting approval or payment)" value={formatAmount(viewBudget.reservedAmount ?? 0)} />
             <DetailRow icon={<TrendingDown className="h-5 w-5" />} label="Consumed Budget" value={formatAmount(viewConsumed)} />
             <DetailRow
               icon={<Calendar className="h-5 w-5" />}
