@@ -14,6 +14,7 @@ import {
 import Button from "@/components/Button/Button";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { expenseReportService, lineItemService } from "@/pages/expense-management/api/expenseReportsApi";
+import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { PolicyResultBanner } from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
 import ApprovalStatusPill from "../../../approval-engine/components/ApprovalStatusPill";
 import EmployeeLabel from "../../../approval-engine/components/EmployeeLabel";
@@ -170,7 +171,21 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
     verifyLineItem.mutate(
       { reportId, lineItemId: selectedLine.lineItemId, taxChecked },
       {
-        onSuccess: () => showStatusToast("Line item verified successfully", "success"),
+        onSuccess: async () => {
+          showStatusToast("Line item verified successfully", "success");
+
+          // EP04-S4: Apply advance offset if expense is linked to cash advance
+          if (fullReport?.cashAdvanceId) {
+            try {
+              await cashAdvanceApi.applyAdvanceOffset(reportId, {
+                cashAdvanceId: fullReport.cashAdvanceId,
+              });
+            } catch (offsetErr) {
+              console.warn("Failed to apply advance offset:", offsetErr);
+              // Don't show error toast - verification succeeded, offset is best-effort
+            }
+          }
+        },
         onError: (err) => showStatusToast(err.response?.data?.message || "Failed to verify line item", "error"),
       }
     );
