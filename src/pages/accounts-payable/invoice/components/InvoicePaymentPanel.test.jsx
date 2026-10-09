@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import InvoicePaymentPanel from "./InvoicePaymentPanel";
 import { useMarkReadyForPaymentMutation } from "../../payment/hooks/usePaymentMutations";
 import { useInvoiceTds } from "../hooks/useInvoiceTds";
+import { useInvoicePaymentTerms } from "../hooks/useInvoicePaymentTerms";
 import { useApPermissions } from "../../hooks/useApPermissions";
 
 vi.mock("../../payment/hooks/usePaymentMutations", () => ({
@@ -13,6 +14,10 @@ vi.mock("../../payment/hooks/usePaymentMutations", () => ({
 
 vi.mock("../hooks/useInvoiceTds", () => ({
   useInvoiceTds: vi.fn(),
+}));
+
+vi.mock("../hooks/useInvoicePaymentTerms", () => ({
+  useInvoicePaymentTerms: vi.fn(),
 }));
 
 vi.mock("../../hooks/useApPermissions", () => ({
@@ -36,6 +41,33 @@ beforeEach(() => {
   // existed) keep exercising Mark Ready for Payment as before — the TDS-specific describe block
   // overrides this per case.
   useInvoiceTds.mockReturnValue({ data: { determination_status: "VERIFIED" }, isLoading: false, error: null });
+  // Payment terms default to compliant so the pre-existing cases keep their meaning; the
+  // payment-terms describe block below overrides this.
+  useInvoicePaymentTerms.mockReturnValue({ data: { evaluated: true, validation_status: "COMPLIANT" } });
+});
+
+describe("InvoicePaymentPanel — payment-term gate", () => {
+  it.each(["MISMATCH", "REVIEW_REQUIRED"])("hides Mark Ready for Payment while terms are %s and says why", (status) => {
+    useApPermissions.mockReturnValue({ canMarkPaid: true, canViewPaymentTerms: true });
+    useInvoicePaymentTerms.mockReturnValue({ data: { evaluated: true, validation_status: status } });
+    renderPanel({ ...baseInvoice, status: "Approved" });
+    expect(screen.queryByRole("button", { name: /mark ready for payment/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/payment terms must be verified/i)).toBeInTheDocument();
+  });
+
+  it("offers Mark Ready for Payment once terms are verified by Finance", () => {
+    useApPermissions.mockReturnValue({ canMarkPaid: true, canViewPaymentTerms: true });
+    useInvoicePaymentTerms.mockReturnValue({ data: { evaluated: true, validation_status: "VERIFIED_OVERRIDE" } });
+    renderPanel({ ...baseInvoice, status: "Approved" });
+    expect(screen.getByRole("button", { name: /mark ready for payment/i })).toBeInTheDocument();
+  });
+
+  it("does not block a legacy invoice that has not been evaluated (the backend checks it at mark-ready)", () => {
+    useApPermissions.mockReturnValue({ canMarkPaid: true, canViewPaymentTerms: true });
+    useInvoicePaymentTerms.mockReturnValue({ data: { evaluated: false } });
+    renderPanel({ ...baseInvoice, status: "Approved" });
+    expect(screen.getByRole("button", { name: /mark ready for payment/i })).toBeInTheDocument();
+  });
 });
 
 describe("InvoicePaymentPanel", () => {

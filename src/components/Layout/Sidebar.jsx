@@ -23,6 +23,7 @@ import { filterMenuByRole } from "../../utils/sidebarPermissions";
 import ArModuleIcon from "../icons/ArModuleIcon";
 import ApModuleIcon from "../icons/ApModuleIcon";
 import { AP_ALL_ROLES } from "../../pages/accounts-payable/constants/apRoles";
+import { AP_MANAGEMENT_ANY } from "../../pages/accounts-payable/constants/paymentTerms";
 import { APPLICATIONS } from "../../utils/applicationRoutes";
 // import AIRSLogo from "../icons/AIRSLogo";
 
@@ -239,7 +240,8 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   // Whole-module gate: unlike EO/XMS (which have no top-level gate because at least one of
   // their items has no allowedRoles), AP must stay fully invisible outside AP_ALL_ROLES —
   // same requirement as Account Receivable's isSuperAdmin gate below.
-  const isApUser = hasRole(AP_ALL_ROLES);
+  // Management users (CEO / Chief Product Officer) hold a management permission but no AP role.
+  const isApUser = hasRole(AP_ALL_ROLES) || hasAnyPermission(AP_MANAGEMENT_ANY);
   const isRM = hasRole(["RESOURCE_MANAGER"]);
   const isPM = hasRole(["PROJECT_MANAGER"]);
   const isDM = hasRole(["DELIVERY_MANAGER"]);

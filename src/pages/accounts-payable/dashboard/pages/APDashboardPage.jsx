@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { RefreshCw, AlertTriangle } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { RefreshCw, AlertTriangle, Wallet, BarChart3, Inbox, Upload } from "lucide-react";
 import PageHeader from "../../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Button from "../../../../components/Button/Button";
@@ -15,6 +15,17 @@ import {
   RecentActivityCard,
 } from "../components/DashboardWidgets";
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
+import { useDashboardViews, useRoleDashboard } from "../hooks/useRoleDashboards";
+import ManagementDashboard from "../components/ManagementDashboard";
+import ApprovalsDashboard from "../components/ApprovalsDashboard";
+import MyWorkDashboard from "../components/MyWorkDashboard";
+import FinanceDashboard from "../components/FinanceDashboard";
+import { SegmentedTabs } from "../components/insights";
+import Breadcrumb from "../../../../components/Breadcrumb/Breadcrumb";
+import { useAuth } from "../../../../contexts/AuthContext";
+import { formatDate } from "../../utils/formatters";
+import { AP_ROUTES } from "../../constants/routes";
+import { Link } from "react-router-dom";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { formatPeriodRange, prettifyKey } from "../utils/dashboardFormatters";
 
@@ -26,7 +37,7 @@ import { formatPeriodRange, prettifyKey } from "../utils/dashboardFormatters";
  * "paid in period" on the backend — it does NOT change current counts/outstanding amounts, per
  * the backend's own documented behavior; this page never recomputes that distinction itself.
  */
-export default function APDashboardPage() {
+function OverviewDashboard({ tabs = null }) {
   // Seeded empty on first load — sending no from_date/to_date lets the backend apply its own
   // default (last 30 days) and return the resolved period, which then seeds the date pickers.
   const [fromDate, setFromDate] = useState("");
@@ -71,9 +82,9 @@ export default function APDashboardPage() {
     (data?.recent_activity?.length ?? 0) > 0;
 
   return (
-    <div className="p-6">
+    <div className="space-y-4 p-4 sm:p-6">
       <PageHeader
-        title="Accounts Payable Dashboard"
+        title="AP Overview"
         subtitle={data?.period ? formatPeriodRange(data.period.from_date, data.period.to_date) : "Here's what's happening across AP"}
         actions={
           <>
@@ -88,6 +99,8 @@ export default function APDashboardPage() {
           </>
         }
       />
+
+      {tabs}
 
       {dateError && (
         <p className="mb-4 flex items-center gap-1.5 text-sm text-red-600">
@@ -157,4 +170,146 @@ export default function APDashboardPage() {
       )}
     </div>
   );
+}
+
+/** Header, primary action and body for each role view. Copy is written from that person's
+ * point of view; the backend decides which views a user may open. */
+const VIEW_CONFIG = {
+  management: {
+    title: (n) => (n ? `Hi ${n}, here's where AP stands` : "Where AP stands"),
+    subtitle: "Liabilities, expected outflow, efficiency and risk · read-only",
+    action: { label: "Open reports", to: AP_ROUTES.REPORTS, icon: BarChart3 },
+    Body: ManagementDashboard,
+  },
+  finance: {
+    title: (n) => (n ? `Hi ${n}, here's your payables overview` : "Payables overview"),
+    subtitle: "What to pay, what's overdue and what's coming up",
+    action: { label: "Open payments", to: AP_ROUTES.PAYMENT_READY, icon: Wallet },
+    Body: FinanceDashboard,
+  },
+  approvals: {
+    title: (n) => (n ? `Hi ${n}, here's your approval queue` : "Your approval queue"),
+    subtitle: "Invoices waiting for your decision, and how fast they move",
+    action: { label: "Open approval queue", to: `${AP_ROUTES.INVOICE_LIST}?queue=approval`, icon: Inbox },
+    Body: ApprovalsDashboard,
+  },
+  my_work: {
+    title: (n) => (n ? `Hi ${n}, here's your invoice work` : "Your invoice work"),
+    subtitle: "What to review, fix and send for approval next",
+    action: { label: "Upload invoice", to: AP_ROUTES.INVOICE_UPLOAD, icon: Upload },
+    Body: MyWorkDashboard,
+  },
+};
+
+function RoleView({ view, tabs, onForbidden }) {
+  const { user } = useAuth();
+  const config = VIEW_CONFIG[view];
+  const { data, isLoading, isFetching, isError, error, refetch } = useRoleDashboard(view);
+  // Permissions changed since the view list was loaded (e.g. roles updated in UMS): move on to a
+  // view this user may open instead of showing an error.
+  const forbidden = isError && error?.status === 403;
+  useEffect(() => {
+    if (forbidden) onForbidden?.(view);
+  }, [forbidden, onForbidden, view]);
+  const firstName = (user?.name || user?.employee_name || "").split(" ")[0];
+  const ActionIcon = config.action.icon;
+  const Body = config.Body;
+  const meta = [config.subtitle, data?.as_of ? `as of ${formatDate(data.as_of)}` : null, data?.base_currency ? `Amounts in ${data.base_currency}` : null]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <div className="space-y-4 p-4 sm:p-6">
+      <Breadcrumb items={[{ label: "Accounts Payable", to: AP_ROUTES.DASHBOARD }, { label: "Dashboard" }]} />
+      <PageHeader
+        title={config.title(firstName)}
+        subtitle={meta}
+        actions={
+          <>
+            <Button variant="outline" size="small" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw size={14} className={isFetching ? "animate-spin" : ""} /> Refresh
+            </Button>
+            <Link to={config.action.to}>
+              <Button variant="primary" size="small">
+                <ActionIcon size={14} /> {config.action.label}
+              </Button>
+            </Link>
+          </>
+        }
+      />
+      {tabs}
+      {isLoading ? (
+        <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-white py-24">
+          <LoadingSpinner text="Loading dashboard..." />
+        </div>
+      ) : forbidden ? (
+        <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-white py-24">
+          <LoadingSpinner text="Switching to a view you can access..." />
+        </div>
+      ) : isError ? (
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-12 text-center">
+          <AlertTriangle className="h-6 w-6 text-rose-500" />
+          <p className="text-sm font-semibold text-rose-700">Unable to load this dashboard.</p>
+          <p className="max-w-md text-xs text-rose-600">{getApiErrorMessage(error, "Something went wrong — please try again.")}</p>
+          <Button size="small" variant="outline" className="mt-2" onClick={() => refetch()}>
+            Retry
+          </Button>
+        </div>
+      ) : (
+        <Body data={data} />
+      )}
+    </div>
+  );
+}
+
+const VIEW_STORAGE_KEY = "ap.dashboard.view";
+
+/**
+ * AP Dashboard — one point of view per person. The backend (GET /dashboard/views) lists the role
+ * views this user may open: Management (CEO / Chief Product Officer), Finance, Approvals, My work
+ * (AP Executive). Each view only fetches and shows that role's own data. Users holding none of
+ * them (e.g. procurement-only) get the permission-driven AP Overview instead. The chosen view is
+ * remembered per browser, same as the Expense dashboard.
+ */
+export default function APDashboardPage() {
+  const { data: views, isLoading, refetch: refetchViews } = useDashboardViews();
+  const [denied, setDenied] = useState([]);
+  const handleForbidden = useCallback(
+    (view) => {
+      setDenied((list) => (list.includes(view) ? list : [...list, view]));
+      refetchViews();
+    },
+    [refetchViews],
+  );
+  const [chosen, setChosen] = useState(() => {
+    try {
+      return window.localStorage.getItem(VIEW_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <LoadingSpinner text="Loading dashboard..." />
+      </div>
+    );
+  }
+  const available = (views || []).filter((v) => VIEW_CONFIG[v.key] && !denied.includes(v.key));
+  if (available.length === 0) return <OverviewDashboard />;
+
+  const active = available.some((v) => v.key === chosen) ? chosen : available[0].key;
+  const choose = (value) => {
+    setChosen(value);
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, value);
+    } catch {
+      /* storage unavailable - the choice just isn't remembered */
+    }
+  };
+  const switcher =
+    available.length > 1 ? (
+      <SegmentedTabs tabs={available.map((v) => ({ value: v.key, label: v.label }))} value={active} onChange={choose} />
+    ) : null;
+  return <RoleView key={active} view={active} tabs={switcher} onForbidden={handleForbidden} />;
 }

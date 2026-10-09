@@ -23,8 +23,14 @@
  */
 export function filterMenuByRole(items, hasRole, hasAnyPermission = () => true) {
   return items.reduce((acc, item) => {
+    // `roleOrPermissions`: visible with ANY of these roles OR ANY of these permissions (e.g. the AP
+    // Dashboard, open to every AP role and to management users who hold no AP role at all).
+    const passesEither = !item.roleOrPermissions
+      || hasRole(item.roleOrPermissions.roles || [])
+      || hasAnyPermission(item.roleOrPermissions.permissions || []);
     const passesRole = !item.allowedRoles || hasRole(item.allowedRoles);
     const passesPermission = !item.requiredPermissions || hasAnyPermission(item.requiredPermissions);
+    if (!passesEither) return acc;
     if (!passesRole || !passesPermission) return acc;
 
     if (item.children?.length) {

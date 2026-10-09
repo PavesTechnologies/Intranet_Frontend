@@ -29,6 +29,7 @@ import { FINANCE_ALL_ROLES, AR_MAKER_ROLES, AR_CHECKER_ROLES, AR_ALL_ROLES } fro
 // Accounts Payable
 import { AP_ROUTES } from "./pages/accounts-payable/constants/routes";
 import { AP_ALL_ROLES } from "./pages/accounts-payable/constants/apRoles";
+import { AP_MANAGEMENT_ANY } from "./pages/accounts-payable/constants/paymentTerms";
 import APDashboardPage from "./pages/accounts-payable/dashboard/pages/APDashboardPage.jsx";
 import DashboardActivityPage from "./pages/accounts-payable/dashboard/pages/DashboardActivityPage.jsx";
 import VendorListPage from "./pages/accounts-payable/vendor/pages/VendorListPage.jsx";
@@ -321,7 +322,7 @@ import OnboardingSummaryPage from "./pages/employee-onboarding/summary-page/Summ
 
 
 
-const ProtectedRoute = ({ children, allowedRoles, requiredPermissions }) => {
+const ProtectedRoute = ({ children, allowedRoles, requiredPermissions, orPermissions }) => {
   const { isAuthenticated, user, logout, hasAnyPermission } = useAuth();
   const location = useLocation();
   const isfirsttlogin = localStorage.getItem("isfirsttlogin");
@@ -354,7 +355,9 @@ const ProtectedRoute = ({ children, allowedRoles, requiredPermissions }) => {
     // match: hasRole,
     // });
 
-    if (!hasRole) {
+    // `orPermissions`: lacking the role is still fine with any of these permissions (e.g. the AP
+    // Dashboard / Reports for management users who hold no AP role).
+    if (!hasRole && !(orPermissions?.length && hasAnyPermission(orPermissions))) {
       return <Navigate to="/unauthorized" replace />;
     }
   }
@@ -503,7 +506,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.DASHBOARD}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} orPermissions={AP_MANAGEMENT_ANY}>
                 <APDashboardPage />
               </ProtectedRoute>
             }
@@ -673,7 +676,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.REPORTS}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} orPermissions={AP_MANAGEMENT_ANY}>
                 <APReportsPage />
               </ProtectedRoute>
             }
