@@ -1,4 +1,4 @@
-import { useContext, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { Wallet, Receipt, Pencil, Search, ChevronRight, Building2, Calendar, Info } from "lucide-react";
 
 import { PageCard } from "../../../../components/Cards/PageCard";
@@ -8,6 +8,11 @@ import { BILLING_MODE_LABELS } from "../../data/wizardOptions";
 import { getBillingTypeDisplayName } from "../../utils/billingType";
 import { formatCurrency, formatDisplayDate, formatProjectDuration } from "../../utils/format";
 import ConfigurationChanges, { ChangedFieldsContext, ChangedIndicator, getChangedFieldLabels, useIsFieldChanged } from "./ConfigurationChanges";
+import {
+  getApiErrorMessage,
+  getBillingRecurringSchedule,
+  getBillingRecurringScheduleByBillingConfigurationId,
+} from "../../services/billingConfigurationService";
 
 // Display-time safety net: a Project Code must never be the project's own
 // internal id — see the matching guard in ProjectStep.jsx / billingConfigurationService.js.
@@ -308,6 +313,90 @@ function RoleRatesTable({ roles, currency }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// Recurring billing occurrences — read-only view of the backend-generated
+// BillingSchedule (the same API and DTO mapping as the Recurring form's
+// "Billing Schedule (Preview)"). Periods, partial final period and amounts
+// all come from the backend; nothing is calculated here.
+function RecurringOccurrences({ recurringConfigurationId, billingConfigurationId, currency }) {
+  const [periods, setPeriods] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!recurringConfigurationId && !billingConfigurationId) {
+      setPeriods([]);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    const request = recurringConfigurationId
+      ? getBillingRecurringSchedule(recurringConfigurationId)
+      : getBillingRecurringScheduleByBillingConfigurationId(billingConfigurationId);
+
+    request
+      .then((result) => {
+        if (!cancelled) setPeriods(Array.isArray(result) ? result : []);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPeriods([]);
+        setError(getApiErrorMessage(err, "Unable to load billing occurrences."));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [recurringConfigurationId, billingConfigurationId]);
+
+  return (
+    <div className="space-y-2 pt-2">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+        Billing Occurrences{periods.length > 0 ? ` (${periods.length})` : ""}
+      </p>
+      {loading ? (
+        <p className="py-1.5 text-xs text-slate-500">Loading billing occurrences…</p>
+      ) : error ? (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>
+      ) : periods.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-slate-200 px-3 py-3 text-center text-xs text-slate-500">
+          No billing occurrences have been generated yet.
+        </p>
+      ) : (
+        <div className="max-h-80 overflow-auto rounded-lg border border-slate-100">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-[11px] font-medium text-slate-500">
+                <th className="px-3 py-2 font-medium">#</th>
+                <th className="px-3 py-2 font-medium">Billing Period</th>
+                <th className="px-3 py-2 text-right font-medium">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-[13px]">
+              {periods.map((period, index) => (
+                <tr key={period.periodNumber || index}>
+                  <td className="px-3 py-2 tabular-nums text-slate-500">{period.periodNumber || index + 1}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-slate-700">
+                    {formatDisplayDate(period.periodStartDate) || "—"} – {formatDisplayDate(period.periodEndDate) || "—"}
+                    {period.isPartialPeriod && <span className="ml-2 text-[11px] text-slate-400">(Partial)</span>}
+                  </td>
+                  <td className="px-3 py-2 text-right font-semibold tabular-nums text-slate-900">
+                    {formatMoney(period.billingAmount, currency) || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -874,7 +963,16 @@ export default function ReviewActivateStep({ wizardData, onEditStep, leading, he
             {/* Billing dates only — Project Duration (the PMS project period)
                 lives in the primary summary. */}
             {hasSchedule ? (
-              <FieldList fields={[{ label: "Effective Period", value: effectivePeriod }]} />
+              <>
+                <FieldList fields={[{ label: "Effective Period", value: effectivePeriod }]} />
+                {billingConfig.billingType === "RECURRING" && (
+                  <RecurringOccurrences
+                    recurringConfigurationId={billingConfig.recurring?.recurringConfigurationId}
+                    billingConfigurationId={billingConfig.billingConfigurationId || wizardData.billingConfigurationId}
+                    currency={currency}
+                  />
+                )}
+              </>
             ) : (
               <p className="flex items-center gap-2 py-1.5 text-xs text-slate-500">
                 <Calendar className="h-4 w-4 text-slate-300" />

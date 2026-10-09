@@ -24,6 +24,9 @@ import {
   saveBillingConfigurationRecord,
 } from "../services/billingConfigService";
 import { getActiveCurrencies } from "../services/toolPricingService";
+import { RECORD_LOCK_ACTION, RECORD_LOCK_RESOURCE } from "../services/recordLockService";
+import useRecordLock from "../hooks/useRecordLock";
+import { RecordLockOwnIndicator } from "../components/common/RecordLockNotice";
 
 const INITIAL_WIZARD_DATA = {
   setupMode: "EXISTING",
@@ -413,6 +416,55 @@ export default function NewConfigurationWizard() {
   // endpoints for such a record (see ensureBillingConfigurationId) and tells
   // the user the save starts a re-approval cycle.
   const isEditingApproved = isEditingExisting && approvalStatus === "APPROVED";
+  // A PENDING_APPROVAL configuration is edited in place, like an APPROVED one:
+  // it is no longer a draft, so it must also stay off the Draft-only endpoints
+  // (PUT .../draft via Save Draft or ensureBillingConfigurationId).
+  const isEditingPendingApproval = isEditingExisting && approvalStatus === "PENDING_APPROVAL";
+  const isEditingSubmitted = isEditingApproved || isEditingPendingApproval;
+
+  // Editing an existing configuration needs the backend EDIT lock before the
+  // form is shown; a refused lock (409 or any failure) keeps the user on the
+  // read-only view. Viewing never takes a lock — it only reads lock status
+  // (GET) so Edit can be disabled while someone else holds it. The heartbeat
+  // lives here, in the parent session, so changing steps or saving a child
+  // section (rate card, fixed price, recurring, milestone, schedule) never
+  // touches the lock. It is released only on unmount, i.e. when final save,
+  // save draft, cancel or back leave the workflow. A brand-new configuration
+  // (no configId) never takes a lock.
+  const [editLockReady, setEditLockReady] = useState(false);
+  const recordLock = useRecordLock(RECORD_LOCK_RESOURCE.BILLING_CONFIGURATION, {
+    watchResourceId: viewOnly && configId ? configId : null,
+  });
+  const { acquire: acquireRecordLock } = recordLock;
+  const editLockLost = Boolean(configId) && !viewOnly && recordLock.lockLost;
+
+  // A protected mutation answered 409: the backend message is already in the
+  // toast; re-read the lock so the banner/disabled state catches up. Unsaved
+  // form state is left as it is.
+  const handleLockConflict = (error) => {
+    if (error?.response?.status === 409 && configId) recordLock.handleMutationConflict(configId);
+  };
+
+  useEffect(() => {
+    if (!configId || viewOnly) return undefined;
+    let cancelled = false;
+    acquireRecordLock(configId, RECORD_LOCK_ACTION.EDIT).then((result) => {
+      if (cancelled) return;
+      if (result.acquired) setEditLockReady(true);
+      else if (!result.cancelled) setViewOnly(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [configId, viewOnly, acquireRecordLock]);
+
+  const handleStartEdit = async () => {
+    const result = await acquireRecordLock(configId, RECORD_LOCK_ACTION.EDIT);
+    if (result.acquired) {
+      setEditLockReady(true);
+      setViewOnly(false);
+    }
+  };
 
   useEffect(() => {
     if (!configId) return;
@@ -454,6 +506,33 @@ export default function NewConfigurationWizard() {
       isMounted = false;
     };
   }, [configId, navigate]);
+
+  // Background polling for latest Billing Configuration data while viewing (every 12 seconds)
+  useEffect(() => {
+    if (!configId || !viewOnly) return undefined;
+
+    const refreshData = async () => {
+      if (document.visibilityState === "hidden" || saving || submitting) return;
+      try {
+        const result = await fetchBillingConfigurationById(configId);
+        if (result?.detail) {
+          setWizardData((prev) => ({
+            ...prev,
+            ...result.detail,
+          }));
+        }
+        if (result?.summary) {
+          setApprovalStatus(result.summary.approvalStatus || null);
+          setBillingStatus(result.summary.billingStatus || null);
+        }
+      } catch {
+        // Silent background polling
+      }
+    };
+
+    const interval = setInterval(refreshData, 12_000);
+    return () => clearInterval(interval);
+  }, [configId, viewOnly, saving, submitting]);
 
   useEffect(() => {
     let isMounted = true;
@@ -612,11 +691,11 @@ export default function NewConfigurationWizard() {
   // rate card row (and deletes any absent from wizard state), which would race with
   // the single-row create/update the rate card button is about to perform itself.
   const ensureBillingConfigurationId = async () => {
-    // An APPROVED configuration is not a draft — never re-push it through
-    // PUT .../draft. Its parent record already exists with valid ids; its
-    // field changes are persisted (and snapshotted by the backend) by the
-    // final Update Billing Setup save.
-    if (savedConfigId && isEditingApproved) return savedConfigId;
+    // An APPROVED or PENDING_APPROVAL configuration is not a draft — never
+    // re-push it through PUT .../draft. Its parent record already exists with
+    // valid ids; its field changes are persisted (and, for APPROVED,
+    // snapshotted by the backend) by the final Update Billing Setup save.
+    if (savedConfigId && isEditingSubmitted) return savedConfigId;
     if (savedConfigId) {
       // The draft may have been created (below) before billingFrequencyId —
       // or a later billingTypeId change — was known; re-push the current
@@ -710,6 +789,7 @@ export default function NewConfigurationWizard() {
       navigate(CONFIGURATIONS_PATH);
     } catch (error) {
       showStatusToast(getApiErrorMessage(error, "Failed to save draft."), "error");
+      handleLockConflict(error);
     } finally {
       setSaving(false);
     }
@@ -726,6 +806,18 @@ export default function NewConfigurationWizard() {
     return resultingStatus === "PENDING_APPROVAL" && approvalStatus !== "PENDING_APPROVAL"
       ? "Changes submitted for approval. Billing stays inactive until Finance approves them."
       : "Billing setup updated successfully.";
+  };
+
+  // An edited PENDING_APPROVAL configuration normally stays PENDING_APPROVAL,
+  // so the Checker reviews the updated values. If the backend instead reverts
+  // it to DRAFT, re-submit it through the existing submit action so it never
+  // sits outside the approval queue.
+  const resubmitIfRevertedToDraft = async (response, billingConfigurationId) => {
+    if (!isEditingPendingApproval) return;
+    const resultingStatus = String(response?.approvalStatus || response?.data?.approvalStatus || "").trim().toUpperCase();
+    if (resultingStatus === "DRAFT") {
+      await submitConfigurationForApproval(billingConfigurationId);
+    }
   };
 
   const handleFinalSubmit = async () => {
@@ -777,6 +869,8 @@ export default function NewConfigurationWizard() {
         // only persists the update and does not re-trigger the workflow.
         if (!isEditingExisting) {
           await submitConfigurationForApproval(billingConfigurationId);
+        } else {
+          await resubmitIfRevertedToDraft(configResponse, billingConfigurationId);
         }
 
         showStatusToast(getFinalSaveMessage(configResponse), "success");
@@ -817,6 +911,8 @@ export default function NewConfigurationWizard() {
       // only persists the update and does not re-trigger the workflow.
       if (!isEditingExisting) {
         await submitConfigurationForApproval(billingConfigurationId);
+      } else {
+        await resubmitIfRevertedToDraft(saveResult, billingConfigurationId);
       }
 
       showStatusToast(getFinalSaveMessage(saveResult), "success");
@@ -826,6 +922,7 @@ export default function NewConfigurationWizard() {
         ? "Failed to create billing configuration."
         : `Failed to ${isEditingExisting ? "update" : "submit"} billing configuration.`;
       showStatusToast(getApiErrorMessage(error, fallbackMessage), "error");
+      handleLockConflict(error);
     } finally {
       setSubmitting(false);
     }
@@ -834,7 +931,7 @@ export default function NewConfigurationWizard() {
   const isLastStep = currentStep === STEPS.length;
   // Native `disabled` only reflects an in-flight request — a step with missing
   // fields stays clickable so onNext can explain what's missing via toast.
-  const nextDisabled = (isLastStep && submitting) || creatingDraft;
+  const nextDisabled = (isLastStep && (submitting || editLockLost)) || creatingDraft;
   const nextIncomplete = !isLastStep && !isStepValid(currentStep, wizardData);
 
   if (loadingExisting) {
@@ -845,18 +942,36 @@ export default function NewConfigurationWizard() {
     );
   }
 
+  if (configId && !viewOnly && !editLockReady) {
+    return (
+      <div className="p-6">
+        <Loader />
+        <p className="text-center text-sm text-slate-500">Acquiring lock...</p>
+      </div>
+    );
+  }
+
   if (viewOnly) {
     // The review's own overview card is the page header — Back and Edit
     // Configuration live inside it rather than in a separate header card.
     return (
       <div className="mx-auto w-full max-w-6xl">
+        <RecordLockOwnIndicator actionType={recordLock.ownLockAction(configId)} className="mb-3" />
         <ReviewActivateStep
           wizardData={wizardData}
           // Backend-reported changes awaiting approval (empty unless pending).
           pendingChanges={wizardData.changes}
           leading={<BackIconButton onClick={() => navigate(CONFIGURATIONS_PATH)} label="Back to Overview" />}
           headerActions={
-            <Button variant="primary" size="small" onClick={() => setViewOnly(false)}>
+            <Button
+              variant="primary"
+              size="small"
+              onClick={handleStartEdit}
+              loading={recordLock.acquiring}
+              loadingText="Acquiring lock..."
+              disabled={recordLock.isLockedByOther(configId)}
+              title={recordLock.isLockedByOther(configId) ? "This configuration is currently under review." : ""}
+            >
               <Pencil className="h-3.5 w-3.5" /> Edit Configuration
             </Button>
           }
@@ -885,7 +1000,17 @@ export default function NewConfigurationWizard() {
         </p>
       </div>
     </div>
+    {configId && !editLockLost && (
+      <RecordLockOwnIndicator actionType={recordLock.ownLockAction(configId)} />
+    )}
   </div>
+
+  {editLockLost && !recordLock.conflict && (
+    <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-xs text-amber-900" role="status">
+      <Info className="mt-px h-4 w-4 shrink-0 text-amber-600" />
+      <span>Your edit lock on this billing configuration has expired. Reload the page to continue editing.</span>
+    </div>
+  )}
 
   {/* Wizard Stepper */}
   <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6">
@@ -899,6 +1024,9 @@ export default function NewConfigurationWizard() {
   {/* Active Form Step Container */}
   <PageCard className="rounded-2xl border border-slate-200 bg-white shadow-sm">
     <PageCardContent className="space-y-6 p-5 sm:p-6 lg:p-8">
+      {/* Without the EDIT lock every section's controls (incl. child saves) are
+          disabled, but what the user entered stays on screen. */}
+      <fieldset disabled={editLockLost} className="m-0 min-w-0 space-y-6 border-0 p-0">
       {currentStep === 1 && (
         <ProjectStep
           value={wizardData.projectInfo}
@@ -944,6 +1072,8 @@ export default function NewConfigurationWizard() {
         </div>
       )}
 
+      </fieldset>
+
       {/* Navigation — existing component and props unchanged */}
       <div className="mt-2 border-t border-slate-200 pt-5">
         <WizardNavigation
@@ -953,9 +1083,9 @@ export default function NewConfigurationWizard() {
           nextIncomplete={nextIncomplete}
           finalLabel={isEditingExisting ? "Update Billing Setup" : "Create Billing Setup"}
           finalLoadingText={isEditingExisting ? "Updating..." : "Submitting..."}
-          // Save Draft uses the Draft-only endpoint; an APPROVED configuration
-          // is saved once, via Update Billing Setup.
-          showSaveDraft={currentStep > 1 && !isEditingApproved}
+          // Save Draft uses the Draft-only endpoint; an APPROVED or
+          // PENDING_APPROVAL configuration is saved once, via Update Billing Setup.
+          showSaveDraft={currentStep > 1 && !isEditingSubmitted && !editLockLost}
           saving={saving}
           activating={submitting || creatingDraft}
           onBack={handleBack}

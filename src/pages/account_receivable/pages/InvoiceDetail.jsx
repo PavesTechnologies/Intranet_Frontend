@@ -57,6 +57,8 @@ import { getActiveCompanyProfile } from "../services/companyProfileService";
 import { getTaxCalculation } from "../services/taxCalculationService";
 import { getBillingOccurrence } from "../services/billingOccurrenceService";
 import InvoiceDocument from "../components/invoice/InvoiceDocument";
+import { RECORD_LOCK_ACTION, RECORD_LOCK_RESOURCE } from "../services/recordLockService";
+import useRecordLock from "../hooks/useRecordLock";
 
 const TAX_WORKSPACE_PATH = "/account-receivable/tax-calculation";
 const INVOICE_WORKSPACE_PATH = "/account-receivable/invoice-generation";
@@ -146,6 +148,57 @@ export default function InvoiceDetail() {
   const [refreshingAfterCorrection, setRefreshingAfterCorrection] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejectError, setRejectError] = useState("");
+
+  // Invoice approval concurrency. Opening a PENDING_APPROVAL invoice from the
+  // Invoice Approval queue ("Review & Decide") starts a review and takes the
+  // backend APPROVAL lock; any other (read-only) view only polls lock status.
+  // Approve / Reject always go through acquire first, so a 409 keeps their
+  // modals closed. Released on success, when the invoice leaves
+  // PENDING_APPROVAL, on modal cancel outside review mode, and on unmount.
+  const isApprovalReview = source === "invoice-approval";
+  const invoiceLockId = invoice?.invoiceId || null;
+  const isPendingApproval = invoice?.invoiceStatus === "PENDING_APPROVAL";
+  const [lockingAction, setLockingAction] = useState(null);
+  const recordLock = useRecordLock(RECORD_LOCK_RESOURCE.INVOICE, {
+    watchResourceId: isPendingApproval ? invoiceLockId : null,
+  });
+  const { acquire: acquireInvoiceLock, release: releaseInvoiceLock } = recordLock;
+  const invoiceLockConflict = recordLock.isLockedByOther(invoiceLockId) ? recordLock.conflict : null;
+  const decisionBlocked = Boolean(invoiceLockConflict) || Boolean(lockingAction);
+
+  useEffect(() => {
+    if (!invoiceLockId) return;
+    if (!isPendingApproval) {
+      releaseInvoiceLock();
+      return;
+    }
+    if (isApprovalReview) acquireInvoiceLock(invoiceLockId, RECORD_LOCK_ACTION.APPROVAL);
+  }, [invoiceLockId, isPendingApproval, isApprovalReview, acquireInvoiceLock, releaseInvoiceLock]);
+
+  const openDecisionModal = async (action) => {
+    if (!invoiceLockId || lockingAction) return;
+    setLockingAction(action);
+    try {
+      const result = await acquireInvoiceLock(invoiceLockId, RECORD_LOCK_ACTION.APPROVAL);
+      if (!result.acquired) return;
+      if (action === "approve") {
+        setIsConfirmOpen(true);
+      } else {
+        setRejectionReason("");
+        setRejectError("");
+        setIsRejectOpen(true);
+      }
+    } finally {
+      setLockingAction(null);
+    }
+  };
+
+  // Outside review mode the lock only spans the open modal.
+  const closeDecisionModal = () => {
+    setIsConfirmOpen(false);
+    setIsRejectOpen(false);
+    if (!isApprovalReview) releaseInvoiceLock();
+  };
 
   const isOccurrenceMode = Boolean(
     paramOccurrenceId ||
@@ -320,6 +373,7 @@ export default function InvoiceDetail() {
     setIsConfirmOpen(false);
     try {
       const updated = await approveInvoice(invoice.invoiceId);
+      releaseInvoiceLock();
       showStatusToast("Invoice approved successfully.", "success");
       if (updated) {
         setInvoice((prev) => ({
@@ -355,6 +409,7 @@ export default function InvoiceDetail() {
     setRejectError("");
     try {
       const updated = await rejectInvoice(invoice.invoiceId, trimmed);
+      releaseInvoiceLock();
       setIsRejectOpen(false);
       setRejectionReason("");
       showStatusToast("Invoice rejected successfully.", "success");
@@ -740,27 +795,23 @@ export default function InvoiceDetail() {
               <Button
                 variant="primary"
                 size="small"
-                onClick={() => setIsConfirmOpen(true)}
-                disabled={approving || rejecting || refreshing}
+                onClick={() => openDecisionModal("approve")}
+                disabled={approving || rejecting || refreshing || decisionBlocked}
                 className="bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 text-xs font-semibold"
               >
                 <ThumbsUp className="h-3.5 w-3.5" />
-                {approving ? "Approving..." : "Approve"}
+                {lockingAction === "approve" ? "Acquiring lock..." : approving ? "Approving..." : "Approve"}
               </Button>
 
               <Button
                 variant="outline"
                 size="small"
-                onClick={() => {
-                  setRejectionReason("");
-                  setRejectError("");
-                  setIsRejectOpen(true);
-                }}
-                disabled={approving || rejecting || refreshing}
+                onClick={() => openDecisionModal("reject")}
+                disabled={approving || rejecting || refreshing || decisionBlocked}
                 className="border-rose-300 text-rose-700 hover:bg-rose-50 hover:border-rose-400 flex items-center gap-1.5 text-xs font-semibold"
               >
                 <XCircle className="h-3.5 w-3.5 text-rose-600" />
-                Reject Invoice
+                {lockingAction === "reject" ? "Acquiring lock..." : "Reject Invoice"}
               </Button>
             </>
           )}
@@ -1300,7 +1351,7 @@ export default function InvoiceDetail() {
       {/* Confirmation Modal for Approve */}
       <Modal
         isOpen={isConfirmOpen}
-        onClose={() => !approving && setIsConfirmOpen(false)}
+        onClose={() => !approving && closeDecisionModal()}
         title="Approve Invoice"
         size="md"
       >
@@ -1324,7 +1375,7 @@ export default function InvoiceDetail() {
             <Button
               variant="outline"
               size="small"
-              onClick={() => setIsConfirmOpen(false)}
+              onClick={closeDecisionModal}
               disabled={approving}
               className="text-xs"
             >
@@ -1346,7 +1397,7 @@ export default function InvoiceDetail() {
       {/* Confirmation Modal for Reject Invoice (Section 3) */}
       <Modal
         isOpen={isRejectOpen}
-        onClose={() => !rejecting && setIsRejectOpen(false)}
+        onClose={() => !rejecting && closeDecisionModal()}
         title="Reject Invoice"
         size="md"
       >
@@ -1417,7 +1468,7 @@ export default function InvoiceDetail() {
             <Button
               variant="outline"
               size="small"
-              onClick={() => setIsRejectOpen(false)}
+              onClick={closeDecisionModal}
               disabled={rejecting}
               className="text-xs"
             >
