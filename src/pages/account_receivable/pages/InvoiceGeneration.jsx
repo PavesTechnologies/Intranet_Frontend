@@ -101,11 +101,18 @@ export default function InvoiceGeneration() {
     }
   };
 
-  // Route forwarder: if snapshotId is provided as a query parameter or state,
+  // Route forwarder: if snapshotId or occurrenceId / billingScheduleId is provided as a query parameter or state,
   // forward to the dedicated invoice-generation detail workflow
   const targetSnapshotId =
     searchParams.get("snapshotId") ||
     location.state?.snapshotId ||
+    null;
+
+  const targetOccurrenceId =
+    searchParams.get("occurrenceId") ||
+    searchParams.get("billingScheduleId") ||
+    location.state?.occurrenceId ||
+    location.state?.billingScheduleId ||
     null;
 
   useEffect(() => {
@@ -117,8 +124,16 @@ export default function InvoiceGeneration() {
           source: "invoice-generation",
         },
       });
+    } else if (targetOccurrenceId) {
+      navigate(`/account-receivable/invoice-generation/occurrence/${targetOccurrenceId}`, {
+        replace: true,
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+        },
+      });
     }
-  }, [targetSnapshotId, navigate]);
+  }, [targetSnapshotId, targetOccurrenceId, navigate]);
 
   const loadData = async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
@@ -162,40 +177,69 @@ export default function InvoiceGeneration() {
   }, []);
 
   const handleGenerateInvoice = (item) => {
-    const sId = item.snapshotId || item.billingSnapshotId;
-    if (!sId) {
-      showStatusToast("Snapshot identifier is missing.", "error");
-      return;
+    if (item.snapshotId || item.billingSnapshotId) {
+      const sId = item.snapshotId || item.billingSnapshotId;
+      navigate(`/account-receivable/invoice-generation/${sId}`, {
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+          snapshotId: sId,
+          item,
+        },
+      });
+    } else if (item.billingScheduleId || item.occurrenceId) {
+      const occId = item.billingScheduleId || item.occurrenceId;
+      navigate(`/account-receivable/invoice-generation/occurrence/${occId}`, {
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+          occurrenceId: occId,
+          billingScheduleId: occId,
+          item,
+        },
+      });
+    } else {
+      showStatusToast("Identifier is missing for invoice generation.", "error");
     }
-
-    navigate(`/account-receivable/invoice-generation/${sId}`, {
-      state: {
-        from: "invoice-generation",
-        source: "invoice-generation",
-      },
-    });
   };
 
   const handleViewInvoice = (inv) => {
-    const targetId =
-      inv.invoiceId ||
-      inv.billingSnapshotId ||
-      inv.snapshotId;
-
-    if (!targetId) {
-      showStatusToast(
-        "Identifier is missing for this invoice.",
-        "error"
-      );
+    if (inv.invoiceId) {
+      navigate(`/account-receivable/invoices/${inv.invoiceId}`, {
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+        },
+      });
       return;
     }
 
-    navigate(`/account-receivable/invoices/${targetId}`, {
-      state: {
-        from: "invoice-generation",
-        source: "invoice-generation",
-      },
-    });
+    if (inv.snapshotId || inv.billingSnapshotId) {
+      const sId = inv.snapshotId || inv.billingSnapshotId;
+      navigate(`/account-receivable/invoices/${sId}`, {
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+        },
+      });
+      return;
+    }
+
+    if (inv.billingScheduleId || inv.occurrenceId) {
+      const occId = inv.billingScheduleId || inv.occurrenceId;
+      navigate(`/account-receivable/invoices/occurrence/${occId}`, {
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+        },
+      });
+      return;
+    }
+
+    showStatusToast(
+      "Identifier is missing for this invoice.",
+      "error"
+    );
   };
 
   // Filtered invoices/workspace rows
@@ -208,7 +252,7 @@ export default function InvoiceGeneration() {
         if (wsStatus !== statusFilter) return false;
       }
 
-      // Search query supports invoice number, project name, client name, and snapshot number
+      // Search query supports invoice number, project name, client name, snapshot number, and schedule reference
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
 
@@ -216,12 +260,24 @@ export default function InvoiceGeneration() {
         const client = (item.clientName || "").toLowerCase();
         const project = (item.projectName || "").toLowerCase();
         const snapNum = (item.snapshotNumber || "").toLowerCase();
+        const schedId = (item.billingScheduleId ? String(item.billingScheduleId) : "").toLowerCase();
+        const schedRef = (
+          item.billingScheduleNumber ||
+          item.scheduleReference ||
+          item.reference ||
+          (item.periodNumber ? `period ${item.periodNumber}` : "") ||
+          ""
+        ).toLowerCase();
+        const period = (item.billingPeriod || "").toLowerCase();
 
         const matches =
           num.includes(q) ||
           client.includes(q) ||
           project.includes(q) ||
-          snapNum.includes(q);
+          snapNum.includes(q) ||
+          schedId.includes(q) ||
+          schedRef.includes(q) ||
+          period.includes(q);
 
         if (!matches) return false;
       }
@@ -546,8 +602,18 @@ export default function InvoiceGeneration() {
 
     const iid =
       item.invoiceId ||
+      item.snapshotId ||
       item.billingSnapshotId ||
-      item.snapshotId;
+      item.billingScheduleId ||
+      item.occurrenceId;
+
+    const candidateRef =
+      item.snapshotNumber ||
+      item.billingScheduleNumber ||
+      item.scheduleReference ||
+      item.reference ||
+      (item.periodNumber ? `Period ${item.periodNumber}` : null) ||
+      (item.billingScheduleId ? String(item.billingScheduleId) : null);
 
     const delivery =
       demoDeliveryMap[iid] || {
@@ -573,9 +639,9 @@ export default function InvoiceGeneration() {
             </span>
           )}
 
-          {item.snapshotNumber && (
+          {candidateRef && (
             <div className={`text-xs font-mono ${isReady ? "text-indigo-600 font-semibold" : "text-slate-400"}`}>
-              {item.snapshotNumber}
+              {candidateRef}
             </div>
           )}
         </div>

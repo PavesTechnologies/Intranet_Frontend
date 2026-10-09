@@ -397,7 +397,7 @@ export const normalizeInvoice = (payload = {}) => {
     invoiceNumber:
       data.invoiceNumber ||
       data.invoice_number ||
-      (data.generated === false ? "Assigned on generation" : "—"),
+      null,
     invoiceStatus:
       data.invoiceStatus ||
       data.status ||
@@ -469,7 +469,17 @@ export const normalizeInvoice = (payload = {}) => {
     billingAddress: formattedAddress,
     gstin: data.gstinOrTaxId || data.gstin || data.gstNumber || data.taxId || data.tax_id || null,
     gstinOrTaxId: data.gstinOrTaxId || data.gstin || data.gstNumber || data.taxId || data.tax_id || null,
-    contact: data.contact || data.contactPerson || data.contactEmail || data.contactPhone || null,
+    countryName:
+      data.countryName ||
+      data.country_name ||
+      data.clientCountryName ||
+      data.client_country_name ||
+      data.client?.countryName ||
+      data.client?.country_name ||
+      data.client?.country ||
+      data.country ||
+      (typeof data.billingAddress === "object" ? data.billingAddress?.country : null) ||
+      null,
     countryCode:
       data.countryCode ||
       data.country_code ||
@@ -654,6 +664,48 @@ export const normalizeInvoice = (payload = {}) => {
       phone: data.sellerPhone || data.companyPhone || null,
       logoUrl: data.sellerLogoReference || data.logo || null,
     },
+
+    // Persisted Invoice Content (Authoritative snapshot from backend; null if not provided)
+    invoiceNotes:
+      data.invoiceNotes !== undefined && data.invoiceNotes !== null
+        ? String(data.invoiceNotes).trim() || null
+        : data.notes !== undefined && data.notes !== null
+        ? String(data.notes).trim() || null
+        : data.additionalNotes !== undefined && data.additionalNotes !== null
+        ? String(data.additionalNotes).trim() || null
+        : null,
+    notes:
+      data.invoiceNotes !== undefined && data.invoiceNotes !== null
+        ? String(data.invoiceNotes).trim() || null
+        : data.notes !== undefined && data.notes !== null
+        ? String(data.notes).trim() || null
+        : data.additionalNotes !== undefined && data.additionalNotes !== null
+        ? String(data.additionalNotes).trim() || null
+        : null,
+    additionalNotes:
+      data.invoiceNotes !== undefined && data.invoiceNotes !== null
+        ? String(data.invoiceNotes).trim() || null
+        : data.additionalNotes !== undefined && data.additionalNotes !== null
+        ? String(data.additionalNotes).trim() || null
+        : data.notes !== undefined && data.notes !== null
+        ? String(data.notes).trim() || null
+        : null,
+    termsAndConditions:
+      data.termsAndConditions !== undefined && data.termsAndConditions !== null
+        ? String(data.termsAndConditions).trim() || null
+        : data.terms !== undefined && data.terms !== null
+        ? String(data.terms).trim() || null
+        : data.invoiceTerms !== undefined && data.invoiceTerms !== null
+        ? String(data.invoiceTerms).trim() || null
+        : null,
+    paymentInstructions:
+      data.paymentInstructions !== undefined && data.paymentInstructions !== null
+        ? String(data.paymentInstructions).trim() || null
+        : data.paymentInstruction !== undefined && data.paymentInstruction !== null
+        ? String(data.paymentInstruction).trim() || null
+        : data.remittanceInstructions !== undefined && data.remittanceInstructions !== null
+        ? String(data.remittanceInstructions).trim() || null
+        : null,
 
     // Pre-generation flag from backend
     generated:
@@ -945,8 +997,39 @@ export const getInvoiceById = async (invoiceId) => {
 
 
 /**
+ * @typedef {Object} InvoiceGenerationWorkspaceRow
+ * @property {string} workspaceStatus - e.g. "READY_FOR_INVOICE", "GENERATED", "PENDING_APPROVAL", "APPROVED", "REJECTED", "INVOICED"
+ * @property {string|null} [snapshotId] - Billing snapshot UUID (for T&M candidates)
+ * @property {string|null} [snapshotNumber] - Snapshot reference number
+ * @property {string|null} [snapshotStatus]
+ * @property {string|null} [billingScheduleId] - Billing schedule / occurrence UUID (for Recurring candidates)
+ * @property {string|null} [billingScheduleNumber] - Schedule / occurrence reference
+ * @property {string} clientName
+ * @property {string} projectName
+ * @property {string|null} [projectCode]
+ * @property {string|null} [billingType]
+ * @property {string} billingPeriod
+ * @property {string|null} [billingPeriodStart]
+ * @property {string|null} [billingPeriodEnd]
+ * @property {string} currency
+ * @property {string} currencyCode
+ * @property {number} amount
+ * @property {number} totalTaxAmount
+ * @property {number} grandTotal
+ * @property {string|null} [invoiceId]
+ * @property {string|null} [invoiceNumber]
+ * @property {string|null} [invoiceStatus]
+ * @property {string|null} [invoiceDate]
+ * @property {string|null} [dueDate]
+ * @property {string|null} [periodStatus]
+ * @property {string|null} [taxStatus]
+ * @property {number|null} [periodNumber]
+ */
+
+/**
  * Normalizes a single row returned by GET /api/v1/invoice-generation/workspace.
  * Backend provides authoritative workspaceStatus and financial amounts.
+ * Supports both BillingSnapshot candidates (T&M) and BillingSchedule candidates (Recurring).
  */
 export const normalizeInvoiceGenerationWorkspaceItem = (row = {}) => {
   const source = row && typeof row === "object" ? row : {};
@@ -957,15 +1040,47 @@ export const normalizeInvoiceGenerationWorkspaceItem = (row = {}) => {
       ? formatBillingPeriod(periodStart, periodEnd)
       : (source.billingPeriod || "—");
 
+  const snapshotId = source.snapshotId || null;
+  const billingScheduleId =
+    source.billingScheduleId ||
+    source.billing_schedule_id ||
+    source.occurrenceId ||
+    source.occurrence_id ||
+    null;
+
+  let rawWsStatus = (source.workspaceStatus || source.invoiceStatus || "").toUpperCase();
+  let workspaceStatus = rawWsStatus;
+  if (
+    rawWsStatus === "TAX_COMPLETED" ||
+    rawWsStatus === "TAX_CALCULATED" ||
+    rawWsStatus === "READY_FOR_INVOICE" ||
+    (!rawWsStatus && !source.invoiceId)
+  ) {
+    workspaceStatus = "READY_FOR_INVOICE";
+  } else if (!rawWsStatus && source.invoiceId) {
+    workspaceStatus = "GENERATED";
+  }
+
+  const snapshotNumber = source.snapshotNumber || null;
+  const billingScheduleNumber =
+    source.billingScheduleNumber ||
+    source.scheduleNumber ||
+    source.scheduleReference ||
+    source.reference ||
+    (source.periodNumber ? `Period ${source.periodNumber}` : null) ||
+    null;
+
   return {
-    workspaceStatus: (source.workspaceStatus || (source.invoiceId ? "GENERATED" : "READY_FOR_INVOICE")).toUpperCase(),
-    snapshotId: source.snapshotId || null,
-    snapshotNumber: source.snapshotNumber || null,
+    workspaceStatus,
+    snapshotId,
+    snapshotNumber,
     snapshotStatus: source.snapshotStatus || null,
-    clientName: source.clientName || "—",
-    projectName: source.projectName || "—",
+    billingScheduleId,
+    billingScheduleNumber,
+    clientName: source.clientName || source.client || "—",
+    projectName: source.projectName || source.project || "—",
     projectCode: source.projectCode || null,
-    billingType: source.billingType || null,
+    billingType: source.billingType || (billingScheduleId && !snapshotId ? "Recurring" : null),
     billingPeriod: displayPeriod,
     billingPeriodStart: periodStart,
     billingPeriodEnd: periodEnd,
@@ -979,6 +1094,9 @@ export const normalizeInvoiceGenerationWorkspaceItem = (row = {}) => {
     invoiceStatus: source.invoiceStatus ? source.invoiceStatus.toUpperCase() : null,
     invoiceDate: toIsoDateOnly(source.invoiceDate) || null,
     dueDate: toIsoDateOnly(source.dueDate) || null,
+    periodStatus: source.periodStatus || null,
+    taxStatus: source.taxStatus || null,
+    periodNumber: source.periodNumber || null,
   };
 };
 

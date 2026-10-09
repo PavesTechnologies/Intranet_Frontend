@@ -257,6 +257,86 @@ export default function CompanyProfilePage() {
             </PageCardContent>
           </PageCard>
 
+          {/* Default Invoice Content Card */}
+          <PageCard>
+            <PageCardContent className="p-6 space-y-4">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                <div className="space-y-0.5">
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+                    Default Invoice Content
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Preconfigured text applied to generated invoices. Historical invoices retain their saved snapshot.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="small"
+                  onClick={() => setIsModalOpen(true)}
+                  className="flex items-center gap-1.5"
+                >
+                  <Edit3 className="h-3.5 w-3.5" /> Edit Content Defaults
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2">
+                {/* Notes */}
+                <div className="rounded-lg bg-slate-50 p-4 border border-slate-200">
+                  <div className="space-y-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-600 block">
+                      Default Notes
+                    </span>
+                    {profile.defaultInvoiceNotes || profile.invoiceNotes || profile.notes || profile.additionalNotes ? (
+                      <p className="text-xs text-slate-700 whitespace-pre-line leading-relaxed">
+                        {profile.defaultInvoiceNotes || profile.invoiceNotes || profile.notes || profile.additionalNotes}
+                      </p>
+                    ) : (
+                      <p className="text-xs italic text-slate-400">
+                        Not configured (no default notes will appear on generated invoices)
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Terms & Conditions */}
+                <div className="rounded-lg bg-slate-50 p-4 border border-slate-200">
+                  <div className="space-y-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-600 block">
+                      Terms & Conditions
+                    </span>
+                    {profile.defaultTermsAndConditions || profile.termsAndConditions || profile.terms ? (
+                      <p className="text-xs text-slate-700 whitespace-pre-line leading-relaxed">
+                        {profile.defaultTermsAndConditions || profile.termsAndConditions || profile.terms}
+                      </p>
+                    ) : (
+                      <p className="text-xs italic text-slate-400">
+                        Not configured (no default terms will appear on generated invoices)
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Payment Instructions */}
+                <div className="rounded-lg bg-slate-50 p-4 border border-slate-200">
+                  <div className="space-y-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-600 block">
+                      Payment Instructions
+                    </span>
+                    {profile.defaultPaymentInstructions || profile.paymentInstructions || profile.paymentInstruction ? (
+                      <p className="text-xs text-slate-700 whitespace-pre-line leading-relaxed">
+                        {profile.defaultPaymentInstructions || profile.paymentInstructions || profile.paymentInstruction}
+                      </p>
+                    ) : (
+                      <p className="text-xs italic text-slate-400">
+                        Not configured (no payment instructions will appear on generated invoices)
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </PageCardContent>
+          </PageCard>
+
           {/* Context Notice */}
           <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-4 flex items-start gap-3">
             <CheckCircle2 className="h-5 w-5 text-indigo-600 shrink-0 mt-0.5" />

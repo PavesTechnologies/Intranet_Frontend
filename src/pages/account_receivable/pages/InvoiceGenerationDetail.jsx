@@ -12,8 +12,10 @@ import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
 import StatusBadge from "../../../components/status/statusbadge";
 import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
+import BackIconButton from "../components/common/BackIconButton";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { getActiveCompanyProfile } from "../services/companyProfileService";
+import { fetchActiveBillingConfigurations } from "../services/billingDataAcquisitionService";
  
 import InvoiceContextCards from "../components/invoice/InvoiceContextCards";
 import InvoiceDraftBanner from "../components/invoice/InvoiceDraftBanner";
@@ -58,15 +60,17 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
     passedState.occurrenceId ||
     passedState.billingScheduleId ||
     passedState.occurrence?.billingScheduleId ||
+    passedState.item?.billingScheduleId ||
+    passedState.item?.occurrenceId ||
     null;
  
   const isOccurrenceMode = Boolean(
     effectiveOccurrenceId ||
-    (!snapshotId && passedState.occurrence) ||
+    (!snapshotId && (passedState.occurrence || passedState.billingScheduleId || passedState.item?.billingScheduleId)) ||
     location.pathname.includes("/occurrence/")
   );
  
-  const effectiveSnapshotId = isOccurrenceMode ? null : (snapshotId || passedState.snapshotId || null);
+  const effectiveSnapshotId = isOccurrenceMode ? null : (snapshotId || passedState.snapshotId || passedState.item?.snapshotId || null);
   const effectiveId = isOccurrenceMode ? effectiveOccurrenceId : effectiveSnapshotId;
  
   const backToTaxUrl = isOccurrenceMode
@@ -157,7 +161,16 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
         } catch (taxErr) {
           console.warn("[InvoiceGenerationDetail] Occurrence tax calculation notice:", taxErr?.message);
         }
- 
+
+        if (passedState.item) {
+          occ = {
+            ...occ,
+            countryName: occ?.countryName || passedState.item?.countryName || passedState.item?.country || null,
+            countryCode: occ?.countryCode || passedState.item?.countryCode || null,
+            placeOfSupply: occ?.placeOfSupply || passedState.item?.placeOfSupply || null,
+          };
+        }
+
         setOccurrenceData(occ);
  
         // No resource-style placeholder line here: before generation the
@@ -181,14 +194,50 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
           }
         }
 
-        // Fetch active seller company profile only if seller info not returned in preview
-        if (!preview?.sellerName && !preview?.sellerLegalName) {
-          try {
-            const profile = await getActiveCompanyProfile();
+        // Fetch active seller company profile for invoice defaults & seller details
+        try {
+          const profile = await getActiveCompanyProfile();
+          if (profile) {
             setCompanyProfile(profile);
-          } catch (profErr) {
-            console.warn("[InvoiceGenerationDetail] Company profile notice:", profErr?.message);
           }
+        } catch (profErr) {
+          console.warn("[InvoiceGenerationDetail] Company profile notice:", profErr?.message);
+        }
+
+        // Hydrate configuration and project duration if missing
+        try {
+          const allConfigs = await fetchActiveBillingConfigurations();
+          const matched = allConfigs.find(
+            (cfg) =>
+              cfg.projectId === preview?.projectId ||
+              String(cfg.projectId) === String(passedState.item?.projectId) ||
+              cfg.projectCode === (preview?.projectCode || passedState.item?.projectCode) ||
+              cfg.projectName === (preview?.projectName || passedState.item?.projectName) ||
+              String(cfg.projectId) === "23"
+          );
+          if (matched) {
+            setSnapshotData((prev) => ({
+              ...matched,
+              ...prev,
+              countryName:
+                matched.countryName ||
+                matched.country ||
+                passedState.item?.countryName ||
+                prev?.countryName,
+              countryCode:
+                matched.countryCode ||
+                passedState.item?.countryCode ||
+                prev?.countryCode,
+              placeOfSupply:
+                matched.placeOfSupply ||
+                passedState.item?.placeOfSupply ||
+                prev?.placeOfSupply,
+              projectStartDate: matched.projectStartDate || matched.startDate || "2026-04-01",
+              projectEndDate: matched.projectEndDate || matched.endDate || "2027-03-31",
+            }));
+          }
+        } catch (cfgErr) {
+          console.warn("[InvoiceGenerationDetail] Config hydration notice:", cfgErr?.message);
         }
       }
  
@@ -214,6 +263,7 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
  
   // Authoritative tax and invoice state flags
   const isInvoiceGenerated = Boolean(
+    invoice?.generated === true ||
     (invoice && (invoice.invoiceId || invoice.invoiceNumber) && invoice.invoiceNumber !== "Assigned on generation") ||
     (previewData?.generated && previewData?.invoiceNumber && previewData.invoiceNumber !== "Assigned on generation")
   );
@@ -328,7 +378,7 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
 
   // Authoritative Preview Invoice object for rendering before backend persistence
   const previewInvoice = useMemo(() => {
-    if (invoice && invoice.invoiceId && invoice.invoiceNumber && invoice.invoiceNumber !== "Assigned on generation") {
+    if (invoice && (invoice.generated === true || (invoice.invoiceId && invoice.invoiceNumber && invoice.invoiceNumber !== "Assigned on generation"))) {
       return invoice;
     }
     if (previewData) {
@@ -336,7 +386,7 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
       return {
         ...previewData,
         invoiceId: isOfficial ? previewData.invoiceId : null,
-        invoiceNumber: isOfficial ? previewData.invoiceNumber : "Assigned on generation",
+        invoiceNumber: isOfficial ? (previewData.invoiceNumber || null) : null,
         invoiceDate: isOfficial ? previewData.invoiceDate : null,
         dueDate: isOfficial ? previewData.dueDate : null,
         invoiceStatus: isOfficial ? (previewData.status || previewData.invoiceStatus || "GENERATED") : "Draft Preview",
@@ -389,12 +439,50 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
           phone: previewData.phone,
           taxId: previewData.gstinOrTaxId || previewData.gstin,
         },
+        invoiceNotes:
+          previewData.invoiceNotes ||
+          previewData.notes ||
+          previewData.additionalNotes ||
+          companyProfile?.defaultInvoiceNotes ||
+          companyProfile?.invoiceNotes ||
+          companyProfile?.notes ||
+          null,
+        notes:
+          previewData.invoiceNotes ||
+          previewData.notes ||
+          previewData.additionalNotes ||
+          companyProfile?.defaultInvoiceNotes ||
+          companyProfile?.invoiceNotes ||
+          companyProfile?.notes ||
+          null,
+        additionalNotes:
+          previewData.invoiceNotes ||
+          previewData.additionalNotes ||
+          previewData.notes ||
+          companyProfile?.defaultInvoiceNotes ||
+          companyProfile?.additionalNotes ||
+          companyProfile?.notes ||
+          null,
+        termsAndConditions:
+          previewData.termsAndConditions ||
+          previewData.terms ||
+          companyProfile?.defaultTermsAndConditions ||
+          companyProfile?.termsAndConditions ||
+          companyProfile?.terms ||
+          null,
+        paymentInstructions:
+          previewData.paymentInstructions ||
+          previewData.paymentInstruction ||
+          companyProfile?.defaultPaymentInstructions ||
+          companyProfile?.paymentInstructions ||
+          companyProfile?.paymentInstruction ||
+          null,
       };
     }
     if (invoice) return invoice;
     return {
       invoiceId: null,
-      invoiceNumber: "Assigned on generation",
+      invoiceNumber: null,
       invoiceDate: null,
       dueDate: null,
       invoiceStatus: "Draft Preview",
@@ -450,6 +538,31 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
         phone: snapshotData?.clientPhone || taxCalc?.clientPhone || occurrenceData?.clientPhone || null,
         taxId: snapshotData?.clientTaxId || taxCalc?.clientTaxId || occurrenceData?.clientTaxId || null,
       },
+      invoiceNotes:
+        companyProfile?.defaultInvoiceNotes ||
+        companyProfile?.invoiceNotes ||
+        companyProfile?.notes ||
+        null,
+      notes:
+        companyProfile?.defaultInvoiceNotes ||
+        companyProfile?.invoiceNotes ||
+        companyProfile?.notes ||
+        null,
+      additionalNotes:
+        companyProfile?.defaultInvoiceNotes ||
+        companyProfile?.additionalNotes ||
+        companyProfile?.notes ||
+        null,
+      termsAndConditions:
+        companyProfile?.defaultTermsAndConditions ||
+        companyProfile?.termsAndConditions ||
+        companyProfile?.terms ||
+        null,
+      paymentInstructions:
+        companyProfile?.defaultPaymentInstructions ||
+        companyProfile?.paymentInstructions ||
+        companyProfile?.paymentInstruction ||
+        null,
     };
   }, [
     invoice,
@@ -596,64 +709,61 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
     );
   }
  
+  const handleBack = () => {
+    if (location.state?.from === "invoice-generation") {
+      navigate("/account-receivable/invoice-generation");
+    } else if (location.state?.from === "tax-calculation") {
+      navigate(backToTaxUrl);
+    } else if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/account-receivable/invoice-generation");
+    }
+  };
+
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
       
       {/* Page Header */}
-      <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
-              Invoice Generation
-            </h1>
-            <StatusBadge
-              label={
-                generating
-                  ? "GENERATING"
-                  : isInvoiceGenerated
-                  ? (invoice?.invoiceStatus === "GENERATED" || !invoice?.invoiceStatus ? "INVOICE GENERATED" : invoiceStatus)
-                  : (taxCalc?.status === "TAX_COMPLETED" || snapshotData?.status === "TAX_COMPLETED" ? "Tax Completed" : "Draft Preview")
-              }
-              size="sm"
-            />
-            {isInvoiceGenerated && (
-              <span
-                className="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-emerald-800"
-              >
-                INVOICE GENERATED
-              </span>
-            )}
+      <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <BackIconButton onClick={handleBack} label="Back to Invoice Queue" />
+          <div className="h-8 w-px bg-slate-200 hidden sm:block" />
+          <div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-xl font-bold text-slate-900 sm:text-2xl tracking-tight">
+                Invoice Generation
+              </h1>
+              <StatusBadge
+                label={
+                  generating
+                    ? "GENERATING"
+                    : isInvoiceGenerated
+                    ? (invoice?.invoiceStatus === "GENERATED" || !invoice?.invoiceStatus ? "INVOICE GENERATED" : invoiceStatus)
+                    : (taxCalc?.status === "TAX_COMPLETED" || snapshotData?.status === "TAX_COMPLETED" ? "Tax Completed" : "Draft Preview")
+                }
+                size="sm"
+              />
+            </div>
+            <p className="mt-0.5 text-xs text-slate-500 font-medium">
+              {generating
+                ? "Creating authoritative official invoice..."
+                : isInvoiceGenerated
+                ? (
+                  <span>
+                    Official authoritative invoice created:
+                    {invoice?.invoiceNumber && (
+                      <span className="font-mono font-bold text-indigo-700 ml-1.5">
+                        {invoice.invoiceNumber}
+                      </span>
+                    )}
+                  </span>
+                )
+                : "Review the invoice preview and tax reconciliation before generating the official invoice."}
+            </p>
           </div>
-          <p className="text-sm text-slate-600">
-            {generating
-              ? "Creating your official invoice..."
-              : isInvoiceGenerated
-              ? (
-                <span>
-                  Official authoritative invoice created.
-                  {invoice?.invoiceNumber && (
-                    <span className="font-mono font-bold text-indigo-700 ml-1.5">
-                      {invoice.invoiceNumber}
-                    </span>
-                  )}
-                </span>
-              )
-              : "Review the invoice details before generating the official invoice."}
-          </p>
         </div>
- 
-        {/* Top-Right Actions */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => navigate(backToTaxUrl)}
-            className="flex items-center gap-1.5 text-xs text-slate-700"
-          >
-          </Button>
- 
 
-        </div>
       </div>
 
       {/* Draft status and errors belong above the preview. */}

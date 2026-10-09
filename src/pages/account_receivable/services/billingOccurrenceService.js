@@ -160,6 +160,23 @@ export const normalizeBillingOccurrence = (item = {}) => {
     currencyCode: item.currencyCode ?? "USD",
     taxRegionName: item.taxRegionName ?? "",
     taxRegionCode: item.taxRegionCode ?? "",
+    countryName:
+      item.countryName ??
+      item.country_name ??
+      item.clientCountryName ??
+      item.client_country_name ??
+      item.client?.countryName ??
+      item.client?.country ??
+      item.country ??
+      null,
+    countryCode:
+      item.countryCode ??
+      item.country_code ??
+      item.clientCountryCode ??
+      item.client_country_code ??
+      item.client?.countryCode ??
+      null,
+    placeOfSupply: item.placeOfSupply ?? item.place_of_supply ?? null,
 
     // Tax calculation result, present once taxStatus has moved past TAX_PENDING.
     taxCalculationId: item.taxCalculationId ?? null,
@@ -221,6 +238,9 @@ export const mergeOccurrenceWithTaxCalc = (base = {}, taxCalc = {}) => {
     currencyCode: b.currencyCode || c.currencyCode || "USD",
     taxRegionName: b.taxRegionName || c.taxRegionName,
     taxRegionCode: b.taxRegionCode || c.taxRegionCode,
+    countryName: b.countryName || c.countryName || null,
+    countryCode: b.countryCode || c.countryCode || null,
+    placeOfSupply: b.placeOfSupply || c.placeOfSupply || null,
     scheduleType: b.scheduleType || c.scheduleType,
 
     periodStartDate: b.periodStartDate || c.periodStartDate,
