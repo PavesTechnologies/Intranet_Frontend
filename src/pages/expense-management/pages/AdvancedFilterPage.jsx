@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { AlertCircle, Loader, ChevronLeft } from "lucide-react";
+import { AlertCircle, Loader, ChevronLeft, Save } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Pagination from "@/components/Pagination/pagination";
 import Button from "@/components/Button/Button";
 import { FilterPanel } from "../components/FilterPanel";
+import { SaveFilterModal } from "../components/SaveFilterModal";
+import { SavedFiltersList } from "../components/SavedFiltersList";
 import { useAdvancedFilter } from "../hooks/useAdvancedFilter";
+import { useAuth } from "@/contexts/AuthContext";
 
 /**
- * EP12-S2: Advanced Multi-Criteria Filter Page
+ * EP12-S2/S3: Advanced Multi-Criteria Filter Page with Saved Presets
  *
  * Features:
  * - Collapsible filter sidebar with multiple filter options
@@ -18,12 +21,17 @@ import { useAdvancedFilter } from "../hooks/useAdvancedFilter";
  * - Server-side filtering with role-based scope enforcement
  * - Amount range validation
  * - Empty result sets for conflicting filters
+ * - EP12-S3: Save, load, and manage filter presets
  */
 export default function AdvancedFilterPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(0);
   const [filtersPanelCollapsed, setFiltersPanelCollapsed] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [editingFilterId, setEditingFilterId] = useState(null);
+  const [showSavedFilters, setShowSavedFilters] = useState(false);
 
   // Initialize filters from URL or empty
   const [filters, setFilters] = useState(() => {
@@ -66,6 +74,30 @@ export default function AdvancedFilterPage() {
     setPage(0);
   };
 
+  const handleSaveFilter = () => {
+    setEditingFilterId(null);
+    setShowSaveModal(true);
+  };
+
+  const handleLoadSavedFilter = (savedFilterJson) => {
+    setFilters(savedFilterJson);
+    const params = new URLSearchParams();
+    Object.entries(savedFilterJson).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== "") {
+        params.set(key, value);
+      }
+    });
+    setSearchParams(params);
+    setPage(0);
+    setShowSavedFilters(false);
+  };
+
+  const handleEditSavedFilter = (filterId, filterName, savedFilterJson) => {
+    setEditingFilterId(filterId);
+    handleLoadSavedFilter(savedFilterJson);
+    setShowSaveModal(true);
+  };
+
   const activeFilterCount = useMemo(
     () => Object.values(filters).filter((v) => v !== null && v !== undefined && v !== "").length,
     [filters]
@@ -82,33 +114,58 @@ export default function AdvancedFilterPage() {
           ]}
         />
 
-        <div className="mt-4 flex items-start justify-between">
-          <div>
+        <div className="mt-4 flex items-start justify-between gap-4">
+          <div className="flex-1">
             <h1 className="text-3xl font-bold text-gray-900 mb-1">Advanced Filters</h1>
             <p className="text-gray-600">Filter expense reports by multiple criteria to find exactly what you need</p>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => navigate("/expense-management/dashboard")}
-            className="ml-4"
-          >
-            <ChevronLeft size={16} />
-            Back
-          </Button>
+          <div className="flex gap-2">
+            {activeFilterCount > 0 && (
+              <Button
+                onClick={handleSaveFilter}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <Save size={16} />
+                Save Filter
+              </Button>
+            )}
+            <Button
+              onClick={() => setShowSavedFilters(!showSavedFilters)}
+              variant={showSavedFilters ? "solid" : "outline"}
+            >
+              {showSavedFilters ? "Hide" : "Show"} Saved
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate("/expense-management/dashboard")}
+            >
+              <ChevronLeft size={16} />
+              Back
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Content: Filter Panel + Results */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Filter Panel */}
-        <FilterPanel
-          filters={filters}
-          onFiltersChange={handleFiltersChange}
-          onApplyFilters={handleApplyFilters}
-          onResetFilters={handleResetFilters}
-          isCollapsed={filtersPanelCollapsed}
-          onCollapsedChange={setFiltersPanelCollapsed}
-        />
+        {/* Filter Panel / Saved Filters Toggle */}
+        {!showSavedFilters ? (
+          <FilterPanel
+            filters={filters}
+            onFiltersChange={handleFiltersChange}
+            onApplyFilters={handleApplyFilters}
+            onResetFilters={handleResetFilters}
+            isCollapsed={filtersPanelCollapsed}
+            onCollapsedChange={setFiltersPanelCollapsed}
+          />
+        ) : (
+          <div className="w-80 bg-gray-50 border-r border-gray-200 overflow-y-auto p-4">
+            <SavedFiltersList
+              onLoadFilter={handleLoadSavedFilter}
+              onEditFilter={handleEditSavedFilter}
+            />
+          </div>
+        )}
 
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto p-6">
@@ -235,6 +292,15 @@ export default function AdvancedFilterPage() {
           )}
         </div>
       </div>
+
+      {/* Save Filter Modal */}
+      <SaveFilterModal
+        isOpen={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        filters={filters}
+        employeeId={user?.id || ""}
+        existingFilterId={editingFilterId}
+      />
     </div>
   );
 }
