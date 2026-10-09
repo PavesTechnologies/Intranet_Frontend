@@ -4,6 +4,8 @@ import { INVOICE_PERMISSIONS } from "../pages/accounts-payable/constants/invoice
 import { PAYMENT_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/paymentPermissions";
 import { AP_MANAGEMENT_ANY, AP_MANAGEMENT_PERMISSIONS } from "../pages/accounts-payable/constants/paymentTerms";
 import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/tdsTrackingPermissions";
+import { VENDOR_ANY_PERMISSIONS } from "../pages/accounts-payable/constants/vendorPermissions";
+import { PROCUREMENT_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/procurementPermissions";
 
 /**
  * Canonical role identifiers.
@@ -330,9 +332,12 @@ export const AP_SUBMENU = [
   { label: "Dashboard", to: AP_ROUTES.DASHBOARD, roleOrPermissions: { roles: AP_ALL_ROLES, permissions: AP_MANAGEMENT_ANY } },
   // Same gate as the route itself: every AP user has their own notifications, and which ones
   // they see is decided by the backend from the JWT, so there is nothing finer to filter on.
-  { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
+  // Same gate as the Procurement route: an AP role plus at least one Procurement view
+  // permission (PR_VIEW / PR_APPROVAL_VIEW / QUOTATION_VIEW / VENDOR_SELECTION_VIEW / PO_VIEW).
+  { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES, requiredPermissions: PROCUREMENT_ANY_VIEW_PERMISSIONS },
   { label: "Notifications", to: AP_ROUTES.NOTIFICATIONS, allowedRoles: AP_ALL_ROLES },
-  { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
+  // Backend-enforced UMS permissions (vendor_permissions.py) - VENDOR_VIEW / VENDOR_MANAGE / VENDOR_BANK_MANAGE.
+  { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES, requiredPermissions: VENDOR_ANY_PERMISSIONS },
   { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
   // Payment Management (Ready for Payment ⇄ Payment History, cross-linked from each page) and
   // TDS Tracking are flat entries: the AP flyout doesn't open nested children. Gated on the

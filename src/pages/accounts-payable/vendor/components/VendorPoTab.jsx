@@ -52,6 +52,7 @@ import VendorPoForm, {
 
 import VendorDocumentUploadModal from "./VendorDocumentUploadModal";
 import VendorPoDetailModal from "./VendorPoDetailModal";
+import { useApPermissions } from "../../hooks/useApPermissions";
 
 const toNumber = (value) => {
   const num = Number(value);
@@ -203,6 +204,7 @@ const VendorPoTab = ({
   poId,
   vendorName,
 }) => {
+  const { canEditVendor } = useApPermissions();
   const [
     isModalOpen,
     setIsModalOpen,
@@ -769,7 +771,7 @@ const VendorPoTab = ({
                   <Download className="h-3.5 w-3.5" />
                 </Button>
               </div>
-            ) : (
+            ) : canEditVendor ? (
               <Button
                 size="small"
                 variant="outline"
@@ -782,6 +784,8 @@ const VendorPoTab = ({
                 <Upload className="h-3.5 w-3.5" />
                 Upload
               </Button>
+            ) : (
+              "—"
             ),
         };
       }
@@ -800,12 +804,14 @@ const VendorPoTab = ({
         emptyMessage="No purchase orders found for this vendor."
         errorMessage="Unable to load purchase orders right now."
         actions={
-          <Button
-            onClick={openAdd}
-          >
-            <Plus className="h-4 w-4" />
-            Add PO
-          </Button>
+          canEditVendor ? (
+            <Button
+              onClick={openAdd}
+            >
+              <Plus className="h-4 w-4" />
+              Add PO
+            </Button>
+          ) : null
         }
       >
         <GenericTable

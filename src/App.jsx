@@ -30,6 +30,7 @@ import { FINANCE_ALL_ROLES, AR_MAKER_ROLES, AR_CHECKER_ROLES, AR_ALL_ROLES } fro
 import { AP_ROUTES } from "./pages/accounts-payable/constants/routes";
 import { AP_ALL_ROLES } from "./pages/accounts-payable/constants/apRoles";
 import { AP_MANAGEMENT_ANY } from "./pages/accounts-payable/constants/paymentTerms";
+import { VENDOR_PERMISSIONS, VENDOR_ANY_PERMISSIONS } from "./pages/accounts-payable/constants/vendorPermissions";
 import APDashboardPage from "./pages/accounts-payable/dashboard/pages/APDashboardPage.jsx";
 import DashboardActivityPage from "./pages/accounts-payable/dashboard/pages/DashboardActivityPage.jsx";
 import VendorListPage from "./pages/accounts-payable/vendor/pages/VendorListPage.jsx";
@@ -522,7 +523,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_LIST}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} requiredPermissions={VENDOR_ANY_PERMISSIONS}>
                 <VendorListPage />
               </ProtectedRoute>
             }
@@ -530,7 +531,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_ONBOARD}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} requiredPermissions={[VENDOR_PERMISSIONS.VENDOR_MANAGE, PROCUREMENT_PERMISSIONS.ONBOARDING_PROCESS]}>
                 <VendorOnboardingPage />
               </ProtectedRoute>
             }
@@ -554,7 +555,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_DETAIL()}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} requiredPermissions={VENDOR_ANY_PERMISSIONS}>
                 <VendorDetailPage />
               </ProtectedRoute>
             }
@@ -562,7 +563,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_UPDATE()}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} requiredPermissions={[VENDOR_PERMISSIONS.VENDOR_MANAGE]}>
                 <VendorUpdatePage />
               </ProtectedRoute>
             }

@@ -15,6 +15,7 @@ import { TDS_TRACKING_PERMISSIONS, TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "../
 import { INVOICE_PERMISSIONS } from "../constants/invoicePermissions";
 import { TDS_PERMISSIONS, TDS_ANY_VIEW_PERMISSIONS } from "../constants/tdsPermissions";
 import { TDS_CONFIG_PERMISSIONS } from "../constants/tdsConfigPermissions";
+import { VENDOR_PERMISSIONS, VENDOR_ANY_PERMISSIONS } from "../constants/vendorPermissions";
 import { AP_VENDOR_MANAGER_ROLES } from "../constants/apRoles";
 import {
   PAYMENT_TERM_PERMISSIONS,
@@ -48,9 +49,13 @@ export function useApPermissions() {
 
   return {
     canViewDashboard: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_DASHBOARD)),
-    canOnboardVendor: hasRole(rolesForPermission(AP_PERMISSIONS.ONBOARD_VENDOR)),
-    canEditVendor: hasRole(rolesForPermission(AP_PERMISSIONS.EDIT_VENDOR)),
-    canViewVendor: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_VENDOR)),
+    // Vendor Management now runs on UMS permissions (vendor_permissions.py enforces them on
+    // every vendor / intake / PO / GRN route). Onboarding is also reachable from the procurement
+    // onboarding-request flow (ONBOARDING_PROCESS), same as the backend allows.
+    canOnboardVendor: hasAnyPermission([VENDOR_PERMISSIONS.VENDOR_MANAGE, PROCUREMENT_PERMISSIONS.ONBOARDING_PROCESS]),
+    canEditVendor: hasPermission(VENDOR_PERMISSIONS.VENDOR_MANAGE),
+    canViewVendor: hasAnyPermission(VENDOR_ANY_PERMISSIONS),
+    canManageVendorBanks: hasPermission(VENDOR_PERMISSIONS.VENDOR_BANK_MANAGE),
     // System Configuration's base tabs vs. the TDS Configuration tab are mutually exclusive by
     // design (Admin never sees TDS Configuration, Finance_Executive never sees the base tabs) —
     // see constants/permissions.js's comment on MANAGE_SYSTEM_CONFIG/MANAGE_TDS_CONFIG.
