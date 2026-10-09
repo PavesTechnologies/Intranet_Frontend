@@ -32,6 +32,8 @@ import {
   approveInvoice,
   rejectInvoice,
 } from "../services/invoiceService";
+import { RECORD_LOCK_ACTION, RECORD_LOCK_RESOURCE } from "../services/recordLockService";
+import useRecordLock from "../hooks/useRecordLock";
 
 /* ------------------------------------------------------------------ */
 /* Global constants                                                    */
@@ -104,6 +106,7 @@ const TABLE_HEADER_ALIGNMENTS = {
 
 
 const getInvoiceStatus = (inv) => (inv.status || inv.invoiceStatus || "").toUpperCase();
+const getInvoiceRecordId = (inv) => inv?.invoiceId || inv?.billingSnapshotId || inv?.snapshotId;
 
 export default function InvoiceApproval() {
   const navigate = useNavigate();
@@ -125,12 +128,45 @@ export default function InvoiceApproval() {
   const [rejectLoading, setRejectLoading] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
+  // Approve / Reject from the list first take the backend APPROVAL lock; the
+  // confirmation modal only opens once it is ours. A 409 leaves the modal
+  // closed (the hook shows the backend's owner message). The lock is released
+  // on cancel, on success and on unmount.
+  const recordLock = useRecordLock(RECORD_LOCK_RESOURCE.INVOICE);
+  const [lockingInvoiceId, setLockingInvoiceId] = useState(null);
+
+  const startDecision = async (inv, openModal) => {
+    const invId = getInvoiceRecordId(inv);
+    if (!invId || lockingInvoiceId) return;
+    setLockingInvoiceId(invId);
+    try {
+      const result = await recordLock.acquire(invId, RECORD_LOCK_ACTION.APPROVAL);
+      if (result.acquired) openModal();
+    } finally {
+      setLockingInvoiceId(null);
+    }
+  };
+
+  const closeApproveModal = () => {
+    if (approveLoading) return;
+    setApproveTarget(null);
+    recordLock.release();
+  };
+
+  const closeRejectModal = () => {
+    if (rejectLoading) return;
+    setRejectTarget(null);
+    setRejectReason("");
+    recordLock.release();
+  };
+
   const handleConfirmApprove = async () => {
     if (!approveTarget) return;
-    const invId = approveTarget.invoiceId || approveTarget.billingSnapshotId || approveTarget.snapshotId;
+    const invId = getInvoiceRecordId(approveTarget);
     setApproveLoading(true);
     try {
       await approveInvoice(invId);
+      recordLock.release();
       showStatusToast("Invoice approved successfully.", "success");
       setApproveTarget(null);
       await loadData();
@@ -144,7 +180,7 @@ export default function InvoiceApproval() {
 
   const handleConfirmReject = async () => {
     if (!rejectTarget) return;
-    const invId = rejectTarget.invoiceId || rejectTarget.billingSnapshotId || rejectTarget.snapshotId;
+    const invId = getInvoiceRecordId(rejectTarget);
     if (!rejectReason.trim()) {
       showStatusToast("Please provide a reason for rejection.", "error");
       return;
@@ -152,6 +188,7 @@ export default function InvoiceApproval() {
     setRejectLoading(true);
     try {
       await rejectInvoice(invId, rejectReason.trim());
+      recordLock.release();
       showStatusToast("Invoice rejected.", "success");
       setRejectTarget(null);
       setRejectReason("");
@@ -420,6 +457,7 @@ export default function InvoiceApproval() {
     const rawStatus = getInvoiceStatus(item);
     const isPending = rawStatus === STATUS_TABS.PENDING;
     const isRejected = rawStatus === STATUS_TABS.REJECTED;
+    const isLockingRow = lockingInvoiceId !== null && lockingInvoiceId === getInvoiceRecordId(item);
 
     return {
       onRowClick: () => handleReviewInvoice(item),
@@ -502,20 +540,23 @@ export default function InvoiceApproval() {
                 onClick: () => handleReviewInvoice(item),
               },
               {
-                label: "Approve Invoice",
+                label: isLockingRow ? "Acquiring lock..." : "Approve Invoice",
                 icon: <CheckCircle2 className="h-4 w-4 text-emerald-600" />,
                 hidden: !isPending,
-                onClick: () => setApproveTarget(item),
+                disabled: Boolean(lockingInvoiceId),
+                onClick: () => startDecision(item, () => setApproveTarget(item)),
               },
               {
-                label: "Reject Invoice",
+                label: isLockingRow ? "Acquiring lock..." : "Reject Invoice",
                 icon: <XCircle className="h-4 w-4 text-rose-600" />,
                 hidden: !isPending,
                 danger: true,
-                onClick: () => {
-                  setRejectReason("");
-                  setRejectTarget(item);
-                },
+                disabled: Boolean(lockingInvoiceId),
+                onClick: () =>
+                  startDecision(item, () => {
+                    setRejectReason("");
+                    setRejectTarget(item);
+                  }),
               },
             ]}
           />
@@ -604,7 +645,7 @@ export default function InvoiceApproval() {
         confirmText="Approve"
         variant="primary"
         isLoading={approveLoading}
-        onCancel={() => !approveLoading && setApproveTarget(null)}
+        onCancel={closeApproveModal}
         onConfirm={handleConfirmApprove}
       />
 
@@ -620,12 +661,7 @@ export default function InvoiceApproval() {
         confirmText="Reject Invoice"
         variant="danger"
         isLoading={rejectLoading}
-        onCancel={() => {
-          if (!rejectLoading) {
-            setRejectTarget(null);
-            setRejectReason("");
-          }
-        }}
+        onCancel={closeRejectModal}
         onConfirm={handleConfirmReject}
       >
         <div className="mt-3">
