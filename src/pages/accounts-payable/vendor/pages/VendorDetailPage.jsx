@@ -30,6 +30,7 @@ import VendorGrnTab from "../components/VendorGrnTab";
 import VendorNdaTab from "../components/VendorNdaTab";
 import VendorDocumentsTab from "../components/VendorDocumentsTab";
 import VendorActivityCards from "../components/VendorActivityCards";
+import VendorAgreementsTab from "../components/VendorAgreementsTab";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -40,6 +41,7 @@ const TABS = [
   { id: "grn", label: "GRN" },
   { id: "nda", label: "NDA" },
   { id: "documents", label: "Documents" },
+  { id: "agreements", label: "Agreements" },
 ];
 
 const DetailRow = ({ label, value }) => (
@@ -295,6 +297,15 @@ export default function VendorDetailPage() {
                 />
 
                 <DetailRow
+                  label="MSME (Udyam)"
+                  value={
+                    vendor.msme_registered
+                      ? `${vendor.msme_category || "MSME"} — ${vendor.udyam_number || "no Udyam no."}`
+                      : "Not registered"
+                  }
+                />
+
+                <DetailRow
                   label="PAN Number"
                   value={vendor.pan_number}
                 />
@@ -388,6 +399,13 @@ export default function VendorDetailPage() {
         {activeTab === "documents" && (
           <VendorDocumentsTab
             vendorId={vendorId}
+          />
+        )}
+
+        {activeTab === "agreements" && (
+          <VendorAgreementsTab
+            vendorId={vendorId}
+            vendorName={vendor.vendor_name}
           />
         )}
       </div>

@@ -13,16 +13,17 @@ import { useReadyForPayment } from "../hooks/usePaymentTracking";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useApPermissions } from "../../hooks/useApPermissions";
 import { AP_ROUTES } from "../../constants/routes";
+import PaymentTermStatusBadge from "../../invoice/components/PaymentTermStatusBadge";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
 
 const HEADERS = [
   "Invoice #", "Vendor", "Invoice Date", "Due Date", "Invoice Amount", "TDS",
-  "Net Payable", "Paid", "Remaining", "Status", "Action",
+  "Net Payable", "Paid", "Remaining", "Status", "Terms", "Action",
 ];
 const COLUMNS = [
   "invoiceNumber", "vendor", "invoiceDate", "dueDate", "invoiceAmount", "tds",
-  "netPayable", "paid", "remaining", "status", "action",
+  "netPayable", "paid", "remaining", "status", "terms", "action",
 ];
 
 const STATUS_OPTIONS = [
@@ -46,7 +47,8 @@ export default function PaymentReadyPage() {
     const requested = searchParams.get("status");
     return STATUS_OPTIONS.some((o) => o.value === requested) ? requested : "";
   });
-  const [overdue, setOverdue] = useState(false);
+  // `?overdue=1` deep link (Finance dashboard's Overdue card) - same one-shot initial read as `?status=`.
+  const [overdue, setOverdue] = useState(() => searchParams.get("overdue") === "1");
   const [payingInvoice, setPayingInvoice] = useState(null);
   const debouncedSearch = useDebouncedValue(search.trim());
 
@@ -70,6 +72,11 @@ export default function PaymentReadyPage() {
         <span className={invoice.isOverdue ? "font-medium text-red-600" : ""}>
           {formatDate(invoice.dueDate)}
           {invoice.isOverdue && <span className="ml-1 text-xs">(overdue)</span>}
+          {invoice.statutoryDueDate && (
+            <span className="ml-1 rounded bg-amber-50 px-1 text-[10px] font-semibold text-amber-700" title="MSME supplier — statutory payment limit applies">
+              MSME
+            </span>
+          )}
         </span>
       ),
       invoiceAmount: formatCurrency(invoice.invoiceAmount, symbol),
@@ -78,6 +85,7 @@ export default function PaymentReadyPage() {
       paid: formatCurrency(invoice.amountPaid, symbol),
       remaining: <span className="font-semibold">{formatCurrency(invoice.remainingAmount, symbol)}</span>,
       status: <StatusBadge label={invoice.statusName || invoice.statusCode} size="sm" />,
+      terms: <PaymentTermStatusBadge status={invoice.paymentTermStatus} />,
       action:
         canRecordPayment && invoice.remainingAmount > 0 ? (
           <Button variant="primary" size="small" onClick={() => setPayingInvoice(invoice)}>
