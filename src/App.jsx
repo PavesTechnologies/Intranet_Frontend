@@ -221,6 +221,8 @@ import XmsApprovalFlowsPage from "./pages/expense-management/approval-engine/pag
 import XmsApprovalFlowBuilderPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowBuilderPage.jsx";
 import XmsCatchAllFlowPage from "./pages/expense-management/approval-engine/pages/CatchAllFlowPage.jsx";
 import XmsDepartmentApproversPage from "./pages/expense-management/approval-engine/pages/DepartmentApproversPage.jsx";
+import XmsGlobalSearchPage from "./pages/expense-management/pages/GlobalSearchPage.jsx";
+import XmsAdvancedFilterPage from "./pages/expense-management/pages/AdvancedFilterPage.jsx";
 import XmsDelegationsPage from "./pages/expense-management/approval-engine/pages/DelegationsPage.jsx";
 import XmsFinancePage from "./pages/expense-management/pages/finance/FinancePage.jsx";
 import XmsApPaymentQueuePage from "./pages/expense-management/pages/ap-payments/ApPaymentQueuePage.jsx";
@@ -1730,6 +1732,10 @@ const AppRoutes = () => {
 
           {/* Expense Management (XMS) */}
           <Route path="/expense-management/dashboard" element={<ProtectedRoute allowedRoles={["General", "Manager", "Reporting_Manager", "Finance", "Finance_Executive", "AP_Executive", "Admin", "Super_Admin"]}><XmsDashboardPage /></ProtectedRoute>} />
+
+          {/* EP12-S1: Global Search */}
+          <Route path="/expense-management/search" element={<ProtectedRoute allowedRoles={["General", "Manager", "Reporting_Manager", "Finance", "Finance_Executive", "AP_Executive", "Admin", "Super_Admin"]}><XmsGlobalSearchPage /></ProtectedRoute>} />
+          <Route path="/expense-management/filters" element={<ProtectedRoute allowedRoles={["General", "Manager", "Reporting_Manager", "Finance", "Finance_Executive", "AP_Executive", "Admin", "Super_Admin"]}><XmsAdvancedFilterPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/expenses/create" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsCreateExpensePage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/my" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsMyExpensesPage /></ProtectedRoute>} />
