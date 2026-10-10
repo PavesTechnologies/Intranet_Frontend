@@ -6,6 +6,7 @@ import InvoiceReviewWorkbenchPage, { isSelectable } from "./InvoiceReviewWorkben
 import { useBulkReviewMutation, useBulkSendMutation, useReviewWorkbench } from "../hooks/useReviewWorkbench";
 import useDepartments from "../../system-configuration/hooks/useDepartments";
 import { usePurchaseCategoriesByDepartment } from "../../system-configuration/hooks/usePurchaseCategories";
+import { useRecheckInvoice } from "../../automation/hooks/useApAutomation";
 
 vi.mock("../hooks/useReviewWorkbench", () => ({
   useReviewWorkbench: vi.fn(),
@@ -13,6 +14,7 @@ vi.mock("../hooks/useReviewWorkbench", () => ({
   useBulkSendMutation: vi.fn(),
 }));
 vi.mock("../../system-configuration/hooks/useDepartments", () => ({ default: vi.fn() }));
+vi.mock("../../automation/hooks/useApAutomation", () => ({ useRecheckInvoice: vi.fn() }));
 vi.mock("../../system-configuration/hooks/usePurchaseCategories", () => ({ usePurchaseCategoriesByDepartment: vi.fn() }));
 vi.mock("react-toastify", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
@@ -59,6 +61,7 @@ beforeEach(() => {
   useReviewWorkbench.mockReturnValue({ data: { items: rows, max_bulk: 25, can_review: true, can_send: true }, isLoading: false, isError: false });
   useBulkReviewMutation.mockReturnValue(mutation(response));
   useBulkSendMutation.mockReturnValue(mutation(response));
+  useRecheckInvoice.mockReturnValue(mutation({ invoice_id: 4, outcome: "AUTO_SENT", reasons: [] }));
   useDepartments.mockReturnValue({ data: [{ id: 10, name: "IT", is_active: true }, { id: 20, name: "Finance", is_active: true }] });
   usePurchaseCategoriesByDepartment.mockImplementation((dept) => ({
     data: dept === 20 ? [{ id: 201, name: "Audit", is_active: true }] : dept === 10 ? [{ id: 101, name: "Software", is_active: true }] : [],
@@ -160,5 +163,22 @@ describe("navigation", () => {
     await user.click(screen.getByRole("button", { name: /Review & send 1/ }));
     await user.click(await screen.findByRole("button", { name: /View in Invoice Management/ }));
     expect(screen.getByText("at /accounts-payable/invoices?queue=approval")).toBeInTheDocument();
+  });
+});
+
+describe("PO invoices and automation", () => {
+  it("offers a re-check for a waiting PO invoice and shows the automation outcome", async () => {
+    const user = userEvent.setup();
+    const po = row(4, {
+      invoice_type: "PO", coding_source: "PO", ready: false,
+      checks: [ok("validation", "Validation passed on upload"), bad("match", "No goods receipt (GRN) recorded for this PO yet")],
+      automation: { outcome: "EXCEPTION", reasons: ["No goods receipt (GRN) recorded for this PO yet"], at: "2026-10-10T10:00:00Z" },
+    });
+    useReviewWorkbench.mockReturnValue({ data: { items: [po], max_bulk: 25, can_review: true, can_send: true }, isLoading: false, isError: false });
+    renderPage();
+    const tr = screen.getByText("INV-4").closest("tr");
+    expect(within(tr).getByText(/AP automation: Needs review/)).toBeInTheDocument();
+    await user.click(within(tr).getByRole("button", { name: "Re-check" }));
+    expect(useRecheckInvoice.mock.results[0].value.mutateAsync).toHaveBeenCalledWith(4);
   });
 });

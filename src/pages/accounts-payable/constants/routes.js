@@ -26,6 +26,7 @@ export const AP_ROUTES = {
     `${BASE}/invoices/bulk-upload/${batchId}`,
   INVOICE_OCR_REVIEW: `${BASE}/invoices/ocr-review`,
   INVOICE_REVIEW_WORKBENCH: `${BASE}/invoices/review-workbench`,
+  AP_AUTOMATION: `${BASE}/automation`,
   INVOICE_VALIDATION: `${BASE}/invoices/validation`,
   INVOICE_LIST: `${BASE}/invoices`,
   INVOICE_DETAIL: (invoiceId = ":invoiceId") =>
@@ -44,6 +45,9 @@ export const AP_ROUTES = {
     `${BASE}/payments/invoice/${invoiceId}`,
 
   TDS_TRACKING: `${BASE}/tds/tracking`,
+  TDS_CHALLANS: `${BASE}/tds/challans`,
+  TDS_CHALLAN_NEW: `${BASE}/tds/challans/new`,
+  TDS_FILING_NEW: `${BASE}/tds/filings/new`,
   TDS_TRACKING_DETAIL: (invoiceId = ":invoiceId") =>
     `${BASE}/tds/tracking/${invoiceId}`,
 

@@ -1,16 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
-import RecordPaymentModal, { validateRecordPayment } from "./RecordPaymentModal";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import RecordPaymentModal, { validateRecordPayment, editedFields } from "./RecordPaymentModal";
 import {
   usePaymentMetadata,
   useRecordPaymentMutation,
   useUploadPaymentDocumentMutation,
+  useExtractReceiptMutation,
 } from "../hooks/usePaymentTracking";
 
 vi.mock("../hooks/usePaymentTracking", () => ({
   usePaymentMetadata: vi.fn(),
   useRecordPaymentMutation: vi.fn(),
   useUploadPaymentDocumentMutation: vi.fn(),
+  useExtractReceiptMutation: vi.fn(),
 }));
 vi.mock("react-toastify", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }));
 
@@ -76,6 +78,7 @@ describe("RecordPaymentModal", () => {
     });
     useRecordPaymentMutation.mockReturnValue({ mutate, isPending: false });
     useUploadPaymentDocumentMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    useExtractReceiptMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
   });
 
   it("shows the backend amounts and the remaining payable, prefilled as the amount", () => {
@@ -92,5 +95,67 @@ describe("RecordPaymentModal", () => {
     fireEvent.click(screen.getByRole("button", { name: /record payment/i }));
     expect(screen.getByText(/cannot exceed the remaining payable/)).toBeInTheDocument();
     expect(mutate).not.toHaveBeenCalled();
+  });
+});
+
+describe("receipt auto-fill", () => {
+  let mutate;
+  const extracted = (warnings = []) => ({
+    fields: {
+      payment_date: { value: "2026-01-14", confidence: 96 },
+      amount: { value: "40000.00", confidence: 97 },
+      payment_mode: { value: "NEFT", confidence: 92 },
+      reference_number: { value: "SBIN426281234567", confidence: 95 },
+    },
+    beneficiary_name: "ACME LTD",
+    beneficiary_account_masked: "XXXX5678",
+    warnings,
+  });
+  const receipt = new File(["%PDF"], "advice.pdf", { type: "application/pdf" });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mutate = vi.fn();
+    usePaymentMetadata.mockReturnValue({
+      data: { paymentModes: [{ value: "NEFT", label: "NEFT", referenceLabel: "UTR Number" }], receiptRequired: true },
+    });
+    useRecordPaymentMutation.mockReturnValue({ mutate, isPending: false });
+    useUploadPaymentDocumentMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+  });
+
+  it("fills the form, attaches the receipt and records the entry mode", async () => {
+    useExtractReceiptMutation.mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(extracted()), isPending: false });
+    render(<RecordPaymentModal isOpen invoice={invoice} onClose={vi.fn()} />);
+    fireEvent.change(screen.getByTestId("receipt-autofill-input"), { target: { files: [receipt] } });
+    expect(await screen.findByText(/Filled from/)).toBeInTheDocument();
+    expect(screen.getByLabelText("UTR Number * · auto-filled")).toHaveValue("SBIN426281234567");
+    expect(screen.getByText("The uploaded receipt (advice.pdf) will be attached to this payment.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Payment Amount/), { target: { value: "39000" } });
+    fireEvent.click(screen.getByRole("button", { name: /record payment/i }));
+    await waitFor(() => expect(mutate).toHaveBeenCalled());
+    expect(mutate.mock.calls[0][0].payload).toMatchObject({
+      payment_date: "2026-01-14", amount: "39000", payment_mode: "NEFT", reference_number: "SBIN426281234567",
+      entry_mode: "RECEIPT_EXTRACTED", edited_fields: ["amount"],
+    });
+  });
+
+  it("needs an acknowledgement for serious warnings", async () => {
+    const warnings = [{ code: "BENEFICIARY_MISMATCH", severity: "error", message: "Beneficiary 'Zeta' does not look like the vendor 'Acme Ltd'." }];
+    useExtractReceiptMutation.mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(extracted(warnings)), isPending: false });
+    render(<RecordPaymentModal isOpen invoice={invoice} onClose={vi.fn()} />);
+    fireEvent.change(screen.getByTestId("receipt-autofill-input"), { target: { files: [receipt] } });
+    expect(await screen.findByText(/does not look like the vendor/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /record payment/i }));
+    expect(screen.getByText(/Confirm you have checked the receipt warnings/)).toBeInTheDocument();
+    expect(mutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: /record payment/i }));
+    expect(mutate).toHaveBeenCalled();
+  });
+
+  it("manual entry is unchanged and marked MANUAL", () => {
+    render(<RecordPaymentModal isOpen invoice={invoice} onClose={vi.fn()} />);
+    expect(editedFields({ amount: "5" }, { amount: "5" })).toEqual([]);
+    expect(screen.getByRole("button", { name: /Upload receipt to auto-fill/ })).toBeInTheDocument();
   });
 });

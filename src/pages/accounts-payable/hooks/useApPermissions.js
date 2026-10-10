@@ -78,6 +78,7 @@ export function useApPermissions() {
     canUploadInvoice: hasPermission(INVOICE_PERMISSIONS.INVOICE_CREATE),
     canBulkUploadInvoices: hasPermission(INVOICE_PERMISSIONS.INVOICE_BULK_UPLOAD),
     canManageEmailIntake: hasPermission(INVOICE_PERMISSIONS.EMAIL_INTAKE_MANAGE),
+    canManageAutomation: hasPermission("AP_AUTOMATION_MANAGE"),
     canReviewOcr: hasPermission(INVOICE_PERMISSIONS.INVOICE_OCR_REVIEW),
     // The standalone Validation Queue page is part of the same OCR/intake pipeline — no
     // separate backend permission exists for it.

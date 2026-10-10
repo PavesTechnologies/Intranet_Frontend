@@ -17,6 +17,8 @@ import { getApiErrorMessage } from "../../utils/apiError";
 import useDepartments from "../../system-configuration/hooks/useDepartments";
 import { usePurchaseCategoriesByDepartment } from "../../system-configuration/hooks/usePurchaseCategories";
 import { useBulkReviewMutation, useBulkSendMutation, useReviewWorkbench } from "../hooks/useReviewWorkbench";
+import { useRecheckInvoice } from "../../automation/hooks/useApAutomation";
+import { AUTOMATION_OUTCOME } from "../../constants/apAutomation";
 import { formatDateTime } from "../components/bulk/BulkUploadParts";
 
 const SOURCE_LABEL = {
@@ -137,6 +139,12 @@ function Checks({ row, override }) {
           );
         })}
       {fixedByOverride && <li className="text-slate-500">Department / category chosen - checked again when you submit.</li>}
+      {row.automation && (
+        <li className="pt-0.5 text-[11px] text-slate-500">
+          AP automation: {AUTOMATION_OUTCOME[row.automation.outcome]?.label || row.automation.outcome}
+          {row.automation.at ? ` · ${formatDateTime(row.automation.at)}` : ""}
+        </li>
+      )}
     </ul>
   );
 }
@@ -199,7 +207,20 @@ export default function InvoiceReviewWorkbenchPage() {
   const { data: departments = [] } = useDepartments();
   const bulkReview = useBulkReviewMutation();
   const bulkSend = useBulkSendMutation();
-  const busy = bulkReview.isPending || bulkSend.isPending;
+  const recheck = useRecheckInvoice();
+  const busy = bulkReview.isPending || bulkSend.isPending || recheck.isPending;
+
+  const recheckRow = async (row) => {
+    try {
+      const result = await recheck.mutateAsync(row.invoice_id);
+      const label = AUTOMATION_OUTCOME[result.outcome]?.label || result.outcome;
+      (result.outcome === "EXCEPTION" ? toast.info : toast.success)(
+        `${row.invoice_number}: ${label}${result.reasons?.[0] ? ` - ${result.reasons[0]}` : ""}`,
+      );
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not re-check this invoice."));
+    }
+  };
 
   const rows = useMemo(() => data?.items || [], [data]);
   const maxBulk = data?.max_bulk || 25;
@@ -403,9 +424,16 @@ export default function InvoiceReviewWorkbenchPage() {
                         <Checks row={row} override={overrides[row.invoice_id]} />
                       </td>
                       <td className="px-4 py-3 text-left">
-                        <Button size="small" variant="outline" onClick={() => navigate(AP_ROUTES.INVOICE_DETAIL(row.invoice_id))}>
-                          {canSelect ? "Open" : "Review"}
-                        </Button>
+                        <div className="flex flex-col items-start gap-1.5">
+                          <Button size="small" variant="outline" onClick={() => navigate(AP_ROUTES.INVOICE_DETAIL(row.invoice_id))}>
+                            {canSelect ? "Open" : "Review"}
+                          </Button>
+                          {stage === "to_review" && row.invoice_type === "PO" && !row.ready && data?.can_review && (
+                            <Button size="small" variant="ghost" onClick={() => recheckRow(row)} disabled={busy} title="Run the touchless checks again (e.g. after the goods receipt was recorded)">
+                              Re-check
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

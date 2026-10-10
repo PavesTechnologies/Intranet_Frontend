@@ -42,6 +42,13 @@ function EfficiencyCard({ efficiency }) {
           </div>
         ))}
       </div>
+      {efficiency.touchless && (
+        <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+          <span className="font-semibold">Touchless PO invoices (30 days): {efficiency.touchless.touchless_rate}%</span> ·{" "}
+          {efficiency.touchless.auto_approved + efficiency.touchless.auto_sent} of {efficiency.touchless.processed} processed without manual review
+          {efficiency.touchless.auto_approved ? ` · ${efficiency.touchless.auto_approved} auto-approved` : ""}
+        </p>
+      )}
       <div className="mt-4">
         <p className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-700">
           Approval bottlenecks

@@ -134,6 +134,18 @@ export const paymentService = {
     return mapInvoicePaymentDetail(response.data);
   },
 
+  /**
+   * Phase 4: read a payment receipt and return suggested Record Payment values + warnings
+   * (raw backend shape: {fields: {payment_date|amount|payment_mode|reference_number: {value, confidence}},
+   * beneficiary_name, transaction_status, warnings: [{code, severity, message}]}). Records nothing.
+   */
+  async extractReceipt(invoiceId, file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post(`${AP_BASE_URL}/payment/invoice/${Number(invoiceId)}/receipt/extract`, formData);
+    return response.data;
+  },
+
   /** Upload a receipt / proof for a recorded payment (multipart "file" + "document_type"). */
   async uploadPaymentDocument(paymentId, file, documentType = "RECEIPT") {
     const formData = new FormData();

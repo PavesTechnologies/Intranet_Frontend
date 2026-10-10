@@ -43,6 +43,8 @@ import InvoiceUploadPage from "./pages/accounts-payable/invoice/pages/InvoiceUpl
 import InvoiceBulkUploadPage from "./pages/accounts-payable/invoice/pages/InvoiceBulkUploadPage.jsx";
 import InvoiceBulkBatchPage from "./pages/accounts-payable/invoice/pages/InvoiceBulkBatchPage.jsx";
 import InvoiceReviewWorkbenchPage from "./pages/accounts-payable/invoice/pages/InvoiceReviewWorkbenchPage.jsx";
+import APAutomationPage from "./pages/accounts-payable/automation/pages/APAutomationPage.jsx";
+import { AP_AUTOMATION_PERMISSIONS } from "./pages/accounts-payable/constants/apAutomation";
 import { APPROVAL_PERMISSIONS as REVIEW_SEND_PERMISSIONS } from "./pages/accounts-payable/constants/approvalPermissions";
 import InvoiceOcrReviewQueuePage from "./pages/accounts-payable/invoice/pages/InvoiceOcrReviewQueuePage.jsx";
 import InvoiceValidationQueuePage from "./pages/accounts-payable/invoice/pages/InvoiceValidationQueuePage.jsx";
@@ -54,6 +56,9 @@ import PaymentMarkAsPaidPage from "./pages/accounts-payable/payment/pages/Paymen
 import PaymentInvoiceDetailPage from "./pages/accounts-payable/payment/pages/PaymentInvoiceDetailPage.jsx";
 import TdsTrackingPage from "./pages/accounts-payable/tds-tracking/pages/TdsTrackingPage.jsx";
 import TdsTrackingDetailPage from "./pages/accounts-payable/tds-tracking/pages/TdsTrackingDetailPage.jsx";
+import TdsChallansPage from "./pages/accounts-payable/tds-tracking/pages/TdsChallansPage.jsx";
+import TdsChallanNewPage from "./pages/accounts-payable/tds-tracking/pages/TdsChallanNewPage.jsx";
+import TdsFilingNewPage from "./pages/accounts-payable/tds-tracking/pages/TdsFilingNewPage.jsx";
 import { PAYMENT_ANY_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/paymentPermissions";
 import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/tdsTrackingPermissions";
 import PaymentQueuePage from "./pages/accounts-payable/payment/pages/PaymentQueuePage.jsx";
@@ -589,6 +594,14 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path={AP_ROUTES.AP_AUTOMATION}
+            element={
+              <ProtectedRoute requiredPermissions={[AP_AUTOMATION_PERMISSIONS.AP_AUTOMATION_MANAGE]}>
+                <APAutomationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path={AP_ROUTES.INVOICE_REVIEW_WORKBENCH}
             element={
               <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_OCR_REVIEW, REVIEW_SEND_PERMISSIONS.INVOICE_SEND_FOR_APPROVAL]}>
@@ -683,6 +696,30 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute requiredPermissions={TDS_TRACKING_ANY_VIEW_PERMISSIONS}>
                 <TdsTrackingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.TDS_CHALLANS}
+            element={
+              <ProtectedRoute requiredPermissions={TDS_TRACKING_ANY_VIEW_PERMISSIONS}>
+                <TdsChallansPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.TDS_CHALLAN_NEW}
+            element={
+              <ProtectedRoute requiredPermissions={["TDS_TRACKING_UPDATE"]}>
+                <TdsChallanNewPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.TDS_FILING_NEW}
+            element={
+              <ProtectedRoute requiredPermissions={["TDS_TRACKING_UPDATE"]}>
+                <TdsFilingNewPage />
               </ProtectedRoute>
             }
           />

@@ -5,6 +5,7 @@ import { PAYMENT_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constant
 import { AP_MANAGEMENT_ANY, AP_MANAGEMENT_PERMISSIONS } from "../pages/accounts-payable/constants/paymentTerms";
 import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/tdsTrackingPermissions";
 import { VENDOR_ANY_PERMISSIONS } from "../pages/accounts-payable/constants/vendorPermissions";
+import { AP_AUTOMATION_PERMISSIONS } from "../pages/accounts-payable/constants/apAutomation";
 import { PROCUREMENT_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/procurementPermissions";
 
 /**
@@ -351,6 +352,8 @@ export const AP_SUBMENU = [
   // The page lists only the reports the backend says this user may run (reports_route.py);
   // payment access is the entry point today, management reporting permissions join in Phase 6.
   { label: "Reports", to: AP_ROUTES.REPORTS, requiredPermissions: [...PAYMENT_ANY_VIEW_PERMISSIONS, AP_MANAGEMENT_PERMISSIONS.REPORTS_VIEW] },
+  // Touchless PO-invoice settings - Finance Manager only (backend-enforced on /ap-automation).
+  { label: "AP Automation", to: AP_ROUTES.AP_AUTOMATION, requiredPermissions: [AP_AUTOMATION_PERMISSIONS.AP_AUTOMATION_MANAGE] },
   // { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
   // Split into two role-exclusive entries (both pointing at the same route) rather than one
   // AP_ALL_ROLES item — System Configuration's tabs are now Admin-only/Finance_Executive-only

@@ -11,6 +11,7 @@ import { KpiTile, SegmentedTabs, Empty } from "../../dashboard/components/insigh
 import { AP_ROUTES } from "../../constants/routes";
 import { useApPermissions } from "../../hooks/useApPermissions";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { AUTOMATION_OUTCOME } from "../../constants/apAutomation";
 import {
   isBatchRunning,
   useBulkBatch,
@@ -68,6 +69,12 @@ function ItemRow({ item, busy, onRetry, onSkip, canOnboardVendor }) {
         <StatusPill meta={ITEM_STATUS[item.status]} stalled={item.stalled} />
         {item.stalled && <p className="mt-1 max-w-[320px] text-xs text-amber-700">Processing stopped (server restart). Retry to resume.</p>}
         {item.error_message && <p className="mt-1 max-w-[320px] text-xs text-slate-600">{item.error_message}</p>}
+        {item.automation && (
+          <p className={`mt-1 max-w-[320px] text-xs ${item.automation.outcome === "EXCEPTION" || item.automation.outcome === "REVIEWED_NOT_SENT" ? "text-amber-700" : "text-emerald-700"}`}>
+            AP automation: {AUTOMATION_OUTCOME[item.automation.outcome]?.label || item.automation.outcome}
+            {item.automation.reasons?.[0] ? ` - ${item.automation.reasons[0]}` : ""}
+          </p>
+        )}
         {item.status === "CREATED" && item.is_valid === false && item.validation_issues?.length > 0 && (
           <p className="mt-1 max-w-[320px] text-xs text-amber-700" title={item.validation_issues.join("\n")}>
             {item.validation_issues.length} validation issue{item.validation_issues.length === 1 ? "" : "s"} to fix in review:{" "}
