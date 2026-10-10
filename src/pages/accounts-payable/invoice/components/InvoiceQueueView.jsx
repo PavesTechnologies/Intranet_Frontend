@@ -79,10 +79,19 @@ export default function InvoiceQueueView({ title, subtitle, defaultQueueType, sh
         title={title}
         subtitle={subtitle}
         actions={
-          showUploadAction && permissions.canUploadInvoice ? (
-            <Button variant="primary" onClick={() => navigate(AP_ROUTES.INVOICE_UPLOAD)}>
-              Upload Invoice
-            </Button>
+          showUploadAction && (permissions.canUploadInvoice || permissions.canBulkUploadInvoices) ? (
+            <>
+              {permissions.canBulkUploadInvoices && (
+                <Button variant="outline" onClick={() => navigate(AP_ROUTES.INVOICE_BULK_UPLOAD)}>
+                  Bulk Upload
+                </Button>
+              )}
+              {permissions.canUploadInvoice && (
+                <Button variant="primary" onClick={() => navigate(AP_ROUTES.INVOICE_UPLOAD)}>
+                  Upload Invoice
+                </Button>
+              )}
+            </>
           ) : undefined
         }
       />

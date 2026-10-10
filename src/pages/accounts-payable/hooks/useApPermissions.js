@@ -76,6 +76,7 @@ export function useApPermissions() {
     // invoice_process_route.py, invoice_details_route.py) — migrated off the frontend
     // role -> permission guess the same way canMarkPaid/canViewPayment already were.
     canUploadInvoice: hasPermission(INVOICE_PERMISSIONS.INVOICE_CREATE),
+    canBulkUploadInvoices: hasPermission(INVOICE_PERMISSIONS.INVOICE_BULK_UPLOAD),
     canReviewOcr: hasPermission(INVOICE_PERMISSIONS.INVOICE_OCR_REVIEW),
     // The standalone Validation Queue page is part of the same OCR/intake pipeline — no
     // separate backend permission exists for it.

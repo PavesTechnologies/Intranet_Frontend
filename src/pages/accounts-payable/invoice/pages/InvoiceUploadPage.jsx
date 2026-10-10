@@ -16,6 +16,7 @@ import InvoiceProcessingPipeline, { VALIDATION_STAGES } from "../components/Invo
 import Stage1ReviewSection from "../components/stage1/Stage1ReviewSection";
 import { AP_ROUTES } from "../../constants/routes";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { useApPermissions } from "../../hooks/useApPermissions";
 
 const ACCEPTED_MIME_TYPES = ["application/pdf", "image/png", "image/jpeg"];
 const ACCEPTED_EXTENSIONS = [".pdf", ".png", ".jpg", ".jpeg"];
@@ -107,6 +108,7 @@ function isPipelineActive(pipeline) {
 /** Route: /accounts-payable/invoices/upload */
 export default function InvoiceUploadPage() {
   const navigate = useNavigate();
+  const { canBulkUploadInvoices } = useApPermissions();
   const inputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [validationError, setValidationError] = useState("");
@@ -400,7 +402,19 @@ export default function InvoiceUploadPage() {
 
   return (
     <div className="p-6">
-      {!inReview && <PageHeader title="Upload Invoice" subtitle="Upload a vendor invoice document for OCR processing" />}
+      {!inReview && (
+        <PageHeader
+          title="Upload Invoice"
+          subtitle="Upload a vendor invoice document for OCR processing"
+          actions={
+            canBulkUploadInvoices ? (
+              <Button variant="outline" onClick={() => navigate(AP_ROUTES.INVOICE_BULK_UPLOAD)}>
+                Bulk upload
+              </Button>
+            ) : undefined
+          }
+        />
+      )}
 
       <div className={inReview ? "w-full" : "mx-auto max-w-2xl"}>
         {pipeline ? (

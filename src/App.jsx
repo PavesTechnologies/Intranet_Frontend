@@ -40,6 +40,8 @@ import VendorUpdatePage from "./pages/accounts-payable/vendor/pages/VendorUpdate
 import InternalRequestsPage from "./pages/accounts-payable/vendor/pages/InternalRequestsPage.jsx";
 import InternalRequestDetailPage from "./pages/accounts-payable/vendor/pages/InternalRequestDetailPage.jsx";
 import InvoiceUploadPage from "./pages/accounts-payable/invoice/pages/InvoiceUploadPage.jsx";
+import InvoiceBulkUploadPage from "./pages/accounts-payable/invoice/pages/InvoiceBulkUploadPage.jsx";
+import InvoiceBulkBatchPage from "./pages/accounts-payable/invoice/pages/InvoiceBulkBatchPage.jsx";
 import InvoiceOcrReviewQueuePage from "./pages/accounts-payable/invoice/pages/InvoiceOcrReviewQueuePage.jsx";
 import InvoiceValidationQueuePage from "./pages/accounts-payable/invoice/pages/InvoiceValidationQueuePage.jsx";
 import InvoiceListPage from "./pages/accounts-payable/invoice/pages/InvoiceListPage.jsx";
@@ -573,6 +575,22 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <InvoiceUploadPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.INVOICE_BULK_UPLOAD}
+            element={
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_BULK_UPLOAD]}>
+                <InvoiceBulkUploadPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.INVOICE_BULK_BATCH()}
+            element={
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_BULK_UPLOAD]}>
+                <InvoiceBulkBatchPage />
               </ProtectedRoute>
             }
           />

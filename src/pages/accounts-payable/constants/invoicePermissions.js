@@ -20,6 +20,9 @@ export const INVOICE_PERMISSIONS = {
   INVOICE_CREATE: "INVOICE_CREATE",
   // PATCH .../ocr-review, GET /review-queue.
   INVOICE_OCR_REVIEW: "INVOICE_OCR_REVIEW",
+  // /invoice-bulk-upload (invoice_bulk_upload_route.py): upload a ZIP / several invoices at once,
+  // batch history, retry / skip. Invoices it creates land in the same OCR review queue.
+  INVOICE_BULK_UPLOAD: "INVOICE_BULK_UPLOAD",
 };
 
 export default INVOICE_PERMISSIONS;
