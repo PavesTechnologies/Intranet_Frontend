@@ -261,7 +261,7 @@ export default function PaymentTermsMasterPage() {
   const tableRows = useMemo(() => {
     return paginatedItems.map((item) => ({
       paymentTermName: <span className="font-semibold text-slate-900">{item.paymentTermName}</span>,
-      paymentDays: <span className="whitespace-nowrap font-mono text-sm font-semibold text-slate-700">{item.paymentDays ?? "—"} days</span>,
+      paymentDays: <span className="whitespace-nowrap tabular-nums text-sm font-semibold text-slate-700">{item.paymentDays ?? "—"} days</span>,
       description: <span className="block max-w-md truncate text-xs text-slate-500">{item.description || "—"}</span>,
       status: <StatusBadge label={item.status} size="sm" />,
       actions: (
@@ -336,7 +336,7 @@ export default function PaymentTermsMasterPage() {
         <PageCardContent className="space-y-4 p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-base font-bold text-slate-900">Payment Terms</h2>
+              <h2 className="text-base font-semibold text-slate-900">Payment Terms</h2>
               <p className="mt-0.5 text-xs text-slate-500">Average active payment term: {stats.avgDays} days</p>
             </div>
             <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:flex-row sm:items-center">

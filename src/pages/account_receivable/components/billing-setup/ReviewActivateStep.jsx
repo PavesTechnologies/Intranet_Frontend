@@ -190,7 +190,7 @@ function ReviewSection({ icon, title, stepId, onEdit, children }) {
   return (
     // Body is rendered directly in PageCard — PageCardContent always adds p-4,
     // which would double the section padding.
-    <PageCard className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <PageCard className="overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-2.5">
         <div className="flex items-center gap-2">
           <Icon className="h-4 w-4 text-[#0A0082]" />

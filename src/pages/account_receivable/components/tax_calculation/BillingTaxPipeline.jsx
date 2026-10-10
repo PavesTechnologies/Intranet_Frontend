@@ -50,7 +50,7 @@ function Money({ value, currency }) {
     return <span className="text-slate-300">—</span>;
   }
   return (
-    <span className="whitespace-nowrap font-mono tabular-nums text-slate-800">
+    <span className="whitespace-nowrap tabular-nums text-slate-800">
       {formatCurrency(value, currency)}
     </span>
   );
@@ -140,7 +140,7 @@ export default function BillingTaxPipeline({
     <PageCard>
       {/* Title */}
       <div className="px-4 pt-4 sm:px-5">
-        <h2 className="text-sm font-semibold text-slate-900">Billing Tax Pipeline</h2>
+        <h2 className="text-base font-semibold text-slate-900">Billing Tax Pipeline</h2>
         <p className="mt-0.5 text-xs text-slate-500">
           All billing types move through the same stages, from upcoming occurrence to invoice.
         </p>

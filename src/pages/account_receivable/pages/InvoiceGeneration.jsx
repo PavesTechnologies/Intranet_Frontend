@@ -667,7 +667,7 @@ export default function InvoiceGeneration() {
       ),
 
       grandTotal: (
-        <div className="text-left font-mono font-bold text-slate-900">
+        <div className="text-left tabular-nums font-bold text-slate-900">
           {formatCurrency(
             item.grandTotal || item.amount || 0,
             item.currency || "USD"
@@ -825,7 +825,7 @@ export default function InvoiceGeneration() {
       <PageCard>
         {/* Title */}
         <div className="px-4 pt-4 sm:px-5">
-          <h2 className="text-sm font-semibold text-slate-900">
+          <h2 className="text-base font-semibold text-slate-900">
             Invoice Pipeline
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
@@ -877,18 +877,6 @@ export default function InvoiceGeneration() {
 
         {/* Invoice Queue Table */}
         <div className="border-t border-slate-100 p-4 sm:p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-800">
-              Invoice Queue
-            </h3>
-
-            <span className="text-xs text-slate-400 font-medium">
-              {filteredInvoices.length}{" "}
-              {filteredInvoices.length === 1
-                ? "Record"
-                : "Records"}
-            </span>
-          </div>
 
           <ARTable
             headers={tableHeaders}

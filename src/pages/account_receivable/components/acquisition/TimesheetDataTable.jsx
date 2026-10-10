@@ -105,7 +105,7 @@ export default function TimesheetDataTable({
               placeholder="Search employee / role..."
             />
           </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 font-mono text-xs font-semibold text-slate-600">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 tabular-nums text-xs font-semibold text-slate-600">
             {records.length} records ({totalHours} hrs)
           </div>
         </div>
@@ -183,13 +183,13 @@ export default function TimesheetDataTable({
               pageRecords.map((rec, idx) => (
                 <tr key={rec.id || idx} className="transition-colors hover:bg-slate-50">
                   <td className="px-4 py-2.5 font-semibold text-slate-900">{rec.employee || "Employee"}</td>
-                  <td className="px-4 py-2.5 font-mono text-slate-600">{rec.workDate}</td>
+                  <td className="px-4 py-2.5 tabular-nums text-slate-600">{rec.workDate}</td>
                   <td className="px-4 py-2.5 text-slate-500">{rec.role || "Software Engineer"}</td>
                   <td className="px-4 py-2.5 text-left font-semibold text-slate-900">{rec.hours} hrs</td>
-                  <td className="px-4 py-2.5 text-left font-mono tabular-nums text-slate-700">
+                  <td className="px-4 py-2.5 text-left tabular-nums text-slate-700">
                     {currency} {Number(rec.rate || 0).toLocaleString()}
                   </td>
-                  <td className="px-4 py-2.5 text-left font-mono tabular-nums font-semibold text-indigo-900">
+                  <td className="px-4 py-2.5 text-left tabular-nums font-semibold text-indigo-900">
                     {currency} {Number(rec.amount || rec.hours * rec.rate || 0).toLocaleString()}
                   </td>
                   <td className="px-4 py-2.5 text-center">

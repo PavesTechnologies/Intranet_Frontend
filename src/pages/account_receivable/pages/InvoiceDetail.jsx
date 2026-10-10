@@ -21,6 +21,7 @@ import {
   MailCheck,
 } from "lucide-react";
 
+import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
@@ -748,21 +749,19 @@ export default function InvoiceDetail() {
         : [];
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-5">
+    <div className="mx-auto w-full max-w-5xl space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Invoice Generated</h1>
-          </div>
-          <p className="text-sm text-slate-600">
+      <PageHeader
+        title="Invoice Generated"
+        subtitle={
+          <>
             Invoice Number:{" "}
             <span className="ml-1 font-mono font-bold text-indigo-700">
               {invoice?.invoiceNumber || "—"}
             </span>
-          </p>
-        </div>
-
+          </>
+        }
+        actions={
         <div className="flex flex-wrap items-center gap-2">
           {/* Action: Send to Client (for APPROVED invoices) */}
           {invoice?.invoiceStatus === "APPROVED" && (
@@ -834,7 +833,8 @@ export default function InvoiceDetail() {
             )
           )}
         </div>
-      </div>
+        }
+      />
 
       {/* Delivery Status Banner — APPROVED invoices only */}
       {invoice?.invoiceStatus === "APPROVED" && (
@@ -920,7 +920,7 @@ export default function InvoiceDetail() {
               </div>
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <h2 className="text-base font-bold text-slate-900">
+                  <h2 className="text-base font-semibold text-slate-900">
                     {invoice.correctionRequired ? "Correction Required" : "Correction Completed"}
                   </h2>
                   <StatusBadge label="REJECTED" size="sm" />
@@ -1136,19 +1136,19 @@ export default function InvoiceDetail() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
                   <div>
                     <span className="text-slate-500 font-medium block">Current Subtotal:</span>
-                    <span className="font-mono font-bold text-slate-800 text-sm mt-0.5 block">
+                    <span className="tabular-nums font-bold text-slate-800 text-sm mt-0.5 block">
                       {formatCurrency(invoice?.subtotal, currency)}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-500 font-medium block">Current Total Tax:</span>
-                    <span className="font-mono font-bold text-slate-800 text-sm mt-0.5 block">
+                    <span className="tabular-nums font-bold text-slate-800 text-sm mt-0.5 block">
                       {formatCurrency(invoice?.totalTax, currency)}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-500 font-medium block">Current Grand Total:</span>
-                    <span className="font-mono font-bold text-indigo-900 text-sm mt-0.5 block">
+                    <span className="tabular-nums font-bold text-indigo-900 text-sm mt-0.5 block">
                       {formatCurrency(invoice?.grandTotal, currency)}
                     </span>
                   </div>
@@ -1201,19 +1201,19 @@ export default function InvoiceDetail() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100 text-xs">
                   <div>
                     <span className="text-slate-500 font-medium block">Refreshed Subtotal</span>
-                    <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">
+                    <span className="tabular-nums font-bold text-slate-900 text-sm mt-0.5 block">
                       {formatCurrency(invoice?.subtotal, currency)}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-500 font-medium block">Refreshed Total Tax</span>
-                    <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">
+                    <span className="tabular-nums font-bold text-slate-900 text-sm mt-0.5 block">
                       {formatCurrency(invoice?.totalTax, currency)}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-500 font-medium block">Refreshed Grand Total</span>
-                    <span className="font-mono font-bold text-emerald-900 text-sm mt-0.5 block">
+                    <span className="tabular-nums font-bold text-emerald-900 text-sm mt-0.5 block">
                       {formatCurrency(invoice?.grandTotal, currency)}
                     </span>
                   </div>
@@ -1357,7 +1357,7 @@ export default function InvoiceDetail() {
             </div>
             <div>
               <span className="font-semibold">Grand Total:</span>{" "}
-              <span className="font-mono font-bold text-slate-800">
+              <span className="tabular-nums font-bold text-slate-800">
                 {formatCurrency(invoice?.grandTotal, currency)}
               </span>
             </div>
@@ -1413,7 +1413,7 @@ export default function InvoiceDetail() {
             </div>
             <div className="flex justify-between border-t border-slate-200 pt-1.5">
               <span className="text-slate-700 font-bold">Grand Total:</span>
-              <span className="font-mono font-bold text-slate-900">
+              <span className="tabular-nums font-bold text-slate-900">
                 {formatCurrency(invoice?.grandTotal, currency)}
               </span>
             </div>
@@ -1509,7 +1509,7 @@ export default function InvoiceDetail() {
             </div>
             <div className="flex justify-between border-t border-slate-200 pt-1.5">
               <span className="text-slate-700 font-bold">Grand Total:</span>
-              <span className="font-mono font-bold text-slate-900">
+              <span className="tabular-nums font-bold text-slate-900">
                 {formatCurrency(invoice?.grandTotal, currency)}
               </span>
             </div>
@@ -1618,7 +1618,7 @@ export default function InvoiceDetail() {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-slate-500 font-medium">Current Grand Total:</span>
-              <span className="font-mono font-bold text-indigo-900">{formatCurrency(invoice?.grandTotal, currency)}</span>
+              <span className="tabular-nums font-bold text-indigo-900">{formatCurrency(invoice?.grandTotal, currency)}</span>
             </div>
             <div className="flex justify-between items-center pt-1 border-t border-slate-200/60">
               <span className="text-slate-500 font-medium">Status after refresh:</span>
@@ -1682,7 +1682,7 @@ export default function InvoiceDetail() {
             </div>
             <div className="flex justify-between border-t border-slate-200 pt-1.5">
               <span className="text-slate-700 font-bold">Grand Total:</span>
-              <span className="font-mono font-bold text-slate-900">{formatCurrency(invoice?.grandTotal, currency)}</span>
+              <span className="tabular-nums font-bold text-slate-900">{formatCurrency(invoice?.grandTotal, currency)}</span>
             </div>
           </div>
 

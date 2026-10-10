@@ -324,7 +324,7 @@ export default function TaxConfigurationMasterPage() {
       <PageCard className="overflow-hidden">
         <PageCardContent className="space-y-4 p-4 sm:p-5">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Tax Regions</h2>
+            <h2 className="text-base font-semibold text-slate-900">Tax Regions</h2>
             <p className="mt-0.5 text-xs text-slate-500">
               {stats.totalTaxRules} tax rules across {currencyOptions.length - 1} currencies
             </p>

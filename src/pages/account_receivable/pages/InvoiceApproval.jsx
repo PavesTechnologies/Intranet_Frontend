@@ -345,16 +345,6 @@ export default function InvoiceApproval() {
           />
         </button>
       ))}
-
-      <div className="col-span-2 sm:col-span-1">
-        <ARKPICard
-          label="Total Approval Value"
-          value={loading ? "…" : formatCurrency(kpis.totalApprovalValue, kpis.currency)}
-          icon={<DollarSign className="h-5 w-5" />}
-          color="bg-indigo-600 text-white"
-          className="h-full w-full"
-        />
-      </div>
     </div>
   );
 
@@ -383,7 +373,7 @@ export default function InvoiceApproval() {
   // Error state with retry
   if (error && !loading && invoices.length === 0) {
     return (
-      <div className="space-y-4">
+      <div className="w-full space-y-6">
         <PageHeader
           title="Invoice Approval"
           subtitle="Review, approve, and track invoices through the invoice approval lifecycle."
@@ -411,7 +401,7 @@ export default function InvoiceApproval() {
   // Genuine empty state: zero workflow records exist
   if (!loading && invoices.length === 0) {
     return (
-      <div className="space-y-4">
+      <div className="w-full space-y-6">
         <PageHeader
           title="Invoice Approval"
           subtitle="Review, approve, and track invoices through the invoice approval lifecycle."
@@ -478,7 +468,7 @@ export default function InvoiceApproval() {
         </div>
       ),
       grandTotal: (
-        <div className="text-left font-mono font-bold text-slate-900">
+        <div className="text-left tabular-nums font-bold text-slate-900">
           {formatCurrency(item.grandTotal || 0, item.currency || item.currencyCode || "USD")}
         </div>
       ),
@@ -551,7 +541,7 @@ export default function InvoiceApproval() {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="w-full space-y-6">
       {/* 1. Page Header */}
       <PageHeader
         title="Invoice Approval"

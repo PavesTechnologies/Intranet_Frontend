@@ -156,7 +156,7 @@ function InfoRow({ label, value }) {
 
 function ReviewSection({ title, rows }) {
   return (
-    <PageCard className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+    <PageCard className="overflow-hidden">
       <PageCardContent className="p-0">
         <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">{title}</h3>
@@ -173,7 +173,7 @@ function ReviewSection({ title, rows }) {
 
 function ReviewTable({ title, headers, rows, emptyMessage }) {
   return (
-    <PageCard className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+    <PageCard className="overflow-hidden">
       <PageCardContent className="p-0">
         <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">{title}</h3>
@@ -260,7 +260,7 @@ function ApprovalReviewDetails({ config }) {
 
         {/* 2. Billing-type-specific details */}
         {billingType === "FIXED_PRICE" && (
-          <PageCard className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm p-4 space-y-3">
+          <PageCard className="overflow-hidden p-4 space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-2">
               Fixed Price Financial Summary
             </h3>
@@ -417,7 +417,7 @@ function ApprovalReviewDetails({ config }) {
         )}
 
         {/* 3. Billing Schedule — only the schedule facts relevant to this billing type */}
-        <PageCard className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+        <PageCard className="overflow-hidden">
           <PageCardContent className="p-0">
             <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3 flex items-center gap-2">
               <Calendar className="h-4 w-4 text-[#0A0082]" />
@@ -818,7 +818,7 @@ export default function BillingApprovals() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="w-full space-y-6">
       {/* 1. Page Header */}
       <PageHeader
         title="Billing Configuration Approvals"

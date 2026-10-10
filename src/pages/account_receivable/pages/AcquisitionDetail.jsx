@@ -13,6 +13,7 @@ import {
   Info,
 } from "lucide-react";
  
+import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
@@ -899,8 +900,8 @@ export default function AcquisitionDetail() {
  
   if (loadingConfig) {
     return (
-      <div className="flex h-[400px] items-center justify-center">
-        <Loader />
+      <div className="flex h-80 items-center justify-center">
+        <Loader size="lg" />
       </div>
     );
   }
@@ -922,20 +923,18 @@ export default function AcquisitionDetail() {
   // --- RENDER DRAFT SUBVIEW ---
   if (subView === "DRAFT" && draft) {
     return (
-      <div className="mx-auto max-w-4xl space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">Pre-Tax Commercial Draft</h1>
-            <p className="text-xs text-slate-500">
-              Review line-item totals before advancing to official tax calculation.
-            </p>
-          </div>
-          <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-            Draft
-          </span>
-        </div>
- 
-        <PageCard className="border-slate-200 bg-white shadow-sm">
+      <div className="mx-auto w-full max-w-4xl space-y-6">
+        <PageHeader
+          title={
+            <span className="flex flex-wrap items-center gap-2.5">
+              Pre-Tax Commercial Draft
+              <StatusBadge label="Draft" size="sm" />
+            </span>
+          }
+          subtitle="Review line-item totals before advancing to official tax calculation."
+        />
+
+        <PageCard>
           <PageCardContent className="p-8 space-y-6">
             <div className="grid grid-cols-2 gap-4 border-b border-slate-100 pb-6 text-sm sm:grid-cols-4">
               <div>
@@ -948,28 +947,28 @@ export default function AcquisitionDetail() {
               </div>
               <div>
                 <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Billing Period</div>
-                <div className="mt-1 font-mono font-semibold text-slate-800">{config.billingPeriod || "—"}</div>
+                <div className="mt-1 tabular-nums font-semibold text-slate-800">{config.billingPeriod || "—"}</div>
               </div>
               <div>
                 <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Currency</div>
-                <div className="mt-1 font-mono font-semibold text-indigo-700">{config.currency}</div>
+                <div className="mt-1 tabular-nums font-semibold text-indigo-700">{config.currency}</div>
               </div>
             </div>
  
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium text-slate-500">Subtotal (Acquired Sum)</span>
-                <span className="font-mono font-semibold text-slate-900">
+                <span className="tabular-nums font-semibold text-slate-900">
                   {config.currency} {draft.subtotal.toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-sm">
                 <span className="font-medium text-slate-500">Estimated Tax (Dynamic GST 18%)</span>
-                <span className="font-mono font-semibold text-slate-900">
+                <span className="tabular-nums font-semibold text-slate-900">
                   {config.currency} {draft.estimatedTax.toLocaleString()}
                 </span>
               </div>
-              <div className="flex items-center justify-between pt-2 font-mono text-xl font-bold text-slate-900">
+              <div className="flex items-center justify-between pt-2 tabular-nums text-xl font-bold text-slate-900">
                 <span>Grand Total</span>
                 <span>
                   {config.currency} {draft.estimatedGrandTotal.toLocaleString()}
@@ -1040,21 +1039,18 @@ export default function AcquisitionDetail() {
   });
  
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-5">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Billing Snapshot</p>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="font-mono text-xl font-bold text-slate-900 sm:text-2xl">
-              {snapshotNumber || "Not Yet Acquired"}
-            </h1>
+      <PageHeader
+        title={
+          <span className="flex flex-wrap items-center gap-2.5">
+            <span className="font-mono">{snapshotNumber || "Not Yet Acquired"}</span>
             <StatusBadge label={config.billingStatus || "NOT_ACQUIRED"} size="sm" />
-          </div>
-        </div>
- 
-        <div className="flex flex-shrink-0 items-center gap-2">
-          {primaryAction && (
+          </span>
+        }
+        subtitle="Billing Snapshot"
+        actions={
+          primaryAction && (
             <Button
               variant={primaryAction.variant}
               size="small"
@@ -1065,9 +1061,9 @@ export default function AcquisitionDetail() {
               <primaryAction.icon className={`h-3.5 w-3.5 ${primaryAction.spin ? "animate-spin" : ""}`} />
               {primaryAction.label}
             </Button>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
  
       {/* Clear user-facing message when snapshot details are unavailable */}
       {isAcquired && !realSnapshotId && (

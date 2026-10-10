@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Pencil, FolderKanban, Coins, Receipt, ShieldCheck, Info } from "lucide-react";
 
+import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
@@ -952,15 +953,15 @@ export default function NewConfigurationWizard() {
 
   if (loadingExisting) {
     return (
-      <div className="p-6">
-        <Loader />
+      <div className="flex h-80 items-center justify-center">
+        <Loader size="lg" />
       </div>
     );
   }
 
   if (configId && !viewOnly && !editLockReady) {
     return (
-      <div className="p-6">
+      <div className="flex h-80 flex-col items-center justify-center">
         <Loader />
         <p className="text-center text-sm text-slate-500">Acquiring lock...</p>
       </div>
@@ -997,7 +998,7 @@ export default function NewConfigurationWizard() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 pb-8 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-6xl space-y-6 pb-8">
   {/* Header */}
   <div className="space-y-2">
     <div className="flex items-center gap-3">
@@ -1005,15 +1006,11 @@ export default function NewConfigurationWizard() {
         onClick={handleCancel}
         label="Back to Billing Setups"
       />
-
-      <div className="min-w-0">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
-          {configId ? "Edit Billing Configuration" : "Create Billing Configuration"}
-        </h1>
-
-        <p className="mt-1 ml-0.5 text-sm leading-6 text-slate-500 sm:ml-1 sm:text-[15px]">
-          Configure billing details for a project
-        </p>
+      <div className="min-w-0 flex-1">
+        <PageHeader
+          title={configId ? "Edit Billing Configuration" : "Create Billing Configuration"}
+          subtitle="Configure billing details for a project"
+        />
       </div>
     </div>
     {configId && !editLockLost && (
@@ -1029,16 +1026,16 @@ export default function NewConfigurationWizard() {
   )}
 
   {/* Wizard Stepper */}
-  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6">
+  <PageCard className="px-4 py-4 sm:px-6">
     <WizardStepper
       steps={STEPS}
       currentStep={currentStep}
       onStepClick={handleStepClick}
     />
-  </div>
+  </PageCard>
 
   {/* Active Form Step Container */}
-  <PageCard className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <PageCard>
     <PageCardContent className="space-y-6 p-5 sm:p-6 lg:p-8">
       {/* Without the EDIT lock every section's controls (incl. child saves) are
           disabled, but what the user entered stays on screen. */}

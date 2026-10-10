@@ -146,14 +146,14 @@ export default function BillingDataAcquisition() {
 
   if (loadingConfigs) {
     return (
-      <div className="flex h-[500px] items-center justify-center">
-        <Loader />
+      <div className="flex h-80 items-center justify-center">
+        <Loader size="lg" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="w-full space-y-6">
       <PageHeader
         title="Billing Data Acquisition Console"
         subtitle="Manage source data acquisition, review billing snapshots, and prepare commercial records for invoicing."
