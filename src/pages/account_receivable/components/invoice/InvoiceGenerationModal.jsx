@@ -175,7 +175,7 @@ export default function InvoiceGenerationModal({
                 The backend service encountered an issue while generating the official invoice. The draft invoice remains intact.
               </p>
               {generateError && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-3 font-mono text-xs text-rose-800 break-words mt-2">
+                <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-3 tabular-nums text-xs text-rose-800 break-words mt-2">
                   {generateError}
                 </div>
               )}

@@ -26,15 +26,15 @@ export default function CommercialCalculationCard({
       <div className="space-y-1.5 text-sm">
         <div className="flex items-center justify-between text-slate-600">
           <span>Subtotal</span>
-          <span className="font-mono font-semibold text-slate-800">{fmt(subtotal, currency)}</span>
+          <span className="tabular-nums font-semibold text-slate-800">{fmt(subtotal, currency)}</span>
         </div>
         <div className="flex items-center justify-between text-slate-600">
           <span>Expenses</span>
-          <span className="font-mono font-semibold text-slate-800">{fmt(expenseAmount, currency)}</span>
+          <span className="tabular-nums font-semibold text-slate-800">{fmt(expenseAmount, currency)}</span>
         </div>
         <div className="flex items-center justify-between border-t border-slate-200 pt-2 font-bold text-slate-900">
           <span>Total Amount</span>
-          <span className="font-mono text-base text-indigo-900">{fmt(taxableAmount, currency)}</span>
+          <span className="tabular-nums text-base text-indigo-900">{fmt(taxableAmount, currency)}</span>
         </div>
       </div>
     </div>

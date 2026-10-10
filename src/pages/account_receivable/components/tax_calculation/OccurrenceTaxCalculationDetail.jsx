@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import PageHeader from "../../../../components/ui/PageHeader";
 import { PageCard } from "../../../../components/Cards/PageCard";
 import Button from "../../../../components/Button/Button";
 import Loader from "../../../../components/ui/Loader";
@@ -138,10 +139,12 @@ export default function OccurrenceTaxCalculationDetail({ occurrenceId }) {
 
   if (!occurrence) {
     return (
-      <div className="mx-auto w-full max-w-5xl space-y-4">
+      <div className="mx-auto w-full max-w-5xl space-y-6">
         <div className="flex items-center gap-3">
           <BackIconButton onClick={() => navigate(CONSOLE_PATH)} label="Back to Tax Calculation" />
-          <h1 className="text-lg font-semibold text-slate-900">Tax Calculation</h1>
+          <div className="min-w-0 flex-1">
+            <PageHeader title="Tax Calculation" />
+          </div>
         </div>
         <PageCard>
           <div className="p-6 text-center text-sm text-slate-500">

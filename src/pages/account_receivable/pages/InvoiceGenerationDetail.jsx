@@ -8,6 +8,7 @@ import {
   Send,
 } from "lucide-react";
  
+import PageHeader from "../../../components/ui/PageHeader";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
 import StatusBadge from "../../../components/status/statusbadge";
@@ -724,28 +725,27 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
     <div className="mx-auto w-full max-w-5xl space-y-6">
       
       {/* Page Header */}
-      <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <BackIconButton onClick={handleBack} label="Back to Invoice Queue" />
-          <div className="h-8 w-px bg-slate-200 hidden sm:block" />
-          <div>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="text-xl font-bold text-slate-900 sm:text-2xl tracking-tight">
+      <div className="flex items-center gap-3">
+        <BackIconButton onClick={handleBack} label="Back to Invoice Queue" />
+        <div className="flex-1">
+          <PageHeader
+            title={
+              <span className="flex flex-wrap items-center gap-2.5">
                 Invoice Generation
-              </h1>
-              <StatusBadge
-                label={
-                  generating
-                    ? "GENERATING"
-                    : isInvoiceGenerated
-                    ? (invoice?.invoiceStatus === "GENERATED" || !invoice?.invoiceStatus ? "INVOICE GENERATED" : invoiceStatus)
-                    : (taxCalc?.status === "TAX_COMPLETED" || snapshotData?.status === "TAX_COMPLETED" ? "Tax Completed" : "Draft Preview")
-                }
-                size="sm"
-              />
-            </div>
-            <p className="mt-0.5 text-xs text-slate-500 font-medium">
-              {generating
+                <StatusBadge
+                  label={
+                    generating
+                      ? "GENERATING"
+                      : isInvoiceGenerated
+                      ? (invoice?.invoiceStatus === "GENERATED" || !invoice?.invoiceStatus ? "INVOICE GENERATED" : invoiceStatus)
+                      : (taxCalc?.status === "TAX_COMPLETED" || snapshotData?.status === "TAX_COMPLETED" ? "Tax Completed" : "Draft Preview")
+                  }
+                  size="sm"
+                />
+              </span>
+            }
+            subtitle={
+              generating
                 ? "Creating authoritative official invoice..."
                 : isInvoiceGenerated
                 ? (
@@ -758,11 +758,10 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
                     )}
                   </span>
                 )
-                : "Review the invoice preview and tax reconciliation before generating the official invoice."}
-            </p>
-          </div>
+                : "Review the invoice preview and tax reconciliation before generating the official invoice."
+            }
+          />
         </div>
-
       </div>
 
       {/* Draft status and errors belong above the preview. */}

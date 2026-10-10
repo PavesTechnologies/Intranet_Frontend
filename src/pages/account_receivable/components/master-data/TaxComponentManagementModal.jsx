@@ -596,7 +596,7 @@ export default function TaxComponentManagementModal({
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-left font-mono font-bold text-slate-800">
+                    <td className="px-4 py-3 text-left tabular-nums font-bold text-slate-800">
                       {comp.taxRate !== undefined && comp.taxRate !== null ? `${comp.taxRate}%` : "—"}
                     </td>
                     <td className="px-4 py-3">

@@ -326,7 +326,7 @@ export default function BillingTypeMasterPage() {
         <PageCardContent className="space-y-4 p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-base font-bold text-slate-900">Billing Types</h2>
+              <h2 className="text-base font-semibold text-slate-900">Billing Types</h2>
               <p className="mt-0.5 text-xs text-slate-500">Manage the billing models available to AR configurations</p>
             </div>
             <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:flex-row sm:items-center">

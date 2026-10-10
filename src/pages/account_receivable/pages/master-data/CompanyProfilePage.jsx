@@ -91,7 +91,7 @@ export default function CompanyProfilePage() {
 
       {/* Loading State */}
       {loading && (
-        <div className="flex h-72 items-center justify-center">
+        <div className="flex h-80 items-center justify-center">
           <Loader size="lg" text="Loading company profile..." />
         </div>
       )}

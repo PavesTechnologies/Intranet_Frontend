@@ -385,7 +385,7 @@ export default function Overview() {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="w-full space-y-6">
       {/* 1. Page Header */}
       <PageHeader
         title="Project Billing Setup — Overview"

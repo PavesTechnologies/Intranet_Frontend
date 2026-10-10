@@ -24,6 +24,7 @@ import {
   Lock,
 } from "lucide-react";
 
+import PageHeader from "../../../../components/ui/PageHeader";
 import { PageCard } from "../../../../components/Cards/PageCard";
 import Button from "../../../../components/Button/Button";
 import BackIconButton from "../common/BackIconButton";
@@ -136,33 +137,21 @@ export default function TaxCalculationDetailView({
     taxableNum > 0 && isTaxCompleted ? ((taxNum / taxableNum) * 100).toFixed(2) : null;
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-5">
-      {/* 1. Enhanced Header with Status */}
-      <div className="pb-3 border-b border-slate-200">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <BackIconButton onClick={onBack} label={backLabel} />
-            <div className="h-8 w-px bg-slate-200 hidden sm:block" />
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100/70 border border-indigo-200/60 text-[#0A0082] shadow-2xs">
-                <Calculator className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                    Tax Calculation
-                  </h1>
-                  <StageBadge stage={stage} label={displayStatus} />
-                </div>
-                <p className="mt-0.5 text-xs text-slate-500 font-medium">
-                  Authoritative tax engine computation & compliance breakdown
-                </p>
-              </div>
-            </div>
-          </div>
-          {headerActions && (
-            <div className="flex shrink-0 items-center gap-2">{headerActions}</div>
-          )}
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      {/* 1. Header with Status */}
+      <div className="flex items-center gap-3">
+        <BackIconButton onClick={onBack} label={backLabel} />
+        <div className="min-w-0 flex-1">
+          <PageHeader
+            title={
+              <span className="flex flex-wrap items-center gap-2.5">
+                Tax Calculation
+                <StageBadge stage={stage} label={displayStatus} />
+              </span>
+            }
+            subtitle="Authoritative tax engine computation & compliance breakdown"
+            actions={headerActions}
+          />
         </div>
       </div>
 
@@ -178,7 +167,7 @@ export default function TaxCalculationDetailView({
       )}
 
       {/* 2. Billing Context Card */}
-      <PageCard className="overflow-hidden border border-slate-200/90 shadow-xs">
+      <PageCard className="overflow-hidden">
         <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700">
@@ -249,13 +238,13 @@ export default function TaxCalculationDetailView({
       </PageCard>
 
       {/* 3. Calculation Summary (Compact & Refined Segmented Metric Bar) */}
-      <PageCard className="overflow-hidden border border-slate-200/90 shadow-xs">
+      <PageCard className="overflow-hidden">
         <div className="flex items-center border-b border-slate-100 bg-slate-50/60 px-4 py-2 sm:px-5 sm:py-2.5">
           <div className="flex items-center gap-1.5">
             <div className="flex h-5 w-5 items-center justify-center rounded bg-emerald-50 text-emerald-700">
               <Coins className="h-3 w-3" />
             </div>
-            <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
               Calculation Summary
             </h2>
           </div>
@@ -272,7 +261,7 @@ export default function TaxCalculationDetailView({
               <Receipt className="h-3.5 w-3.5 text-slate-400" />
             </div>
             <div className="mt-1.5">
-              <div className="font-mono text-lg sm:text-xl font-bold tracking-tight text-slate-900">
+              <div className="tabular-nums text-lg sm:text-xl font-bold tracking-tight text-slate-900">
                 {money(taxableAmount)}
               </div>
               <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-400">
@@ -304,11 +293,11 @@ export default function TaxCalculationDetailView({
             </div>
             <div className="mt-1.5">
               {isTaxCompleted ? (
-                <div className="font-mono text-lg sm:text-xl font-bold tracking-tight text-emerald-700">
+                <div className="tabular-nums text-lg sm:text-xl font-bold tracking-tight text-emerald-700">
                   {money(totalTaxAmount)}
                 </div>
               ) : (
-                <div className="font-mono text-base sm:text-lg font-bold tracking-tight text-amber-800">
+                <div className="tabular-nums text-base sm:text-lg font-bold tracking-tight text-amber-800">
                   Pending
                 </div>
               )}
@@ -347,11 +336,11 @@ export default function TaxCalculationDetailView({
             </div>
             <div className="mt-1.5">
               {isTaxCompleted ? (
-                <div className="font-mono text-lg sm:text-xl font-black tracking-tight text-indigo-950">
+                <div className="tabular-nums text-lg sm:text-xl font-black tracking-tight text-indigo-950">
                   {money(grandTotal)}
                 </div>
               ) : (
-                <div className="font-mono text-base sm:text-lg font-bold tracking-tight text-slate-500">
+                <div className="tabular-nums text-base sm:text-lg font-bold tracking-tight text-slate-500">
                   Pending
                 </div>
               )}
@@ -367,7 +356,7 @@ export default function TaxCalculationDetailView({
       </PageCard>
 
       {/* 4. Tax Breakdown Section (Option 2 Finalized: Merged Action Card when pending) */}
-      <PageCard className="overflow-hidden border border-slate-200/90 shadow-xs">
+      <PageCard className="overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-3.5">
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-50 text-purple-700">
@@ -465,10 +454,10 @@ export default function TaxCalculationDetailView({
                             {humanizeApplicability(component.applicabilityType)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-left font-mono font-medium text-slate-700 tabular-nums">
+                        <td className="px-4 py-3 text-left font-medium text-slate-700 tabular-nums">
                           {formatRatePercentage(component.appliedRate) ?? "—"}
                         </td>
-                        <td className="px-4 py-3 text-left font-mono font-bold text-slate-900 tabular-nums">
+                        <td className="px-4 py-3 text-left font-bold text-slate-900 tabular-nums">
                           {formatCurrency(component.taxAmount, currency)}
                         </td>
                       </tr>
@@ -483,25 +472,25 @@ export default function TaxCalculationDetailView({
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between text-slate-600">
                       <span>Taxable Amount</span>
-                      <span className="font-mono font-semibold text-slate-900 tabular-nums">
+                      <span className="font-semibold text-slate-900 tabular-nums">
                         {money(taxableAmount)}
                       </span>
                     </div>
                     <div className="flex justify-between text-slate-600">
                       <span>+ Total Tax</span>
-                      <span className="font-mono font-semibold text-emerald-700 tabular-nums">
+                      <span className="font-semibold text-emerald-700 tabular-nums">
                         +{money(totalTaxAmount)}
                       </span>
                     </div>
                     <div className="border-t border-slate-200 pt-2 flex justify-between font-bold text-slate-900 text-sm">
                       <span className="text-indigo-950 font-bold">Grand Total</span>
-                      <span className="font-mono font-extrabold text-indigo-950 tabular-nums">
+                      <span className="font-extrabold text-indigo-950 tabular-nums">
                         {money(grandTotal)}
                       </span>
                     </div>
                   </div>
                   {summaryNotes.filter(Boolean).map((note) => (
-                    <p key={note} className="mt-2 text-right font-mono text-[11px] text-slate-400">
+                    <p key={note} className="mt-2 text-right tabular-nums text-[11px] text-slate-400">
                       {note}
                     </p>
                   ))}
