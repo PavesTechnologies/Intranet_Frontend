@@ -79,7 +79,7 @@ export default function InvoiceDraftBanner({
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-sm font-bold text-indigo-950">Invoice Generation – Draft Preview</h3>
-                  <span className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded">
+                  <span className="inline-flex items-center gap-1 tabular-nums text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded">
                     <CheckCircle2 className="h-3 w-3 text-emerald-600" />
                     Ready to Generate
                   </span>

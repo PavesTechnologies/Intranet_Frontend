@@ -76,7 +76,7 @@ export default function PendingTimesheetsModal({
             </h4>
             <p className="text-amber-800">
               Billing acquisition is blocked until all required timesheets for billing period{" "}
-              <strong className="font-mono">{config.billingPeriod}</strong> receive manager approval.
+              <strong className="tabular-nums">{config.billingPeriod}</strong> receive manager approval.
             </p>
           </div>
         </div>
@@ -98,8 +98,8 @@ export default function PendingTimesheetsModal({
                 pageTimesheets.map((t, idx) => (
                   <tr key={t.id || idx} className="hover:bg-slate-50">
                     <td className="px-4 py-2.5 font-semibold text-slate-900">{t.employee}</td>
-                    <td className="px-4 py-2.5 font-mono text-slate-600">{t.workDate}</td>
-                    <td className="px-4 py-2.5 text-left font-semibold font-mono text-amber-800">{t.hours} hrs</td>
+                    <td className="px-4 py-2.5 tabular-nums text-slate-600">{t.workDate}</td>
+                    <td className="px-4 py-2.5 text-left font-semibold tabular-nums text-amber-800">{t.hours} hrs</td>
                     <td className="px-4 py-2.5 text-slate-500">{t.role || "Software Engineer"}</td>
                     <td className="px-4 py-2.5 text-center">
                       <StatusBadge label={t.approvalStatus || "Pending Approval"} size="sm" />

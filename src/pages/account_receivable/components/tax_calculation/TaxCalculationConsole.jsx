@@ -318,7 +318,7 @@ export default function TaxCalculationConsole() {
   };
 
   return (
-    <div className="w-full space-y-5">
+    <div className="w-full space-y-6">
       {/* 1. Page Header */}
       <PageHeader
         title="Tax Calculation"

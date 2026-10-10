@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../
 import StatusBadge from "../../../../components/status/statusbadge";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
+import { PageCard } from "../../../../components/Cards/PageCard";
 import Pagination from "../../../../components/Pagination/pagination";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import ARTable from "../../components/common/ARTable";
@@ -263,7 +264,9 @@ export default function TaxConfigurationRegionDetailPage() {
           onClick={() => navigate("/account-receivable/master-data/tax-configuration")}
           label="Back to Tax Configuration"
         />
-        <LoadingSpinner text="Loading tax region..." />
+        <div className="flex h-80 items-center justify-center">
+          <LoadingSpinner text="Loading tax region..." />
+        </div>
       </div>
     );
   }
@@ -290,9 +293,9 @@ export default function TaxConfigurationRegionDetailPage() {
           onClick={() => navigate("/account-receivable/master-data/tax-configuration")}
           label="Back to Tax Configuration"
         />
-        <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+        <PageCard className="p-6 text-center text-sm text-slate-500">
           Tax region not found.
-        </div>
+        </PageCard>
       </div>
     );
   }
@@ -359,7 +362,7 @@ export default function TaxConfigurationRegionDetailPage() {
       </div>
 
       {activeTab === "details" && (
-        <div className="rounded-xl border border-slate-200 bg-white">
+        <PageCard>
           <div className="divide-y divide-slate-100 text-sm">
             <div className="grid grid-cols-3 gap-2 px-5 py-3">
               <span className="font-semibold text-slate-500">Tax Region Code</span>
@@ -390,7 +393,7 @@ export default function TaxConfigurationRegionDetailPage() {
               </span>
             </div>
           </div>
-        </div>
+        </PageCard>
       )}
 
       {activeTab === "rules" && (

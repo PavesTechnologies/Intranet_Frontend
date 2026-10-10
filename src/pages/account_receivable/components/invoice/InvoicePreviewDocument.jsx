@@ -944,7 +944,7 @@ export default function InvoicePreviewDocument({
             Invoice Number
           </span>
           {displayInvoiceNumber === "Not Yet Generated" ? (
-            <span className="inline-block mt-1 font-mono font-bold text-[11px] text-amber-800 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded shadow-2xs">
+            <span className="inline-block mt-1 tabular-nums font-bold text-[11px] text-amber-800 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded shadow-2xs">
               Pending Generation
             </span>
           ) : (
@@ -1164,19 +1164,19 @@ export default function InvoicePreviewDocument({
                 <td className="py-3.5 px-3 text-left font-mono font-semibold text-slate-700 bg-slate-50/50">
                   {row.hsnOrSac}
                 </td>
-                <td className="py-3.5 px-3 text-left font-mono font-semibold text-slate-800">
+                <td className="py-3.5 px-3 text-left tabular-nums font-semibold text-slate-800">
                   {row.qtyDisplay}
                 </td>
-                <td className="py-3.5 px-3 text-left font-mono text-slate-900 font-medium">
+                <td className="py-3.5 px-3 text-left tabular-nums text-slate-900 font-medium">
                   {row.rateDisplay}
                 </td>
-                <td className="py-3.5 px-3 text-left font-mono font-medium text-slate-900">
+                <td className="py-3.5 px-3 text-left tabular-nums font-medium text-slate-900">
                   {formatCurrency(row.taxableAmount, currency)}
                 </td>
-                <td className="py-3.5 px-3 text-left font-mono text-slate-800 whitespace-nowrap">
+                <td className="py-3.5 px-3 text-left tabular-nums text-slate-800 whitespace-nowrap">
                   {formatCurrency(row.taxAmount, currency)}
                 </td>
-                <td className="py-3.5 pr-4 pl-3 text-left font-mono font-bold text-slate-950">
+                <td className="py-3.5 pr-4 pl-3 text-left tabular-nums font-bold text-slate-950">
                   {formatCurrency(row.totalAmount, currency)}
                 </td>
               </tr>
@@ -1187,17 +1187,17 @@ export default function InvoicePreviewDocument({
               <td colSpan={3} className="py-2.5 px-3 text-left">
                 Total Items: <span className="font-black text-[#0A0082]">{totalItemsCount}</span>
               </td>
-              <td className="py-2.5 px-3 text-left font-mono">
+              <td className="py-2.5 px-3 text-left tabular-nums">
                 {totalQtyDisplay}
               </td>
               <td className="py-2.5 px-3 text-left text-slate-500">—</td>
-              <td className="py-2.5 px-3 text-left font-mono">
+              <td className="py-2.5 px-3 text-left tabular-nums">
                 {formatCurrency(subtotal, currency)}
               </td>
-              <td className="py-2.5 px-3 text-left font-mono">
+              <td className="py-2.5 px-3 text-left tabular-nums">
                 {formatCurrency(totalTax, currency)}
               </td>
-              <td className="py-2.5 pr-4 pl-3 text-left font-mono font-black text-slate-950">
+              <td className="py-2.5 pr-4 pl-3 text-left tabular-nums font-black text-slate-950">
                 {formatCurrency(grandTotal, currency)}
               </td>
             </tr>
@@ -1247,13 +1247,13 @@ export default function InvoicePreviewDocument({
                       <td className="py-2 px-3 text-left font-semibold text-slate-800">
                         {comp.taxTypeCode || comp.taxComponent}
                       </td>
-                      <td className="py-2 px-3 text-left font-mono text-slate-800">
+                      <td className="py-2 px-3 text-left tabular-nums text-slate-800">
                         {formatCurrency(comp.taxableAmount ?? subtotal, currency)}
                       </td>
-                      <td className="py-2 px-3 text-left font-mono text-slate-800">
+                      <td className="py-2 px-3 text-left tabular-nums text-slate-800">
                         {comp.rate ? `${Number(comp.rate).toFixed(1)}%` : `${effectiveTaxRatePct}%`}
                       </td>
-                      <td className="py-2 pr-3 pl-2 text-left font-mono font-bold text-slate-900">
+                      <td className="py-2 pr-3 pl-2 text-left tabular-nums font-bold text-slate-900">
                         {formatCurrency(comp.amount, currency)}
                       </td>
                     </tr>
@@ -1263,13 +1263,13 @@ export default function InvoicePreviewDocument({
                     <td className="py-2 px-3 text-left font-semibold text-slate-800">
                       Integrated Tax (IGST / GST)
                     </td>
-                    <td className="py-2 px-3 text-left font-mono text-slate-800">
+                    <td className="py-2 px-3 text-left tabular-nums text-slate-800">
                       {formatCurrency(subtotal, currency)}
                     </td>
-                    <td className="py-2 px-3 text-left font-mono text-slate-800">
+                    <td className="py-2 px-3 text-left tabular-nums text-slate-800">
                       {effectiveTaxRatePct}%
                     </td>
-                    <td className="py-2 pr-3 pl-2 text-left font-mono font-bold text-slate-900">
+                    <td className="py-2 pr-3 pl-2 text-left tabular-nums font-bold text-slate-900">
                       {formatCurrency(totalTax, currency)}
                     </td>
                   </tr>
@@ -1301,7 +1301,7 @@ export default function InvoicePreviewDocument({
             <div className="space-y-2">
               <div className="flex justify-between items-center text-slate-700">
                 <span className="font-bold text-slate-900">Taxable Amount (Subtotal)</span>
-                <span className="font-bold text-slate-900 font-mono text-xs">
+                <span className="font-bold text-slate-900 tabular-nums text-xs">
                   {formatCurrency(subtotal, currency)}
                 </span>
               </div>
@@ -1316,7 +1316,7 @@ export default function InvoicePreviewDocument({
                       {comp.taxTypeCode || comp.taxComponent}
                       {comp.rate ? ` (${Number(comp.rate).toFixed(1)}%)` : ""}
                     </span>
-                    <span className="font-mono font-semibold text-slate-900">
+                    <span className="tabular-nums font-semibold text-slate-900">
                       {formatCurrency(comp.amount, currency)}
                     </span>
                   </div>
@@ -1326,7 +1326,7 @@ export default function InvoicePreviewDocument({
                   <span className="font-medium text-slate-800">
                     Total Tax ({effectiveTaxRatePct}%)
                   </span>
-                  <span className="font-mono font-semibold text-slate-900">
+                  <span className="tabular-nums font-semibold text-slate-900">
                     {formatCurrency(totalTax, currency)}
                   </span>
                 </div>
@@ -1335,7 +1335,7 @@ export default function InvoicePreviewDocument({
               {expenses > 0 && (
                 <div className="flex justify-between items-center text-slate-700">
                   <span className="font-bold text-slate-900">Reimbursable Expenses</span>
-                  <span className="font-bold text-slate-900 font-mono">
+                  <span className="font-bold text-slate-900 tabular-nums">
                     {formatCurrency(expenses, currency)}
                   </span>
                 </div>
@@ -1353,7 +1353,7 @@ export default function InvoicePreviewDocument({
                     Inclusive of all applicable taxes
                   </span>
                 </div>
-                <span className="font-mono text-base sm:text-xl font-black">
+                <span className="tabular-nums text-base sm:text-xl font-black">
                   {formatCurrency(grandTotal, currency)}
                 </span>
               </div>
@@ -1362,7 +1362,7 @@ export default function InvoicePreviewDocument({
             {/* Amount Payable */}
             <div className="flex justify-between items-center pt-2 border-t border-slate-200 px-1">
               <span className="font-bold text-slate-800 text-xs">Total Amount Payable:</span>
-              <span className="font-mono text-sm sm:text-base font-black text-[#0A0082]">
+              <span className="tabular-nums text-sm sm:text-base font-black text-[#0A0082]">
                 {formatCurrency(grandTotal, currency)}
               </span>
             </div>

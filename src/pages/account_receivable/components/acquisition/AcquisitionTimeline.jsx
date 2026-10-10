@@ -59,7 +59,7 @@ export default function AcquisitionTimeline({ history = [] }) {
           )}
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-medium text-slate-500">
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 tabular-nums text-[11px] font-medium text-slate-500">
             {events.length}
           </span>
           <ChevronDown
@@ -84,10 +84,10 @@ export default function AcquisitionTimeline({ history = [] }) {
                 </span>
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                   <span className="text-xs font-semibold text-slate-900">{evt.event}</span>
-                  <span className="font-mono text-[11px] text-slate-400">{evt.timestamp}</span>
+                  <span className="tabular-nums text-[11px] text-slate-400">{evt.timestamp}</span>
                 </div>
                 <p className="mt-0.5 text-xs text-slate-500">{evt.details}</p>
-                <p className="mt-0.5 font-mono text-[11px] text-slate-400">{evt.actor}</p>
+                <p className="mt-0.5 tabular-nums text-[11px] text-slate-400">{evt.actor}</p>
               </li>
             ))}
           </ol>

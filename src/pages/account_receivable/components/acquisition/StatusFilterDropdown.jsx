@@ -50,7 +50,7 @@ export default function StatusFilterDropdown({
         className="flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-3 text-left text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
       >
         <span className="truncate">
-          {activeOption.label} <span className="font-mono text-slate-500">({activeOption.count})</span>
+          {activeOption.label} <span className="tabular-nums text-slate-500">({activeOption.count})</span>
         </span>
         <ChevronDown
           className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform duration-200 ${
@@ -91,7 +91,7 @@ export default function StatusFilterDropdown({
                     <span className="truncate">{option.label}</span>
                   </div>
                   <span
-                    className={`font-mono text-xs ${
+                    className={`tabular-nums text-xs ${
                       isSelected ? "text-indigo-700 font-bold" : option.count === 0 ? "text-slate-400" : "text-slate-600"
                     }`}
                   >
@@ -134,7 +134,7 @@ export default function StatusFilterDropdown({
                     <span className="truncate">{option.label}</span>
                   </div>
                   <span
-                    className={`font-mono text-xs ${
+                    className={`tabular-nums text-xs ${
                       isSelected ? "text-indigo-700 font-bold" : option.count === 0 ? "text-slate-400" : "text-slate-600"
                     }`}
                   >

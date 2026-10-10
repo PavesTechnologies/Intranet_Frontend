@@ -193,7 +193,7 @@ export default function AcquisitionQueue({
             </div>
           ),
           billingPeriod: (
-            <div className="flex items-center justify-start font-mono text-xs text-slate-600">
+            <div className="flex items-center justify-start tabular-nums text-xs text-slate-600">
               {cfg.billingPeriod}
             </div>
           ),
