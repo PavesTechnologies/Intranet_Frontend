@@ -319,7 +319,7 @@ export default function BillingFrequencyMasterPage() {
               <h2 className="text-base font-bold text-slate-900">Billing Frequencies</h2>
               <p className="mt-0.5 text-xs text-slate-500">Define the billing cycles available to AR configurations</p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:flex-row sm:items-center">
               <div className="w-full sm:w-72">
                 <SearchInput
                   value={searchQuery}

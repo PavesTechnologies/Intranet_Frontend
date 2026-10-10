@@ -8,7 +8,6 @@ import {
   FileText,
   Edit3,
   Plus,
-  RefreshCw,
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
@@ -108,14 +107,6 @@ export default function CompanyProfilePage() {
               <h3 className="text-base font-bold text-slate-800">Unable to Load Company Profile</h3>
               <p className="text-xs text-slate-500 max-w-md mx-auto">{errorMsg}</p>
             </div>
-            <Button
-              variant="outline"
-              size="small"
-              onClick={() => fetchProfile(true)}
-              className="flex items-center gap-1.5 mx-auto"
-            >
-              <RefreshCw className="h-3.5 w-3.5" /> Try Again
-            </Button>
           </PageCardContent>
         </PageCard>
       )}

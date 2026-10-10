@@ -21,11 +21,12 @@ import StatusBadge from "../../../../components/status/statusbadge";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import SearchInput from "../../../../components/filter/Searchbar";
 import ARClearFiltersButton from "../../components/common/ARClearFiltersButton";
-import FilterListbox from "../../../../components/filter/FilterListbox";
+import FilterListbox from "../../components/common/ARFilterListbox";
 import Pagination from "../../../../components/Pagination/pagination";
 import ARTable from "../../components/common/ARTable";
 import ActionMenu from "../../components/common/ActionMenu";
 import ARKPICard from "../../components/common/ARKPICard";
+import ARKPIStatusTabs from "../../components/common/ARKPIStatusTabs";
 import BackIconButton from "../../components/common/BackIconButton";
 import TaxRegionFormModal from "../../components/master-data/TaxRegionFormModal";
 import { deriveTaxComponentRows } from "../../utils/taxRuleComponents";
@@ -322,50 +323,59 @@ export default function TaxConfigurationMasterPage() {
 
       <PageCard className="overflow-hidden">
         <PageCardContent className="space-y-4 p-4 sm:p-5">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Tax Regions</h2>
-              <p className="mt-0.5 text-xs text-slate-500">
-                {stats.totalTaxRules} tax rules across {currencyOptions.length - 1} currencies
-              </p>
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Tax Regions</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {stats.totalTaxRules} tax rules across {currencyOptions.length - 1} currencies
+            </p>
+          </div>
+          <ARKPIStatusTabs
+            label="Tax region summary filters"
+            loading={loading}
+            items={kpis.map((kpi) => ({
+              key: kpi.key,
+              label: kpi.label,
+              value: kpi.value,
+              active: activeKpi === kpi.key,
+              onClick: () => handleKpiClick(kpi.key),
+            }))}
+          />
+          <div className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:grid-cols-2 xl:flex xl:items-center">
+            <div className="w-full xl:w-64">
+              <SearchInput
+                value={searchQuery}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Search tax regions..."
+              />
             </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:flex xl:items-center">
-              <div className="w-full xl:w-64">
-                <SearchInput
-                  value={searchQuery}
-                  onChange={(event) => {
-                    setSearchQuery(event.target.value);
-                    setCurrentPage(1);
-                  }}
-                  placeholder="Search tax regions..."
-                />
-              </div>
-              <div className="w-full sm:w-44">
-                <FilterListbox
-                  options={currencyOptions}
-                  value={currencyFilter}
-                  onChange={(value) => {
-                    setCurrencyFilter(value);
-                    setCurrentPage(1);
-                  }}
-                  placeholder="All currencies"
-                />
-              </div>
-              <div className="w-full sm:w-44">
-                <FilterListbox
-                  options={regimeOptions}
-                  value={regimeFilter}
-                  onChange={(value) => {
-                    setRegimeFilter(value);
-                    setCurrentPage(1);
-                  }}
-                  placeholder="All regimes"
-                />
-              </div>
-              {hasActiveFilters && (
-                <ARClearFiltersButton onClick={handleResetFilters} />
-              )}
+            <div className="w-full sm:w-44">
+              <FilterListbox
+                options={currencyOptions}
+                value={currencyFilter}
+                onChange={(value) => {
+                  setCurrencyFilter(value);
+                  setCurrentPage(1);
+                }}
+                placeholder="All currencies"
+              />
             </div>
+            <div className="w-full sm:w-44">
+              <FilterListbox
+                options={regimeOptions}
+                value={regimeFilter}
+                onChange={(value) => {
+                  setRegimeFilter(value);
+                  setCurrentPage(1);
+                }}
+                placeholder="All regimes"
+              />
+            </div>
+            {hasActiveFilters && (
+              <ARClearFiltersButton onClick={handleResetFilters} />
+            )}
           </div>
 
           <ARTable

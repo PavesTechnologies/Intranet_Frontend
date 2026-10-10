@@ -1,7 +1,7 @@
 import { Users, ScrollText, ListChecks, RefreshCcw, Receipt, Wrench, PlayCircle, XCircle } from "lucide-react";
 
 import Button from "../../../../components/Button/Button";
-import GenericTable from "../../../../components/Table/table";
+import ARTable from "../common/ARTable";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 import ChargeStatusCard from "../ChargeStatusCard";
@@ -92,7 +92,7 @@ function getPreviewConfig(billingType, billingMode, currency) {
   return null;
 }
 
-export default function AcquireDataStep({ billingContext, acquisitionResults, acquiring, onAcquire, onRefresh, onClear }) {
+export default function AcquireDataStep({ billingContext, acquisitionResults, acquiring, onAcquire, onClear }) {
   const previewConfig = getPreviewConfig(billingContext.billingType, billingContext.billingMode, billingContext.currency);
   const previewResult = previewConfig ? acquisitionResults?.[previewConfig.chargeType] : null;
   const hasResults = Boolean(acquisitionResults);
@@ -114,9 +114,6 @@ export default function AcquireDataStep({ billingContext, acquisitionResults, ac
       <div className="flex flex-wrap gap-3">
         <Button variant="primary" onClick={onAcquire} loading={acquiring} loadingText="Acquiring...">
           <PlayCircle className="h-4 w-4" /> Acquire Billing Data
-        </Button>
-        <Button variant="outline" onClick={onRefresh} disabled={!hasResults || acquiring}>
-          Refresh
         </Button>
         <Button variant="ghost" onClick={onClear} disabled={!hasResults}>
           <XCircle className="h-4 w-4" /> Clear Results
@@ -145,7 +142,7 @@ export default function AcquireDataStep({ billingContext, acquisitionResults, ac
             </div>
           ) : (
             <div className="w-full overflow-x-auto">
-              <GenericTable headers={previewConfig.headers} columns={previewConfig.columns} rows={previewRows} />
+              <ARTable headers={previewConfig.headers} columns={previewConfig.columns} rows={previewRows} />
             </div>
           )}
         </div>

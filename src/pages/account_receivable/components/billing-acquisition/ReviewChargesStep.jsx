@@ -3,7 +3,7 @@ import { Eye } from "lucide-react";
 
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Button from "../../../../components/Button/Button";
-import GenericTable from "../../../../components/Table/table";
+import ARTable from "../common/ARTable";
 import Modal from "../../../../components/ui/Modal";
 import { Fonts } from "../../../../components/Fonts/Fonts";
 import { formatCurrency } from "../../utils/format";
@@ -102,7 +102,7 @@ export default function ReviewChargesStep({ billingContext, acquisitionResults }
             <div className="py-10 text-center text-sm text-slate-500">No acquired charges to review yet.</div>
           ) : (
             <div className="w-full overflow-x-auto">
-              <GenericTable
+              <ARTable
                 headers={["Charge Type", "Description", "Quantity", "Unit Price", "Amount", "Source System", "Actions"]}
                 columns={["chargeType", "description", "quantity", "unitPrice", "amount", "sourceSystem", "actions"]}
                 rows={tableRows}

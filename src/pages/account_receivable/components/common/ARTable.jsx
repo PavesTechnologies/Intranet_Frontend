@@ -44,13 +44,14 @@ const ARTable = ({
         </div>
       ) : (
         <div className="w-full overflow-x-auto">
-          <table className="w-full min-w-full table-auto border-collapse text-sm">
+          <table className="w-full min-w-[760px] table-auto border-collapse text-[13px]">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
                 {headers.map((header, idx) => (
                   <th
                     key={idx}
-                    className={`px-4 py-3 font-semibold text-slate-600 ${getAlignmentClass(header, idx)}`}
+                    scope="col"
+                    className={`whitespace-nowrap px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 ${getAlignmentClass(header, idx)}`}
                   >
                     {header}
                   </th>
@@ -62,12 +63,12 @@ const ARTable = ({
                 <tr
                   key={rowIndex}
                   onClick={row.onRowClick}
-                  className={`transition-colors ${row.rowClass || ""} hover:bg-slate-50 ${row.onRowClick ? "cursor-pointer" : ""}`}
+                  className={`h-12 align-middle transition-colors ${row.rowClass || ""} hover:bg-slate-50 ${row.onRowClick ? "cursor-pointer" : ""}`}
                 >
                   {columns.map((col, colIndex) => (
                     <td
                       key={colIndex}
-                      className={`px-4 py-3 align-middle text-slate-700 ${getAlignmentClass(col, colIndex)}`}
+                      className={`px-4 py-2 align-middle text-slate-700 ${getAlignmentClass(col, colIndex)}`}
                     >
                       {row[col]}
                     </td>

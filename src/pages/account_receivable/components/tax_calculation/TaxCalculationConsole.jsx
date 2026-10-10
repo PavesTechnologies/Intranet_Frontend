@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Calculator,
-  RefreshCw,
   CheckCircle2,
   CalendarClock,
   Layers,
@@ -11,7 +10,6 @@ import {
 
 import PageHeader from "../../../../components/ui/PageHeader";
 import ARKPICard from "../common/ARKPICard";
-import Button from "../../../../components/Button/Button";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 
 import {
@@ -266,11 +264,6 @@ export default function TaxCalculationConsole() {
     loadOccurrences();
   }, []);
 
-  const handleRefresh = () => {
-    loadData(true);
-    loadOccurrences();
-  };
-
   // One display model for every billing type — T&M snapshots and billing
   // occurrences become identical pipeline records.
   const records = useMemo(
@@ -330,12 +323,6 @@ export default function TaxCalculationConsole() {
       <PageHeader
         title="Tax Calculation"
         subtitle="Calculate and review tax for acquired billing snapshots and billing occurrences."
-        actions={
-          <Button variant="outline" size="small" onClick={handleRefresh} disabled={refreshing || occLoading}>
-            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        }
       />
 
       {/* 2. KPI Cards — counts come from the same records the pipeline renders */}
