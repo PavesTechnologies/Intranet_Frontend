@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { bulkUploadService } from "../services/bulkUploadService";
+import { bulkUploadService, emailIntakeService } from "../services/bulkUploadService";
 import { invalidateInvoices } from "./useInvoiceMutations";
 
 export const BULK_BATCHES_KEY = ["accountsPayable", "bulkUpload", "batches"];
@@ -20,10 +20,10 @@ export function useBulkUploadLimits() {
   });
 }
 
-export function useBulkBatches({ mine = true, page = 1, pageSize = 10 } = {}) {
+export function useBulkBatches({ mine = true, sourceType, page = 1, pageSize = 10 } = {}) {
   return useQuery({
-    queryKey: [...BULK_BATCHES_KEY, { mine, page, pageSize }],
-    queryFn: () => bulkUploadService.listBatches({ mine, page, pageSize }),
+    queryKey: [...BULK_BATCHES_KEY, { mine, sourceType, page, pageSize }],
+    queryFn: () => bulkUploadService.listBatches({ mine, sourceType, page, pageSize }),
     // Keep the history's progress counts moving while any listed batch is still running.
     refetchInterval: (query) => (query.state.data?.items?.some(isBatchRunning) ? POLL_MS : false),
   });
@@ -45,6 +45,20 @@ export function useBulkBatch(batchId) {
     },
     enabled: Boolean(batchId),
     refetchInterval: (query) => (isBatchRunning(query.state.data) ? POLL_MS : false),
+  });
+}
+
+export const EMAIL_INTAKE_KEY = ["accountsPayable", "emailIntake", "status"];
+
+export function useEmailIntakeStatus() {
+  return useQuery({ queryKey: EMAIL_INTAKE_KEY, queryFn: () => emailIntakeService.getStatus(), refetchInterval: 60000 });
+}
+
+export function useSetEmailIntakeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled) => emailIntakeService.setEnabled(enabled),
+    onSuccess: (status) => queryClient.setQueryData(EMAIL_INTAKE_KEY, status),
   });
 }
 

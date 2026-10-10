@@ -25,6 +25,7 @@ export const AP_ROUTES = {
   INVOICE_BULK_BATCH: (batchId = ":batchId") =>
     `${BASE}/invoices/bulk-upload/${batchId}`,
   INVOICE_OCR_REVIEW: `${BASE}/invoices/ocr-review`,
+  INVOICE_REVIEW_WORKBENCH: `${BASE}/invoices/review-workbench`,
   INVOICE_VALIDATION: `${BASE}/invoices/validation`,
   INVOICE_LIST: `${BASE}/invoices`,
   INVOICE_DETAIL: (invoiceId = ":invoiceId") =>

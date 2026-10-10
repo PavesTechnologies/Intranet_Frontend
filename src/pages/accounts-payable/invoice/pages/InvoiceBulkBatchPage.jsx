@@ -4,7 +4,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
-import { AlertTriangle, CheckCircle2, Copy, Loader2, RotateCcw } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Copy, Loader2, Mail, RotateCcw } from "lucide-react";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
 import { KpiTile, SegmentedTabs, Empty } from "../../dashboard/components/insights";
@@ -152,7 +152,11 @@ export default function InvoiceBulkBatchPage() {
     <div className="space-y-5 p-6">
       <PageHeader
         title={`Batch #${batch.batch_id}`}
-        subtitle={`${batch.source_name || ""} · uploaded ${formatDateTime(batch.created_at)}${batch.uploaded_by_name ? ` by ${batch.uploaded_by_name}` : ""}`}
+        subtitle={
+          batch.source_type === "EMAIL"
+            ? `Email "${batch.email_subject || batch.source_name || ""}" from ${batch.email_from || "unknown sender"} · received ${formatDateTime(batch.email_received_at || batch.created_at)}`
+            : `${batch.source_name || ""} · uploaded ${formatDateTime(batch.created_at)}${batch.uploaded_by_name ? ` by ${batch.uploaded_by_name}` : ""}`
+        }
         actions={
           <>
             {retryable > 0 && (
@@ -165,12 +169,32 @@ export default function InvoiceBulkBatchPage() {
                 <RotateCcw className="h-4 w-4" /> Retry {retryable} file{retryable === 1 ? "" : "s"}
               </Button>
             )}
+            {c.created > 0 && (
+              <Link to={AP_ROUTES.INVOICE_REVIEW_WORKBENCH}>
+                <Button variant="outline">Review &amp; send created invoices</Button>
+              </Link>
+            )}
             <Link to={AP_ROUTES.INVOICE_BULK_UPLOAD}>
-              <Button variant="outline">New bulk upload</Button>
+              <Button variant="outline">
+                <ArrowLeft className="h-4 w-4" /> Back to bulk upload
+              </Button>
+            </Link>
+            <Link to={AP_ROUTES.INVOICE_LIST}>
+              <Button variant="outline">Invoices</Button>
             </Link>
           </>
         }
       />
+
+      {batch.source_type === "EMAIL" && batch.sender_known === false && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="note">
+          <Mail className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <p>
+            <span className="font-semibold">{batch.email_from || "This sender"}</span> is not the email address of any vendor on record.
+            Check that the invoices are genuine before approving them.
+          </p>
+        </div>
+      )}
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

@@ -42,6 +42,8 @@ import InternalRequestDetailPage from "./pages/accounts-payable/vendor/pages/Int
 import InvoiceUploadPage from "./pages/accounts-payable/invoice/pages/InvoiceUploadPage.jsx";
 import InvoiceBulkUploadPage from "./pages/accounts-payable/invoice/pages/InvoiceBulkUploadPage.jsx";
 import InvoiceBulkBatchPage from "./pages/accounts-payable/invoice/pages/InvoiceBulkBatchPage.jsx";
+import InvoiceReviewWorkbenchPage from "./pages/accounts-payable/invoice/pages/InvoiceReviewWorkbenchPage.jsx";
+import { APPROVAL_PERMISSIONS as REVIEW_SEND_PERMISSIONS } from "./pages/accounts-payable/constants/approvalPermissions";
 import InvoiceOcrReviewQueuePage from "./pages/accounts-payable/invoice/pages/InvoiceOcrReviewQueuePage.jsx";
 import InvoiceValidationQueuePage from "./pages/accounts-payable/invoice/pages/InvoiceValidationQueuePage.jsx";
 import InvoiceListPage from "./pages/accounts-payable/invoice/pages/InvoiceListPage.jsx";
@@ -581,8 +583,16 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.INVOICE_BULK_UPLOAD}
             element={
-              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_BULK_UPLOAD]}>
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_BULK_UPLOAD, INVOICE_PERMISSIONS.EMAIL_INTAKE_MANAGE]}>
                 <InvoiceBulkUploadPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.INVOICE_REVIEW_WORKBENCH}
+            element={
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_OCR_REVIEW, REVIEW_SEND_PERMISSIONS.INVOICE_SEND_FOR_APPROVAL]}>
+                <InvoiceReviewWorkbenchPage />
               </ProtectedRoute>
             }
           />

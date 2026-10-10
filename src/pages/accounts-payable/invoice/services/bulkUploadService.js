@@ -28,9 +28,10 @@ export const bulkUploadService = {
     return data;
   },
 
-  async listBatches({ mine = true, status, page = 1, pageSize = 20 } = {}) {
+  async listBatches({ mine = true, status, sourceType, page = 1, pageSize = 20 } = {}) {
     const params = { mine, page, page_size: pageSize };
     if (status) params.status = status;
+    if (sourceType) params.source_type = sourceType;
     const { data } = await api.get(`${BASE}/batches`, { params });
     return data;
   },
@@ -52,6 +53,18 @@ export const bulkUploadService = {
 
   async skipItem(itemId) {
     const { data } = await api.post(`${BASE}/items/${encodeURIComponent(itemId)}/skip`);
+    return data;
+  },
+};
+
+/** Mailbox intake on/off switch (email_intake_route.py). */
+export const emailIntakeService = {
+  async getStatus() {
+    const { data } = await api.get(`${AP_BASE_URL}/email-intake/status`);
+    return data;
+  },
+  async setEnabled(enabled) {
+    const { data } = await api.put(`${AP_BASE_URL}/email-intake/status`, { enabled });
     return data;
   },
 };

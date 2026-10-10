@@ -48,6 +48,11 @@ function OcrReviewModalBody({ item, isOpen, onClose, onViewDocument }) {
         invoice_number: item.invoice_number || "",
         gross_amount: item.net_amount ?? "",
         net_amount: item.net_amount ?? "",
+        // Pre-filled so a NON_PO invoice shows its Department / Category fields straight away
+        // (without it they stayed hidden and saving failed with a 422).
+        ...(item.invoice_type ? { invoice_type: item.invoice_type } : {}),
+        ...(item.department_id ? { department_id: String(item.department_id) } : {}),
+        ...(item.purchase_category_id ? { purchase_category_id: String(item.purchase_category_id) } : {}),
       },
     },
     onSaved: onClose,
