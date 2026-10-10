@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, CheckCircle2, AlertTriangle, History } from "lucide-react";
 
-import GenericTable from "../../../../components/Table/table";
+import ARTable from "../common/ARTable";
 import Tooltip from "../../../../components/status/Tooltip";
 import StatusBadge from "../../../../components/status/statusbadge";
 import Modal from "../../../../components/ui/Modal";
@@ -172,7 +172,9 @@ export default function InvoiceSoftwareSelection({ projectId, periodFrom, period
       unitPrice: formatCurrency(item.unitPrice, item.currencyCode),
       currency: item.currencyCode,
       assignmentPeriod: `${formatDisplayDate(item.assignmentStartDate)} – ${formatDisplayDate(item.assignmentEndDate)}`,
-      status: !item.selectionEligible ? (
+      status: (
+        <div className="flex justify-center">
+          {!item.selectionEligible ? (
         <Tooltip content={item.selectionReason || "This asset is not eligible for invoice selection."}>
           <span className="inline-flex items-center gap-1 text-sm text-amber-600">
             <AlertTriangle className="h-4 w-4" /> No Pricing Configured
@@ -192,6 +194,8 @@ export default function InvoiceSoftwareSelection({ projectId, periodFrom, period
         </Tooltip>
       ) : (
         <StatusBadge label="Available" size="sm" />
+          )}
+        </div>
       ),
       actions: (
         <Button
@@ -225,7 +229,7 @@ export default function InvoiceSoftwareSelection({ projectId, periodFrom, period
             </div>
           ) : (
             <div className="w-full overflow-x-auto">
-              <GenericTable headers={TABLE_HEADERS} columns={TABLE_COLUMNS} rows={tableRows} loading={loading} />
+              <ARTable headers={TABLE_HEADERS} columns={TABLE_COLUMNS} rows={tableRows} loading={loading} />
             </div>
           )}
         </div>
@@ -238,7 +242,7 @@ export default function InvoiceSoftwareSelection({ projectId, periodFrom, period
         width="640px"
       >
         <div className="w-full overflow-x-auto">
-          <GenericTable headers={HISTORY_TABLE_HEADERS} columns={HISTORY_TABLE_COLUMNS} rows={historyDialogRows} />
+          <ARTable headers={HISTORY_TABLE_HEADERS} columns={HISTORY_TABLE_COLUMNS} rows={historyDialogRows} />
         </div>
       </Modal>
     </div>

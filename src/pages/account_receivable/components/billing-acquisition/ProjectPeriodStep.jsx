@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { RefreshCw, X } from "lucide-react";
+import { FolderKanban, X } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
@@ -114,7 +114,7 @@ export default function ProjectPeriodStep({
           loadingText="Loading..."
           disabled={!selection.configId}
         >
-          <RefreshCw className="h-3.5 w-3.5" /> Load Billing Context
+          <FolderKanban className="h-3.5 w-3.5" /> Load Billing Context
         </Button>
         <Button variant="ghost" onClick={onReset} disabled={!hasSelection}>
           <X className="h-3.5 w-3.5" /> Reset

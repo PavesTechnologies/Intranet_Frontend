@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, AlertTriangle, Loader2 } from "lucide-react";
 
 import Button from "../../../../components/Button/Button";
 import FormInput from "../../../../components/forms/FormInput";
@@ -350,8 +350,7 @@ export default function TaxRuleFormModal({
               forceReloadRef.current = true;
               setReloadKey((k) => k + 1);
             }}>
-            <RefreshCw className="mr-1 h-3.5 w-3.5" />
-            Retry
+                Retry
           </Button>
         </div>
       );

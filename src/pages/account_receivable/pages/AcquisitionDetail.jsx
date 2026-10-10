@@ -19,7 +19,6 @@ import Loader from "../../../components/ui/Loader";
 import FormInput from "../../../components/forms/FormInput";
 import Modal from "../../../components/Modal/modal";
 import StatusBadge from "../../../components/status/statusbadge";
-import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
 import { showStatusToast } from "../../../components/toastfy/toast";
  
 import {
@@ -1042,13 +1041,6 @@ export default function AcquisitionDetail() {
  
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5">
-      <Breadcrumb
-        items={[
-          { label: "Billing Data Acquisition", to: QUEUE_PATH },
-          { label: config.projectName || snapshotNumber || "Snapshot" },
-        ]}
-      />
- 
       {/* Page Header */}
       <div className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
@@ -1062,18 +1054,6 @@ export default function AcquisitionDetail() {
         </div>
  
         <div className="flex flex-shrink-0 items-center gap-2">
-          {isAcquired && (
-            <Button
-              variant="outline"
-              size="small"
-              onClick={handleRefreshSnapshot}
-              disabled={refreshing || acquiring}
-              className="text-xs"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </Button>
-          )}
           {primaryAction && (
             <Button
               variant={primaryAction.variant}

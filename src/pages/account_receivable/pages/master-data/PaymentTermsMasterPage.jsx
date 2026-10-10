@@ -339,7 +339,7 @@ export default function PaymentTermsMasterPage() {
               <h2 className="text-base font-bold text-slate-900">Payment Terms</h2>
               <p className="mt-0.5 text-xs text-slate-500">Average active payment term: {stats.avgDays} days</p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:flex-row sm:items-center">
               <div className="w-full sm:w-72">
                 <SearchInput
                   value={searchQuery}

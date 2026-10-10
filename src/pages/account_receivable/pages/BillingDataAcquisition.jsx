@@ -160,8 +160,6 @@ export default function BillingDataAcquisition() {
         actions={
           <AcquisitionHeader
             lastSync={lastSyncTime}
-            onRefresh={() => loadData(true)}
-            refreshing={refreshing}
           />
         }
       />

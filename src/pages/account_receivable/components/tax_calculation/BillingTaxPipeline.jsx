@@ -1,11 +1,12 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
-import { Calculator, ChevronRight, Eye, Inbox } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Calculator, Eye, Inbox } from "lucide-react";
 
 import { PageCard } from "../../../../components/Cards/PageCard";
 import SearchInput from "../../../../components/filter/Searchbar";
 import ARClearFiltersButton from "../common/ARClearFiltersButton";
+import ARKPIStatusTabs from "../common/ARKPIStatusTabs";
 import ActionMenu from "../common/ActionMenu";
-import FilterListbox from "../../../../components/filter/FilterListbox";
+import FilterListbox from "../common/ARFilterListbox";
 import Pagination from "../../../../components/Pagination/pagination";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Button from "../../../../components/Button/Button";
@@ -43,10 +44,6 @@ const ALIGN_CLASS = { left: "text-left", right: "text-left", center: "text-cente
 // with the card's 20px content gutter.
 const cellPadding = (idx) =>
   `px-4 ${idx === 0 ? "pl-4 sm:pl-5" : ""} ${idx === COLUMNS.length - 1 ? "pr-4 sm:pr-5" : ""}`;
-
-// Compact, equal-height toolbar controls (search input and listboxes).
-const LISTBOX_BUTTON_CLASS =
-  "relative h-9 w-full cursor-default rounded-lg border border-gray-300 bg-white pl-3 pr-8 text-left text-[13px] text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20";
 
 function Money({ value, currency }) {
   if (value === null || value === undefined) {
@@ -137,31 +134,6 @@ export default function BillingTaxPipeline({
     ? "No billing records match your current filters."
     : PIPELINE_EMPTY_MESSAGES[stage] || PIPELINE_EMPTY_MESSAGES.ALL;
 
-  const renderTab = (key, label) => {
-    const active = stage === key;
-    return (
-      <button
-        key={key}
-        type="button"
-        onClick={() => onStageChange?.(key)}
-        className={`flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:bg-slate-50 ${
-          active
-            ? "border-[#0A0082] text-[#0A0082]"
-            : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800"
-        }`}
-      >
-        {label}
-        <span
-          className={`min-w-[20px] rounded-full px-1.5 py-px text-center text-[10px] font-semibold tabular-nums ${
-            active ? "bg-[#0A0082] text-white" : "bg-slate-100 text-slate-600"
-          }`}
-        >
-          {loading ? "…" : stageCounts[key]}
-        </span>
-      </button>
-    );
-  };
-
   return (
     // No overflow clipping on the card: it grows with its content and the page
     // does the vertical scrolling; filter dropdowns can extend past its edge.
@@ -177,16 +149,21 @@ export default function BillingTaxPipeline({
       {/* Stage tabs — All, then the pipeline in order. The bottom rule is an
           inset shadow (not a border + negative margin) so the row never
           overflows vertically; it only scrolls sideways on narrow screens. */}
-      <div className="mt-3 flex items-center gap-1 overflow-x-auto overflow-y-hidden px-2 shadow-[inset_0_-1px_0_0_#e2e8f0] sm:px-3">
-        {renderTab(ALL, "All")}
-        <span className="mx-2 h-4 w-px shrink-0 bg-slate-200" aria-hidden="true" />
-        {PIPELINE_STAGE_ORDER.map((s, idx) => (
-          <Fragment key={s}>
-            {idx > 0 && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300" aria-hidden="true" />}
-            {renderTab(s, PIPELINE_STAGE_LABELS[s])}
-          </Fragment>
-        ))}
-      </div>
+      <ARKPIStatusTabs
+        label="Billing tax pipeline stages"
+        loading={loading}
+        className="mt-3"
+        items={[
+          { key: ALL, label: "All", value: stageCounts[ALL], active: stage === ALL, onClick: () => onStageChange?.(ALL) },
+          ...PIPELINE_STAGE_ORDER.map((key) => ({
+            key,
+            label: PIPELINE_STAGE_LABELS[key],
+            value: stageCounts[key],
+            active: stage === key,
+            onClick: () => onStageChange?.(stage === key ? ALL : key),
+          })),
+        ]}
+      />
 
       {/* Filter toolbar — search is the widest control; wraps to two rows below lg */}
       <div className="px-4 py-3 sm:px-5">
@@ -204,21 +181,18 @@ export default function BillingTaxPipeline({
             value={billingTypeFilter}
             onChange={setBillingTypeFilter}
             placeholder="Billing Type"
-            buttonClassName={LISTBOX_BUTTON_CLASS}
           />
           <FilterListbox
             options={regionOptions}
             value={regionFilter}
             onChange={setRegionFilter}
             placeholder="Tax Region"
-            buttonClassName={LISTBOX_BUTTON_CLASS}
           />
           <FilterListbox
             options={monthOptions}
             value={monthFilter}
             onChange={setMonthFilter}
             placeholder="Billing Period"
-            buttonClassName={LISTBOX_BUTTON_CLASS}
           />
           {hasActiveFilters && (
             <ARClearFiltersButton
