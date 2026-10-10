@@ -14,14 +14,13 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import ARKPICard from "../components/common/ARKPICard";
+import ARKPIStatusTabs from "../components/common/ARKPIStatusTabs";
 import Button from "../../../components/Button/Button";
 import SearchInput from "../../../components/filter/Searchbar";
 import ARClearFiltersButton from "../components/common/ARClearFiltersButton";
-import FilterListbox from "../../../components/filter/FilterListbox";
 import ARTable from "../components/common/ARTable";
 import Pagination from "../../../components/Pagination/pagination";
 import StatusBadge from "../../../components/status/statusbadge";
@@ -40,21 +39,6 @@ import { getBillingTypeDisplayName } from "../utils/billingType";
 
 const INITIAL_FILTERS = { search: "" };
 const PAGE_SIZE = 6;
-
-const APPROVAL_STATUS_OPTIONS = [
-  { label: "All Approval Statuses", value: "ALL" },
-  { label: "Draft", value: "DRAFT" },
-  { label: "Pending Approval", value: "PENDING_APPROVAL" },
-  { label: "Approved", value: "APPROVED" },
-  { label: "Rejected", value: "REJECTED" },
-];
-
-const CONFIG_STATUS_OPTIONS = [
-  { label: "All Configuration Statuses", value: "ALL" },
-  { label: "Active", value: "ACTIVE" },
-  { label: "Inactive", value: "INACTIVE" },
-  { label: "Expired", value: "EXPIRED" },
-];
 
 const TABLE_HEADERS = ["Client", "Project", "Billing Type", "Approval Status", "Configuration Status", "Actions"];
 const TABLE_COLUMNS = ["client", "project", "billingType", "approvalStatus", "configurationStatus", "actions"];
@@ -476,7 +460,41 @@ export default function Overview() {
       {/* 3. Billing Configurations */}
       <PageCard>
         <PageCardContent className="p-4 sm:p-5 space-y-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Billing configurations</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Filter projects by approval and configuration status.</p>
+          </div>
+          <div className="space-y-1">
+            <h3 className="px-2 text-xs font-semibold text-slate-600">Approval status</h3>
+
+<ARKPIStatusTabs
+  label="Billing approval status"
+  loading={loadingStats}
+  items={[
+    ...approvalKpis.map((kpi) => ({
+      key: kpi.key,
+      label: kpi.label,
+      value: kpi.value,
+      active: kpi.active,
+      onClick: () => handleKpiClick(kpi.key),
+    })),
+    ...configurationKpis.map((kpi) => ({
+      key: kpi.key,
+      label: kpi.label,
+      value: kpi.value,
+      active: kpi.active,
+      onClick: () => handleKpiClick(kpi.key),
+    })),
+  ]}
+/>
+
+                        <ARKPIStatusTabs
+              label="Billing configuration status"
+              loading={loadingStats}
+   
+            />
+          </div>
+          <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/70 p-2 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex-1 w-full lg:max-w-md">
               <SearchInput
                 value={filters.search}
@@ -485,48 +503,6 @@ export default function Overview() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setApprovalStatusFilter("ALL");
-                  setConfigStatusFilter("ALL");
-                  setCurrentPage(1);
-                }}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap",
-                  approvalStatusFilter === "ALL" && configStatusFilter === "ALL" && !filters.search
-                    ? "border-blue-300 bg-blue-50 text-blue-800"
-                    : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
-                )}
-                title="Show all configurations"
-              >
-                All Configurations ({filteredConfigs.length})
-              </button>
-
-              <div className="w-48 sm:w-52">
-                <FilterListbox
-                  options={APPROVAL_STATUS_OPTIONS}
-                  value={approvalStatusFilter}
-                  onChange={(val) => {
-                    setApprovalStatusFilter(val);
-                    setCurrentPage(1);
-                  }}
-                  placeholder="Approval Status"
-                />
-              </div>
-
-              <div className="w-48 sm:w-52">
-                <FilterListbox
-                  options={CONFIG_STATUS_OPTIONS}
-                  value={configStatusFilter}
-                  onChange={(val) => {
-                    setConfigStatusFilter(val);
-                    setCurrentPage(1);
-                  }}
-                  placeholder="Configuration Status"
-                />
-              </div>
-
               {(approvalStatusFilter !== "ALL" || configStatusFilter !== "ALL" || filters.search) && (
                 <ARClearFiltersButton onClick={handleResetFilters} title="Clear all search and status filters" />
               )}

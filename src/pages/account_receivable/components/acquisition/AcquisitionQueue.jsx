@@ -3,7 +3,7 @@ import { Layers, Play, Eye } from "lucide-react";
 import StatusBadge from "../../../../components/status/statusbadge";
 import SearchInput from "../../../../components/filter/Searchbar";
 import ARClearFiltersButton from "../common/ARClearFiltersButton";
-import FilterListbox from "../../../../components/filter/FilterListbox";
+import ARKPIStatusTabs from "../common/ARKPIStatusTabs";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Pagination from "../../../../components/Pagination/pagination";
 import ARTable from "../common/ARTable";
@@ -40,9 +40,6 @@ const TABLE_ALIGNMENTS = {
   actions: "center",
 };
 
-
-const FILTER_BUTTON_CLASS =
-  "flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-left text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/30";
 
 export default function AcquisitionQueue({
   configs = [],
@@ -148,11 +145,6 @@ export default function AcquisitionQueue({
     { key: "INVOICED", label: "Invoiced", count: populationCounts.invoiced },
   ];
 
-  const statusFilterOptions = tabs.map((tab) => ({
-    value: tab.key,
-    label: `${tab.label} (${tab.count})`,
-  }));
-
   const totalPages = Math.ceil(filteredConfigs.length / PAGE_SIZE) || 1;
   const paginatedConfigs = filteredConfigs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
@@ -255,10 +247,26 @@ export default function AcquisitionQueue({
   return (
     <PageCard>
       <PageCardContent className="space-y-4 p-4 sm:p-5">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Acquisition queue</h2>
+          <p className="mt-0.5 text-xs text-slate-500">Review billing setups by their current acquisition and invoice readiness.</p>
+        </div>
+        <ARKPIStatusTabs
+          label="Billing acquisition status"
+          loading={loading}
+          items={tabs.map((tab) => ({
+            key: tab.key,
+            label: tab.label,
+            value: tab.count,
+            active: activeStatusFilter === tab.key,
+            onClick: () => handleStatusFilterChange(
+              tab.key === "ALL" || activeStatusFilter === tab.key ? "ALL" : tab.key
+            ),
+          }))}
+        />
 
-
-        {/* Controls Bar: Search Input + FilterListbox + Clear Button */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        {/* Search and clear controls */}
+        <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/70 p-2 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex-1 w-full lg:max-w-md">
             <SearchInput
               value={activeSearch}
@@ -268,16 +276,6 @@ export default function AcquisitionQueue({
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="w-56 sm:w-64">
-              <FilterListbox
-                options={statusFilterOptions}
-                value={activeStatusFilter}
-                onChange={handleStatusFilterChange}
-                buttonClassName={FILTER_BUTTON_CLASS}
-                placeholder="Filter status"
-              />
-            </div>
-
             {isFilterActive && (
               <ARClearFiltersButton onClick={handleResetFilters} title="Clear all search and status filters" />
             )}

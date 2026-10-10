@@ -1,8 +1,11 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { AlertTriangle, BellRing, Clock, UserCheck } from "lucide-react";
 import Modal from "../../../../components/Modal/modal";
 import Button from "../../../../components/Button/Button";
 import StatusBadge from "../../../../components/status/statusbadge";
+import Pagination from "../../../../components/Pagination/pagination";
+
+const PAGE_SIZE = 10;
 
 export default function PendingTimesheetsModal({
   isOpen,
@@ -12,6 +15,21 @@ export default function PendingTimesheetsModal({
   onRemindPM,
   reminding = false,
 }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(pendingTimesheets.length / PAGE_SIZE));
+  const pageTimesheets = pendingTimesheets.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [pendingTimesheets]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
   if (!config) return null;
 
   const totalPendingHours = pendingTimesheets.reduce((acc, t) => acc + Number(t.hours || 0), 0);
@@ -64,7 +82,7 @@ export default function PendingTimesheetsModal({
         </div>
 
         {/* Table of pending timesheets */}
-        <div className="max-h-80 overflow-y-auto rounded-xl border border-slate-200">
+        <div className="rounded-xl border border-slate-200">
           <table className="min-w-full divide-y divide-slate-200 text-xs">
             <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
               <tr>
@@ -77,7 +95,7 @@ export default function PendingTimesheetsModal({
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
               {pendingTimesheets.length > 0 ? (
-                pendingTimesheets.map((t, idx) => (
+                pageTimesheets.map((t, idx) => (
                   <tr key={t.id || idx} className="hover:bg-slate-50">
                     <td className="px-4 py-2.5 font-semibold text-slate-900">{t.employee}</td>
                     <td className="px-4 py-2.5 font-mono text-slate-600">{t.workDate}</td>
@@ -98,6 +116,19 @@ export default function PendingTimesheetsModal({
             </tbody>
           </table>
         </div>
+        {pendingTimesheets.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+            <p className="text-xs text-slate-500">
+              Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, pendingTimesheets.length)} of {pendingTimesheets.length} timesheets
+            </p>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+              onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+            />
+          </div>
+        )}
       </div>
     </Modal>
   );

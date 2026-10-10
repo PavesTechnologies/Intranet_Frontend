@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../
 import StatusBadge from "../../../../components/status/statusbadge";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
+import Pagination from "../../../../components/Pagination/pagination";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import ARTable from "../../components/common/ARTable";
 import ActionMenu from "../../components/common/ActionMenu";
@@ -48,6 +49,7 @@ const TABS = [
   { key: "details", label: "Region Details" },
   { key: "rules", label: "Tax Configurations & Rules" },
 ];
+const CONFIG_PAGE_SIZE = 10;
 
 export default function TaxConfigurationRegionDetailPage() {
   const { taxRegionId } = useParams();
@@ -61,6 +63,7 @@ export default function TaxConfigurationRegionDetailPage() {
   const [notFound, setNotFound] = useState(false);
 
   const [activeTab, setActiveTab] = useState("details");
+  const [currentConfigPage, setCurrentConfigPage] = useState(1);
 
   const [isRegionFormOpen, setIsRegionFormOpen] = useState(false);
   const [isRuleFormOpen, setIsRuleFormOpen] = useState(false);
@@ -243,6 +246,16 @@ export default function TaxConfigurationRegionDetailPage() {
     });
   }, [configs, region]);
 
+  const configTotalPages = Math.max(1, Math.ceil(configTableRows.length / CONFIG_PAGE_SIZE));
+  const paginatedConfigRows = configTableRows.slice(
+    (currentConfigPage - 1) * CONFIG_PAGE_SIZE,
+    currentConfigPage * CONFIG_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    if (currentConfigPage > configTotalPages) setCurrentConfigPage(configTotalPages);
+  }, [currentConfigPage, configTotalPages]);
+
   if (loading) {
     return (
       <div className="w-full space-y-6">
@@ -395,10 +408,23 @@ export default function TaxConfigurationRegionDetailPage() {
           <ARTable
             headers={configTableHeaders}
             columns={configTableColumns}
-            rows={configTableRows}
+            rows={paginatedConfigRows}
             loading={false}
             emptyMessage="No tax configurations configured for this region yet. Click 'Add Tax Configuration' to create one."
           />
+          {configTableRows.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+              <p className="text-xs text-slate-500">
+                Showing {(currentConfigPage - 1) * CONFIG_PAGE_SIZE + 1}–{Math.min(currentConfigPage * CONFIG_PAGE_SIZE, configTableRows.length)} of {configTableRows.length} configurations
+              </p>
+              <Pagination
+                currentPage={currentConfigPage}
+                totalPages={configTotalPages}
+                onPrevious={() => setCurrentConfigPage((page) => Math.max(page - 1, 1))}
+                onNext={() => setCurrentConfigPage((page) => Math.min(page + 1, configTotalPages))}
+              />
+            </div>
+          )}
         </div>
       )}
 

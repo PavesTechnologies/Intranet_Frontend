@@ -25,7 +25,6 @@ import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
 import StatusBadge from "../../../components/status/statusbadge";
-import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
 import Modal from "../../../components/Modal/modal";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { formatCurrency, formatDisplayDate, formatDisplayDateTime } from "../utils/format";
@@ -657,14 +656,6 @@ export default function InvoiceDetail() {
   if (errorMsg && !invoice) {
     return (
       <div className="mx-auto w-full max-w-4xl space-y-6">
-        <Breadcrumb
-          items={[
-            { label: "Billing Data Acquisition", to: "/account-receivable/billing-data-acquisition/workspace" },
-            { label: "Tax Calculation", to: TAX_WORKSPACE_PATH },
-            { label: "Invoice" },
-          ]}
-        />
-
         <PageCard>
           <PageCardContent className="p-10 text-center space-y-4">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-rose-600">
@@ -699,7 +690,7 @@ export default function InvoiceDetail() {
                 onClick={() => loadInvoice(true)}
                 className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold"
               >
-                <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Retry
+                Retry
               </Button>
             </div>
           </PageCardContent>
@@ -816,7 +807,7 @@ export default function InvoiceDetail() {
             </>
           )}
 
-          {/* Action: Resubmit for Approval / Refresh Invoice (for REJECTED invoices) */}
+          {/* Action: Resubmit for Approval / Recalculate invoice (for REJECTED invoices) */}
           {invoice?.invoiceStatus === "REJECTED" && (
             invoice?.correctionRequired === false ? (
               <Button
@@ -838,7 +829,7 @@ export default function InvoiceDetail() {
                 className="border-indigo-300 text-indigo-700 hover:bg-indigo-50 flex items-center gap-1.5 text-xs font-semibold"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${refreshingAfterCorrection ? "animate-spin" : ""}`} />
-                {refreshingAfterCorrection ? "Refreshing..." : "Refresh Invoice"}
+                {refreshingAfterCorrection ? "Recalculating..." : "Recalculate invoice"}
               </Button>
             )
           )}
@@ -976,7 +967,7 @@ export default function InvoiceDetail() {
                 className="text-xs bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-medium flex items-center gap-1.5"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${refreshingAfterCorrection ? "animate-spin" : ""}`} />
-                {refreshingAfterCorrection ? "Refreshing..." : "Refresh Invoice"}
+                {refreshingAfterCorrection ? "Recalculating..." : "Recalculate invoice"}
               </Button>
 
               {invoice.correctionRequired === false ? (
@@ -1551,12 +1542,12 @@ export default function InvoiceDetail() {
       <Modal
         isOpen={isRefreshModalOpen}
         onClose={() => !refreshingAfterCorrection && setIsRefreshModalOpen(false)}
-        title="Refresh Invoice"
+            title="Recalculate invoice"
         size="md"
       >
         <div className="space-y-4">
           <p className="text-sm font-semibold text-slate-800">
-            Refresh this invoice from the latest billing and tax data?
+                Recalculate this invoice from the latest billing and tax data?
           </p>
           <p className="text-xs text-slate-600">
             The invoice will remain rejected, but its financial details will be refreshed from the authoritative billing and tax data. You can resubmit it for approval afterward.
@@ -1591,7 +1582,7 @@ export default function InvoiceDetail() {
               className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white text-xs font-semibold flex items-center gap-1.5"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${refreshingAfterCorrection ? "animate-spin" : ""}`} />
-              {refreshingAfterCorrection ? "Refreshing..." : "Refresh Invoice"}
+                {refreshingAfterCorrection ? "Recalculating..." : "Recalculate invoice"}
             </Button>
           </div>
         </div>

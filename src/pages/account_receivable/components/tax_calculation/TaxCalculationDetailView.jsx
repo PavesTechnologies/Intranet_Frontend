@@ -438,8 +438,8 @@ export default function TaxCalculationDetailView({
                     <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-600">
                       <th className="px-4 py-3 text-left">Tax Component</th>
                       <th className="px-4 py-3 text-left">Applicability</th>
-                      <th className="px-4 py-3 text-right">Applied Rate</th>
-                      <th className="px-4 py-3 text-right">Tax Amount</th>
+                      <th className="px-4 py-3 text-left">Applied Rate</th>
+                      <th className="px-4 py-3 text-left">Tax Amount</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -448,7 +448,7 @@ export default function TaxCalculationDetailView({
                         key={component.id}
                         className="transition-colors hover:bg-slate-50/60"
                       >
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-left">
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-slate-900">
                               {component.taxTypeName || component.taxTypeCode || "Tax Component"}
@@ -460,15 +460,15 @@ export default function TaxCalculationDetailView({
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-600 font-medium">
+                        <td className="px-4 py-3 text-left text-slate-600 font-medium">
                           <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
                             {humanizeApplicability(component.applicabilityType)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right font-mono font-medium text-slate-700 tabular-nums">
+                        <td className="px-4 py-3 text-left font-mono font-medium text-slate-700 tabular-nums">
                           {formatRatePercentage(component.appliedRate) ?? "—"}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 tabular-nums">
+                        <td className="px-4 py-3 text-left font-mono font-bold text-slate-900 tabular-nums">
                           {formatCurrency(component.taxAmount, currency)}
                         </td>
                       </tr>

@@ -1114,26 +1114,26 @@ export default function InvoicePreviewDocument({
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="bg-[#0A0082] text-white">
-              <th className="py-3 px-3 text-center w-10 font-bold uppercase tracking-wider text-[11px]">#</th>
+              <th className="py-3 px-3 text-left w-10 font-bold uppercase tracking-wider text-[11px]">#</th>
               <th className="py-3 px-3 text-left font-bold uppercase tracking-wider text-[11px]">
                 Description of Services / Deliverables
               </th>
-              <th className="py-3 px-3 text-center w-24 font-bold uppercase tracking-wider text-[11px]">
+              <th className="py-3 px-3 text-left w-24 font-bold uppercase tracking-wider text-[11px]">
                 HSN/SAC
               </th>
-              <th className="py-3 px-3 text-center w-16 font-bold uppercase tracking-wider text-[11px]">
+              <th className="py-3 px-3 text-left w-16 font-bold uppercase tracking-wider text-[11px]">
                 Qty
               </th>
-              <th className="py-3 px-3 text-right w-28 font-bold uppercase tracking-wider text-[11px]">
+              <th className="py-3 px-3 text-left w-28 font-bold uppercase tracking-wider text-[11px]">
                 Rate
               </th>
-              <th className="py-3 px-3 text-right w-28 font-bold uppercase tracking-wider text-[11px]">
+              <th className="py-3 px-3 text-left w-28 font-bold uppercase tracking-wider text-[11px]">
                 Taxable Value
               </th>
-              <th className="py-3 px-3 text-right w-24 font-bold uppercase tracking-wider text-[11px]">
+              <th className="py-3 px-3 text-left w-24 font-bold uppercase tracking-wider text-[11px]">
                 Tax ({effectiveTaxRatePct}%)
               </th>
-              <th className="py-3 pr-4 pl-3 text-right w-32 font-bold uppercase tracking-wider text-[11px]">
+              <th className="py-3 pr-4 pl-3 text-left w-32 font-bold uppercase tracking-wider text-[11px]">
                 Total Amount
               </th>
             </tr>
@@ -1141,7 +1141,7 @@ export default function InvoicePreviewDocument({
           <tbody className="divide-y divide-slate-200">
             {formattedRows.map((row) => (
               <tr key={row.index} className="align-top hover:bg-slate-50/80 transition-colors">
-                <td className="py-3.5 px-3 text-center text-slate-500 font-semibold">
+                <td className="py-3.5 px-3 text-left text-slate-500 font-semibold">
                   {row.index}
                 </td>
                 <td className="py-3.5 px-3 text-left">
@@ -1161,22 +1161,22 @@ export default function InvoicePreviewDocument({
                     </div>
                   )}
                 </td>
-                <td className="py-3.5 px-3 text-center font-mono font-semibold text-slate-700 bg-slate-50/50">
+                <td className="py-3.5 px-3 text-left font-mono font-semibold text-slate-700 bg-slate-50/50">
                   {row.hsnOrSac}
                 </td>
-                <td className="py-3.5 px-3 text-center font-mono font-semibold text-slate-800">
+                <td className="py-3.5 px-3 text-left font-mono font-semibold text-slate-800">
                   {row.qtyDisplay}
                 </td>
-                <td className="py-3.5 px-3 text-right font-mono text-slate-900 font-medium">
+                <td className="py-3.5 px-3 text-left font-mono text-slate-900 font-medium">
                   {row.rateDisplay}
                 </td>
-                <td className="py-3.5 px-3 text-right font-mono font-medium text-slate-900">
+                <td className="py-3.5 px-3 text-left font-mono font-medium text-slate-900">
                   {formatCurrency(row.taxableAmount, currency)}
                 </td>
-                <td className="py-3.5 px-3 text-right font-mono text-slate-800 whitespace-nowrap">
+                <td className="py-3.5 px-3 text-left font-mono text-slate-800 whitespace-nowrap">
                   {formatCurrency(row.taxAmount, currency)}
                 </td>
-                <td className="py-3.5 pr-4 pl-3 text-right font-mono font-bold text-slate-950">
+                <td className="py-3.5 pr-4 pl-3 text-left font-mono font-bold text-slate-950">
                   {formatCurrency(row.totalAmount, currency)}
                 </td>
               </tr>
@@ -1187,17 +1187,17 @@ export default function InvoicePreviewDocument({
               <td colSpan={3} className="py-2.5 px-3 text-left">
                 Total Items: <span className="font-black text-[#0A0082]">{totalItemsCount}</span>
               </td>
-              <td className="py-2.5 px-3 text-center font-mono">
+              <td className="py-2.5 px-3 text-left font-mono">
                 {totalQtyDisplay}
               </td>
-              <td className="py-2.5 px-3 text-right text-slate-500">—</td>
-              <td className="py-2.5 px-3 text-right font-mono">
+              <td className="py-2.5 px-3 text-left text-slate-500">—</td>
+              <td className="py-2.5 px-3 text-left font-mono">
                 {formatCurrency(subtotal, currency)}
               </td>
-              <td className="py-2.5 px-3 text-right font-mono">
+              <td className="py-2.5 px-3 text-left font-mono">
                 {formatCurrency(totalTax, currency)}
               </td>
-              <td className="py-2.5 pr-4 pl-3 text-right font-mono font-black text-slate-950">
+              <td className="py-2.5 pr-4 pl-3 text-left font-mono font-black text-slate-950">
                 {formatCurrency(grandTotal, currency)}
               </td>
             </tr>
@@ -1235,41 +1235,41 @@ export default function InvoicePreviewDocument({
               <thead>
                 <tr className="border-b border-slate-200 text-slate-600 font-bold bg-slate-50/70">
                   <th className="py-2 px-3 text-left">Tax Component</th>
-                  <th className="py-2 px-3 text-right">Taxable Amount</th>
-                  <th className="py-2 px-3 text-right">Rate</th>
-                  <th className="py-2 pr-3 pl-2 text-right">Tax Amount</th>
+                  <th className="py-2 px-3 text-left">Taxable Amount</th>
+                  <th className="py-2 px-3 text-left">Rate</th>
+                  <th className="py-2 pr-3 pl-2 text-left">Tax Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {effectiveTaxBreakdown.length > 0 ? (
                   effectiveTaxBreakdown.map((comp) => (
                     <tr key={comp.id}>
-                      <td className="py-2 px-3 font-semibold text-slate-800">
+                      <td className="py-2 px-3 text-left font-semibold text-slate-800">
                         {comp.taxTypeCode || comp.taxComponent}
                       </td>
-                      <td className="py-2 px-3 text-right font-mono text-slate-800">
+                      <td className="py-2 px-3 text-left font-mono text-slate-800">
                         {formatCurrency(comp.taxableAmount ?? subtotal, currency)}
                       </td>
-                      <td className="py-2 px-3 text-right font-mono text-slate-800">
+                      <td className="py-2 px-3 text-left font-mono text-slate-800">
                         {comp.rate ? `${Number(comp.rate).toFixed(1)}%` : `${effectiveTaxRatePct}%`}
                       </td>
-                      <td className="py-2 pr-3 pl-2 text-right font-mono font-bold text-slate-900">
+                      <td className="py-2 pr-3 pl-2 text-left font-mono font-bold text-slate-900">
                         {formatCurrency(comp.amount, currency)}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td className="py-2 px-3 font-semibold text-slate-800">
+                    <td className="py-2 px-3 text-left font-semibold text-slate-800">
                       Integrated Tax (IGST / GST)
                     </td>
-                    <td className="py-2 px-3 text-right font-mono text-slate-800">
+                    <td className="py-2 px-3 text-left font-mono text-slate-800">
                       {formatCurrency(subtotal, currency)}
                     </td>
-                    <td className="py-2 px-3 text-right font-mono text-slate-800">
+                    <td className="py-2 px-3 text-left font-mono text-slate-800">
                       {effectiveTaxRatePct}%
                     </td>
-                    <td className="py-2 pr-3 pl-2 text-right font-mono font-bold text-slate-900">
+                    <td className="py-2 pr-3 pl-2 text-left font-mono font-bold text-slate-900">
                       {formatCurrency(totalTax, currency)}
                     </td>
                   </tr>

@@ -1,13 +1,7 @@
-import { RefreshCw } from "lucide-react";
-import Button from "../../../../components/Button/Button";
-
-export default function AcquisitionHeader({ lastSync, onRefresh, refreshing }) {
+export default function AcquisitionHeader({ lastSync }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <Button variant="outline" size="small" onClick={onRefresh} disabled={refreshing}>
-        <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-        {refreshing ? "Syncing..." : "Refresh"}
-      </Button>
+      {lastSync && <span className="text-xs text-slate-500">Last synced {lastSync}</span>}
     </div>
   );
 }

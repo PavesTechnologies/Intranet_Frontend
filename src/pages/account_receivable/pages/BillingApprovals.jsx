@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Eye, CheckCircle2, XCircle, ClipboardCheck, Clock, FolderKanban, Building2, Calendar, Receipt, Wallet, Info, AlertTriangle, FilterX } from "lucide-react";
 import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
-import { KPICard } from "../../../components/kpi/KPI";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/Modal/modal";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import FormTextArea from "../../../components/forms/FormTextArea";
 import SearchInput from "../../../components/filter/Searchbar";
-import FilterListbox from "../../../components/filter/FilterListbox";
+import ARKPICard from "../components/common/ARKPICard";
+import ARKPIStatusTabs from "../components/common/ARKPIStatusTabs";
+import ARClearFiltersButton from "../components/common/ARClearFiltersButton";
 import Pagination from "../../../components/Pagination/pagination";
 import StatusBadge from "../../../components/status/statusbadge";
 import { showStatusToast } from "../../../components/toastfy/toast";
@@ -49,15 +50,6 @@ const STATUS_TABS = {
   EXPIRED: "EXPIRED",
   ALL: "ALL",
 };
-
-// Options for the shared FilterListbox — same {label, value} shape used by every
-// other AR list page's status filter (see Overview.jsx's APPROVAL_STATUS_OPTIONS).
-const STATUS_FILTER_OPTIONS = [
-  { value: STATUS_TABS.PENDING, label: "Pending Approvals" },
-  { value: STATUS_TABS.APPROVED, label: "Approved" },
-  { value: STATUS_TABS.REJECTED, label: "Rejected" },
-  { value: STATUS_TABS.ALL, label: "All Requests" },
-];
 
 const TABLE_HEADERS = [
   "Project",
@@ -655,11 +647,6 @@ export default function BillingApprovals() {
     setCurrentPage(1);
   };
 
-  const handleTabChange = (key) => {
-    setStatusTab(key);
-    setCurrentPage(1);
-  };
-
   useEffect(() => {
     setCurrentPage(1);
   }, [statusTab, searchQuery]);
@@ -840,80 +827,44 @@ export default function BillingApprovals() {
 
       {/* 2. Summary KPI Cards (Total, Pending, Approved, Rejected) */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {kpiCards.map((kpi) => {
-          const isActive =
-            statusTab === kpi.key ||
-            (statusTab === STATUS_TABS.ALL && kpi.key === STATUS_TABS.ALL);
-
-          return (
-            <button
-              key={kpi.key}
-              type="button"
-              onClick={() => handleKpiClick(kpi.key)}
-              title={`Filter by ${kpi.label}`}
-              className="
-          text-left
-          rounded-xl
-          border-0
-          outline-none
-          focus:outline-none
-          focus-visible:outline-none
-          focus:ring-0
-          focus-visible:ring-0
-          active:ring-0
-          active:outline-none
-          appearance-none
-        "
-              style={{
-                outline: "none",
-                boxShadow: "none",
-              }}
-            >
-              <KPICard
-                label={kpi.label}
-                value={loading ? "…" : kpi.value}
-                icon={<kpi.icon className="h-5 w-5" />}
-                color={kpi.color}
-                active={isActive}
-                className="
-            h-full
-            w-full
-            cursor-pointer
-            bg-white
-            shadow-sm
-            border
-            border-slate-200
-            transition-all
-            hover:shadow-md
-            !outline-none
-            !ring-0
-            !ring-offset-0
-            focus:!outline-none
-            focus:!ring-0
-            focus:!ring-offset-0
-            focus-visible:!outline-none
-            focus-visible:!ring-0
-            focus-visible:!ring-offset-0
-            active:!ring-0
-            active:!outline-none
-          "
-                style={{
-                  outline: "none",
-                  boxShadow: "none",
-                }}
-              />
-            </button>
-          );
-        })}
+        {kpiCards.map((kpi) => (
+          <button
+            key={kpi.key}
+            type="button"
+            onClick={() => handleKpiClick(kpi.key)}
+            title={`Filter by ${kpi.label}`}
+            className="w-full rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          >
+            <ARKPICard
+              label={kpi.label}
+              value={loading ? "…" : kpi.value}
+              icon={<kpi.icon className="h-5 w-5" />}
+              color={kpi.color}
+              className="h-full w-full"
+            />
+          </button>
+        ))}
       </div>
 
       {/* 3. Main Data Card */}
       <PageCard>
         <PageCardContent className="p-4 sm:p-5 space-y-4">
-          {/* Filter row — shared SearchInput + shared FilterListbox, matching the
-              pattern used on Overview.jsx and other AR list pages. Status counts
-              remain visible via the KPI cards above, so they aren't duplicated here. */}
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Billing requests</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Review and track submitted billing configuration approvals.</p>
+          </div>
+          <ARKPIStatusTabs
+            label="Billing request approval status"
+            loading={loading}
+            items={kpiCards.map((kpi) => ({
+              key: kpi.key,
+              label: kpi.label,
+              value: kpi.value,
+              active: statusTab === kpi.key,
+              onClick: () => handleKpiClick(kpi.key),
+            }))}
+          />
+          <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/70 p-2 lg:flex-row lg:items-center lg:justify-between">
             <div className="w-full lg:max-w-md">
               <SearchInput
                 value={searchQuery}
@@ -922,16 +873,16 @@ export default function BillingApprovals() {
                 placeholder="Search by project, code, or client..."
               />
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="w-48 sm:w-52">
-                <FilterListbox
-                  options={STATUS_FILTER_OPTIONS}
-                  value={statusTab}
-                  onChange={handleTabChange}
-                  placeholder="Filter by Status"
-                />
-              </div>
-            </div>
+            {(statusTab !== STATUS_TABS.ALL || searchQuery) && (
+              <ARClearFiltersButton
+                onClick={() => {
+                  setStatusTab(STATUS_TABS.ALL);
+                  setSearchQuery("");
+                  setCurrentPage(1);
+                }}
+                title="Clear search and status filters"
+              />
+            )}
           </div>
 
           <div className="overflow-x-auto">

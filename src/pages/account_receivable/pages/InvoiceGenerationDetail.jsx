@@ -11,7 +11,6 @@ import {
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
 import StatusBadge from "../../../components/status/statusbadge";
-import Breadcrumb from "../../../components/Breadcrumb/Breadcrumb";
 import BackIconButton from "../components/common/BackIconButton";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { getActiveCompanyProfile } from "../services/companyProfileService";

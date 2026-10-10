@@ -1,8 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ArrowUpDown, Info, CheckCircle2, Clock, FileSpreadsheet } from "lucide-react";
 import StatusBadge from "../../../../components/status/statusbadge";
 import Loader from "../../../../components/ui/Loader";
 import SearchInput from "../../../../components/filter/Searchbar";
+import Pagination from "../../../../components/Pagination/pagination";
+
+const PAGE_SIZE = 10;
 
 export default function TimesheetDataTable({
   records = [],
@@ -14,6 +17,7 @@ export default function TimesheetDataTable({
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState("workDate");
   const [sortAsc, setSortAsc] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -55,6 +59,20 @@ export default function TimesheetDataTable({
     return result;
   }, [records, searchTerm, sortField, sortAsc]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / PAGE_SIZE));
+  const pageRecords = filteredAndSorted.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
   const totalHours = useMemo(() => {
     return records.reduce((acc, r) => acc + (Number(r.hours) || 0), 0);
   }, [records]);
@@ -79,7 +97,7 @@ export default function TimesheetDataTable({
           </h3>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:flex-row sm:items-center">
           <div className="relative w-48">
             <SearchInput
               value={searchTerm}
@@ -93,8 +111,7 @@ export default function TimesheetDataTable({
         </div>
       </div>
 
-      {/* Table Container with max 550px scroll height */}
-      <div className="max-h-[550px] w-full overflow-x-auto overflow-y-auto rounded-xl border border-slate-200">
+      <div className="w-full overflow-x-auto rounded-xl border border-slate-200">
         <table className="min-w-full divide-y divide-slate-200 text-xs">
           <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
             <tr className="text-slate-600">
@@ -163,7 +180,7 @@ export default function TimesheetDataTable({
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
             {filteredAndSorted.length > 0 ? (
-              filteredAndSorted.map((rec, idx) => (
+              pageRecords.map((rec, idx) => (
                 <tr key={rec.id || idx} className="transition-colors hover:bg-slate-50">
                   <td className="px-4 py-2.5 font-semibold text-slate-900">{rec.employee || "Employee"}</td>
                   <td className="px-4 py-2.5 font-mono text-slate-600">{rec.workDate}</td>
@@ -204,6 +221,20 @@ export default function TimesheetDataTable({
           </tbody>
         </table>
       </div>
+
+      {filteredAndSorted.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+          <p className="text-xs text-slate-500">
+            Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredAndSorted.length)} of {filteredAndSorted.length} records
+          </p>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+            onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+          />
+        </div>
+      )}
 
       <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
         <Info className="h-3 w-3 flex-shrink-0" />
