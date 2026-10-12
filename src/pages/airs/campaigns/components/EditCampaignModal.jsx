@@ -45,6 +45,11 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
     const isActive = (info.status || "").toUpperCase() === "ACTIVE";
 
     const currentStatus = (info.status || "").toUpperCase();
+    // Resuming needs a calibrated JD unless the campaign predates calibration
+    // (exempt campaigns carry a jd_calibration_warning instead).
+    const jdConfig = detail?.jd_configuration || {};
+    const resumeBlockedByJd = (jdConfig.jd_calibration_status || "CALIBRATED") !== "CALIBRATED"
+        && !jdConfig.jd_calibration_warning;
 
     const [form, setForm] = useState({});
     const [confirmScoring, setConfirmScoring] = useState(false);
@@ -323,6 +328,16 @@ export default function EditCampaignModal({ isOpen, onClose, campaignId, detail,
                         <p className="text-[11.5px] text-amber-700">
                             Pausing stops new uploads and suspends queued processing until resumed.
                             {impact && ` Currently ${impact.queued_task_count ?? 0} queued task(s) and ${impact.processing_bulk_job_count ?? 0} bulk job(s) in flight.`}
+                        </p>
+                    </div>
+                )}
+
+                {statusChanged && targetStatus === "ACTIVE" && resumeBlockedByJd && (
+                    <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-100">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                        <p className="text-[11.5px] text-amber-800">
+                            The JD '{jdConfig.jd_title}' is not calibrated, so this campaign can't be resumed yet.
+                            An HR admin must calibrate it first (JD &gt; Calibration).
                         </p>
                     </div>
                 )}

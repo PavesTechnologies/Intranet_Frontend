@@ -362,3 +362,46 @@ export const getJDUnknownSkills = async (jdId) => {
         throw error;
     }
 };
+
+// ---- JD calibration (HR_ADMIN edits; everyone else read-only) ----
+
+const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
+
+// GET /job-descriptions/{jd_id}/calibration - status, skills by tier, ambiguous
+// skill senses, experience + tolerance, education, live campaigns, warnings.
+export const getJDCalibration = async (jdId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}/calibration`, { headers: authHeader() });
+        return response.data?.data ?? response.data;
+    } catch (error) {
+        console.error("Error fetching JD calibration:", error);
+        toast.error(getErrorMessage(error, "Failed to load the JD calibration."));
+        throw error;
+    }
+};
+
+// PUT /job-descriptions/{jd_id}/calibration (HR_ADMIN) - 422 explains what is missing
+// (e.g. the meaning of an ambiguous skill). Live campaigns' scored candidates are
+// marked "score out of date"; nobody is re-scored automatically.
+export const saveJDCalibration = async (jdId, payload) => {
+    try {
+        const response = await api.put(`${BASE_URL}/job-descriptions/${jdId}/calibration`, payload, { headers: authHeader() });
+        toast.success(response.data?.message || "JD calibrated.");
+        return response.data?.data ?? response.data;
+    } catch (error) {
+        console.error("Error saving JD calibration:", error);
+        toast.error(getErrorMessage(error, "Failed to save the JD calibration."));
+        throw error;
+    }
+};
+
+// GET /job-descriptions/{jd_id}/calibration/versions - newest first.
+export const getJDCalibrationVersions = async (jdId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}/calibration/versions`, { headers: authHeader() });
+        return response.data?.data ?? response.data ?? [];
+    } catch (error) {
+        console.error("Error fetching JD calibration history:", error);
+        return [];
+    }
+};

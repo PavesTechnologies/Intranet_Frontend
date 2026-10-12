@@ -15,6 +15,7 @@ import EditCampaignModal from "./components/EditCampaignModal";
 import WeightPresetsModal from "./components/WeightPresetsModal";
 import useCampaignPermissions from "./hooks/useCampaignPermissions";
 import { getAllJDs } from "../service/jdservice";
+import JdCalibrationBadge from "../components/JdCalibrationBadge";
 import {
   createCampaign,
   getAllCampaigns,
@@ -228,8 +229,9 @@ export default function Campaigns() {
     })();
   }, [createModalOpen, jdList.length]);
 
-  //only verified+active jobs are campaign create eligible
-  const eligibleJds = useMemo(() => jdList.filter((jd) => jd.is_active_version && (jd.is_verified || "").toUpperCase() === "VERIFIED"
+  // Only active, calibrated JDs can start a campaign (the backend enforces this too).
+  const eligibleJds = useMemo(() => jdList.filter((jd) => jd.is_active_version
+      && (jd.calibration_status || "").toUpperCase() === "CALIBRATED"
     ),
     [jdList]
   );
@@ -238,7 +240,7 @@ export default function Campaigns() {
     {
       value: "",
       label: eligibleJds.length === 0 && jdList.length > 0
-        ? "No verified JDs available"
+        ? "No calibrated JDs available - an HR admin must calibrate a JD first"
         : "Select a job description",
     },
     ...eligibleJds.map((jd) => ({ value: jd.id, label: jd.title })),
@@ -498,6 +500,11 @@ export default function Campaigns() {
                       {c.jd_title || "—"}
                       {c.max_candidates != null && ` · ${c.max_candidates} opening${c.max_candidates === 1 ? "" : "s"}`}
                     </p>
+                    {c.jd_calibration_status && c.jd_calibration_status !== "CALIBRATED" && (
+                      <div className="mt-1" title={c.jd_calibration_warning || undefined}>
+                        <JdCalibrationBadge calibrationStatus={c.jd_calibration_status} compact />
+                      </div>
+                    )}
                   </div>
 
                   {/* Candidate stats — real pipeline data */}

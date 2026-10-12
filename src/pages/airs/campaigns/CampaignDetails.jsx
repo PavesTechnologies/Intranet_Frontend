@@ -43,6 +43,7 @@ import CandidateFilterBar from "./components/CandidateFilterBar";
 import { bulkSendRejectionEmail } from "../candidates/services/candidateScoreService";
 import { getBulkUploadFiles, getBulkUploadFileLog } from "../service/resumeIntake";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../../components/ui/tooltip";
+import JdCalibrationBadge from "../components/JdCalibrationBadge";
 
 // Colour per pipeline stage (used for the funnel bars)
 const STAGE_COLORS = {
@@ -223,6 +224,17 @@ export default function CampaignDetails() {
         </div>
       )}
 
+      {/* A campaign that predates JD calibration keeps running, with this warning until its JD is calibrated. */}
+      {jd.jd_calibration_warning && (
+        <div className="mb-4 flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-100">
+          <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          <p className="text-[11.5px] text-amber-800">
+            {jd.jd_calibration_warning}{" "}
+            {jd.jd_id && <Link to={`/ai-screening/jds/${jd.jd_id}`} className="font-bold underline">Open the JD</Link>}
+          </p>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-6 gap-6">
         {tabs.map((t) => (<button
@@ -399,6 +411,11 @@ function DetailsTab({ info, jd, scoring, limits, hm }) {
           <p className="text-[10px] text-slate-400 mt-1">
             v{jd.version_number ?? "—"} · {jd.jurisdiction ?? "—"} · {jd.mandatory_skill_count ?? 0} mandatory skills
           </p>
+          {jd.jd_calibration_status && (
+            <div className="mt-1.5">
+              <JdCalibrationBadge calibrationStatus={jd.jd_calibration_status} verificationStatus={jd.jd_verification_status} />
+            </div>
+          )}
         </div>
       </div>
 

@@ -29,6 +29,8 @@ import {
 import { toast } from "react-toastify";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import Button from "../../../components/Button/Button";
+import JdCalibrationPanel from "./components/JdCalibrationPanel";
+import JdCalibrationBadge from "../components/JdCalibrationBadge";
 import Modal from "../../../components/ui/Modal";
 import SkillActionModal from "../../../components/Modal/modal";
 import FormInput from "../../../components/forms/FormInput";
@@ -158,7 +160,7 @@ export default function JdDetails() {
       }
     };
     fetchJd();
-  }, [id]);
+  }, [id, jdReloadKey]);
 
   const [isExporting, setIsExporting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -260,6 +262,8 @@ export default function JdDetails() {
 
   // Tabs: overview, skills, campaigns, versions, audit
   const [activeTab, setActiveTab] = useState("overview");
+  // Bumped after a calibration save so the JD (and its badge) reload.
+  const [jdReloadKey, setJdReloadKey] = useState(0);
 
   const [dbCampaigns, setDbCampaigns] = useState([]);
   const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false);
@@ -781,8 +785,9 @@ export default function JdDetails() {
   const experience = currentJd.experience || (currentJd.min_experience_years !== null && currentJd.min_experience_years !== undefined ? `${currentJd.min_experience_years} years` : "Not Specified");
   const education = currentJd.education || (currentJd.education_criteria ? `${currentJd.education_criteria.degree || ""} in ${currentJd.education_criteria.field || ""}` : "Not Specified");
   const source = currentJd.source || (currentJd.source_format === "TEXT" ? "Manual" : currentJd.source_format === "PDF" ? "PDF Upload" : currentJd.source_format === "DOCX" ? "DOCX Upload" : currentJd.source_format || "Manual");
-  const status = currentJd.status || currentJd.is_verified || (currentJd.is_active_version ? "Ready" : "Closed");
-  const isJdCampaignEligible = currentJd.is_active_version && (currentJd.is_verified || "").toUpperCase() === "VERIFIED";
+  // A campaign needs an active JD that an HR admin has calibrated (enforced by the backend too).
+  const isJdCalibrated = (currentJd.calibration_status || "").toUpperCase() === "CALIBRATED";
+  const isJdCampaignEligible = currentJd.is_active_version && isJdCalibrated;
   const createdBy = currentJd.createdBy || currentJd.created_by || "System";
   const createdDate = currentJd.createdDate || (currentJd.created_at ? currentJd.created_at.split('T')[0] : "");
   const updatedDate = currentJd.updatedDate || (currentJd.updated_at ? currentJd.updated_at.split('T')[0] : createdDate);
@@ -1121,6 +1126,7 @@ export default function JdDetails() {
       <div className="flex border-b border-slate-200 mb-6 gap-6 overflow-x-auto whitespace-nowrap scrollbar-none">
         {[
           { id: "overview", label: "Overview" },
+          { id: "calibration", label: "Calibration" },
           { id: "extracted_json", label: "Extracted JSON" },
           { id: "jd_skills", label: "JD Skill" },
           { id: "jd_unknown_skills", label: "JD Unknown Skills" },
@@ -1180,13 +1186,19 @@ export default function JdDetails() {
               </div>
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">Status</span>
-                <span className="inline-block mt-0.5 bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded text-[10px] border border-blue-100">
-                  {status}
+                <span className="inline-block mt-0.5">
+                  <JdCalibrationBadge calibrationStatus={currentJd.calibration_status}
+                    calibrationVersion={currentJd.calibration_version} verificationStatus={currentJd.is_verified} />
                 </span>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* --- CALIBRATION TAB (HR_ADMIN edits; everyone else read-only) --- */}
+      {activeTab === "calibration" && (
+        <JdCalibrationPanel jdId={id} canCalibrate={isHRAdmin} onSaved={() => setJdReloadKey((k) => k + 1)} />
       )}
 
       {/* --- EXTRACTED JSON TAB --- */}
@@ -1506,8 +1518,10 @@ export default function JdDetails() {
                   variant="primary"
                   disabled={!isJdCampaignEligible}
                   title={!isJdCampaignEligible
-                    ?"Campaigns require a verified,active JD - resolve unknown skills first."
-                    :undefined}
+                    ? (!currentJd.is_active_version
+                      ? "Campaigns need the active version of this JD."
+                      : "Calibrate this JD first (Calibration tab) - campaigns need a calibrated JD.")
+                    : undefined}
                   onClick={() => {
                     setCampaignForm(DEFAULT_CAMPAIGN_FORM);
                     setLinkCampaignModalOpen(true);

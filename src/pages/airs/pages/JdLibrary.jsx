@@ -29,6 +29,7 @@ import Modal from "../../../components/ui/Modal";
 import FilterListbox from "../../../components/filter/FilterListbox";
 // import CountriesList from "../../../components/CountriesList";
 import { Badge } from "../../../components/ui/badge";
+import JdCalibrationBadge from "../components/JdCalibrationBadge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../../components/ui/tabs";
 import GenericTable from "../../../components/Table/table";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -300,7 +301,10 @@ export default function JdLibrary() {
         ),
         status: (
           <div className="w-full flex justify-center">
-            {getStatusBadge(status)}
+            {String(status).toUpperCase() === "CLOSED"
+              ? getStatusBadge(status)
+              : <JdCalibrationBadge calibrationStatus={jd.calibration_status}
+                  calibrationVersion={jd.calibration_version} verificationStatus={jd.is_verified} />}
           </div>
         ),
         isActive: (
