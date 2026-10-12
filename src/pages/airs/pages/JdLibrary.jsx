@@ -39,7 +39,8 @@ import JdProcessingList from "./JdProcessingList";
 const statusOptions = [
   { label: "All Statuses", value: "All" },
   { label: "VERIFIED", value: "VERIFIED" },
-  { label: "UNVERIFIED", value: "UNVERIFIED" },
+  // The backend stores NOT_VERIFIED; "UNVERIFIED" never matched anything.
+  { label: "NOT VERIFIED", value: "NOT_VERIFIED" },
   { label: "PARTIALLY VERIFIED", value: "PARTIALLY_VERIFIED" }
 ];
 
@@ -202,7 +203,7 @@ export default function JdLibrary() {
     if (normalized === "VERIFIED") {
       return <Badge className="bg-blue-50 text-blue-700 border-blue-100 font-semibold px-2.5 py-1 text-xs">{status}</Badge>;
     }
-    if (normalized === "UNVERIFIED") {
+    if (normalized === "NOT_VERIFIED") {
       return <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-semibold px-2.5 py-1 text-xs">{status}</Badge>;
     }
     if (normalized === "PARTIALLY_VERIFIED") {
