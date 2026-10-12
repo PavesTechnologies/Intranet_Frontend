@@ -8,6 +8,7 @@ import LoadingSpinner from "../../../../components/LoadingSpinner";
 import ConfirmationModal from "../../../../components/confirmation_modal/ConfirmationModal";
 import AIProviderFormModal from "./AIProviderFormModal";
 import useAiProviders from "../hooks/useAiProviders";
+import { describeModels } from "../utils/modelSetup";
 
 const formatDate = (value) => (value ? new Date(value).toLocaleString() : null);
 
@@ -29,6 +30,32 @@ function StatusPill({ row }) {
     </span>
   );
 }
+
+// "Extraction · gemini-lite" lines, with the backup model under each.
+function ModelList({ row }) {
+  const lines = describeModels(row);
+  const single = lines.length === 1 && lines[0].usage === "BOTH";
+  return (
+    <div className="space-y-0.5 max-w-[280px]">
+      {lines.map((m) => (
+        <div key={m.usage} className="text-[12px] leading-tight">
+          <span className="text-slate-700 truncate inline-block max-w-full align-middle" title={m.model}>
+            {!single && <span className="text-[10.5px] font-semibold text-slate-400 mr-1">{m.label}:</span>}
+            {m.model}
+          </span>
+          {m.backup && (
+            <div className="text-[10.5px] text-slate-400 truncate" title={m.backup}>backup: {m.backup}</div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const modelSummary = (row) =>
+  describeModels(row)
+    .map((m) => (m.usage === "BOTH" ? m.model : `${m.label}: ${m.model}`))
+    .join(" · ");
 
 // Disabled buttons don't receive hover (pointer-events-none), so the reason
 // a button is disabled lives on this wrapper's title instead.
@@ -84,17 +111,13 @@ export default function SettingsAIProviders() {
     return null;
   };
 
-  const headers = ["Provider", "Model", "API key", "Status", "Actions"];
+  const headers = ["Provider", "Models", "API key", "Status", "Actions"];
   const columns = ["provider", "model", "apiKey", "status", "actions"];
   const tableRows = providers.rows.map((row) => ({
     id: row.id,
     rowClass: "hover:bg-slate-50/50 transition",
     provider: <span className="font-semibold text-slate-900">{row.provider_label}</span>,
-    model: (
-      <span className="text-slate-700 truncate max-w-[220px] inline-block align-middle" title={row.model_name}>
-        {row.model_name}
-      </span>
-    ),
+    model: <ModelList row={row} />,
     apiKey: <span className="font-mono text-[12px] text-slate-500">{row.api_key_masked || "—"}</span>,
     status: <StatusPill row={row} />,
     actions: (
@@ -159,7 +182,7 @@ export default function SettingsAIProviders() {
             </span>
           ) : (
             <span className="text-slate-600">
-              Active: <span className="font-semibold">{active.provider_label} · {active.model_name}</span>
+              Active: <span className="font-semibold">{active.provider_label} · {modelSummary(active)}</span>
             </span>
           )}
         </div>
@@ -210,7 +233,7 @@ export default function SettingsAIProviders() {
         message={
           confirm?.type === "delete"
             ? `${confirm?.row.provider_label} and its saved API key will be removed.`
-            : `New JD parsing, resume parsing and AI evaluation jobs will use ${confirm?.row.provider_label} · ${confirm?.row.model_name}.`
+            : `New JD parsing, resume parsing and AI evaluation jobs will use ${confirm?.row.provider_label} · ${confirm ? modelSummary(confirm.row) : ""}.`
         }
         confirmText={confirm?.type === "delete" ? "Delete" : "Set active"}
         variant={confirm?.type === "delete" ? "danger" : "primary"}
