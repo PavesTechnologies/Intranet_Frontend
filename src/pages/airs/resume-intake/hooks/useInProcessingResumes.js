@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAllResumes } from "../../service/resumeIntake";
 
 // Backs the "In Processing" tab beside Resume Upload History, using the same
@@ -19,7 +19,8 @@ export default function useInProcessingResumes({ campaignFilter, statusFilter, s
   const [isLoading, setIsLoading] = useState(false);
 
   const [sortBy, sortDir] = sortValue.split(":");
-  const statusesToFetch = statusFilter ? [statusFilter] : IN_PROCESS_STATUSES;
+  // Memoised so the effect below can depend on it without refetching every render.
+  const statusesToFetch = useMemo(() => (statusFilter ? [statusFilter] : IN_PROCESS_STATUSES), [statusFilter]);
 
   // Initial REST load only — live progress after this comes from each row's
   // own WS subscription (ResumeProcessingCard), which also triggers
@@ -68,7 +69,7 @@ export default function useInProcessingResumes({ campaignFilter, statusFilter, s
     return () => {
       cancelled = true;
     };
-  }, [campaignFilter, statusFilter, sourceFilter, sortBy, sortDir, enabled]);
+  }, [campaignFilter, statusesToFetch, sourceFilter, sortBy, sortDir, enabled]);
 
   const refreshInProcessing = async () => {
     const baseParams = {

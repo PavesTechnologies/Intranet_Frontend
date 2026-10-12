@@ -84,6 +84,15 @@ export default function useTalentPool() {
     setCurrentPage(1);
   };
 
+  // Array filters are compared by content, not identity, so a re-created but
+  // identical array never refetches.
+  const locationsKey = filters.locations.join("|");
+  const designationsKey = filters.designations.join("|");
+  const degreeLevelsKey = filters.degreeLevels.join("|");
+  const educationFieldsKey = filters.educationFields.join("|");
+  const campaignIdsKey = filters.campaignIds.join("|");
+  const pipelineStagesKey = filters.pipelineStages.join("|");
+
   const load = useCallback(async () => {
     const isSemantic = searchMode === TALENT_POOL_SEARCH_MODES.SEMANTIC;
     const query = searchText.trim();
@@ -137,16 +146,17 @@ export default function useTalentPool() {
     } finally {
       setLoading(false);
     }
+    // The *Key values stand in for the filter arrays read above (content, not identity).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     searchMode,
     searchText,
-    filters.locations.join("|"),
-    filters.designations.join("|"),
-    filters.degreeLevels.join("|"),
-    filters.educationFields.join("|"),
-    filters.campaignIds.join("|"),
-    filters.pipelineStages.join("|"),
+    locationsKey,
+    designationsKey,
+    degreeLevelsKey,
+    educationFieldsKey,
+    campaignIdsKey,
+    pipelineStagesKey,
     filters.experienceMin,
     filters.experienceMax,
     filters.scoreMin,

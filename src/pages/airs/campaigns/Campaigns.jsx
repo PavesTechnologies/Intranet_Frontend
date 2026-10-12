@@ -282,10 +282,13 @@ export default function Campaigns() {
     // don't fire a doomed request per visible card; cards fall back to the
     // "Pipeline metrics unavailable" state.
     if (!canViewPipeline) return;
+    // The ref holds one Set for the component's lifetime; read it once so the
+    // cleanup below releases ids from the same Set this run added them to.
+    const requestedIds = requestedIdsRef.current;
     const idsOnPage = [...new Set(paginatedCampaigns.map((c) => c.id).filter(Boolean))];
-    const missing = idsOnPage.filter((id) => !(id in pipelineStats) && !requestedIdsRef.current.has(id));
+    const missing = idsOnPage.filter((id) => !(id in pipelineStats) && !requestedIds.has(id));
     if (missing.length === 0) return;
-    missing.forEach((id) => requestedIdsRef.current.add(id));
+    missing.forEach((id) => requestedIds.add(id));
 
     let cancelled = false;
     (async () => {
@@ -309,7 +312,7 @@ export default function Campaigns() {
       // or unmounted before it resolved) so they're retried instead of stuck
       // "requested" forever; ids that did land are already excluded above via
       // the `id in pipelineStats` check, so this is a no-op for those.
-      missing.forEach((id) => requestedIdsRef.current.delete(id));
+      missing.forEach((id) => requestedIds.delete(id));
     };
   }, [paginatedCampaigns, pipelineStats, canViewPipeline]);
 

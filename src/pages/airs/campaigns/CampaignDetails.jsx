@@ -1812,8 +1812,13 @@ function TimelineTab({ campaignId }) {
     ...availableTypes.map((t) => ({ value: t, label: stageLabel(t) })),
   ];
 
-  // Reload from scratch whenever the event-type filter changes
-  useEffect(() => { load(true); /* eslint-disable-next-line */ }, [eventType]);
+  // Reload from scratch whenever the event-type filter changes. `load` is
+  // deliberately not a dependency: it changes with `offset`, which load()
+  // itself advances, so depending on it would reload in a loop.
+  useEffect(() => {
+    load(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventType]);
 
   const hasMore = events.length < total;
 
