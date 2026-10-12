@@ -353,27 +353,27 @@ export default function CurrencyManagementPage() {
   const currencyTotalPages = Math.ceil(totalCurrenciesFilteredCount / ITEMS_PER_PAGE);
 
   // Exchange Rates Pagination/Filters Computing
+  // Newest effective date first, then by currency pair, so each day's rates are grouped together.
+  const filteredSortedRates = allExchangeRates
+    .filter((r) => {
+      const matchesFrom = !rateFromCurrencyFilter || r.fromCurrencyCode === rateFromCurrencyFilter;
+      const matchesTo = !rateToCurrencyFilter || r.toCurrencyCode === rateToCurrencyFilter;
+      const matchesDate = !rateEffectiveDateFilter || r.effectiveDate === rateEffectiveDateFilter;
+      return matchesFrom && matchesTo && matchesDate;
+    })
+    .sort((a, b) =>
+      (b.effectiveDate || "").localeCompare(a.effectiveDate || "")
+      || (a.fromCurrencyCode || "").localeCompare(b.fromCurrencyCode || "")
+      || (a.toCurrencyCode || "").localeCompare(b.toCurrencyCode || "")
+    );
+
   const displayedRates = isRatesServerPaginated
     ? exchangeRates
-    : (() => {
-        const filtered = allExchangeRates.filter((r) => {
-          const matchesFrom = !rateFromCurrencyFilter || r.fromCurrency === rateFromCurrencyFilter;
-          const matchesTo = !rateToCurrencyFilter || r.toCurrency === rateToCurrencyFilter;
-          const matchesDate = !rateEffectiveDateFilter || r.effectiveDate === rateEffectiveDateFilter;
-          return matchesFrom && matchesTo && matchesDate;
-        });
-        const start = (rateCurrentPage - 1) * ITEMS_PER_PAGE;
-        return filtered.slice(start, start + ITEMS_PER_PAGE);
-      })();
+    : filteredSortedRates.slice((rateCurrentPage - 1) * ITEMS_PER_PAGE, rateCurrentPage * ITEMS_PER_PAGE);
 
   const totalRatesFilteredCount = isRatesServerPaginated
     ? totalRatesCount
-    : allExchangeRates.filter((r) => {
-        const matchesFrom = !rateFromCurrencyFilter || r.fromCurrency === rateFromCurrencyFilter;
-        const matchesTo = !rateToCurrencyFilter || r.toCurrency === rateToCurrencyFilter;
-        const matchesDate = !rateEffectiveDateFilter || r.effectiveDate === rateEffectiveDateFilter;
-        return matchesFrom && matchesTo && matchesDate;
-      }).length;
+    : filteredSortedRates.length;
 
   const ratesTotalPages = Math.ceil(totalRatesFilteredCount / ITEMS_PER_PAGE);
 
