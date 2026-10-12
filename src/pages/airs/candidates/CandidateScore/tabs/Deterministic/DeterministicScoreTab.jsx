@@ -8,7 +8,6 @@ import SummaryCard from "./components/SummaryCard";
 import SkillsTabNav from "./components/SkillsTabNav";
 import SkillsTable from "./components/SkillsTable";
 import MissingSkillsList from "./components/MissingSkillsList";
-import AdditionalSkillsList from "./components/AdditionalSkillsList";
 import PaginatedSkillsSection from "./components/PaginatedSkillsSection";
 import ValidationSection from "./components/ValidationSection";
 import ScoreCalculation from "./components/ScoreCalculation";
@@ -59,7 +58,6 @@ export default function DeterministicScoreTab({ candidate, onLayerFailure }) {
             mandatory: breakdown.mandatorySkills.length,
             preferred: breakdown.preferredSkills.length,
             missing: breakdown.missingMandatorySkills.length,
-            additional: breakdown.additionalCandidateSkills.length,
           }}
         />
         <div className="mt-4">
@@ -78,16 +76,11 @@ export default function DeterministicScoreTab({ candidate, onLayerFailure }) {
               {(pageItems) => <MissingSkillsList items={pageItems} />}
             </PaginatedSkillsSection>
           )}
-          {skillsTab === "additional" && (
-            <PaginatedSkillsSection items={breakdown.additionalCandidateSkills}>
-              {(pageItems) => <AdditionalSkillsList items={pageItems} />}
-            </PaginatedSkillsSection>
-          )}
         </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl px-4">
-        <AccordionSection icon={ShieldCheck} title="Validation">
+        <AccordionSection icon={ShieldCheck} title="Experience & Education">
           <ValidationSection
             experienceValidation={breakdown.experienceValidation}
             educationValidation={breakdown.educationValidation}

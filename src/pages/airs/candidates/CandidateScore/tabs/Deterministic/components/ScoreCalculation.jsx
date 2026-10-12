@@ -1,13 +1,16 @@
 import React from "react";
 import { isEmpty } from "../../../../utils/candidateDataUtils";
 
-function ScoreBar({ label, value, weightPct, color }) {
-  const hasValue = !isEmpty(value);
+// applicable=false: the part didn't count toward the final score (no JD
+// requirement / no data) - shown greyed, never as a real 100 or 0.
+function ScoreBar({ label, value, weightPct, color, applicable = true }) {
+  const hasValue = applicable && !isEmpty(value);
   return (
-    <div>
+    <div className={applicable ? "" : "opacity-60"}>
       <div className="flex items-center justify-between text-[11.5px] mb-1">
         <span className="text-slate-500">
-          {label} <span className="text-slate-400">({weightPct}% weight)</span>
+          {label}{" "}
+          <span className="text-slate-400">{applicable ? `(${weightPct}% weight)` : "(not applicable - not counted)"}</span>
         </span>
         <span className="font-semibold text-slate-900">{hasValue ? Number(value).toFixed(2) : "-"}</span>
       </div>
@@ -59,8 +62,14 @@ export default function ScoreCalculation({ scoreCalculation, configuration }) {
       {hasFunctional && (
         <ScoreBar label="Functional Score" value={sc.functional_score} weightPct={pct(config.functional_weight)} color="#059669" />
       )}
-      <ScoreBar label="Experience Score" value={sc.experience_score} weightPct={pct(config.experience_weight)} color="#7C3AED" />
-      <ScoreBar label="Education Score" value={sc.education_score} weightPct={pct(config.education_weight)} color="#0D9488" />
+      <ScoreBar
+        label="Experience Score" value={sc.experience_score} weightPct={pct(config.experience_weight)} color="#7C3AED"
+        applicable={sc.experience_applicable !== false}
+      />
+      <ScoreBar
+        label="Education Score" value={sc.education_score} weightPct={pct(config.education_weight)} color="#0D9488"
+        applicable={sc.education_applicable !== false}
+      />
 
       {hasFunctional && (requiredCapabilities.length > 0 || preferredCapabilities.length > 0) && (
         <div className="space-y-3 pt-1">
@@ -75,6 +84,11 @@ export default function ScoreCalculation({ scoreCalculation, configuration }) {
           {isEmpty(sc.final_score) ? "-" : `${Number(sc.final_score).toFixed(2)} / 100`}
         </span>
       </div>
+      {(sc.experience_applicable === false || sc.education_applicable === false) && (
+        <p className="text-[10.5px] text-slate-400">
+          Parts that don't apply are left out and the remaining weights are scaled up to 100%.
+        </p>
+      )}
 
     </div>
   );
