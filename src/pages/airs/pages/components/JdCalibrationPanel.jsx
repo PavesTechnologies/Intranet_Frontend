@@ -56,7 +56,9 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved }) {
 
   const coreCount = useMemo(
     () => (form ? Object.values(form.skills).filter((s) => s.tier === "CORE").length : 0), [form]);
-  const minYears = form && form.min !== "" ? Number(form.min) : null;
+  // Blank means "use the extracted minimum" (scoring falls back to it).
+  const extractedMin = view?.extracted_min_experience_years ?? null;
+  const minYears = form && form.min !== "" ? Number(form.min) : extractedMin;
   const defaultTolerance = minYears !== null ? Math.max(1, Math.round(minYears * 0.1 * 10) / 10) : null;
 
   const setSkill = (id, patch) => setForm((f) => ({ ...f, skills: { ...f.skills, [id]: { ...f.skills[id], ...patch } } }));
@@ -217,6 +219,9 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved }) {
           <span className="font-bold">Minimum experience (years)</span>
           <input type="number" min="0" max="60" step="0.5" className={inputClass} disabled={readOnly}
             value={form.min} onChange={(e) => setForm((f) => ({ ...f, min: e.target.value }))} />
+          <span className="text-[10px] text-slate-400">
+            Blank uses the extracted minimum ({extractedMin !== null ? `${extractedMin} years` : "none extracted"}). Enter 0 for no minimum.
+          </span>
         </label>
         <label className="text-xs text-slate-700 flex flex-col gap-1">
           <span className="font-bold">Tolerance (years)</span>
