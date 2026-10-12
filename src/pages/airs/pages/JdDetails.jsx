@@ -509,6 +509,11 @@ export default function JdDetails() {
     isHRAdmin && "action",
   ].filter(Boolean);
 
+  // While a campaign using this JD is live, skill edits go through the
+  // Calibration tab (a new calibration version) instead of per-skill edits.
+  const skillEditsLocked = Boolean((jdDetail || jd)?.has_live_campaign);
+  const SKILL_EDITS_LOCKED_NOTE = "Edit skills in the Calibration tab";
+
   const jdSkillsRows = useMemo(() => {
     return paginatedSkills.map((sk) => {
       return {
@@ -567,10 +572,12 @@ export default function JdDetails() {
         ),
         action: (
           <div className="w-full flex justify-center gap-1.5">
-            <Button variant="outline" size="small" title="Edit Mandatory / Importance" onClick={() => openSkillEdit(sk)}>
+            <Button variant="outline" size="small" disabled={skillEditsLocked}
+              title={skillEditsLocked ? SKILL_EDITS_LOCKED_NOTE : "Edit Mandatory / Importance"} onClick={() => openSkillEdit(sk)}>
               <Edit2 className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="danger" size="small" title="Remove Skill from JD" onClick={() => setSkillRemoveTarget(sk)}>
+            <Button variant="danger" size="small" disabled={skillEditsLocked}
+              title={skillEditsLocked ? SKILL_EDITS_LOCKED_NOTE : "Remove Skill from JD"} onClick={() => setSkillRemoveTarget(sk)}>
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -578,7 +585,7 @@ export default function JdDetails() {
         rowClass: "hover:bg-slate-50/50 transition",
       };
     });
-  }, [paginatedSkills]);
+  }, [paginatedSkills, skillEditsLocked]);
 
   // Selecting/resolving unknown skills is an HR_ADMIN-only action — the
   // select and action columns only exist for that role; RECRUITER and
@@ -1396,6 +1403,11 @@ export default function JdDetails() {
             <div>
               <h3 className="text-sm font-bold text-slate-900">JD Skill</h3>
               <p className="text-[11px] text-slate-500 mt-0.5">Vector-mapped skills extracted and matched from the job description taxonomy.</p>
+              {skillEditsLocked && (
+                <p className="text-[11px] text-amber-700 font-semibold mt-1">
+                  A campaign using this JD is live. {SKILL_EDITS_LOCKED_NOTE}.
+                </p>
+              )}
             </div>
           </div>
 
