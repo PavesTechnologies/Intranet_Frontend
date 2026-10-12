@@ -1,11 +1,10 @@
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, Layers } from "lucide-react";
+import { Plus, Pencil, Trash2, Layers, CalendarClock } from "lucide-react";
 import Select from "react-select";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import { PageCard, PageCardContent } from "@/components/Cards/PageCard";
 import GenericTable from "@/components/Table/table";
-import Pagination from "@/components/Pagination/pagination";
 import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
 import Modal from "@/components/Modal/modal";
@@ -19,6 +18,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { showStatusToast } from "@/components/toastfy/toast";
 import api from "@/api/axiosInstance";
 import { Fonts } from "@/components/Fonts/Fonts";
+import { taxCodeService } from "@/pages/expense-management/api/expenseReportsApi";
+import Pagination from "@/components/Pagination/pagination";
+import CategoryTaxMappingModal from "@/pages/expense-management/components/masters/CategoryTaxMappingModal";
 
 const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
 
@@ -137,6 +139,8 @@ export default function ExpenseCategoriesPage() {
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState(null);
+  // Category whose dated tax mappings are open in the mapping modal.
+  const [mappingCategory, setMappingCategory] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   const getGlAccountsList = useCallback(() => {
@@ -191,6 +195,36 @@ export default function ExpenseCategoriesPage() {
   useEffect(() => {
     fetchActiveGlAccounts();
   }, []);
+
+  // Tax Configuration master - a newly chosen Tax Code must be an active one (validated server-side).
+  // All codes are loaded so a category still mapped to a deactivated code can show it as such.
+  const [taxCodes, setTaxCodes] = useState([]);
+  useEffect(() => {
+    taxCodeService
+      .getAll()
+      .then((res) => setTaxCodes(Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : []))
+      .catch((err) => console.error("Failed to load tax codes:", err));
+  }, []);
+  const isActiveTaxCode = (t) => (t.status || "").toUpperCase() === "ACTIVE";
+  const currentTaxCode = formData.taxCode
+    ? taxCodes.find((t) => t.taxCode.toUpperCase() === formData.taxCode.toUpperCase())
+    : undefined;
+  const taxCodeOptions = [
+    { label: "— No tax —", value: "" },
+    ...taxCodes
+      .filter(isActiveTaxCode)
+      .map((t) => ({ label: `${t.taxCode} - ${t.taxName} (${Number(t.ratePercent)}%)`, value: t.taxCode })),
+    // Keep the category's current value selectable so editing other fields doesn't silently drop it:
+    // a deactivated code, or legacy free text that was never in the master.
+    ...(formData.taxCode && !(currentTaxCode && isActiveTaxCode(currentTaxCode))
+      ? [{
+          label: currentTaxCode
+            ? `${currentTaxCode.taxCode} - ${currentTaxCode.taxName} (inactive)`
+            : `${formData.taxCode} (not in Tax Configuration)`,
+          value: formData.taxCode,
+        }]
+      : []),
+  ];
 
   useEffect(() => {
     fetchCategories();
@@ -252,14 +286,6 @@ export default function ExpenseCategoriesPage() {
     setSearchTerm(value || "");
     setCurrentPage(1);
   }, []);
-
-  const handlePreviousPage = useCallback(() => {
-    setCurrentPage((prev) => Math.max(prev - 1, 1));
-  }, []);
-
-  const handleNextPage = useCallback(() => {
-    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
-  }, [totalPages]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -441,12 +467,12 @@ export default function ExpenseCategoriesPage() {
   ];
 
   const headers = isAdmin
-    ? ["S.No", "Category Code", "Category Name", "GL Account", "Max Limit", "Receipt Req.", "Status", "Actions"]
-    : ["S.No", "Category Code", "Category Name", "GL Account", "Max Limit", "Receipt Req.", "Status"];
+    ? ["S.No", "Category Code", "Category Name", "GL Account", "Tax", "Max Limit", "Receipt Req.", "Status", "Actions"]
+    : ["S.No", "Category Code", "Category Name", "GL Account", "Tax", "Max Limit", "Receipt Req.", "Status"];
 
   const columns = isAdmin
-    ? ["serial_no", "categoryCode", "categoryName", "glAccount", "maxLimit", "receiptRequired", "status", "actions"]
-    : ["serial_no", "categoryCode", "categoryName", "glAccount", "maxLimit", "receiptRequired", "status"];
+    ? ["serial_no", "categoryCode", "categoryName", "glAccount", "tax", "maxLimit", "receiptRequired", "status", "actions"]
+    : ["serial_no", "categoryCode", "categoryName", "glAccount", "tax", "maxLimit", "receiptRequired", "status"];
 
   const tableRows = displayedCategories.map((cat, index) => {
     const statusVal = cat.status || "INACTIVE";
@@ -460,6 +486,7 @@ export default function ExpenseCategoriesPage() {
       categoryCode: cat.categoryCode || "N/A",
       categoryName: cat.categoryName || "N/A",
       glAccount: glAccountDisplay,
+      tax: cat.taxCode ? `${cat.taxCode}${cat.taxRate != null ? ` (${Number(cat.taxRate)}%)` : ""}` : "—",
       maxLimit: cat.maxLimit !== undefined ? `${cat.maxLimit}` : "—",
       receiptRequired: (
         <span
@@ -488,6 +515,18 @@ export default function ExpenseCategoriesPage() {
             onClick={() => handleEditClick(cat)}
           >
             <Pencil size={16} />
+          </Button>
+
+          <Button
+            type="button"
+            variant="link"
+            size="icon"
+            title="Tax mapping (by date)"
+            aria-label="Tax mapping"
+            className="h-8 w-8 p-0 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-800 transition rounded-md"
+            onClick={() => setMappingCategory(cat)}
+          >
+            <CalendarClock size={16} />
           </Button>
 
           <Button
@@ -588,16 +627,14 @@ export default function ExpenseCategoriesPage() {
               />
             </div>
 
-            {totalPages > 1 && (
-              <div className="mt-4 flex justify-center">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPrevious={handlePreviousPage}
-                  onNext={handleNextPage}
-                />
-              </div>
-            )}
+            <div className="mt-4 flex justify-center">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPrevious={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                onNext={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+              />
+            </div>
           </>
         )}
       </div>
@@ -731,14 +768,21 @@ export default function ExpenseCategoriesPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormInput
-              label="Tax Code"
-              name="taxCode"
-              placeholder="e.g. GST-18"
-              value={formData.taxCode}
-              onChange={handleInputChange}
-              disabled={submitting}
-            />
+            <div>
+              <FormSelect
+                label="Tax Code"
+                name="taxCode"
+                value={formData.taxCode}
+                onChange={(e) => handleSelectChange("taxCode", e.target.value)}
+                options={taxCodeOptions}
+                anchorOptions
+              />
+              <p className="mt-1 text-[11px] text-gray-500">
+                {currentCategory
+                  ? "A change applies from today. To schedule one, use Tax mapping in the table."
+                  : "Applies from the category's effective date."}
+              </p>
+            </div>
 
             <FormSelect
               label="Status"
@@ -778,6 +822,15 @@ export default function ExpenseCategoriesPage() {
       </Modal>
 
       {/* Delete Confirmation Modal */}
+      <CategoryTaxMappingModal
+        isOpen={!!mappingCategory}
+        onClose={() => setMappingCategory(null)}
+        category={mappingCategory}
+        taxCodes={taxCodes}
+        canEdit={isAdmin}
+        onChanged={fetchCategories}
+      />
+
       <ConfirmationModal
         isOpen={isConfirmOpen}
         title="Delete Expense Category"

@@ -1,5 +1,6 @@
 import api from "../../../api/axiosInstance";
 import { fetchActiveBillingConfigurations } from "./billingDataAcquisitionService";
+export { fetchActiveBillingConfigurations };
 import { getActiveBillingFrequencies, normalizeBillingFrequency } from "./billingFrequencyService";
 import { getActivePaymentTerms, normalizePaymentTerm } from "./paymentTermsService";
 import { getActiveTaxRegions, normalizeTaxRegion } from "./taxRegionService";
@@ -10,6 +11,7 @@ const BILLING_CONFIGURATIONS_URL = `${BASE_URL}/api/billing-configurations`;
 const BILLING_RECURRING_URL = `${BASE_URL}/api/billing-recurring`;
 const TM_RATE_CARDS_URL = `${BASE_URL}/api/billing-tm-rate-card`;
 const BILLING_FIXED_PRICE_URL = `${BASE_URL}/api/billing-fixed-price`;
+const BILLING_MILESTONE_PLAN_URL = `${BASE_URL}/api/billing-milestone-plan`;
 
 export const unwrapData = (response) => {
   const payload = response?.data;
@@ -53,7 +55,13 @@ const normalizeBillingTypeValue = (value) => {
 
   if (["TIME_MATERIAL", "TIMESHEET_BASED", "TIMESHEET", "TIME_AND_MATERIAL"].includes(normalized)) return "TIME_MATERIAL";
   if (["FIXED_PRICE", "FIXED"].includes(normalized)) return "FIXED_PRICE";
-  if (["MILESTONE", "MILESTONE_BASED"].includes(normalized)) return "MILESTONE";
+  // No separate "Milestone Plan" master-data record exists — the billing_type_master
+  // row is still literally named "Milestone Based" (normalizes to MILESTONE_BASED
+  // here), and it now drives the Milestone Plan flow (Full Payment / Installments
+  // today, Milestones via PMS later). Must be checked before the bare "MILESTONE"
+  // fallback below, which is otherwise unreachable via live master data.
+  if (["MILESTONE_PLAN", "MILESTONE_BASED"].includes(normalized)) return "MILESTONE_PLAN";
+  if (["MILESTONE"].includes(normalized)) return "MILESTONE";
   if (["RECURRING", "RECURRING_BILLING", "SUBSCRIPTION", "SUBSCRIPTION_BASED"].includes(normalized)) return "RECURRING";
 
   return normalized;
@@ -135,6 +143,20 @@ const firstPresent = (...values) =>
 const getObjectValue = (value, keys = []) => {
   if (!value || typeof value !== "object") return "";
   return firstPresent(...keys.map((key) => value[key])) || "";
+};
+
+// A business Project Code must never be the project's own internal id — if a
+// resolved "code" turns out to literally equal the projectId, that's not a
+// real code (either a stale value persisted before this mapping was fixed,
+// or a fallback that leaked the id through), so treat it as missing rather
+// than display the wrong value. Applied at every point a projectCode is
+// finally assigned, so the invariant holds regardless of which source it
+// came from.
+const sanitizeProjectCode = (code, projectId) => {
+  const codeStr = code === null || code === undefined ? "" : String(code).trim();
+  if (!codeStr) return "";
+  if (projectId === null || projectId === undefined || projectId === "") return codeStr;
+  return codeStr === String(projectId).trim() ? "" : codeStr;
 };
 
 const normalizePricingModelValue = (value) => {
@@ -283,13 +305,29 @@ export const normalizeBillingConfiguration = (config = {}) => {
     typeof billingConfig.billingFrequency === "string" ? billingConfig.billingFrequency : "",
   );
 
+  const resolvedProjectId = config.projectId || projectInfo.projectId || projectInfo.id || "";
+
   return {
     ...config,
     id: getConfigId(config),
     billingConfigurationId: getConfigId(config),
-    projectCode: config.projectCode || projectInfo.projectCode || projectInfo.code || "",
-    projectName: config.projectName || projectInfo.projectName || projectInfo.name || "",
-    projectId: config.projectId || projectInfo.projectId || projectInfo.id || "",
+    // Deliberately NOT falling back to the generic projectInfo.code/.name keys —
+    // on a BillingConfiguration record those are ambiguous (e.g. could collide
+    // with an unrelated status code, or a record title that defaults to the
+    // client's name) and have been seen to leak client/unrelated data into the
+    // Project Code/Project Name display. Only unambiguous, explicitly
+    // project-prefixed keys are used here. sanitizeProjectCode additionally
+    // strips the value if it turns out to literally equal the projectId.
+    projectCode: sanitizeProjectCode(
+      config.projectCode ||
+        projectInfo.projectCode ||
+        projectInfo.project_code ||
+        config.project_code ||
+        "",
+      resolvedProjectId,
+    ),
+    projectName: config.projectName || projectInfo.projectName || "",
+    projectId: resolvedProjectId,
     clientId:
       config.clientId ||
       projectInfo.clientId ||
@@ -311,6 +349,10 @@ export const normalizeBillingConfiguration = (config = {}) => {
     setupMode,
     approvalStatus,
     approvalStatusLabel: labelize(approvalStatus),
+    // Re-approval change tracking (backend change snapshot) — preserved as-is.
+    changes: Array.isArray(config.changes) ? config.changes : [],
+    previousApprovalStatus: String(config.previousApprovalStatus || "").trim().toUpperCase(),
+    previousBillingStatus: String(config.previousBillingStatus || "").trim().toUpperCase(),
     billingStatus,
     billingStatusLabel: labelize(billingStatus),
     toolBillingEnabled:
@@ -561,6 +603,20 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
     invoiceGenerationType === "AUTOMATIC",
   );
 
+  const resolvedProjectId = firstPresent(rawProjectInfo.projectId, config.projectId, rawProjectInfo.id) || "";
+  // The flat GET .../{id} DTO is itself project-shaped (projectId,
+  // projectName, projectBudget, primaryLocation, countryCode, ...), so it goes
+  // through the same canonical normalizeProject as /available-projects — never
+  // a separate hand-written mapping that can drift. A nested projectInfo (this
+  // function's own output round-tripping) takes precedence over the flat
+  // fields. getBillingConfigurationById then merges in the master project
+  // record for this projectId — see resolveConfigurationProject.
+  const detailProject = toProjectInfoFields(
+    // id/value cleared: on a configuration DTO those are the configuration's
+    // own identifiers, never a project id (Product/Service has no project).
+    normalizeProject({ ...config, ...rawProjectInfo, id: undefined, value: undefined, projectId: resolvedProjectId }),
+  );
+
   return {
     ...config,
     billingConfigurationId: normalized.billingConfigurationId,
@@ -577,19 +633,15 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
         rawProjectInfo.client?.name,
         normalized.client,
       ) || "",
-      projectId: firstPresent(rawProjectInfo.projectId, config.projectId, rawProjectInfo.id) || "",
-      projectName: firstPresent(rawProjectInfo.projectName, config.projectName, rawProjectInfo.name, normalized.projectName) || "",
-      projectCode: firstPresent(rawProjectInfo.projectCode, config.projectCode, rawProjectInfo.code, normalized.projectCode) || "",
-      // The flat GET .../{id} DTO carries this at the top level (config.primaryLocation),
-      // not nested under projectInfo/project — without this fallback, editing an existing
-      // configuration always showed a blank Primary Location even though the backend
-      // returned it, since the spread above only pulls from rawProjectInfo.
-      primaryLocation: firstPresent(rawProjectInfo.primaryLocation, config.primaryLocation, rawProjectInfo.location, config.location) || "",
-      projectBudget: firstPresent(rawProjectInfo.projectBudget, config.projectBudget, rawProjectInfo.budget, rawProjectInfo.budgetAmount) || "",
-      projectBudgetCurrency: currency,
-      currency,
-      startDate: toLocalDateString(firstPresent(rawProjectInfo.startDate, rawProjectInfo.projectStartDate, config.effectiveFrom, config.startDate)) || effectiveFrom,
-      endDate: toLocalDateString(firstPresent(rawProjectInfo.endDate, rawProjectInfo.projectEndDate, config.effectiveTo, config.endDate)) || effectiveTo,
+      ...detailProject,
+      // Billing Currency is the project's budget currency; `currency` (which
+      // also checks the DTO's billing currencyCode) is only the fallback.
+      projectBudgetCurrency: normalizeCurrencyCode(detailProject.projectBudgetCurrency, currency),
+      currency: normalizeCurrencyCode(detailProject.projectBudgetCurrency, currency),
+      // startDate/endDate come from detailProject above — project dates only.
+      // Billing effectiveFrom/effectiveTo are a different concept and must
+      // never stand in for the project period (Project Duration, and the
+      // "within project duration" checks in BillingConfigurationStep).
     },
     billingConfig: {
       ...rawBillingConfig,
@@ -665,6 +717,56 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
       },
       milestones: rawBillingConfig.milestones || config.milestones || [],
       milestoneSettings: rawBillingConfig.milestoneSettings || config.milestoneSettings || {},
+      // Milestone Plan (Full Payment / Installments) — distinct from the legacy
+      // milestones/milestoneSettings above. Populated below in
+      // getBillingConfigurationById once billingType === "MILESTONE_PLAN" is known.
+      milestonePlan: (() => {
+        const rawMilestonePlan = firstPresent(
+          rawBillingConfig.milestonePlan,
+          rawBillingConfig.milestonePlanDetails,
+          rawBillingConfig.billingMilestonePlan,
+          rawBillingConfig.milestonePlanConfiguration,
+          config.milestonePlan,
+          config.milestonePlanDetails,
+          config.billingMilestonePlan,
+          config.billingMilestonePlanConfiguration,
+        );
+        const parsedPlan =
+          rawMilestonePlan && typeof rawMilestonePlan === "object"
+            ? normalizeMilestonePlanConfig(rawMilestonePlan)
+            : normalizeMilestonePlanConfig({
+                totalContractValue: firstPresent(
+                  config.totalContractValue,
+                  rawBillingConfig.totalContractValue,
+                  rawProjectInfo.projectBudget,
+                  config.projectBudget,
+                ),
+                paymentStructure: firstPresent(
+                  config.paymentStructure,
+                  rawBillingConfig.paymentStructure,
+                ),
+                entries: firstPresent(
+                  config.entries,
+                  config.paymentEntries,
+                  rawBillingConfig.entries,
+                  rawBillingConfig.paymentEntries,
+                ),
+                remarks: firstPresent(
+                  config.milestonePlanRemarks,
+                  rawBillingConfig.milestonePlanRemarks,
+                ),
+              });
+
+        return {
+          ...parsedPlan,
+          totalContractValue:
+            firstPresent(
+              parsedPlan.totalContractValue,
+              rawProjectInfo.projectBudget,
+              config.projectBudget,
+            ) ?? "",
+        };
+      })(),
       monthlyRetainer: rawBillingConfig.monthlyRetainer || {},
       recurring: rawBillingConfig.recurring || {},
     },
@@ -687,6 +789,64 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
         false,
       ),
     }),
+  };
+};
+
+// --- Canonical project model --------------------------------------------
+//
+// normalizeProject is the ONE mapping from any backend project-shaped payload
+// (/available-projects, /projects/{clientId}, or the flat
+// GET /billing-configurations/{id} DTO) to the canonical project:
+//   { projectId, projectName, projectCode, projectDuration, projectBudget,
+//     projectBudgetCurrency, primaryLocation, countryCode, email, phoneNumber,
+//     startDate, endDate }
+// New and Edit both produce the selected project through it, and
+// toProjectInfoFields copies exactly those fields onto wizard projectInfo, so
+// Step 1 renders identically regardless of where the project came from.
+//
+// TEMPORARY migration compatibility — the ONLY place these aliases are read:
+// the billing-configuration detail DTO currently names two fields
+// differently from every other project API ("projectcode", "phone"). Remove
+// these two aliases once the backend returns projectCode/phoneNumber there.
+const DETAIL_DTO_PROJECT_CODE_ALIAS = "projectcode";
+const DETAIL_DTO_PHONE_ALIAS = "phone";
+
+const CANONICAL_PROJECT_FIELDS = [
+  "projectId",
+  "projectName",
+  "projectCode",
+  "projectDuration",
+  "projectBudget",
+  "projectBudgetCurrency",
+  "primaryLocation",
+  "countryCode",
+  "email",
+  "phoneNumber",
+  "startDate",
+  "endDate",
+];
+
+// Combines several canonical project objects for the SAME projectId,
+// field-by-field in priority order (first non-blank wins) — e.g. the
+// /available-projects record, then /projects/{clientId}, then the
+// configuration's own detail DTO. Blank sources (null) are skipped.
+export const mergeProjectSources = (...sources) => {
+  const present = sources.filter(Boolean);
+  return CANONICAL_PROJECT_FIELDS.reduce((merged, field) => {
+    merged[field] = firstPresent(...present.map((source) => source[field])) ?? "";
+    return merged;
+  }, {});
+};
+
+// Canonical project -> the project fields stored on wizard projectInfo.
+// Billing Currency (projectInfo.currency) is always the project's budget
+// currency.
+export const toProjectInfoFields = (project = {}) => {
+  const fields = mergeProjectSources(project);
+  return {
+    ...fields,
+    projectCode: sanitizeProjectCode(fields.projectCode, fields.projectId),
+    currency: fields.projectBudgetCurrency,
   };
 };
 
@@ -713,8 +873,16 @@ export const normalizeProject = (project = {}) => {
     projectId: id,
     clientId: project.clientId || project.client?.clientId || project.client?.id,
     clientName: project.clientName || project.client?.clientName || project.client?.name || "",
-    projectName: project.projectName || project.name || project.label || "",
-    projectCode: project.projectCode || project.code || project.projectKey || "",
+    // Deliberately NOT falling back to the generic project.name/.code/.label
+    // keys — those collide with unrelated fields on some project DTOs (e.g.
+    // a legacy numeric "code" that isn't the project code at all) and have
+    // been seen to leak a wrong value into Project Name/Project Code. Only
+    // unambiguous, explicitly project-prefixed keys are used here.
+    projectName: project.projectName || "",
+    projectCode: sanitizeProjectCode(
+      firstPresent(project.projectCode, project[DETAIL_DTO_PROJECT_CODE_ALIAS], project.projectKey, project.project_code) || "",
+      id,
+    ),
     contractNumber: project.contractNumber || project.contractReference || "",
     currency: currencyCode || projectBudgetCurrency || "",
     billingType: project.billingType || "",
@@ -723,11 +891,12 @@ export const normalizeProject = (project = {}) => {
     projectDuration,
     projectBudget,
     projectBudgetCurrency,
-    // RMS-sourced client contact fields carried straight through from the
-    // available-projects response — never re-derived or hardcoded here.
+    // RMS-sourced contact fields carried straight through from the backend
+    // project payload — never re-derived, hardcoded, or taken from the client.
+    primaryLocation: project.primaryLocation || "",
     countryCode: project.countryCode || "",
     email: project.email || "",
-    phoneNumber: project.phoneNumber || "",
+    phoneNumber: firstPresent(project.phoneNumber, project[DETAIL_DTO_PHONE_ALIAS]) || "",
     // Normalized to a plain yyyy-mm-dd (never a raw datetime/timestamp string) —
     // every date-range check downstream (Recurring's Billing Start/End Date
     // validation, Fixed Price's Effective From/To) does lexical string
@@ -779,6 +948,42 @@ export const getBillingConfigurations = async () => {
   }
 };
 
+// Flat BillingConfigurationResponseDto -> its canonical project (plus
+// clientId for resolution). id/value are cleared: on this DTO they are the
+// configuration's own identifiers, never a project id.
+export const getConfigurationDetailProject = (record = {}) => ({
+  ...toProjectInfoFields(normalizeProject({ ...record, id: undefined, value: undefined, projectId: record.projectId || "" })),
+  clientId: record.clientId || "",
+});
+
+// Resolves the canonical project for a saved configuration's projectId —
+// the /available-projects record first (same source New uses), then
+// /projects/{clientId}, then the configuration's own detail project
+// (`detailProject`, already normalized) for anything neither master record
+// provides (e.g. a project excluded from /available-projects by
+// new-configuration eligibility rules). Shared by the wizard's edit/view
+// hydration and the Finance approval review, so both show the same project.
+export const resolveConfigurationProject = async (detailProject = {}) => {
+  const { clientId, projectId } = detailProject;
+  // No project to resolve (e.g. Product/Service billing) — leave as-is.
+  if (!clientId || !projectId) return {};
+
+  const findMatch = (list) => (list || []).find((p) => String(p.projectId || p.id) === String(projectId));
+  const [availableProjects, clientProjects] = await Promise.all([
+    getAvailableProjectsForBillingConfiguration(clientId).catch((err) => {
+      console.warn("Unable to resolve project master data from available projects", err);
+      return [];
+    }),
+    getBillingConfigurationProjectsByClient(clientId).catch((err) => {
+      console.warn("Unable to resolve project master data from client project list", err);
+      return [];
+    }),
+  ]);
+
+  const selectedProject = mergeProjectSources(findMatch(availableProjects), findMatch(clientProjects), detailProject);
+  return toProjectInfoFields({ ...selectedProject, projectId });
+};
+
 export const getBillingConfigurationById = async (billingConfigurationId) => {
   const response = await api.get(`${BILLING_CONFIGURATIONS_URL}/${billingConfigurationId}`);
   const config = unwrapData(response);
@@ -799,6 +1004,39 @@ export const getBillingConfigurationById = async (billingConfigurationId) => {
       console.warn("Unable to load fixed price configuration", error);
     }
   }
+
+  const isMilestonePlanType =
+    detail.billingConfig?.billingType === "MILESTONE_PLAN" ||
+    detail.billingConfig?.billingType === "MILESTONE" ||
+    detail.billingConfig?.billingType === "MILESTONE_BASED" ||
+    String(detail.billingConfig?.billingTypeName || "").toUpperCase().includes("MILESTONE");
+
+  if (isMilestonePlanType && configId) {
+    try {
+      const milestonePlanRecord = await getMilestonePlanByBillingConfiguration(configId);
+      if (milestonePlanRecord) {
+        const normalizedPlan = normalizeMilestonePlanConfig(milestonePlanRecord);
+        detail.billingConfig.milestonePlan = {
+          ...detail.billingConfig.milestonePlan,
+          ...normalizedPlan,
+          totalContractValue: firstPresent(
+            normalizedPlan.totalContractValue,
+            detail.billingConfig.milestonePlan?.totalContractValue,
+            detail.projectInfo?.projectBudget,
+          ) ?? "",
+        };
+      }
+    } catch (error) {
+      console.warn("Unable to load milestone plan configuration", error);
+    }
+  }
+
+  // Resolve the canonical project master data for the saved projectId —
+  // never inferred from the client object. See resolveConfigurationProject.
+  detail.projectInfo = {
+    ...detail.projectInfo,
+    ...(await resolveConfigurationProject(detail.projectInfo)),
+  };
 
   if (detail.billingConfig?.billingType === "RECURRING" && configId) {
     try {
@@ -1244,6 +1482,167 @@ export const deleteFixedPriceConfiguration = async (fixedPriceConfigurationId) =
   return unwrapData(response);
 };
 
+export const isMilestonePlanNotFoundError = (error) => {
+  if (!error) return false;
+  if (error.response?.status === 404) return true;
+  const rawMsg =
+    error.response?.data?.message ||
+    error.response?.data?.detail ||
+    error.response?.data?.error ||
+    (typeof error.response?.data === "string" ? error.response.data : "") ||
+    error.message ||
+    "";
+  const normalized = String(rawMsg).toLowerCase();
+  return (
+    normalized.includes("milestone plan configuration not found") ||
+    normalized.includes("not found for this billing configuration")
+  );
+};
+
+// --- Milestone Plan Configuration APIs (BillingMilestonePlanRequestDto/ResponseDto) ---
+// Currently supports only PaymentStructure FULL_PAYMENT / INSTALLMENTS — MILESTONES
+// (project-milestone-driven, sourced from PMS) is a future addition and must never be
+// offered in the UI yet. Mirrors the Fixed Price API shape above: GET-by-billing-config
+// returns a list even though only one active record is ever expected per configuration.
+export const getMilestonePlanByBillingConfiguration = async (billingConfigurationId) => {
+  if (!billingConfigurationId) return null;
+  try {
+    const response = await api.get(`${BILLING_MILESTONE_PLAN_URL}/${billingConfigurationId}/milestone-plan`);
+    const payload = unwrapData(response);
+    const records = asArray(payload);
+
+    if (records.length > 0) {
+      return records.find((record) => record?.isActive !== false) || records[0];
+    }
+
+    return payload && typeof payload === "object" && !Array.isArray(payload) ? payload : null;
+  } catch (error) {
+    if (isMilestonePlanNotFoundError(error)) {
+      return null;
+    }
+    throw error;
+  }
+};
+
+export const getMilestonePlanById = async (milestonePlanId) => {
+  if (!milestonePlanId) return null;
+  try {
+    const response = await api.get(`${BILLING_MILESTONE_PLAN_URL}/milestone-plan/${milestonePlanId}`);
+    return unwrapData(response);
+  } catch (error) {
+    if (isMilestonePlanNotFoundError(error)) {
+      return null;
+    }
+    throw error;
+  }
+};
+
+export const createMilestonePlanConfiguration = async (billingConfigurationId, payload) => {
+  if (!billingConfigurationId) throw new Error("Missing billingConfigurationId");
+  const response = await api.post(`${BILLING_MILESTONE_PLAN_URL}/${billingConfigurationId}/milestone-plan`, payload);
+  return unwrapData(response);
+};
+
+export const updateMilestonePlanConfiguration = async (milestonePlanId, payload) => {
+  if (!milestonePlanId) throw new Error("Missing milestonePlanId");
+  const response = await api.put(`${BILLING_MILESTONE_PLAN_URL}/milestone-plan/${milestonePlanId}`, payload);
+  return unwrapData(response);
+};
+
+export const deleteMilestonePlanConfiguration = async (milestonePlanId) => {
+  if (!milestonePlanId) throw new Error("Missing milestonePlanId");
+  try {
+    const response = await api.delete(`${BILLING_MILESTONE_PLAN_URL}/milestone-plan/${milestonePlanId}`);
+    return unwrapData(response);
+  } catch (error) {
+    if (isMilestonePlanNotFoundError(error)) {
+      return null;
+    }
+    throw error;
+  }
+};
+
+export const normalizeMilestonePaymentEntry = (entry = {}) => ({
+  paymentEntryId: firstPresent(entry.paymentEntryId, entry.billingPaymentEntryId, entry.id) || null,
+  sequence: entry.sequence ?? null,
+  percentage: entry.percentage ?? "",
+  amount: entry.amount ?? "",
+  billingDate: toLocalDateString(firstPresent(entry.billingDate, entry.paymentDate, entry.date)) || "",
+  remarks: entry.remarks || "",
+});
+
+// BillingMilestonePlanResponseDto -> wizard's internal Milestone Plan form-state
+// shape (mirrors normalizeFixedPriceConfig above).
+export const normalizeMilestonePlanConfig = (record = {}) => {
+  const rawEntries = firstPresent(
+    record.entries,
+    record.paymentEntries,
+    record.milestonePlanEntries,
+    record.installmentEntries,
+    record.milestoneEntries,
+  );
+  const entries = Array.isArray(rawEntries)
+    ? rawEntries.map(normalizeMilestonePaymentEntry)
+    : [];
+
+  return {
+    milestonePlanId: firstPresent(record.milestonePlanId, record.billingMilestonePlanId, record.id) || null,
+    totalContractValue:
+      firstPresent(
+        record.totalContractValue,
+        record.contractValue,
+        record.manualContractValue,
+        record.totalAmount,
+        record.amount,
+        record.pmsProjectBudget,
+        record.projectBudget,
+      ) ?? "",
+    paymentStructure:
+      firstPresent(record.paymentStructure, record.structure, record.paymentPlan) ||
+      (entries.length > 1 ? "INSTALLMENTS" : "FULL_PAYMENT"),
+    entries,
+    remarks: record.remarks || "",
+  };
+};
+
+// Builds the POST/PUT /api/billing-milestone-plan request body
+// (BillingMilestonePlanRequestDto). Each entry's "amount" is dropped — that field
+// doesn't exist on BillingPaymentEntryRequestDto, the backend alone calculates and
+// persists it. Sequence is always re-derived from row order (1-indexed), never
+// trusted from stale form state, so reordering/removing installments can never
+// leave a gap or duplicate.
+export const buildMilestonePlanRequestPayload = (milestonePlan = {}) => {
+  const cleanTotal =
+    milestonePlan.totalContractValue === null ||
+    milestonePlan.totalContractValue === undefined ||
+    milestonePlan.totalContractValue === ""
+      ? null
+      : typeof milestonePlan.totalContractValue === "number"
+      ? milestonePlan.totalContractValue
+      : Number(String(milestonePlan.totalContractValue).replace(/,/g, "").trim());
+
+  return {
+    totalContractValue: cleanTotal !== null && !Number.isNaN(cleanTotal) ? cleanTotal : null,
+    paymentStructure: milestonePlan.paymentStructure || null,
+    entries: (milestonePlan.entries || []).map((entry, index) => {
+      const cleanPercent =
+        entry.percentage === null || entry.percentage === undefined || entry.percentage === ""
+          ? null
+          : typeof entry.percentage === "number"
+          ? entry.percentage
+          : Number(String(entry.percentage).replace(/,/g, "").trim());
+
+      return {
+        sequence: index + 1,
+        percentage: cleanPercent !== null && !Number.isNaN(cleanPercent) ? cleanPercent : null,
+        billingDate: toLocalDateString(firstPresent(entry.billingDate, entry.paymentDate, entry.date)) || null,
+        remarks: entry.remarks || "",
+      };
+    }),
+    remarks: milestonePlan.remarks || "",
+  };
+};
+
 // Builds the POST/PUT /api/billing-recurring request body — field names match
 // the backend's RecurringBillingRequestDto exactly (recurringName/
 // recurringStartDate/recurringEndDate, not the legacy subscription* names).
@@ -1380,6 +1779,14 @@ const toLocalDateString = (value) => {
 
   const rawValue = String(value).trim();
   if (!rawValue) return "";
+
+  if (rawValue.includes(",")) {
+    const parts = rawValue.split(",").map((p) => parseInt(p.trim(), 10)).filter((p) => !isNaN(p));
+    if (parts.length >= 3) {
+      const [year, month, day] = parts;
+      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
 
   const isoMatch = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
@@ -1665,6 +2072,25 @@ export const saveBillingConfiguration = async (payload, billingConfigurationId, 
       }
     } catch (error) {
       console.warn("Unable to save fixed price configuration", error);
+    }
+  }
+
+  if (configId && billingType === "MILESTONE_PLAN") {
+    try {
+      const existingMilestonePlan = await getMilestonePlanByBillingConfiguration(configId);
+      const milestonePlanPayload = buildMilestonePlanRequestPayload(payload?.billingConfig?.milestonePlan);
+      const existingId =
+        existingMilestonePlan?.milestonePlanId ||
+        existingMilestonePlan?.id ||
+        payload?.billingConfig?.milestonePlan?.milestonePlanId ||
+        null;
+      if (existingId) {
+        await updateMilestonePlanConfiguration(existingId, milestonePlanPayload);
+      } else {
+        await createMilestonePlanConfiguration(configId, milestonePlanPayload);
+      }
+    } catch (error) {
+      console.warn("Unable to save milestone plan configuration", error);
     }
   }
 

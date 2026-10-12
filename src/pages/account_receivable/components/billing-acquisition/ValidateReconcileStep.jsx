@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle, AlertTriangle, RefreshCw, Download } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, Download } from "lucide-react";
 
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Button from "../../../../components/Button/Button";
@@ -58,7 +58,7 @@ export default function ValidateReconcileStep({ billingContext, validation, vali
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-900">Validation Checklist</h3>
             <Button variant="outline" size="small" onClick={onRevalidate} loading={validating} loadingText="Validating...">
-              <RefreshCw className="h-3.5 w-3.5" /> Re-run Validation
+              <CheckCircle2 className="h-3.5 w-3.5" /> Re-run Validation
             </Button>
           </div>
 

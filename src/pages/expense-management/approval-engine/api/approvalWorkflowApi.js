@@ -65,5 +65,16 @@ export const approvalWorkflowApi = {
   rejectReport: (reportId, comment) =>
     api.post(`/xms/approvals/${reportId}/reject`, { comment }, withBase()),
 
+  // A SEPARATE, approver-side authorization of a policy exception — distinct from the employee's
+  // own justify() on policyApi.js. Returns the updated PolicyWarningResponse (approverJustification,
+  // approverJustifiedBy, approverJustifiedAt now set). Rejects if this violation was already
+  // authorized once, or if the caller isn't an active approver/delegate at the report's current level.
+  approveException: (reportId, lineItemId, violationId, justification) =>
+    api.post(
+      `/xms/approvals/${reportId}/line-items/${lineItemId}/policy-warnings/${violationId}/approve-exception`,
+      { justification },
+      withBase()
+    ),
+
   bulkApprove: (reportId) => api.post(`/xms/approvals/${reportId}/bulk-approve`, {}, withBase()),
 };

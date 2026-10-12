@@ -64,6 +64,86 @@ export const getApiErrorMessage = (error, fallback = "Something went wrong. Plea
 // (single source of truth for the real TaxRegionResponseDto shape) —
 // re-exported below.
 
+export const APPLICABILITY_LABELS = {
+  ALL: "All Jurisdictions",
+  SAME_JURISDICTION: "Same Jurisdiction",
+  DIFFERENT_JURISDICTION: "Different Jurisdiction",
+};
+
+export const getApplicabilityLabel = (type) => {
+  return APPLICABILITY_LABELS[type] || type || "All Jurisdictions";
+};
+
+export const normalizeTaxConfigurationComponent = (comp = {}) => {
+  if (!comp || typeof comp !== "object") return {};
+
+  const taxConfigurationComponentId =
+    comp.taxConfigurationComponentId ||
+    comp.tax_configuration_component_id ||
+    comp.id ||
+    "";
+  const taxTypeObj = comp.taxType || comp.tax_type || {};
+  const taxTypeId =
+    comp.taxTypeId ||
+    comp.tax_type_id ||
+    taxTypeObj.taxTypeId ||
+    taxTypeObj.id ||
+    "";
+  const taxTypeCode = (
+    comp.taxTypeCode ||
+    comp.tax_type_code ||
+    taxTypeObj.taxTypeCode ||
+    taxTypeObj.code ||
+    ""
+  ).toUpperCase();
+  const taxTypeName =
+    comp.taxTypeName ||
+    comp.tax_type_name ||
+    taxTypeObj.taxTypeName ||
+    taxTypeObj.name ||
+    taxTypeCode ||
+    "";
+  const taxRate =
+    comp.taxRate !== undefined && comp.taxRate !== null
+      ? Number(comp.taxRate)
+      : comp.rate !== undefined && comp.rate !== null
+      ? Number(comp.rate)
+      : comp.appliedRate !== undefined && comp.appliedRate !== null
+      ? Number(comp.appliedRate)
+      : 0;
+  const applicabilityType =
+    comp.applicabilityType ||
+    comp.applicability_type ||
+    "ALL";
+  const activeFlag =
+    comp.isActive ?? comp.is_active ?? comp.active ?? (comp.status === "ACTIVE") ?? true;
+
+  return {
+    ...comp,
+    id: taxConfigurationComponentId,
+    taxConfigurationComponentId,
+    taxTypeId,
+    taxTypeCode,
+    taxTypeName,
+    taxRate,
+    applicabilityType,
+    isActive: Boolean(activeFlag),
+    active: Boolean(activeFlag),
+    status: activeFlag ? "ACTIVE" : "INACTIVE",
+  };
+};
+
+// The AR backend serializes LocalDate as [yyyy, m, d]; date inputs and the
+// request DTO need "yyyy-MM-dd".
+export const toIsoDate = (val) => {
+  if (Array.isArray(val)) {
+    const [y, m, d] = val;
+    if (!y || !m || !d) return "";
+    return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+  return typeof val === "string" ? val.slice(0, 10) : "";
+};
+
 export const normalizeTaxRateConfiguration = (item = {}) => {
   if (!item || typeof item !== "object") return {};
 
@@ -112,17 +192,14 @@ export const normalizeTaxRateConfiguration = (item = {}) => {
   let sgstRate = null;
   let igstRate = null;
 
-  const rawComponents = Array.isArray(item.components) ? item.components : [];
+  const rawComponents = Array.isArray(item.components)
+    ? item.components.map(normalizeTaxConfigurationComponent)
+    : [];
+
   if (rawComponents.length > 0) {
     rawComponents.forEach((comp) => {
-      const code = (
-        comp.taxTypeCode ||
-        comp.code ||
-        comp.taxType?.taxTypeCode ||
-        comp.taxType?.code ||
-        ""
-      ).toUpperCase();
-      const rate = parseRate(comp.taxRate ?? comp.rate ?? comp.appliedRate);
+      const code = (comp.taxTypeCode || "").toUpperCase();
+      const rate = parseRate(comp.taxRate);
       if (code === "CGST") cgstRate = rate;
       else if (code === "SGST") sgstRate = rate;
       else if (code === "IGST") igstRate = rate;
@@ -142,8 +219,9 @@ export const normalizeTaxRateConfiguration = (item = {}) => {
     }
   }
 
-  const effectiveFrom = item.effectiveFrom || item.effective_from || "";
-  const effectiveTo = item.effectiveTo || item.effective_to || null;
+  const effectiveFrom = toIsoDate(item.effectiveFrom || item.effective_from) || "";
+  const effectiveTo = toIsoDate(item.effectiveTo || item.effective_to) || null;
+  const taxRegimeId = item.taxRegimeId || item.tax_regime_id || null;
 
   const activeFlag = item.active ?? item.is_active ?? item.isActive ?? (item.status === "ACTIVE") ?? true;
   const status = activeFlag ? "ACTIVE" : "INACTIVE";
@@ -158,6 +236,7 @@ export const normalizeTaxRateConfiguration = (item = {}) => {
     taxRegionCode,
     taxRegionLabel,
     taxRegime,
+    taxRegimeId,
     cgstRate,
     sgstRate,
     igstRate,
@@ -212,6 +291,66 @@ export const updateTaxRateConfiguration = async (id, payload) => {
 // PATCH tax-rate-configurations/{id}/deactivate
 export const deactivateTaxRateConfiguration = async (id) => {
   const response = await api.patch(`${TAX_RATE_CONFIGURATIONS_URL}/${id}/deactivate`);
+  return normalizeTaxRateConfiguration(unwrapData(response));
+};
+
+// POST /api/tax-configuration-components/tax-configuration/{taxConfigurationId}
+// Adds a component to an existing configuration without recreating the configuration
+export const addTaxConfigurationComponent = async (taxConfigurationId, payload) => {
+  const url = `${BASE_URL}/api/tax-configuration-components/tax-configuration/${taxConfigurationId}`;
+  const body = {
+    taxTypeId: payload.taxTypeId,
+    taxRate: Number(payload.taxRate),
+    applicabilityType: payload.applicabilityType,
+  };
+  const response = await api.post(url, body);
+  return normalizeTaxConfigurationComponent(unwrapData(response));
+};
+
+// PUT /api/v1/tax-rate-configurations/{id} to update an existing component while preserving all other components
+export const updateTaxConfigurationComponent = async (
+  taxConfiguration,
+  targetComponentIdOrTaxTypeId,
+  updatedFields
+) => {
+  if (!taxConfiguration || !taxConfiguration.id) {
+    throw new Error("Tax configuration is required to update components.");
+  }
+
+  const existingComponents = Array.isArray(taxConfiguration.components)
+    ? taxConfiguration.components
+    : [];
+
+  const updatedComponents = existingComponents.map((comp) => {
+    const isTarget =
+      (targetComponentIdOrTaxTypeId && comp.id === targetComponentIdOrTaxTypeId) ||
+      (targetComponentIdOrTaxTypeId && comp.taxConfigurationComponentId === targetComponentIdOrTaxTypeId) ||
+      (targetComponentIdOrTaxTypeId && comp.taxTypeId === targetComponentIdOrTaxTypeId);
+
+    if (isTarget) {
+      return {
+        taxTypeId: comp.taxTypeId,
+        taxRate: updatedFields.taxRate !== undefined ? Number(updatedFields.taxRate) : comp.taxRate,
+        applicabilityType: updatedFields.applicabilityType || comp.applicabilityType,
+      };
+    }
+
+    return {
+      taxTypeId: comp.taxTypeId,
+      taxRate: Number(comp.taxRate),
+      applicabilityType: comp.applicabilityType,
+    };
+  });
+
+  const payload = {
+    taxRegionId: taxConfiguration.taxRegionId,
+    taxRegime: taxConfiguration.taxRegime,
+    effectiveFrom: taxConfiguration.effectiveFrom,
+    effectiveTo: taxConfiguration.effectiveTo || null,
+    components: updatedComponents,
+  };
+
+  const response = await api.put(`${TAX_RATE_CONFIGURATIONS_URL}/${taxConfiguration.id}`, payload);
   return normalizeTaxRateConfiguration(unwrapData(response));
 };
 

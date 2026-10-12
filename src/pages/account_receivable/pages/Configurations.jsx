@@ -1,25 +1,26 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import { 
-  Plus, 
-  Pencil, 
-  Trash2, 
-  Search, 
-  RefreshCw, 
-  Eye, 
-  ArrowUpDown, 
-  ArrowUp, 
-  ArrowDown, 
-  ChevronLeft, 
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Eye,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ChevronLeft,
   ChevronRight,
-  Info 
+  Info
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
+import SearchInput from "../../../components/filter/Searchbar";
 import { PageCard } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
 import FormSelect from "../../../components/forms/FormSelect";
+import FilterListbox from "../components/common/ARFilterListbox";
+import ARClearFiltersButton from "../components/common/ARClearFiltersButton";
 import ARTable from "../components/common/ARTable";
 import StatusBadge from "../../../components/status/statusbadge";
 import Modal from "../../../components/Modal/modal";
@@ -460,16 +461,6 @@ export default function Configurations() {
         actions={
           <div className="flex items-center gap-3">
             <Button
-              variant="outline"
-              size="sm"
-              onClick={loadData}
-              disabled={loading}
-              className="flex items-center gap-1.5"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-            <Button
               onClick={handleOpenCreateModal}
               disabled={loading}
               className="flex items-center gap-1.5 bg-[#0A0082] text-white hover:bg-[#0A0082]/90 shadow-sm"
@@ -490,11 +481,10 @@ export default function Configurations() {
               <button
                 key={m.id}
                 onClick={() => setSelectedMaster(m.id)}
-                className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${
-                  isActive
+                className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${isActive
                     ? "bg-[#0A0082] text-white shadow-sm border border-[#0A0082]"
                     : "text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-800"
-                }`}
+                  }`}
               >
                 {m.label}
               </button>
@@ -507,47 +497,40 @@ export default function Configurations() {
       <div className="space-y-4">
         {/* Search and Filters panel */}
         <PageCard className="p-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
               {/* Text Search Input */}
               <div className="relative min-w-[280px] flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
+                <SearchInput
                   placeholder={`Search ${activeSchema.title.toLowerCase()}...`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20"
                 />
               </div>
 
               {/* Status Select Filter */}
-              <FormSelect
-                name="statusFilter"
+              <FilterListbox
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={setStatusFilter}
                 options={[
-                  { value: "", label: "All Statuses" },
+                  { value: "", label: "All statuses" },
                   { value: "ACTIVE", label: "Active" },
                   { value: "INACTIVE", label: "Inactive" },
                 ]}
-                className="max-w-[180px]"
+                placeholder="All statuses"
               />
             </div>
 
-            {/* Clear filters button */}
+            {/* clear button */}
             {(searchQuery || statusFilter) && (
-              <Button
-                variant="ghost"
-                size="sm"
+              <ARClearFiltersButton
                 onClick={() => {
                   setSearchQuery("");
                   setStatusFilter("");
+                  setCurrentPage(1);
                 }}
-                className="text-xs text-slate-500 hover:text-slate-700"
-              >
-                Clear Search
-              </Button>
+                label="Clear filters"
+              />
             )}
           </div>
         </PageCard>
@@ -581,7 +564,7 @@ export default function Configurations() {
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
                 variant="outline"
-                size="sm"
+                size="small"
               >
                 Previous
               </Button>
@@ -589,12 +572,12 @@ export default function Configurations() {
                 onClick={() => setCurrentPage((prev) => Math.min(prev + 1, pageCount))}
                 disabled={currentPage === pageCount}
                 variant="outline"
-                size="sm"
+                size="small"
               >
                 Next
               </Button>
             </div>
-            
+
             {/* Desktop pagination */}
             <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
               <div>
@@ -625,11 +608,10 @@ export default function Configurations() {
                         key={pageNum}
                         onClick={() => setCurrentPage(pageNum)}
                         aria-current={isCurrent ? "page" : undefined}
-                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold border focus:z-20 focus:outline-none ${
-                          isCurrent
+                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold border focus:z-20 focus:outline-none ${isCurrent
                             ? "z-10 bg-[#0A0082] text-white border-[#0A0082]"
                             : "text-slate-900 border-slate-300 hover:bg-slate-50"
-                        }`}
+                          }`}
                       >
                         {pageNum}
                       </button>
@@ -710,9 +692,8 @@ export default function Configurations() {
                       value={formData[field.name] || ""}
                       onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
                       placeholder={`Enter ${field.label.toLowerCase()}`}
-                      className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20 ${
-                        formErrors[field.name] ? "border-red-300 focus:border-red-500" : "border-slate-300"
-                      }`}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none transition focus:border-[#0A0082] focus:ring-2 focus:ring-[#0A0082]/20 ${formErrors[field.name] ? "border-red-300 focus:border-red-500" : "border-slate-300"
+                        }`}
                       rows={3}
                     />
                     {formErrors[field.name] && (

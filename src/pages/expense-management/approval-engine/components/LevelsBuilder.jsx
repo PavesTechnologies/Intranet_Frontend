@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Plus, Trash2 } from "lucide-react";
 import Button from "@/components/Button/Button";
+import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 
 const LEVEL_TYPE_OPTIONS = [
   { value: "APPROVAL", label: "Approval" },
@@ -76,6 +77,14 @@ function LevelCard({ id, level, onChange, onRemove, canRemove }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const isFinance = level.levelType === "FINANCE_VERIFICATION";
   const sourceTypeOptions = sourceTypeOptionsFor(level.levelType);
+  // No backend confirmation/diff exists for this flow's save - a level or approver removed here
+  // is gone the instant "Save Changes" is clicked (full replace, orphanRemoval). This is the only
+  // guard against a stray click permanently deleting a configured approver.
+  const [pendingRemoveApproverId, setPendingRemoveApproverId] = useState(null);
+  const pendingRemoveApprover = level.approvers.find((a) => a.id === pendingRemoveApproverId) || null;
+  const pendingRemoveApproverLabel = pendingRemoveApprover
+    ? sourceTypeOptions.find((o) => o.value === pendingRemoveApprover.sourceType)?.label || pendingRemoveApprover.sourceType
+    : "";
 
   const updateApprover = (rowId, next) =>
     onChange({ ...level, approvers: level.approvers.map((a) => (a.id === rowId ? { ...next, id: rowId } : a)) });
@@ -166,7 +175,7 @@ function LevelCard({ id, level, onChange, onRemove, canRemove }) {
                 approver={a}
                 sourceTypeOptions={sourceTypeOptions}
                 onChange={(next) => updateApprover(a.id, next)}
-                onRemove={() => removeApprover(a.id)}
+                onRemove={() => setPendingRemoveApproverId(a.id)}
                 canRemove={level.approvers.length > 1}
               />
             ))}
@@ -177,6 +186,20 @@ function LevelCard({ id, level, onChange, onRemove, canRemove }) {
       <Button size="small" variant="outline" className="mt-2" onClick={addApprover}>
         <Plus className="h-3.5 w-3.5" /> Add approver
       </Button>
+
+      <ConfirmationModal
+        isOpen={!!pendingRemoveApprover}
+        title="Remove approver"
+        message={`Remove this ${pendingRemoveApproverLabel} approver entry? This is permanent once you save changes.`}
+        confirmText="Remove"
+        cancelText="Cancel"
+        variant="danger"
+        onCancel={() => setPendingRemoveApproverId(null)}
+        onConfirm={() => {
+          removeApprover(pendingRemoveApproverId);
+          setPendingRemoveApproverId(null);
+        }}
+      />
     </div>
   );
 }
@@ -191,6 +214,11 @@ function LevelCard({ id, level, onChange, onRemove, canRemove }) {
  */
 export default function LevelsBuilder({ levels, onChange }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  // Same rationale as LevelCard's approver-removal guard - removing a level here deletes it (and
+  // every approver on it) the instant the flow is saved, with no server-side confirmation or diff.
+  const [pendingRemoveLevelId, setPendingRemoveLevelId] = useState(null);
+  const pendingRemoveIndex = levels.findIndex((l) => l.id === pendingRemoveLevelId);
+  const pendingRemoveLevel = pendingRemoveIndex >= 0 ? levels[pendingRemoveIndex] : null;
 
   const updateLevel = (levelId, next) => onChange(levels.map((l) => (l.id === levelId ? { ...next, id: levelId } : l)));
   const removeLevel = (levelId) => onChange(levels.filter((l) => l.id !== levelId));
@@ -217,7 +245,7 @@ export default function LevelsBuilder({ levels, onChange }) {
                 <span className="absolute -left-3 -top-3 z-10 bg-[#0A0082] text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center shadow">
                   {idx + 1}
                 </span>
-                <LevelCard level={level} id={level.id} onChange={(next) => updateLevel(level.id, next)} onRemove={() => removeLevel(level.id)} canRemove={levels.length > 1} />
+                <LevelCard level={level} id={level.id} onChange={(next) => updateLevel(level.id, next)} onRemove={() => setPendingRemoveLevelId(level.id)} canRemove={levels.length > 1} />
               </div>
             ))}
           </div>
@@ -227,6 +255,20 @@ export default function LevelsBuilder({ levels, onChange }) {
       <Button size="small" variant="outline" className="mt-3" onClick={addLevel}>
         <Plus className="h-3.5 w-3.5" /> Add level
       </Button>
+
+      <ConfirmationModal
+        isOpen={!!pendingRemoveLevel}
+        title="Remove level"
+        message={`Remove Level ${pendingRemoveIndex + 1}${pendingRemoveLevel?.levelName ? ` ("${pendingRemoveLevel.levelName}")` : ""} and all of its approvers? This is permanent once you save changes.`}
+        confirmText="Remove Level"
+        cancelText="Cancel"
+        variant="danger"
+        onCancel={() => setPendingRemoveLevelId(null)}
+        onConfirm={() => {
+          removeLevel(pendingRemoveLevelId);
+          setPendingRemoveLevelId(null);
+        }}
+      />
     </div>
   );
 }

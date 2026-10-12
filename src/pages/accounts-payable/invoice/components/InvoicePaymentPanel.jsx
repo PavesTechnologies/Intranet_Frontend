@@ -7,6 +7,8 @@ import Modal from "../../../../components/Modal/modal";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { useMarkReadyForPaymentMutation } from "../../payment/hooks/usePaymentMutations";
 import { useInvoiceTds } from "../hooks/useInvoiceTds";
+import { useInvoicePaymentTerms } from "../hooks/useInvoicePaymentTerms";
+import { PAYABLE_TERM_STATUSES } from "../../constants/paymentTerms";
 import { useApPermissions } from "../../hooks/useApPermissions";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { formatCurrency, formatDate, formatTime, calculateBalance } from "../../utils/formatters";
@@ -32,17 +34,20 @@ function buildTdsBasisLine(tds, symbol) {
  * Payment readiness/status for this invoice. "Mark Ready for Payment" is the one manual gate
  * between Approved and payable (Backend/Business_Layer/services/payment_service.py:
  * mark_ready_for_payment) — never automatic just because the invoice was approved. Individual
- * payment transactions aren't listed here: GET /apm/payment has no invoice_id filter (only
- * vendor_id/status_id), so per-invoice payment history isn't fetchable without pulling every
- * payment in the system — see the Payment History page (filtered by vendor/status) instead.
+ * payments (and their receipts) are listed on the invoice's payment detail page
+ * (GET /apm/payment/invoice/{id}, AP_ROUTES.PAYMENT_DETAIL), where Record Payment also lives.
  */
 export default function InvoicePaymentPanel({ invoice }) {
-  const { canMarkPaid } = useApPermissions();
+  const { canMarkPaid, canViewPaymentManagement, canViewTdsTracking, canViewPaymentTerms } = useApPermissions();
   const markReady = useMarkReadyForPaymentMutation();
   // TDS Phase 1: the backend does not itself enforce "TDS verified before ready-for-payment" —
   // same frontend-only sequencing as InvoiceApprovalPanel's send-for-approval gate (see
   // InvoiceTdsPanel for the actual verify UI). A 404 here just means "not yet determined."
   const { data: tds } = useInvoiceTds(invoice.id);
+  // Payment terms must be COMPLIANT or verified by Finance before Mark Ready for Payment — the
+  // backend enforces this (payment_service.mark_ready_for_payment); this only explains the block.
+  // A not-yet-evaluated invoice is checked by the backend at mark-ready time, so it isn't blocked here.
+  const { data: paymentTerms } = useInvoicePaymentTerms(invoice.id, { enabled: canViewPaymentTerms });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [reasonOpen, setReasonOpen] = useState(false);
 
@@ -51,7 +56,9 @@ export default function InvoicePaymentPanel({ invoice }) {
   const isApproved = invoice.status === INVOICE_STATUS.APPROVED;
   const tdsVerified = tds?.determination_status === "VERIFIED";
   const tdsBlocksMarkReady = isApproved && !tdsVerified;
-  const canOfferMarkReady = isApproved && canMarkPaid && tdsVerified;
+  const termsBlockMarkReady =
+    isApproved && Boolean(paymentTerms?.evaluated) && !PAYABLE_TERM_STATUSES.includes(paymentTerms.validation_status);
+  const canOfferMarkReady = isApproved && canMarkPaid && tdsVerified && !termsBlockMarkReady;
   // Backend-enforced, not a display estimate: PaymentService now caps allocation at
   // net_amount - tds_amount and rejects anything over it. invoice.payableAmount comes straight
   // off the invoice-details response (mapInvoiceRecord) — the same field the backend itself
@@ -142,7 +149,9 @@ export default function InvoicePaymentPanel({ invoice }) {
           <p className="mb-3 text-xs italic text-gray-500">
             {tdsBlocksMarkReady
               ? "Approved, but not yet payable — TDS must be verified before this invoice can be marked ready for payment."
-              : "Approved, but not yet payable — Finance must mark it ready for payment first."}
+              : termsBlockMarkReady
+                ? "Approved, but not yet payable — the payment terms must be verified (see Payment Terms) before this invoice can be marked ready for payment."
+                : "Approved, but not yet payable — Finance must mark it ready for payment first."}
           </p>
         )}
 
@@ -154,7 +163,7 @@ export default function InvoicePaymentPanel({ invoice }) {
 
         {isPayable && balance > 0 && canMarkPaid && (
           <Link
-            to={AP_ROUTES.PAYMENT_MARK_PAID(invoice.id)}
+            to={AP_ROUTES.PAYMENT_DETAIL(invoice.id)}
             className="mt-2 block w-full rounded-lg border border-[#0A0082] px-3 py-2 text-center text-sm font-medium text-[#0A0082] hover:bg-[#0A0082]/5"
           >
             Pay Invoice
@@ -162,6 +171,24 @@ export default function InvoicePaymentPanel({ invoice }) {
         )}
 
         {invoice.status === INVOICE_STATUS.PAID && <StatusBadge label="Paid" size="sm" />}
+
+        {/* Every recorded payment (with receipts) and the separate TDS tracking lifecycle live
+            on their own pages — linked here rather than duplicated. */}
+        {(canViewPaymentManagement && (isPayable || invoice.status === INVOICE_STATUS.PAID)) ||
+        (canViewTdsTracking && tds?.tds_applicable) ? (
+          <div className="mt-3 flex flex-col gap-1 border-t border-gray-100 pt-2 text-sm">
+            {canViewPaymentManagement && (isPayable || invoice.status === INVOICE_STATUS.PAID) && (
+              <Link to={AP_ROUTES.PAYMENT_DETAIL(invoice.id)} className="text-[#0A0082] hover:underline">
+                Payment history & receipts →
+              </Link>
+            )}
+            {canViewTdsTracking && tds?.tds_applicable && (
+              <Link to={AP_ROUTES.TDS_TRACKING_DETAIL(invoice.id)} className="text-[#0A0082] hover:underline">
+                TDS tracking (deduction / challan / filing) →
+              </Link>
+            )}
+          </div>
+        ) : null}
       </PageCardContent>
 
       <Modal

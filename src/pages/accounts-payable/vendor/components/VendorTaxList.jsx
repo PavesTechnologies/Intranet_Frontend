@@ -8,6 +8,7 @@ import StatusBadge from "../../../../components/status/statusbadge";
 import { getApiErrorMessage } from "../../utils/apiError";
 import VendorTaxForm, { DEFAULT_TAX_FORM } from "./VendorTaxForm";
 import { useCreateTax, useUpdateTax, useDeleteTax } from "../hooks/useVendorMutations";
+import { useApPermissions } from "../../hooks/useApPermissions";
 
 const validateTaxForm = (formData) => {
   const errors = {};
@@ -21,6 +22,7 @@ const validateTaxForm = (formData) => {
  * `is_verified` is backend-managed and shown read-only.
  */
 const VendorTaxList = ({ vendorId, address }) => {
+  const { canEditVendor } = useApPermissions();
   const taxes = address.vendor_tax || [];
 
   const [modalTarget, setModalTarget] = useState(null); // { tax } | { tax: null } for add | null
@@ -99,9 +101,11 @@ const VendorTaxList = ({ vendorId, address }) => {
         <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
           Tax Registrations
         </span>
-        <Button size="small" variant="outline" onClick={openAdd}>
-          <Plus className="h-3.5 w-3.5" /> Add Tax
-        </Button>
+        {canEditVendor && (
+          <Button size="small" variant="outline" onClick={openAdd}>
+            <Plus className="h-3.5 w-3.5" /> Add Tax
+          </Button>
+        )}
       </div>
 
       {taxes.length === 0 ? (
@@ -118,14 +122,14 @@ const VendorTaxList = ({ vendorId, address }) => {
                 <span className="text-gray-500">{tax.registration_number}</span>
                 <StatusBadge label={tax.is_verified ? "Verified" : "Unverified"} size="sm" />
               </span>
-              <span className="flex gap-1.5">
+              {canEditVendor && <span className="flex gap-1.5">
                 <Button size="small" variant="ghost" onClick={() => openEdit(tax)}>
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
                 <Button size="small" variant="ghost" onClick={() => setDeleteTarget(tax)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
-              </span>
+              </span>}
             </li>
           ))}
         </ul>

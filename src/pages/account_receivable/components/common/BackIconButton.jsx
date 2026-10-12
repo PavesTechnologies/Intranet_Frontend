@@ -1,6 +1,5 @@
 import { ArrowLeft } from "lucide-react";
 
-import Button from "../../../../components/Button/Button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../../../components/ui/tooltip";
 
 // Single icon-only back control used across every AR screen/wizard/drawer so
@@ -11,17 +10,15 @@ export default function BackIconButton({ onClick, label = "Go back", disabled = 
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button
+          <button
             type="button"
-            variant="ghost"
-            size="icon"
             onClick={onClick}
             disabled={disabled}
             aria-label={label}
-            className={`rounded-full border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 ${className}`}
+            className={`inline-flex items-center justify-center h-8 w-8 rounded-full border border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-800 transition active:scale-95 shadow-2xs ${className}`}
           >
             <ArrowLeft className="h-4 w-4" />
-          </Button>
+          </button>
         </TooltipTrigger>
         <TooltipContent side="bottom">{label}</TooltipContent>
       </Tooltip>

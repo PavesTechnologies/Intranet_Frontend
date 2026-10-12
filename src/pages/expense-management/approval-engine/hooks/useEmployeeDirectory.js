@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { employeeDirectoryApi } from "../api/employeeDirectoryApi";
 
-export const EMPLOYEE_DIRECTORY_KEY = ["approvalEmployeeDirectory"];
+// Versioned: bump whenever the cached entry shape changes, so a cache built by older code (kept
+// across hot reloads and SPA navigation for up to gcTime) is never read with the new shape.
+export const EMPLOYEE_DIRECTORY_KEY = ["approvalEmployeeDirectory", 2];
 
 /**
  * Resolves employeeId -> { name, email } across every approval-engine screen (queue/history lists,
@@ -16,23 +18,47 @@ export const EMPLOYEE_DIRECTORY_KEY = ["approvalEmployeeDirectory"];
  * id, so any UUID-keyed lookup (ApproverLabel) could never resolve and silently fell back to a
  * truncated uuid for every approver, in every panel that shows one.
  */
-export const useEmployeeDirectory = () =>
+const directoryQuery = {
+  queryKey: EMPLOYEE_DIRECTORY_KEY,
+  queryFn: async () => {
+    const res = await employeeDirectoryApi.getAll();
+    const raw = Array.isArray(res.data) ? res.data : res.data?.content || res.data?.data || [];
+    const map = new Map();
+    raw.forEach((e) => {
+      const employeeId = e.employee_id ?? e.employeeId;
+      const employeeUuid = e.employee_uuid ?? e.employeeUuid ?? e.user_uuid ?? e.userUuid;
+      if (!employeeId && !employeeUuid) return;
+      const name = [e.first_name ?? e.firstName, e.last_name ?? e.lastName].filter(Boolean).join(" ").trim();
+      const entry = {
+        employeeId: employeeId ? String(employeeId) : null,
+        name: name || null,
+        email: e.work_email ?? e.workEmail ?? "",
+        employmentStatus: e.employment_status ?? e.employmentStatus ?? "",
+      };
+      if (employeeId) map.set(employeeId, entry);
+      if (employeeUuid) map.set(employeeUuid, entry);
+    });
+    return map;
+  },
+  staleTime: 10 * 60_000,
+  gcTime: 30 * 60_000,
+  retry: 1,
+};
+
+export const useEmployeeDirectory = () => useQuery(directoryQuery);
+
+export const ACTIVE_EMPLOYEES_KEY = ["xmsActiveEmployees"];
+
+/**
+ * Current employees for pickers, as { employeeId, name, email }, sorted by name. Served by the
+ * expense service (GET /xms/employees), which already filters to Active employees.
+ */
+export const useEmployeeList = () =>
   useQuery({
-    queryKey: EMPLOYEE_DIRECTORY_KEY,
+    queryKey: ACTIVE_EMPLOYEES_KEY,
     queryFn: async () => {
-      const res = await employeeDirectoryApi.getAll();
-      const raw = Array.isArray(res.data) ? res.data : res.data?.content || res.data?.data || [];
-      const map = new Map();
-      raw.forEach((e) => {
-        const employeeId = e.employee_id ?? e.employeeId;
-        const employeeUuid = e.employee_uuid ?? e.employeeUuid ?? e.user_uuid ?? e.userUuid;
-        if (!employeeId && !employeeUuid) return;
-        const name = [e.first_name ?? e.firstName, e.last_name ?? e.lastName].filter(Boolean).join(" ").trim();
-        const entry = { name: name || null, email: e.work_email ?? e.workEmail ?? "" };
-        if (employeeId) map.set(employeeId, entry);
-        if (employeeUuid) map.set(employeeUuid, entry);
-      });
-      return map;
+      const res = await employeeDirectoryApi.getActive();
+      return (res.data?.data || []).map((e) => ({ employeeId: e.employeeId, name: e.name, email: e.email || "" }));
     },
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,

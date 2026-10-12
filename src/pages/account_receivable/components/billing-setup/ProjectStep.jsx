@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { RefreshCw, AlertCircle, FolderKanban, Hash, CalendarRange, MapPin, Mail, Phone } from "lucide-react";
+import { RefreshCw, AlertCircle, FolderKanban, Hash, CalendarRange, MapPin, Mail, Phone, Search } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
@@ -7,9 +7,12 @@ import FormTextArea from "../../../../components/forms/FormTextArea";
 import SearchableSelect from "../common/SearchableSelect";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import { BILLING_CONTEXT_OPTIONS } from "../../data/wizardOptions";
+import { formatProjectDuration } from "../../utils/format";
 import {
   getBillingConfigurationClients,
   getAvailableProjectsForBillingConfiguration,
+  mergeProjectSources,
+  toProjectInfoFields,
 } from "../../services/billingConfigService";
 
 function FieldCell({ icon, label, value }) {
@@ -28,6 +31,18 @@ function FieldCell({ icon, label, value }) {
 // leaving a stray leading/trailing space when either half is missing.
 function formatPhoneNumber(countryCode, phoneNumber) {
   return [countryCode, phoneNumber].filter(Boolean).join(" ") || "—";
+}
+
+// Display-time safety net: a Project Code must never be the project's own
+// internal id. A legacy record can have that value persisted (saved before
+// this mapping was fixed) or a lookup can fall through to it — either way,
+// never show it as the code, here in the dropdown label or in the Synced
+// Information card below.
+function sanitizeProjectCode(code, projectId) {
+  const codeStr = code === null || code === undefined ? "" : String(code).trim();
+  if (!codeStr) return "";
+  if (projectId === null || projectId === undefined || projectId === "") return codeStr;
+  return codeStr === String(projectId).trim() ? "" : codeStr;
 }
 
 const EMPTY_PROJECT_FIELDS = {
@@ -144,74 +159,31 @@ export default function ProjectStep({ value = {}, onChange }) {
   // the backend is the sole source of truth for that eligibility, so no
   // further filtering happens here.
   //
-  // When editing an existing configuration, its own project may be absent
-  // from that eligibility list (e.g. it's already configured, so it no longer
-  // qualifies as available for a NEW configuration). Rather than treat that as
-  // "no projects found", fall back to the project data already carried on the
-  // configuration itself (`value`) so it stays selectable/displayed here —
-  // this never affects the New Billing Configuration list or its API.
+  // When editing, `value` already carries the canonical selected project
+  // (getBillingConfigurationById resolves it by projectId). If that project
+  // is in the list, the list record wins field-by-field with `value` filling
+  // any gaps; if it isn't (excluded by new-configuration eligibility rules),
+  // the project from `value` is appended so it stays selected and displayed.
+  // Both go through the same mergeProjectSources/toProjectInfoFields as New.
+  // Recomputed whenever the list or the saved project changes, so it doesn't
+  // matter which of the two loads first.
+  const savedProjectKey = JSON.stringify(toProjectInfoFields(value));
   const displayProjects = useMemo(() => {
-    if (!value.projectId) return projects;
-    const alreadyListed = projects.some(
-      (project) => String(project.projectId || project.id || "") === String(value.projectId)
-    );
-    if (alreadyListed) {
-      // The available-projects API entry may not carry primaryLocation/contact
-      // fields (it's a slim "eligible for a new configuration" DTO) — never
-      // let a missing/null value from it clobber what's already known from
-      // the configuration being edited.
-      return projects.map((project) =>
-        String(project.projectId || project.id || "") === String(value.projectId)
-          ? {
-              ...project,
-              primaryLocation: value.primaryLocation || project.primaryLocation,
-              countryCode: project.countryCode || value.countryCode,
-              email: project.email || value.email,
-              phoneNumber: project.phoneNumber || value.phoneNumber,
-            }
-          : project
-      );
+    const savedProject = JSON.parse(savedProjectKey);
+    if (!savedProject.projectId) return projects;
+    const isSaved = (project) => String(project.projectId || project.id || "") === String(savedProject.projectId);
+    if (projects.some(isSaved)) {
+      return projects.map((project) => (isSaved(project) ? { ...project, ...mergeProjectSources(project, savedProject) } : project));
     }
-    return [
-      ...projects,
-      {
-        projectId: value.projectId,
-        projectName: value.projectName,
-        projectCode: value.projectCode,
-        projectDuration: value.projectDuration,
-        projectBudget: value.projectBudget,
-        projectBudgetCurrency: value.projectBudgetCurrency,
-        currency: value.currency,
-        primaryLocation: value.primaryLocation,
-        countryCode: value.countryCode,
-        email: value.email,
-        phoneNumber: value.phoneNumber,
-        startDate: value.startDate,
-        endDate: value.endDate,
-      },
-    ];
-  }, [
-    projects,
-    value.projectId,
-    value.projectName,
-    value.projectCode,
-    value.projectDuration,
-    value.projectBudget,
-    value.projectBudgetCurrency,
-    value.currency,
-    value.primaryLocation,
-    value.countryCode,
-    value.email,
-    value.phoneNumber,
-    value.startDate,
-    value.endDate,
-  ]);
+    return [...projects, savedProject];
+  }, [projects, savedProjectKey]);
 
   const projectOptions = useMemo(() => {
     if (!value.clientId) return [];
     return displayProjects.map((project) => {
       const id = String(project.projectId || project.id || "");
-      const label = project.projectCode ? `${project.projectCode} — ${project.projectName}` : project.projectName;
+      const code = sanitizeProjectCode(project.projectCode, project.projectId || project.id);
+      const label = code ? `${code} — ${project.projectName}` : project.projectName;
       return { value: id, label };
     });
   }, [displayProjects, value.clientId]);
@@ -224,47 +196,30 @@ export default function ProjectStep({ value = {}, onChange }) {
     );
   }, [displayProjects, value.projectId]);
 
-  // A Draft billing configuration can come back from the backend without its
-  // project-derived fields (e.g. projectCode) persisted — once the client's
-  // project list loads, backfill anything missing from the matched project so
-  // the summary card and step validation don't see a false "missing" field.
+  // Backfills any canonical project field still blank on `value` from the
+  // resolved project (list record, or the saved project itself) — e.g. the
+  // list loaded after the configuration did. Only fills blanks, never
+  // overwrites a hydrated value, and is a no-op (no onChange, no loop) once
+  // nothing is missing.
   useEffect(() => {
     if (!matchedProject) return;
-    if (value.projectCode && value.projectDuration) return;
 
-    onChange({
-      ...value,
-      projectName: value.projectName || matchedProject.projectName,
-      // available-projects can return a null projectCode (e.g. no PMS code
-      // assigned yet) — fall back to the projectId so this required field is
-      // never blocked on a value the user has no way to enter (it's read-only
-      // Synced Information for enterprise projects).
-      projectCode:
-        value.projectCode ||
-        matchedProject.projectCode ||
-        (matchedProject.projectId ? String(matchedProject.projectId) : ""),
-      projectDuration: value.projectDuration || matchedProject.projectDuration,
-      currency: value.currency || matchedProject.projectBudgetCurrency || matchedProject.currency || "",
-      projectBudget: value.projectBudget ?? matchedProject.projectBudget ?? "",
-      projectBudgetCurrency:
-        value.projectBudgetCurrency || matchedProject.projectBudgetCurrency || matchedProject.currency || "",
-      primaryLocation: value.primaryLocation || matchedProject.primaryLocation || "",
-      countryCode: value.countryCode || matchedProject.countryCode || "",
-      email: value.email || matchedProject.email || "",
-      phoneNumber: value.phoneNumber || matchedProject.phoneNumber || "",
-      startDate: value.startDate || matchedProject.startDate,
-      endDate: value.endDate || matchedProject.endDate,
+    const patch = {};
+    Object.entries(toProjectInfoFields(matchedProject)).forEach(([field, source]) => {
+      if (field === "projectId") return;
+      const current = value[field];
+      const hasCurrent = current !== undefined && current !== null && current !== "";
+      const hasSource = source !== undefined && source !== null && source !== "";
+      if (!hasCurrent && hasSource) patch[field] = source;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchedProject]);
 
-  const getProjectDurationLabel = (projectData) => {
-    if (projectData?.projectDuration) return projectData.projectDuration;
-    if (projectData?.startDate || projectData?.endDate) {
-      return `${projectData.startDate || "—"} to ${projectData.endDate || "Ongoing"}`;
-    }
-    return "—";
-  };
+    if (Object.keys(patch).length === 0) return;
+    onChange({ ...value, ...patch });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchedProject, value]);
+
+  // Same Project Duration formatting as View/Review/Approval.
+  const getProjectDurationLabel = (projectData) => formatProjectDuration(projectData) || "—";
 
   // Handlers
   const handleClientSelect = (clientId) => {
@@ -288,19 +243,8 @@ export default function ProjectStep({ value = {}, onChange }) {
         projectSource: "ENTERPRISE",
         clientId: value.clientId,
         clientName: value.clientName,
+        ...toProjectInfoFields(project),
         projectId,
-        projectName: project.projectName,
-        projectCode: project.projectCode || String(projectId),
-        projectDuration: project.projectDuration,
-        currency: project.projectBudgetCurrency || project.currency || "",
-        projectBudget: project.projectBudget ?? "",
-        projectBudgetCurrency: project.projectBudgetCurrency || project.currency || "",
-        primaryLocation: project.primaryLocation || "",
-        countryCode: project.countryCode || "",
-        email: project.email || "",
-        phoneNumber: project.phoneNumber || "",
-        startDate: project.startDate,
-        endDate: project.endDate,
       });
     } else {
       onChange({
@@ -413,7 +357,7 @@ export default function ProjectStep({ value = {}, onChange }) {
             onClick={switchToEnterprise}
             className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
+            <Search className="h-3.5 w-3.5" />
             Search Enterprise Projects
           </button>
         </div>
@@ -527,7 +471,15 @@ export default function ProjectStep({ value = {}, onChange }) {
                   requiredMark
                   name="projectId"
                   options={projectOptions}
-                  value={value.projectId || ""}
+                  // SearchableSelect matches this against option.value with
+                  // strict === (option.value is always String(projectId) — see
+                  // projectOptions below). A Draft loaded from the backend can
+                  // carry projectId as a number (e.g. 38), which would never
+                  // strictly equal the string "38" in projectOptions, leaving
+                  // the dropdown stuck on its placeholder even though the
+                  // correct project was selected. Stringify here so it always
+                  // matches regardless of where projectId came from.
+                  value={value.projectId ? String(value.projectId) : ""}
                   onChange={handleProjectSelect}
                   placeholder={projectSelectorPlaceholder}
                   disabled={loadingClients || !value.clientId || loadingProjects}
@@ -618,7 +570,7 @@ export default function ProjectStep({ value = {}, onChange }) {
               <FieldCell
                 icon={<Hash className="h-3 w-3" strokeWidth={1.75} />}
                 label="Project Code"
-                value={value.projectCode || "—"}
+                value={sanitizeProjectCode(value.projectCode, value.projectId) || "—"}
               />
             </div>
             <div className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-2 sm:divide-y-0 sm:divide-x">

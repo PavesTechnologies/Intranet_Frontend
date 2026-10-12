@@ -10,9 +10,20 @@ import { APPROVAL_PERMISSIONS, APPROVAL_ANY_VIEW_PERMISSIONS } from "../constant
 import {
   INVOICE_HISTORY_VIEW_PERMISSIONS,
 } from "../constants/approvalPermissions";
-import { PAYMENT_PERMISSIONS } from "../constants/paymentPermissions";
+import { PAYMENT_PERMISSIONS, PAYMENT_ANY_VIEW_PERMISSIONS } from "../constants/paymentPermissions";
+import { TDS_TRACKING_PERMISSIONS, TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "../constants/tdsTrackingPermissions";
 import { INVOICE_PERMISSIONS } from "../constants/invoicePermissions";
 import { TDS_PERMISSIONS, TDS_ANY_VIEW_PERMISSIONS } from "../constants/tdsPermissions";
+import { TDS_CONFIG_PERMISSIONS } from "../constants/tdsConfigPermissions";
+import { VENDOR_PERMISSIONS, VENDOR_ANY_PERMISSIONS } from "../constants/vendorPermissions";
+import { AP_VENDOR_MANAGER_ROLES } from "../constants/apRoles";
+import {
+  PAYMENT_TERM_PERMISSIONS,
+  PAYMENT_TERM_VIEW_PERMISSIONS,
+  PAYMENT_TERM_RECHECK_PERMISSIONS,
+  AGREEMENT_VIEW_PERMISSIONS,
+  AGREEMENT_EDIT_PERMISSIONS,
+} from "../constants/paymentTerms";
 
 /**
  * One boolean flag per capability, consumed by pages/buttons instead of calling
@@ -38,13 +49,36 @@ export function useApPermissions() {
 
   return {
     canViewDashboard: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_DASHBOARD)),
-    canOnboardVendor: hasRole(rolesForPermission(AP_PERMISSIONS.ONBOARD_VENDOR)),
-    canEditVendor: hasRole(rolesForPermission(AP_PERMISSIONS.EDIT_VENDOR)),
-    canViewVendor: hasRole(rolesForPermission(AP_PERMISSIONS.VIEW_VENDOR)),
+    // Vendor Management now runs on UMS permissions (vendor_permissions.py enforces them on
+    // every vendor / intake / PO / GRN route). Onboarding is also reachable from the procurement
+    // onboarding-request flow (ONBOARDING_PROCESS), same as the backend allows.
+    canOnboardVendor: hasAnyPermission([VENDOR_PERMISSIONS.VENDOR_MANAGE, PROCUREMENT_PERMISSIONS.ONBOARDING_PROCESS]),
+    canEditVendor: hasPermission(VENDOR_PERMISSIONS.VENDOR_MANAGE),
+    canViewVendor: hasAnyPermission(VENDOR_ANY_PERMISSIONS),
+    canManageVendorBanks: hasPermission(VENDOR_PERMISSIONS.VENDOR_BANK_MANAGE),
+    // System Configuration's base tabs vs. the TDS Configuration tab are mutually exclusive by
+    // design (Admin never sees TDS Configuration, Finance_Executive never sees the base tabs) —
+    // see constants/permissions.js's comment on MANAGE_SYSTEM_CONFIG/MANAGE_TDS_CONFIG.
+    canManageSystemConfig: hasRole(rolesForPermission(AP_PERMISSIONS.MANAGE_SYSTEM_CONFIG)),
+    // Role alone is necessary but not sufficient — the TDS Configuration backend enforces its
+    // own real UMS permissions (TDS_CONFIG_VIEW/CREATE/EDIT/DELETE/IMPORT) independently of role,
+    // so canManageTdsConfig (Finance_Executive-only, the access-model decision) is combined with
+    // canViewTdsConfig (the actual granted permission) for the tab to show functioning content —
+    // see SystemConfigurationPage.jsx. The four action-level flags below gate individual buttons;
+    // the backend remains authoritative regardless (a 401/403 is still handled at the call site).
+    canManageTdsConfig: hasRole(rolesForPermission(AP_PERMISSIONS.MANAGE_TDS_CONFIG)),
+    canViewTdsConfig: hasPermission(TDS_CONFIG_PERMISSIONS.TDS_CONFIG_VIEW),
+    canCreateTdsConfig: hasPermission(TDS_CONFIG_PERMISSIONS.TDS_CONFIG_CREATE),
+    canEditTdsConfig: hasPermission(TDS_CONFIG_PERMISSIONS.TDS_CONFIG_EDIT),
+    canDeleteTdsConfig: hasPermission(TDS_CONFIG_PERMISSIONS.TDS_CONFIG_DELETE),
+    canImportTdsConfig: hasPermission(TDS_CONFIG_PERMISSIONS.TDS_CONFIG_IMPORT),
     // Invoice intake/OCR/view now carry real UMS permissions (invoice_extraction_route.py,
     // invoice_process_route.py, invoice_details_route.py) — migrated off the frontend
     // role -> permission guess the same way canMarkPaid/canViewPayment already were.
     canUploadInvoice: hasPermission(INVOICE_PERMISSIONS.INVOICE_CREATE),
+    canBulkUploadInvoices: hasPermission(INVOICE_PERMISSIONS.INVOICE_BULK_UPLOAD),
+    canManageEmailIntake: hasPermission(INVOICE_PERMISSIONS.EMAIL_INTAKE_MANAGE),
+    canManageAutomation: hasPermission("AP_AUTOMATION_MANAGE"),
     canReviewOcr: hasPermission(INVOICE_PERMISSIONS.INVOICE_OCR_REVIEW),
     // The standalone Validation Queue page is part of the same OCR/intake pipeline — no
     // separate backend permission exists for it.
@@ -57,6 +91,15 @@ export function useApPermissions() {
     // a frontend role guess.
     canMarkPaid: hasPermission(PAYMENT_PERMISSIONS.PAYMENT_PROCESS),
     canViewPayment: hasPermission(PAYMENT_PERMISSIONS.PAYMENT_VIEW),
+    // Payment Management pages (Ready for Payment / Payment History / payment detail) — the
+    // backend's read endpoints accept PAYMENT_VIEW or PAYMENT_PROCESS.
+    canViewPaymentManagement: hasAnyPermission(PAYMENT_ANY_VIEW_PERMISSIONS),
+    // Record Payment + upload receipt (POST /payment/invoice/{id}/record, /payment/{id}/documents).
+    canRecordPayment: hasPermission(PAYMENT_PERMISSIONS.PAYMENT_PROCESS),
+
+    // ── TDS Tracking (deduction / deposit / filing recorded from outside systems) ──
+    canViewTdsTracking: hasAnyPermission(TDS_TRACKING_ANY_VIEW_PERMISSIONS),
+    canUpdateTdsTracking: hasPermission(TDS_TRACKING_PERMISSIONS.TDS_TRACKING_UPDATE),
 
     // ── Invoice TDS (tax deducted at source) ───────────────────────────────
     // GET .../tds accepts INVOICE_TDS_VIEW OR plain INVOICE_VIEW per the backend contract — so
@@ -71,6 +114,19 @@ export function useApPermissions() {
     // Locks the determination in (Finance) — required before Mark Ready for Payment, see
     // InvoicePaymentPanel.
     canVerifyTds: hasPermission(TDS_PERMISSIONS.INVOICE_TDS_VERIFY),
+
+    // ── Payment-term compliance (payment_terms_route.py) ───────────────────
+    canViewPaymentTerms: hasAnyPermission(PAYMENT_TERM_VIEW_PERMISSIONS),
+    canRecheckPaymentTerms: hasAnyPermission(PAYMENT_TERM_RECHECK_PERMISSIONS),
+    // Resolves MISMATCH / REVIEW_REQUIRED — required before Mark Ready for Payment.
+    canVerifyPaymentTerms: hasPermission(PAYMENT_TERM_PERMISSIONS.INVOICE_PAYMENT_TERM_VERIFY),
+    // Vendor agreements: a finance permission OR a vendor-manager role (mirrors the backend).
+    canViewAgreements:
+      hasAnyPermission(AGREEMENT_VIEW_PERMISSIONS) || hasRole(AP_VENDOR_MANAGER_ROLES),
+    canUploadAgreements:
+      hasAnyPermission(AGREEMENT_EDIT_PERMISSIONS) || hasRole(AP_VENDOR_MANAGER_ROLES),
+    // Four-eyes: the backend additionally refuses the uploader.
+    canVerifyAgreements: hasPermission(PAYMENT_TERM_PERMISSIONS.VENDOR_AGREEMENT_VERIFY),
 
     // ── PR Request ─────────────────────────────────────────────────────────
     canViewPR: hasPermission(PROCUREMENT_PERMISSIONS.PR_VIEW),

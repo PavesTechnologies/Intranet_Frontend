@@ -10,6 +10,8 @@ import ExpenseReviewPanel from "../components/ExpenseReviewPanel";
 import { useMyHistory } from "../hooks/useApprovalWorkflow";
 import { useApprovalLiveSync } from "../hooks/useApprovalLiveSync";
 import { formatMoney, formatDate } from "../constants/approvalLabels";
+import { DEFAULT_PAGE_SIZE } from "@/pages/expense-management/components/common/pagination";
+import Pagination from "@/components/Pagination/pagination";
 
 const OUTCOME_OPTIONS = [
   { label: "All Outcomes", value: "" },
@@ -26,12 +28,13 @@ const OUTCOME_OPTIONS = [
  */
 export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, breadcrumbLabel, searchTerm = "", hideHeader = false, allowOutcomeFilter = false, noPadding = false }) {
   const [page, setPage] = useState(0);
+  const pageSize = DEFAULT_PAGE_SIZE;
   const [outcomeFilter, setOutcomeFilter] = useState(fixedOutcome || "");
   const [reviewingItem, setReviewingItem] = useState(null);
   useApprovalLiveSync();
 
   const outcome = allowOutcomeFilter ? outcomeFilter || undefined : fixedOutcome;
-  const { data, isLoading, isError, refetch } = useMyHistory(outcome, page, 20);
+  const { data, isPending, isError, refetch } = useMyHistory(outcome, page, pageSize);
   const items = data?.content || [];
 
   const filteredItems = useMemo(() => {
@@ -83,7 +86,7 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
         )}
       </div>
 
-      {isLoading && (
+      {isPending && (
         <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-16">
           <LoadingSpinner text="Loading…" />
         </div>
@@ -97,7 +100,7 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
         </div>
       )}
 
-      {!isLoading && !isError && filteredItems.length === 0 && (
+      {!isPending && !isError && filteredItems.length === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-16 text-center">
           <Inbox className="h-8 w-8 text-gray-300" />
           <p className="text-sm font-medium text-gray-600">
@@ -178,17 +181,14 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
         </>
       )}
 
-      {data && data.totalPages > 1 && (
-        <div className="flex items-center justify-end gap-3 mt-4 text-sm text-gray-600">
-          <Button size="small" variant="outline" disabled={data.first} onClick={() => setPage((p) => p - 1)}>
-            Previous
-          </Button>
-          <span>
-            Page {data.page + 1} of {data.totalPages}
-          </span>
-          <Button size="small" variant="outline" disabled={data.last} onClick={() => setPage((p) => p + 1)}>
-            Next
-          </Button>
+      {data && (
+        <div className="mt-4 flex justify-center">
+          <Pagination
+            currentPage={page + 1}
+            totalPages={data.totalPages ?? 0}
+            onPrevious={() => setPage(Math.max(page - 1, 0))}
+            onNext={() => setPage(Math.min(page + 1, (data.totalPages ?? 0) - 1))}
+          />
         </div>
       )}
 

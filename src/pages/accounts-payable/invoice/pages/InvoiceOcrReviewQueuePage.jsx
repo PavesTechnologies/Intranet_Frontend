@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
 import { Eye } from "lucide-react";
+import { Link } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
+import { AP_ROUTES } from "../../constants/routes";
 import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -86,7 +88,15 @@ export default function InvoiceOcrReviewQueuePage() {
 
   return (
     <div className="p-6">
-      <PageHeader title="OCR Review Queue" subtitle="Invoices awaiting OCR field review or vendor assignment" />
+      <PageHeader
+        title="OCR Review Queue"
+        subtitle="Invoices awaiting OCR field review or vendor assignment"
+        actions={
+          <Link to={AP_ROUTES.INVOICE_REVIEW_WORKBENCH}>
+            <Button variant="primary">Review &amp; send in bulk</Button>
+          </Link>
+        }
+      />
 
       {isError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">

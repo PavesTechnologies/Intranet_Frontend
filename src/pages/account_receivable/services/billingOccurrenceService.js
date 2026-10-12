@@ -132,15 +132,22 @@ export const normalizeBillingOccurrence = (item = {}) => {
     billingConfigurationId: item.billingConfigurationId ?? null,
     recurringConfigurationId: item.recurringConfigurationId ?? null,
     periodNumber: item.periodNumber ?? null,
+    // Billing Period — the span this occurrence bills for. Never project dates.
     periodStartDate: item.periodStartDate ?? item.billingPeriodStart ?? item.billingPeriodStartDate ?? "",
     periodEndDate: item.periodEndDate ?? item.billingPeriodEnd ?? item.billingPeriodEndDate ?? "",
     billingDate: item.billingDate ?? item.invoiceDate ?? "",
+    // Project Duration — the project's own lifecycle, only from the backend's
+    // project dates (never derived from the billing period or billing date).
+    projectStartDate: item.projectStartDate ?? "",
+    projectEndDate: item.projectEndDate ?? "",
     billingAmount: rawBillingAmount,
     scheduleType: item.scheduleType ?? "",
     isPartialPeriod: Boolean(item.isPartialPeriod),
     periodStatus: periodStatus,
     taxStatus: taxStatus,
-    isInvoiced: Boolean(item.isInvoiced),
+    // Persisted flag the backend sets when an invoice is generated for this
+    // occurrence. Strict: a "false" string or other truthy value is not true.
+    isInvoiced: item.isInvoiced === true || String(item.isInvoiced).toLowerCase() === "true",
     invoiceDate: item.invoiceDate ?? null,
     remarks: item.remarks ?? "",
     isActive: item.isActive !== undefined ? Boolean(item.isActive) : true,
@@ -153,6 +160,23 @@ export const normalizeBillingOccurrence = (item = {}) => {
     currencyCode: item.currencyCode ?? "USD",
     taxRegionName: item.taxRegionName ?? "",
     taxRegionCode: item.taxRegionCode ?? "",
+    countryName:
+      item.countryName ??
+      item.country_name ??
+      item.clientCountryName ??
+      item.client_country_name ??
+      item.client?.countryName ??
+      item.client?.country ??
+      item.country ??
+      null,
+    countryCode:
+      item.countryCode ??
+      item.country_code ??
+      item.clientCountryCode ??
+      item.client_country_code ??
+      item.client?.countryCode ??
+      null,
+    placeOfSupply: item.placeOfSupply ?? item.place_of_supply ?? null,
 
     // Tax calculation result, present once taxStatus has moved past TAX_PENDING.
     taxCalculationId: item.taxCalculationId ?? null,
@@ -199,16 +223,31 @@ export const mergeOccurrenceWithTaxCalc = (base = {}, taxCalc = {}) => {
     ...c,
 
     billingScheduleId: b.billingScheduleId || c.billingScheduleId,
+    // The tax-calculation response carries no occurrence/configuration
+    // identity — keep the occurrence's, or the billing type (resolved from
+    // these links) and the invoice line item are lost.
+    billingConfigurationId: b.billingConfigurationId || c.billingConfigurationId,
+    recurringConfigurationId: b.recurringConfigurationId || c.recurringConfigurationId,
+    billingTypeName: b.billingTypeName || c.billingTypeName,
+    periodNumber: b.periodNumber ?? c.periodNumber,
+    isPartialPeriod: b.isPartialPeriod || c.isPartialPeriod,
+    isInvoiced: b.isInvoiced || c.isInvoiced,
+    invoiceDate: b.invoiceDate || c.invoiceDate,
     projectName: b.projectName || c.projectName,
     clientName: b.clientName || c.clientName,
     currencyCode: b.currencyCode || c.currencyCode || "USD",
     taxRegionName: b.taxRegionName || c.taxRegionName,
     taxRegionCode: b.taxRegionCode || c.taxRegionCode,
+    countryName: b.countryName || c.countryName || null,
+    countryCode: b.countryCode || c.countryCode || null,
+    placeOfSupply: b.placeOfSupply || c.placeOfSupply || null,
     scheduleType: b.scheduleType || c.scheduleType,
 
     periodStartDate: b.periodStartDate || c.periodStartDate,
     periodEndDate: b.periodEndDate || c.periodEndDate,
     billingDate: b.billingDate || c.billingDate,
+    projectStartDate: b.projectStartDate || c.projectStartDate,
+    projectEndDate: b.projectEndDate || c.projectEndDate,
 
     billingAmount:
       b.billingAmount !== null && b.billingAmount !== undefined

@@ -14,6 +14,7 @@ import goodsReceiptService from "../../goods-receipt/services/goodsReceiptServic
 import VendorGrnForm, { DEFAULT_GRN_FORM, DEFAULT_GRN_LINE } from "./VendorGrnForm";
 import VendorDocumentUploadModal from "./VendorDocumentUploadModal";
 import VendorCollectionPanel from "./VendorCollectionPanel";
+import { useApPermissions } from "../../hooks/useApPermissions";
 
 const toNumber = (value) => {
   const num = Number(value);
@@ -47,6 +48,7 @@ const buildGrnPayload = (formData, lines, vendorId) => ({
  * @param {string} vendorName
  */
 const VendorGrnTab = ({ vendorId, vendorName }) => {
+  const { canEditVendor } = useApPermissions();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState(DEFAULT_GRN_FORM);
   const [lines, setLines] = useState([{ ...DEFAULT_GRN_LINE }]);
@@ -186,10 +188,12 @@ const VendorGrnTab = ({ vendorId, vendorName }) => {
         >
           <Download className="h-3.5 w-3.5" /> Download
         </Button>
-      ) : (
+      ) : canEditVendor ? (
         <Button size="small" variant="outline" onClick={() => openUploadModal(grn)}>
           <Upload className="h-3.5 w-3.5" /> Upload
         </Button>
+      ) : (
+        "—"
       ),
     };
   });
@@ -207,9 +211,11 @@ const VendorGrnTab = ({ vendorId, vendorName }) => {
         emptyMessage="No goods receipts found for this vendor."
         errorMessage="Unable to load goods receipts right now."
         actions={
-          <Button onClick={openAdd}>
-            <Plus className="h-4 w-4" /> Add GRN
-          </Button>
+          canEditVendor ? (
+            <Button onClick={openAdd}>
+              <Plus className="h-4 w-4" /> Add GRN
+            </Button>
+          ) : null
         }
       >
         <GenericTable

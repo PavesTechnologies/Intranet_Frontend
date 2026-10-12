@@ -12,39 +12,23 @@ const ARTable = ({
   headers = [],
   rows = [],
   columns = [],
-  alignments = {},
   loading = false,
   emptyMessage = "No records found.",
 }) => {
   const hasData = rows.length > 0;
 
   const getAlignmentClass = (colOrHeader, idx) => {
-    if (alignments) {
-      if (alignments[colOrHeader] === "left") return "text-left";
-      if (alignments[colOrHeader] === "center") return "text-center";
-      if (alignments[colOrHeader] === "right") return "text-right";
-
-      const colKey = columns[idx];
-      if (colKey && alignments[colKey] === "left") return "text-left";
-      if (colKey && alignments[colKey] === "center") return "text-center";
-      if (colKey && alignments[colKey] === "right") return "text-right";
-
-      const headerKey = headers[idx];
-      if (headerKey && alignments[headerKey] === "left") return "text-left";
-      if (headerKey && alignments[headerKey] === "center") return "text-center";
-      if (headerKey && alignments[headerKey] === "right") return "text-right";
-
-      if (alignments[idx] === "left") return "text-left";
-      if (alignments[idx] === "center") return "text-center";
-      if (alignments[idx] === "right") return "text-right";
-    }
-
-    const name = String(columns[idx] || headers[idx] || colOrHeader || "").toLowerCase();
-    if (name === "client" || name === "project") {
-      return "text-left";
-    }
-
-    return idx === 0 ? "text-left" : "text-center";
+    const names = [columns[idx], headers[idx], colOrHeader]
+      .filter(Boolean)
+      .map((name) =>
+        String(name)
+          .replace(/([a-z])([A-Z])/g, "$1 $2")
+          .toLowerCase()
+          .split(/[^a-z]+/)
+      );
+    return names.some((parts) => parts.some((part) => part === "status" || part === "action" || part === "actions"))
+      ? "text-center"
+      : "text-left";
   };
 
   return (
@@ -60,13 +44,14 @@ const ARTable = ({
         </div>
       ) : (
         <div className="w-full overflow-x-auto">
-          <table className="w-full min-w-full table-auto border-collapse text-sm">
+          <table className="w-full min-w-[760px] table-auto border-collapse text-[13px]">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
                 {headers.map((header, idx) => (
                   <th
                     key={idx}
-                    className={`px-4 py-3 font-semibold text-slate-600 ${getAlignmentClass(header, idx)}`}
+                    scope="col"
+                    className={`whitespace-nowrap px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 ${getAlignmentClass(header, idx)}`}
                   >
                     {header}
                   </th>
@@ -78,12 +63,12 @@ const ARTable = ({
                 <tr
                   key={rowIndex}
                   onClick={row.onRowClick}
-                  className={`transition-colors ${row.rowClass || ""} hover:bg-slate-50 ${row.onRowClick ? "cursor-pointer" : ""}`}
+                  className={`h-12 align-middle transition-colors ${row.rowClass || ""} hover:bg-slate-50 ${row.onRowClick ? "cursor-pointer" : ""}`}
                 >
                   {columns.map((col, colIndex) => (
                     <td
                       key={colIndex}
-                      className={`px-4 py-3 align-middle text-slate-700 ${getAlignmentClass(col, colIndex)}`}
+                      className={`px-4 py-2 align-middle text-slate-700 ${getAlignmentClass(col, colIndex)}`}
                     >
                       {row[col]}
                     </td>

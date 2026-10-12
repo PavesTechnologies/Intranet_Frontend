@@ -29,23 +29,40 @@ export default function BillingSummaryGrid({ config = {} }) {
   const billingTypeLabel =
     BILLING_TYPE_LABELS[config.billingType] || getBillingTypeDisplayName(config.billingType) || "—";
 
+  const isAcquired = Boolean(
+    config.snapshotId ||
+    config.existingSnapshot ||
+    (config.snapshotLifecycleStatus &&
+      config.snapshotLifecycleStatus !== "NOT_ACQUIRED" &&
+      config.snapshotLifecycleStatus !== "ACQUISITION_FAILED") ||
+    (config.billingStatus &&
+      config.billingStatus !== "NOT_ACQUIRED" &&
+      config.billingStatus !== "ACQUISITION_FAILED" &&
+      config.billingStatus !== "VALIDATING")
+  );
+
+  const displayedBillingPeriod =
+    isAcquired && config.billingPeriod && config.billingPeriod !== "—"
+      ? config.billingPeriod
+      : "—";
+
   return (
     <div className="grid grid-cols-1 gap-x-10 sm:grid-cols-2">
       <div className="divide-y divide-slate-100">
         <Field label="Project">{config.projectName || "—"}</Field>
         <Field label="Client">{config.client || "—"}</Field>
         <Field label="Project Duration">
-          <span className="font-mono tabular-nums">{config.projectDuration || "—"}</span>
+          <span className="tabular-nums">{config.projectDuration || "—"}</span>
         </Field>
         <Field label="Billing Type">{billingTypeLabel}</Field>
         <Field label="Billing Frequency">{frequencyLabel(config.billingFrequency)}</Field>
       </div>
       <div className="divide-y divide-slate-100">
         <Field label="Billing Period">
-          <span className="font-mono tabular-nums">{config.billingPeriod || "—"}</span>
+          <span className="tabular-nums">{displayedBillingPeriod}</span>
         </Field>
         <Field label="Currency">
-          <span className="font-mono tabular-nums">{config.currency || "USD"}</span>
+          <span className="tabular-nums">{config.currency || "USD"}</span>
         </Field>
         <Field label="Payment Terms">{config.paymentTerms || "Net 30"}</Field>
       </div>

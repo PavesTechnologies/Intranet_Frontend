@@ -1,6 +1,6 @@
 import React from "react";
 import { FolderKanban, Play, CheckCircle2, FileCheck, Receipt } from "lucide-react";
-import { KPICard } from "../../../../components/kpi/KPI";
+import ARKPICard from "../common/ARKPICard";
 import { getAcquisitionKpis } from "../../services/billingDataAcquisitionService";
 
 export default function AcquisitionMetrics({
@@ -72,24 +72,22 @@ export default function AcquisitionMetrics({
           (selectedStatusFilter === "ALL" && kpi.key === "ALL");
 
         return (
-<button
-  key={kpi.key}
-  type="button"
-  onClick={() => handleCardClick(kpi.key)}
-  title={kpi.tooltip}
-  className="text-left rounded-xl border-0 outline-none transition-transform active:scale-[0.99] focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 active:ring-0 active:outline-none appearance-none"
-  style={{ outline: "none", boxShadow: "none" }}
->
-  <KPICard
+          <button
+            key={kpi.key}
+            type="button"
+            onClick={() => handleCardClick(kpi.key)}
+            title={kpi.tooltip}
+            aria-pressed={isActive}
+            className="w-full rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          >
+            <ARKPICard
     label={kpi.label}
     value={loading ? "…" : kpi.value}
     icon={<kpi.icon className="h-5 w-5" />}
     color={kpi.color}
-    active={isActive}
-    className="h-full w-full cursor-pointer bg-white shadow-sm border border-slate-200 transition-all hover:shadow-md !outline-none !ring-0 !ring-offset-0 focus:!outline-none focus:!ring-0 focus:!ring-offset-0 focus-visible:!outline-none focus-visible:!ring-0 focus-visible:!ring-offset-0 active:!ring-0 active:!outline-none"
-    style={{ outline: "none", boxShadow: "none" }}
-  />
-</button>
+              className="h-full w-full"
+            />
+          </button>
         );
       })}
     </div>

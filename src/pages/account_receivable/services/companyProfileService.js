@@ -7,19 +7,50 @@ const AR_BASE_URL =
   "http://localhost:8080";
 
 const COMPANY_PROFILE_URL = `${AR_BASE_URL}/api/v1/company-profile`;
+const INVOICE_CONTENT_DEFAULTS_URL = `${COMPANY_PROFILE_URL}/invoice-content-defaults`;
 
 const unwrapData = (response) => {
   const payload = response?.data;
   if (payload && typeof payload === "object") {
-    if (payload.data && typeof payload.data === "object" && !Array.isArray(payload.data)) {
+    // Unwrap ApiResponse<T> envelope ({ success, message, data })
+    if ("data" in payload && payload.data !== undefined) {
       return payload.data;
     }
   }
-  return payload?.data ?? payload ?? null;
+  return payload ?? null;
 };
 
 export const normalizeCompanyProfile = (item) => {
   if (!item || typeof item !== "object" || Object.keys(item).length === 0) return null;
+
+  const notesVal =
+    item.defaultInvoiceNotes !== undefined && item.defaultInvoiceNotes !== null
+      ? String(item.defaultInvoiceNotes).trim() || null
+      : item.invoiceNotes !== undefined && item.invoiceNotes !== null
+      ? String(item.invoiceNotes).trim() || null
+      : item.notes !== undefined && item.notes !== null
+      ? String(item.notes).trim() || null
+      : item.additionalNotes !== undefined && item.additionalNotes !== null
+      ? String(item.additionalNotes).trim() || null
+      : null;
+
+  const termsVal =
+    item.defaultTermsAndConditions !== undefined && item.defaultTermsAndConditions !== null
+      ? String(item.defaultTermsAndConditions).trim() || null
+      : item.termsAndConditions !== undefined && item.termsAndConditions !== null
+      ? String(item.termsAndConditions).trim() || null
+      : item.terms !== undefined && item.terms !== null
+      ? String(item.terms).trim() || null
+      : null;
+
+  const paymentVal =
+    item.defaultPaymentInstructions !== undefined && item.defaultPaymentInstructions !== null
+      ? String(item.defaultPaymentInstructions).trim() || null
+      : item.paymentInstructions !== undefined && item.paymentInstructions !== null
+      ? String(item.paymentInstructions).trim() || null
+      : item.paymentInstruction !== undefined && item.paymentInstruction !== null
+      ? String(item.paymentInstruction).trim() || null
+      : null;
 
   return {
     companyProfileId: item.companyProfileId || item.id || null,
@@ -35,6 +66,17 @@ export const normalizeCompanyProfile = (item) => {
     phone: item.phone ? String(item.phone).trim() : null,
     logoReference: item.logoReference || null,
     isActive: Boolean(item.isActive ?? true),
+    // Company Profile API defaults
+    defaultInvoiceNotes: notesVal,
+    defaultTermsAndConditions: termsVal,
+    defaultPaymentInstructions: paymentVal,
+    // Aliases for convenience across frontend components
+    invoiceNotes: notesVal,
+    notes: notesVal,
+    additionalNotes: notesVal,
+    termsAndConditions: termsVal,
+    terms: termsVal,
+    paymentInstructions: paymentVal,
   };
 };
 
@@ -100,6 +142,145 @@ export const updateCompanyProfile = async (companyProfileId, payload) => {
 };
 
 /**
+ * GET /api/v1/company-profile/invoice-content-defaults
+ * Fetches default Invoice Notes, Terms & Conditions, and Payment Instructions from backend.
+ * Dedicated endpoint response: { companyProfileId, invoiceNotes, termsAndConditions, paymentInstructions, updatedAt }
+ * Falls back to active company profile defaults (defaultInvoiceNotes, defaultTermsAndConditions, defaultPaymentInstructions) if needed.
+ */
+export const getInvoiceContentDefaults = async () => {
+  try {
+    try {
+      const response = await api.get(INVOICE_CONTENT_DEFAULTS_URL);
+      const data = unwrapData(response);
+      if (data && typeof data === "object") {
+        const invoiceNotes = data.invoiceNotes ?? data.notes ?? null;
+        const termsAndConditions = data.termsAndConditions ?? data.terms ?? null;
+        const paymentInstructions = data.paymentInstructions ?? data.paymentInstruction ?? null;
+
+        return {
+          companyProfileId: data.companyProfileId || null,
+          invoiceNotes,
+          notes: invoiceNotes,
+          termsAndConditions,
+          paymentInstructions,
+          updatedAt: data.updatedAt || null,
+        };
+      }
+    } catch (err) {
+      if (err?.response?.status !== 404 && err?.response?.status !== 405) {
+        throw err;
+      }
+    }
+
+    const profile = await getActiveCompanyProfile();
+    const invoiceNotes = profile?.defaultInvoiceNotes || profile?.invoiceNotes || profile?.notes || null;
+    const termsAndConditions = profile?.defaultTermsAndConditions || profile?.termsAndConditions || profile?.terms || null;
+    const paymentInstructions = profile?.defaultPaymentInstructions || profile?.paymentInstructions || profile?.paymentInstruction || null;
+
+    return {
+      companyProfileId: profile?.companyProfileId || null,
+      invoiceNotes,
+      notes: invoiceNotes,
+      termsAndConditions,
+      paymentInstructions,
+      updatedAt: null,
+    };
+  } catch (error) {
+    console.warn("[companyProfileService] Could not load invoice content defaults:", error?.message);
+    return {
+      companyProfileId: null,
+      invoiceNotes: null,
+      notes: null,
+      termsAndConditions: null,
+      paymentInstructions: null,
+      updatedAt: null,
+    };
+  }
+};
+
+/**
+ * PUT /api/v1/company-profile/invoice-content-defaults
+ * Persists updated default Notes, Terms & Conditions, and Payment Instructions to backend.
+ * Dedicated endpoint accepts: { invoiceNotes, termsAndConditions, paymentInstructions }
+ */
+export const updateInvoiceContentDefaults = async (payload) => {
+  const invoiceNotes =
+    payload?.invoiceNotes !== undefined && payload?.invoiceNotes !== null
+      ? String(payload.invoiceNotes).trim() || null
+      : payload?.notes !== undefined && payload?.notes !== null
+      ? String(payload.notes).trim() || null
+      : null;
+
+  const termsAndConditions =
+    payload?.termsAndConditions !== undefined && payload?.termsAndConditions !== null
+      ? String(payload.termsAndConditions).trim() || null
+      : payload?.terms !== undefined && payload?.terms !== null
+      ? String(payload.terms).trim() || null
+      : null;
+
+  const paymentInstructions =
+    payload?.paymentInstructions !== undefined && payload?.paymentInstructions !== null
+      ? String(payload.paymentInstructions).trim() || null
+      : payload?.paymentInstruction !== undefined && payload?.paymentInstruction !== null
+      ? String(payload.paymentInstruction).trim() || null
+      : null;
+
+  const cleanPayload = {
+    invoiceNotes,
+    termsAndConditions,
+    paymentInstructions,
+  };
+
+  try {
+    try {
+      const response = await api.put(INVOICE_CONTENT_DEFAULTS_URL, cleanPayload);
+      const data = unwrapData(response);
+      if (data && typeof data === "object") {
+        return {
+          companyProfileId: data.companyProfileId || null,
+          invoiceNotes: data.invoiceNotes ?? null,
+          notes: data.invoiceNotes ?? null,
+          termsAndConditions: data.termsAndConditions ?? null,
+          paymentInstructions: data.paymentInstructions ?? null,
+          updatedAt: data.updatedAt || null,
+        };
+      }
+      return data;
+    } catch (err) {
+      if (err?.response?.status !== 404 && err?.response?.status !== 405) {
+        throw err;
+      }
+    }
+
+    const active = await getActiveCompanyProfile();
+    if (!active?.companyProfileId) {
+      throw new Error("No active company profile found to update invoice content defaults.");
+    }
+
+    const updated = await updateCompanyProfile(active.companyProfileId, {
+      ...active,
+      defaultInvoiceNotes: cleanPayload.invoiceNotes,
+      defaultTermsAndConditions: cleanPayload.termsAndConditions,
+      defaultPaymentInstructions: cleanPayload.paymentInstructions,
+      invoiceNotes: cleanPayload.invoiceNotes,
+      termsAndConditions: cleanPayload.termsAndConditions,
+      paymentInstructions: cleanPayload.paymentInstructions,
+    });
+
+    return {
+      companyProfileId: updated.companyProfileId || null,
+      invoiceNotes: updated.defaultInvoiceNotes || updated.invoiceNotes || null,
+      notes: updated.defaultInvoiceNotes || updated.invoiceNotes || null,
+      termsAndConditions: updated.defaultTermsAndConditions || updated.termsAndConditions || null,
+      paymentInstructions: updated.defaultPaymentInstructions || updated.paymentInstructions || null,
+      updatedAt: null,
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
  * Extracts backend or network error messages consistently.
  */
 export const getCompanyProfileErrorMessage = (
@@ -129,6 +310,8 @@ export default {
   getCompanyProfileById,
   createCompanyProfile,
   updateCompanyProfile,
+  getInvoiceContentDefaults,
+  updateInvoiceContentDefaults,
   normalizeCompanyProfile,
   getCompanyProfileErrorMessage,
 };

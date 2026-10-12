@@ -16,4 +16,8 @@ export const departmentApproverApi = {
   create: (payload) => api.post("/xms/admin/department-approvers", payload, withBase()),
   update: (id, payload) => api.put(`/xms/admin/department-approvers/${id}`, payload, withBase()),
   delete: (id) => api.delete(`/xms/admin/department-approvers/${id}`, withBase()),
+  // DepartmentApproverOverviewResponse[]: every Employee Onboarding department + its approver (if any).
+  getDepartments: () => api.get("/xms/admin/department-approvers/departments", withBase()),
+  // ApproverCandidateResponse[]: active UMS users matched to employee records.
+  getApproverCandidates: () => api.get("/xms/admin/department-approvers/approver-candidates", withBase()),
 };

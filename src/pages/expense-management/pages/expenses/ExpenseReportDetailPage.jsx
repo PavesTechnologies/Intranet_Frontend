@@ -46,6 +46,15 @@ import {
   splitService,
   REPORT_EDITABLE_STATUSES,
 } from "@/pages/expense-management/api/expenseReportsApi";
+import TaxBreakdownPanel, {
+  emptyTaxValue,
+  taxValueFromLine,
+  taxValueFromOcr,
+  taxRequestFields,
+  taxRequestFieldsForConfirm,
+  validateTaxValue,
+} from "@/pages/expense-management/components/expense-reports/TaxBreakdownPanel";
+import TaxStatusBadge from "@/pages/expense-management/components/expense-reports/TaxStatusBadge";
 import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
 import SummaryPanel from "@/pages/expense-management/components/expense-reports/SummaryPanel";
 import api from "@/api/axiosInstance";
@@ -53,13 +62,14 @@ import Select from "react-select";
 import FormInput from "@/components/forms/FormInput";
 import FormTextArea from "@/components/forms/FormTextArea";
 import FormDatePicker from "@/components/forms/FormDatePicker";
-import GstCalculationCard from "@/pages/expense-management/components/expense-reports/GstCalculationCard";
 import CurrencyConversionCard from "@/pages/expense-management/components/expense-reports/CurrencyConversionCard";
 import ReceiptDropzone from "@/pages/expense-management/components/expense-reports/ReceiptDropzone";
 import PolicyStatusBadge, {
   PolicyResultBanner,
   derivePolicyStatus,
+  isJustified,
 } from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
+import PolicyJustificationModal from "@/pages/expense-management/components/expense-reports/PolicyJustificationModal";
 import ApprovalStatusPill from "@/pages/expense-management/approval-engine/components/ApprovalStatusPill";
 import { useApprovalLiveSync } from "@/pages/expense-management/approval-engine/hooks/useApprovalLiveSync";
 import {
@@ -70,6 +80,8 @@ import {
   useCancelReport,
 } from "@/pages/expense-management/approval-engine/hooks/useApprovalWorkflow";
 import { useFinanceReviews } from "@/pages/expense-management/pages/finance/hooks/useFinanceVerification";
+import { useClientPagination } from "@/pages/expense-management/components/common/pagination";
+import Pagination from "@/components/Pagination/pagination";
 
 const formatDate = (value) => {
   if (!value) return "—";
@@ -129,19 +141,40 @@ export default function ExpenseReportDetailPage() {
 
   const needsCorrectionLines = (lineItemReviews || []).filter((r) => r.status === "NEEDS_CORRECTION");
   const queriedLines = (financeReviews || []).filter((r) => r.status === "QUERIED" || r.status === "QUERY_RAISED" || r.reason);
+  // Who sent the report back and why. An approver's Needs Correction and a Finance query both
+  // leave it AWAITING_CORRECTION, and the employee can't read Finance's own review list, so the
+  // approval status carries both (correctionRequestedBy / correctionRequests). The review lists
+  // above are only a fallback for a backend that doesn't send them yet.
+  const correctionFromFinance =
+    approvalStatus?.correctionRequestedBy === "FINANCE" ||
+    (!approvalStatus?.correctionRequestedBy && (report?.reportStatus === "QUERY_RAISED" || queriedLines.length > 0));
+  const correctionRequests = approvalStatus?.correctionRequests?.length
+    ? approvalStatus.correctionRequests
+    : (correctionFromFinance ? queriedLines : needsCorrectionLines).map((r) => ({
+        lineItemId: r.lineItemId,
+        comment: r.reason || r.comment,
+      }));
   // Mirrors the backend's ReportStatus.isEditable() set exactly (EMS/enums/ReportStatus.java) -
   // report-level Edit/Delete must stay available during AWAITING_CORRECTION (that's the whole
   // point of the correction loop), not just DRAFT. Also gates Add/Edit/Delete Line Item and
   // Submit, since the backend rejects all of those once the report leaves this status set.
   const isReportEditable = REPORT_EDITABLE_STATUSES.includes(report?.reportStatus);
 
-  // Enforcement (not severity) decides whether submission is actually blocked — see
-  // PolicyStatusBadge.derivePolicyStatus. Submit/Resubmit must stay disabled while any
-  // line item is BLOCKED, matching the backend's submission-time policy gate exactly.
-  const blockedLineItems = lineItems.filter(
-    (li) => derivePolicyStatus(li.lineStatus, li.policyWarnings).status === "BLOCKED"
+  // Every policy violation the employee hasn't explained yet. The backend's submission gate needs
+  // an explanation for each (WARN or BLOCK); once explained, the approver and Finance decide.
+  // Submit/Resubmit opens the justification dialog for these instead of being disabled.
+  const unexplainedViolations = useMemo(
+    () =>
+      lineItems.flatMap((li) =>
+        (li.policyWarnings || [])
+          .filter((w) => w.violationId && !isJustified(w))
+          .map((violation) => ({ lineItem: li, violation }))
+      ),
+    [lineItems]
   );
-  const hasBlockedLineItem = blockedLineItems.length > 0;
+  const [justifyDialog, setJustifyDialog] = useState(null); // { mode: "submit" | "save", items } | null
+  const [justifySaving, setJustifySaving] = useState(false);
+  const [justifyError, setJustifyError] = useState("");
 
     const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -177,7 +210,7 @@ export default function ExpenseReportDetailPage() {
     description: "",
     amount: "",
     currencyId: "",
-    taxAmount: "0",
+    tax: emptyTaxValue,
     costCenterId: "",
     clientBillable: false,
     projectId: "",
@@ -304,25 +337,27 @@ export default function ExpenseReportDetailPage() {
   const fetchLookups = useCallback(async () => {
     try {
       setLookupsLoading(true);
-      const [costCenterList, currencyList, categoryList, projectListResponse] = await Promise.all([
+      // Epic 8: the caller's own PMS-assigned ACTIVE projects — not the admin-wide project
+      // master list (an employee can only select a project they're actually assigned to).
+      const [costCenterList, currencyList, categoryList, projectList] = await Promise.all([
         lookupService.getActiveCostCenters(),
         lookupService.getActiveCurrencies(),
         lookupService.getActiveCategories(),
-        api.get("/xms/admin/projects", {
-          baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }).catch((err) => {
-          console.error("Failed to load projects:", err);
-          return { data: { data: [] } };
+        // Errors are surfaced (not silently swallowed to []) — an empty project list should
+        // only ever mean "PMS genuinely has no assigned work," never "the request failed."
+        lookupService.getAssignedProjects().catch((err) => {
+          console.error("Failed to load assigned projects:", err);
+          showStatusToast(
+            err.response?.data?.message || "Could not load your assigned projects.",
+            "error"
+          );
+          return [];
         }),
       ]);
       setCostCenters(costCenterList);
       setCurrencies(currencyList);
       setCategories(categoryList);
-      const pList = projectListResponse?.data?.data || projectListResponse?.data || [];
-      setProjects(Array.isArray(pList) ? pList : []);
+      setProjects(Array.isArray(projectList) ? projectList : []);
     } catch (err) {
       console.error("Failed to load lookups:", err);
     } finally {
@@ -422,6 +457,24 @@ export default function ExpenseReportDetailPage() {
       if (!receiptId) {
         throw new Error("Failed to retrieve receipt ID from upload response");
       }
+      // The upload endpoint deliberately returns only { receiptId, processingStatus } - the
+      // advisory duplicate-file-reuse flag only comes back on the full receipt (GET /receipts/{id}),
+      // so check it separately, best-effort, purely to decide whether to warn here.
+      try {
+        const detailRes = await api.get(`/xms/employee/receipts/${receiptId}`, {
+          baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+        const detail = detailRes.data?.data || detailRes.data;
+        if (detail?.possibleDuplicateFileReuse) {
+          showStatusToast(
+            "This exact receipt file was already uploaded elsewhere — it's still being scanned, but please check this isn't an accidental duplicate.",
+            "warning"
+          );
+        }
+      } catch {
+        // best-effort only - never blocks the OCR scan flow
+      }
 
       setScanningProgress(20);
 
@@ -468,14 +521,21 @@ export default function ExpenseReportDetailPage() {
               taxNum = 0;
             }
 
-            // Validate GST: GST cannot exceed the expense amount.
-            if (taxNum > amountNum) {
-              taxNum = 0;
+            // Keep what OCR read even when it looks wrong - zeroing it silently loses the receipt's
+            // GST. Flag it instead; submit validation still blocks GST above the amount.
+            let taxWarning = "";
+            if (taxNum > 0 && amountNum > 0 && taxNum > amountNum) {
+              taxWarning = "GST read from the receipt is more than the amount. Check both values.";
+            } else if (taxNum > 0 && isLowConfidence) {
+              taxWarning = "Low-confidence scan. Check the GST against the receipt.";
             }
 
-            // Pre-match category name if present in active categories list
+            // Pre-select the category the server suggested from the receipt text (it is always an
+            // active category); fall back to matching by name/code.
             let categoryIdVal = "";
-            if (responsePayload.categoryName) {
+            if (responsePayload.categoryId && categories.some((c) => c.categoryId === responsePayload.categoryId)) {
+              categoryIdVal = responsePayload.categoryId;
+            } else if (responsePayload.categoryName) {
               const matchedCat = categories.find(
                 (c) => c.categoryName?.toLowerCase() === responsePayload.categoryName.toLowerCase() ||
                        c.categoryCode?.toLowerCase() === responsePayload.categoryName.toLowerCase()
@@ -506,7 +566,9 @@ export default function ExpenseReportDetailPage() {
               description: "",
               amount: (isLowConfidence || amountNum <= 0) ? "" : amountNum.toFixed(2),
               currencyId: currencyIdVal,
-              taxAmount: isLowConfidence ? "0.00" : taxNum.toFixed(2),
+              // The receipt's GST is the entered side; the server compares it with the tax code.
+              tax: taxValueFromOcr(taxNum > 0 ? taxNum.toFixed(2) : null),
+              ocrTaxAmount: taxNum > 0 ? taxNum : null,
               costCenterId: report?.costCenterId || "",
               clientBillable: false,
               projectId: "",
@@ -516,6 +578,8 @@ export default function ExpenseReportDetailPage() {
 
             // Close selection dialog and open the full-screen OCR review modal
             setIsSelectionDialogOpen(false);
+            setOcrTaxWarning(taxWarning);
+            setOcrTaxPreview(null);
             setOcrReviewData(reviewData);
             setOcrReviewErrors({});
             setIsOcrReviewOpen(true);
@@ -745,14 +809,53 @@ export default function ExpenseReportDetailPage() {
     }
   };
 
-  const handleSubmitOrResubmit = () => {
+  const submitNow = () => {
     submitReport.mutate(reportId, {
       onSuccess: () => {
         showStatusToast(["AWAITING_CORRECTION", "QUERY_RAISED"].includes(report.reportStatus) ? "Report resubmitted" : "Report submitted for approval", "success");
         fetchReport();
+        fetchLineItems();
       },
       onError: (err) => showStatusToast(err.response?.data?.message || "Failed to submit report", "error"),
     });
+  };
+
+  const openJustifyDialog = (mode) => {
+    setJustifyError("");
+    setJustifyDialog({ mode, items: unexplainedViolations });
+  };
+
+  // Unexplained policy violations are explained first, then the report is submitted.
+  const handleSubmitOrResubmit = () => {
+    if (unexplainedViolations.length > 0) {
+      openJustifyDialog("submit");
+      return;
+    }
+    submitNow();
+  };
+
+  const handleJustifyConfirm = async (entries) => {
+    setJustifySaving(true);
+    setJustifyError("");
+    try {
+      for (const entry of entries) {
+        await lineItemService.justifyPolicyWarning(reportId, entry.lineItemId, entry.violationId, entry.justification);
+      }
+    } catch (err) {
+      setJustifyError(err.response?.data?.message || err.response?.data?.detail || "Couldn't save your explanation. Try again.");
+      setJustifySaving(false);
+      fetchLineItems();
+      return;
+    }
+    await fetchLineItems();
+    setJustifySaving(false);
+    const mode = justifyDialog?.mode;
+    setJustifyDialog(null);
+    if (mode === "submit") {
+      submitNow();
+    } else {
+      showStatusToast("Explanations saved", "success");
+    }
   };
 
   const handleLifecycleConfirm = () => {
@@ -782,7 +885,8 @@ export default function ExpenseReportDetailPage() {
   const headers = ["Category", "Merchant", "Date", "Amount", "Policy", "GST", "Net Amount", "Base Amount", "Cost Center", "Billable", "Actions"];
   const columns = ["category", "merchant", "date", "amount", "policy", "gst", "net", "base", "costCenter", "billable", "actions"];
 
-  const tableRows = filteredLineItems.map((li) => {
+  const { pageItems: pagedLineItems, paginationProps: lineItemPager } = useClientPagination(filteredLineItems);
+  const tableRows = pagedLineItems.map((li) => {
     const showCurrency = li.currencyCode && (li.currencyCode === "EUR" || li.currencyCode !== li.baseCurrencyCode);
     const rowObj = {
       category: <span className="font-medium text-gray-800">{li.categoryName || "—"}</span>,
@@ -800,8 +904,12 @@ export default function ExpenseReportDetailPage() {
       ),
       policy: <PolicyStatusBadge lineStatus={li.lineStatus} policyWarnings={li.policyWarnings} />,
       gst: (
-        <span className="font-mono text-amber-600">
-          {formatAmount(li.taxAmount)} {showCurrency && <span className="text-xs text-gray-400">{li.currencyCode}</span>}
+        <span className="inline-flex flex-col items-start gap-0.5">
+          <span className="font-mono text-amber-600">
+            {formatAmount(li.taxAmount)} {showCurrency && <span className="text-xs text-gray-400">{li.currencyCode}</span>}
+          </span>
+          {li.tax?.taxCode && <span className="text-[11px] text-gray-400">{li.tax.taxCode}</span>}
+          <TaxStatusBadge tax={li.tax} />
         </span>
       ),
       net: (
@@ -884,30 +992,35 @@ export default function ExpenseReportDetailPage() {
     return rowObj;
   });
 
+  // Latest server tax preview of the OCR review form (the receipt's GST vs the tax code).
+  const [ocrTaxPreview, setOcrTaxPreview] = useState(null);
+  // Shown until the user edits the amount or tax: OCR's GST looked implausible or the scan was low-confidence.
+  const [ocrTaxWarning, setOcrTaxWarning] = useState("");
+
   const handleOcrInputChange = (e) => {
     const { name, value } = e.target;
+    if (name === "amount") setOcrTaxWarning("");
     setOcrReviewData((prev) => ({ ...prev, [name]: value }));
     if (ocrReviewErrors[name]) setOcrReviewErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
   const handleOcrSelectChange = (name, value) => {
-    setOcrReviewData((prev) => ({ ...prev, [name]: value }));
+    // A new category brings its own default tax code, so an explicit pick is dropped.
+    setOcrReviewData((prev) =>
+      name === "categoryId" ? { ...prev, categoryId: value, tax: { ...prev.tax, taxCodeId: null } } : { ...prev, [name]: value }
+    );
     if (ocrReviewErrors[name]) setOcrReviewErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
   const validateOcrForm = () => {
     const errors = {};
     const amountNum = Number(ocrReviewData.amount);
-    const gstNum = Number(ocrReviewData.taxAmount);
 
     if (!ocrReviewData.amount || amountNum <= 0) {
       errors.amount = "Amount is required and must be greater than 0.";
     }
-    if (ocrReviewData.taxAmount === "" || gstNum < 0) {
-      errors.taxAmount = "GST must be zero or a positive number.";
-    } else if (amountNum > 0 && gstNum > amountNum) {
-      errors.taxAmount = "GST cannot exceed the expense amount.";
-    }
+    const taxError = validateTaxValue(ocrReviewData.tax, ocrTaxPreview, ocrReviewData.amount);
+    if (taxError) errors.tax = taxError;
     if (!ocrReviewData.merchantName.trim()) errors.merchantName = "Merchant is required.";
     if (!ocrReviewData.currencyId) errors.currencyId = "Currency is required.";
     if (!ocrReviewData.categoryId) errors.categoryId = "Category is required.";
@@ -936,7 +1049,7 @@ export default function ExpenseReportDetailPage() {
       description: ocrReviewData.description ? ocrReviewData.description.trim() : "",
       amount: Number(ocrReviewData.amount),
       currencyId: ocrReviewData.currencyId,
-      taxAmount: Number(ocrReviewData.taxAmount),
+      ...taxRequestFieldsForConfirm(ocrReviewData.tax, ocrTaxPreview),
       costCenterId: ocrReviewData.costCenterId,
       projectId: ocrReviewData.clientBillable ? (ocrReviewData.projectId || null) : null,
       clientBillable: !!ocrReviewData.clientBillable,
@@ -1016,6 +1129,7 @@ export default function ExpenseReportDetailPage() {
                         ? `Pending ${approvalStatus.currentLevelDisplayName}`
                         : undefined
                     }
+                    correctionRequestedBy={approvalStatus?.correctionRequestedBy}
                   />
                 </div>
                 <p className="text-xs text-gray-400 font-mono mt-1">{report.reportNumber}</p>
@@ -1030,8 +1144,7 @@ export default function ExpenseReportDetailPage() {
                       loading={submitReport.isPending}
                       loadingText="Submitting..."
                       onClick={handleSubmitOrResubmit}
-                      disabled={report.reportStatus !== "DRAFT" || lineItems.length === 0 || hasBlockedLineItem || isLifecycleBusy}
-                      title={hasBlockedLineItem ? "Resolve the blocked policy violation(s) below before submitting." : undefined}
+                      disabled={report.reportStatus !== "DRAFT" || lineItems.length === 0 || isLifecycleBusy}
                       className={lineItems.length === 0 ? "!pointer-events-auto cursor-not-allowed" : ""}
                     >
                       Submit for Approval
@@ -1044,8 +1157,7 @@ export default function ExpenseReportDetailPage() {
                       loading={submitReport.isPending}
                       loadingText="Resubmitting..."
                       onClick={handleSubmitOrResubmit}
-                      disabled={hasBlockedLineItem || isLifecycleBusy}
-                      title={hasBlockedLineItem ? "Resolve the blocked policy violation(s) below before resubmitting." : undefined}
+                      disabled={isLifecycleBusy}
                     >
                       Resubmit
                     </Button>
@@ -1057,8 +1169,7 @@ export default function ExpenseReportDetailPage() {
                       loading={submitReport.isPending}
                       loadingText="Resubmitting..."
                       onClick={handleSubmitOrResubmit}
-                      disabled={hasBlockedLineItem || isLifecycleBusy}
-                      title={hasBlockedLineItem ? "Resolve the blocked policy violation(s) below before resubmitting." : undefined}
+                      disabled={isLifecycleBusy}
                     >
                       Resubmit
                     </Button>
@@ -1089,50 +1200,41 @@ export default function ExpenseReportDetailPage() {
               )}
             </div>
 
-            {report.reportStatus === "AWAITING_CORRECTION" && needsCorrectionLines.length > 0 && (
+            {["AWAITING_CORRECTION", "QUERY_RAISED"].includes(report.reportStatus) && correctionRequests.length > 0 && (
               <div className="mt-4 rounded-lg bg-orange-50 border border-orange-200 px-4 py-3">
                 <p className="text-sm font-semibold text-orange-800">
-                  {needsCorrectionLines.length} line item{needsCorrectionLines.length > 1 ? "s" : ""} need correction
+                  {correctionFromFinance ? "Finance requested a correction on " : "Your approver requested a correction on "}
+                  {correctionRequests.length} line item{correctionRequests.length > 1 ? "s" : ""}
                 </p>
                 <ul className="mt-2 space-y-1.5">
-                  {needsCorrectionLines.map((r) => (
+                  {correctionRequests.map((r) => (
                     <li key={r.lineItemId} className="text-sm text-orange-700">
                       <span className="font-medium">{lineItems.find((li) => li.lineItemId === r.lineItemId)?.merchantName || "Line item"}:</span>{" "}
-                      {r.comment}
+                      {r.comment || "Correction requested"}
                     </li>
                   ))}
                 </ul>
-                <p className="mt-2 text-xs text-orange-600">Fix the flagged line(s) below, then click Resubmit above.</p>
+                <p className="mt-2 text-xs text-orange-600">
+                  Fix the flagged line{correctionRequests.length > 1 ? "s" : ""} below, then click Resubmit above
+                  {correctionFromFinance ? "; it goes straight back to Finance unless the change needs re-approval." : "."}
+                </p>
               </div>
             )}
 
-            {report.reportStatus === "QUERY_RAISED" && queriedLines.length > 0 && (
-              <div className="mt-4 rounded-lg bg-orange-50 border border-orange-200 px-4 py-3">
-                <p className="text-sm font-semibold text-orange-800">
-                  Finance Executive requested correction on {queriedLines.length} line item{queriedLines.length > 1 ? "s" : ""}
-                </p>
-                <ul className="mt-2 space-y-1.5">
-                  {queriedLines.map((r) => (
-                    <li key={r.lineItemId} className="text-sm text-orange-700">
-                      <span className="font-medium">{lineItems.find((li) => li.lineItemId === r.lineItemId)?.merchantName || "Line item"}:</span>{" "}
-                      {r.reason || r.comment || "Correction requested"}
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-2 text-xs text-orange-600">Fix the flagged line(s) below, then click Resubmit above.</p>
-              </div>
-            )}
-
-            {hasBlockedLineItem && ["DRAFT", "AWAITING_CORRECTION", "QUERY_RAISED"].includes(report.reportStatus) && (
-              <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3">
-                <p className="text-sm font-semibold text-red-800">
-                  This report cannot be submitted — {blockedLineItems.length} line item{blockedLineItems.length > 1 ? "s are" : " is"} blocked by policy.
-                </p>
-                <p className="mt-1 text-xs text-red-600">
-                  A policy violation on {blockedLineItems.length > 1 ? "these line items" : "this line item"} requires enforcement and cannot be
-                  overridden by justification alone. Fix the flagged {blockedLineItems.length > 1 ? "amounts/details" : "amount/details"} in the
-                  "Policy" column below before submitting.
-                </p>
+            {canManage && isReportEditable && unexplainedViolations.length > 0 && (
+              <div className="mt-4 flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">
+                    {unexplainedViolations.length} policy violation{unexplainedViolations.length > 1 ? "s need" : " needs"} your explanation
+                  </p>
+                  <p className="mt-0.5 text-xs text-amber-700">
+                    Some expenses go over policy. Explain why before you submit; your approver and Finance will see your explanation and
+                    decide whether to accept them.
+                  </p>
+                </div>
+                <Button variant="outline" size="small" className="shrink-0" onClick={() => openJustifyDialog("save")}>
+                  Explain now
+                </Button>
               </div>
             )}
 
@@ -1183,6 +1285,9 @@ export default function ExpenseReportDetailPage() {
             ) : (
               <div className="w-full overflow-x-auto rounded-lg">
                 <GenericTable headers={headers} rows={tableRows} columns={columns} />
+                <div className="mt-4 flex justify-center">
+                  <Pagination {...lineItemPager} />
+                </div>
               </div>
             )}
           </div>
@@ -1450,6 +1555,32 @@ export default function ExpenseReportDetailPage() {
         onCancel={() => setLineItemToDelete(null)}
         isLoading={deletingLineItem}
         variant="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={!!pendingLifecycleAction}
+        title={pendingLifecycleAction === "recall" ? "Recall to Draft" : "Cancel Expense Report"}
+        message={
+          pendingLifecycleAction === "recall"
+            ? "This will withdraw the report from approval and return it to Draft so you can edit it. You'll need to resubmit it afterwards."
+            : "This will permanently cancel this expense report. This action cannot be undone."
+        }
+        confirmText={pendingLifecycleAction === "recall" ? "Recall to Draft" : "Cancel Report"}
+        cancelText="Back"
+        onConfirm={handleLifecycleConfirm}
+        onCancel={() => setPendingLifecycleAction(null)}
+        isLoading={isLifecycleBusy}
+        variant={pendingLifecycleAction === "recall" ? "primary" : "danger"}
+      />
+
+      <PolicyJustificationModal
+        isOpen={!!justifyDialog}
+        items={justifyDialog?.items || []}
+        mode={justifyDialog?.mode}
+        isSaving={justifySaving || submitReport.isPending}
+        error={justifyError}
+        onConfirm={handleJustifyConfirm}
+        onCancel={() => setJustifyDialog(null)}
       />
 
       {isEditReportOpen && createPortal(
@@ -1931,7 +2062,7 @@ export default function ExpenseReportDetailPage() {
                     </div>
 
                     {/* Amount, Currency, and GST in a 3-column sub-grid */}
-                    <div className="col-span-2 grid grid-cols-3 gap-3">
+                    <div className="col-span-2 grid grid-cols-2 gap-3">
                       {/* Amount */}
                       <div className="space-y-1">
                         <label className="block text-xs font-semibold text-gray-600">
@@ -1976,30 +2107,29 @@ export default function ExpenseReportDetailPage() {
                         )}
                       </div>
 
-                      {/* GST */}
-                      <div className="space-y-1">
-                        <label className="block text-xs font-semibold text-gray-600">
-                          GST <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="number"
-                          name="taxAmount"
-                          step="0.01"
-                          min="0"
-                          placeholder="0.00"
-                          value={ocrReviewData.taxAmount}
-                          onChange={handleOcrInputChange}
-                          disabled={ocrSubmitting}
-                          className={`w-full px-2.5 py-1.5 rounded-md border text-xs transition focus:outline-none focus:ring-2 ${
-                            ocrReviewErrors.taxAmount
-                              ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                              : "border-gray-300 focus:border-indigo-500 focus:ring-indigo-500/20"
-                        }`}
-                        />
-                        {ocrReviewErrors.taxAmount && (
-                          <span className="text-[11px] text-red-600 block mt-0.5">{ocrReviewErrors.taxAmount}</span>
-                        )}
-                      </div>
+                    </div>
+
+                    <div className="col-span-2 space-y-1">
+                      <TaxBreakdownPanel
+                        amount={ocrReviewData.amount}
+                        currencyId={ocrReviewData.currencyId}
+                        currencyCode={currencyOptions.find((o) => o.value === ocrReviewData.currencyId)?.code || ""}
+                        expenseDate={ocrReviewData.expenseDate}
+                        categoryId={ocrReviewData.categoryId}
+                        value={ocrReviewData.tax}
+                        onChange={(tax) => {
+                          setOcrTaxWarning("");
+                          setOcrReviewData((prev) => ({ ...prev, tax }));
+                          if (ocrReviewErrors.tax) setOcrReviewErrors((prev) => ({ ...prev, tax: "" }));
+                        }}
+                        onPreview={setOcrTaxPreview}
+                        error={ocrReviewErrors.tax}
+                        disabled={ocrSubmitting}
+                        ocrTaxAmount={ocrReviewData.ocrTaxAmount}
+                      />
+                      {ocrTaxWarning && !ocrReviewErrors.tax && (
+                        <span className="text-[11px] text-amber-700 block">{ocrTaxWarning}</span>
+                      )}
                     </div>
 
                     {/* Client Billable & Project */}
@@ -2023,10 +2153,8 @@ export default function ExpenseReportDetailPage() {
                       </label>
                       <Select
                         options={projects
-                          .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
                           .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))}
                         value={projects
-                          .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
                           .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))
                           .find((o) => o.value === ocrReviewData.projectId) || null}
                         onChange={(opt) => handleOcrSelectChange("projectId", opt ? opt.value : "")}
@@ -2057,7 +2185,6 @@ export default function ExpenseReportDetailPage() {
 
                   {/* Real-time Cards */}
                   <div className="grid grid-cols-2 gap-3 mt-1">
-                    <GstCalculationCard amount={ocrReviewData.amount} gst={ocrReviewData.taxAmount} />
                     <CurrencyConversionCard
                       amount={ocrReviewData.amount}
                       currencyCode={currencyOptions.find((o) => o.value === ocrReviewData.currencyId)?.code}
@@ -2163,7 +2290,7 @@ const emptyForm = (defaultCostCenterId) => ({
   description: "",
   amount: "",
   currencyId: "",
-  taxAmount: "0",
+  tax: emptyTaxValue,
   costCenterId: defaultCostCenterId || "",
   clientBillable: false,
   projectId: "",
@@ -2186,6 +2313,9 @@ function LineItemDrawer({
   const [savedLineItem, setSavedLineItem] = useState(null);
   const [ocrReceiptId, setOcrReceiptId] = useState(null);
   const [projects, setProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  // Latest server tax preview for the form (drives validation and the request's tax fields).
+  const [taxPreview, setTaxPreview] = useState(null);
 
   // Split Allocation (ExpenseSplitController) — layered on top of the line item's own
   // costCenterId above, not a replacement for it. Whole-set replace, so `splitRows` always
@@ -2250,18 +2380,18 @@ function LineItemDrawer({
       return;
     }
 
+    // Epic 8: the employee's own PMS-assigned ACTIVE projects — not the admin-wide project
+    // master list. An employee can only select a project they're actually assigned to.
     const loadProjects = async () => {
       try {
-        const res = await api.get("/xms/admin/projects", {
-          baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
-        const list = res.data?.data || res.data || [];
+        setLoadingProjects(true);
+        const list = await lookupService.getAssignedProjects();
         setProjects(Array.isArray(list) ? list : []);
       } catch (err) {
-        console.error("Failed to load projects:", err);
+        console.error("Failed to load assigned projects:", err);
+        showStatusToast("Could not load your assigned projects. You can still save this expense as non-billable.", "error");
+      } finally {
+        setLoadingProjects(false);
       }
     };
     loadProjects();
@@ -2278,11 +2408,13 @@ function LineItemDrawer({
           description: lineItem.description || "",
           amount: lineItem.amount ?? "",
           currencyId: lineItem.currencyId || "",
-          taxAmount: lineItem.taxAmount ?? "0",
+          // Saved line: its snapshot. OCR draft: the receipt's GST as the entered side.
+          tax: lineItem.lineItemId ? taxValueFromLine(lineItem) : taxValueFromOcr(lineItem.taxAmount),
           costCenterId: isOcr ? "" : (lineItem.costCenterId || defaultCostCenterId || ""),
           clientBillable: !!lineItem.clientBillable,
           projectId: lineItem.projectId || "",
         });
+        setTaxPreview(null);
         setSavedLineItem(lineItem);
         setOcrReceiptId(lineItem.ocrReceiptId || null);
         if (lineItem.scannedFile) {
@@ -2298,6 +2430,7 @@ function LineItemDrawer({
       }
     } else {
       setFormData(emptyForm(defaultCostCenterId));
+      setTaxPreview(null);
       setSavedLineItem(null);
       setOcrReceiptId(null);
       setSplitEnabled(false);
@@ -2433,7 +2566,10 @@ function LineItemDrawer({
   };
 
   const handleSelectChange = (name, value) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    // A new category brings its own default tax code, so an explicit pick is dropped.
+    setFormData((prev) =>
+      name === "categoryId" ? { ...prev, categoryId: value, tax: { ...prev.tax, taxCodeId: null } } : { ...prev, [name]: value }
+    );
     if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
@@ -2690,16 +2826,12 @@ function LineItemDrawer({
   const validateForm = () => {
     const errors = {};
     const amountNum = Number(formData.amount);
-    const gstNum = Number(formData.taxAmount);
 
     if (!formData.amount || amountNum <= 0) {
       errors.amount = "Amount is required and must be greater than 0.";
     }
-    if (formData.taxAmount === "" || gstNum < 0) {
-      errors.taxAmount = "GST must be zero or a positive number.";
-    } else if (amountNum > 0 && gstNum > amountNum) {
-      errors.taxAmount = "GST cannot exceed the expense amount.";
-    }
+    const taxError = validateTaxValue(formData.tax, taxPreview, formData.amount);
+    if (taxError) errors.tax = taxError;
     if (!formData.merchantName.trim()) errors.merchantName = "Merchant is required.";
     if (!formData.currencyId) errors.currencyId = "Currency is required.";
     if (!formData.categoryId) errors.categoryId = "Category is required.";
@@ -2718,9 +2850,9 @@ function LineItemDrawer({
   };
 
   // Enforcement (not severity) decides the outcome — see PolicyStatusBadge.
-  // BLOCKED keeps the drawer open (with the violation banner visible) rather
-  // than closing behind a misleading success toast; WARNING still follows
-  // the normal save-and-close flow but surfaces the warning via toast.
+  // BLOCKED (an unexplained BLOCK rule) keeps the drawer open with the violation
+  // banner visible, since the employee will have to explain it when submitting;
+  // WARNING follows the normal save-and-close flow and surfaces the warning via toast.
   const finalizeLineItemSave = (savedItem, successMessage, { closeOnSuccess = false } = {}) => {
     const { status, warnings } = derivePolicyStatus(savedItem?.lineStatus, savedItem?.policyWarnings);
     setSavedLineItem(savedItem);
@@ -2728,8 +2860,10 @@ function LineItemDrawer({
     if (status === "BLOCKED") {
       const firstMsg = warnings[0]?.message;
       showStatusToast(
-        firstMsg ? `Saved, but blocked by policy: ${firstMsg}` : "Saved, but this line item is blocked by policy.",
-        "error"
+        firstMsg
+          ? `Saved. Over policy: ${firstMsg} You'll be asked to explain it when you submit.`
+          : "Saved. This is over policy; you'll be asked to explain it when you submit.",
+        "warning"
       );
       onSaved?.();
       return;
@@ -2766,7 +2900,10 @@ function LineItemDrawer({
       description: formData.description ? formData.description.trim() : "",
       amount: Number(formData.amount),
       currencyId: formData.currencyId,
-      taxAmount: Number(formData.taxAmount),
+      // An OCR draft is saved through /receipts/{id}/confirm, where a null tax would fall back to raw OCR.
+      ...(ocrReceiptId && !(savedLineItem && savedLineItem.lineItemId)
+        ? taxRequestFieldsForConfirm(formData.tax, taxPreview)
+        : taxRequestFields(formData.tax, taxPreview)),
       costCenterId: formData.costCenterId,
       projectId: formData.clientBillable ? (formData.projectId || null) : null,
       clientBillable: !!formData.clientBillable,
@@ -2872,8 +3009,10 @@ function LineItemDrawer({
   }, [categoryOptions, lineItem]);
 
   const projectOptions = useMemo(() => {
+    // No client-side status filter: /xms/employee/projects/assigned (PMS /api/my-work under
+    // the hood) already restricts to the employee's ACTIVE/PLANNING projects server-side, and
+    // does not even return a status field per project — filtering here would just empty the list.
     return projects
-      .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
       .map((p) => ({
         value: p.projectId,
         label: `${p.projectCode} - ${p.projectName}`,
@@ -3091,7 +3230,7 @@ function LineItemDrawer({
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormInput
             label="Amount"
             name="amount"
@@ -3125,23 +3264,30 @@ function LineItemDrawer({
             {formErrors.currencyId && <span className="text-[11px] text-red-600 block mt-0.5">{formErrors.currencyId}</span>}
           </div>
 
-          <FormInput
-            label="GST"
-            name="taxAmount"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="0.00"
-            value={formData.taxAmount}
-            onChange={handleInputChange}
-            requiredMark
-            disabled={submitting}
-            error={formErrors.taxAmount}
-            className="space-y-0.5"
-            labelClassName="block text-xs font-semibold text-gray-600"
-            inputClassName="w-full text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm h-8"
-          />
         </div>
+
+        <TaxBreakdownPanel
+          amount={formData.amount}
+          currencyId={formData.currencyId}
+          currencyCode={selectedCurrency?.code || ""}
+          expenseDate={formData.expenseDate}
+          categoryId={formData.categoryId}
+          value={formData.tax}
+          onChange={(tax) => {
+            setFormData((prev) => ({ ...prev, tax }));
+            if (formErrors.tax) setFormErrors((prev) => ({ ...prev, tax: "" }));
+          }}
+          onPreview={setTaxPreview}
+          error={formErrors.tax}
+          disabled={submitting}
+          ocrTaxAmount={
+            savedLineItem?.lineItemId
+              ? savedLineItem?.tax?.ocrTaxAmount ?? null
+              : Number(lineItem?.taxAmount) > 0 ? Number(lineItem.taxAmount) : null
+          }
+          savedTaxSource={savedLineItem?.tax?.taxSource}
+          savedTaxAmount={savedLineItem?.taxAmount}
+        />
 
         <div className="space-y-0.5">
           <label className="block text-xs font-semibold text-gray-600">
@@ -3168,17 +3314,18 @@ function LineItemDrawer({
               options={projectOptions}
               value={projectOptions.find((o) => o.value === formData.projectId) || null}
               onChange={(opt) => handleSelectChange("projectId", opt ? opt.value : "")}
-              placeholder="Select project..."
+              placeholder={loadingProjects ? "Loading your assigned projects..." : "Select project..."}
               isSearchable
+              isLoading={loadingProjects}
+              noOptionsMessage={() => (loadingProjects ? "Loading..." : "You have no assigned projects. Ask your PM to add you in PMS.")}
               styles={compactSelectStyles}
-              isDisabled={submitting}
+              isDisabled={submitting || loadingProjects}
             />
             {formErrors.projectId && <span className="text-[11px] text-red-600 block mt-0.5">{formErrors.projectId}</span>}
           </div>
         )}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <GstCalculationCard amount={formData.amount} gst={formData.taxAmount} />
           <CurrencyConversionCard
             amount={formData.amount}
             currencyCode={selectedCurrency?.code}

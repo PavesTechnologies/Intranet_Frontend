@@ -5,7 +5,6 @@ import Select from "react-select";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import { PageCard, PageCardContent } from "@/components/Cards/PageCard";
 import GenericTable from "@/components/Table/table";
-import Pagination from "@/components/Pagination/pagination";
 import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
 import Modal from "@/components/Modal/modal";
@@ -18,6 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { showStatusToast } from "@/components/toastfy/toast";
 import api from "@/api/axiosInstance";
 import { Fonts } from "@/components/Fonts/Fonts";
+import Pagination from "@/components/Pagination/pagination";
 
 const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
 
@@ -353,27 +353,27 @@ export default function CurrencyManagementPage() {
   const currencyTotalPages = Math.ceil(totalCurrenciesFilteredCount / ITEMS_PER_PAGE);
 
   // Exchange Rates Pagination/Filters Computing
+  // Newest effective date first, then by currency pair, so each day's rates are grouped together.
+  const filteredSortedRates = allExchangeRates
+    .filter((r) => {
+      const matchesFrom = !rateFromCurrencyFilter || r.fromCurrencyCode === rateFromCurrencyFilter;
+      const matchesTo = !rateToCurrencyFilter || r.toCurrencyCode === rateToCurrencyFilter;
+      const matchesDate = !rateEffectiveDateFilter || r.effectiveDate === rateEffectiveDateFilter;
+      return matchesFrom && matchesTo && matchesDate;
+    })
+    .sort((a, b) =>
+      (b.effectiveDate || "").localeCompare(a.effectiveDate || "")
+      || (a.fromCurrencyCode || "").localeCompare(b.fromCurrencyCode || "")
+      || (a.toCurrencyCode || "").localeCompare(b.toCurrencyCode || "")
+    );
+
   const displayedRates = isRatesServerPaginated
     ? exchangeRates
-    : (() => {
-        const filtered = allExchangeRates.filter((r) => {
-          const matchesFrom = !rateFromCurrencyFilter || r.fromCurrency === rateFromCurrencyFilter;
-          const matchesTo = !rateToCurrencyFilter || r.toCurrency === rateToCurrencyFilter;
-          const matchesDate = !rateEffectiveDateFilter || r.effectiveDate === rateEffectiveDateFilter;
-          return matchesFrom && matchesTo && matchesDate;
-        });
-        const start = (rateCurrentPage - 1) * ITEMS_PER_PAGE;
-        return filtered.slice(start, start + ITEMS_PER_PAGE);
-      })();
+    : filteredSortedRates.slice((rateCurrentPage - 1) * ITEMS_PER_PAGE, rateCurrentPage * ITEMS_PER_PAGE);
 
   const totalRatesFilteredCount = isRatesServerPaginated
     ? totalRatesCount
-    : allExchangeRates.filter((r) => {
-        const matchesFrom = !rateFromCurrencyFilter || r.fromCurrency === rateFromCurrencyFilter;
-        const matchesTo = !rateToCurrencyFilter || r.toCurrency === rateToCurrencyFilter;
-        const matchesDate = !rateEffectiveDateFilter || r.effectiveDate === rateEffectiveDateFilter;
-        return matchesFrom && matchesTo && matchesDate;
-      }).length;
+    : filteredSortedRates.length;
 
   const ratesTotalPages = Math.ceil(totalRatesFilteredCount / ITEMS_PER_PAGE);
 
@@ -1105,16 +1105,14 @@ export default function CurrencyManagementPage() {
                 />
               </div>
 
-              {currencyTotalPages > 1 && (
-                <div className="mt-4 flex justify-center">
-                  <Pagination
-                    currentPage={currencyCurrentPage}
-                    totalPages={currencyTotalPages}
-                    onPrevious={() => setCurrencyCurrentPage((p) => Math.max(p - 1, 1))}
-                    onNext={() => setCurrencyCurrentPage((p) => Math.min(p + 1, currencyTotalPages))}
-                  />
-                </div>
-              )}
+              <div className="mt-4 flex justify-center">
+                <Pagination
+                  currentPage={currencyCurrentPage}
+                  totalPages={currencyTotalPages}
+                  onPrevious={() => setCurrencyCurrentPage((p) => Math.max(p - 1, 1))}
+                  onNext={() => setCurrencyCurrentPage((p) => Math.min(p + 1, currencyTotalPages))}
+                />
+              </div>
             </>
           )
         ) : (
@@ -1151,16 +1149,14 @@ export default function CurrencyManagementPage() {
                 />
               </div>
 
-              {ratesTotalPages > 1 && (
-                <div className="mt-4 flex justify-center">
-                  <Pagination
-                    currentPage={rateCurrentPage}
-                    totalPages={ratesTotalPages}
-                    onPrevious={() => setRateCurrentPage((p) => Math.max(p - 1, 1))}
-                    onNext={() => setRateCurrentPage((p) => Math.min(p + 1, ratesTotalPages))}
-                  />
-                </div>
-              )}
+              <div className="mt-4 flex justify-center">
+                <Pagination
+                  currentPage={rateCurrentPage}
+                  totalPages={ratesTotalPages}
+                  onPrevious={() => setRateCurrentPage((p) => Math.max(p - 1, 1))}
+                  onNext={() => setRateCurrentPage((p) => Math.min(p + 1, ratesTotalPages))}
+                />
+              </div>
             </>
           )
         )}

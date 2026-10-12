@@ -10,6 +10,7 @@ import {
   useReviewSplit,
   useRejectReport,
   useBulkApprove,
+  useApproveException,
 } from "../hooks/useApprovalWorkflow";
 import { useApprovalLiveSync } from "../hooks/useApprovalLiveSync";
 import { formatMoney } from "../constants/approvalLabels";
@@ -19,6 +20,8 @@ import LineItemReviewPanel from "../components/LineItemReviewPanel";
 import CommentPromptModal from "../components/CommentPromptModal";
 import MyDelegateCard from "../components/MyDelegateCard";
 import ExpenseReviewPanel from "../components/ExpenseReviewPanel";
+import { DEFAULT_PAGE_SIZE } from "@/pages/expense-management/components/common/pagination";
+import Pagination from "@/components/Pagination/pagination";
 
 const hasPolicyIssue = (relevantLines) =>
   (relevantLines || []).some((l) => (l.source?.policyViolations?.length || 0) > 0);
@@ -41,17 +44,19 @@ const merchantSummary = (relevantLines) => {
  */
 export default function PendingApprovalsPage({ searchTerm = "", hideHeader = false, noPadding = false }) {
   const [page, setPage] = useState(0);
+  const pageSize = DEFAULT_PAGE_SIZE;
   const [expandedReportId, setExpandedReportId] = useState(null);
   const [rejectingReport, setRejectingReport] = useState(null);
   const [reviewingItem, setReviewingItem] = useState(null);
 
   useApprovalLiveSync();
 
-  const { data, isLoading, isError, refetch } = useMyQueue(page, 20);
+  const { data, isPending, isFetching, isError, refetch } = useMyQueue(page, pageSize);
   const reviewLineItem = useReviewLineItem();
   const reviewSplit = useReviewSplit();
   const rejectReport = useRejectReport();
   const bulkApprove = useBulkApprove();
+  const approveException = useApproveException();
 
   const items = data?.content || [];
 
@@ -80,7 +85,8 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
     });
   }, [resolvedItems, searchTerm]);
 
-  const isMutating = reviewLineItem.isPending || reviewSplit.isPending || rejectReport.isPending || bulkApprove.isPending;
+  const isMutating =
+    reviewLineItem.isPending || reviewSplit.isPending || rejectReport.isPending || bulkApprove.isPending || approveException.isPending;
 
   // A split-owned line fans out to one reviewSplit call per cost-center split the caller owns on
   // it (almost always exactly one); a normal-track line is a single reviewLineItem call.
@@ -105,15 +111,25 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
   };
 
   const handleApproveLine = (reportId, relevantLine) => {
-    approveLine(reportId, relevantLine).catch((err) =>
-      showStatusToast(err.response?.data?.message || "Failed to approve", "error")
-    );
+    approveLine(reportId, relevantLine)
+      .then(() => showStatusToast("Approved", "success"))
+      .catch((err) => showStatusToast(err.response?.data?.message || "Failed to approve", "error"));
   };
 
   const handleFlagLine = (reportId, relevantLine, comment) => {
     flagLine(reportId, relevantLine, comment)
       .then(() => showStatusToast("Flagged for correction", "success"))
       .catch((err) => showStatusToast(err.response?.data?.message || "Failed to flag for correction", "error"));
+  };
+
+  const handleApproveException = (reportId, lineItemId, violationId, justification) => {
+    approveException.mutate(
+      { reportId, lineItemId, violationId, justification },
+      {
+        onSuccess: () => showStatusToast("Exception authorized", "success"),
+        onError: (err) => showStatusToast(err.response?.data?.message || "Failed to authorize exception", "error"),
+      }
+    );
   };
 
   const handleBulkApprove = (reportId) => {
@@ -168,11 +184,11 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
 
       <MyDelegateCard />
 
-      {isLoading && (
-        <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-16">
-          <LoadingSpinner text="Loading your queue…" />
-        </div>
-      )}
+     {isPending && !data && (
+  <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white py-16">
+    <LoadingSpinner text="Loading your queue…" />
+  </div>
+)}
 
       {isError && (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 py-10 text-center">
@@ -182,7 +198,7 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
         </div>
       )}
 
-      {!isLoading && !isError && items.length === 0 && (
+      { data && !isError && items.length === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-16 text-center">
           <Inbox className="h-8 w-8 text-gray-300" />
           <p className="text-sm font-medium text-gray-600">No pending approvals.</p>
@@ -190,7 +206,7 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
         </div>
       )}
 
-      {!isLoading && !isError && items.length > 0 && filteredItems.length === 0 && (
+      {!isPending && !isError && items.length > 0 && filteredItems.length === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white py-16 text-center">
           <Inbox className="h-8 w-8 text-gray-300" />
           <p className="text-sm font-medium text-gray-600">No pending approvals match your search.</p>
@@ -292,6 +308,9 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
                                 isBusy={isMutating}
                                 onApproveLine={(line) => handleApproveLine(item.reportId, line)}
                                 onFlagLine={(line, comment) => handleFlagLine(item.reportId, line, comment)}
+                                onApproveException={(line, violationId, justification) =>
+                                  handleApproveException(item.reportId, line.lineItemId, violationId, justification)
+                                }
                               />
                             </td>
                           </tr>
@@ -347,17 +366,14 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
         </>
       )}
 
-      {data && data.totalPages > 1 && (
-        <div className="flex items-center justify-end gap-3 mt-4 text-sm text-gray-600">
-          <Button size="small" variant="outline" disabled={data.first} onClick={() => setPage((p) => p - 1)}>
-            Previous
-          </Button>
-          <span>
-            Page {data.page + 1} of {data.totalPages}
-          </span>
-          <Button size="small" variant="outline" disabled={data.last} onClick={() => setPage((p) => p + 1)}>
-            Next
-          </Button>
+      {data && (
+        <div className="mt-4 flex justify-center">
+          <Pagination
+            currentPage={page + 1}
+            totalPages={data.totalPages ?? 0}
+            onPrevious={() => setPage(Math.max(page - 1, 0))}
+            onNext={() => setPage(Math.min(page + 1, (data.totalPages ?? 0) - 1))}
+          />
         </div>
       )}
 

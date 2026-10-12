@@ -200,10 +200,9 @@ export default function MasterDataOverview() {
   return (
     <div className="w-full space-y-6">
       <div className="flex items-center gap-3">
-        <BackIconButton onClick={() => navigate("/account-receivable/dashboard")} label="Back to Dashboard" />
         <div className="flex-1">
           <PageHeader
-            title="Configurations"
+            title="Configuration"
             subtitle="Manage the foundational configuration used across AR & Billing"
           />
         </div>
@@ -228,7 +227,7 @@ export default function MasterDataOverview() {
       />
 
       <div>
-        <h2 className="mb-3 text-base font-bold text-slate-800">Configuration Masters</h2>
+        <h2 className="mb-3 text-base font-semibold text-slate-900">Configuration Masters</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {MASTER_DEFINITIONS.map((master) => {
             if (!master.implemented) {

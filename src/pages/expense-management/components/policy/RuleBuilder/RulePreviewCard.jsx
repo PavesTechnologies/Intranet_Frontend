@@ -53,7 +53,14 @@ const buildSentence = ({ ruleType, categoryLabel, ruleValue, limits, bundleLabel
     case "DUPLICATE_EXPENSE":
       return (
         <>
-          when a {scope} {category} expense looks like a duplicate of another submission
+          when a {scope} {category} expense looks like a duplicate of another submission by the same employee
+        </>
+      );
+    case "CROSS_EMPLOYEE_DUPLICATE_EXPENSE":
+      return (
+        <>
+          when a {scope} {category} expense matches the vendor, date, amount, and currency of an expense already
+          submitted by a <span className="font-semibold">different</span> employee — a possible shared or duplicate claim
         </>
       );
     default:
