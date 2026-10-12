@@ -6,7 +6,7 @@ import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import clsx from "clsx";
-import { ArrowRight, FileArchive, FileText, ScanText, UploadCloud, X, ClipboardCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, FileArchive, FileText, Mail, ScanText, UploadCloud, X, ClipboardCheck } from "lucide-react";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
 import Pagination from "../../../../components/Pagination/pagination";
@@ -15,6 +15,7 @@ import { AP_ROUTES } from "../../constants/routes";
 import { useApPermissions } from "../../hooks/useApPermissions";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { useBulkBatches, useBulkUploadLimits, useUploadBatchMutation } from "../hooks/useBulkUpload";
+import EmailIntakeCard from "../components/bulk/EmailIntakeCard";
 import {
   BATCH_STATUS,
   BatchProgressBar,
@@ -87,7 +88,12 @@ function BatchHistory() {
   const navigate = useNavigate();
   const [scope, setScope] = useState("mine");
   const [page, setPage] = useState(1);
-  const { data, isLoading, isError, error } = useBulkBatches({ mine: scope === "mine", page, pageSize: HISTORY_PAGE_SIZE });
+  const { data, isLoading, isError, error } = useBulkBatches({
+    mine: scope === "mine",
+    sourceType: scope === "email" ? "EMAIL" : undefined,
+    page,
+    pageSize: HISTORY_PAGE_SIZE,
+  });
   const batches = data?.items || [];
   const totalPages = Math.max(1, Math.ceil((data?.total || 0) / HISTORY_PAGE_SIZE));
 
@@ -102,6 +108,7 @@ function BatchHistory() {
           tabs={[
             { value: "mine", label: "My uploads" },
             { value: "all", label: "All uploads" },
+            { value: "email", label: "From email" },
           ]}
           value={scope}
           onChange={(v) => {
@@ -141,12 +148,20 @@ function BatchHistory() {
                     <td className="px-5 py-3 text-left">
                       <p className="font-semibold text-slate-900">#{b.batch_id}</p>
                       <p className="max-w-[240px] truncate text-xs text-slate-500" title={b.source_name}>
+                        {b.source_type === "EMAIL" && <Mail className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-label="From email" />}
                         {b.source_name}
                       </p>
                     </td>
                     <td className="px-3 py-3 text-slate-600 text-left">
                       <p>{formatDateTime(b.created_at)}</p>
-                      {scope === "all" && b.uploaded_by_name && <p className="text-xs text-slate-400">{b.uploaded_by_name}</p>}
+                      {b.source_type === "EMAIL" ? (
+                        <p className="max-w-[220px] truncate text-xs text-slate-400" title={b.email_from || ""}>
+                          {b.email_from || "Email"}
+                          {b.sender_known === false && <span className="ml-1 font-semibold text-amber-700">· unknown sender</span>}
+                        </p>
+                      ) : (
+                        scope !== "mine" && b.uploaded_by_name && <p className="text-xs text-slate-400">{b.uploaded_by_name}</p>
+                      )}
                     </td>
                     <td className="w-[32%] px-3 py-3">
                       <BatchProgressBar batch={b} />
@@ -184,7 +199,21 @@ function BatchHistory() {
   );
 }
 
+/** Route: needs INVOICE_BULK_UPLOAD (upload + history) or EMAIL_INTAKE_MANAGE (mailbox switch only). */
 export default function InvoiceBulkUploadPage() {
+  const { canBulkUploadInvoices, canManageEmailIntake } = useApPermissions();
+  if (!canBulkUploadInvoices) {
+    return (
+      <div className="space-y-5 p-6">
+        <PageHeader title="Mailbox Intake" subtitle="Invoices emailed to the AP mailbox are read automatically while intake is on." />
+        {canManageEmailIntake && <EmailIntakeCard />}
+      </div>
+    );
+  }
+  return <BulkUploadWorkspace />;
+}
+
+function BulkUploadWorkspace() {
   const navigate = useNavigate();
   const inputRef = useRef(null);
   const { canUploadInvoice } = useApPermissions();
@@ -231,15 +260,22 @@ export default function InvoiceBulkUploadPage() {
         title="Bulk Invoice Upload"
         subtitle={`Upload a ZIP or up to ${limits.max_files} invoices at once. Each one is read, validated and saved for OCR review.`}
         actions={
-          canUploadInvoice ? (
-            <Button variant="outline" onClick={() => navigate(AP_ROUTES.INVOICE_UPLOAD)}>
-              Single upload
+          <>
+            <Button variant="outline" onClick={() => navigate(AP_ROUTES.INVOICE_LIST)}>
+              <ArrowLeft className="h-4 w-4" /> Back to Invoices
             </Button>
-          ) : undefined
+            {canUploadInvoice && (
+              <Button variant="outline" onClick={() => navigate(AP_ROUTES.INVOICE_UPLOAD)}>
+                Single upload
+              </Button>
+            )}
+          </>
         }
       />
 
       <HowItWorks />
+
+      <EmailIntakeCard />
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div

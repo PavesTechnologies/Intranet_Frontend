@@ -16,7 +16,7 @@ export default function DocumentViewButton({ fetchBlob, fileName }) {
   const handleView = async () => {
     setLoading(true);
     try {
-      openBlobInNewTab(await fetchBlob());
+      openBlobInNewTab(await fetchBlob(), fileName);
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Could not open the document."));
     } finally {

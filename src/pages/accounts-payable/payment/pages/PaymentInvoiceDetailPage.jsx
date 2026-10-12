@@ -200,7 +200,8 @@ export default function PaymentInvoiceDetailPage() {
                         fetchBlob={() => paymentService.viewPaymentDocument(payment.paymentId, doc.id)}
                       />
                     ))}
-                    {canRecordPayment && (
+                    {/* Only while the payment has no receipt yet - once attached, the receipt is the record. */}
+                    {canRecordPayment && payment.documents.length === 0 && (
                       <button
                         type="button"
                         onClick={() => setUploadFor(payment)}

@@ -23,6 +23,8 @@ export const INVOICE_PERMISSIONS = {
   // /invoice-bulk-upload (invoice_bulk_upload_route.py): upload a ZIP / several invoices at once,
   // batch history, retry / skip. Invoices it creates land in the same OCR review queue.
   INVOICE_BULK_UPLOAD: "INVOICE_BULK_UPLOAD",
+  // PUT /email-intake/status (email_intake_route.py): switch mailbox invoice intake on / off.
+  EMAIL_INTAKE_MANAGE: "EMAIL_INTAKE_MANAGE",
 };
 
 export default INVOICE_PERMISSIONS;

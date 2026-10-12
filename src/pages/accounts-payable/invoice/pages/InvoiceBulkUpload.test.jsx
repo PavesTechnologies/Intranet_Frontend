@@ -12,6 +12,8 @@ import {
   useRetryItemMutation,
   useSkipItemMutation,
   useUploadBatchMutation,
+  useEmailIntakeStatus,
+  useSetEmailIntakeMutation,
   isBatchRunning,
 } from "../hooks/useBulkUpload";
 import { useApPermissions } from "../../hooks/useApPermissions";
@@ -27,6 +29,8 @@ vi.mock("../hooks/useBulkUpload", async () => {
     useRetryItemMutation: vi.fn(),
     useSkipItemMutation: vi.fn(),
     useUploadBatchMutation: vi.fn(),
+    useEmailIntakeStatus: vi.fn(),
+    useSetEmailIntakeMutation: vi.fn(),
   };
 });
 vi.mock("../../hooks/useApPermissions", () => ({ useApPermissions: vi.fn() }));
@@ -67,7 +71,13 @@ beforeEach(() => {
   useRetryItemMutation.mockReturnValue(mutation(vi.fn().mockResolvedValue(batch)));
   useSkipItemMutation.mockReturnValue(mutation(vi.fn().mockResolvedValue(batch)));
   useBulkBatch.mockReturnValue({ data: batch, isLoading: false, isError: false });
+  useEmailIntakeStatus.mockReturnValue({ data: intakeStatus(), isLoading: false, isError: false });
+  useSetEmailIntakeMutation.mockReturnValue(mutation(vi.fn().mockResolvedValue(intakeStatus({ enabled: true }))));
 });
+
+function intakeStatus(over = {}) {
+  return { enabled: false, mailbox: "ap@paves.example", sender_filter: [], interval_minutes: 15, last_run: null, can_manage: true, ...over };
+}
 
 describe("checkSelection", () => {
   it("mirrors the server's batch rules", () => {
@@ -154,5 +164,64 @@ describe("InvoiceBulkBatchPage", () => {
     await user.click(screen.getByRole("tab", { name: /Needs attention/ }));
     expect(screen.queryByText("inv-1.pdf")).toBeNull();
     expect(screen.getByText("new-vendor.pdf")).toBeInTheDocument();
+  });
+});
+
+describe("email batches", () => {
+  it("names the email and warns when the sender is not a known vendor", () => {
+    useBulkBatch.mockReturnValue({
+      data: { ...batch, source_type: "EMAIL", email_subject: "Tax invoice INV-1", email_from: "stranger@unknown.io", sender_known: false },
+      isLoading: false,
+      isError: false,
+    });
+    render(
+      <MemoryRouter initialEntries={["/b/12"]}>
+        <Routes>
+          <Route path="/b/:batchId" element={<InvoiceBulkBatchPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/Email "Tax invoice INV-1" from stranger@unknown.io/)).toBeInTheDocument();
+    expect(screen.getByRole("note")).toHaveTextContent("is not the email address of any vendor on record");
+  });
+});
+
+describe("mailbox intake switch", () => {
+  const renderPage = () =>
+    render(
+      <MemoryRouter>
+        <InvoiceBulkUploadPage />
+      </MemoryRouter>,
+    );
+
+  it("is off by default and switches on after confirmation", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const toggle = screen.getByRole("switch", { name: "Mailbox intake" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByText(/are not being read/)).toBeInTheDocument();
+    await user.click(toggle);
+    await user.click(screen.getByRole("button", { name: "Switch on" }));
+    expect(useSetEmailIntakeMutation.mock.results[0].value.mutateAsync).toHaveBeenCalledWith(true);
+  });
+
+  it("is read-only without EMAIL_INTAKE_MANAGE and shows the sender filter", () => {
+    useEmailIntakeStatus.mockReturnValue({
+      data: intakeStatus({ enabled: true, can_manage: false, sender_filter: ["billing@acme.example"], last_run: { at: "2026-10-10T10:00:00Z", status: "ok", imported: 2 } }),
+      isLoading: false,
+      isError: false,
+    });
+    renderPage();
+    expect(screen.queryByRole("switch")).toBeNull();
+    expect(screen.getByText("Only mail from billing@acme.example")).toBeInTheDocument();
+    expect(screen.getByText(/2 emails imported/)).toBeInTheDocument();
+  });
+
+  it("shows only the switch to a user who can manage intake but not bulk upload", () => {
+    useApPermissions.mockReturnValue({ canBulkUploadInvoices: false, canManageEmailIntake: true });
+    renderPage();
+    expect(screen.getByRole("heading", { name: "Mailbox Intake" })).toBeInTheDocument();
+    expect(screen.queryByTestId("bulk-file-input")).toBeNull();
+    expect(screen.getByRole("switch", { name: "Mailbox intake" })).toBeInTheDocument();
   });
 });
