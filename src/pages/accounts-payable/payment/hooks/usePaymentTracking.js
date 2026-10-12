@@ -91,6 +91,11 @@ export function useRecordPaymentMutation() {
   });
 }
 
+/** variables: {invoiceId, file} - read-only receipt auto-fill (nothing is recorded). */
+export function useExtractReceiptMutation() {
+  return useMutation({ mutationFn: ({ invoiceId, file }) => paymentService.extractReceipt(invoiceId, file) });
+}
+
 /** variables: {invoiceId, paymentId, file, documentType} */
 export function useUploadPaymentDocumentMutation() {
   const queryClient = useQueryClient();
