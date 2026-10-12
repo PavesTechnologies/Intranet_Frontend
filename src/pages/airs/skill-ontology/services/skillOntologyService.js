@@ -160,6 +160,19 @@ export const deleteUnknownSkill = async (unknownSkillId, payload = {}) => {
   }
 };
 
+// JDs this unknown skill appears in, each with the CORE / SUPPORTING class
+// that JD's extraction gave it (importance; null for preferred/unlisted).
+// Used to warn before a delete removes a core skill from a JD.
+export const getUnknownSkillJds = async (unknownSkillId) => {
+  try {
+    const response = await api.get(`${BASE_URL}/skills/unknown/${unknownSkillId}/jds`, { headers: authHeaders() });
+    return response.data?.data || [];
+  } catch (error) {
+    console.error("Error loading JDs for unknown skill:", error);
+    throw error;
+  }
+};
+
 // HR_ADMIN-only bulk approve — creates a canonical skill for each selected
 // unknown skill in one call. Response carries a per-item results array
 // (partial success is normal: some ids can succeed while others fail), plus
