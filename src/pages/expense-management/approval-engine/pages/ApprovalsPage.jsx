@@ -15,6 +15,8 @@ import { useMyQueue, useMyHistory } from "../hooks/useApprovalWorkflow";
 import SearchInput from "@/components/filter/Searchbar";
 import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 
 const QUEUE_PAGE_SIZE = 20;
 
@@ -85,9 +87,26 @@ export default function ApprovalsPage() {
   // -----------------------------
   // Counts
   // -----------------------------
-  const pendingCount = queueQuery.data?.totalElements ?? 0;
-  const approvedCount = approvedQuery.data?.totalElements ?? 0;
-  const rejectedCount = rejectedQuery.data?.totalElements ?? 0;
+  // Cash advance totals per tab, from the same endpoint the Cash Advances list uses,
+  // so the cards and the list agree. Only the total is needed, so ask for one row.
+  const cashAdvanceCountQuery = (status) => ({
+    queryKey: ["cashAdvanceApprovalCount", status ?? "PENDING", reloadKey],
+    queryFn: async () => {
+      const res = await cashAdvanceApi.getMyApprovals({ status, page: 0, size: 1 });
+      return res.data?.data?.totalElements ?? 0;
+    },
+  });
+
+  const cashAdvancePendingQuery = useQuery(cashAdvanceCountQuery());
+  const cashAdvanceApprovedQuery = useQuery(cashAdvanceCountQuery("APPROVED"));
+  const cashAdvanceRejectedQuery = useQuery(cashAdvanceCountQuery("REJECTED"));
+
+  const pendingCount =
+    (queueQuery.data?.totalElements ?? 0) + (cashAdvancePendingQuery.data ?? 0);
+  const approvedCount =
+    (approvedQuery.data?.totalElements ?? 0) + (cashAdvanceApprovedQuery.data ?? 0);
+  const rejectedCount =
+    (rejectedQuery.data?.totalElements ?? 0) + (cashAdvanceRejectedQuery.data ?? 0);
 
   const totalCount =
     pendingCount + approvedCount + rejectedCount;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { CheckCircle2, XCircle, Eye, DollarSign, Calendar, RefreshCw, Send, AlertCircle } from "lucide-react";
 import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -7,7 +8,6 @@ import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { lookupService } from "@/pages/expense-management/api/expenseReportsApi";
 import { useAuth } from "@/contexts/AuthContext";
 import EmployeeLabel from "@/pages/expense-management/approval-engine/components/EmployeeLabel";
-import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 
 const formatMoney = (amount, currencyCode = "INR") => {
   const num = Number(amount) || 0;
@@ -264,6 +264,21 @@ const canApproveAdvance = (adv, user, hasRole) => {
     }
   }
 
+  // Manager stage: only the assigned manager can approve or reject. Finance (and other roles,
+  // including Admin) can still see the request, but Approve stays disabled until the manager has acted.
+  const isManagerStage = ["SUBMITTED", "PENDING", "PENDING_APPROVAL", "PENDING_MANAGER_APPROVAL"].includes(statusUpper);
+  if (isManagerStage) {
+    const managerId = adv.managerId ? String(adv.managerId).toLowerCase() : null;
+    const userIds = user
+      ? [user.employeeId, user.employee_id, user.id, user.user_id, user.sub]
+          .filter(Boolean)
+          .map((id) => String(id).toLowerCase())
+      : [];
+    if (!managerId || !userIds.includes(managerId)) {
+      return false;
+    }
+  }
+
   // Explicit backend boolean flag checks if provided (and explicitly true/false boolean)
   if (typeof adv.canApprove === "boolean") return adv.canApprove;
   if (typeof adv.actionable === "boolean") return adv.actionable;
@@ -287,7 +302,7 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
   const { user, hasRole } = useAuth();
   const [advances, setAdvances] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedAdvance, setSelectedAdvance] = useState(null);
+  const navigate = useNavigate();
   const [costCentersMap, setCostCentersMap] = useState(new Map());
 
   // Approve Confirmation Modal
@@ -319,35 +334,15 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
     };
   }, []);
 
-  const isManagerPOV = hasRole
-    ? hasRole([
-        "Manager",
-        "MANAGER",
-        "Reporting_Manager",
-        "Project_Manager",
-        "Delivery_Manager",
-        "Resource_Manager",
-        "General",
-        "GENERAL",
-        "Finance Executive",
-        "FINANCE_EXECUTIVE",
-        "Finance",
-        "FINANCE",
-        "Admin",
-        "ADMIN"
-      ])
-    : true;
-
+  // The backend already limits /my-approvals to the caller's roles and approval scope, so the
+  // list shows whatever it returns (the same rows the card counts are based on).
   const fetchAdvances = async () => {
-    if (!isManagerPOV) {
-      setAdvances([]);
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     try {
-      const res = await cashAdvanceApi.getMyApprovals();
+      // Pending: the server's default (everything awaiting this user). Approved/Rejected ask for that status.
+      const status =
+        activeTab === "approved" ? "APPROVED" : activeTab === "rejected" ? "REJECTED" : undefined;
+      const res = await cashAdvanceApi.getMyApprovals({ status, size: 100 });
       const data = res.data?.data || res.data || [];
       const list = Array.isArray(data) ? data : data.content || data.items || [];
       setAdvances(list);
@@ -364,8 +359,6 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
   }, [activeTab]);
 
   const filteredAdvances = useMemo(() => {
-    if (!isManagerPOV) return [];
-
     return advances.filter((adv) => {
       const statusUpper = (adv.status || "").toUpperCase();
 
@@ -478,6 +471,19 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                 {filteredAdvances.map((adv) => {
                   const advId = adv.advanceId || adv.id;
                   const isActionable = canApproveAdvance(adv, user, hasRole);
+                  // Show the buttons on every awaiting-approval row; disable them when this user can't act yet
+                  const showActions =
+                    isActionable ||
+                    [
+                      "SUBMITTED",
+                      "PENDING",
+                      "PENDING_APPROVAL",
+                      "PENDING_MANAGER_APPROVAL",
+                      "PENDING_COST_CENTER_APPROVAL",
+                      "PENDING_COST_CENTER",
+                      "PENDING_FINANCE_APPROVAL",
+                      "PENDING_FINANCE",
+                    ].includes((adv.status || "").toUpperCase());
                   const empId = adv.employeeId || adv.employee_id || adv.userId || adv.createdById || adv.createdBy;
 
                   return (
@@ -507,20 +513,20 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                       <td className="py-3 px-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
-                            onClick={() => setSelectedAdvance(adv)}
+                            onClick={() => navigate(`/expense-management/approvals/cash-advance/${adv.advanceId || adv.id}`)}
                             title="View Details"
                             className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition"
                           >
                             <Eye size={15} />
                           </button>
 
-                          {isActionable && (
+                          {showActions && (
                             <>
                               <Button
                                 size="sm"
                                 variant="primary"
                                 onClick={() => handleApprove(adv)}
-                                disabled={actionLoading}
+                                disabled={actionLoading || !isActionable}
                                 className="!py-1 !px-2.5 !text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white"
                               >
                                 Approve
@@ -530,7 +536,7 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
                                 size="sm"
                                 variant="danger"
                                 onClick={() => setRejectingAdvance(adv)}
-                                disabled={actionLoading}
+                                disabled={actionLoading || !isActionable}
                                 className="!py-1 !px-2.5 !text-[11px]"
                               >
                                 Reject
@@ -547,79 +553,6 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
           </div>
         )}
       </div>
-
-      {/* View Detail Modal */}
-      {selectedAdvance && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 my-8">
-            <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50">
-              <h3 className="font-bold text-gray-900 text-sm">Cash Advance Request Details & Lifecycle</h3>
-              <button onClick={() => setSelectedAdvance(null)} className="text-gray-400 hover:text-gray-600 p-1">
-                <XCircle size={18} />
-              </button>
-            </div>
-            <div className="p-5 space-y-4 text-xs max-h-[80vh] overflow-y-auto">
-              {/* Stepper */}
-              <CashAdvanceWorkflowStepper currentStatus={selectedAdvance.status} />
-
-              <div className="flex items-center justify-between bg-blue-50 p-3 rounded-lg border border-blue-100">
-                <div>
-                  <p className="text-[10px] font-semibold text-blue-600 uppercase">Requested Amount</p>
-                  <p className="text-lg font-bold text-blue-900 mt-0.5">
-                    {formatMoney(selectedAdvance.amount, selectedAdvance.currencyCode || "INR")}
-                  </p>
-                </div>
-                {getStatusBadge(selectedAdvance.status)}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Employee</p>
-                  <p className="font-semibold text-gray-800 mt-0.5">
-                    <EmployeeLabel employeeId={selectedAdvance.employeeId || selectedAdvance.employee_id || selectedAdvance.userId} showIdSubtext />
-                  </p>
-                </div>
-                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Report #</p>
-                  <p className="font-mono font-medium text-blue-700 mt-0.5">{formatAdvanceNumber(selectedAdvance)}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Title</p>
-                  <p className="font-semibold text-gray-800 mt-0.5">{selectedAdvance.title || "—"}</p>
-                </div>
-                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Cost Center</p>
-                  <p className="font-medium text-gray-800 mt-0.5">{getCostCenterValue(selectedAdvance, costCentersMap)}</p>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase">Purpose / Justification</p>
-                <p className="text-gray-800 mt-1 whitespace-pre-line">{selectedAdvance.purpose || "No details provided."}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Needed By Date</p>
-                  <p className="font-medium text-gray-800 mt-0.5">{formatDate(getNeededByDateValue(selectedAdvance))}</p>
-                </div>
-                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Settlement Expected</p>
-                  <p className="font-medium text-gray-800 mt-0.5">{formatDate(selectedAdvance.settlementDueDate)}</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
-              <Button variant="outline" onClick={() => setSelectedAdvance(null)} className="text-xs">
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Approve Confirmation Modal */}
       {approvingAdvance && (

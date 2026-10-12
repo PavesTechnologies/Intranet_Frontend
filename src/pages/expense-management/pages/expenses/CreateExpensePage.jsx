@@ -1021,22 +1021,6 @@ export default function CreateExpensePage() {
     // CREATE PAYLOAD
     // ----------------------------------------------------------
 
-    /*
-     * IMPORTANT:
-     *
-     * Do NOT send cashAdvanceId here.
-     *
-     * The current ExpenseReport create request is:
-     *
-     * title
-     * businessPurpose
-     * costCenterId
-     * currencyId
-     *
-     * The selected cash advance is retained in the UI
-     * for the subsequent settlement/adjustment workflow.
-     */
-
     const payload = {
       title,
       businessPurpose,
@@ -1045,6 +1029,12 @@ export default function CreateExpensePage() {
       currencyId:
         formData.currencyId,
     };
+
+    // A report created from a cash advance is linked to it on the server, so the employee's
+    // expenses can be verified and offset against that advance. The link is set on create only.
+    const createPayload = formData.cashAdvanceId
+      ? { ...payload, cashAdvanceId: formData.cashAdvanceId }
+      : payload;
 
 
     console.log(
@@ -1086,7 +1076,7 @@ export default function CreateExpensePage() {
       else {
         res =
           await expenseReportService.create(
-            payload
+            createPayload
           );
 
 

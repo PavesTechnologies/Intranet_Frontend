@@ -216,6 +216,7 @@ import XmsRequestAdvancePage from "./pages/expense-management/pages/cash-advance
 import XmsMyAdvancesPage from "./pages/expense-management/pages/cash-advance/MyAdvancesPage.jsx";
 import XmsSettlementPage from "./pages/expense-management/pages/cash-advance/SettlementPage.jsx";
 import XmsCashAdvanceApprovalsPage from "./pages/expense-management/pages/cash-advance/CashAdvanceApprovalsPage.jsx";
+import XmsCashAdvanceDetailPage from "./pages/expense-management/pages/cash-advance/CashAdvanceDetailPage.jsx";
 import XmsApprovalsPage from "./pages/expense-management/approval-engine/pages/ApprovalsPage.jsx";
 import XmsApprovalFlowsPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowsPage.jsx";
 import XmsApprovalFlowBuilderPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowBuilderPage.jsx";
@@ -1746,8 +1747,10 @@ const AppRoutes = () => {
 
           <Route path="/expense-management/cash-advance/request" element={<ProtectedRoute allowedRoles={["General"]}><XmsRequestAdvancePage /></ProtectedRoute>} />
           <Route path="/expense-management/cash-advance/my" element={<ProtectedRoute allowedRoles={["General"]}><XmsMyAdvancesPage /></ProtectedRoute>} />
-          <Route path="/expense-management/cash-advance/settlement" element={<ProtectedRoute allowedRoles={["General"]}><XmsSettlementPage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/settlement" element={<ProtectedRoute allowedRoles={["General", "Finance", "FINANCE_EXECUTIVE", "Admin"]}><XmsSettlementPage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/settlement/:advanceId" element={<ProtectedRoute allowedRoles={["General", "Finance", "FINANCE_EXECUTIVE", "Admin"]}><XmsCashAdvanceDetailPage /></ProtectedRoute>} />
           <Route path="/expense-management/cash-advance/approvals" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsCashAdvanceApprovalsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/:advanceId" element={<ProtectedRoute allowedRoles={["General"]}><XmsCashAdvanceDetailPage /></ProtectedRoute>} />
 
           {/* No role gate (§1.5): any employee can be a resolved approver (NAMED_USER/DEPARTMENT_OWNER/
               COST_CENTER_OWNER), not just "Manager" - the backend itself has no role restriction on
@@ -1756,6 +1759,7 @@ const AppRoutes = () => {
           <Route path="/expense-management/approvals/approved" element={<Navigate to="/expense-management/approvals" replace />} />
           <Route path="/expense-management/approvals/rejected" element={<Navigate to="/expense-management/approvals" replace />} />
           <Route path="/expense-management/approvals" element={<ProtectedRoute><XmsApprovalsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/approvals/cash-advance/:advanceId" element={<ProtectedRoute><XmsCashAdvanceDetailPage /></ProtectedRoute>} />
 
           {/* Approval Rules (Admin config) - ADMIN-only, matching the Masters section's own role gate. */}
           <Route path="/expense-management/approval-rules/flows" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsApprovalFlowsPage /></ProtectedRoute>} />

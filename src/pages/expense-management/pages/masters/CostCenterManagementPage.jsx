@@ -562,7 +562,10 @@ export default function CostCenterManagementPage() {
   const activeCostCentersCount = statsCostCenters.filter((c) => (c.status || "").toUpperCase() === "ACTIVE").length;
   const inactiveCostCentersCount = statsCostCenters.filter((c) => (c.status || "").toUpperCase() === "INACTIVE").length;
 
+  // Actual utilized = money spent on expenses. Cash advances and their fees are reported separately,
+  // so they are excluded here (the backend computes this figure without them).
   const getConsumed = (b) => {
+    if (b.actualUtilized !== undefined && b.actualUtilized !== null) return Number(b.actualUtilized);
     if (b.consumedBudget !== undefined && b.consumedBudget !== null) return Number(b.consumedBudget);
     return getTotalPool(b) - Number(b.availableBudget || 0);
   };
@@ -571,6 +574,21 @@ export default function CostCenterManagementPage() {
   const totalAllocatedBudget = statsBudgets.reduce((sum, b) => sum + getTotalPool(b), 0);
   const totalAvailableBudget = statsBudgets.reduce((sum, b) => sum + Number(b.effectiveAvailable ?? b.availableBudget ?? 0), 0);
   const totalConsumedBudget = statsBudgets.reduce((sum, b) => sum + getConsumed(b), 0);
+
+  // Spent vs committed, kept apart so Finance can tell actual spend from allocations
+  const budgetBreakdown = statsBudgets.reduce(
+    (acc, b) => {
+      acc.total += getTotalPool(b);
+      acc.actualUtilized += getConsumed(b);
+      acc.reserved += Number(b.reservedAmount ?? 0);
+      acc.cashAdvance += Number(b.cashAdvanceAllocated ?? 0);
+      acc.cashAdvanceFee += Number(b.cashAdvanceFeeAllocated ?? 0);
+      acc.remaining += Number(b.effectiveAvailable ?? b.availableBudget ?? 0);
+      return acc;
+    },
+    { total: 0, actualUtilized: 0, reserved: 0, cashAdvance: 0, cashAdvanceFee: 0, remaining: 0 }
+  );
+  budgetBreakdown.impact = budgetBreakdown.cashAdvance + budgetBreakdown.cashAdvanceFee;
 
   const fiscalYearOptions = Array.from(new Set(statsBudgets.map((b) => b.fiscalYear).filter(Boolean))).sort();
 
@@ -1098,8 +1116,10 @@ export default function CostCenterManagementPage() {
     "Fiscal Year",
     "Budget Amount",
     "Available to Spend",
-    "Consumed (Paid)",
+    "Actual Utilized",
     "Reserved",
+    "Cash Advance",
+    "Cash Advance Fee",
     "Utilization",
     "Created Date",
     "Actions",
@@ -1114,6 +1134,8 @@ export default function CostCenterManagementPage() {
     "availableBudget",
     "consumedBudget",
     "reserved",
+    "cashAdvance",
+    "cashAdvanceFee",
     "utilization",
     "createdDate",
     "actions",
@@ -1160,6 +1182,13 @@ export default function CostCenterManagementPage() {
           {formatAmount(b.reservedAmount ?? 0)}
         </span>
       ),
+      // Approved cash advances drawn from this budget (already deducted from Available to Spend)
+      cashAdvance: (
+        <span title="Approved cash advances drawn from this budget (already deducted from Available to Spend)" className="font-semibold text-indigo-700">
+          {formatAmount(b.cashAdvanceAllocated ?? 0)}
+        </span>
+      ),
+      cashAdvanceFee: formatAmount(b.cashAdvanceFeeAllocated ?? 0),
       utilization: <UtilizationBar percent={utilizationPercent} />,
       createdDate: formatDate(b.createdDate || b.createdAt),
       actions: (
@@ -1428,6 +1457,30 @@ export default function CostCenterManagementPage() {
           </>
         )}
       </div>
+
+      {activeTab !== "costCenters" && (
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="mb-3 text-xs font-bold uppercase tracking-wider text-[#0a174e]">
+            Budget breakdown: spent vs committed
+          </p>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+            {[
+              ["Total Budget", budgetBreakdown.total, "text-gray-900", "Budget amount plus rollover"],
+              ["Actual Utilized", budgetBreakdown.actualUtilized, "text-red-600", "Money actually spent on expenses"],
+              ["Reserved / Allocated", budgetBreakdown.reserved, "text-amber-700", "Submitted reports awaiting payment"],
+              ["Cash Advance Amount", budgetBreakdown.cashAdvance, "text-indigo-700", "Approved advance principal"],
+              ["Cash Advance Fee", budgetBreakdown.cashAdvanceFee, "text-indigo-700", "Company-paid advance fees"],
+              ["Total Budget Impact", budgetBreakdown.impact, "text-indigo-900", "Advance principal plus fees, each counted once"],
+              ["Remaining Available", budgetBreakdown.remaining, "text-green-600", "Left to spend after reserved amounts"],
+            ].map(([label, value, tone, hint]) => (
+              <div key={label} title={hint} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{label}</p>
+                <p className={`mt-1 truncate text-lg font-bold ${tone}`}>{formatAmount(value)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search & Filtering Panel */}
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -2068,6 +2121,7 @@ export default function CostCenterManagementPage() {
             />
             <DetailRow icon={<PiggyBank className="h-5 w-5" />} label="Left After Payments" value={formatAmount(viewBudget.availableBudget)} />
             <DetailRow icon={<TrendingDown className="h-5 w-5" />} label="Reserved (awaiting approval or payment)" value={formatAmount(viewBudget.reservedAmount ?? 0)} />
+            <DetailRow icon={<Wallet className="h-5 w-5" />} label="Cash Advance Allocated (approved, already deducted)" value={formatAmount(viewBudget.cashAdvanceAllocated ?? 0)} />
             <DetailRow icon={<TrendingDown className="h-5 w-5" />} label="Consumed Budget" value={formatAmount(viewConsumed)} />
             <DetailRow
               icon={<AlertTriangle className="h-5 w-5" />}

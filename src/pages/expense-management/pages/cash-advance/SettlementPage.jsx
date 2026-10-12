@@ -12,6 +12,7 @@ import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
 import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEmployeeDirectory } from "@/pages/expense-management/approval-engine/hooks/useEmployeeDirectory";
 
@@ -61,6 +62,7 @@ const getEmployeeName = (adv, directory) => {
 export default function SettlementPage() {
   const { user, hasRole } = useAuth();
   const { data: directory } = useEmployeeDirectory();
+  const navigate = useNavigate();
   const [advances, setAdvances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -88,7 +90,6 @@ export default function SettlementPage() {
     );
   }, [user, hasRole]);
 
-  const [selectedAdvance, setSelectedAdvance] = useState(null);
   const [disbursing, setDisbursing] = useState(null);
   const [settlingAdvance, setSettlingAdvance] = useState(null);
   const [settlementAction, setSettlementAction] = useState("SETTLE");
@@ -556,7 +557,7 @@ export default function SettlementPage() {
                       <td className="py-3 px-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
-                            onClick={() => setSelectedAdvance(adv)}
+                            onClick={() => navigate(`/expense-management/cash-advance/settlement/${adv.advanceId || adv.id}`)}
                             title="View Details & Lifecycle"
                             className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition flex items-center gap-1"
                           >
@@ -601,67 +602,6 @@ export default function SettlementPage() {
         )}
       </div>
 
-      {/* View Details & Lifecycle Stepper Modal */}
-      {selectedAdvance && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 my-8">
-            <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50">
-              <h3 className="font-bold text-gray-900 text-sm">
-                Settlement & Lifecycle Details #{String(selectedAdvance.advanceId || selectedAdvance.id).slice(0, 8)}
-              </h3>
-              <button onClick={() => setSelectedAdvance(null)} className="text-gray-400 hover:text-gray-600 p-1">
-                <CheckCircle2 size={18} />
-              </button>
-            </div>
-            <div className="p-5 space-y-4 text-xs max-h-[80vh] overflow-y-auto">
-              {/* Stepper */}
-              <CashAdvanceWorkflowStepper
-                currentStatus={selectedAdvance.status}
-                linkedExpenseReport={selectedAdvance.linkedExpenseReport}
-              />
-
-              {/* Stage 6 Adjustment Calculation Card */}
-              <CashAdvanceAdjustmentCard
-                advanceAmount={selectedAdvance.amount}
-                verifiedExpenseAmount={selectedAdvance.verifiedExpenseAmount || selectedAdvance.expenseAmount || selectedAdvance.totalExpenses || 0}
-                currencyCode={selectedAdvance.currencyCode || "INR"}
-                status={selectedAdvance.status}
-              />
-
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase">Title & Business Purpose</p>
-                <p className="font-semibold text-gray-900 mt-0.5">{selectedAdvance.title || "—"}</p>
-                <p className="text-gray-700 mt-1 whitespace-pre-line">{selectedAdvance.purpose || "—"}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Needed By Date</p>
-                  <p className="font-medium text-gray-800 mt-0.5">{formatDate(selectedAdvance.neededByDate)}</p>
-                </div>
-                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Settlement Due Date</p>
-                  <p className="font-medium text-gray-800 mt-0.5">{formatDate(selectedAdvance.settlementDueDate)}</p>
-                </div>
-              </div>
-
-              {selectedAdvance.notes && (
-                <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Settlement Audit & Notes History</p>
-                  <p className="text-gray-800 mt-1 whitespace-pre-line font-mono text-[11px]">
-                    {selectedAdvance.notes}
-                  </p>
-                </div>
-              )}
-            </div>
-            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
-              <Button variant="outline" onClick={() => setSelectedAdvance(null)} className="text-xs">
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Settle Advance Details Modal / Panel */}
       {/* Disbursement Confirmation Modal */}

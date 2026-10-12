@@ -28,10 +28,8 @@ import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal
 import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
-import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
-import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
 
-const formatMoney = (amount, currencyCode = "INR") => {
+export const formatMoney = (amount, currencyCode = "INR") => {
   const num = Number(amount) || 0;
   return `${currencyCode} ${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
@@ -53,7 +51,7 @@ const getNeededByDateValue = (adv) => {
   );
 };
 
-const formatDate = (dateValue) => {
+export const formatDate = (dateValue) => {
   if (!dateValue) return "—";
 
   if (Array.isArray(dateValue)) {
@@ -103,7 +101,7 @@ const getAgingDays = (adv) => {
   return Math.max(0, Math.floor((today - due) / 86400000));
 };
 
-const getCostCenterValue = (adv) => {
+export const getCostCenterValue = (adv) => {
   if (!adv) return "—";
 
   if (typeof adv.costCenterName === "string" && adv.costCenterName.trim()) {
@@ -147,7 +145,7 @@ const getCostCenterValue = (adv) => {
   return "—";
 };
 
-const getStatusBadge = (status) => {
+export const getStatusBadge = (status) => {
   const upper = (status || "").toUpperCase();
   switch (upper) {
     case "DRAFT":
@@ -208,7 +206,6 @@ export default function MyAdvancesPage() {
   const [statusFilter, setStatusFilter] = useState("ALL");
 
   // Modals state
-  const [selectedAdvance, setSelectedAdvance] = useState(null); // Detail modal
   const [editingAdvance, setEditingAdvance] = useState(null); // Edit modal
   const [confirmModal, setConfirmModal] = useState({ open: false, title: "", message: "", action: null });
   const [submittingAction, setSubmittingAction] = useState(false);
@@ -642,7 +639,7 @@ export default function MyAdvancesPage() {
                         <div className="flex items-center justify-end gap-1.5">
                           {/* View Detail Action */}
                           <button
-                            onClick={() => setSelectedAdvance(adv)}
+                            onClick={() => navigate(`/expense-management/cash-advance/${adv.advanceId || adv.id}`)}
                             title="View details"
                             className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition"
                           >
@@ -698,140 +695,6 @@ export default function MyAdvancesPage() {
           </div>
         )}
       </div>
-
-      {/* View Detail Modal */}
-      {selectedAdvance && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 my-8">
-            <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-blue-600" />
-                <h3 className="font-bold text-gray-900 text-sm">
-                  Cash Advance Lifecycle #{String(selectedAdvance.advanceId || selectedAdvance.id).slice(0, 8)}
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedAdvance(null)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-md"
-              >
-                <XCircle size={18} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4 text-xs max-h-[80vh] overflow-y-auto">
-              {/* 7-Stage Workflow Lifecycle Stepper */}
-              <CashAdvanceWorkflowStepper
-                currentStatus={selectedAdvance.status}
-                linkedExpenseReport={selectedAdvance.linkedExpenseReport}
-              />
-
-              <div className="flex items-center justify-between bg-blue-50/50 p-3 rounded-lg border border-blue-100">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase text-blue-600">Advance Disbursed Amount</p>
-                  <p className="text-lg font-bold text-blue-900 mt-0.5">
-                    {formatMoney(selectedAdvance.amount, selectedAdvance.currencyCode || "INR")}
-                  </p>
-                </div>
-                <div>{getStatusBadge(selectedAdvance.status)}</div>
-              </div>
-
-              {/* Stage 6 Adjustment Card */}
-              {["DISBURSED", "EXPENSE_SUBMITTED", "EXPENSE_VERIFIED", "PARTIALLY_ADJUSTED", "ADJUSTED", "SETTLED"].includes(
-                (selectedAdvance.status || "").toUpperCase()
-              ) && (
-                <CashAdvanceAdjustmentCard
-                  advanceAmount={selectedAdvance.amount}
-                  verifiedExpenseAmount={selectedAdvance.verifiedExpenseAmount || selectedAdvance.expenseAmount || selectedAdvance.totalExpenses || 0}
-                  currencyCode={selectedAdvance.currencyCode || "INR"}
-                  status={selectedAdvance.status}
-                  outstandingBalance={selectedAdvance.outstandingBalance}
-                  expenseReport={selectedAdvance.linkedExpenseReport}
-                  onApplyOffset={async ({ expenseReportId, offsetAmount }) => {
-                    if (!expenseReportId) {
-                      showStatusToast("No linked expense report is available for the advance offset.", "error");
-                      return;
-                    }
-                    const maxOffset = Math.min(
-                      Number(selectedAdvance.outstandingBalance) || 0,
-                      Number(selectedAdvance.linkedExpenseReport?.reimbursableTotal ?? selectedAdvance.linkedExpenseReport?.totalAmount ?? 0) || 0
-                    );
-                    if (offsetAmount <= 0 || offsetAmount > maxOffset) {
-                      showStatusToast("Offset amount cannot exceed the verified expense amount or outstanding advance balance.", "error");
-                      return;
-                    }
-                    await cashAdvanceApi.applyAdvanceOffset(expenseReportId, {
-                      cashAdvanceId: selectedAdvance.advanceId || selectedAdvance.id,
-                      advanceId: selectedAdvance.advanceId || selectedAdvance.id,
-                      offsetAmount,
-                    });
-                    showStatusToast("Advance offset applied successfully.", "success");
-                    setSelectedAdvance(null);
-                    fetchMyAdvances();
-                  }}
-                />
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Title</p>
-                  <p className="font-semibold text-gray-800 mt-0.5">{selectedAdvance.title || "—"}</p>
-                </div>
-                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Cost Center</p>
-                  <p className="font-semibold text-gray-800 mt-0.5">{getCostCenterValue(selectedAdvance)}</p>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase">Purpose / Business Justification</p>
-                <p className="text-gray-800 mt-1 leading-relaxed whitespace-pre-line">
-                  {selectedAdvance.purpose || "No justification provided."}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Needed By Date</p>
-                  <p className="font-medium text-gray-800 mt-0.5">{formatDate(selectedAdvance.neededByDate)}</p>
-                </div>
-                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Settlement Due Date</p>
-                  <p className="font-medium text-gray-800 mt-0.5">{formatDate(selectedAdvance.settlementDueDate)}</p>
-                </div>
-              </div>
-
-              {selectedAdvance.notes && (
-                <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Notes & Remarks</p>
-                  <p className="text-gray-700 mt-1">{selectedAdvance.notes}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
-              <div>
-                {["DISBURSED", "EXPENSE_SUBMITTED"].includes((selectedAdvance.status || "").toUpperCase()) && (
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      const advId = selectedAdvance.advanceId || selectedAdvance.id;
-                      setSelectedAdvance(null);
-                      navigate(`/expense-management/expenses/create?cashAdvanceId=${advId}`);
-                    }}
-                    className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
-                  >
-                    <Send size={13} className="mr-1.5" /> Stage 4: Submit Linked Expenses
-                  </Button>
-                )}
-              </div>
-
-              <Button variant="outline" onClick={() => setSelectedAdvance(null)} className="text-xs">
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Edit Draft Modal */}
       {editingAdvance && (

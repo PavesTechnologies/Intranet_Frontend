@@ -90,6 +90,8 @@ export const getStageIndex = (statusStr) => {
       return 1;
     case "APPROVED_REQUEST":
       return 2;
+    // APPROVED means Finance approved it but has not yet disbursed it, so stage 3 is the current stage
+    case "APPROVED":
     case "DISBURSED":
     case "IN_PROGRESS":
     case "IN PROGRESS":
@@ -105,7 +107,6 @@ export const getStageIndex = (statusStr) => {
     case "UNDER_REVIEW":
     case "UNDER REVIEW":
       return 5;
-    case "APPROVED":
     case "EXPENSE_VERIFIED":
     case "EXPENSE VERIFIED":
     case "SETTLEMENT_PENDING":
@@ -163,57 +164,64 @@ export default function CashAdvanceWorkflowStepper({ currentStatus, linkedExpens
         )}
       </div>
 
-      {/* Grid Stepper */}
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-7">
-        {STAGES.map((stage) => {
-          const Icon = stage.icon;
-          const isPassed = !isRejected && !isCancelled && !isOverdue && currentStageIndex > stage.id;
-          const isCurrent = !isRejected && !isCancelled && !isOverdue && currentStageIndex === stage.id;
+      {/* Horizontal pipeline: scrolls sideways on narrow screens instead of wrapping */}
+      <div className="overflow-x-auto pb-2">
+        <ol className="flex min-w-[880px] items-start">
+          {STAGES.map((stage, index) => {
+            const Icon = stage.icon;
+            const isPassed = !isRejected && !isCancelled && !isOverdue && currentStageIndex > stage.id;
+            const isCurrent = !isRejected && !isCancelled && !isOverdue && currentStageIndex === stage.id;
+            const isLast = index === STAGES.length - 1;
 
-          let cardStyle = "border-gray-200 bg-gray-50/70 text-gray-400";
-          let iconBg = "bg-gray-200 text-gray-500";
-          let badgeText = "Pending";
-          let badgeStyle = "bg-gray-100 text-gray-500 border-gray-200";
+            let circleStyle = "bg-gray-100 text-gray-400 border-gray-300";
+            let connectorStyle = "bg-gray-200";
+            let titleStyle = "text-gray-400";
+            let badgeText = "Pending";
+            let badgeStyle = "bg-gray-100 text-gray-500 border-gray-200";
 
-          if (isPassed) {
-            cardStyle = "border-emerald-200 bg-emerald-50/40 text-emerald-950";
-            iconBg = "bg-emerald-600 text-white";
-            badgeText = "Completed";
-            badgeStyle = "bg-emerald-100 text-emerald-800 border-emerald-300";
-          } else if (isCurrent) {
-            cardStyle = "border-blue-400 bg-blue-50/60 text-blue-950 ring-2 ring-blue-500/20";
-            iconBg = "bg-blue-600 text-white";
-            badgeText = "Active";
-            badgeStyle = "bg-blue-600 text-white border-blue-600 animate-pulse";
-          }
+            if (isPassed) {
+              circleStyle = "bg-emerald-600 text-white border-emerald-600";
+              connectorStyle = "bg-emerald-500";
+              titleStyle = "text-gray-900";
+              badgeText = "Completed";
+              badgeStyle = "bg-emerald-100 text-emerald-800 border-emerald-300";
+            } else if (isCurrent) {
+              circleStyle = "bg-blue-600 text-white border-blue-600 ring-4 ring-blue-500/20";
+              titleStyle = "text-blue-900";
+              badgeText = "Active";
+              badgeStyle = "bg-blue-600 text-white border-blue-600 animate-pulse";
+            }
 
-          return (
-            <div
-              key={stage.id}
-              className={`relative flex flex-col justify-between rounded-lg border p-2.5 transition-all ${cardStyle}`}
-            >
-              <div className="flex items-start justify-between gap-1.5 mb-2">
-                <div className={`p-1.5 rounded-md text-xs ${iconBg}`}>
-                  <Icon size={14} />
+            return (
+              <li key={stage.id} className="relative flex flex-1 flex-col items-center px-2 text-center">
+                {/* Connector from this stage's centre to the next stage's centre */}
+                {!isLast && (
+                  <span
+                    aria-hidden="true"
+                    className={`absolute left-1/2 top-5 h-0.5 w-full ${connectorStyle}`}
+                  />
+                )}
+
+                <div className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 ${circleStyle}`}>
+                  {isPassed ? <CheckCircle2 size={18} /> : <Icon size={18} />}
                 </div>
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${badgeStyle}`}>
+
+                <p className={`mt-2 text-xs font-bold leading-tight ${titleStyle}`}>{stage.title}</p>
+                <p className="mt-1 text-[10px] leading-tight text-gray-500">{stage.subtitle}</p>
+
+                <span className={`mt-2 text-[10px] font-bold px-1.5 py-0.5 rounded border ${badgeStyle}`}>
                   {badgeText}
                 </span>
-              </div>
 
-              <div>
-                <p className="text-xs font-bold leading-tight">{stage.title}</p>
-                <p className="text-[10px] leading-tight text-gray-500 mt-1 line-clamp-2">{stage.subtitle}</p>
-              </div>
-
-              {stage.id === 4 && linkedExpenseReport && (
-                <div className="mt-2 pt-1.5 border-t border-gray-200/60 text-[10px] font-mono text-blue-700 font-semibold truncate">
-                  Linked: #{String(linkedExpenseReport.reportNumber || linkedExpenseReport.id || "").slice(0, 8)}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                {stage.id === 4 && linkedExpenseReport && (
+                  <div className="mt-1.5 text-[10px] font-mono text-blue-700 font-semibold truncate max-w-full">
+                    Linked: #{String(linkedExpenseReport.reportNumber || linkedExpenseReport.id || "").slice(0, 8)}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
       </div>
     </div>
   );
