@@ -47,23 +47,22 @@ const directoryQuery = {
 
 export const useEmployeeDirectory = () => useQuery(directoryQuery);
 
-// Employment statuses meaning the person has left - they can't cover anyone's approvals.
-const DEPARTED_STATUS = /resign|terminat|inactive|exit|relieved|abscond|separat/i;
+export const ACTIVE_EMPLOYEES_KEY = ["xmsActiveEmployees"];
 
 /**
- * The directory as a pickable list of current employees, one per employeeId, sorted by name.
- * Shares the directory's cached query (same key), so it costs no extra request.
+ * Current employees for pickers, as { employeeId, name, email }, sorted by name. Served by the
+ * expense service (GET /xms/employees), which already filters to Active employees.
  */
 export const useEmployeeList = () =>
   useQuery({
-    ...directoryQuery,
-    select: (map) => {
-      const byId = new Map();
-      map.forEach((entry) => {
-        if (entry.employeeId && !DEPARTED_STATUS.test(entry.employmentStatus || "")) byId.set(entry.employeeId, entry);
-      });
-      return [...byId.values()].sort((a, b) => (a.name || a.employeeId).localeCompare(b.name || b.employeeId));
+    queryKey: ACTIVE_EMPLOYEES_KEY,
+    queryFn: async () => {
+      const res = await employeeDirectoryApi.getActive();
+      return (res.data?.data || []).map((e) => ({ employeeId: e.employeeId, name: e.name, email: e.email || "" }));
     },
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: 1,
   });
 
 /** `map.get(id)?.name` with the null-map/not-found cases collapsed to a single fallback. */

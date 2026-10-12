@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { RefreshCw } from "lucide-react";
 
-import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { formatDisplayDate } from "../utils/format";
@@ -47,7 +45,15 @@ export default function TaxCalculation() {
   const [hasInvoice, setHasInvoice] = useState(false);
   const [existingInvoice, setExistingInvoice] = useState(null);
 
-  const effectiveSnapshotId = snapshotId || taxCalc?.billingSnapshotId || snapshotData?.snapshotId || null;
+  const effectiveSnapshotId = snapshotId || null;
+
+  useEffect(() => {
+    if (!snapshotId) {
+      setTaxCalc(null);
+      setSnapshotData(null);
+      setLoading(false);
+    }
+  }, [snapshotId]);
 
   const loadData = async () => {
     if (!effectiveSnapshotId) {
@@ -129,6 +135,8 @@ export default function TaxCalculation() {
             currency: snapDetails?.currencyCode || matched.currency || "USD",
             subtotal: snapDetails?.subtotal ?? matched.subtotal ?? 5500,
             totalAmount: snapDetails?.totalAmount ?? matched.totalAmount ?? 5500,
+            taxRegion: snapDetails?.taxRegionName || snapDetails?.taxRegion || matched.taxRegionName || matched.taxRegion || passedState.config?.taxRegion || "India",
+            taxRegionName: snapDetails?.taxRegionName || snapDetails?.taxRegion || matched.taxRegionName || matched.taxRegion || passedState.config?.taxRegionName || "India",
             billingStatus: existingCalc ? "TAX_COMPLETED" : (snapDetails?.status || matched.status || "READY_FOR_TAX"),
           });
         }
@@ -209,7 +217,7 @@ export default function TaxCalculation() {
   }
 
   // If no snapshotId exists (standalone route /account-receivable/tax-calculation), render Tax Calculation Console
-  if (!effectiveSnapshotId) {
+  if (!snapshotId && !occurrenceId) {
     return <TaxCalculationConsole />;
   }
 
@@ -339,14 +347,30 @@ export default function TaxCalculation() {
         },
       };
 
+  const taxRegion =
+    taxCalc?.taxRegionName ||
+    taxCalc?.taxRegion ||
+    taxCalc?.taxRegionCode ||
+    snapshotData?.taxRegionName ||
+    snapshotData?.taxRegion ||
+    snapshotData?.taxRegionCode ||
+    passedState.taxRegionName ||
+    passedState.taxRegion ||
+    passedState.config?.taxRegionName ||
+    passedState.config?.taxRegion ||
+    "India (Standard)";
+
+  const handleBack = () => {
+    if (window.history.length > 1 && location.state?.from === "acquisition-detail") {
+      navigate(-1);
+    } else {
+      navigate(CONSOLE_PATH);
+    }
+  };
+
   return (
     <TaxCalculationDetailView
-      onBack={() => navigate(CONSOLE_PATH)}
-      headerActions={
-        <div className="flex items-center gap-2">
- 
-        </div>
-      }
+      onBack={handleBack}
       billingType="Time & Material"
       stage={stage}
       statusLabel={statusLabel}
@@ -356,7 +380,7 @@ export default function TaxCalculation() {
         { label: "Project Duration", value: formatFullPeriod(projectStartDate, projectEndDate) },
         { label: "Billing Period", value: billingPeriod },
         { label: "Billing Date", value: formatDisplayDate(billingDate) },
-        { label: "Tax Region", value: taxCalc?.taxRegionName },
+        { label: "Tax Region", value: taxRegion },
       ]}
       extraContextFields={[{ label: "Snapshot", value: snapshotNum }]}
       currency={currency}

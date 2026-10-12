@@ -2,7 +2,10 @@ import { AP_ALL_ROLES, AP_ROLES } from "../pages/accounts-payable/constants/apRo
 import { AP_ROUTES } from "../pages/accounts-payable/constants/routes";
 import { INVOICE_PERMISSIONS } from "../pages/accounts-payable/constants/invoicePermissions";
 import { PAYMENT_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/paymentPermissions";
+import { AP_MANAGEMENT_ANY, AP_MANAGEMENT_PERMISSIONS } from "../pages/accounts-payable/constants/paymentTerms";
 import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/tdsTrackingPermissions";
+import { VENDOR_ANY_PERMISSIONS } from "../pages/accounts-payable/constants/vendorPermissions";
+import { PROCUREMENT_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/procurementPermissions";
 
 /**
  * Canonical role identifiers.
@@ -190,8 +193,10 @@ export const XMS_SUBMENU = [
     label: "Expenses",
     to: "/expense-management/expenses/my",
     allowedRoles: [...XMS_EMPLOYEE, ...XMS_MANAGER],
+    // No "Create Expense" entry: My Expenses has its own create button. Employees therefore see a
+    // single child, which collapses to a plain "Expenses" link; managers keep the submenu.
+    collapseSingleChild: true,
     children: [
-      { label: "Create Expense",  to: "/expense-management/expenses/create" },
       { label: "My Expenses",     to: "/expense-management/expenses/my" },
       { label: "All Expenses",    to: "/expense-management/expenses/all",     allowedRoles: XMS_MANAGER },
       { label: "Expense Reports", to: "/expense-management/expenses/reports", allowedRoles: XMS_MANAGER },
@@ -272,11 +277,12 @@ export const XMS_SUBMENU = [
       { label: "Version History",     to: "/expense-management/policy-engine/versions" },
     ],
   },
-  // {
-  //   label: "Reports",
-  //   to: "/expense-management/reports",
-  //   allowedRoles: XMS_REPORT_VIEWERS,
-  // },
+  {
+    // Organization-wide for Finance/Admin; a manager sees their own team (ExpenseReportingController).
+    label: "Reports",
+    to: "/expense-management/reports",
+    allowedRoles: XMS_REPORT_VIEWERS,
+  },
   // {
   //   label: "Activity",
   //   to: "/expense-management/activity/notifications",
@@ -286,11 +292,11 @@ export const XMS_SUBMENU = [
   //     { label: "Audit Logs",    to: "/expense-management/activity/audit-logs", allowedRoles: XMS_ADMIN },
   //   ],
   // },
-  // {
-  //   label: "Settings",
-  //   to: "/expense-management/settings",
-  //   allowedRoles: XMS_ADMIN,
-  // },
+  {
+    label: "Settings",
+    to: "/expense-management/settings",
+    allowedRoles: XMS_ADMIN,
+  },
 ];
 
 /**
@@ -325,12 +331,16 @@ export const XMS_SUBMENU = [
 const _INVOICE_VIEW_PERMISSIONS = [INVOICE_PERMISSIONS.INVOICE_VIEW];
 
 export const AP_SUBMENU = [
-  { label: "Dashboard", to: AP_ROUTES.DASHBOARD, allowedRoles: AP_ALL_ROLES },
+  // AP roles see their role views; management users (no AP role) see the read-only Management view.
+  { label: "Dashboard", to: AP_ROUTES.DASHBOARD, roleOrPermissions: { roles: AP_ALL_ROLES, permissions: AP_MANAGEMENT_ANY } },
   // Same gate as the route itself: every AP user has their own notifications, and which ones
   // they see is decided by the backend from the JWT, so there is nothing finer to filter on.
-  { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
+  // Same gate as the Procurement route: an AP role plus at least one Procurement view
+  // permission (PR_VIEW / PR_APPROVAL_VIEW / QUOTATION_VIEW / VENDOR_SELECTION_VIEW / PO_VIEW).
+  { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES, requiredPermissions: PROCUREMENT_ANY_VIEW_PERMISSIONS },
   { label: "Notifications", to: AP_ROUTES.NOTIFICATIONS, allowedRoles: AP_ALL_ROLES },
-  { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES },
+  // Backend-enforced UMS permissions (vendor_permissions.py) - VENDOR_VIEW / VENDOR_MANAGE / VENDOR_BANK_MANAGE.
+  { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES, requiredPermissions: VENDOR_ANY_PERMISSIONS },
   { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
   // Payment Management (Ready for Payment ⇄ Payment History, cross-linked from each page) and
   // TDS Tracking are flat entries: the AP flyout doesn't open nested children. Gated on the
@@ -338,6 +348,9 @@ export const AP_SUBMENU = [
   // would only 403.
   { label: "Payment Management", to: AP_ROUTES.PAYMENT_READY, requiredPermissions: PAYMENT_ANY_VIEW_PERMISSIONS },
   { label: "TDS Tracking", to: AP_ROUTES.TDS_TRACKING, requiredPermissions: TDS_TRACKING_ANY_VIEW_PERMISSIONS },
+  // The page lists only the reports the backend says this user may run (reports_route.py);
+  // payment access is the entry point today, management reporting permissions join in Phase 6.
+  { label: "Reports", to: AP_ROUTES.REPORTS, requiredPermissions: [...PAYMENT_ANY_VIEW_PERMISSIONS, AP_MANAGEMENT_PERMISSIONS.REPORTS_VIEW] },
   // { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
   // Split into two role-exclusive entries (both pointing at the same route) rather than one
   // AP_ALL_ROLES item — System Configuration's tabs are now Admin-only/Finance_Executive-only

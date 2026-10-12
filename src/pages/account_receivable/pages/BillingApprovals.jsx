@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Eye, CheckCircle2, XCircle, ClipboardCheck, Clock, FolderKanban, Building2, Calendar, Receipt, Wallet, Info, AlertTriangle, FilterX } from "lucide-react";
 import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
-import { KPICard } from "../../../components/kpi/KPI";
 import Button from "../../../components/Button/Button";
 import Modal from "../../../components/Modal/modal";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import FormTextArea from "../../../components/forms/FormTextArea";
 import SearchInput from "../../../components/filter/Searchbar";
-import FilterListbox from "../../../components/filter/FilterListbox";
+import ARKPICard from "../components/common/ARKPICard";
+import ARKPIStatusTabs from "../components/common/ARKPIStatusTabs";
+import ARClearFiltersButton from "../components/common/ARClearFiltersButton";
 import Pagination from "../../../components/Pagination/pagination";
 import StatusBadge from "../../../components/status/statusbadge";
 import { showStatusToast } from "../../../components/toastfy/toast";
@@ -33,6 +34,9 @@ import ConfigurationChanges, {
 import { BILLING_MODE_LABELS } from "../data/wizardOptions";
 import { getBillingTypeDisplayName } from "../utils/billingType";
 import { formatCurrency, formatDisplayDate } from "../utils/format";
+import { RECORD_LOCK_ACTION, RECORD_LOCK_RESOURCE } from "../services/recordLockService";
+import useRecordLock from "../hooks/useRecordLock";
+import { RecordLockOwnIndicator } from "../components/common/RecordLockNotice";
 
 const PAGE_SIZE = 5;
 
@@ -46,15 +50,6 @@ const STATUS_TABS = {
   EXPIRED: "EXPIRED",
   ALL: "ALL",
 };
-
-// Options for the shared FilterListbox — same {label, value} shape used by every
-// other AR list page's status filter (see Overview.jsx's APPROVAL_STATUS_OPTIONS).
-const STATUS_FILTER_OPTIONS = [
-  { value: STATUS_TABS.PENDING, label: "Pending Approvals" },
-  { value: STATUS_TABS.APPROVED, label: "Approved" },
-  { value: STATUS_TABS.REJECTED, label: "Rejected" },
-  { value: STATUS_TABS.ALL, label: "All Requests" },
-];
 
 const TABLE_HEADERS = [
   "Project",
@@ -161,7 +156,7 @@ function InfoRow({ label, value }) {
 
 function ReviewSection({ title, rows }) {
   return (
-    <PageCard className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+    <PageCard className="overflow-hidden">
       <PageCardContent className="p-0">
         <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">{title}</h3>
@@ -178,7 +173,7 @@ function ReviewSection({ title, rows }) {
 
 function ReviewTable({ title, headers, rows, emptyMessage }) {
   return (
-    <PageCard className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+    <PageCard className="overflow-hidden">
       <PageCardContent className="p-0">
         <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">{title}</h3>
@@ -265,7 +260,7 @@ function ApprovalReviewDetails({ config }) {
 
         {/* 2. Billing-type-specific details */}
         {billingType === "FIXED_PRICE" && (
-          <PageCard className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm p-4 space-y-3">
+          <PageCard className="overflow-hidden p-4 space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-2">
               Fixed Price Financial Summary
             </h3>
@@ -422,7 +417,7 @@ function ApprovalReviewDetails({ config }) {
         )}
 
         {/* 3. Billing Schedule — only the schedule facts relevant to this billing type */}
-        <PageCard className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+        <PageCard className="overflow-hidden">
           <PageCardContent className="p-0">
             <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3 flex items-center gap-2">
               <Calendar className="h-4 w-4 text-[#0A0082]" />
@@ -504,8 +499,35 @@ export default function BillingApprovals() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejectLoading, setRejectLoading] = useState(false);
 
-  const loadAllApprovals = async () => {
-    setLoading(true);
+  // Opening Review only READS the lock status (GET) — it never takes a lock,
+  // so viewing stays available to everyone. Lock status is checked automatically on
+  // open and polled every 12s via useRecordLock. When Approve/Reject is clicked,
+  // the APPROVAL lock is acquired automatically via ensureReviewLock.
+  const recordLock = useRecordLock(RECORD_LOCK_RESOURCE.BILLING_CONFIGURATION, {
+    watchResourceId: reviewTarget?.approvalStatus === "PENDING_APPROVAL" ? (reviewTarget.billingConfigurationId || reviewTarget.id) : null,
+  });
+  const reviewLockId = rejectTarget?.billingConfigurationId || rejectTarget?.id || reviewTarget?.billingConfigurationId || reviewTarget?.id;
+  const isBlockedByOtherLock = Boolean(
+    (recordLock.conflict && !recordLock.conflict.isCurrentUser) ||
+    recordLock.isLockedByOther(reviewLockId)
+  );
+  const ownReviewLockAction = recordLock.ownLockAction(reviewLockId);
+
+  // POST is authoritative: Approve/Reject re-run it (a no-op while held) so a
+  // stale enabled button can never bypass the backend lock check.
+  const ensureReviewLock = async () => {
+    if (!reviewLockId) return false;
+    const result = await recordLock.acquire(reviewLockId, RECORD_LOCK_ACTION.APPROVAL);
+    return result.acquired;
+  };
+
+  const handleMutationError = (error, fallback) => {
+    showStatusToast(getApiErrorMessage(error, fallback), "error");
+    if (error?.response?.status === 409 && reviewLockId) recordLock.handleMutationConflict(reviewLockId);
+  };
+
+  const loadAllApprovals = async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
       const [pendingResult, allConfigs] = await Promise.allSettled([
         getPendingApprovalConfigurations(),
@@ -547,15 +569,57 @@ export default function BillingApprovals() {
 
       setConfigs(Array.from(combinedMap.values()));
     } catch (error) {
-      showStatusToast(getApiErrorMessage(error, "Failed to load billing configuration approvals."), "error");
+      if (!silent) {
+        showStatusToast(getApiErrorMessage(error, "Failed to load billing configuration approvals."), "error");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadAllApprovals();
   }, []);
+
+  // Background polling for approval requests list (every 12 seconds while active)
+  useEffect(() => {
+    const refreshList = () => {
+      if (document.visibilityState !== "hidden") {
+        loadAllApprovals({ silent: true });
+      }
+    };
+
+    const interval = setInterval(refreshList, 12_000);
+    window.addEventListener("focus", refreshList);
+    document.addEventListener("visibilitychange", refreshList);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", refreshList);
+      document.removeEventListener("visibilitychange", refreshList);
+    };
+  }, []);
+
+  // Background polling for active review target details (every 12 seconds while modal is open)
+  useEffect(() => {
+    if (!reviewTarget?.billingConfigurationId) return undefined;
+    const targetId = reviewTarget.billingConfigurationId;
+
+    const refreshReviewDetail = async () => {
+      if (document.visibilityState === "hidden" || approveLoading || rejectLoading) return;
+      try {
+        const latestDetail = await getBillingConfigurationForApproval(targetId);
+        if (latestDetail) {
+          setReviewTarget((prev) => (prev?.billingConfigurationId === targetId ? latestDetail : prev));
+        }
+      } catch (error) {
+        // Silent polling: errors / conflicts caught by lock hook
+      }
+    };
+
+    const interval = setInterval(refreshReviewDetail, 12_000);
+    return () => clearInterval(interval);
+  }, [reviewTarget?.billingConfigurationId, approveLoading, rejectLoading]);
 
   const tabCounts = useMemo(() => {
     return {
@@ -580,11 +644,6 @@ export default function BillingApprovals() {
     } else {
       setStatusTab((prev) => (prev === kpiKey ? STATUS_TABS.ALL : kpiKey));
     }
-    setCurrentPage(1);
-  };
-
-  const handleTabChange = (key) => {
-    setStatusTab(key);
     setCurrentPage(1);
   };
 
@@ -638,9 +697,11 @@ export default function BillingApprovals() {
   const closeReview = () => {
     if (approveLoading) return;
     setReviewTarget(null);
+    recordLock.release();
   };
 
-  const openRejectModal = () => {
+  const openRejectModal = async () => {
+    if (!(await ensureReviewLock())) return;
     setRejectTarget(reviewTarget);
     setRejectionReason("");
     setReviewTarget(null);
@@ -650,6 +711,7 @@ export default function BillingApprovals() {
     if (rejectLoading) return;
     setRejectTarget(null);
     setRejectionReason("");
+    recordLock.release();
   };
 
   // Approving is a single click from the review screen — no extra "are you
@@ -672,14 +734,19 @@ export default function BillingApprovals() {
   const handleApprove = async () => {
     if (!reviewTarget) return;
     setApproveLoading(true);
+    if (!(await ensureReviewLock())) {
+      setApproveLoading(false);
+      return;
+    }
     try {
       const { billingConfigurationId } = reviewTarget;
       const hadChanges = (reviewTarget.changes || []).length > 0;
       await approveBillingConfigurationRequest(billingConfigurationId);
+      recordLock.release();
       showStatusToast(hadChanges ? "Changes approved successfully." : "Billing Configuration approved successfully.", "success");
       await Promise.all([loadAllApprovals(), showRefreshedReview(billingConfigurationId)]);
     } catch (error) {
-      showStatusToast(getApiErrorMessage(error, "Failed to approve billing configuration."), "error");
+      handleMutationError(error, "Failed to approve billing configuration.");
     } finally {
       setApproveLoading(false);
     }
@@ -694,9 +761,11 @@ export default function BillingApprovals() {
 
     setRejectLoading(true);
     try {
+      if (!(await ensureReviewLock())) return;
       const { billingConfigurationId } = rejectTarget;
       const hadChanges = (rejectTarget.changes || []).length > 0;
       await rejectBillingConfigurationRequest(billingConfigurationId, rejectionReason.trim());
+      recordLock.release();
       setRejectTarget(null);
       setRejectionReason("");
       const [, refreshed] = await Promise.all([loadAllApprovals(), showRefreshedReview(billingConfigurationId)]);
@@ -709,7 +778,7 @@ export default function BillingApprovals() {
         "success"
       );
     } catch (error) {
-      showStatusToast(getApiErrorMessage(error, "Failed to reject billing configuration."), "error");
+      handleMutationError(error, "Failed to reject billing configuration.");
     } finally {
       setRejectLoading(false);
     }
@@ -749,7 +818,7 @@ export default function BillingApprovals() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="w-full space-y-6">
       {/* 1. Page Header */}
       <PageHeader
         title="Billing Configuration Approvals"
@@ -758,80 +827,44 @@ export default function BillingApprovals() {
 
       {/* 2. Summary KPI Cards (Total, Pending, Approved, Rejected) */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {kpiCards.map((kpi) => {
-          const isActive =
-            statusTab === kpi.key ||
-            (statusTab === STATUS_TABS.ALL && kpi.key === STATUS_TABS.ALL);
-
-          return (
-            <button
-              key={kpi.key}
-              type="button"
-              onClick={() => handleKpiClick(kpi.key)}
-              title={`Filter by ${kpi.label}`}
-              className="
-          text-left
-          rounded-xl
-          border-0
-          outline-none
-          focus:outline-none
-          focus-visible:outline-none
-          focus:ring-0
-          focus-visible:ring-0
-          active:ring-0
-          active:outline-none
-          appearance-none
-        "
-              style={{
-                outline: "none",
-                boxShadow: "none",
-              }}
-            >
-              <KPICard
-                label={kpi.label}
-                value={loading ? "…" : kpi.value}
-                icon={<kpi.icon className="h-5 w-5" />}
-                color={kpi.color}
-                active={isActive}
-                className="
-            h-full
-            w-full
-            cursor-pointer
-            bg-white
-            shadow-sm
-            border
-            border-slate-200
-            transition-all
-            hover:shadow-md
-            !outline-none
-            !ring-0
-            !ring-offset-0
-            focus:!outline-none
-            focus:!ring-0
-            focus:!ring-offset-0
-            focus-visible:!outline-none
-            focus-visible:!ring-0
-            focus-visible:!ring-offset-0
-            active:!ring-0
-            active:!outline-none
-          "
-                style={{
-                  outline: "none",
-                  boxShadow: "none",
-                }}
-              />
-            </button>
-          );
-        })}
+        {kpiCards.map((kpi) => (
+          <button
+            key={kpi.key}
+            type="button"
+            onClick={() => handleKpiClick(kpi.key)}
+            title={`Filter by ${kpi.label}`}
+            className="w-full rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          >
+            <ARKPICard
+              label={kpi.label}
+              value={loading ? "…" : kpi.value}
+              icon={<kpi.icon className="h-5 w-5" />}
+              color={kpi.color}
+              className="h-full w-full"
+            />
+          </button>
+        ))}
       </div>
 
       {/* 3. Main Data Card */}
       <PageCard>
         <PageCardContent className="p-4 sm:p-5 space-y-4">
-          {/* Filter row — shared SearchInput + shared FilterListbox, matching the
-              pattern used on Overview.jsx and other AR list pages. Status counts
-              remain visible via the KPI cards above, so they aren't duplicated here. */}
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Billing requests</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Review and track submitted billing configuration approvals.</p>
+          </div>
+          <ARKPIStatusTabs
+            label="Billing request approval status"
+            loading={loading}
+            items={kpiCards.map((kpi) => ({
+              key: kpi.key,
+              label: kpi.label,
+              value: kpi.value,
+              active: statusTab === kpi.key,
+              onClick: () => handleKpiClick(kpi.key),
+            }))}
+          />
+          <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/70 p-2 lg:flex-row lg:items-center lg:justify-between">
             <div className="w-full lg:max-w-md">
               <SearchInput
                 value={searchQuery}
@@ -840,16 +873,16 @@ export default function BillingApprovals() {
                 placeholder="Search by project, code, or client..."
               />
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="w-48 sm:w-52">
-                <FilterListbox
-                  options={STATUS_FILTER_OPTIONS}
-                  value={statusTab}
-                  onChange={handleTabChange}
-                  placeholder="Filter by Status"
-                />
-              </div>
-            </div>
+            {(statusTab !== STATUS_TABS.ALL || searchQuery) && (
+              <ARClearFiltersButton
+                onClick={() => {
+                  setStatusTab(STATUS_TABS.ALL);
+                  setSearchQuery("");
+                  setCurrentPage(1);
+                }}
+                title="Clear search and status filters"
+              />
+            )}
           </div>
 
           <div className="overflow-x-auto">
@@ -884,7 +917,13 @@ export default function BillingApprovals() {
             <div className="flex justify-end gap-2">
               {reviewTarget.approvalStatus === "PENDING_APPROVAL" ? (
                 <>
-                  <Button variant="danger" size="small" onClick={openRejectModal} disabled={approveLoading}>
+                  <Button
+                    variant="danger"
+                    size="small"
+                    onClick={openRejectModal}
+                    disabled={approveLoading || isBlockedByOtherLock}
+                    title={isBlockedByOtherLock ? "This configuration is currently being edited by another user." : ""}
+                  >
                     <XCircle className="h-4 w-4" /> Reject Configuration
                   </Button>
                   <Button
@@ -893,6 +932,8 @@ export default function BillingApprovals() {
                     onClick={handleApprove}
                     loading={approveLoading}
                     loadingText="Approving..."
+                    disabled={approveLoading || isBlockedByOtherLock}
+                    title={isBlockedByOtherLock ? "This configuration is currently being edited by another user." : ""}
                   >
                     <CheckCircle2 className="h-4 w-4" /> Approve Configuration
                   </Button>
@@ -906,6 +947,9 @@ export default function BillingApprovals() {
           )
         }
       >
+        {reviewTarget?.approvalStatus === "PENDING_APPROVAL" && ownReviewLockAction && (
+          <RecordLockOwnIndicator actionType={ownReviewLockAction} className="mb-4" />
+        )}
         {reviewTarget && <ApprovalReviewDetails config={reviewTarget} />}
       </Modal>
 

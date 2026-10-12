@@ -67,6 +67,12 @@ export function mapInvoicePaymentSummary(raw) {
     lastPaymentMode: raw.last_payment_mode,
     lastPaymentReference: raw.last_payment_reference,
     receiptCount: raw.receipt_count ?? 0,
+    // Payment-term compliance (null until the invoice has been evaluated)
+    paymentTermStatus: raw.payment_term_status ?? null,
+    paymentTermReason: raw.payment_term_reason ?? null,
+    dueDateVerified: raw.due_date_verified ?? null,
+    contractualDueDate: raw.contractual_due_date ?? null,
+    statutoryDueDate: raw.statutory_due_date ?? null,
   };
 }
 

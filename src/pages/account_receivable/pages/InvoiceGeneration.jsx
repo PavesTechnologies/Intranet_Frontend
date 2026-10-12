@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   FileText,
-  RefreshCw,
   CheckCircle2,
   FolderKanban,
   Clock,
@@ -11,15 +10,15 @@ import {
   Eye,
   AlertCircle,
   MailCheck,
-  ChevronRight,
 } from "lucide-react";
 
 import PageHeader from "../../../components/ui/PageHeader";
 import SearchInput from "../../../components/filter/Searchbar";
 import { PageCard } from "../../../components/Cards/PageCard";
 import ARKPICard from "../components/common/ARKPICard";
+import ARKPIStatusTabs from "../components/common/ARKPIStatusTabs";
+import ARClearFiltersButton from "../components/common/ARClearFiltersButton";
 import { cn } from "@/lib/utils";
-import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
 import StatusBadge from "../../../components/status/statusbadge";
 import Pagination from "../../../components/Pagination/pagination";
@@ -101,11 +100,18 @@ export default function InvoiceGeneration() {
     }
   };
 
-  // Route forwarder: if snapshotId is provided as a query parameter or state,
+  // Route forwarder: if snapshotId or occurrenceId / billingScheduleId is provided as a query parameter or state,
   // forward to the dedicated invoice-generation detail workflow
   const targetSnapshotId =
     searchParams.get("snapshotId") ||
     location.state?.snapshotId ||
+    null;
+
+  const targetOccurrenceId =
+    searchParams.get("occurrenceId") ||
+    searchParams.get("billingScheduleId") ||
+    location.state?.occurrenceId ||
+    location.state?.billingScheduleId ||
     null;
 
   useEffect(() => {
@@ -117,8 +123,16 @@ export default function InvoiceGeneration() {
           source: "invoice-generation",
         },
       });
+    } else if (targetOccurrenceId) {
+      navigate(`/account-receivable/invoice-generation/occurrence/${targetOccurrenceId}`, {
+        replace: true,
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+        },
+      });
     }
-  }, [targetSnapshotId, navigate]);
+  }, [targetSnapshotId, targetOccurrenceId, navigate]);
 
   const loadData = async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
@@ -162,40 +176,69 @@ export default function InvoiceGeneration() {
   }, []);
 
   const handleGenerateInvoice = (item) => {
-    const sId = item.snapshotId || item.billingSnapshotId;
-    if (!sId) {
-      showStatusToast("Snapshot identifier is missing.", "error");
-      return;
+    if (item.snapshotId || item.billingSnapshotId) {
+      const sId = item.snapshotId || item.billingSnapshotId;
+      navigate(`/account-receivable/invoice-generation/${sId}`, {
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+          snapshotId: sId,
+          item,
+        },
+      });
+    } else if (item.billingScheduleId || item.occurrenceId) {
+      const occId = item.billingScheduleId || item.occurrenceId;
+      navigate(`/account-receivable/invoice-generation/occurrence/${occId}`, {
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+          occurrenceId: occId,
+          billingScheduleId: occId,
+          item,
+        },
+      });
+    } else {
+      showStatusToast("Identifier is missing for invoice generation.", "error");
     }
-
-    navigate(`/account-receivable/invoice-generation/${sId}`, {
-      state: {
-        from: "invoice-generation",
-        source: "invoice-generation",
-      },
-    });
   };
 
   const handleViewInvoice = (inv) => {
-    const targetId =
-      inv.invoiceId ||
-      inv.billingSnapshotId ||
-      inv.snapshotId;
-
-    if (!targetId) {
-      showStatusToast(
-        "Identifier is missing for this invoice.",
-        "error"
-      );
+    if (inv.invoiceId) {
+      navigate(`/account-receivable/invoices/${inv.invoiceId}`, {
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+        },
+      });
       return;
     }
 
-    navigate(`/account-receivable/invoices/${targetId}`, {
-      state: {
-        from: "invoice-generation",
-        source: "invoice-generation",
-      },
-    });
+    if (inv.snapshotId || inv.billingSnapshotId) {
+      const sId = inv.snapshotId || inv.billingSnapshotId;
+      navigate(`/account-receivable/invoices/${sId}`, {
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+        },
+      });
+      return;
+    }
+
+    if (inv.billingScheduleId || inv.occurrenceId) {
+      const occId = inv.billingScheduleId || inv.occurrenceId;
+      navigate(`/account-receivable/invoices/occurrence/${occId}`, {
+        state: {
+          from: "invoice-generation",
+          source: "invoice-generation",
+        },
+      });
+      return;
+    }
+
+    showStatusToast(
+      "Identifier is missing for this invoice.",
+      "error"
+    );
   };
 
   // Filtered invoices/workspace rows
@@ -208,7 +251,7 @@ export default function InvoiceGeneration() {
         if (wsStatus !== statusFilter) return false;
       }
 
-      // Search query supports invoice number, project name, client name, and snapshot number
+      // Search query supports invoice number, project name, client name, snapshot number, and schedule reference
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
 
@@ -216,12 +259,24 @@ export default function InvoiceGeneration() {
         const client = (item.clientName || "").toLowerCase();
         const project = (item.projectName || "").toLowerCase();
         const snapNum = (item.snapshotNumber || "").toLowerCase();
+        const schedId = (item.billingScheduleId ? String(item.billingScheduleId) : "").toLowerCase();
+        const schedRef = (
+          item.billingScheduleNumber ||
+          item.scheduleReference ||
+          item.reference ||
+          (item.periodNumber ? `period ${item.periodNumber}` : "") ||
+          ""
+        ).toLowerCase();
+        const period = (item.billingPeriod || "").toLowerCase();
 
         const matches =
           num.includes(q) ||
           client.includes(q) ||
           project.includes(q) ||
-          snapNum.includes(q);
+          snapNum.includes(q) ||
+          schedId.includes(q) ||
+          schedRef.includes(q) ||
+          period.includes(q);
 
         if (!matches) return false;
       }
@@ -302,34 +357,6 @@ export default function InvoiceGeneration() {
       currency,
     };
   }, [workspaceItems, backendSummary]);
-
-  // Stage tabs renderer with count pill badge (aligned with Tax Calculation Console)
-  const renderTab = (key, label, count) => {
-    const active = statusFilter === key;
-    return (
-      <button
-        key={key}
-        type="button"
-        role="tab"
-        aria-selected={active}
-        onClick={() => setStatusFilter(key)}
-        className={`flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:bg-slate-50 ${
-          active
-            ? "border-[#0A0082] text-[#0A0082]"
-            : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800"
-        }`}
-      >
-        {label}
-        <span
-          className={`min-w-[20px] rounded-full px-1.5 py-px text-center text-[10px] font-semibold tabular-nums ${
-            active ? "bg-[#0A0082] text-white" : "bg-slate-100 text-slate-600"
-          }`}
-        >
-          {loading ? "…" : count}
-        </span>
-      </button>
-    );
-  };
 
   // Grouped KPIs — Approval Status (5 cards) and Invoice Status (2 cards)
   const approvalKpis = [
@@ -546,8 +573,18 @@ export default function InvoiceGeneration() {
 
     const iid =
       item.invoiceId ||
+      item.snapshotId ||
       item.billingSnapshotId ||
-      item.snapshotId;
+      item.billingScheduleId ||
+      item.occurrenceId;
+
+    const candidateRef =
+      item.snapshotNumber ||
+      item.billingScheduleNumber ||
+      item.scheduleReference ||
+      item.reference ||
+      (item.periodNumber ? `Period ${item.periodNumber}` : null) ||
+      (item.billingScheduleId ? String(item.billingScheduleId) : null);
 
     const delivery =
       demoDeliveryMap[iid] || {
@@ -573,9 +610,9 @@ export default function InvoiceGeneration() {
             </span>
           )}
 
-          {item.snapshotNumber && (
+          {candidateRef && (
             <div className={`text-xs font-mono ${isReady ? "text-indigo-600 font-semibold" : "text-slate-400"}`}>
-              {item.snapshotNumber}
+              {candidateRef}
             </div>
           )}
         </div>
@@ -602,13 +639,13 @@ export default function InvoiceGeneration() {
       ),
 
       billingPeriod: (
-        <div className="flex items-center justify-center font-medium text-slate-700">
+        <div className="flex items-center justify-start font-medium text-slate-700">
           {item.billingPeriod || "—"}
         </div>
       ),
 
       invoiceDate: (
-        <div className="flex items-center justify-center font-medium text-slate-700">
+        <div className="flex items-center justify-start font-medium text-slate-700">
           {item.invoiceDate
             ? formatDisplayDate(item.invoiceDate)
             : "—"}
@@ -616,7 +653,7 @@ export default function InvoiceGeneration() {
       ),
 
       dueDate: (
-        <div className="flex items-center justify-center font-medium text-slate-700">
+        <div className="flex items-center justify-start font-medium text-slate-700">
           {item.dueDate
             ? formatDisplayDate(item.dueDate)
             : "—"}
@@ -624,13 +661,13 @@ export default function InvoiceGeneration() {
       ),
 
       currency: (
-        <div className="flex items-center justify-center font-semibold text-slate-700">
+        <div className="flex items-center justify-start font-semibold text-slate-700">
           {item.currency || "USD"}
         </div>
       ),
 
       grandTotal: (
-        <div className="text-right font-mono font-bold text-slate-900">
+        <div className="text-left tabular-nums font-bold text-slate-900">
           {formatCurrency(
             item.grandTotal || item.amount || 0,
             item.currency || "USD"
@@ -709,21 +746,6 @@ export default function InvoiceGeneration() {
       <PageHeader
         title="Invoice Generation"
         subtitle="Workspace containing invoice-ready billing candidates and created invoices."
-        actions={
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => loadData(true)}
-            disabled={refreshing}
-          >
-            <RefreshCw
-              className={`mr-1.5 h-3.5 w-3.5 ${
-                refreshing ? "animate-spin" : ""
-              }`}
-            />
-            Refresh
-          </Button>
-        }
       />
 
       {/* Inline Error Notice if data fetch failed */}
@@ -739,15 +761,6 @@ export default function InvoiceGeneration() {
             <div>{error}</div>
           </div>
 
-          <Button
-            size="small"
-            variant="outline"
-            onClick={() => loadData(true)}
-            className="text-xs bg-white text-rose-700 border-rose-300 hover:bg-rose-50 font-semibold shrink-0"
-          >
-            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-            Retry
-          </Button>
         </div>
       )}
 
@@ -812,7 +825,7 @@ export default function InvoiceGeneration() {
       <PageCard>
         {/* Title */}
         <div className="px-4 pt-4 sm:px-5">
-          <h2 className="text-sm font-semibold text-slate-900">
+          <h2 className="text-base font-semibold text-slate-900">
             Invoice Pipeline
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
@@ -821,44 +834,49 @@ export default function InvoiceGeneration() {
         </div>
 
         {/* Pipeline Stage Tabs */}
-        <div role="tablist" aria-label="Invoice Pipeline Stages" className="mt-3 flex items-center gap-1 overflow-x-auto overflow-y-hidden px-2 shadow-[inset_0_-1px_0_0_#e2e8f0] sm:px-3">
-          {renderTab("ALL", "All", kpis.allCount)}
-          <span className="mx-2 h-4 w-px shrink-0 bg-slate-200" aria-hidden="true" />
-          {PIPELINE_STAGES.map((s, idx) => (
-            <React.Fragment key={s.key}>
-              {idx > 0 && (
-                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300" aria-hidden="true" />
-              )}
-              {renderTab(s.key, s.label, kpis[s.countKey])}
-            </React.Fragment>
-          ))}
-        </div>
+        <ARKPIStatusTabs
+          label="Invoice pipeline stages"
+          loading={loading}
+          className="mt-3"
+          items={[
+            { key: "ALL", label: "All", value: kpis.allCount, active: statusFilter === "ALL", onClick: () => setStatusFilter("ALL") },
+            ...PIPELINE_STAGES.map((s) => ({
+              key: s.key,
+              label: s.label,
+              value: kpis[s.countKey],
+              active: statusFilter === s.key,
+              onClick: () => setStatusFilter(s.key),
+            })),
+          ]}
+        />
 
         {/* Search Toolbar — placed inside the pipeline card */}
         <div className="px-4 py-3 sm:px-5">
-          <div className="relative w-full lg:max-w-md">
+          <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full lg:max-w-md">
             <SearchInput
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               placeholder="Search by invoice number, project, client, snapshot..."
             />
+            </div>
+            {searchQuery && (
+              <ARClearFiltersButton
+                onClick={() => {
+                  setSearchQuery("");
+                  setCurrentPage(1);
+                }}
+                label="Clear filters"
+              />
+            )}
           </div>
         </div>
 
         {/* Invoice Queue Table */}
         <div className="border-t border-slate-100 p-4 sm:p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-800">
-              Invoice Queue
-            </h3>
-
-            <span className="text-xs text-slate-400 font-medium">
-              {filteredInvoices.length}{" "}
-              {filteredInvoices.length === 1
-                ? "Record"
-                : "Records"}
-            </span>
-          </div>
 
           <ARTable
             headers={tableHeaders}

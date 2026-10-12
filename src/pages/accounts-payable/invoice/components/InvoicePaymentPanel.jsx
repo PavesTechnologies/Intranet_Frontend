@@ -7,6 +7,8 @@ import Modal from "../../../../components/Modal/modal";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { useMarkReadyForPaymentMutation } from "../../payment/hooks/usePaymentMutations";
 import { useInvoiceTds } from "../hooks/useInvoiceTds";
+import { useInvoicePaymentTerms } from "../hooks/useInvoicePaymentTerms";
+import { PAYABLE_TERM_STATUSES } from "../../constants/paymentTerms";
 import { useApPermissions } from "../../hooks/useApPermissions";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { formatCurrency, formatDate, formatTime, calculateBalance } from "../../utils/formatters";
@@ -36,12 +38,16 @@ function buildTdsBasisLine(tds, symbol) {
  * (GET /apm/payment/invoice/{id}, AP_ROUTES.PAYMENT_DETAIL), where Record Payment also lives.
  */
 export default function InvoicePaymentPanel({ invoice }) {
-  const { canMarkPaid, canViewPaymentManagement, canViewTdsTracking } = useApPermissions();
+  const { canMarkPaid, canViewPaymentManagement, canViewTdsTracking, canViewPaymentTerms } = useApPermissions();
   const markReady = useMarkReadyForPaymentMutation();
   // TDS Phase 1: the backend does not itself enforce "TDS verified before ready-for-payment" —
   // same frontend-only sequencing as InvoiceApprovalPanel's send-for-approval gate (see
   // InvoiceTdsPanel for the actual verify UI). A 404 here just means "not yet determined."
   const { data: tds } = useInvoiceTds(invoice.id);
+  // Payment terms must be COMPLIANT or verified by Finance before Mark Ready for Payment — the
+  // backend enforces this (payment_service.mark_ready_for_payment); this only explains the block.
+  // A not-yet-evaluated invoice is checked by the backend at mark-ready time, so it isn't blocked here.
+  const { data: paymentTerms } = useInvoicePaymentTerms(invoice.id, { enabled: canViewPaymentTerms });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [reasonOpen, setReasonOpen] = useState(false);
 
@@ -50,7 +56,9 @@ export default function InvoicePaymentPanel({ invoice }) {
   const isApproved = invoice.status === INVOICE_STATUS.APPROVED;
   const tdsVerified = tds?.determination_status === "VERIFIED";
   const tdsBlocksMarkReady = isApproved && !tdsVerified;
-  const canOfferMarkReady = isApproved && canMarkPaid && tdsVerified;
+  const termsBlockMarkReady =
+    isApproved && Boolean(paymentTerms?.evaluated) && !PAYABLE_TERM_STATUSES.includes(paymentTerms.validation_status);
+  const canOfferMarkReady = isApproved && canMarkPaid && tdsVerified && !termsBlockMarkReady;
   // Backend-enforced, not a display estimate: PaymentService now caps allocation at
   // net_amount - tds_amount and rejects anything over it. invoice.payableAmount comes straight
   // off the invoice-details response (mapInvoiceRecord) — the same field the backend itself
@@ -141,7 +149,9 @@ export default function InvoicePaymentPanel({ invoice }) {
           <p className="mb-3 text-xs italic text-gray-500">
             {tdsBlocksMarkReady
               ? "Approved, but not yet payable — TDS must be verified before this invoice can be marked ready for payment."
-              : "Approved, but not yet payable — Finance must mark it ready for payment first."}
+              : termsBlockMarkReady
+                ? "Approved, but not yet payable — the payment terms must be verified (see Payment Terms) before this invoice can be marked ready for payment."
+                : "Approved, but not yet payable — Finance must mark it ready for payment first."}
           </p>
         )}
 

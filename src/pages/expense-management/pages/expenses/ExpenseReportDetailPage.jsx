@@ -1557,6 +1557,22 @@ export default function ExpenseReportDetailPage() {
         variant="danger"
       />
 
+      <ConfirmationModal
+        isOpen={!!pendingLifecycleAction}
+        title={pendingLifecycleAction === "recall" ? "Recall to Draft" : "Cancel Expense Report"}
+        message={
+          pendingLifecycleAction === "recall"
+            ? "This will withdraw the report from approval and return it to Draft so you can edit it. You'll need to resubmit it afterwards."
+            : "This will permanently cancel this expense report. This action cannot be undone."
+        }
+        confirmText={pendingLifecycleAction === "recall" ? "Recall to Draft" : "Cancel Report"}
+        cancelText="Back"
+        onConfirm={handleLifecycleConfirm}
+        onCancel={() => setPendingLifecycleAction(null)}
+        isLoading={isLifecycleBusy}
+        variant={pendingLifecycleAction === "recall" ? "primary" : "danger"}
+      />
+
       <PolicyJustificationModal
         isOpen={!!justifyDialog}
         items={justifyDialog?.items || []}

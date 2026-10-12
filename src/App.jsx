@@ -29,6 +29,8 @@ import { FINANCE_ALL_ROLES, AR_MAKER_ROLES, AR_CHECKER_ROLES, AR_ALL_ROLES } fro
 // Accounts Payable
 import { AP_ROUTES } from "./pages/accounts-payable/constants/routes";
 import { AP_ALL_ROLES } from "./pages/accounts-payable/constants/apRoles";
+import { AP_MANAGEMENT_ANY } from "./pages/accounts-payable/constants/paymentTerms";
+import { VENDOR_PERMISSIONS, VENDOR_ANY_PERMISSIONS } from "./pages/accounts-payable/constants/vendorPermissions";
 import APDashboardPage from "./pages/accounts-payable/dashboard/pages/APDashboardPage.jsx";
 import DashboardActivityPage from "./pages/accounts-payable/dashboard/pages/DashboardActivityPage.jsx";
 import VendorListPage from "./pages/accounts-payable/vendor/pages/VendorListPage.jsx";
@@ -38,6 +40,8 @@ import VendorUpdatePage from "./pages/accounts-payable/vendor/pages/VendorUpdate
 import InternalRequestsPage from "./pages/accounts-payable/vendor/pages/InternalRequestsPage.jsx";
 import InternalRequestDetailPage from "./pages/accounts-payable/vendor/pages/InternalRequestDetailPage.jsx";
 import InvoiceUploadPage from "./pages/accounts-payable/invoice/pages/InvoiceUploadPage.jsx";
+import InvoiceBulkUploadPage from "./pages/accounts-payable/invoice/pages/InvoiceBulkUploadPage.jsx";
+import InvoiceBulkBatchPage from "./pages/accounts-payable/invoice/pages/InvoiceBulkBatchPage.jsx";
 import InvoiceOcrReviewQueuePage from "./pages/accounts-payable/invoice/pages/InvoiceOcrReviewQueuePage.jsx";
 import InvoiceValidationQueuePage from "./pages/accounts-payable/invoice/pages/InvoiceValidationQueuePage.jsx";
 import InvoiceListPage from "./pages/accounts-payable/invoice/pages/InvoiceListPage.jsx";
@@ -324,7 +328,7 @@ import OnboardingSummaryPage from "./pages/employee-onboarding/summary-page/Summ
 
 
 
-const ProtectedRoute = ({ children, allowedRoles, requiredPermissions }) => {
+const ProtectedRoute = ({ children, allowedRoles, requiredPermissions, orPermissions }) => {
   const { isAuthenticated, user, logout, hasAnyPermission } = useAuth();
   const location = useLocation();
   const isfirsttlogin = localStorage.getItem("isfirsttlogin");
@@ -357,7 +361,9 @@ const ProtectedRoute = ({ children, allowedRoles, requiredPermissions }) => {
     // match: hasRole,
     // });
 
-    if (!hasRole) {
+    // `orPermissions`: lacking the role is still fine with any of these permissions (e.g. the AP
+    // Dashboard / Reports for management users who hold no AP role).
+    if (!hasRole && !(orPermissions?.length && hasAnyPermission(orPermissions))) {
       return <Navigate to="/unauthorized" replace />;
     }
   }
@@ -506,7 +512,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.DASHBOARD}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} orPermissions={AP_MANAGEMENT_ANY}>
                 <APDashboardPage />
               </ProtectedRoute>
             }
@@ -522,7 +528,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_LIST}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} requiredPermissions={VENDOR_ANY_PERMISSIONS}>
                 <VendorListPage />
               </ProtectedRoute>
             }
@@ -530,7 +536,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_ONBOARD}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} requiredPermissions={[VENDOR_PERMISSIONS.VENDOR_MANAGE, PROCUREMENT_PERMISSIONS.ONBOARDING_PROCESS]}>
                 <VendorOnboardingPage />
               </ProtectedRoute>
             }
@@ -554,7 +560,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_DETAIL()}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} requiredPermissions={VENDOR_ANY_PERMISSIONS}>
                 <VendorDetailPage />
               </ProtectedRoute>
             }
@@ -562,7 +568,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.VENDOR_UPDATE()}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} requiredPermissions={[VENDOR_PERMISSIONS.VENDOR_MANAGE]}>
                 <VendorUpdatePage />
               </ProtectedRoute>
             }
@@ -572,6 +578,22 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_VIEW]}>
                 <InvoiceUploadPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.INVOICE_BULK_UPLOAD}
+            element={
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_BULK_UPLOAD]}>
+                <InvoiceBulkUploadPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.INVOICE_BULK_BATCH()}
+            element={
+              <ProtectedRoute requiredPermissions={[INVOICE_PERMISSIONS.INVOICE_BULK_UPLOAD]}>
+                <InvoiceBulkBatchPage />
               </ProtectedRoute>
             }
           />
@@ -676,7 +698,7 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.REPORTS}
             element={
-              <ProtectedRoute allowedRoles={AP_ALL_ROLES}>
+              <ProtectedRoute allowedRoles={AP_ALL_ROLES} orPermissions={AP_MANAGEMENT_ANY}>
                 <APReportsPage />
               </ProtectedRoute>
             }
@@ -1794,7 +1816,7 @@ const AppRoutes = () => {
           <Route path="/expense-management/policy-engine/assignments" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyAssignmentsPage /></ProtectedRoute>} />
           <Route path="/expense-management/policy-engine/severity-thresholds" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsSeverityThresholdPage /></ProtectedRoute>} />
           <Route path="/expense-management/policy-engine/versions" element={<ProtectedRoute allowedRoles={POLICY_VIEW_ROLES}><XmsPolicyVersionsPage /></ProtectedRoute>} />
-          <Route path="/expense-management/reports" element={<ProtectedRoute allowedRoles={["Manager", "Finance", "Admin", "Super_Admin"]}><XmsReportsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/reports" element={<ProtectedRoute allowedRoles={["Manager", "Finance", "Finance_Executive", "Admin", "Super_Admin"]}><XmsReportsPage /></ProtectedRoute>} />
 
           <Route path="/expense-management/activity/notifications" element={<ProtectedRoute allowedRoles={["General", "Manager", "Reporting_Manager", "Finance", "Finance_Executive", "AP_Executive", "Admin", "Super_Admin"]}><XmsNotificationsPage /></ProtectedRoute>} />
           <Route path="/expense-management/activity/audit-logs" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsAuditLogsPage /></ProtectedRoute>} />

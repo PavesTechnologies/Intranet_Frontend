@@ -4,7 +4,6 @@ import {
   Plus,
   Pencil,
   Trash2,
-  RefreshCw,
   Eye,
   ArrowUpDown,
   ArrowUp,
@@ -20,6 +19,8 @@ import { PageCard } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import FormInput from "../../../components/forms/FormInput";
 import FormSelect from "../../../components/forms/FormSelect";
+import FilterListbox from "../components/common/ARFilterListbox";
+import ARClearFiltersButton from "../components/common/ARClearFiltersButton";
 import ARTable from "../components/common/ARTable";
 import StatusBadge from "../../../components/status/statusbadge";
 import Modal from "../../../components/Modal/modal";
@@ -460,16 +461,6 @@ export default function Configurations() {
         actions={
           <div className="flex items-center gap-3">
             <Button
-              variant="outline"
-              size="small"
-              onClick={loadData}
-              disabled={loading}
-              className="flex items-center gap-1.5"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-            <Button
               onClick={handleOpenCreateModal}
               disabled={loading}
               className="flex items-center gap-1.5 bg-[#0A0082] text-white hover:bg-[#0A0082]/90 shadow-sm"
@@ -506,7 +497,7 @@ export default function Configurations() {
       <div className="space-y-4">
         {/* Search and Filters panel */}
         <PageCard className="p-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
               {/* Text Search Input */}
               <div className="relative min-w-[280px] flex-1">
@@ -518,32 +509,28 @@ export default function Configurations() {
               </div>
 
               {/* Status Select Filter */}
-              <FormSelect
-                name="statusFilter"
+              <FilterListbox
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={setStatusFilter}
                 options={[
-                  { value: "", label: "All Statuses" },
+                  { value: "", label: "All statuses" },
                   { value: "ACTIVE", label: "Active" },
                   { value: "INACTIVE", label: "Inactive" },
                 ]}
-                className="max-w-[180px]"
+                placeholder="All statuses"
               />
             </div>
 
             {/* clear button */}
             {(searchQuery || statusFilter) && (
-              <Button
-                variant="ghost"
-                size="small"
+              <ARClearFiltersButton
                 onClick={() => {
                   setSearchQuery("");
                   setStatusFilter("");
+                  setCurrentPage(1);
                 }}
-                className="text-xs text-slate-500 hover:text-slate-700"
-              >
-                Clear Search
-              </Button>
+                label="Clear filters"
+              />
             )}
           </div>
         </PageCard>

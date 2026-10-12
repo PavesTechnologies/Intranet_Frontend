@@ -35,6 +35,9 @@ export default function VendorUpdatePage() {
       phone_number: vendor.phone_number || "",
       email: vendor.email || "",
       status_id: vendor.status_id || "",
+      msme_registered: vendor.msme_registered ? "true" : "false",
+      udyam_number: vendor.udyam_number || "",
+      msme_category: vendor.msme_category || "",
     });
   }, [vendor]);
 
@@ -51,6 +54,15 @@ export default function VendorUpdatePage() {
       setErrors({ vendor_name: "This field is required." });
       return;
     }
+    const isMsme = String(formData.msme_registered) === "true";
+    if (isMsme && !/^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/.test(formData.udyam_number?.trim().toUpperCase() || "")) {
+      setErrors({ udyam_number: "Enter a valid Udyam number (UDYAM-XX-00-0000000)." });
+      return;
+    }
+    if (isMsme && !formData.msme_category) {
+      toast.error("Select the MSME category.");
+      return;
+    }
 
     try {
       await updateVendorMutation.mutateAsync({
@@ -63,6 +75,9 @@ export default function VendorUpdatePage() {
         phone_number: formData.phone_number?.trim() || null,
         email: formData.email?.trim() || null,
         status_id: formData.status_id ? Number(formData.status_id) : undefined,
+        msme_registered: isMsme,
+        udyam_number: isMsme ? formData.udyam_number.trim().toUpperCase() : null,
+        msme_category: isMsme ? formData.msme_category : null,
       });
       toast.success("Vendor updated.");
       navigate(AP_ROUTES.VENDOR_DETAIL(vendorId));
@@ -115,7 +130,7 @@ export default function VendorUpdatePage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <PageCard>
           <PageCardContent>
-            <VendorForm formData={formData} errors={errors} onChange={handleChange} mode="edit" />
+            <VendorForm formData={formData} errors={errors} onChange={handleChange} mode="edit" showMsmeFields />
           </PageCardContent>
         </PageCard>
 

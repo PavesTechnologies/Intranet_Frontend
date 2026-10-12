@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { RefreshCw, AlertCircle, FolderKanban, Hash, CalendarRange, MapPin, Mail, Phone } from "lucide-react";
+import { RefreshCw, AlertCircle, FolderKanban, Hash, CalendarRange, MapPin, Mail, Phone, Search } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormDatePicker from "../../../../components/forms/FormDatePicker";
@@ -357,7 +357,7 @@ export default function ProjectStep({ value = {}, onChange }) {
             onClick={switchToEnterprise}
             className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
+            <Search className="h-3.5 w-3.5" />
             Search Enterprise Projects
           </button>
         </div>

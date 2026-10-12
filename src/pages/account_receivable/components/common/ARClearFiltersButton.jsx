@@ -14,7 +14,7 @@ export default function ARClearFiltersButton({
       size="small"
       onClick={onClick}
       title={title}
-      className={`h-10 whitespace-nowrap px-3 text-xs font-semibold ${className}`}
+      className={`h-9 whitespace-nowrap px-3 text-xs font-semibold ${className}`}
     >
       <FilterX className="h-3.5 w-3.5 text-slate-500" />
       <span>{label}</span>

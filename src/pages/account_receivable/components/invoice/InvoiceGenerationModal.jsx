@@ -1,5 +1,5 @@
 import React from "react";
-import { CheckCircle2, AlertTriangle, Send, X, FileText, RefreshCw, ArrowRight } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Send, X, FileText, ArrowRight } from "lucide-react";
 import Modal from "../../../../components/Modal/modal";
 import Button from "../../../../components/Button/Button";
 import StatusBadge from "../../../../components/status/statusbadge";
@@ -175,7 +175,7 @@ export default function InvoiceGenerationModal({
                 The backend service encountered an issue while generating the official invoice. The draft invoice remains intact.
               </p>
               {generateError && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-3 font-mono text-xs text-rose-800 break-words mt-2">
+                <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-3 tabular-nums text-xs text-rose-800 break-words mt-2">
                   {generateError}
                 </div>
               )}
@@ -198,7 +198,7 @@ export default function InvoiceGenerationModal({
                 onClick={onRetry}
                 className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold px-4 py-2 shadow-xs"
               >
-                <RefreshCw className="h-3.5 w-3.5" /> Try Again
+            <ArrowRight className="h-3.5 w-3.5" /> Try Again
               </Button>
             )}
           </div>

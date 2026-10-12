@@ -21,6 +21,7 @@ import {
   REPORT_DELETABLE_STATUSES,
 } from "@/pages/expense-management/api/expenseReportsApi";
 import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
+import SavedFiltersControl from "@/pages/expense-management/components/common/SavedFiltersControl";
 import Pagination from "@/components/Pagination/pagination";
  
 const ITEMS_PER_PAGE = 10;
@@ -187,6 +188,12 @@ export default function MyExpensesPage() {
  
   const handleStatusFilterChange = (e) => {
     setStatusFilter(e.target.value);
+    setCurrentPage(1);
+  };
+
+  const handleApplySavedFilter = (filters) => {
+    setSearchTerm(filters.search || "");
+    setStatusFilter(filters.status || "");
     setCurrentPage(1);
   };
  
@@ -460,6 +467,11 @@ export default function MyExpensesPage() {
             options={statusFilterOptions}
             className="[&>label]:text-xs [&>label]:mb-1"
             buttonClassName="!py-1.5 !px-3 !text-xs"
+          />
+          <SavedFiltersControl
+            scope="my-expenses"
+            filters={{ search: searchTerm, status: statusFilter }}
+            onApply={handleApplySavedFilter}
           />
         </div>
       </div>

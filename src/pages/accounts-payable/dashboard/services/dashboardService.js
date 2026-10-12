@@ -16,6 +16,40 @@ function withNormalizedStatus(error) {
  * see) — this service never filters or recomputes anything, just fetches and returns raw.
  */
 export const dashboardService = {
+  /** Role dashboards this user may open: [{key, label}] in display order (GET /dashboard/views). */
+  async getViews() {
+    try {
+      const response = await api.get(`${AP_BASE_URL}/dashboard/views`);
+      return response.data;
+    } catch (error) {
+      throw withNormalizedStatus(error);
+    }
+  },
+
+  /** One role dashboard: "management" | "approvals" | "my_work" | "finance" (GET /dashboard/view/{key}). */
+  async getView(key) {
+    try {
+      const response = await api.get(`${AP_BASE_URL}/dashboard/view/${key}`);
+      return response.data;
+    } catch (error) {
+      throw withNormalizedStatus(error);
+    }
+  },
+
+  /**
+   * Finance Executive dashboard (GET /dashboard/finance) — action cards, ageing, upcoming
+   * payments by month, recent payments, TDS follow-ups. Every amount is computed by the backend
+   * (ap_reporting_service.py) and carried per currency; nothing is recomputed here.
+   */
+  async getFinance() {
+    try {
+      const response = await api.get(`${AP_BASE_URL}/dashboard/finance`);
+      return response.data;
+    } catch (error) {
+      throw withNormalizedStatus(error);
+    }
+  },
+
   /**
    * @param {{fromDate?: string, toDate?: string}} [params] - YYYY-MM-DD, both optional; backend
    *   defaults to the last 30 days when omitted and returns the resolved period either way.

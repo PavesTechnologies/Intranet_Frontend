@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   XCircle,
   DollarSign,
-  RefreshCw,
   Eye,
   FileText,
   FileCheck,
@@ -13,17 +12,17 @@ import {
 
 import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
-import { KPICard } from "../../../components/kpi/KPI";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
 import SearchInput from "../../../components/filter/Searchbar";
 import ARClearFiltersButton from "../components/common/ARClearFiltersButton";
-import FilterListbox from "../../../components/filter/FilterListbox";
 import Pagination from "../../../components/Pagination/pagination";
 import StatusBadge from "../../../components/status/statusbadge";
 import ConfirmationModal from "../../../components/confirmation_modal/ConfirmationModal";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import ARTable from "../components/common/ARTable";
+import ARKPICard from "../components/common/ARKPICard";
+import ARKPIStatusTabs from "../components/common/ARKPIStatusTabs";
 import ActionMenu from "../components/common/ActionMenu";
 import { formatCurrency, formatDisplayDate, formatDisplayDateTime } from "../utils/format";
 import {
@@ -32,6 +31,8 @@ import {
   approveInvoice,
   rejectInvoice,
 } from "../services/invoiceService";
+import { RECORD_LOCK_ACTION, RECORD_LOCK_RESOURCE } from "../services/recordLockService";
+import useRecordLock from "../hooks/useRecordLock";
 
 /* ------------------------------------------------------------------ */
 /* Global constants                                                    */
@@ -104,6 +105,7 @@ const TABLE_HEADER_ALIGNMENTS = {
 
 
 const getInvoiceStatus = (inv) => (inv.status || inv.invoiceStatus || "").toUpperCase();
+const getInvoiceRecordId = (inv) => inv?.invoiceId || inv?.billingSnapshotId || inv?.snapshotId;
 
 export default function InvoiceApproval() {
   const navigate = useNavigate();
@@ -125,12 +127,45 @@ export default function InvoiceApproval() {
   const [rejectLoading, setRejectLoading] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
+  // Approve / Reject from the list first take the backend APPROVAL lock; the
+  // confirmation modal only opens once it is ours. A 409 leaves the modal
+  // closed (the hook shows the backend's owner message). The lock is released
+  // on cancel, on success and on unmount.
+  const recordLock = useRecordLock(RECORD_LOCK_RESOURCE.INVOICE);
+  const [lockingInvoiceId, setLockingInvoiceId] = useState(null);
+
+  const startDecision = async (inv, openModal) => {
+    const invId = getInvoiceRecordId(inv);
+    if (!invId || lockingInvoiceId) return;
+    setLockingInvoiceId(invId);
+    try {
+      const result = await recordLock.acquire(invId, RECORD_LOCK_ACTION.APPROVAL);
+      if (result.acquired) openModal();
+    } finally {
+      setLockingInvoiceId(null);
+    }
+  };
+
+  const closeApproveModal = () => {
+    if (approveLoading) return;
+    setApproveTarget(null);
+    recordLock.release();
+  };
+
+  const closeRejectModal = () => {
+    if (rejectLoading) return;
+    setRejectTarget(null);
+    setRejectReason("");
+    recordLock.release();
+  };
+
   const handleConfirmApprove = async () => {
     if (!approveTarget) return;
-    const invId = approveTarget.invoiceId || approveTarget.billingSnapshotId || approveTarget.snapshotId;
+    const invId = getInvoiceRecordId(approveTarget);
     setApproveLoading(true);
     try {
       await approveInvoice(invId);
+      recordLock.release();
       showStatusToast("Invoice approved successfully.", "success");
       setApproveTarget(null);
       await loadData();
@@ -144,7 +179,7 @@ export default function InvoiceApproval() {
 
   const handleConfirmReject = async () => {
     if (!rejectTarget) return;
-    const invId = rejectTarget.invoiceId || rejectTarget.billingSnapshotId || rejectTarget.snapshotId;
+    const invId = getInvoiceRecordId(rejectTarget);
     if (!rejectReason.trim()) {
       showStatusToast("Please provide a reason for rejection.", "error");
       return;
@@ -152,6 +187,7 @@ export default function InvoiceApproval() {
     setRejectLoading(true);
     try {
       await rejectInvoice(invId, rejectReason.trim());
+      recordLock.release();
       showStatusToast("Invoice rejected.", "success");
       setRejectTarget(null);
       setRejectReason("");
@@ -220,24 +256,12 @@ export default function InvoiceApproval() {
     { key: STATUS_TABS.REJECTED, label: "Rejected", icon: XCircle, color: "bg-rose-600 text-white" },
   ];
 
-  const statusFilterOptions = [
-    { value: STATUS_TABS.ALL, label: `All Statuses (${kpis.ALL})` },
-    { value: STATUS_TABS.PENDING, label: `Pending Approval (${kpis.PENDING_APPROVAL})` },
-    { value: STATUS_TABS.APPROVED, label: `Approved (${kpis.APPROVED})` },
-    { value: STATUS_TABS.REJECTED, label: `Rejected (${kpis.REJECTED})` },
-  ];
-
   const handleKpiClick = (key) => {
     if (key === STATUS_TABS.ALL) {
       setStatusTab(STATUS_TABS.ALL);
     } else {
       setStatusTab((prev) => (prev === key ? STATUS_TABS.ALL : key));
     }
-    setCurrentPage(1);
-  };
-
-  const handleStatusChange = (value) => {
-    setStatusTab(value);
     setCurrentPage(1);
   };
 
@@ -302,14 +326,7 @@ export default function InvoiceApproval() {
     });
   };
 
-  const refreshButton = (label = "Refresh") => (
-    <Button variant="outline" size="small" onClick={() => loadData(true)} disabled={refreshing}>
-      <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-      {label}
-    </Button>
-  );
-
-  const kpiSection = (
+  const kpiCardsSection = (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {kpiCards.map((kpi) => (
         <button
@@ -317,28 +334,32 @@ export default function InvoiceApproval() {
           type="button"
           onClick={() => handleKpiClick(kpi.key)}
           title={`Filter by ${kpi.label}`}
-          className="text-left rounded-xl transition-transform active:scale-[0.99] focus:outline-none"
+          className="w-full rounded-xl text-left transition-transform active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
         >
-          <KPICard
+          <ARKPICard
             label={kpi.label}
             value={loading ? "…" : kpis[kpi.key]}
             icon={<kpi.icon className="h-5 w-5" />}
             color={kpi.color}
-            className="h-full w-full cursor-pointer bg-white shadow-sm border border-slate-200 transition-all hover:shadow-md"
+            className="h-full w-full"
           />
         </button>
       ))}
-
-      <div className="col-span-2 sm:col-span-1">
-        <KPICard
-          label="Total Approval Value"
-          value={loading ? "…" : formatCurrency(kpis.totalApprovalValue, kpis.currency)}
-          icon={<DollarSign className="h-5 w-5" />}
-          color="bg-indigo-600 text-white"
-          className="h-full w-full bg-white shadow-sm border border-slate-200"
-        />
-      </div>
     </div>
+  );
+
+  const kpiSection = (
+    <ARKPIStatusTabs
+      label="Invoice approval status"
+      loading={loading}
+      items={kpiCards.map((kpi) => ({
+        key: kpi.key,
+        label: kpi.label,
+        value: kpis[kpi.key],
+        active: statusTab === kpi.key,
+        onClick: () => handleKpiClick(kpi.key),
+      }))}
+    />
   );
 
   if (loading && !refreshing) {
@@ -352,11 +373,10 @@ export default function InvoiceApproval() {
   // Error state with retry
   if (error && !loading && invoices.length === 0) {
     return (
-      <div className="space-y-4">
+      <div className="w-full space-y-6">
         <PageHeader
           title="Invoice Approval"
           subtitle="Review, approve, and track invoices through the invoice approval lifecycle."
-          actions={refreshButton("Retry")}
         />
 
         <PageCard>
@@ -371,13 +391,6 @@ export default function InvoiceApproval() {
               <p className="text-sm text-red-600">{error}</p>
             </div>
             <div className="pt-3">
-              <Button
-                onClick={() => loadData(true)}
-                className="bg-[#0A0082] text-white hover:bg-[#0A0082]/90 font-semibold px-6 py-2.5"
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Retry
-              </Button>
             </div>
           </PageCardContent>
         </PageCard>
@@ -388,14 +401,13 @@ export default function InvoiceApproval() {
   // Genuine empty state: zero workflow records exist
   if (!loading && invoices.length === 0) {
     return (
-      <div className="space-y-4">
+      <div className="w-full space-y-6">
         <PageHeader
           title="Invoice Approval"
           subtitle="Review, approve, and track invoices through the invoice approval lifecycle."
-          actions={refreshButton()}
         />
 
-        {kpiSection}
+        {kpiCardsSection}
 
         <PageCard>
           <PageCardContent className="p-12 text-center space-y-4">
@@ -420,6 +432,7 @@ export default function InvoiceApproval() {
     const rawStatus = getInvoiceStatus(item);
     const isPending = rawStatus === STATUS_TABS.PENDING;
     const isRejected = rawStatus === STATUS_TABS.REJECTED;
+    const isLockingRow = lockingInvoiceId !== null && lockingInvoiceId === getInvoiceRecordId(item);
 
     return {
       onRowClick: () => handleReviewInvoice(item),
@@ -440,22 +453,22 @@ export default function InvoiceApproval() {
         </div>
       ),
       billingPeriod: (
-        <div className="flex items-center justify-center font-medium text-slate-700">
+        <div className="flex items-center justify-start font-medium text-slate-700">
           {item.billingPeriod || "—"}
         </div>
       ),
       invoiceDate: (
-        <div className="flex items-center justify-center font-medium text-slate-700">
+        <div className="flex items-center justify-start font-medium text-slate-700">
           {item.invoiceDate ? formatDisplayDate(item.invoiceDate) : "—"}
         </div>
       ),
       dueDate: (
-        <div className="flex items-center justify-center font-medium text-slate-700">
+        <div className="flex items-center justify-start font-medium text-slate-700">
           {item.dueDate ? formatDisplayDate(item.dueDate) : "—"}
         </div>
       ),
       grandTotal: (
-        <div className="text-right font-mono font-bold text-slate-900">
+        <div className="text-left tabular-nums font-bold text-slate-900">
           {formatCurrency(item.grandTotal || 0, item.currency || item.currencyCode || "USD")}
         </div>
       ),
@@ -502,20 +515,23 @@ export default function InvoiceApproval() {
                 onClick: () => handleReviewInvoice(item),
               },
               {
-                label: "Approve Invoice",
+                label: isLockingRow ? "Acquiring lock..." : "Approve Invoice",
                 icon: <CheckCircle2 className="h-4 w-4 text-emerald-600" />,
                 hidden: !isPending,
-                onClick: () => setApproveTarget(item),
+                disabled: Boolean(lockingInvoiceId),
+                onClick: () => startDecision(item, () => setApproveTarget(item)),
               },
               {
-                label: "Reject Invoice",
+                label: isLockingRow ? "Acquiring lock..." : "Reject Invoice",
                 icon: <XCircle className="h-4 w-4 text-rose-600" />,
                 hidden: !isPending,
                 danger: true,
-                onClick: () => {
-                  setRejectReason("");
-                  setRejectTarget(item);
-                },
+                disabled: Boolean(lockingInvoiceId),
+                onClick: () =>
+                  startDecision(item, () => {
+                    setRejectReason("");
+                    setRejectTarget(item);
+                  }),
               },
             ]}
           />
@@ -525,21 +541,30 @@ export default function InvoiceApproval() {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="w-full space-y-6">
       {/* 1. Page Header */}
       <PageHeader
         title="Invoice Approval"
         subtitle="Review, approve, and track invoices through the invoice approval lifecycle."
-        actions={refreshButton()}
       />
 
       {/* 2. KPI Cards — click to filter, click the active card again to clear */}
-      {kpiSection}
+      {kpiCardsSection}
 
       {/* 3. Main Data Card */}
       <PageCard>
         <PageCardContent className="p-4 sm:p-5 space-y-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Invoice approvals</h2>
+              <p className="mt-0.5 text-xs text-slate-500">Review invoices by approval status and track their latest action.</p>
+            </div>
+            <p className="text-xs font-medium text-slate-600">
+              Total approval value <span className="ml-1 font-semibold text-slate-900">{loading ? "…" : formatCurrency(kpis.totalApprovalValue, kpis.currency)}</span>
+            </p>
+          </div>
+          {kpiSection}
+          <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/70 p-2 lg:flex-row lg:items-center lg:justify-between">
             <div className="w-full lg:max-w-md">
               <SearchInput
                 value={searchQuery}
@@ -549,14 +574,6 @@ export default function InvoiceApproval() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="w-48 sm:w-52">
-                <FilterListbox
-                  options={statusFilterOptions}
-                  value={statusTab}
-                  onChange={handleStatusChange}
-                  placeholder="Filter by Status"
-                />
-              </div>
               {(statusTab !== STATUS_TABS.ALL || searchQuery) && (
                 <ARClearFiltersButton
                   onClick={() => {
@@ -604,7 +621,7 @@ export default function InvoiceApproval() {
         confirmText="Approve"
         variant="primary"
         isLoading={approveLoading}
-        onCancel={() => !approveLoading && setApproveTarget(null)}
+        onCancel={closeApproveModal}
         onConfirm={handleConfirmApprove}
       />
 
@@ -620,12 +637,7 @@ export default function InvoiceApproval() {
         confirmText="Reject Invoice"
         variant="danger"
         isLoading={rejectLoading}
-        onCancel={() => {
-          if (!rejectLoading) {
-            setRejectTarget(null);
-            setRejectReason("");
-          }
-        }}
+        onCancel={closeRejectModal}
         onConfirm={handleConfirmReject}
       >
         <div className="mt-3">

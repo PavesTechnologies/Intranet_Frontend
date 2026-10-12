@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 
 import Button from "../../../../components/Button/Button";
 import FormInput from "../../../../components/forms/FormInput";
+import FormTextArea from "../../../../components/forms/FormTextArea";
 import Modal from "../../../../components/Modal/modal";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import {
@@ -24,6 +25,9 @@ const EMPTY_FORM = {
   country: "",
   postalCode: "",
   logoReference: "",
+  notes: "",
+  termsAndConditions: "",
+  paymentInstructions: "",
 };
 
 export default function CompanyProfileModal({
@@ -54,6 +58,22 @@ export default function CompanyProfileModal({
         country: initialData.country || "",
         postalCode: initialData.postalCode || "",
         logoReference: initialData.logoReference || "",
+        notes:
+          initialData.defaultInvoiceNotes ||
+          initialData.invoiceNotes ||
+          initialData.notes ||
+          initialData.additionalNotes ||
+          "",
+        termsAndConditions:
+          initialData.defaultTermsAndConditions ||
+          initialData.termsAndConditions ||
+          initialData.terms ||
+          "",
+        paymentInstructions:
+          initialData.defaultPaymentInstructions ||
+          initialData.paymentInstructions ||
+          initialData.paymentInstruction ||
+          "",
       });
     } else {
       setFormData(EMPTY_FORM);
@@ -128,11 +148,29 @@ export default function CompanyProfileModal({
       errors.phone = "Must be 25 characters or fewer.";
     }
 
+    const notes = (formData.notes || "").trim();
+    const termsAndConditions = (formData.termsAndConditions || "").trim();
+    const paymentInstructions = (formData.paymentInstructions || "").trim();
+
+    if (notes.length > 5000) {
+      errors.notes = "Notes must be 5000 characters or fewer.";
+    }
+
+    if (termsAndConditions.length > 10000) {
+      errors.termsAndConditions = "Terms & Conditions must be 10000 characters or fewer.";
+    }
+
+    if (paymentInstructions.length > 5000) {
+      errors.paymentInstructions = "Payment Instructions must be 5000 characters or fewer.";
+    }
+
     return errors;
   };
 
   const handleSubmit = async (e) => {
     e?.preventDefault();
+    if (submitting) return;
+
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
@@ -140,6 +178,10 @@ export default function CompanyProfileModal({
     }
 
     setSubmitting(true);
+    const notesVal = (formData.notes || "").trim() || null;
+    const termsVal = (formData.termsAndConditions || "").trim() || null;
+    const paymentVal = (formData.paymentInstructions || "").trim() || null;
+
     const payload = {
       legalName: formData.legalName.trim(),
       gstin: (formData.gstin || "").trim() || null,
@@ -152,6 +194,15 @@ export default function CompanyProfileModal({
       country: (formData.country || "").trim() || null,
       postalCode: (formData.postalCode || "").trim() || null,
       logoReference: (formData.logoReference || "").trim() || null,
+      // Support backend Company Profile DTO and dedicated content defaults fields
+      defaultInvoiceNotes: notesVal,
+      defaultTermsAndConditions: termsVal,
+      defaultPaymentInstructions: paymentVal,
+      invoiceNotes: notesVal,
+      notes: notesVal,
+      additionalNotes: notesVal,
+      termsAndConditions: termsVal,
+      paymentInstructions: paymentVal,
       isActive: true,
     };
 
@@ -332,6 +383,89 @@ export default function CompanyProfileModal({
             placeholder="https://cdn.example.com/logo.png"
             disabled={submitting}
           />
+        </div>
+
+        {/* Section: Default Invoice Content */}
+        <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              Default Invoice Content
+            </h4>
+            <span className="text-[11px] text-slate-400">
+              Defaults for notes, terms, and payment instructions
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label htmlFor="notes" className="text-xs font-semibold text-slate-700">
+                  Notes
+                </label>
+                <span className="text-[11px] text-slate-400">
+                  {formData.notes?.length || 0}/5000
+                </span>
+              </div>
+              <FormTextArea
+                id="notes"
+                name="notes"
+                value={formData.notes}
+                onChange={handleChange}
+                placeholder="Optional notes to display at the bottom of generated invoices..."
+                rows={3}
+                disabled={submitting}
+              />
+              {formErrors.notes && (
+                <p className="mt-1 text-xs text-rose-500 font-medium">{formErrors.notes}</p>
+              )}
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label htmlFor="termsAndConditions" className="text-xs font-semibold text-slate-700">
+                  Terms & Conditions
+                </label>
+                <span className="text-[11px] text-slate-400">
+                  {formData.termsAndConditions?.length || 0}/10000
+                </span>
+              </div>
+              <FormTextArea
+                id="termsAndConditions"
+                name="termsAndConditions"
+                value={formData.termsAndConditions}
+                onChange={handleChange}
+                placeholder="Standard commercial and payment terms..."
+                rows={4}
+                disabled={submitting}
+              />
+              {formErrors.termsAndConditions && (
+                <p className="mt-1 text-xs text-rose-500 font-medium">{formErrors.termsAndConditions}</p>
+              )}
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label htmlFor="paymentInstructions" className="text-xs font-semibold text-slate-700">
+                  Payment Instructions
+                </label>
+                <span className="text-[11px] text-slate-400">
+                  {formData.paymentInstructions?.length || 0}/5000
+                </span>
+              </div>
+              <FormTextArea
+                id="paymentInstructions"
+                name="paymentInstructions"
+                value={formData.paymentInstructions}
+                onChange={handleChange}
+                placeholder="Bank account details, wire remittance instructions, or payment link..."
+                rows={3}
+                disabled={submitting}
+              />
+              {formErrors.paymentInstructions && (
+                <p className="mt-1 text-xs text-rose-500 font-medium">{formErrors.paymentInstructions}</p>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Action Footer */}
