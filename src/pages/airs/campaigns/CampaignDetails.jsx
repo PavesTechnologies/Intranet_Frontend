@@ -468,6 +468,10 @@ function DetailsTab({ info, jd, scoring, limits, hm }) {
                 <Row label="Det. Cutoff" value={scoring.deterministic_threshold ?? "—"} />
                 <Row label="Sem. Cutoff" value={scoring.semantic_threshold} />
                 <Row label="AI Cutoff" value={scoring.ai_threshold} />
+                <Row
+                  label="Max Missing Core"
+                  value={scoring.max_missing_core_pct == null ? "—" : `${scoring.max_missing_core_pct}% (cap ${scoring.max_missing_core_skills ?? "—"})`}
+                />
               </div>
             </Card>
           </div>

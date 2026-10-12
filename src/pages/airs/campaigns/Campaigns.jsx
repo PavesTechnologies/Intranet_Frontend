@@ -41,6 +41,8 @@ const DEFAULT_CAMPAIGN_FORM = {
   prompt_template_id: "",
   ai_evaluate_prompt_id: "",
   deterministic_threshold: 70,
+  max_missing_core_pct: 25,
+  max_missing_core_skills: 3,
 };
 
 const STATUS_OPTIONS = [
@@ -351,6 +353,8 @@ export default function Campaigns() {
       semantic_threshold: Number(campaignForm.semantic_threshold),
       ai_threshold: Number(campaignForm.ai_threshold),
       deterministic_threshold: Number(campaignForm.deterministic_threshold),
+      max_missing_core_pct: Number(campaignForm.max_missing_core_pct),
+      max_missing_core_skills: Number(campaignForm.max_missing_core_skills),
       hiring_manager_id: String(campaignForm.hiring_manager_id).trim(),
       recruiter_id: String(campaignForm.recruiter_id).trim(),
       prompt_template_id: String(campaignForm.prompt_template_id || "").trim(),
