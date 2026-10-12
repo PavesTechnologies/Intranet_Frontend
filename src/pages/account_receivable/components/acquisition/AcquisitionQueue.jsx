@@ -247,9 +247,23 @@ export default function AcquisitionQueue({
   return (
     <PageCard>
       <PageCardContent className="space-y-4 p-4 sm:p-5">
-        <div>
-          <h2 className="text-base font-semibold text-slate-900">Acquisition queue</h2>
-          <p className="mt-0.5 text-xs text-slate-500">Review billing setups by their current acquisition and invoice readiness.</p>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Acquisition queue</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Review billing setups by their current acquisition and invoice readiness.</p>
+          </div>
+          <div className="flex w-full items-center justify-end gap-2 lg:w-[420px]">
+            <div className="min-w-0 flex-1">
+              <SearchInput
+                value={activeSearch}
+                onSearch={handleSearchChange}
+                placeholder="Search project, code or client..."
+              />
+            </div>
+            {isFilterActive && (
+              <ARClearFiltersButton onClick={handleResetFilters} title="Clear all search and status filters" />
+            )}
+          </div>
         </div>
         <ARKPIStatusTabs
           label="Billing acquisition status"
@@ -264,23 +278,6 @@ export default function AcquisitionQueue({
             ),
           }))}
         />
-
-        {/* Search and clear controls */}
-        <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/70 p-2 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex-1 w-full lg:max-w-md">
-            <SearchInput
-              value={activeSearch}
-              onSearch={handleSearchChange}
-              placeholder="Search project, code or client..."
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            {isFilterActive && (
-              <ARClearFiltersButton onClick={handleResetFilters} title="Clear all search and status filters" />
-            )}
-          </div>
-        </div>
 
         {/* Table or Contextual Empty State */}
         {filteredConfigs.length === 0 ? (

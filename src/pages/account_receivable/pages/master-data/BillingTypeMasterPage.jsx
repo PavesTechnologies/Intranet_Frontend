@@ -64,7 +64,7 @@ export default function BillingTypeMasterPage() {
   const [permissionError, setPermissionError] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("ACTIVE");
+  const [activeTab, setActiveTab] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -324,13 +324,13 @@ export default function BillingTypeMasterPage() {
 
       <PageCard className="overflow-hidden">
         <PageCardContent className="space-y-4 p-4 sm:p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-base font-semibold text-slate-900">Billing Types</h2>
               <p className="mt-0.5 text-xs text-slate-500">Manage the billing models available to AR configurations</p>
             </div>
-            <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:flex-row sm:items-center">
-              <div className="w-full sm:w-72">
+            <div className="flex w-full items-center justify-end gap-2 lg:w-[420px]">
+              <div className="min-w-0 flex-1">
                 <SearchInput
                   value={searchQuery}
                   onChange={(event) => {
@@ -340,9 +340,7 @@ export default function BillingTypeMasterPage() {
                   placeholder="Search billing types..."
                 />
               </div>
-              {hasActiveFilters && (
-                <ARClearFiltersButton onClick={handleResetFilters} />
-              )}
+              {hasActiveFilters && <ARClearFiltersButton onClick={handleResetFilters} />}
             </div>
           </div>
 

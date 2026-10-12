@@ -375,6 +375,10 @@ export default function InvoiceDetail() {
       const updated = await approveInvoice(invoice.invoiceId);
       releaseInvoiceLock();
       showStatusToast("Invoice approved successfully.", "success");
+      if (isApprovalReview) {
+        navigate(INVOICE_APPROVAL_PATH, { replace: true });
+        return;
+      }
       if (updated) {
         setInvoice((prev) => ({
           ...prev,
@@ -413,6 +417,10 @@ export default function InvoiceDetail() {
       setIsRejectOpen(false);
       setRejectionReason("");
       showStatusToast("Invoice rejected successfully.", "success");
+      if (isApprovalReview) {
+        navigate(INVOICE_APPROVAL_PATH, { replace: true });
+        return;
+      }
       if (updated) {
         setInvoice((prev) => ({
           ...prev,
