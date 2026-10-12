@@ -20,6 +20,8 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import ErrorState from "./components/ErrorState";
 import SkillForm from "./components/SkillForm";
 import useUnknownSkillSuggestions from "./hooks/useUnknownSkillSuggestions";
+import useCoreSkillUsage from "./hooks/useCoreSkillUsage";
+import CoreSkillDeleteWarning from "./components/CoreSkillDeleteWarning";
 import { deleteUnknownSkill, resolveUnknownSkill, createCanonicalSkillFromUnknown } from "./services/skillOntologyService";
 import { formatDate, validateSkillForm } from "./utils/skillOntologyUtils.jsx";
 import { EMPTY_SKILL_FORM } from "./constants/skillOntologyConstants";
@@ -239,6 +241,9 @@ export function MapSkillModalBody({ rawSkill, unknownSkillId, target, onClose, o
 
 export function DeleteSkillModalBody({ rawSkill, unknownSkillId, onClose, onDeleted }) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const coreUsage = useCoreSkillUsage([unknownSkillId]);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const blocked = coreUsage.loading || (coreUsage.usages.length > 0 && !acknowledged);
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -260,12 +265,14 @@ export function DeleteSkillModalBody({ rawSkill, unknownSkillId, onClose, onDele
         action cannot be undone.
       </p>
 
+      <CoreSkillDeleteWarning {...coreUsage} acknowledged={acknowledged} onAcknowledge={setAcknowledged} />
+
       {/* Footer actions */}
       <div className="flex justify-end gap-3 pt-1">
         <Button variant="outline" size="medium" onClick={onClose} disabled={isDeleting}>
           Cancel
         </Button>
-        <Button variant="danger" size="medium" loading={isDeleting} onClick={handleDelete}>
+        <Button variant="danger" size="medium" loading={isDeleting} onClick={handleDelete} disabled={blocked}>
           <Trash2 className="h-4 w-4" />
           Confirm
         </Button>

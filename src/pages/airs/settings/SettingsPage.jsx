@@ -61,18 +61,18 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {/* Scoring defaults 40%, AI providers table 60%; stacks below lg. */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 items-stretch">
-        <div className="lg:col-span-2 min-w-0">
+      {/* AI providers full width (its per-purpose model list needs the room);
+          scoring defaults and calendar integrations share the row below,
+          stacking below lg. */}
+      <SettingsAIProviders />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch mt-5">
+        <div className="min-w-0">
           <SettingsWeightConfig />
         </div>
-        <div className="lg:col-span-3 min-w-0">
-          <SettingsAIProviders />
+        <div className="min-w-0">
+          <SettingsIntegrations />
         </div>
-      </div>
-
-      <div className="mt-5">
-        <SettingsIntegrations />
       </div>
     </div>
   );

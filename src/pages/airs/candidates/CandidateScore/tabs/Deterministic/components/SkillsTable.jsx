@@ -42,11 +42,14 @@ const PREFERRED_COLUMNS = ["jdSkill", "candidateSkill", "matchType", "bonus", "c
 // deterministic_score_breakdown.mandatory_skills / .preferred_skills, no
 // derived scoring, just display formatting.
 export default function SkillsTable({ items, variant }) {
-  if (!items || items.length === 0) {
-    return <p className="text-[11.5px] text-slate-400 py-2">No data available</p>;
-  }
-
   const isMandatory = variant === "mandatory";
+  if (!items || items.length === 0) {
+    return (
+      <p className="text-[11.5px] text-slate-400 py-2">
+        {isMandatory ? "This JD has no required skills." : "This JD has no preferred skills."}
+      </p>
+    );
+  }
 
   const rows = items.map((r, i) => ({
     id: i,

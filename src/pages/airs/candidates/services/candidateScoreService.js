@@ -153,3 +153,37 @@ export const bulkSendRejectionEmail = async (campaignCandidateIds) => {
     throw error;
   }
 };
+
+// Candidate Scorecard — Re-parse & re-score (RECRUITER / HR_ADMIN) —
+// POST /airs/campaign-candidates/{campaign_candidate_id}/reparse
+// Re-parses the stored resume and replaces its current skills (the previous
+// parse is kept). A rejected candidate moves back to Screening only when a
+// recruiter does this, with a reason.
+export const reparseCandidateResume = async (campaignCandidateId, reason) => {
+  const response = await api.post(
+    `${BASE_URL}/campaign-candidates/${campaignCandidateId}/reparse`,
+    { reason: reason || null },
+    { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
+  );
+  return response.data;
+};
+
+// Candidate Scorecard — what each re-parse changed —
+// GET /airs/campaign-candidates/{campaign_candidate_id}/parse-changes
+export const getParseChanges = async (campaignCandidateId) => {
+  const response = await api.get(`${BASE_URL}/campaign-candidates/${campaignCandidateId}/parse-changes`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  });
+  return response.data;
+};
+
+// Candidate Scorecard — re-score a candidate whose score is out of date (RECRUITER) —
+// POST /airs/campaign-candidates/{campaign_candidate_id}/rescore
+// At Screening: the normal screening re-score; at any other stage only the
+// scores are recomputed - the stage never changes.
+export const rescoreCandidate = async (campaignCandidateId) => {
+  const response = await api.post(`${BASE_URL}/campaign-candidates/${campaignCandidateId}/rescore`, {}, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  });
+  return response.data;
+};

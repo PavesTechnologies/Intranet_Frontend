@@ -8,15 +8,15 @@ import SummaryCard from "./components/SummaryCard";
 import SkillsTabNav from "./components/SkillsTabNav";
 import SkillsTable from "./components/SkillsTable";
 import MissingSkillsList from "./components/MissingSkillsList";
-import AdditionalSkillsList from "./components/AdditionalSkillsList";
 import PaginatedSkillsSection from "./components/PaginatedSkillsSection";
 import ValidationSection from "./components/ValidationSection";
 import ScoreCalculation from "./components/ScoreCalculation";
 import ConfigurationCard from "./components/ConfigurationCard";
+import ShadowScorePanel from "./components/ShadowScorePanel";
 
 // Requirements Score tab — GET /airs/campaign-candidates/{campaign_candidate_id}/deterministic.
 export default function DeterministicScoreTab({ candidate, onLayerFailure }) {
-  const { breakdown, failure, loading, error, refetch } = useDeterministicScore(candidate?.id);
+  const { breakdown, failure, shadowV2, loading, error, refetch } = useDeterministicScore(candidate?.id);
 
   // Optional: lets a host page (PipelineCandidateScorecardPage) flag/retry a
   // dead-lettered layer from this tab's own fresh response.
@@ -59,7 +59,6 @@ export default function DeterministicScoreTab({ candidate, onLayerFailure }) {
             mandatory: breakdown.mandatorySkills.length,
             preferred: breakdown.preferredSkills.length,
             missing: breakdown.missingMandatorySkills.length,
-            additional: breakdown.additionalCandidateSkills.length,
           }}
         />
         <div className="mt-4">
@@ -78,16 +77,11 @@ export default function DeterministicScoreTab({ candidate, onLayerFailure }) {
               {(pageItems) => <MissingSkillsList items={pageItems} />}
             </PaginatedSkillsSection>
           )}
-          {skillsTab === "additional" && (
-            <PaginatedSkillsSection items={breakdown.additionalCandidateSkills}>
-              {(pageItems) => <AdditionalSkillsList items={pageItems} />}
-            </PaginatedSkillsSection>
-          )}
         </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl px-4">
-        <AccordionSection icon={ShieldCheck} title="Validation">
+        <AccordionSection icon={ShieldCheck} title="Experience & Education">
           <ValidationSection
             experienceValidation={breakdown.experienceValidation}
             educationValidation={breakdown.educationValidation}
@@ -102,6 +96,8 @@ export default function DeterministicScoreTab({ candidate, onLayerFailure }) {
           <ConfigurationCard configuration={breakdown.configuration} />
         </AccordionSection>
       </div>
+
+      <ShadowScorePanel shadow={shadowV2} />
     </div>
   );
 }
