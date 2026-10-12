@@ -21,6 +21,7 @@ import EditCampaignModal from "./components/EditCampaignModal";
 import ReopenCampaignModal from "./components/ReopenCampaignModal";
 import CandidateActionModals from "./components/CandidateActionModals";
 import CampaignExportPanel from "./components/CampaignExportPanel";
+import ScoringShadowReport from "./components/ScoringShadowReport";
 import { getNoteCounts } from "./services/candidateActionsService";
 import { useAuth } from "../../../contexts/AuthContext";
 import { REJECTION_LAYER_LABELS } from "../constants/scoreLabels";
@@ -61,7 +62,7 @@ export default function CampaignDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { canManageCampaigns, canViewPipeline, canViewTimeline, canViewCampaigns, isHiringManager, isRecruiter } = useCampaignPermissions();
+  const { canManageCampaigns, canViewPipeline, canViewTimeline, canViewCampaigns, isHiringManager, isRecruiter, isHRAdmin } = useCampaignPermissions();
 
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -162,6 +163,8 @@ export default function CampaignDetails() {
     // Its own tab rather than scattered buttons, so every export for
     // this campaign is discoverable in one place.
     { id: "exports", label: "Exports", icon: Download, show: true },
+    // Scoring v2 (Phase 1) shadow comparison - HR_ADMIN only, never decides.
+    { id: "scoringV2", label: "Scoring v2 (shadow)", icon: Activity, show: isHRAdmin },
   ].filter((t) => t.show);
 
   const statusStyle = {
@@ -265,6 +268,7 @@ export default function CampaignDetails() {
       {activeTab === "timeline" && <TimelineTab campaignId={id} />}
 
       {activeTab === "exports" && <CampaignExportPanel campaignId={id} />}
+      {activeTab === "scoringV2" && isHRAdmin && <ScoringShadowReport campaignId={id} />}
 
       {canEdit && (<EditCampaignModal
           isOpen={editOpen}

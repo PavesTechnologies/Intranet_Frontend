@@ -12,10 +12,11 @@ import PaginatedSkillsSection from "./components/PaginatedSkillsSection";
 import ValidationSection from "./components/ValidationSection";
 import ScoreCalculation from "./components/ScoreCalculation";
 import ConfigurationCard from "./components/ConfigurationCard";
+import ShadowScorePanel from "./components/ShadowScorePanel";
 
 // Requirements Score tab — GET /airs/campaign-candidates/{campaign_candidate_id}/deterministic.
 export default function DeterministicScoreTab({ candidate, onLayerFailure }) {
-  const { breakdown, failure, loading, error, refetch } = useDeterministicScore(candidate?.id);
+  const { breakdown, failure, shadowV2, loading, error, refetch } = useDeterministicScore(candidate?.id);
 
   // Optional: lets a host page (PipelineCandidateScorecardPage) flag/retry a
   // dead-lettered layer from this tab's own fresh response.
@@ -95,6 +96,8 @@ export default function DeterministicScoreTab({ candidate, onLayerFailure }) {
           <ConfigurationCard configuration={breakdown.configuration} />
         </AccordionSection>
       </div>
+
+      <ShadowScorePanel shadow={shadowV2} />
     </div>
   );
 }
