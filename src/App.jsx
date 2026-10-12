@@ -59,6 +59,8 @@ import TdsTrackingDetailPage from "./pages/accounts-payable/tds-tracking/pages/T
 import TdsChallansPage from "./pages/accounts-payable/tds-tracking/pages/TdsChallansPage.jsx";
 import TdsChallanNewPage from "./pages/accounts-payable/tds-tracking/pages/TdsChallanNewPage.jsx";
 import TdsFilingNewPage from "./pages/accounts-payable/tds-tracking/pages/TdsFilingNewPage.jsx";
+import BulkImportPage from "./pages/accounts-payable/bulk-import/pages/BulkImportPage.jsx";
+import BulkImportJobPage from "./pages/accounts-payable/bulk-import/pages/BulkImportJobPage.jsx";
 import { PAYMENT_ANY_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/paymentPermissions";
 import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/tdsTrackingPermissions";
 import PaymentQueuePage from "./pages/accounts-payable/payment/pages/PaymentQueuePage.jsx";
@@ -696,6 +698,22 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute requiredPermissions={TDS_TRACKING_ANY_VIEW_PERMISSIONS}>
                 <TdsTrackingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.BULK_IMPORT}
+            element={
+              <ProtectedRoute requiredPermissions={["PAYMENT_PROCESS", "TDS_TRACKING_UPDATE"]}>
+                <BulkImportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.BULK_IMPORT_JOB()}
+            element={
+              <ProtectedRoute requiredPermissions={["PAYMENT_PROCESS", "TDS_TRACKING_UPDATE"]}>
+                <BulkImportJobPage />
               </ProtectedRoute>
             }
           />

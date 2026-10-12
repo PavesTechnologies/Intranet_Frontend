@@ -3,13 +3,15 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import APAutomationPage from "./APAutomationPage";
-import { useAutomationSettings, useAutomationStats, useRunAutomationNow, useUpdateAutomationSettings } from "../hooks/useApAutomation";
+import { useAutomationSettings, useAutomationStats, useRunAutomationNow, useUpdateAutomationSettings, useSharePointImport, useSetSharePointImport } from "../hooks/useApAutomation";
 
 vi.mock("../hooks/useApAutomation", () => ({
   useAutomationSettings: vi.fn(),
   useAutomationStats: vi.fn(),
   useUpdateAutomationSettings: vi.fn(),
   useRunAutomationNow: vi.fn(),
+  useSharePointImport: vi.fn(),
+  useSetSharePointImport: vi.fn(),
 }));
 vi.mock("react-toastify", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
@@ -28,6 +30,12 @@ beforeEach(() => {
   });
   useUpdateAutomationSettings.mockReturnValue(mutation(settings({ enabled: true })));
   useRunAutomationNow.mockReturnValue(mutation([{ invoice_id: 1, outcome: "AUTO_SENT" }]));
+  useSharePointImport.mockReturnValue({
+    data: { enabled: false, configured: true, site: "paves.sharepoint.com:/sites/AP", library: "Documents", root_folder: "AP Imports",
+      folders: ["Payments/Inbox", "TDS Challans/Inbox", "TDS Filings/Inbox"], last_run: { at: "2026-10-12T02:00:00Z", status: "ok", sheets: 2, recorded: 14, review: 3 } },
+    isLoading: false, isError: false,
+  });
+  useSetSharePointImport.mockReturnValue(mutation({ enabled: true }));
 });
 
 const renderPage = () =>
@@ -76,5 +84,23 @@ describe("APAutomationPage", () => {
     renderPage();
     await user.click(screen.getByRole("button", { name: /Re-check waiting invoices/ }));
     expect(useRunAutomationNow.mock.results[0].value.mutateAsync).toHaveBeenCalled();
+  });
+});
+
+describe("SharePoint import card", () => {
+  it("shows the folders and last run, and switches on after confirmation", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    expect(screen.getByText((t) => t.includes("Payments/Inbox, TDS Challans/Inbox"))).toBeInTheDocument();
+    expect(screen.getByText(/14 recorded · 3 to review/)).toBeInTheDocument();
+    await user.click(screen.getByRole("switch", { name: "SharePoint import" }));
+    await user.click(screen.getByRole("button", { name: "Switch on" }));
+    expect(useSetSharePointImport.mock.results[0].value.mutateAsync).toHaveBeenCalledWith(true);
+  });
+
+  it("cannot be switched on before SharePoint is configured", () => {
+    useSharePointImport.mockReturnValue({ data: { enabled: false, configured: false, site: null, library: "Documents", root_folder: "AP Imports", folders: [], last_run: null }, isLoading: false, isError: false });
+    renderPage();
+    expect(screen.getByRole("switch", { name: "SharePoint import" })).toBeDisabled();
   });
 });

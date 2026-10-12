@@ -42,9 +42,32 @@ export function extractFileNameFromContentDisposition(header, fallback = null) {
   return match ? decodeURIComponent(match[1].replace(/"/g, "")) : fallback;
 }
 
+const VIEWABLE_TYPES = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  tif: "image/tiff",
+  tiff: "image/tiff",
+  txt: "text/plain",
+};
+
+/**
+ * A document stored without its type comes back as application/octet-stream, which the browser
+ * downloads instead of showing. When we know the file name, give the blob its real type so it opens.
+ */
+export function viewableBlob(blob, fileName) {
+  const generic = !blob?.type || blob.type === "application/octet-stream" || blob.type === "binary/octet-stream";
+  const extension = (fileName || "").split(".").pop()?.toLowerCase();
+  const type = VIEWABLE_TYPES[extension];
+  return generic && type ? new Blob([blob], { type }) : blob;
+}
+
 /** Opens a blob in a new tab (View Document) — same pattern as InvoiceAttachmentList.handleView. */
-export function openBlobInNewTab(blob) {
-  const url = URL.createObjectURL(blob);
+export function openBlobInNewTab(blob, fileName) {
+  const url = URL.createObjectURL(viewableBlob(blob, fileName));
   window.open(url, "_blank", "noopener,noreferrer");
   // Don't revoke immediately — the new tab still needs the object URL.
   setTimeout(() => URL.revokeObjectURL(url), 60_000);

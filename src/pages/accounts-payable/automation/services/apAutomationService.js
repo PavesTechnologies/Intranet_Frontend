@@ -20,6 +20,14 @@ export const apAutomationService = {
     const { data } = await api.post(`${BASE}/run`);
     return data;
   },
+  async getSharePointImport() {
+    const { data } = await api.get(`${BASE}/sharepoint-import`);
+    return data;
+  },
+  async setSharePointImport(enabled) {
+    const { data } = await api.put(`${BASE}/sharepoint-import`, { enabled });
+    return data;
+  },
   async recheckInvoice(invoiceId) {
     const { data } = await api.post(`${BASE}/invoices/${encodeURIComponent(invoiceId)}/run`);
     return data;

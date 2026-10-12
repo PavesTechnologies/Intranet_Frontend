@@ -19,9 +19,9 @@ import { fmtDate, money } from "../components/TdsDocumentParts";
 
 const PAGE_SIZE = 20;
 
-async function openDocument(loader, id) {
+async function openDocument(loader, id, fileName) {
   try {
-    openBlobInNewTab(await loader(id));
+    openBlobInNewTab(await loader(id), fileName);
   } catch (err) {
     toast.error(getApiErrorMessage(err, "Could not open the document."));
   }
@@ -61,7 +61,7 @@ function ChallanModal({ id, onClose }) {
   return (
     <Modal isOpen={Boolean(id)} onClose={onClose} title={data ? `Challan ${data.cin}` : "Challan"} subtitle={data ? `Deposited ${fmtDate(data.deposit_date)} · BSR ${data.bsr_code} · serial ${data.challan_serial_no}` : undefined} size="lg"
       footer={<div className="flex justify-end gap-2">
-        {data?.has_document && <Button variant="outline" onClick={() => openDocument(tdsChallanService.challanDocument, id)}><FileText className="h-4 w-4" /> View challan</Button>}
+        {data?.has_document && <Button variant="outline" onClick={() => openDocument(tdsChallanService.challanDocument, id, data.file_name)}><FileText className="h-4 w-4" /> View challan</Button>}
         <Button variant="primary" onClick={onClose}>Close</Button>
       </div>}>
       {isLoading || !data ? <p className="text-sm text-slate-500">Loading…</p> : (
@@ -84,7 +84,7 @@ function FilingModal({ id, onClose }) {
   return (
     <Modal isOpen={Boolean(id)} onClose={onClose} title={data ? `${data.form_type} ${data.financial_year} Q${data.quarter}` : "Filing"} subtitle={data ? `Acknowledgement ${data.acknowledgement_no} · filed ${fmtDate(data.filing_date)}` : undefined} size="lg"
       footer={<div className="flex justify-end gap-2">
-        {data?.has_document && <Button variant="outline" onClick={() => openDocument(tdsChallanService.filingDocument, id)}><FileText className="h-4 w-4" /> View acknowledgement</Button>}
+        {data?.has_document && <Button variant="outline" onClick={() => openDocument(tdsChallanService.filingDocument, id, data.file_name)}><FileText className="h-4 w-4" /> View acknowledgement</Button>}
         <Button variant="primary" onClick={onClose}>Close</Button>
       </div>}>
       {isLoading || !data ? <p className="text-sm text-slate-500">Loading…</p> : <InvoicesTable rows={data.invoices} />}
@@ -122,6 +122,9 @@ export default function TdsChallansPage() {
             </Button>
             {canUpdateTdsTracking && (
               <>
+                <Button variant="outline" onClick={() => navigate(`${AP_ROUTES.BULK_IMPORT}?type=${tab === "filings" ? "tds-filings" : "tds-challans"}`)}>
+                  Bulk import
+                </Button>
                 <Button variant="outline" onClick={() => navigate(AP_ROUTES.TDS_FILING_NEW)}>
                   <Plus className="h-4 w-4" /> Record quarterly filing
                 </Button>

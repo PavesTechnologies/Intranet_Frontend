@@ -46,6 +46,8 @@ export const AP_ROUTES = {
 
   TDS_TRACKING: `${BASE}/tds/tracking`,
   TDS_CHALLANS: `${BASE}/tds/challans`,
+  BULK_IMPORT: `${BASE}/bulk-import`,
+  BULK_IMPORT_JOB: (jobId = ":jobId") => `${BASE}/bulk-import/${jobId}`,
   TDS_CHALLAN_NEW: `${BASE}/tds/challans/new`,
   TDS_FILING_NEW: `${BASE}/tds/filings/new`,
   TDS_TRACKING_DETAIL: (invoiceId = ":invoiceId") =>

@@ -34,6 +34,18 @@ function useRefreshAfter(mutationFn) {
   });
 }
 
+export function useSharePointImport() {
+  return useQuery({ queryKey: [...AP_AUTOMATION_KEY, "sharepoint"], queryFn: () => apAutomationService.getSharePointImport() });
+}
+
+export function useSetSharePointImport() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled) => apAutomationService.setSharePointImport(enabled),
+    onSuccess: (status) => queryClient.setQueryData([...AP_AUTOMATION_KEY, "sharepoint"], status),
+  });
+}
+
 export function useRunAutomationNow() {
   return useRefreshAfter(() => apAutomationService.runNow());
 }

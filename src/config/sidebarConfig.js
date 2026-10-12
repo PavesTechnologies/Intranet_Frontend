@@ -352,6 +352,8 @@ export const AP_SUBMENU = [
   // The page lists only the reports the backend says this user may run (reports_route.py);
   // payment access is the entry point today, management reporting permissions join in Phase 6.
   { label: "Reports", to: AP_ROUTES.REPORTS, requiredPermissions: [...PAYMENT_ANY_VIEW_PERMISSIONS, AP_MANAGEMENT_PERMISSIONS.REPORTS_VIEW] },
+  // Payments / TDS challans / filings from one Excel sheet (backend checks the permission per type).
+  { label: "Bulk Import", to: AP_ROUTES.BULK_IMPORT, requiredPermissions: ["PAYMENT_PROCESS", "TDS_TRACKING_UPDATE"] },
   // Touchless PO-invoice settings - Finance Manager only (backend-enforced on /ap-automation).
   { label: "AP Automation", to: AP_ROUTES.AP_AUTOMATION, requiredPermissions: [AP_AUTOMATION_PERMISSIONS.AP_AUTOMATION_MANAGE] },
   // { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
