@@ -112,9 +112,9 @@ export const cashAdvanceApi = {
     }),
 
   // EP04-S4: apply verified expense amount against outstanding cash advance
-  // REST contract: POST /api/v1/expense-reports/{id}/apply-advance-offset
+  // REST contract: POST /xms/api/v1/expense-reports/{id}/apply-advance-offset
   applyAdvanceOffset: (expenseReportId, payload = {}) =>
-    api.post(`/api/v1/expense-reports/${expenseReportId}/apply-advance-offset`, payload, {
+    api.post(`/xms/api/v1/expense-reports/${expenseReportId}/apply-advance-offset`, payload, {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
