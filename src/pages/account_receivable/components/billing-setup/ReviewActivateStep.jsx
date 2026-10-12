@@ -4,7 +4,6 @@ import { Wallet, Receipt, Pencil, ChevronRight, Building2, Calendar, Info } from
 import { PageCard } from "../../../../components/Cards/PageCard";
 import SearchInput from "../../../../components/filter/Searchbar";
 import Modal from "../../../../components/Modal/modal";
-import StatusBadge from "../../../../components/status/statusbadge";
 import { BILLING_MODE_LABELS } from "../../data/wizardOptions";
 import { getBillingTypeDisplayName } from "../../utils/billingType";
 import { formatCurrency, formatDisplayDate, formatProjectDuration } from "../../utils/format";
@@ -22,15 +21,6 @@ const sanitizeProjectCode = (code, projectId) => {
   if (!codeStr) return "";
   if (projectId === null || projectId === undefined || projectId === "") return codeStr;
   return codeStr === String(projectId).trim() ? "" : codeStr;
-};
-
-const labelizeStatus = (value) => {
-  if (!value) return "";
-  return String(value)
-    .toLowerCase()
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
 };
 
 const FREQUENCY_LABEL_MAP = {
@@ -531,7 +521,7 @@ function buildMilestonePlanReview(wizardData, projectInfo) {
 // only place these, Billing Type/Frequency, Currency and Project Budget
 // appear. Shared with the Finance approval review (BillingApprovals.jsx) so
 // all screens present the project identically.
-export function ReviewHeader({ projectInfo, isProductService, approvalStatus, billingStatus, leading, actions, summary }) {
+export function ReviewHeader({ projectInfo, isProductService, leading, actions, summary }) {
   const projectCode = sanitizeProjectCode(projectInfo.projectCode, projectInfo.projectId);
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -569,12 +559,6 @@ export function ReviewHeader({ projectInfo, isProductService, approvalStatus, bi
         </div>
 
         <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end">
-          {(approvalStatus || billingStatus) && (
-            <div className="flex flex-wrap gap-1.5 sm:justify-end">
-              {approvalStatus && <StatusBadge label={labelizeStatus(approvalStatus)} size="sm" />}
-              {billingStatus && <StatusBadge label={labelizeStatus(billingStatus)} size="sm" />}
-            </div>
-          )}
           {actions}
         </div>
       </div>
@@ -836,7 +820,7 @@ function MilestonePlanPricing({ review, currency, projectBudgetValue }) {
 // genuinely different amount, and individual payment amounts appear only in
 // Payment Schedule.
 export default function ReviewActivateStep({ wizardData, onEditStep, leading, headerActions, pendingChanges }) {
-  const { projectInfo = {}, billingConfig = {}, controls = {}, approvalStatus, billingStatus } = wizardData;
+  const { projectInfo = {}, billingConfig = {}, controls = {} } = wizardData;
 
   const billingContext = projectInfo.billingContext || "PROJECT";
   const isProductService = billingContext === "PRODUCT_SERVICE";
@@ -909,8 +893,6 @@ export default function ReviewActivateStep({ wizardData, onEditStep, leading, he
         <ReviewHeader
           projectInfo={projectInfo}
           isProductService={isProductService}
-          approvalStatus={approvalStatus}
-          billingStatus={billingStatus}
           leading={leading}
           actions={
             (headerActions || onEditStep) && (

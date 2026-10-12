@@ -462,7 +462,6 @@ export default function PaymentTermsMasterPage() {
         onClose={() => setIsViewOpen(false)}
         title="Payment Term Details"
         subtitle="Read-only properties of the selected record"
-        badge={viewingItem && <StatusBadge label={viewingItem.status} size="sm" />}
       >
         {viewingItem && (
           <div className="divide-y divide-slate-100 text-sm">

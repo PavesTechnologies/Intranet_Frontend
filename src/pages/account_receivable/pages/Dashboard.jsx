@@ -76,7 +76,6 @@ const WORKSPACE_PATH = `${AR_BASE}/project-billing-setup/workspace`;
 
 // Validated categorical pair (blue / orange) for the financial charts.
 const SERIES_NET = "#2a78d6";
-const SERIES_TAX = "#eb6834";
 const YEAR_SERIES_COLORS = ["#eb6834", "#22c55e", "#2a78d6"];
 const MONTHS_SHOWN = 12;
 const USE_MOCK_DASHBOARD_DATA = true;
@@ -438,11 +437,11 @@ function TrendTooltip({ active, payload, label, currency }) {
     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
       <p className="mb-1 font-semibold text-slate-900">{title}</p>
       <p className="flex items-center justify-between gap-4 text-slate-600">
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm" style={{ background: SERIES_NET }} />Net amount</span>
+        <span>Net amount</span>
         <span className="font-medium tabular-nums text-slate-900">{formatCurrency(net, currency)}</span>
       </p>
       <p className="flex items-center justify-between gap-4 text-slate-600">
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm" style={{ background: SERIES_TAX }} />Tax</span>
+        <span>Tax</span>
         <span className="font-medium tabular-nums text-slate-900">{formatCurrency(tax, currency)}</span>
       </p>
       <div className="mt-1 flex items-center justify-between gap-4 border-t border-slate-100 pt-1">
@@ -910,15 +909,15 @@ export default function AccountReceivableDashboard() {
       </div>
 
       {/* 5. Financial charts — monthly trend + country comparison */}
-      <div className="grid gap-4 lg:grid-cols-5">
-        <PageCard className="lg:col-span-3">
+      <div className="grid gap-4">
+        <PageCard>
           <PageCardContent className="p-4 sm:p-5">
             <SectionTitle
               title="Monthly financial trend"
               subtitle={
                 monthlyTrend.length
-                  ? `${useDemoData ? "Demo view" : "Live view"} • Invoiced across ${MONTHS_SHOWN} months: ${formatCurrency(trendTotals.total, currency)} across ${trendTotals.count} invoice${trendTotals.count === 1 ? "" : "s"}`
-                  : "Invoiced amount per month, split into net amount and tax."
+                  ? `${useDemoData ? "Demo view" : "Live view"} • Grand total across ${MONTHS_SHOWN} months: ${formatCurrency(trendTotals.total, currency)} across ${trendTotals.count} invoice${trendTotals.count === 1 ? "" : "s"} • Hover for net and tax`
+                  : "Grand total per month; hover over a bar for net amount and tax."
               }
               right={
                 currencies.length > 1 && (
@@ -944,9 +943,14 @@ export default function AccountReceivableDashboard() {
                     </span>
                   ))}
                 </div>
-                <div className="h-[240px]" role="img" aria-label={`Monthly invoiced amount in ${currency}, grouped by the last three years`}>
+                <div className="h-[320px]" role="img" aria-label={`Monthly grand total in ${currency}, with separate bars for each of the last three years`}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyTrend} margin={{ top: 16, right: 4, bottom: 0, left: 0 }} barCategoryGap="18%">
+                    <BarChart
+                      data={monthlyTrend}
+                      margin={{ top: 22, right: 12, bottom: 4, left: 4 }}
+                      barCategoryGap="20%"
+                      barGap={4}
+                    >
                       <CartesianGrid vertical={false} stroke="#eef0f3" />
                       <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#e2e8f0" }} tick={{ fontSize: 11, fill: "#64748b" }} />
                       <YAxis
@@ -956,7 +960,11 @@ export default function AccountReceivableDashboard() {
                         tick={{ fontSize: 11, fill: "#64748b" }}
                         tickFormatter={(value) => compactNumber.format(value)}
                       />
-                      <Tooltip cursor={{ fill: "rgba(148,163,184,0.12)" }} content={<TrendTooltip currency={currency} />} />
+                      <Tooltip
+                        shared={false}
+                        cursor={{ fill: "rgba(148,163,184,0.12)" }}
+                        content={<TrendTooltip currency={currency} />}
+                      />
                       {yearValuesFromMonth(monthlyTrend[0]).map((year, index) => (
                         <Bar
                           key={year}
@@ -965,7 +973,7 @@ export default function AccountReceivableDashboard() {
                           stroke="#fff"
                           strokeWidth={1}
                           radius={[4, 4, 0, 0]}
-                          maxBarSize={18}
+                          maxBarSize={24}
                         >
                           <LabelList
                             dataKey={`${year}Total`}
@@ -979,7 +987,7 @@ export default function AccountReceivableDashboard() {
                   </ResponsiveContainer>
                 </div>
                 <table className="sr-only">
-                  <caption>Monthly invoiced amount in {currency}, grouped by year</caption>
+                  <caption>Monthly grand total in {currency}, with separate bars for each year</caption>
                   <thead><tr><th>Month</th>{yearValuesFromMonth(monthlyTrend[0]).map((year) => <th key={year}>{year}</th>)}</tr></thead>
                   <tbody>
                     {monthlyTrend.map((m) => (
@@ -997,7 +1005,7 @@ export default function AccountReceivableDashboard() {
           </PageCardContent>
         </PageCard>
 
-        <PageCard className="lg:col-span-2">
+        <PageCard>
           <PageCardContent className="p-4 sm:p-5">
             <SectionTitle
               title="Country comparison"

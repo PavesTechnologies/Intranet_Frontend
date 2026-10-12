@@ -12,7 +12,6 @@ import {
   SlidersHorizontal,
   FileSpreadsheet,
 } from "lucide-react";
-import StatusBadge from "../../../../components/status/statusbadge";
 import Button from "../../../../components/Button/Button";
 
 export default function BillingReadinessCard({
@@ -57,7 +56,6 @@ export default function BillingReadinessCard({
           <FileCheck className="h-4 w-4 text-indigo-600" />
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Billing Readiness</h3>
         </div>
-        <StatusBadge label={config.snapshotLifecycleStatus || config.billingStatus || "NOT_ACQUIRED"} size="sm" />
       </div>
 
       {/* State-driven Content */}

@@ -928,7 +928,6 @@ export default function AcquisitionDetail() {
           title={
             <span className="flex flex-wrap items-center gap-2.5">
               Pre-Tax Commercial Draft
-              <StatusBadge label="Draft" size="sm" />
             </span>
           }
           subtitle="Review line-item totals before advancing to official tax calculation."
@@ -1042,12 +1041,7 @@ export default function AcquisitionDetail() {
     <div className="mx-auto w-full max-w-7xl space-y-6">
       {/* Page Header */}
       <PageHeader
-        title={
-          <span className="flex flex-wrap items-center gap-2.5">
-            <span className="font-mono">{snapshotNumber || "Not Yet Acquired"}</span>
-            <StatusBadge label={config.billingStatus || "NOT_ACQUIRED"} size="sm" />
-          </span>
-        }
+        title={<span className="font-mono">{snapshotNumber || "Not Yet Acquired"}</span>}
         subtitle="Billing Snapshot"
         actions={
           primaryAction && (

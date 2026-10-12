@@ -138,17 +138,12 @@ export default function TaxCalculationDetailView({
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
-      {/* 1. Header with Status */}
+      {/* 1. Header */}
       <div className="flex items-center gap-3">
         <BackIconButton onClick={onBack} label={backLabel} />
         <div className="min-w-0 flex-1">
           <PageHeader
-            title={
-              <span className="flex flex-wrap items-center gap-2.5">
-                Tax Calculation
-                <StageBadge stage={stage} label={displayStatus} />
-              </span>
-            }
+            title="Tax Calculation"
             subtitle="Authoritative tax engine computation & compliance breakdown"
             actions={headerActions}
           />
