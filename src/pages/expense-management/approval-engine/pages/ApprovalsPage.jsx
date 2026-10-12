@@ -11,6 +11,7 @@ import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import PendingApprovalsPage from "./PendingApprovalsPage";
 import ApprovalHistoryPage from "./ApprovalHistoryPage";
 import CashAdvanceApprovalsList from "../components/CashAdvanceApprovalsList";
+import FinancePage from "../../pages/finance/FinancePage";
 import { useMyQueue, useMyHistory } from "../hooks/useApprovalWorkflow";
 import SearchInput from "@/components/filter/Searchbar";
 import FormSelect from "@/components/forms/FormSelect";
@@ -35,6 +36,9 @@ export default function ApprovalsPage() {
   // -----------------------------
   // Role check
   // -----------------------------
+  // Only people who approve other employees' requests see the approval categories. General (employee)
+  // and Admin/Finance roles are not approvers here; Finance has its own category below. The server
+  // still decides which items each user can act on.
   const isManager = hasRole
     ? hasRole([
         "Manager",
@@ -43,16 +47,13 @@ export default function ApprovalsPage() {
         "Project_Manager",
         "Delivery_Manager",
         "Resource_Manager",
-        "General",
-        "GENERAL",
-        "Finance Executive",
-        "FINANCE_EXECUTIVE",
-        "Finance",
-        "FINANCE",
-        "Admin",
-        "ADMIN",
       ])
-    : true;
+    : false;
+
+  // Finance verification queue, shown as a category so Finance users work from Approvals.
+  const isFinance = hasRole
+    ? hasRole(["Finance", "FINANCE", "Finance_Executive", "FINANCE_EXECUTIVE"])
+    : false;
 
   // -----------------------------
   // Breadcrumbs
@@ -137,7 +138,15 @@ export default function ApprovalsPage() {
       label: "Expense Reports",
       value: "EXPENSE_REPORTS",
     },
-    ...(isManager
+    ...(isFinance
+      ? [
+          {
+            label: "Finance",
+            value: "FINANCE",
+          },
+        ]
+      : []),
+    ...(isManager || isFinance
       ? [
           {
             label: "Cash Advances",
@@ -147,9 +156,12 @@ export default function ApprovalsPage() {
       : []),
   ];
 
-  const activeCategory = isManager
-    ? approvalCategory
-    : "EXPENSE_REPORTS";
+  const activeCategory =
+    approvalCategory === "FINANCE" && !isFinance
+      ? "EXPENSE_REPORTS"
+      : isManager || isFinance
+        ? approvalCategory
+        : "EXPENSE_REPORTS";
 
   // -----------------------------
   // Status options
@@ -375,8 +387,10 @@ export default function ApprovalsPage() {
 
       {/* Tab Content */}
       <div className="approvals-tab-container">
-        {/* Cash Advances */}
-        {activeCategory === "CASH_ADVANCES" ? (
+        {/* Finance verification (Finance roles only) */}
+        {activeCategory === "FINANCE" ? (
+          <FinancePage />
+        ) : /* Cash Advances */ activeCategory === "CASH_ADVANCES" ? (
           <CashAdvanceApprovalsList
             key={`cash-${activeTab}-${reloadKey}`}
             activeTab={activeTab}

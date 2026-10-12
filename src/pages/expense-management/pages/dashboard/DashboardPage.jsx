@@ -38,7 +38,10 @@ import {
   ItemList,
 } from "@/pages/expense-management/components/dashboard/DashboardWidgets";
 
-const VIEW_STORAGE_KEY = "xms.dashboard.view";
+// Remembered tab is per user: one browser is often shared by several accounts (e.g. a Finance login
+// and an approver login), and a shared key made the second account open on the first one's tab.
+const viewStorageKey = (user) =>
+  `xms.dashboard.view.${user?.employeeId || user?.email || user?.id || "anonymous"}`;
 
 /**
  * One entry per role dashboard: who may see it, its tab label, the backend view it loads
@@ -147,7 +150,7 @@ export default function DashboardPage() {
   }, [available]);
   const [view, setView] = useState(() => {
     try {
-      return localStorage.getItem(VIEW_STORAGE_KEY) || null;
+      return localStorage.getItem(viewStorageKey(user)) || null;
     } catch {
       return null;
     }
@@ -155,7 +158,7 @@ export default function DashboardPage() {
   const active = available.find((v) => v.view === view) || available.find((v) => v.view === defaultView) || VIEWS[0];
   useEffect(() => {
     try {
-      localStorage.setItem(VIEW_STORAGE_KEY, active.view);
+      localStorage.setItem(viewStorageKey(user), active.view);
     } catch {
       /* private mode etc. - the choice just isn't remembered */
     }

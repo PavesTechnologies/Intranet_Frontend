@@ -16,7 +16,7 @@ import {
   formatMoney,
   getCostCenterValue,
   getStatusBadge,
-} from "@/pages/expense-management/pages/cash-advance/MyAdvancesPage";
+} from "@/pages/expense-management/pages/cash-advance/cashAdvanceDisplay";
 
 const APPROVALS_PATH = "/expense-management/approvals";
 const MY_ADVANCES_PATH = "/expense-management/cash-advance/my";
@@ -67,6 +67,7 @@ export default function CashAdvanceDetailPage() {
 
   const [advance, setAdvance] = useState(null);
   const [settlement, setSettlement] = useState(null);
+  const [utilization, setUtilization] = useState(null);
   const [loading, setLoading] = useState(true);
   const [repayment, setRepayment] = useState({ amount: "", paymentMethod: "BANK_TRANSFER", paymentReference: "", notes: "" });
   const [repayError, setRepayError] = useState("");
@@ -82,8 +83,12 @@ export default function CashAdvanceDetailPage() {
 
       // The settlement figures (verified expenses, repaid, outstanding) come from the settlement endpoint
       if (isSettlementView) {
-        const settlementResponse = await cashAdvanceApi.getSettlement(advanceId);
+        const [settlementResponse, utilizationResponse] = await Promise.all([
+          cashAdvanceApi.getSettlement(advanceId),
+          cashAdvanceApi.getUtilization(advanceId),
+        ]);
         setSettlement(settlementResponse?.data?.data ?? settlementResponse?.data ?? null);
+        setUtilization(utilizationResponse?.data?.data ?? utilizationResponse?.data ?? null);
       }
     } catch (error) {
       console.error("Failed to load cash advance:", error);
@@ -234,6 +239,94 @@ export default function CashAdvanceDetailPage() {
                 <p className={`mt-1 text-sm font-bold ${tone}`}>{value}</p>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Server-calculated utilization from the linked expense reports (settlement view only; figures are not recalculated here) */}
+        {isSettlementView && utilization && (
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[#0a174e]">Utilization from expense reports</h4>
+              <span className="text-[11px] font-semibold text-gray-600">Closure: {utilization.closureStatus?.replace(/_/g, " ")}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {[
+                ["Claimed", utilization.claimedAmount],
+                ["Approved", utilization.approvedAmount],
+                ["Returned", utilization.returnedAmount],
+                ["Pending review", utilization.pendingReviewAmount],
+                ["Submitted (reserved)", utilization.submittedReservationAmount],
+                ["Approved utilization", utilization.approvedUtilization],
+                ["Repaid (confirmed)", utilization.totalRepaidAmount],
+                ["Outstanding", utilization.outstandingBalance],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{label}</p>
+                  <p className="mt-1 text-sm font-bold text-gray-900">{formatMoney(value ?? 0, utilization.currencyCode || advance.currencyCode || "INR")}</p>
+                </div>
+              ))}
+            </div>
+
+            {!utilization.balanceConsistent && (
+              <p className="text-xs font-semibold text-rose-700">
+                Stored outstanding balance does not match the ledger. Check the adjustments and repayments before closing.
+              </p>
+            )}
+
+            {utilization.linkedReports?.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-gray-500">
+                      <th className="py-1.5 pr-4 font-semibold">Report</th>
+                      <th className="py-1.5 pr-4 font-semibold">Status</th>
+                      <th className="py-1.5 pr-4 font-semibold text-right">Claimed</th>
+                      <th className="py-1.5 font-semibold text-right">Reserved</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {utilization.linkedReports.map((r) => (
+                      <tr key={r.reportId} className="border-t border-gray-100">
+                        <td className="py-1.5 pr-4 font-mono">{r.reportNumber}</td>
+                        <td className="py-1.5 pr-4">{r.reportStatus?.replace(/_/g, " ")}</td>
+                        <td className="py-1.5 pr-4 text-right">{formatMoney(r.claimedAmount ?? 0, utilization.currencyCode || "INR")}</td>
+                        <td className="py-1.5 text-right">{formatMoney(r.reservedAmount ?? 0, utilization.currencyCode || "INR")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {utilization.categories?.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-gray-500">
+                      <th className="py-1.5 pr-4 font-semibold">Category</th>
+                      <th className="py-1.5 pr-4 font-semibold text-right">Lines</th>
+                      <th className="py-1.5 pr-4 font-semibold text-right">Claimed</th>
+                      <th className="py-1.5 pr-4 font-semibold text-right">Approved</th>
+                      <th className="py-1.5 pr-4 font-semibold text-right">Returned</th>
+                      <th className="py-1.5 font-semibold text-right">Missing receipts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {utilization.categories.map((c) => (
+                      <tr key={c.categoryId ?? c.categoryName} className="border-t border-gray-100">
+                        <td className="py-1.5 pr-4">{c.categoryName}</td>
+                        <td className="py-1.5 pr-4 text-right">{c.lineCount}</td>
+                        <td className="py-1.5 pr-4 text-right">{formatMoney(c.claimedAmount ?? 0, utilization.currencyCode || "INR")}</td>
+                        <td className="py-1.5 pr-4 text-right">{formatMoney(c.approvedAmount ?? 0, utilization.currencyCode || "INR")}</td>
+                        <td className="py-1.5 pr-4 text-right">{formatMoney(c.returnedAmount ?? 0, utilization.currencyCode || "INR")}</td>
+                        <td className={`py-1.5 text-right ${c.missingReceiptCount > 0 ? "font-semibold text-rose-700" : ""}`}>{c.missingReceiptCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 

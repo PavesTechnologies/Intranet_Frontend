@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getStageIndex } from "../components/CashAdvanceWorkflowStepper";
+import { getStageIndex } from "../cashAdvanceStages";
 
 describe("getStageIndex", () => {
   it("treats an approved-but-not-disbursed advance as stage 3, not as settled", () => {

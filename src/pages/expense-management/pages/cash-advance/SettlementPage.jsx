@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { DollarSign, CheckCircle2, RefreshCw, Eye, CheckCircle, Clock, FileText, AlertCircle, Layers, ArrowUpRight, ArrowDownLeft, CreditCard, XCircle, Loader2 } from "lucide-react";
+import { DollarSign, CheckCircle2, RefreshCw, Eye, Receipt, CheckCircle, Clock, FileText, AlertCircle, Layers, ArrowUpRight, ArrowDownLeft, CreditCard, XCircle, Loader2 } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import Button from "@/components/Button/Button";
 import SearchInput from "@/components/filter/Searchbar";
@@ -58,6 +58,20 @@ const getEmployeeName = (adv, directory) => {
   }
   return "—";
 };
+
+// Statuses in which the employee may attach expenses to settle the advance (matches the backend's
+// linkable-advance rule in ExpenseReportServiceImpl).
+const LINKABLE_EXPENSE_STATUSES = [
+  "DISBURSED", "IN_PROGRESS", "EXPENSE_SUBMITTED", "EXPENSE_VERIFIED",
+  "SETTLEMENT_PENDING", "PARTIALLY_ADJUSTED", "PARTIALLY_SETTLED",
+];
+
+// The button is for the advance's own employee only. The backend checks this again when the report is created.
+const canOpenExpenseFor = (adv, user) =>
+  Boolean(user?.employeeId) &&
+  String(adv.employeeId ?? "").trim().toLowerCase() === String(user.employeeId).trim().toLowerCase() &&
+  LINKABLE_EXPENSE_STATUSES.includes((adv.status || "").toUpperCase()) &&
+  Number(adv.outstandingBalance ?? 0) > 0;
 
 export default function SettlementPage() {
   const { user, hasRole } = useAuth();
@@ -563,6 +577,16 @@ export default function SettlementPage() {
                           >
                             <Eye size={15} />
                           </button>
+
+                          {canOpenExpenseFor(adv, user) && (
+                            <button
+                              onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${adv.advanceId || adv.id}`)}
+                              title="Create an expense report for this cash advance"
+                              className="inline-flex items-center gap-1 rounded-md border border-indigo-200 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-50"
+                            >
+                              <Receipt size={13} /> Cash Advance Expense
+                            </button>
+                          )}
 
                           {isFinanceExecutive && (
                             <>

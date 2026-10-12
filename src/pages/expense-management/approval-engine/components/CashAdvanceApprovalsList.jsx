@@ -210,7 +210,8 @@ const canApproveAdvance = (adv, user, hasRole) => {
     return false;
   }
 
-  // User must have appropriate approval role (Manager, Finance Executive, Finance, or Admin)
+  // Manager roles approve at manager stage; Finance roles approve at finance stage. Employees (General)
+  // and Admin are not approvers. The stage checks below decide which of the two applies to each advance.
   const isAuthorizedRole = hasRole
     ? hasRole([
         "Manager",
@@ -219,16 +220,12 @@ const canApproveAdvance = (adv, user, hasRole) => {
         "Project_Manager",
         "Delivery_Manager",
         "Resource_Manager",
-        "General",
-        "GENERAL",
-        "Finance Executive",
-        "FINANCE_EXECUTIVE",
         "Finance",
         "FINANCE",
-        "Admin",
-        "ADMIN"
+        "Finance_Executive",
+        "FINANCE_EXECUTIVE",
       ])
-    : true;
+    : false;
 
   if (!isAuthorizedRole) {
     return false;
