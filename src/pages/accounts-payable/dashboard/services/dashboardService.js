@@ -26,6 +26,16 @@ export const dashboardService = {
     }
   },
 
+  /** Action Center: this user's prioritised to-do list, all-clear areas and quick actions (GET /dashboard/actions). */
+  async getActions() {
+    try {
+      const response = await api.get(`${AP_BASE_URL}/dashboard/actions`);
+      return response.data;
+    } catch (error) {
+      throw withNormalizedStatus(error);
+    }
+  },
+
   /** One role dashboard: "management" | "approvals" | "my_work" | "finance" (GET /dashboard/view/{key}). */
   async getView(key) {
     try {
