@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, History } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import JdCalibrationBadge from "../../components/JdCalibrationBadge";
+import JdUnknownSkillResolver from "./JdUnknownSkillResolver";
 import { getJDCalibration, getJDCalibrationVersions, saveJDCalibration } from "../../service/jdservice";
 
 // JD calibration: HR_ADMIN confirms or edits the JD's scoring inputs - skill tiers,
@@ -88,6 +89,21 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved }) {
     }
   };
 
+  // An unknown skill was resolved: take the new view, keeping unsaved edits to
+  // the skills already on the form (a mapped skill arrives with its own tier).
+  const onUnknownResolved = (calibration) => {
+    if (!calibration) { load(); return; }
+    const fresh = formFromView(calibration);
+    setView(calibration);
+    setForm((f) => ({
+      ...fresh,
+      skills: Object.fromEntries(Object.entries(fresh.skills).map(([id, v]) => [id, f?.skills[id] || v])),
+      min: f ? f.min : fresh.min, tolerance: f ? f.tolerance : fresh.tolerance, education: f ? f.education : fresh.education,
+    }));
+    setVersions(null);
+    onSaved?.();
+  };
+
   const toggleHistory = async () => {
     if (versions) { setVersions(null); return; }
     setVersions(await getJDCalibrationVersions(jdId));
@@ -98,6 +114,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved }) {
 
   const readOnly = !canCalibrate;
   const missingSense = view.skills.filter((s) => s.ambiguous && !form.skills[s.jd_skill_id]?.sense_key);
+  const blocking = view.blocking_unknown_skills || [];
 
   return (
     <div className="space-y-5">
@@ -130,8 +147,13 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved }) {
               {versions.map((v) => (
                 <li key={v.version_no} className="text-xs text-slate-700">
                   <span className="font-bold">v{v.version_no}</span> · {v.calibrated_by_name || v.calibrated_by} · {v.calibrated_at.split("T")[0]}
+                  {v.changes?.note && <span className="text-slate-500"> · {v.changes.note}</span>}
                   {v.changes?.skills?.length > 0 && (
-                    <span className="text-slate-500"> · {v.changes.skills.map((c) => `${c.skill}: ${c.field === "tier" ? "tier" : "meaning"} ${c.before ?? "—"} → ${c.after ?? "—"}`).join("; ")}</span>
+                    <span className="text-slate-500"> · {v.changes.skills.map((c) => (
+                      c.field === "added" ? `${c.skill} added (${(c.after || "unclassified").toLowerCase()})`
+                        : c.field === "removed" ? `${c.skill} removed`
+                          : `${c.skill}: ${c.field === "tier" ? "tier" : "meaning"} ${c.before ?? "—"} → ${c.after ?? "—"}`
+                    )).join("; ")}</span>
                   )}
                   {["min_experience_years", "experience_tolerance_years", "education_requirement"].filter((k) => v.changes?.[k]).map((k) => (
                     <span key={k} className="text-slate-500"> · {k.replaceAll("_", " ")}: {String(v.changes[k].before ?? "—")} → {String(v.changes[k].after ?? "—")}</span>
@@ -199,18 +221,8 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved }) {
             })}
           </tbody>
         </table>
-        {view.unknown_skills.length > 0 && (
-          <div className="mt-4">
-            <h4 className="text-[11px] font-bold text-slate-600 mb-1">Not in the catalogue (unknown skills)</h4>
-            <ul className="text-xs text-slate-600 space-y-0.5">
-              {view.unknown_skills.map((u) => (
-                <li key={u.unknown_skill_id}>{u.raw_text}
-                  <span className="text-slate-400"> · {u.tier ? u.tier.toLowerCase() : "unclassified"} · {u.status.toLowerCase()}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <JdUnknownSkillResolver jdId={jdId} unknownSkills={view.unknown_skills} readOnly={readOnly}
+          onResolved={onUnknownResolved} />
       </div>
 
       {/* Experience & education */}
@@ -257,9 +269,11 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved }) {
 
       {!readOnly && (
         <div className="flex justify-end">
-          <Button variant="primary" size="medium" onClick={save} disabled={saving || missingSense.length > 0}
+          <Button variant="primary" size="medium" onClick={save}
+            disabled={saving || missingSense.length > 0 || blocking.length > 0}
             loading={saving} loadingText="Saving..."
-            title={missingSense.length > 0 ? `Choose the meaning of: ${missingSense.map((s) => s.name).join(", ")}` : undefined}>
+            title={blocking.length > 0 ? `Resolve these core skills first: ${blocking.join(", ")}`
+              : missingSense.length > 0 ? `Choose the meaning of: ${missingSense.map((s) => s.name).join(", ")}` : undefined}>
             {view.calibration_status === "CALIBRATED" ? "Save calibration" : "Calibrate JD"}
           </Button>
         </div>

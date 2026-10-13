@@ -603,6 +603,7 @@ export default function JdDetails() {
     ),
     <div key="rawSkill" className="w-full flex justify-start select-none">Raw Skill</div>,
     <div key="mandatory" className="w-full flex justify-center select-none">Mandatory</div>,
+    <div key="tier" className="w-full flex justify-center select-none">Tier</div>,
     <div key="status" className="w-full flex justify-center select-none">Status</div>,
     <div key="createdAt" className="w-full flex justify-center select-none">Created Date</div>,
     isHRAdmin && <div key="action" className="w-full flex justify-center select-none">Action</div>,
@@ -612,6 +613,7 @@ export default function JdDetails() {
     isHRAdmin && "select",
     "raw_text",
     "mandatory",
+    "tier",
     "status",
     "created_at",
     isHRAdmin && "action",
@@ -648,10 +650,18 @@ export default function JdDetails() {
             </span>
           </div>
         ),
+        tier: (
+          <div className="w-full flex justify-center">
+            <span className={`text-[9px] px-2 py-0.5 rounded font-bold border capitalize ${
+              sk.tier === "CORE" ? "bg-rose-50 text-rose-700 border-rose-100" : "bg-slate-100 text-slate-500 border-slate-200"}`}>
+              {sk.tier ? sk.tier.toLowerCase() : "unclassified"}
+            </span>
+          </div>
+        ),
         status: (
           <div className="w-full flex justify-center">
             <span className="text-[9px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-bold border border-amber-100">
-              {sk.status}
+              {sk.resolution ? `${sk.status} · ${sk.resolution.replace("_", " ").toLowerCase()}` : sk.status}
             </span>
           </div>
         ),

@@ -405,3 +405,31 @@ export const getJDCalibrationVersions = async (jdId) => {
         return [];
     }
 };
+
+// GET /job-descriptions/{jd_id}/unknown-skills/suggestions - top-3 catalogue
+// skills (embedding similarity) for each unresolved unknown skill of the JD.
+export const getJDUnknownSkillSuggestions = async (jdId) => {
+    try {
+        const response = await api.get(`${BASE_URL}/job-descriptions/${jdId}/unknown-skills/suggestions`, { headers: authHeader() });
+        return response.data?.data ?? response.data ?? [];
+    } catch (error) {
+        console.error("Error fetching unknown-skill suggestions:", error);
+        return [];
+    }
+};
+
+// POST /job-descriptions/{jd_id}/unknown-skills/{unknown_skill_id}/resolve (HR_ADMIN)
+// payload: { action: "MAP", canonical_skill_id } | { action: "NEW", canonical_name? } | { action: "DROP" }.
+// MAP / DROP affect this JD only; NEW adds the skill to the catalogue for every JD.
+export const resolveJDUnknownSkill = async (jdId, unknownSkillId, payload) => {
+    try {
+        const response = await api.post(
+            `${BASE_URL}/job-descriptions/${jdId}/unknown-skills/${unknownSkillId}/resolve`, payload, { headers: authHeader() });
+        toast.success(response.data?.message || "Resolved.");
+        return response.data?.data ?? response.data;
+    } catch (error) {
+        console.error("Error resolving unknown skill:", error);
+        toast.error(getErrorMessage(error, "Failed to resolve the unknown skill."));
+        throw error;
+    }
+};
