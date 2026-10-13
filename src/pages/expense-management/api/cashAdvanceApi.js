@@ -1,6 +1,7 @@
 import api from "@/api/axiosInstance";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const authHeaders = () => {
   const token = localStorage.getItem("token");

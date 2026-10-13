@@ -50,6 +50,7 @@ import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal
 import TaxBreakdownPanel, {
   emptyTaxValue,
 } from "@/pages/expense-management/components/expense-reports/TaxBreakdownPanel";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 const breadcrumbs = [
   {
     label: "Expense Management",
@@ -610,7 +611,7 @@ export default function CreateExpensePage() {
           const [catList, projListResponse] = await Promise.all([
             lookupService.getActiveCategories(),
             api.get("/xms/admin/projects", {
-              baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
+              baseURL: XMS_BASE_URL,
               headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
               },

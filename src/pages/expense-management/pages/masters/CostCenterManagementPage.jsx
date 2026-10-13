@@ -37,8 +37,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { showStatusToast } from "@/components/toastfy/toast";
 import api from "@/api/axiosInstance";
 import Pagination from "@/components/Pagination/pagination";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 const EMPLOYEE_ONBOARDING_URL = window.__APP_CONFIG__?.EMPLOYEE_ONBOARDING_URL || "";
 
 const authHeaders = () => ({

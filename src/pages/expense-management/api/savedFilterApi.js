@@ -1,6 +1,7 @@
 import api from "@/api/axiosInstance";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 const withBase = (extra) => ({ baseURL: EXPENSE_API_BASE, headers: authHeaders(), ...extra });
@@ -19,7 +20,7 @@ export const savedFilterApi = {
    */
   create: (filterName, employeeId, filterJson) => {
     return api.post(
-      "/employee/saved-filters",
+      "/xms/employee/saved-filters",
       {
         filterName,
         employeeId,
@@ -33,14 +34,14 @@ export const savedFilterApi = {
    * Get all saved filters for current user
    */
   getAll: () => {
-    return api.get("/employee/saved-filters", withBase());
+    return api.get("/xms/employee/saved-filters", withBase());
   },
 
   /**
    * Get a specific saved filter by ID
    */
   getById: (filterId) => {
-    return api.get(`/employee/saved-filters/${filterId}`, withBase());
+    return api.get(`/xms/employee/saved-filters/${filterId}`, withBase());
   },
 
   /**
@@ -48,7 +49,7 @@ export const savedFilterApi = {
    */
   update: (filterId, filterName, employeeId, filterJson) => {
     return api.put(
-      `/employee/saved-filters/${filterId}`,
+      `/xms/employee/saved-filters/${filterId}`,
       {
         filterName,
         employeeId,
@@ -62,6 +63,6 @@ export const savedFilterApi = {
    * Delete a saved filter
    */
   delete: (filterId) => {
-    return api.delete(`/employee/saved-filters/${filterId}`, withBase());
+    return api.delete(`/xms/employee/saved-filters/${filterId}`, withBase());
   },
 };
