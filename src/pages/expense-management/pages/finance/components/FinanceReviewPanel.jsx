@@ -14,6 +14,7 @@ import {
 import Button from "@/components/Button/Button";
 import { showStatusToast } from "@/components/toastfy/toast";
 import { expenseReportService, lineItemService } from "@/pages/expense-management/api/expenseReportsApi";
+import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { PolicyResultBanner } from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
 import ApprovalStatusPill from "../../../approval-engine/components/ApprovalStatusPill";
 import EmployeeLabel from "../../../approval-engine/components/EmployeeLabel";
@@ -98,6 +99,7 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
   });
 
   const reportStatus = fullReport?.reportStatus || "PENDING_FINANCE_VERIFICATION";
+  const [applyingOffset, setApplyingOffset] = useState(false);
   const lineItems = queueItem?.pendingLineItems || [];
 
   // Match queue items or full items
@@ -170,10 +172,29 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
     verifyLineItem.mutate(
       { reportId, lineItemId: selectedLine.lineItemId, taxChecked },
       {
-        onSuccess: () => showStatusToast("Line item verified successfully", "success"),
+        onSuccess: async () => {
+          showStatusToast("Line item verified successfully", "success");
+          // The advance offset is applied once per report, after approval, from the button below.
+        },
         onError: (err) => showStatusToast(err.response?.data?.message || "Failed to verify line item", "error"),
       }
     );
+  };
+
+  // Applies the verified report against its linked cash advance, once. Server errors (not linked,
+  // already offset, over the verified total or the outstanding balance) are shown, never swallowed.
+  const handleApplyOffset = async () => {
+    setApplyingOffset(true);
+    try {
+      await cashAdvanceApi.applyAdvanceOffset(reportId, {
+        cashAdvanceId: fullReport.cashAdvanceId,
+      });
+      showStatusToast("Advance offset applied", "success");
+    } catch (err) {
+      showStatusToast(err.response?.data?.message || "Failed to apply advance offset", "error");
+    } finally {
+      setApplyingOffset(false);
+    }
   };
 
   const handleAdjustTax = (payload) => {
@@ -370,6 +391,17 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
                 onClick={handleVerify}
               >
                 <Check className="h-4 w-4" /> Verify Line
+              </Button>
+            </div>
+          )}
+
+          {!canAct && fullReport?.cashAdvanceId && ["APPROVED", "CLOSED"].includes(reportStatus) && (
+            <div className="sticky bottom-0 flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-gray-200 bg-white p-3 sm:p-4">
+              <p className="mr-auto text-xs text-gray-600">
+                This report is linked to a cash advance. Applying the offset reduces the advance by the verified total, and can be done once.
+              </p>
+              <Button variant="success" disabled={applyingOffset} loading={applyingOffset} onClick={handleApplyOffset}>
+                <Check className="h-4 w-4" /> Apply Advance Offset
               </Button>
             </div>
           )}

@@ -11,10 +11,13 @@ import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import PendingApprovalsPage from "./PendingApprovalsPage";
 import ApprovalHistoryPage from "./ApprovalHistoryPage";
 import CashAdvanceApprovalsList from "../components/CashAdvanceApprovalsList";
+import FinancePage from "../../pages/finance/FinancePage";
 import { useMyQueue, useMyHistory } from "../hooks/useApprovalWorkflow";
 import SearchInput from "@/components/filter/Searchbar";
 import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 
 const QUEUE_PAGE_SIZE = 20;
 
@@ -33,6 +36,9 @@ export default function ApprovalsPage() {
   // -----------------------------
   // Role check
   // -----------------------------
+  // Only people who approve other employees' requests see the approval categories. General (employee)
+  // and Admin/Finance roles are not approvers here; Finance has its own category below. The server
+  // still decides which items each user can act on.
   const isManager = hasRole
     ? hasRole([
         "Manager",
@@ -41,16 +47,13 @@ export default function ApprovalsPage() {
         "Project_Manager",
         "Delivery_Manager",
         "Resource_Manager",
-        "General",
-        "GENERAL",
-        "Finance Executive",
-        "FINANCE_EXECUTIVE",
-        "Finance",
-        "FINANCE",
-        "Admin",
-        "ADMIN",
       ])
-    : true;
+    : false;
+
+  // Finance verification queue, shown as a category so Finance users work from Approvals.
+  const isFinance = hasRole
+    ? hasRole(["Finance", "FINANCE", "Finance_Executive", "FINANCE_EXECUTIVE"])
+    : false;
 
   // -----------------------------
   // Breadcrumbs
@@ -85,9 +88,26 @@ export default function ApprovalsPage() {
   // -----------------------------
   // Counts
   // -----------------------------
-  const pendingCount = queueQuery.data?.totalElements ?? 0;
-  const approvedCount = approvedQuery.data?.totalElements ?? 0;
-  const rejectedCount = rejectedQuery.data?.totalElements ?? 0;
+  // Cash advance totals per tab, from the same endpoint the Cash Advances list uses,
+  // so the cards and the list agree. Only the total is needed, so ask for one row.
+  const cashAdvanceCountQuery = (status) => ({
+    queryKey: ["cashAdvanceApprovalCount", status ?? "PENDING", reloadKey],
+    queryFn: async () => {
+      const res = await cashAdvanceApi.getMyApprovals({ status, page: 0, size: 1 });
+      return res.data?.data?.totalElements ?? 0;
+    },
+  });
+
+  const cashAdvancePendingQuery = useQuery(cashAdvanceCountQuery());
+  const cashAdvanceApprovedQuery = useQuery(cashAdvanceCountQuery("APPROVED"));
+  const cashAdvanceRejectedQuery = useQuery(cashAdvanceCountQuery("REJECTED"));
+
+  const pendingCount =
+    (queueQuery.data?.totalElements ?? 0) + (cashAdvancePendingQuery.data ?? 0);
+  const approvedCount =
+    (approvedQuery.data?.totalElements ?? 0) + (cashAdvanceApprovedQuery.data ?? 0);
+  const rejectedCount =
+    (rejectedQuery.data?.totalElements ?? 0) + (cashAdvanceRejectedQuery.data ?? 0);
 
   const totalCount =
     pendingCount + approvedCount + rejectedCount;
@@ -118,7 +138,15 @@ export default function ApprovalsPage() {
       label: "Expense Reports",
       value: "EXPENSE_REPORTS",
     },
-    ...(isManager
+    ...(isFinance
+      ? [
+          {
+            label: "Finance",
+            value: "FINANCE",
+          },
+        ]
+      : []),
+    ...(isManager || isFinance
       ? [
           {
             label: "Cash Advances",
@@ -128,9 +156,12 @@ export default function ApprovalsPage() {
       : []),
   ];
 
-  const activeCategory = isManager
-    ? approvalCategory
-    : "EXPENSE_REPORTS";
+  const activeCategory =
+    approvalCategory === "FINANCE" && !isFinance
+      ? "EXPENSE_REPORTS"
+      : isManager || isFinance
+        ? approvalCategory
+        : "EXPENSE_REPORTS";
 
   // -----------------------------
   // Status options
@@ -356,8 +387,10 @@ export default function ApprovalsPage() {
 
       {/* Tab Content */}
       <div className="approvals-tab-container">
-        {/* Cash Advances */}
-        {activeCategory === "CASH_ADVANCES" ? (
+        {/* Finance verification (Finance roles only) */}
+        {activeCategory === "FINANCE" ? (
+          <FinancePage />
+        ) : /* Cash Advances */ activeCategory === "CASH_ADVANCES" ? (
           <CashAdvanceApprovalsList
             key={`cash-${activeTab}-${reloadKey}`}
             activeTab={activeTab}

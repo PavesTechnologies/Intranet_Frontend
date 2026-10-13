@@ -102,6 +102,13 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }),
 
+  // Server-calculated utilization (claimed/approved/returned, reservations, closure). Display only.
+  getUtilization: (advanceId) =>
+    api.get(`/xms/employee/cash-advances/${advanceId}/utilization`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+
   repay: (advanceId, payload) =>
     api.post(`/xms/employee/cash-advances/${advanceId}/repayments`, {
       advanceId,

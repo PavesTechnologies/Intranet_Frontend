@@ -17,7 +17,10 @@
       "Bash(grep -Hm1 ^description: /c/Users/Rangaswamy.Dama/Downloads/Intranet_Frontend/.claude/skills/*/SKILL.md)",
       "Bash(ls /c/Users/Rangaswamy.Dama/Downloads/Intranet_Frontend/.claude/skills)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5173/ --max-time 3)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:5173/src/pages/airs/candidates/CandidateScore/tabs/Resume/ResumeTab.jsx\" --max-time 5)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:5173/src/pages/airs/candidates/CandidateScore/tabs/Resume/ResumeTab.jsx\" --max-time 5)",
+      "Bash(node -c \"src/pages/expense-management/approval-engine/components/__tests__/CashAdvanceApprovalsList.test.js\")",
+      "Bash(npm test *)",
+      "Read(//c/Users/Lokeshwari.Busam/Desktop/Myfiles/projects/Expense_Management_Service/src/main/java/com/expense_management_service/service/impl/**)"
     ]
   }
 }
