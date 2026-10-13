@@ -1,4 +1,5 @@
 import api from "@/api/axiosInstance";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 /**
  * Service layer for Finance Verification endpoints (/xms/finance-verification/*).
@@ -6,7 +7,7 @@ import api from "@/api/axiosInstance";
  * base URL overrides and auth headers configuration.
  */
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,

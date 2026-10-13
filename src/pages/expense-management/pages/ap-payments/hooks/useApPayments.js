@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/axiosInstance";
 import { apPaymentApi } from "@/pages/accounts-payable/services/apPaymentApi";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 /**
  * Wraps the existing accounts-payable apPaymentApi (GET /xms/ap-payments/queue,
@@ -19,7 +20,7 @@ export const AP_HISTORY_KEY = (status, page, size) => ["apPaymentHistory", statu
 // called directly here (same base URL/auth as that client) rather than editing that module.
 const getApHistory = (status, page, size) =>
   api.get("/xms/ap-payments/history", {
-    baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
+    baseURL: XMS_BASE_URL,
     headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     params: { status, page, size },
   });
@@ -62,7 +63,7 @@ export const useApPaymentSummary = () =>
     queryFn: () =>
       api
         .get("/xms/ap-payments/summary", {
-          baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
+          baseURL: XMS_BASE_URL,
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         })
         .then(unwrap),

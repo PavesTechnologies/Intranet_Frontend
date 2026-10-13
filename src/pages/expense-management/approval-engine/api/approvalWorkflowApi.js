@@ -1,4 +1,5 @@
 import api from "@/api/axiosInstance";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 /**
  * Service layer for the Approval Engine's action/read endpoints (/xms/approvals/*),
@@ -13,7 +14,7 @@ import api from "@/api/axiosInstance";
  *   { content: [...], page, size, totalElements, totalPages, first, last }
  */
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,

@@ -1,11 +1,12 @@
 import api from "@/api/axiosInstance";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 /**
  * Admin config backing ApproverSourceType.DEPARTMENT_OWNER resolution (/xms/admin/department-approvers,
  * ADMIN-only). DepartmentApproverRequest: { departmentUuid, approverEmployeeId, status? }.
  */
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 const withBase = (extra) => ({ baseURL: EXPENSE_API_BASE, headers: authHeaders(), ...extra });

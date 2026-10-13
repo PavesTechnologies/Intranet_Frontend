@@ -1,6 +1,7 @@
 import api from "@/api/axiosInstance";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 const withBase = (extra) => ({ baseURL: EXPENSE_API_BASE, headers: authHeaders(), ...extra });
@@ -16,6 +17,6 @@ export const globalSearchApi = {
     if (!query || query.trim() === "") {
       return Promise.resolve({ data: { content: [], totalElements: 0, totalPages: 0 } });
     }
-    return api.get(`/search?q=${encodeURIComponent(query)}&page=${page}&size=${size}`, withBase());
+    return api.get(`/xms/api/v1/search?q=${encodeURIComponent(query)}&page=${page}&size=${size}`, withBase());
   },
 };

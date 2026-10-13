@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
+import Button from "../../../../components/Button/Button";
 import GenericTable from "../../../../components/Table/table";
 import Pagination from "../../../../components/Pagination/pagination";
 import StatusBadge from "../../../../components/status/statusbadge";
@@ -92,6 +93,11 @@ export default function TdsTrackingPage() {
       <PageHeader
         title="TDS Tracking"
         subtitle="Invoices with TDS withheld — record deduction, challan payment and return filing done outside the Intranet"
+        actions={
+          <Link to={AP_ROUTES.TDS_CHALLANS}>
+            <Button variant="primary">Challans &amp; filings</Button>
+          </Link>
+        }
       />
 
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4 md:items-end">

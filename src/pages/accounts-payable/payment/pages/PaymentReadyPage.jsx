@@ -107,9 +107,16 @@ export default function PaymentReadyPage() {
         title="Ready for Payment"
         subtitle="Approved invoices with verified TDS and an outstanding payable balance"
         actions={
-          <Link to={AP_ROUTES.PAYMENT_HISTORY} className="text-sm font-medium text-[#0A0082] hover:underline">
-            Payment History →
-          </Link>
+          <div className="flex items-center gap-3">
+            {canRecordPayment && (
+              <Link to={`${AP_ROUTES.BULK_IMPORT}?type=payments`}>
+                <Button variant="outline">Bulk import payments</Button>
+              </Link>
+            )}
+            <Link to={AP_ROUTES.PAYMENT_HISTORY} className="text-sm font-medium text-[#0A0082] hover:underline">
+              Payment History →
+            </Link>
+          </div>
         }
       />
 

@@ -14,7 +14,6 @@ export function mapDeterministicScoreBreakdown(raw) {
     mandatorySkills: arr(breakdown.mandatory_skills),
     preferredSkills: arr(breakdown.preferred_skills),
     missingMandatorySkills: arr(breakdown.missing_mandatory_skills),
-    additionalCandidateSkills: arr(breakdown.additional_candidate_skills),
     hierarchyMatches: arr(breakdown.hierarchy_matches),
     experienceValidation: breakdown.experience_validation ?? null,
     educationValidation: breakdown.education_validation ?? null,

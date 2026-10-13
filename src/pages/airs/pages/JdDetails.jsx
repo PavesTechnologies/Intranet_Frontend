@@ -574,7 +574,7 @@ export default function JdDetails() {
         rowClass: "hover:bg-slate-50/50 transition",
       };
     });
-  }, [paginatedSkills, skillsCurrentPage, jdSkillsData]);
+  }, [paginatedSkills]);
 
   // Selecting/resolving unknown skills is an HR_ADMIN-only action — the
   // select and action columns only exist for that role; RECRUITER and
@@ -690,7 +690,7 @@ export default function JdDetails() {
         rowClass: "hover:bg-slate-50/50 transition",
       };
     });
-  }, [paginatedUnknownSkills, unknownSkillsCurrentPage, jdUnknownSkillsData, selectedUnknownSkillIds]);
+  }, [paginatedUnknownSkills, selectedUnknownSkillIds]);
 
   const fetchJdSkills = async () => {
     setIsLoadingSkills(true);
@@ -722,6 +722,9 @@ export default function JdDetails() {
     }
   };
 
+  // Load the active tab's data, and reload it when the route moves to another
+  // JD (`id`) - otherwise the previous JD's lists stayed on screen. The fetch
+  // functions are recreated every render, so they are deliberately not deps.
   useEffect(() => {
     if (activeTab === "campaigns") {
       fetchDbCampaigns();
@@ -730,7 +733,8 @@ export default function JdDetails() {
     } else if (activeTab === "jd_unknown_skills") {
       fetchJdUnknownSkills();
     }
-  }, [activeTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, id]);
 
   // Skills Editing state
   const [editingSkillIdx, setEditingSkillIdx] = useState(null);

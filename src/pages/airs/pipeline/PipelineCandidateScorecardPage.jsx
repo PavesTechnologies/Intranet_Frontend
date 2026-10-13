@@ -9,13 +9,16 @@ import CandidateOverridePanel from "../campaigns/components/CandidateOverridePan
 import CandidateNotesPanel from "../campaigns/components/CandidateNotesPanel";
 import { exportScorecard } from "../campaigns/services/exportService";
 import Button from "../../../components/Button/Button";
-import { Download, RotateCcw } from "lucide-react";
+import { Download, FileSearch, RotateCcw } from "lucide-react";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../contexts/AuthContext";
 import { SCORE_LABELS } from "../constants/scoreLabels";
 import useCampaignPermissions from "../campaigns/hooks/useCampaignPermissions";
 import { replayDeadLetterTasks, formatApiError } from "../campaigns/services/campaignservice";
 import LayerDeadLetterBanner from "./components/LayerDeadLetterBanner";
+import ParseChangesPanel from "./components/ParseChangesPanel";
+import ReasonModal from "../campaigns/components/ReasonModal";
+import { reparseCandidateResume, rescoreCandidate } from "../candidates/services/candidateScoreService";
 // import { MOCK_CANDIDATES } from "../candidates/mock/candidateMockData";
 // import { mapMockCandidateForScorecard } from "./utils/mapMockCandidateForScorecard";
 
@@ -192,6 +195,56 @@ export default function PipelineCandidateScorecardPage({
         }
       : t
   );
+  // Re-parse & re-score (RECRUITER / HR_ADMIN): fresh parse of the stored
+  // resume, replacing its current skills (the previous parse is kept and
+  // listed in Parse changes). A rejected candidate moves back to Screening
+  // only when a recruiter does it, with a reason.
+  const canReparse = isRecruiter || isHrAdmin;
+  const [reparseOpen, setReparseOpen] = useState(false);
+  const [parseChangesKey, setParseChangesKey] = useState(0);
+  const isRejected = String(candidate?.pipelineStage || "").toUpperCase() === "REJECTED";
+  const reparseMovesToScreening = isRejected && isRecruiter;
+  const submitReparse = useCallback(
+    async (reason) => {
+      try {
+        const res = await reparseCandidateResume(candidate.id, reason);
+        const result = res?.data ?? res;
+        const shared = result?.other_campaigns_sharing_resume
+          ? ` The resume is also in ${result.other_campaigns_sharing_resume} other campaign(s) - its skills update there too.`
+          : "";
+        toast.success(
+          (result?.moves_to_screening
+            ? "Re-parse started. The candidate moves back to Screening and is re-scored when it finishes."
+            : "Re-parse started. The candidate is re-scored when it finishes.") + shared
+        );
+        setReparseOpen(false);
+        setParseChangesKey((k) => k + 1);
+      } catch (err) {
+        toast.error(formatApiError(err, "Could not start the re-parse."));
+      }
+    },
+    [candidate?.id]
+  );
+
+  // Resume re-parsed from another campaign: this campaign's scores are out of
+  // date until a recruiter re-scores (stage never changes past Screening).
+  const [rescoring, setRescoring] = useState(false);
+  const [rescoreQueued, setRescoreQueued] = useState(false);
+  useEffect(() => { setRescoreQueued(false); }, [candidateId]);
+  const submitRescore = useCallback(async () => {
+    setRescoring(true);
+    try {
+      const res = await rescoreCandidate(candidate.id);
+      const result = res?.data ?? res;
+      toast.success(`Re-score queued: ${result?.rescore || "scores will update shortly"}.`);
+      setRescoreQueued(true);
+    } catch (err) {
+      toast.error(formatApiError(err, "Could not re-score the candidate."));
+    } finally {
+      setRescoring(false);
+    }
+  }, [candidate?.id]);
+
   const retryableTabs = failedTabs.filter((t) => layerFailures[t.id].can_retry);
   const headerRetryLabel =
     retryableTabs.length === 1 ? `Retry ${retryableTabs[0].label}` : `Retry failed steps (${retryableTabs.length})`;
@@ -247,7 +300,7 @@ export default function PipelineCandidateScorecardPage({
         candidate={candidate}
         onBack={handleBack}
         actions={
-          (retryableFailures.length > 0 || (!isModal && isHrAdmin && candidate.campaignId)) && (
+          (retryableFailures.length > 0 || (!isModal && (isHrAdmin || canReparse) && candidate.campaignId)) && (
           <>
           {retryableFailures.length > 0 && (
             <Button
@@ -262,6 +315,16 @@ export default function PipelineCandidateScorecardPage({
               }}
             >
               <RotateCcw className="h-3.5 w-3.5 mr-1" /> {headerRetryLabel}
+            </Button>
+          )}
+          {!isModal && canReparse && candidate.campaignId && (
+            <Button
+              variant="outline"
+              size="small"
+              title="Parse the stored resume again and re-score this candidate"
+              onClick={() => setReparseOpen(true)}
+            >
+              <FileSearch className="h-3.5 w-3.5 mr-1" /> Re-parse &amp; re-score
             </Button>
           )}
           {!isModal && isHrAdmin && candidate.campaignId && (
@@ -290,6 +353,21 @@ export default function PipelineCandidateScorecardPage({
         }
       />
 
+      {candidate.scoreOutOfDateAt && !rescoreQueued && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3" role="status">
+          <p className="text-xs text-amber-800">
+            <span className="font-semibold">Re-parsed - score out of date.</span>{" "}
+            {candidate.scoreOutOfDateReason || "The resume was re-parsed in another campaign; these scores don't reflect its current skills."}
+          </p>
+          {isRecruiter && (
+            <Button variant="outline" size="small" loading={rescoring} loadingText="Queuing..." onClick={submitRescore}
+              title="Recompute this campaign's scores. A candidate past Screening keeps their stage.">
+              <RotateCcw className="h-3.5 w-3.5 mr-1" /> Re-score
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
         <CandidateTabs tabs={tabsWithFailureMarker} activeTab={activeTab} onChange={setActiveTab} />
 
@@ -312,6 +390,32 @@ export default function PipelineCandidateScorecardPage({
           meaningful once this record is linked to a campaign (campaignId set
           by the parsed-json response). Skipped in the modal popup variant to
           keep it compact. */}
+      {!isModal && candidate.campaignId && (
+        <ParseChangesPanel campaignCandidateId={candidate.id} refreshKey={parseChangesKey} />
+      )}
+
+      {!isModal && canReparse && candidate.campaignId && (
+        <ReasonModal
+          isOpen={reparseOpen}
+          onClose={() => setReparseOpen(false)}
+          onConfirm={submitReparse}
+          title="Re-parse & re-score"
+          confirmLabel="Re-parse"
+          reasonRequired={reparseMovesToScreening}
+          placeholder={reparseMovesToScreening ? "Why should this candidate be reconsidered?" : "Why re-parse this resume? (optional)"}
+          description="This parses the stored resume again and updates the candidate's current skills with the new result. The previous version is kept - you can see what changed under Parse changes. The candidate is then re-scored."
+          extraContent={
+            isRejected && (
+              <p className={`text-xs rounded-lg px-3 py-2 ${reparseMovesToScreening ? "bg-indigo-50 text-indigo-800" : "bg-amber-50 text-amber-800"}`}>
+                {reparseMovesToScreening
+                  ? "This candidate is Rejected. Re-parsing moves them back to Screening with your reason, and they are re-scored."
+                  : "This candidate is Rejected and stays Rejected - only a recruiter can move them back to Screening."}
+              </p>
+            )
+          }
+        />
+      )}
+
       {!isModal && candidate.campaignId && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
           <CandidateOverridePanel candidate={candidate} onChanged={setOverridePatch} />
