@@ -47,7 +47,7 @@ const VIEW_STORAGE_KEY = "xms.dashboard.view";
 const VIEWS = [
   {
     view: "employee",
-    label: "My expenses",
+    label: "Expenses",
     roles: ["GENERAL", "MANAGER", "REPORTING_MANAGER", "FINANCE", "FINANCE_EXECUTIVE", "AP_EXECUTIVE", "ADMIN", "SUPER_ADMIN"],
     subtitle: "Where your expense reports are, what needs fixing, and what you've been reimbursed.",
     trend: { mode: "money", primaryLabel: "Spend", countLabel: "Expenses" },
