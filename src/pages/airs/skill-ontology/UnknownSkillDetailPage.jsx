@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
   ArrowLeft,
+  Ban,
   Search,
   Trash2,
   GitMerge,
@@ -22,7 +23,9 @@ import SkillForm from "./components/SkillForm";
 import useUnknownSkillSuggestions from "./hooks/useUnknownSkillSuggestions";
 import useCoreSkillUsage from "./hooks/useCoreSkillUsage";
 import CoreSkillDeleteWarning from "./components/CoreSkillDeleteWarning";
-import { deleteUnknownSkill, resolveUnknownSkill, createCanonicalSkillFromUnknown } from "./services/skillOntologyService";
+import {
+  deleteUnknownSkill, dismissUnknownSkill, resolveUnknownSkill, createCanonicalSkillFromUnknown,
+} from "./services/skillOntologyService";
 import { formatDate, validateSkillForm } from "./utils/skillOntologyUtils.jsx";
 import { EMPTY_SKILL_FORM } from "./constants/skillOntologyConstants";
 
@@ -81,6 +84,7 @@ function ActionToggleButton({ icon: Icon, label, active, color, onClick }) {
     create: "bg-[#0A0082] text-white border-[#0A0082] shadow-md",
     map: "bg-indigo-600 text-white border-indigo-600 shadow-md",
     delete: "bg-rose-600  text-white border-rose-600  shadow-md",
+    dismiss: "bg-amber-600 text-white border-amber-600 shadow-md",
   };
   const inactiveStyle =
     "bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50";
@@ -281,6 +285,74 @@ export function DeleteSkillModalBody({ rawSkill, unknownSkillId, onClose, onDele
   );
 }
 
+// ─── Dismiss Unknown Skill – Modal body ───────────────────────────────────────
+// Global: every JD still waiting on the skill drops it. Lists every JD that has
+// it with its tier there; a CORE one needs the same confirmation as a delete.
+
+const TIER_LABEL = { CORE: "Core", SUPPORTING: "Supporting", PREFERRED: "Preferred" };
+
+export function DismissSkillModalBody({ rawSkill, unknownSkillId, onClose, onDismissed }) {
+  const [isDismissing, setIsDismissing] = useState(false);
+  const coreUsage = useCoreSkillUsage([unknownSkillId], true, { activeOnly: false });
+  const [acknowledged, setAcknowledged] = useState(false);
+  const hasCore = coreUsage.usages.length > 0;
+  const blocked = coreUsage.loading || coreUsage.error || (hasCore && !acknowledged);
+
+  const handleDismiss = async () => {
+    setIsDismissing(true);
+    try {
+      const res = await dismissUnknownSkill(unknownSkillId, hasCore && acknowledged);
+      toast.success(res?.data?.message || "Unknown skill dismissed.");
+      onDismissed?.();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.response?.data?.detail || "Failed to dismiss unknown skill.");
+    } finally {
+      setIsDismissing(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <p className="text-[13px] text-slate-600">
+        Dismiss <span className="font-semibold text-slate-900">"{rawSkill}"</span> as not a real skill? Every job
+        description still waiting on it drops it.
+      </p>
+
+      {!coreUsage.loading && !coreUsage.error && (
+        coreUsage.jds.length === 0 ? (
+          <p className="text-[12px] text-slate-500">No job description has this skill.</p>
+        ) : (
+          <div className="rounded-xl border border-slate-200 p-3">
+            <p className="text-[12px] font-semibold text-slate-700 mb-1.5">Job descriptions with this skill</p>
+            <ul className="space-y-1 text-[12px] text-slate-600">
+              {coreUsage.jds.map((jd) => (
+                <li key={jd.id} className="flex justify-between gap-3">
+                  <span>{jd.title} <span className="text-slate-400">(v{jd.version_number}, {jd.job_id})</span></span>
+                  <span className={String(jd.tier).toUpperCase() === "CORE" ? "font-semibold text-rose-700" : "text-slate-500"}>
+                    {TIER_LABEL[String(jd.tier || "").toUpperCase()] || "Unclassified"} · {String(jd.status).toLowerCase()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      )}
+
+      <CoreSkillDeleteWarning {...coreUsage} action="dismiss" acknowledged={acknowledged} onAcknowledge={setAcknowledged} />
+
+      <div className="flex justify-end gap-3 pt-1">
+        <Button variant="outline" size="medium" onClick={onClose} disabled={isDismissing}>
+          Cancel
+        </Button>
+        <Button variant="danger" size="medium" loading={isDismissing} onClick={handleDismiss} disabled={blocked}>
+          <Ban className="h-4 w-4" />
+          Dismiss
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Suggestion Tabs section (always visible on page) ────────────────────────
 
 export function SuggestionTabsSection({ unknownSkillId, onMapClick }) {
@@ -467,7 +539,7 @@ export default function UnknownSkillDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Which modal is open: "create" | "map" | "delete" | null
+  // Which modal is open: "create" | "map" | "delete" | "dismiss" | null
   const [openModal, setOpenModal] = useState(null);
   // Suggestion row the user clicked "Map" on — feeds the Map modal's payload
   const [mapTarget, setMapTarget] = useState(null);
@@ -585,6 +657,13 @@ export default function UnknownSkillDetailPage() {
               onClick={() => setOpenModal("create")}
             />
             <ActionToggleButton
+              icon={Ban}
+              label="Dismiss (not a skill)"
+              active={openModal === "dismiss"}
+              color="dismiss"
+              onClick={() => setOpenModal("dismiss")}
+            />
+            <ActionToggleButton
               icon={Trash2}
               label="Delete Unknown Skill"
               active={openModal === "delete"}
@@ -658,6 +737,20 @@ export default function UnknownSkillDetailPage() {
         maxHeight="max-h-[90vh]"
       >
         <DeleteSkillModalBody rawSkill={skill.rawSkill} unknownSkillId={skill.id} onClose={closeModal} onDeleted={handleDeleted} />
+      </Modal>
+
+      {/* Dismiss Unknown Skill (global) */}
+      <Modal
+        isOpen={openModal === "dismiss"}
+        onClose={closeModal}
+        title="Dismiss Unknown Skill"
+        size="md"
+        animation="zoom"
+        titleIcon={<Ban className="h-5 w-5 text-amber-600" />}
+        maxHeight="max-h-[90vh]"
+      >
+        <DismissSkillModalBody rawSkill={skill.rawSkill} unknownSkillId={skill.id} onClose={closeModal}
+          onDismissed={handleDeleted} />
       </Modal>
     </div>
   );

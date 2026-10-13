@@ -4,14 +4,23 @@ import { AlertTriangle } from "lucide-react";
 // Shown in an unknown-skill delete dialog when any selected skill is a CORE
 // skill on an active JD. The caller keeps Delete disabled until `acknowledged`.
 // `skillNames` maps unknownSkillId -> raw skill text (for the bulk dialog).
-export default function CoreSkillDeleteWarning({ loading, error, usages, skillNames = {}, acknowledged, onAcknowledge }) {
+// `action` words the warning for a delete (default) or a global dismiss.
+const ACTION_TEXT = {
+  delete: { verb: "deleting", removes: "Deleting removes" },
+  dismiss: { verb: "dismissing", removes: "Dismissing removes" },
+};
+
+export default function CoreSkillDeleteWarning({
+  loading, error, usages, skillNames = {}, acknowledged, onAcknowledge, action = "delete",
+}) {
+  const text = ACTION_TEXT[action] || ACTION_TEXT.delete;
   if (loading) {
     return <p className="text-[12px] text-slate-500">Checking which job descriptions use this skill...</p>;
   }
   if (error) {
     return (
       <p className="text-[12px] text-slate-500">
-        Couldn't check whether this skill is a core skill on any job description. Check the job description before deleting.
+        Couldn't check whether this skill is a core skill on any job description. Check the job description before {text.verb}.
       </p>
     );
   }
@@ -28,7 +37,7 @@ export default function CoreSkillDeleteWarning({ loading, error, usages, skillNa
               : "Some selected skills are core skills on a job description."}
           </p>
           <p>
-            Deleting removes it from these job descriptions, which then become verified without it - candidates will
+            {text.removes} it from these job descriptions, which then become verified without it - candidates will
             no longer be checked against it.
           </p>
           <ul className="list-disc pl-4 space-y-0.5">
@@ -43,7 +52,7 @@ export default function CoreSkillDeleteWarning({ loading, error, usages, skillNa
               )),
             )}
           </ul>
-          <p>To keep it as a requirement, map or approve the skill instead of deleting it.</p>
+          <p>To keep it as a requirement, map or approve the skill instead of {text.verb} it.</p>
         </div>
       </div>
       <label className="flex items-center gap-2 text-[12px] font-semibold text-rose-800 cursor-pointer">

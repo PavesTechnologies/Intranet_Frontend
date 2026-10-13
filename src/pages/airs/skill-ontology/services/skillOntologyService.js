@@ -160,6 +160,22 @@ export const deleteUnknownSkill = async (unknownSkillId, payload = {}) => {
   }
 };
 
+// HR_ADMIN-only global dismiss ("not a real skill"): every JD still waiting on
+// it drops it. The backend refuses (409) while it's CORE on any JD unless
+// confirmCore - the dismiss dialog lists every JD and its tier first.
+export const dismissUnknownSkill = async (unknownSkillId, confirmCore = false) => {
+  try {
+    const response = await api.post(`${BASE_URL}/skills/unknown/${unknownSkillId}/dismiss`, null, {
+      headers: authHeaders(),
+      params: { confirm_core: confirmCore },
+    });
+    return ok({ message: response.data?.message, ...(response.data?.data || {}) });
+  } catch (error) {
+    console.error("Error dismissing unknown skill:", error);
+    throw error;
+  }
+};
+
 // JDs this unknown skill appears in, each with the CORE / SUPPORTING class
 // that JD's extraction gave it (importance; null for preferred/unlisted).
 // Used to warn before a delete removes a core skill from a JD.
