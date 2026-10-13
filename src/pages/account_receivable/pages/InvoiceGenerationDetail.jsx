@@ -11,7 +11,6 @@ import {
 import PageHeader from "../../../components/ui/PageHeader";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
-import StatusBadge from "../../../components/status/statusbadge";
 import BackIconButton from "../components/common/BackIconButton";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { getActiveCompanyProfile } from "../services/companyProfileService";
@@ -729,21 +728,7 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
         <BackIconButton onClick={handleBack} label="Back to Invoice Queue" />
         <div className="flex-1">
           <PageHeader
-            title={
-              <span className="flex flex-wrap items-center gap-2.5">
-                Invoice Generation
-                <StatusBadge
-                  label={
-                    generating
-                      ? "GENERATING"
-                      : isInvoiceGenerated
-                      ? (invoice?.invoiceStatus === "GENERATED" || !invoice?.invoiceStatus ? "INVOICE GENERATED" : invoiceStatus)
-                      : (taxCalc?.status === "TAX_COMPLETED" || snapshotData?.status === "TAX_COMPLETED" ? "Tax Completed" : "Draft Preview")
-                  }
-                  size="sm"
-                />
-              </span>
-            }
+            title="Invoice Generation"
             subtitle={
               generating
                 ? "Creating authoritative official invoice..."

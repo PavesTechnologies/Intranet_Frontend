@@ -67,6 +67,7 @@ import {
   getApiErrorMessage,
 } from "../services/billingConfigService";
 import { getInvoiceGenerationWorkspace } from "../services/invoiceService";
+import { getActiveTaxRegions } from "../services/taxRegionService";
 import { formatCurrency } from "../utils/format";
 
 const AR_BASE = "/account-receivable";
@@ -75,9 +76,10 @@ const WORKSPACE_PATH = `${AR_BASE}/project-billing-setup/workspace`;
 
 // Validated categorical pair (blue / orange) for the financial charts.
 const SERIES_NET = "#2a78d6";
-const SERIES_TAX = "#eb6834";
-const MONTHS_SHOWN = 6;
-const COUNTRIES_SHOWN = 6;
+const YEAR_SERIES_COLORS = ["#eb6834", "#22c55e", "#2a78d6"];
+const MONTHS_SHOWN = 12;
+const USE_MOCK_DASHBOARD_DATA = true;
+const MOCK_TAX_REGIONS = ["United States", "United Kingdom", "India", "Singapore"];
 
 const compactNumber = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
 
@@ -232,14 +234,6 @@ const BILLING_MODELS = [
     sources: ["Approved timesheets", "Approved billable hours", "Resource hourly rate", "Approved expenses"],
   },
   {
-    key: "fixed",
-    title: "Fixed Price",
-    icon: BadgeDollarSign,
-    accent: "bg-emerald-600",
-    summary: "Bill an agreed contract value.",
-    sources: ["Contract value", "Approved expenses"],
-  },
-  {
     key: "milestone",
     title: "Milestone",
     icon: Flag,
@@ -290,13 +284,6 @@ const PLANNED_REPORTS = [
   "Cash Flow Forecast",
 ];
 
-const MASTER_LINKS = [
-  { label: "Billing Types", hint: "T&M, Fixed, Milestone, Retainer", icon: Layers, path: `${AR_BASE}/master-data/billing-types` },
-  { label: "Billing Frequency", hint: "Monthly, quarterly and other cycles", icon: CalendarClock, path: `${AR_BASE}/master-data/billing-frequency` },
-  { label: "Payment Terms", hint: "Net days per customer", icon: Clock, path: `${AR_BASE}/master-data/payment-terms` },
-  { label: "Tax Configuration", hint: "Regions, regimes and tax rules", icon: Landmark, path: `${AR_BASE}/master-data/tax-configuration` },
-  { label: "Company Profile", hint: "Invoice letterhead and legal details", icon: Building2, path: `${AR_BASE}/master-data/company-profile` },
-];
 
 /* ------------------------------------------------------------------ */
 /* Chart helpers                                                        */
@@ -315,7 +302,42 @@ const monthLabel = (key) => {
   return new Date(year, month - 1, 1).toLocaleString("en", { month: "short", year: "2-digit" });
 };
 
+const yearValuesFromMonth = (monthEntry) =>
+  [...new Set(
+    Object.keys(monthEntry)
+      .map((key) => key.match(/^(\d{4})(?:Net|Tax|Total|Count)$/)?.[1])
+      .filter(Boolean)
+      .map(Number)
+  )].sort((a, b) => a - b);
+
 const normKey = (value) => String(value || "").trim().toLowerCase();
+
+const buildDemoInvoiceRows = () => {
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear - 2, currentYear - 1, currentYear];
+  const rows = [];
+
+  years.forEach((year, yearIndex) => {
+    for (let month = 0; month < 12; month += 1) {
+      const base = 22000 + yearIndex * 18000 + month * 1700 + (month % 4) * 900;
+      const tax = Number((base * (0.07 + (month % 3) * 0.01) + yearIndex * 700).toFixed(2));
+      const total = Number((base + tax).toFixed(2));
+      const taxRegionName = MOCK_TAX_REGIONS[(month + yearIndex) % MOCK_TAX_REGIONS.length];
+      rows.push({
+        currency: "USD",
+        invoiceDate: `${year}-${String(month + 1).padStart(2, "0")}-05`,
+        projectCode: `PRJ-${yearIndex + 1}${month + 1}`,
+        projectName: `${taxRegionName} Project ${month + 1}`,
+        taxRegionName,
+        grandTotal: total,
+        totalTaxAmount: tax,
+        amount: base,
+      });
+    }
+  });
+
+  return rows;
+};
 
 /* ------------------------------------------------------------------ */
 /* Small presentational pieces                                          */
@@ -400,23 +422,33 @@ function ChartEmpty({ loading, error, message }) {
 
 function TrendTooltip({ active, payload, label, currency }) {
   if (!active || !payload?.length) return null;
-  const point = payload[0].payload;
+
+  const bar = payload[0];
+  const point = bar?.payload || {};
+  const activeKey = bar?.dataKey;
+  const year = Number(String(activeKey || "").match(/^(\d{4})Total$/)?.[1]) || null;
+  const net = year ? Number(point[`${year}Net`] ?? point.net ?? 0) : Number(point.net ?? 0);
+  const tax = year ? Number(point[`${year}Tax`] ?? point.tax ?? 0) : Number(point.tax ?? 0);
+  const total = year ? Number(point[`${year}Total`] ?? point.total ?? 0) : Number(point.total ?? 0);
+  const count = year ? Number(point[`${year}Count`] ?? point.count ?? 0) : Number(point.count ?? 0);
+  const title = year ? `${label} • ${year}` : label;
+
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
-      <p className="mb-1 font-semibold text-slate-900">{label}</p>
+      <p className="mb-1 font-semibold text-slate-900">{title}</p>
       <p className="flex items-center justify-between gap-4 text-slate-600">
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm" style={{ background: SERIES_NET }} />Net amount</span>
-        <span className="font-medium tabular-nums text-slate-900">{formatCurrency(point.net, currency)}</span>
+        <span>Net amount</span>
+        <span className="font-medium tabular-nums text-slate-900">{formatCurrency(net, currency)}</span>
       </p>
       <p className="flex items-center justify-between gap-4 text-slate-600">
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm" style={{ background: SERIES_TAX }} />Tax</span>
-        <span className="font-medium tabular-nums text-slate-900">{formatCurrency(point.tax, currency)}</span>
+        <span>Tax</span>
+        <span className="font-medium tabular-nums text-slate-900">{formatCurrency(tax, currency)}</span>
       </p>
       <div className="mt-1 flex items-center justify-between gap-4 border-t border-slate-100 pt-1">
         <span className="font-semibold text-slate-700">Grand total</span>
-        <span className="font-semibold tabular-nums text-slate-900">{formatCurrency(point.total, currency)}</span>
+        <span className="font-semibold tabular-nums text-slate-900">{formatCurrency(total, currency)}</span>
       </div>
-      <p className="mt-0.5 text-[11px] text-slate-400">{point.count} invoice{point.count === 1 ? "" : "s"}</p>
+      <p className="mt-0.5 text-[11px] text-slate-400">{count} invoice{count === 1 ? "" : "s"}</p>
     </div>
   );
 }
@@ -454,18 +486,15 @@ export default function AccountReceivableDashboard() {
   // KPI filter
   const [activeKpi, setActiveKpi] = useState("total");
 
-  // Selected lifecycle stage (UI only)
-  const [selectedStageKey, setSelectedStageKey] = useState(LIFECYCLE_STAGES[0].key);
-  const selectedStageIndex = LIFECYCLE_STAGES.findIndex((stage) => stage.key === selectedStageKey);
-  const selectedStage = LIFECYCLE_STAGES[selectedStageIndex];
-
   // Financial chart state (UI only)
   const [invoiceRows, setInvoiceRows] = useState([]);
   const [regionByProject, setRegionByProject] = useState({});
+  const [availableTaxRegions, setAvailableTaxRegions] = useState([]);
   const [financeLoading, setFinanceLoading] = useState(true);
   const [financeError, setFinanceError] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState(null);
   const [countryMetric, setCountryMetric] = useState("amount");
+  const [useDemoData, setUseDemoData] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -510,18 +539,40 @@ export default function AccountReceivableDashboard() {
   useEffect(() => {
     let isMounted = true;
 
-    Promise.allSettled([getInvoiceGenerationWorkspace(), getBillingConfigurations()]).then(
-      ([workspaceResult, configsResult]) => {
+    if (USE_MOCK_DASHBOARD_DATA) {
+      setInvoiceRows(buildDemoInvoiceRows());
+      setRegionByProject({});
+      setAvailableTaxRegions(MOCK_TAX_REGIONS);
+      setUseDemoData(true);
+      setFinanceError(false);
+      setFinanceLoading(false);
+
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    // Set USE_MOCK_DASHBOARD_DATA to false to resume live invoice,
+    // billing-configuration, and tax-region data for these charts.
+    Promise.allSettled([getInvoiceGenerationWorkspace(), getBillingConfigurations(), getActiveTaxRegions()]).then(
+      ([workspaceResult, configsResult, taxRegionsResult]) => {
         if (!isMounted) return;
 
         if (workspaceResult.status === "fulfilled") {
-          // Only real invoices count — candidates still "ready for invoice" are not billed yet.
-          setInvoiceRows(
-            (workspaceResult.value?.rows || []).filter(
-              (row) => row.invoiceId || row.workspaceStatus !== "READY_FOR_INVOICE"
-            )
+          const realRows = (workspaceResult.value?.rows || []).filter(
+            (row) => row.invoiceId || row.workspaceStatus !== "READY_FOR_INVOICE"
           );
+
+          if (realRows.length > 0) {
+            setInvoiceRows(realRows);
+            setUseDemoData(false);
+          } else {
+            setInvoiceRows(buildDemoInvoiceRows());
+            setUseDemoData(true);
+          }
         } else {
+          setInvoiceRows(buildDemoInvoiceRows());
+          setUseDemoData(true);
           setFinanceError(true);
         }
 
@@ -534,6 +585,13 @@ export default function AccountReceivableDashboard() {
             if (config.projectName) map[`name:${normKey(config.projectName)}`] = region;
           });
           setRegionByProject(map);
+        }
+
+        if (taxRegionsResult.status === "fulfilled") {
+          const taxRegions = (taxRegionsResult.value || []).map((region) => region.taxRegionName || region.name || region.label).filter(Boolean);
+          setAvailableTaxRegions(taxRegions.length > 0 ? taxRegions : ["United States", "United Kingdom", "India", "Singapore"]);
+        } else {
+          setAvailableTaxRegions(["United States", "United Kingdom", "India", "Singapore"]);
         }
 
         setFinanceLoading(false);
@@ -658,55 +716,101 @@ export default function AccountReceivableDashboard() {
     const rows = invoiceRows.filter((row) => (row.currency || "USD") === currency && monthKeyOf(row));
     if (rows.length === 0) return [];
 
-    const latest = rows.map(monthKeyOf).sort().at(-1);
-    const buckets = Array.from({ length: MONTHS_SHOWN }, (_, i) => {
-      const key = shiftMonth(latest, i - (MONTHS_SHOWN - 1));
-      return { key, label: monthLabel(key), net: 0, tax: 0, total: 0, count: 0 };
-    });
-    const byKey = Object.fromEntries(buckets.map((bucket) => [bucket.key, bucket]));
+    const firstDate = rows.map((row) => new Date(row.invoiceDate || row.billingPeriodStart)).filter(Boolean).sort((a, b) => a - b)[0];
+    const lastDate = rows.map((row) => new Date(row.invoiceDate || row.billingPeriodStart)).filter(Boolean).sort((a, b) => b - a)[0];
+    if (!firstDate || !lastDate) return [];
 
-    rows.forEach((row) => {
-      const bucket = byKey[monthKeyOf(row)];
-      if (!bucket) return;
-      const tax = Number(row.totalTaxAmount) || 0;
-      const total = Number(row.grandTotal) || 0;
-      const net = Number(row.amount) || Math.max(total - tax, 0);
-      bucket.net += net;
-      bucket.tax += tax;
-      bucket.total += total || net + tax;
-      bucket.count += 1;
-    });
+    const startYear = firstDate.getFullYear();
+    const endYear = lastDate.getFullYear();
+    const yearValues = Array.from({ length: Math.max(3, endYear - startYear + 1) }, (_, index) => endYear - index)
+      .slice(0, 3)
+      .sort((a, b) => a - b);
 
-    return buckets;
+    const monthLabels = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+
+    return monthLabels.map((label, index) => {
+      const monthNumber = String(index + 1).padStart(2, "0");
+      const monthEntry = { month: monthNumber, label };
+
+      yearValues.forEach((year) => {
+        monthEntry[`${year}Net`] = 0;
+        monthEntry[`${year}Tax`] = 0;
+        monthEntry[`${year}Total`] = 0;
+        monthEntry[`${year}Count`] = 0;
+      });
+
+      rows.forEach((row) => {
+        const rowDate = new Date(row.invoiceDate || row.billingPeriodStart);
+        if (Number.isNaN(rowDate.getTime())) return;
+
+        const rowYear = rowDate.getFullYear();
+        const rowMonth = String(rowDate.getMonth() + 1).padStart(2, "0");
+        if (!yearValues.includes(rowYear) || rowMonth !== monthNumber) return;
+
+        const tax = Number(row.totalTaxAmount) || 0;
+        const total = Number(row.grandTotal) || 0;
+        const net = Number(row.amount) || Math.max(total - tax, 0);
+
+        monthEntry[`${rowYear}Net`] += net;
+        monthEntry[`${rowYear}Tax`] += tax;
+        monthEntry[`${rowYear}Total`] += total || net + tax;
+        monthEntry[`${rowYear}Count`] += 1;
+      });
+
+      return monthEntry;
+    });
   }, [invoiceRows, currency]);
 
-  const trendTotals = useMemo(
-    () => monthlyTrend.reduce((acc, m) => ({ total: acc.total + m.total, count: acc.count + m.count }), { total: 0, count: 0 }),
-    [monthlyTrend]
-  );
+  const trendTotals = useMemo(() => {
+    return monthlyTrend.reduce(
+      (acc, month) => {
+        const totals = yearValuesFromMonth(month)
+          .map((yearKey) => month[`${yearKey}Total`] || 0)
+          .reduce((sum, value) => sum + value, 0);
+        return {
+          total: acc.total + totals,
+          count: acc.count + Object.keys(month)
+            .filter((key) => key.endsWith("Count"))
+            .reduce((sum, key) => sum + (Number(month[key]) || 0), 0),
+        };
+      },
+      { total: 0, count: 0 }
+    );
+  }, [monthlyTrend]);
 
   const countryComparison = useMemo(() => {
     const regionOf = (row) =>
       regionByProject[`code:${normKey(row.projectCode)}`] ||
       regionByProject[`name:${normKey(row.projectName)}`] ||
+      row.taxRegionName ||
       "Unassigned";
+
+    const dynamicRegions = availableTaxRegions.length > 0 ? availableTaxRegions : [
+      "United States",
+      "United Kingdom",
+      "India",
+      "Singapore",
+    ];
 
     const rows = countryMetric === "amount" ? invoiceRows.filter((row) => (row.currency || "USD") === currency) : invoiceRows;
     const totals = {};
     rows.forEach((row) => {
       const name = regionOf(row);
+      if (!name || name === "Unassigned") return;
       totals[name] = (totals[name] || 0) + (countryMetric === "amount" ? Number(row.grandTotal) || 0 : 1);
     });
 
-    const sorted = Object.entries(totals)
-      .map(([name, value]) => ({ name, value }))
+    const combined = new Set([...dynamicRegions, ...Object.keys(totals)]);
+    const sorted = [...combined]
+      .filter(Boolean)
+      .map((name) => ({ name, value: totals[name] || 0 }))
       .sort((a, b) => b.value - a.value);
 
-    if (sorted.length <= COUNTRIES_SHOWN) return sorted;
-    const head = sorted.slice(0, COUNTRIES_SHOWN - 1);
-    const otherValue = sorted.slice(COUNTRIES_SHOWN - 1).reduce((sum, item) => sum + item.value, 0);
-    return [...head, { name: "Other", value: otherValue }];
-  }, [invoiceRows, regionByProject, countryMetric, currency]);
+    return sorted;
+  }, [invoiceRows, regionByProject, availableTaxRegions, countryMetric, currency]);
 
   const stageIsBlocked = (stage) => stage.status !== "LIVE" || (stage.checkerOnly && !isChecker);
 
@@ -770,142 +874,7 @@ export default function AccountReceivableDashboard() {
         </div>
       </div>
 
-      {/* 3. Interactive AR lifecycle */}
-      <PageCard>
-        <PageCardContent className="p-4 sm:p-5">
-          <SectionTitle
-            title="The AR lifecycle"
-            subtitle="Seven stages, from billing setup to collected cash. Select a stage to see what happens there."
-            right={
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                <RoleChip role="MAKER" /> Finance Executive
-                <RoleChip role="CHECKER" /> Finance Manager
-              </div>
-            }
-          />
-
-          {/* Stage rail */}
-          <div className="-mx-1 overflow-x-auto pb-1">
-            <ol className="flex min-w-[900px] items-stretch gap-0 px-1">
-              {LIFECYCLE_STAGES.map((stage, index) => {
-                const isSelected = stage.key === selectedStageKey;
-                const isPlanned = stage.status !== "LIVE";
-                return (
-                  <li key={stage.key} className="flex flex-1 items-center">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedStageKey(stage.key)}
-                      aria-pressed={isSelected}
-                      className={`group flex h-full w-full flex-col items-start gap-2 rounded-xl border p-3 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
-                        isSelected
-                          ? "border-[#0A0082] bg-indigo-50/60 shadow-sm"
-                          : isPlanned
-                          ? "border-dashed border-slate-300 bg-slate-50/60 hover:border-slate-400"
-                          : "border-slate-200 bg-white hover:border-indigo-300 hover:shadow-sm"
-                      }`}
-                    >
-                      <div className="flex w-full items-center justify-between">
-                        <span
-                          className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                            isSelected ? "bg-[#0A0082] text-white" : isPlanned ? "bg-slate-200 text-slate-500" : "bg-indigo-100 text-[#0A0082]"
-                          }`}
-                        >
-                          <stage.icon className="h-4 w-4" />
-                        </span>
-                        <span className="text-[11px] font-bold tabular-nums text-slate-300">{String(index + 1).padStart(2, "0")}</span>
-                      </div>
-                      <div>
-                        <p className={`text-xs font-bold leading-tight ${isSelected ? "text-[#0A0082]" : "text-slate-800"}`}>{stage.title}</p>
-                        <p className="mt-0.5 text-[11px] leading-tight text-slate-500">{stage.tagline}</p>
-                      </div>
-                      <div className="mt-auto flex w-full items-center justify-between gap-1">
-                        <RoleChip role={stage.role} />
-                        <StatusDot status={stage.status} />
-                      </div>
-                    </button>
-                    {index < LIFECYCLE_STAGES.length - 1 && (
-                      <ChevronRight className="mx-0.5 h-4 w-4 shrink-0 text-slate-300" aria-hidden="true" />
-                    )}
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-
-          {/* Stage detail */}
-          {selectedStage && (
-            <div className="mt-4 grid gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 lg:grid-cols-[1.3fr_1fr]">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                    Stage {selectedStageIndex + 1} of {LIFECYCLE_STAGES.length}
-                  </span>
-                  <RoleChip role={selectedStage.role} />
-                  {selectedStage.status !== "LIVE" && <PlannedBadge />}
-                </div>
-                <h3 className="mt-1 text-lg font-bold text-slate-900">{selectedStage.title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-slate-600">{selectedStage.description}</p>
-
-                <ol className="mt-3 space-y-1.5">
-                  {selectedStage.steps.map((step, index) => (
-                    <li key={step} className="flex items-start gap-2 text-sm text-slate-700">
-                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[#0A0082] ring-1 ring-indigo-200">
-                        {index + 1}
-                      </span>
-                      {step}
-                    </li>
-                  ))}
-                </ol>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <div className="rounded-lg border border-slate-200 bg-white p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Takes in</p>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {selectedStage.inputs.map((input) => (
-                      <span key={input} className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{input}</span>
-                    ))}
-                  </div>
-                  <div className="my-2 flex items-center gap-2 text-slate-300">
-                    <span className="h-px flex-1 bg-slate-200" />
-                    <ArrowRight className="h-3.5 w-3.5" />
-                    <span className="h-px flex-1 bg-slate-200" />
-                  </div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Produces</p>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {selectedStage.outputs.map((output) => (
-                      <span key={output} className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">{output}</span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 bg-white p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Owned by</p>
-                  <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
-                    {selectedStage.role === "CHECKER" ? <ShieldCheck className="h-4 w-4 text-amber-600" /> : selectedStage.role === "MAKER" ? <UserCog className="h-4 w-4 text-indigo-600" /> : <Sparkles className="h-4 w-4 text-slate-500" />}
-                    {ROLE_META[selectedStage.role].label}
-                  </p>
-                </div>
-
-                <div className="mt-auto flex flex-wrap items-center gap-2">
-                  {selectedStage.path && !stageIsBlocked(selectedStage) ? (
-                    <Button variant="primary" size="small" onClick={() => navigate(selectedStage.path)}>
-                      {selectedStage.cta} <ArrowRight className="h-3.5 w-3.5" />
-                    </Button>
-                  ) : (
-                    <p className="flex items-start gap-1.5 text-xs text-slate-500">
-                      {selectedStage.status !== "LIVE" ? <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
-                      {stageBlockedReason(selectedStage)}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </PageCardContent>
-      </PageCard>
-
-      {/* 4. Billing setup at a glance — live numbers */}
+      {/* 3. Billing setup at a glance — live numbers */}
       <div>
         <SectionTitle
           title="Billing setup at a glance"
@@ -940,16 +909,15 @@ export default function AccountReceivableDashboard() {
       </div>
 
       {/* 5. Financial charts — monthly trend + country comparison */}
-      <div className="grid gap-4 lg:grid-cols-5">
-        {/* Monthly financial trend — stacked column: net + tax = grand total */}
-        <PageCard className="lg:col-span-3">
+      <div className="grid gap-4">
+        <PageCard>
           <PageCardContent className="p-4 sm:p-5">
             <SectionTitle
               title="Monthly financial trend"
               subtitle={
                 monthlyTrend.length
-                  ? `Invoiced in the last ${MONTHS_SHOWN} months: ${formatCurrency(trendTotals.total, currency)} across ${trendTotals.count} invoice${trendTotals.count === 1 ? "" : "s"}`
-                  : "Invoiced amount per month, split into net amount and tax."
+                  ? `${useDemoData ? "Demo view" : "Live view"} • Grand total across ${MONTHS_SHOWN} months: ${formatCurrency(trendTotals.total, currency)} across ${trendTotals.count} invoice${trendTotals.count === 1 ? "" : "s"} • Hover for net and tax`
+                  : "Grand total per month; hover over a bar for net amount and tax."
               }
               right={
                 currencies.length > 1 && (
@@ -967,13 +935,22 @@ export default function AccountReceivableDashboard() {
               <ChartEmpty loading={financeLoading} error={financeError} message="No invoices issued yet." />
             ) : (
               <>
-                <div className="mb-2 flex items-center gap-4 text-xs text-slate-600" aria-hidden="true">
-                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: SERIES_NET }} />Net amount</span>
-                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: SERIES_TAX }} />Tax</span>
+                <div className="mb-2 flex flex-wrap items-center gap-4 text-xs text-slate-600" aria-hidden="true">
+                  {yearValuesFromMonth(monthlyTrend[0]).map((year, index) => (
+                    <span key={year} className="flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-sm" style={{ background: YEAR_SERIES_COLORS[index] }} />
+                      {year}
+                    </span>
+                  ))}
                 </div>
-                <div className="h-[240px]" role="img" aria-label={`Monthly invoiced amount in ${currency}, net amount and tax stacked per month`}>
+                <div className="h-[320px]" role="img" aria-label={`Monthly grand total in ${currency}, with separate bars for each of the last three years`}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyTrend} margin={{ top: 16, right: 4, bottom: 0, left: 0 }} barCategoryGap="28%">
+                    <BarChart
+                      data={monthlyTrend}
+                      margin={{ top: 22, right: 12, bottom: 4, left: 4 }}
+                      barCategoryGap="20%"
+                      barGap={4}
+                    >
                       <CartesianGrid vertical={false} stroke="#eef0f3" />
                       <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#e2e8f0" }} tick={{ fontSize: 11, fill: "#64748b" }} />
                       <YAxis
@@ -983,25 +960,43 @@ export default function AccountReceivableDashboard() {
                         tick={{ fontSize: 11, fill: "#64748b" }}
                         tickFormatter={(value) => compactNumber.format(value)}
                       />
-                      <Tooltip cursor={{ fill: "rgba(148,163,184,0.12)" }} content={<TrendTooltip currency={currency} />} />
-                      <Bar dataKey="net" stackId="amount" fill={SERIES_NET} stroke="#fff" strokeWidth={1} maxBarSize={44} />
-                      <Bar dataKey="tax" stackId="amount" fill={SERIES_TAX} stroke="#fff" strokeWidth={1} radius={[4, 4, 0, 0]} maxBarSize={44}>
-                        <LabelList
-                          dataKey="total"
-                          position="top"
-                          formatter={(value) => (value ? compactNumber.format(value) : "")}
-                          style={{ fontSize: 10, fill: "#475569", fontWeight: 600 }}
-                        />
-                      </Bar>
+                      <Tooltip
+                        shared={false}
+                        cursor={{ fill: "rgba(148,163,184,0.12)" }}
+                        content={<TrendTooltip currency={currency} />}
+                      />
+                      {yearValuesFromMonth(monthlyTrend[0]).map((year, index) => (
+                        <Bar
+                          key={year}
+                          dataKey={`${year}Total`}
+                          fill={YEAR_SERIES_COLORS[index]}
+                          stroke="#fff"
+                          strokeWidth={1}
+                          radius={[4, 4, 0, 0]}
+                          maxBarSize={24}
+                        >
+                          <LabelList
+                            dataKey={`${year}Total`}
+                            position="top"
+                            formatter={(value) => (value ? compactNumber.format(value) : "")}
+                            style={{ fontSize: 9, fill: "#475569", fontWeight: 600 }}
+                          />
+                        </Bar>
+                      ))}
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
                 <table className="sr-only">
-                  <caption>Monthly invoiced amount in {currency}</caption>
-                  <thead><tr><th>Month</th><th>Net</th><th>Tax</th><th>Total</th><th>Invoices</th></tr></thead>
+                  <caption>Monthly grand total in {currency}, with separate bars for each year</caption>
+                  <thead><tr><th>Month</th>{yearValuesFromMonth(monthlyTrend[0]).map((year) => <th key={year}>{year}</th>)}</tr></thead>
                   <tbody>
                     {monthlyTrend.map((m) => (
-                      <tr key={m.key}><td>{m.label}</td><td>{m.net}</td><td>{m.tax}</td><td>{m.total}</td><td>{m.count}</td></tr>
+                      <tr key={m.label}>
+                        <td>{m.label}</td>
+                        {yearValuesFromMonth(m).map((year) => (
+                          <td key={`${m.label}-${year}`}>{m[`${year}Total`]}</td>
+                        ))}
+                      </tr>
                     ))}
                   </tbody>
                 </table>
@@ -1010,8 +1005,7 @@ export default function AccountReceivableDashboard() {
           </PageCardContent>
         </PageCard>
 
-        {/* Country comparison — ranked horizontal bars, one hue */}
-        <PageCard className="lg:col-span-2">
+        <PageCard>
           <PageCardContent className="p-4 sm:p-5">
             <SectionTitle
               title="Country comparison"
@@ -1066,7 +1060,7 @@ export default function AccountReceivableDashboard() {
                 </div>
                 <p className="mt-2 flex items-start gap-1.5 text-[11px] text-slate-400">
                   <Globe className="mt-px h-3 w-3 shrink-0" />
-                  Country is taken from each project's billing tax region.
+                  Country is taken from each project's tax region and updates dynamically as new regions are added.
                 </p>
               </>
             )}
@@ -1074,265 +1068,8 @@ export default function AccountReceivableDashboard() {
         </PageCard>
       </div>
 
-      {/* 6. Approval pipeline + Maker/Checker */}
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <PageCard>
-          <PageCardContent className="p-4 sm:p-5">
-            <SectionTitle
-              title="Billing approval pipeline"
-              subtitle="Where every billing configuration sits in the maker–checker flow."
-              right={
-                <span className="text-xs text-slate-500">
-                  <span className="font-semibold text-slate-900 tabular-nums">{loading ? "…" : approvalTotal}</span> configurations
-                </span>
-              }
-            />
-
-            <div className="flex h-3 w-full overflow-hidden rounded-full bg-slate-100" role="img" aria-label="Billing configuration approval distribution">
-              {!loading && approvalTotal > 0 &&
-                approvalSegments.map((segment) =>
-                  segment.value > 0 ? (
-                    <div
-                      key={segment.key}
-                      className={`${segment.className} h-full transition-all`}
-                      style={{ width: `${(segment.value / approvalTotal) * 100}%` }}
-                      title={`${segment.label}: ${segment.value}`}
-                    />
-                  ) : null
-                )}
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {approvalSegments.map((segment, index) => (
-                <div key={segment.key} className="relative rounded-lg border border-slate-200 p-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`h-2 w-2 rounded-full ${segment.className}`} />
-                    <span className="text-xs font-medium text-slate-600">{segment.label}</span>
-                  </div>
-                  <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{loading ? "…" : segment.value}</p>
-                  <p className="text-[11px] text-slate-400">
-                    {loading || approvalTotal === 0 ? "—" : `${Math.round((segment.value / approvalTotal) * 100)}% of total`}
-                  </p>
-                  {index < approvalSegments.length - 2 && (
-                    <ChevronRight className="absolute -right-3 top-1/2 hidden h-4 w-4 -translate-y-1/2 text-slate-300 sm:block" aria-hidden="true" />
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <p className="mt-3 flex items-start gap-1.5 text-xs text-slate-500">
-              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              Only approved configurations can be used for billing data acquisition, tax calculation and invoicing.
-            </p>
-          </PageCardContent>
-        </PageCard>
-
-        <PageCard>
-          <PageCardContent className="p-4 sm:p-5">
-            <SectionTitle title="Who does what" subtitle="Two roles keep every invoice accurate." />
-            <div className="space-y-3">
-              <div className={`rounded-xl border p-3 ${!isChecker ? "border-indigo-200 bg-indigo-50/50" : "border-slate-200"}`}>
-                <div className="flex items-center justify-between">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    <UserCog className="h-4 w-4 text-indigo-600" /> Finance Executive
-                  </p>
-                  <div className="flex items-center gap-1.5">
-                    {!isChecker && <span className="rounded-full bg-[#0A0082] px-2 py-0.5 text-[10px] font-semibold text-white">You</span>}
-                    <RoleChip role="MAKER" />
-                  </div>
-                </div>
-                <ul className="mt-2 grid grid-cols-1 gap-1 text-xs text-slate-600 sm:grid-cols-2">
-                  {["Creates billing setups", "Acquires billing data", "Calculates tax", "Generates invoices"].map((item) => (
-                    <li key={item} className="flex items-center gap-1.5">
-                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-indigo-500" /> {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className={`rounded-xl border p-3 ${isChecker ? "border-amber-200 bg-amber-50/50" : "border-slate-200"}`}>
-                <div className="flex items-center justify-between">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    <ShieldCheck className="h-4 w-4 text-amber-600" /> Finance Manager
-                  </p>
-                  <div className="flex items-center gap-1.5">
-                    {isChecker && <span className="rounded-full bg-[#0A0082] px-2 py-0.5 text-[10px] font-semibold text-white">You</span>}
-                    <RoleChip role="CHECKER" />
-                  </div>
-                </div>
-                <ul className="mt-2 grid grid-cols-1 gap-1 text-xs text-slate-600 sm:grid-cols-2">
-                  {["Approves billing setups", "Approves invoices", "Returns items for correction", "Owns final sign-off"].map((item) => (
-                    <li key={item} className="flex items-center gap-1.5">
-                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-amber-500" /> {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </PageCardContent>
-        </PageCard>
-      </div>
-
-      {/* 7. Billing models */}
-      <PageCard>
-        <PageCardContent className="p-4 sm:p-5">
-          <SectionTitle
-            title="Supported billing models"
-            subtitle="The billing type chosen in setup decides which data is pulled into each invoice."
-            right={
-              <Button variant="outline" size="small" onClick={() => navigate(`${AR_BASE}/master-data/billing-types`)}>
-                Manage billing types
-              </Button>
-            }
-          />
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {BILLING_MODELS.map((model) => (
-              <div key={model.key} className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 transition-shadow hover:shadow-md">
-                <span className={`absolute inset-x-0 top-0 h-1 ${model.accent}`} aria-hidden="true" />
-                <div className="flex items-center gap-2.5">
-                  <span className={`flex h-9 w-9 items-center justify-center rounded-lg text-white ${model.accent}`}>
-                    <model.icon className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">{model.title}</p>
-                    <p className="text-[11px] text-slate-500">{model.summary}</p>
-                  </div>
-                </div>
-                <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Billed from</p>
-                <ul className="mt-1.5 space-y-1">
-                  {model.sources.map((source) => (
-                    <li key={source} className="flex items-center gap-1.5 text-xs text-slate-700">
-                      <span className="h-1 w-1 shrink-0 rounded-full bg-slate-400" /> {source}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </PageCardContent>
-      </PageCard>
-
-      {/* 8. Receivables & collections — the road ahead */}
-      <PageCard>
-        <PageCardContent className="p-4 sm:p-5">
-          <SectionTitle
-            title="Receivables & collections"
-            subtitle="What happens after an invoice is sent: tracking the outstanding balance until it is fully paid."
-            right={<PlannedBadge />}
-          />
-
-          <div className="-mx-1 overflow-x-auto pb-1">
-            <ol className="flex min-w-[820px] items-stretch px-1">
-              {RECEIVABLE_FLOW.map((step, index) => (
-                <li key={step.key} className="flex flex-1 items-center">
-                  <div className="flex h-full w-full flex-col gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-600 ring-1 ring-slate-200">
-                      <step.icon className="h-4 w-4" />
-                    </span>
-                    <p className="text-xs font-bold text-slate-800">{step.title}</p>
-                    <p className="text-[11px] leading-snug text-slate-500">{step.note}</p>
-                  </div>
-                  {index < RECEIVABLE_FLOW.length - 1 && (
-                    <ChevronRight className="mx-0.5 h-4 w-4 shrink-0 text-slate-300" aria-hidden="true" />
-                  )}
-                </li>
-              ))}
-            </ol>
-          </div>
-
-          <div className="mt-4 grid gap-3 lg:grid-cols-3">
-            <div className="rounded-xl border border-slate-200 p-3">
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-                <Hourglass className="h-3.5 w-3.5 text-slate-500" /> Aging buckets
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {AGING_BUCKETS.map((bucket) => (
-                  <span key={bucket.label} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${bucket.className}`}>
-                    {bucket.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 p-3">
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-                <Bell className="h-3.5 w-3.5 text-slate-500" /> Reminder channels
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {REMINDER_CHANNELS.map((channel) => (
-                  <span key={channel.label} className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700">
-                    <channel.icon className="h-3.5 w-3.5" /> {channel.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 p-3">
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-                <Scale className="h-3.5 w-3.5 text-slate-500" /> Balance adjustments
-              </p>
-              <div className="mt-2 space-y-1.5 text-[11px] text-slate-600">
-                <p className="flex items-start gap-1.5">
-                  <FileMinus className="mt-px h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                  <span><span className="font-semibold text-slate-800">Credit notes</span> reduce the balance (returns, billing errors, discounts).</span>
-                </p>
-                <p className="flex items-start gap-1.5">
-                  <FilePlus className="mt-px h-3.5 w-3.5 shrink-0 text-rose-600" />
-                  <span><span className="font-semibold text-slate-800">Debit notes</span> increase it (extra charges, penalties, tax adjustments).</span>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3">
-            <span className="mr-1 flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-              <BarChart3 className="h-3.5 w-3.5" /> Planned reports:
-            </span>
-            {PLANNED_REPORTS.map((report) => (
-              <span key={report} className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-600">
-                {report}
-              </span>
-            ))}
-          </div>
-        </PageCardContent>
-      </PageCard>
-
-      {/* 9. Master data + recent activity */}
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.4fr]">
-        <PageCard>
-          <PageCardContent className="p-4 sm:p-5">
-            <SectionTitle
-              title="Master data"
-              subtitle="Reference data that every setup and invoice relies on."
-              right={
-                <Button variant="link" size="small" onClick={() => navigate(`${AR_BASE}/master-data`)} className="gap-1">
-                  All masters <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
-              }
-            />
-            <ul className="divide-y divide-slate-100">
-              {MASTER_LINKS.map((link) => (
-                <li key={link.label}>
-                  <button
-                    type="button"
-                    onClick={() => navigate(link.path)}
-                    className="group flex w-full items-center gap-3 rounded-lg px-1 py-2.5 text-left transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-[#0A0082]">
-                      <link.icon className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-slate-800">{link.label}</span>
-                      <span className="block truncate text-[11px] text-slate-500">{link.hint}</span>
-                    </span>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-500" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </PageCardContent>
-        </PageCard>
-
+      {/* 8. Recent activity */}
+      <div className="grid gap-4 lg:grid-cols-1">
         <PageCard>
           <PageCardContent className="p-4 sm:p-5">
             <SectionTitle
