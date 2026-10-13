@@ -9,6 +9,7 @@ import FormSelect from "@/components/forms/FormSelect";
 import FormTextArea from "@/components/forms/FormTextArea";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { showStatusToast } from "@/components/toastfy/toast";
+import { useNavigate } from "react-router-dom";
 
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { lookupService } from "@/pages/expense-management/api/expenseReportsApi";
@@ -147,6 +148,8 @@ const getActiveAdvances = (list) => {
 };
 
 export default function RequestAdvancePage() {
+  // In-app navigation after save, so only this page changes (a full reload restarts the whole app).
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: "",
     costCenterId: "",
@@ -544,8 +547,7 @@ export default function RequestAdvancePage() {
         "success"
       );
 
-      window.location.href =
-        "/expense-management/cash-advance/my";
+      navigate("/expense-management/cash-advance/my");
     } catch (error) {
       console.error(
         "Failed to submit cash advance:",
@@ -603,8 +605,7 @@ export default function RequestAdvancePage() {
         "success"
       );
 
-      window.location.href =
-        "/expense-management/cash-advance/my";
+      navigate("/expense-management/cash-advance/my");
     } catch (error) {
       console.error(
         "Failed to save cash advance draft:",

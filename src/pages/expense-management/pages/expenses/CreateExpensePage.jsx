@@ -45,6 +45,9 @@ import SummaryPanel from "@/pages/expense-management/components/expense-reports/
 import { useSubmitReport } from "@/pages/expense-management/approval-engine/hooks/useApprovalWorkflow";
 
 import api from "@/api/axiosInstance";
+import { isJustified } from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
+import PolicyJustificationModal from "@/pages/expense-management/components/expense-reports/PolicyJustificationModal";
+import { LineItemDrawer } from "./ExpenseReportDetailPage";
 
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import TaxBreakdownPanel, {
@@ -227,6 +230,20 @@ export default function CreateExpensePage() {
   const [createdReport, setCreatedReport] = useState(null);
 
   const [lineItems, setLineItems] = useState([]);
+
+  // Policy violations the employee has not explained yet. Submit is blocked until each one has an explanation.
+  const unexplainedViolations = useMemo(
+    () =>
+      lineItems.flatMap((li) =>
+        (li.policyWarnings || [])
+          .filter((w) => w.violationId && !isJustified(w))
+          .map((violation) => ({ lineItem: li, violation }))
+      ),
+    [lineItems]
+  );
+  const [justifyDialog, setJustifyDialog] = useState(null); // { mode: "submit" | "save", items } | null
+  const [justifySaving, setJustifySaving] = useState(false);
+  const [justifyError, setJustifyError] = useState("");
 
 
   const steps = [
@@ -607,18 +624,20 @@ export default function CreateExpensePage() {
     ) {
       const loadStep2Lookups = async () => {
         try {
-          const [catList, projListResponse] = await Promise.all([
+          // The caller's own assigned projects (the admin master list is not readable by employees).
+          const [catList, assignedProjects] = await Promise.all([
             lookupService.getActiveCategories(),
-            api.get("/xms/admin/projects", {
-              baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-            }).catch(() => ({ data: { data: [] } })),
+            lookupService.getAssignedProjects().catch((err) => {
+              console.error("Failed to load assigned projects:", err);
+              showStatusToast(
+                err.response?.data?.message || "Could not load your assigned projects.",
+                "error"
+              );
+              return [];
+            }),
           ]);
           setCategories(catList);
-          const pList = projListResponse?.data?.data || projListResponse?.data || [];
-          setProjects(Array.isArray(pList) ? pList : []);
+          setProjects(Array.isArray(assignedProjects) ? assignedProjects : []);
         } catch (err) {
           console.error(
             "Failed to load categories/projects:",
@@ -1690,21 +1709,57 @@ export default function CreateExpensePage() {
   };
 
   // Step 3: Handle Final Submission for Approval
-  const handleSubmitReport = async () => {
+  const submitNow = () => {
+    submitMutation.mutate(reportId, {
+      onSuccess: () => {
+        showStatusToast("Expense report submitted for approval successfully!", "success");
+        navigate(`/expense-management/expenses/reports/${reportId}`);
+      },
+      onError: (err) => {
+        const errMsg = err.response?.data?.message || err.response?.data?.detail || "Failed to submit expense report.";
+        showStatusToast(errMsg, "error", 4000);
+      },
+    });
+  };
+
+  const handleSubmitReport = () => {
     if (!reportId) return;
+    if (unexplainedViolations.length > 0) {
+      setJustifyError("");
+      setJustifyDialog({ mode: "submit", items: unexplainedViolations });
+      return;
+    }
+    submitNow();
+  };
+
+  const refreshLineItems = async () => {
+    const itemsRes = await lineItemService.getAll(reportId);
+    const payload = itemsRes.data?.data;
+    setLineItems(Array.isArray(payload) ? payload : payload?.lineItems || payload?.content || payload?.data || []);
+  };
+
+  // Saves each explanation, then submits (when the dialog was opened by Submit) or just closes it.
+  const handleJustifyConfirm = async (entries) => {
+    setJustifySaving(true);
+    setJustifyError("");
     try {
-      submitMutation.mutate(reportId, {
-        onSuccess: () => {
-          showStatusToast("Expense report submitted for approval successfully!", "success");
-          navigate(`/expense-management/expenses/reports/${reportId}`);
-        },
-        onError: (err) => {
-          const errMsg = err.response?.data?.message || err.response?.data?.detail || "Failed to submit expense report.";
-          showStatusToast(errMsg, "error", 4000);
-        },
-      });
+      for (const entry of entries) {
+        await lineItemService.justifyPolicyWarning(reportId, entry.lineItemId, entry.violationId, entry.justification);
+      }
     } catch (err) {
-      console.error("Error final submitting report:", err);
+      setJustifyError(err.response?.data?.message || err.response?.data?.detail || "Couldn't save your explanation. Try again.");
+      setJustifySaving(false);
+      refreshLineItems();
+      return;
+    }
+    await refreshLineItems();
+    setJustifySaving(false);
+    const mode = justifyDialog?.mode;
+    setJustifyDialog(null);
+    if (mode === "submit") {
+      submitNow();
+    } else {
+      showStatusToast("Explanations saved", "success");
     }
   };
 
@@ -1881,7 +1936,7 @@ export default function CreateExpensePage() {
 
       {/* MAIN WIZARD */}
 
-      <div className="mx-auto max-w-5xl rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 space-y-6">
+      <div className="mx-auto w-full rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 space-y-6">
 
 
         {/* =====================================================
@@ -2729,6 +2784,26 @@ export default function CreateExpensePage() {
                 </Button>
 
 
+                {unexplainedViolations.length > 0 && (
+                  <div className="mb-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs text-amber-800">
+                      {unexplainedViolations.length} policy violation(s) need an explanation before this report can be submitted.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="small"
+                      className="shrink-0"
+                      onClick={() => {
+                        setJustifyError("");
+                        setJustifyDialog({ mode: "save", items: unexplainedViolations });
+                      }}
+                    >
+                      Explain violations
+                    </Button>
+                  </div>
+                )}
+
                 <Button
                   type="button"
                   variant="primary"
@@ -2758,553 +2833,32 @@ export default function CreateExpensePage() {
           ADD / EDIT LINE ITEM MODAL
       ======================================================== */}
 
-      {isLineItemDrawerOpen && (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-
-            {/* HEADER */}
-
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-
-              <h2 className="text-base font-bold text-gray-900">
-                {
-                  editingLineItem
-                    ? "Edit Line Item"
-                    : "Add Actual Expense"
-                }
-              </h2>
-
-
-              <button
-                type="button"
-                onClick={() =>
-                  setIsLineItemDrawerOpen(
-                    false
-                  )
-                }
-                className="text-gray-400 hover:text-gray-600 transition"
-              >
-                <X size={18} />
-              </button>
-
-            </div>
-
-
-            {/* FORM */}
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-
-              <form
-                id="line-item-drawer-form"
-                onSubmit={
-                  handleSaveLineItem
-                }
-                className="space-y-4"
-              >
-
-                {/* CATEGORY */}
-
-                <div className="space-y-1">
-
-                  <label className="block text-xs font-semibold text-gray-700">
-
-                    Category{" "}
-
-                    <span className="text-red-500">
-                      *
-                    </span>
-
-                  </label>
-
-
-                  <Select
-                    options={
-                      categoryOptions
-                    }
-
-                    value={
-                      categoryOptions.find(
-                        (o) =>
-                          o.value ===
-                          lineItemFormData.categoryId
-                      ) || null
-                    }
-
-                    onChange={(opt) =>
-                      handleLineItemSelectChange(
-                        "categoryId",
-                        opt
-                          ? opt.value
-                          : ""
-                      )
-                    }
-
-                    placeholder="Select category..."
-
-                    isSearchable
-
-                    styles={
-                      compactSelectStyles
-                    }
-
-                    isDisabled={
-                      savingLineItem
-                    }
-                  />
-
-
-                  {lineItemErrors.categoryId && (
-                    <span className="text-[11px] text-red-600 block mt-0.5">
-                      {
-                        lineItemErrors.categoryId
-                      }
-                    </span>
-                  )}
-
-                </div>
-
-
-                {/* DATE + MERCHANT */}
-
-                <div className="grid grid-cols-2 gap-4">
-
-                  <div className="space-y-1">
-
-                    <label className="block text-xs font-semibold text-gray-700">
-
-                      Expense Date{" "}
-
-                      <span className="text-red-500">
-                        *
-                      </span>
-
-                    </label>
-
-
-                    <input
-                      type="date"
-                      name="expenseDate"
-                      value={
-                        lineItemFormData.expenseDate
-                      }
-                      onChange={
-                        handleLineItemInputChange
-                      }
-                      disabled={
-                        savingLineItem
-                      }
-                      className={`w-full px-2.5 py-1.5 h-[38px] rounded-md border text-xs focus:outline-none focus:ring-2 ${
-                        lineItemErrors.expenseDate
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/20"
-                      }`}
-                    />
-
-
-                    {lineItemErrors.expenseDate && (
-                      <span className="text-[11px] text-red-600 block mt-0.5">
-                        {
-                          lineItemErrors.expenseDate
-                        }
-                      </span>
-                    )}
-
-                  </div>
-
-
-                  <div className="space-y-1">
-
-                    <label className="block text-xs font-semibold text-gray-700">
-
-                      Merchant Name{" "}
-
-                      <span className="text-red-500">
-                        *
-                      </span>
-
-                    </label>
-
-
-                    <input
-                      type="text"
-                      name="merchantName"
-                      placeholder="e.g. Uber, Restaurant Name"
-                      value={
-                        lineItemFormData.merchantName
-                      }
-                      onChange={
-                        handleLineItemInputChange
-                      }
-                      disabled={
-                        savingLineItem
-                      }
-                      className={`w-full px-2.5 py-1.5 h-[38px] rounded-md border text-xs focus:outline-none focus:ring-2 ${
-                        lineItemErrors.merchantName
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/20"
-                      }`}
-                    />
-
-
-                    {lineItemErrors.merchantName && (
-                      <span className="text-[11px] text-red-600 block mt-0.5">
-                        {
-                          lineItemErrors.merchantName
-                        }
-                      </span>
-                    )}
-
-                  </div>
-
-                </div>
-
-                {/* Amount, Currency & GST */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1">
-
-                    <label className="block text-xs font-semibold text-gray-700">
-
-                      Amount{" "}
-
-                      <span className="text-red-500">
-                        *
-                      </span>
-
-                    </label>
-
-
-                    <input
-                      type="number"
-                      name="amount"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={
-                        lineItemFormData.amount
-                      }
-                      onChange={
-                        handleLineItemInputChange
-                      }
-                      disabled={
-                        savingLineItem
-                      }
-                      className={`w-full px-2.5 py-1.5 h-[38px] rounded-md border text-xs focus:outline-none focus:ring-2 ${
-                        lineItemErrors.amount
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/20"
-                      }`}
-                    />
-
-
-                    {lineItemErrors.amount && (
-                      <span className="text-[11px] text-red-600 block mt-0.5">
-                        {
-                          lineItemErrors.amount
-                        }
-                      </span>
-                    )}
-
-                  </div>
-
-
-                  <div className="space-y-1">
-
-                    <label className="block text-xs font-semibold text-gray-700">
-
-                      Currency{" "}
-
-                      <span className="text-red-500">
-                        *
-                      </span>
-
-                    </label>
-
-
-                    <Select
-                      options={
-                        currencyOptions
-                      }
-
-                      value={
-                        currencyOptions.find(
-                          (o) =>
-                            o.value ===
-                            lineItemFormData.currencyId
-                        ) || null
-                      }
-
-                      onChange={(opt) =>
-                        handleLineItemSelectChange(
-                          "currencyId",
-                          opt
-                            ? opt.value
-                            : ""
-                        )
-                      }
-
-                      placeholder="Currency"
-
-                      isSearchable
-
-                      styles={
-                        compactSelectStyles
-                      }
-
-                      isDisabled={
-                        savingLineItem
-                      }
-                    />
-
-
-                    {lineItemErrors.currencyId && (
-                      <span className="text-[11px] text-red-600 block mt-0.5">
-                        {
-                          lineItemErrors.currencyId
-                        }
-                      </span>
-                    )}
-
-                  </div>
-
-
-                  <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-gray-700">
-                      GST (Tax) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="taxAmount"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={lineItemFormData.taxAmount}
-                      onChange={handleLineItemInputChange}
-                      disabled={savingLineItem}
-                      className={`w-full px-2.5 py-1.5 h-[38px] rounded-md border text-xs focus:outline-none focus:ring-2 ${
-                        lineItemErrors.taxAmount
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/20"
-                      }`}
-                    />
-                    {lineItemErrors.taxAmount && (
-                      <span className="text-[11px] text-red-600 block mt-0.5">{lineItemErrors.taxAmount}</span>
-                    )}
-                  </div>
-                </div>
-
-
-                {/* BILLABLE / PROJECT */}
-
-                <div className="grid grid-cols-2 gap-4">
-
-                  <div className="space-y-1">
-
-                    <label className="block text-xs font-semibold text-gray-700">
-                      Client Billable?
-                    </label>
-
-
-                    <select
-                      name="clientBillable"
-                      value={
-                        lineItemFormData.clientBillable
-                          .toString()
-                      }
-                      onChange={(e) =>
-                        handleLineItemSelectChange(
-                          "clientBillable",
-                          e.target.value ===
-                            "true"
-                        )
-                      }
-                      disabled={
-                        savingLineItem
-                      }
-                      className="w-full px-2.5 py-1.5 h-[38px] rounded-md border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white"
-                    >
-
-                      <option value="false">
-                        No
-                      </option>
-
-                      <option value="true">
-                        Yes
-                      </option>
-
-                    </select>
-
-                  </div>
-
-
-                  <div className="space-y-1">
-
-                    <label className="block text-xs font-semibold text-gray-700">
-
-                      Project{" "}
-
-                      {lineItemFormData.clientBillable && (
-                        <span className="text-red-500">
-                          *
-                        </span>
-                      )}
-
-                    </label>
-
-
-                    <Select
-                      options={projects
-                        .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
-                        .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))}
-                      value={projects
-                        .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
-                        .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))
-                        .find((o) => o.value === lineItemFormData.projectId) || null}
-                      onChange={(opt) => handleLineItemSelectChange("projectId", opt ? opt.value : "")}
-                      placeholder="Select project..."
-
-                      isSearchable
-
-                      styles={
-                        compactSelectStyles
-                      }
-
-                      isDisabled={
-                        savingLineItem ||
-                        !lineItemFormData.clientBillable
-                      }
-                    />
-
-
-                    {lineItemErrors.projectId && (
-                      <span className="text-[11px] text-red-600 block mt-0.5">
-                        {
-                          lineItemErrors.projectId
-                        }
-                      </span>
-                    )}
-
-                  </div>
-
-                </div>
-
-
-                {/* DESCRIPTION */}
-
-                <div className="space-y-1">
-
-                  <label className="block text-xs font-semibold text-gray-700">
-                    Description
-                  </label>
-
-
-                  <input
-                    type="text"
-                    name="description"
-                    placeholder="Optional notes about this expense..."
-                    value={
-                      lineItemFormData.description
-                    }
-                    onChange={
-                      handleLineItemInputChange
-                    }
-                    disabled={
-                      savingLineItem
-                    }
-                    className="w-full px-2.5 py-1.5 h-[38px] rounded-md border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  />
-
-                </div>
-
-
-                {/* RECEIPT */}
-
-                <div className="space-y-1">
-
-                  <label className="block text-xs font-semibold text-gray-700">
-                    Receipt Attachment (Optional)
-                  </label>
-
-
-                  <input
-                    type="file"
-                    accept=".pdf,.png,.jpg,.jpeg"
-                    disabled={
-                      savingLineItem
-                    }
-                    onChange={(e) => {
-
-                      if (
-                        e.target.files
-                          ?.length
-                      ) {
-                        setReceiptFile(
-                          e.target.files[0]
-                        );
-                      }
-
-                    }}
-                    className="w-full border border-gray-300 rounded-md p-1 bg-white text-xs"
-                  />
-
-
-                  {receiptFile && (
-                    <p className="text-[10px] text-indigo-600 font-semibold mt-1">
-                      File chosen:{" "}
-                      {
-                        receiptFile.name
-                      }
-                    </p>
-                  )}
-
-                </div>
-
-              </form>
-
-            </div>
-
-
-            {/* FOOTER */}
-
-            <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50 shrink-0">
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  setIsLineItemDrawerOpen(
-                    false
-                  )
-                }
-                disabled={
-                  savingLineItem
-                }
-              >
-                Cancel
-              </Button>
-
-
-              <Button
-                type="submit"
-                form="line-item-drawer-form"
-                variant="primary"
-                loading={
-                  savingLineItem
-                }
-                loadingText="Saving..."
-                disabled={
-                  savingLineItem
-                }
-              >
-                Save
-              </Button>
-
-            </div>
-
-          </div>
-
-        </div>
-      )}
+      <PolicyJustificationModal
+        isOpen={!!justifyDialog}
+        items={justifyDialog?.items || []}
+        mode={justifyDialog?.mode}
+        isSaving={justifySaving || submitMutation.isPending}
+        error={justifyError}
+        onConfirm={handleJustifyConfirm}
+        onCancel={() => setJustifyDialog(null)}
+      />
+
+      {/* Add / edit line item: the same drawer the expense report detail page uses */}
+      <LineItemDrawer
+        isOpen={isLineItemDrawerOpen}
+        onClose={() => setIsLineItemDrawerOpen(false)}
+        reportId={reportId}
+        lineItem={editingLineItem}
+        defaultCostCenterId={formData.costCenterId}
+        categoryOptions={categoryOptions}
+        costCenterOptions={costCenterOptions}
+        currencyOptions={currencyOptions}
+        onSaved={async () => {
+          const itemsRes = await lineItemService.getAll(reportId);
+          const payload = itemsRes.data?.data;
+          setLineItems(Array.isArray(payload) ? payload : payload?.lineItems || payload?.content || payload?.data || []);
+        }}
+      />
 
 
       {/* =======================================================

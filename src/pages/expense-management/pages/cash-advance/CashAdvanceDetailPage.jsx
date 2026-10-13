@@ -225,6 +225,7 @@ export default function CashAdvanceDetailPage() {
           <div>{getStatusBadge(advance.status)}</div>
         </div>
 
+
         {/* Settlement breakdown (settlement view only) */}
         {isSettlementView && (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
