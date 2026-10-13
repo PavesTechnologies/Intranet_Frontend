@@ -4,6 +4,7 @@ import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import JdCalibrationBadge from "../../components/JdCalibrationBadge";
 import JdUnknownSkillResolver from "./JdUnknownSkillResolver";
+import { useAuth } from "../../../../contexts/AuthContext";
 import { getJDCalibration, getJDCalibrationVersions, saveJDCalibration } from "../../service/jdservice";
 
 // JD calibration: HR_ADMIN confirms or edits the JD's scoring inputs - skill tiers,
@@ -33,6 +34,7 @@ function formFromView(view) {
 }
 
 export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved }) {
+  const { user } = useAuth();
   const [view, setView] = useState(null);
   const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -112,7 +114,13 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved }) {
   if (loading) return <div className="py-10 flex justify-center"><LoadingSpinner /></div>;
   if (!view || !form) return <p className="text-xs text-slate-500 py-6">Calibration couldn't be loaded.</p>;
 
-  const readOnly = !canCalibrate;
+  // Editable when the SERVER says this user may calibrate: it computes
+  // can_calibrate from the token it received, with the same rule that
+  // authorises the save. The browser's decoded roles can be stale (a silent
+  // token refresh doesn't update them), so they are only the fallback. A live
+  // campaign never makes calibration read-only (D2).
+  const readOnly = !(typeof view.can_calibrate === "boolean" ? view.can_calibrate : canCalibrate);
+  const signedInRoles = [].concat(user?.roles || user?.role || []).join(", ") || "none";
   const missingSense = view.skills.filter((s) => s.ambiguous && !form.skills[s.jd_skill_id]?.sense_key);
   const blocking = view.blocking_unknown_skills || [];
 
@@ -163,6 +171,12 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved }) {
             </ul>
           )}
         </div>
+      )}
+
+      {readOnly && (
+        <p className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2" role="note">
+          Read-only: calibrating needs the HR_ADMIN role. Roles on your sign-in: {signedInRoles}.
+        </p>
       )}
 
       {/* Warnings */}
