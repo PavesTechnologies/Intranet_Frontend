@@ -174,13 +174,15 @@ export default function JdProcessingList({ onTaskCompleted } = {}) {
     }
   };
 
-  const scheduleSilenceBackfill = (taskId, delayMs = SILENCE_BACKFILL_MS) => {
+  // A function declaration (hoisted) rather than a const: it and backfillRow
+  // call each other, so neither can be declared before the other's use.
+  function scheduleSilenceBackfill(taskId, delayMs = SILENCE_BACKFILL_MS) {
     clearBackfillTimer(taskId);
     backfillTimersRef.current.set(
       taskId,
       setTimeout(() => backfillRow(taskId), delayMs)
     );
-  };
+  }
 
   useEffect(
     () => () => {

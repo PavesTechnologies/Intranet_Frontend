@@ -142,6 +142,10 @@ export default function JdDetails() {
 
   const [jdDetail, setJdDetail] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Bumped after a calibration save so the JD (and its badge) reload. Declared
+  // before the fetch effect below, whose dependency array reads it.
+  const [jdReloadKey, setJdReloadKey] = useState(0);
+  const currentJd = jdDetail || jd;
 
 
   useEffect(() => {
@@ -262,8 +266,6 @@ export default function JdDetails() {
 
   // Tabs: overview, skills, campaigns, versions, audit
   const [activeTab, setActiveTab] = useState("overview");
-  // Bumped after a calibration save so the JD (and its badge) reload.
-  const [jdReloadKey, setJdReloadKey] = useState(0);
 
   const [dbCampaigns, setDbCampaigns] = useState([]);
   const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false);
@@ -342,6 +344,41 @@ export default function JdDetails() {
 
   const [jdSkillsData, setJdSkillsData] = useState([]);
   const [jdUnknownSkillsData, setJdUnknownSkillsData] = useState([]);
+  const [isLoadingSkills, setIsLoadingSkills] = useState(false);
+  const [isLoadingUnknownSkills, setIsLoadingUnknownSkills] = useState(false);
+  const [skillsCurrentPage, setSkillsCurrentPage] = useState(1);
+  const [unknownSkillsCurrentPage, setUnknownSkillsCurrentPage] = useState(1);
+
+  const fetchJdSkills = async () => {
+    setIsLoadingSkills(true);
+    setSkillsCurrentPage(1);
+    try {
+      const res = await getJDSkills(id);
+      if (res?.success && res.data) {
+        setJdSkillsData(res.data);
+      }
+    } catch (err) {
+      console.error("Failed to load JD skills:", err);
+    } finally {
+      setIsLoadingSkills(false);
+    }
+  };
+
+  const fetchJdUnknownSkills = async () => {
+    setIsLoadingUnknownSkills(true);
+    setUnknownSkillsCurrentPage(1);
+    try {
+      const res = await getJDUnknownSkills(id);
+      if (res?.success && res.data) {
+        setJdUnknownSkillsData(res.data);
+      }
+    } catch (err) {
+      console.error("Failed to load JD unknown skills:", err);
+    } finally {
+      setIsLoadingUnknownSkills(false);
+    }
+  };
+
 
   // JD Skill edit / remove (HR_ADMIN). The backend refuses both (409) while the
   // JD is used by an active campaign, and (400) when the change would leave the
@@ -389,9 +426,6 @@ export default function JdDetails() {
       setIsSkillSaving(false);
     }
   };
-  const [isLoadingSkills, setIsLoadingSkills] = useState(false);
-  const [isLoadingUnknownSkills, setIsLoadingUnknownSkills] = useState(false);
-
   // Unknown Skill resolution actions — Create / Map / Delete — reuse the same
   // modal bodies, endpoints, and suggestion-tab UI as the Skill Ontology
   // Unknown Skill detail page.
@@ -471,16 +505,14 @@ export default function JdDetails() {
     }
   };
 
-  // Pagination state — JD Skills
-  const [skillsCurrentPage, setSkillsCurrentPage] = useState(1);
+  // Pagination — JD Skills
   const skillsTotalPages = Math.max(1, Math.ceil(jdSkillsData.length / SKILLS_PAGE_SIZE));
   const paginatedSkills = jdSkillsData.slice(
     (skillsCurrentPage - 1) * SKILLS_PAGE_SIZE,
     skillsCurrentPage * SKILLS_PAGE_SIZE
   );
 
-  // Pagination state — JD Unknown Skills
-  const [unknownSkillsCurrentPage, setUnknownSkillsCurrentPage] = useState(1);
+  // Pagination — JD Unknown Skills
   const unknownSkillsTotalPages = Math.max(1, Math.ceil(jdUnknownSkillsData.length / SKILLS_PAGE_SIZE));
   const paginatedUnknownSkills = jdUnknownSkillsData.slice(
     (unknownSkillsCurrentPage - 1) * SKILLS_PAGE_SIZE,
@@ -713,36 +745,6 @@ export default function JdDetails() {
     });
   }, [paginatedUnknownSkills, selectedUnknownSkillIds]);
 
-  const fetchJdSkills = async () => {
-    setIsLoadingSkills(true);
-    setSkillsCurrentPage(1);
-    try {
-      const res = await getJDSkills(id);
-      if (res?.success && res.data) {
-        setJdSkillsData(res.data);
-      }
-    } catch (err) {
-      console.error("Failed to load JD skills:", err);
-    } finally {
-      setIsLoadingSkills(false);
-    }
-  };
-
-  const fetchJdUnknownSkills = async () => {
-    setIsLoadingUnknownSkills(true);
-    setUnknownSkillsCurrentPage(1);
-    try {
-      const res = await getJDUnknownSkills(id);
-      if (res?.success && res.data) {
-        setJdUnknownSkillsData(res.data);
-      }
-    } catch (err) {
-      console.error("Failed to load JD unknown skills:", err);
-    } finally {
-      setIsLoadingUnknownSkills(false);
-    }
-  };
-
   // Load the active tab's data, and reload it when the route moves to another
   // JD (`id`) - otherwise the previous JD's lists stayed on screen. The fetch
   // functions are recreated every render, so they are deliberately not deps.
@@ -779,8 +781,6 @@ export default function JdDetails() {
       </div>
     );
   }
-
-  const currentJd = jdDetail || jd;
 
   if (!currentJd) {
     return (

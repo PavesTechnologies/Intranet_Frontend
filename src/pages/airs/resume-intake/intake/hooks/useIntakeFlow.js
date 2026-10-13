@@ -34,39 +34,6 @@ export default function useIntakeFlow() {
 
   // `uploadResponse` is the accepted-response `data` payload returned by the
   // real POST /resumes call (resume_id, task_id, campaign_name, ...).
-  const submit = ({ uploadResponse, candidateName, candidateEmail, fileFormat }) => {
-    const newResume = {
-      resume_id: uploadResponse.resume_id,
-      candidate_id: uploadResponse.campaign_candidate_id,
-      candidate_name: candidateName,
-      candidate_email_masked: maskEmail(candidateEmail),
-      file_format: fileFormat,
-      version_number: 1,
-      parse_status: uploadResponse.parse_status || "PENDING",
-      parse_confidence_score: null,
-      parser_version: "—",
-      parse_duration_ms: null,
-      created_at: new Date().toISOString(),
-      campaign_name: uploadResponse.campaign_name,
-      pipeline_stage: uploadResponse.pipeline_stage,
-    };
-
-    const newStatus = {
-      task_id: uploadResponse.task_id,
-      overall_status: "QUEUED",
-      current_stage: null,
-      stages: buildStages(),
-      error_message: null,
-    };
-
-    registerMockIntake(newResume, newStatus);
-    setResume(newResume);
-    setStatus(newStatus);
-    setStatusError(null);
-    setStep("processing");
-    beginPolling(newResume.resume_id, newStatus.task_id);
-  };
-
   const beginPolling = (resumeId, taskId) => {
     clearTimeout(pollRef.current);
     let isFetching = false;
@@ -105,6 +72,39 @@ export default function useIntakeFlow() {
     };
 
     poll();
+  };
+
+  const submit = ({ uploadResponse, candidateName, candidateEmail, fileFormat }) => {
+    const newResume = {
+      resume_id: uploadResponse.resume_id,
+      candidate_id: uploadResponse.campaign_candidate_id,
+      candidate_name: candidateName,
+      candidate_email_masked: maskEmail(candidateEmail),
+      file_format: fileFormat,
+      version_number: 1,
+      parse_status: uploadResponse.parse_status || "PENDING",
+      parse_confidence_score: null,
+      parser_version: "—",
+      parse_duration_ms: null,
+      created_at: new Date().toISOString(),
+      campaign_name: uploadResponse.campaign_name,
+      pipeline_stage: uploadResponse.pipeline_stage,
+    };
+
+    const newStatus = {
+      task_id: uploadResponse.task_id,
+      overall_status: "QUEUED",
+      current_stage: null,
+      stages: buildStages(),
+      error_message: null,
+    };
+
+    registerMockIntake(newResume, newStatus);
+    setResume(newResume);
+    setStatus(newStatus);
+    setStatusError(null);
+    setStep("processing");
+    beginPolling(newResume.resume_id, newStatus.task_id);
   };
 
   // Re-checks the current task's status — used when the last poll failed to
