@@ -22,6 +22,7 @@ import { useFinanceQueue, useFinanceHistory, useFinancePaymentSummary } from "./
 import EmployeeLabel from "../../approval-engine/components/EmployeeLabel";
 import { useEmployeeDirectory } from "../../approval-engine/hooks/useEmployeeDirectory";
 import FinanceReviewPanel from "./components/FinanceReviewPanel";
+import CashAdvanceApprovalsList from "../../approval-engine/components/CashAdvanceApprovalsList";
 import PolicyEmptyState from "../../components/policy/common/PolicyEmptyState";
 import SelectableStatCard from "../../components/common/SelectableStatCard";
 import { DEFAULT_PAGE_SIZE } from "@/pages/expense-management/components/common/pagination";
@@ -102,6 +103,8 @@ export default function FinancePage() {
   const [reviewingReport, setReviewingReport] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("");
+  // Finance approves two things: expense reports (verify queue) and cash advances waiting for Finance.
+  const [section, setSection] = useState("expenses");
 
   const pageFor = (tab) => pageByTab[tab] ?? 0;
   const setPageFor = (tab, next) => setPageByTab((prev) => ({ ...prev, [tab]: next }));
@@ -210,9 +213,44 @@ export default function FinancePage() {
   const isAuthError = errorStatus === 401 || errorStatus === 403;
   const [emptyTitle, emptyDescription] = EMPTY_TEXT[activeTab];
 
+  const sectionSwitch = (
+    <div className="flex w-fit space-x-1 rounded-lg bg-gray-50 p-1">
+      {[
+        { value: "expenses", label: "Expense reports" },
+        { value: "cash-advances", label: "Cash advances" },
+      ].map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => setSection(opt.value)}
+          className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+            section === opt.value ? "bg-white text-blue-600 shadow-sm" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (section === "cash-advances") {
+    return (
+      <div className="p-4 sm:p-6 space-y-4">
+        <Breadcrumb items={[{ label: "Expense Management", to: "/expense-management/dashboard" }, { label: "Finance" }]} />
+        <PageHeader
+          title="Finance"
+          subtitle="Cash advances waiting for Finance approval. Approve or reject them here."
+        />
+        {sectionSwitch}
+        <CashAdvanceApprovalsList activeTab="pending" searchTerm="" stage="FINANCE" />
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 sm:p-6 space-y-4">
       <Breadcrumb items={[{ label: "Expense Management", to: "/expense-management/dashboard" }, { label: "Finance" }]} />
+      {sectionSwitch}
 
       <PageHeader
         title="Finance"

@@ -295,7 +295,12 @@ const canApproveAdvance = (adv, user, hasRole) => {
   return pendingStatuses.includes(statusUpper);
 };
 
-export default function CashAdvanceApprovalsList({ activeTab = "pending", searchTerm = "" }) {
+/**
+ * Cash advance approvals. `stage` decides which pending advances this list acts on:
+ * "MANAGER" (the Approvals tab) shows advances waiting for the manager, "FINANCE" (the Finance tab)
+ * shows advances waiting for Finance. Approved and rejected history is not split by stage.
+ */
+export default function CashAdvanceApprovalsList({ activeTab = "pending", searchTerm = "", stage = "MANAGER" }) {
   const { user, hasRole } = useAuth();
   const [advances, setAdvances] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -385,9 +390,14 @@ export default function CashAdvanceApprovalsList({ activeTab = "pending", search
         (adv.employeeName || adv.employee_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         formatAdvanceNumber(adv).toLowerCase().includes(searchTerm.toLowerCase());
 
-      return matchTab && matchSearch;
+      // Pending items belong to one stage only: manager-stage on Approvals, finance-stage on Finance.
+      const isFinanceStage = statusUpper.includes("FINANCE");
+      const matchStage =
+        activeTab !== "pending" || (stage === "FINANCE") === isFinanceStage;
+
+      return matchTab && matchSearch && matchStage;
     });
-  }, [advances, activeTab, searchTerm]);
+  }, [advances, activeTab, searchTerm, stage]);
 
   const handleApprove = (adv) => {
     setApprovingAdvance(adv);
