@@ -1,6 +1,7 @@
 import api from "@/api/axiosInstance";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const authHeaders = () => {
   const token = localStorage.getItem("token");
@@ -98,6 +99,13 @@ export const cashAdvanceApi = {
   // Settlement / repayment endpoints
   getSettlement: (advanceId) =>
     api.get(`/xms/employee/cash-advances/${advanceId}/settlement`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+
+  // Server-calculated utilization (claimed/approved/returned, reservations, closure). Display only.
+  getUtilization: (advanceId) =>
+    api.get(`/xms/employee/cash-advances/${advanceId}/utilization`, {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),

@@ -4,7 +4,6 @@ const TABS = [
   { value: "mandatory", label: "Mandatory Skills" },
   { value: "preferred", label: "Preferred Skills" },
   { value: "missing", label: "Missing Skills" },
-  { value: "additional", label: "Additional Skills" },
 ];
 
 // Rounded-pill segmented control for switching between the Mandatory /

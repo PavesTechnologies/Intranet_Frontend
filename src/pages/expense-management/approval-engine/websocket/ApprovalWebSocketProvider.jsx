@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { notifySessionExpired } from "../../../../api/sessionExpiry";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 /**
  * Same shape as the existing Leave Management WebSocketProvider
@@ -35,7 +36,7 @@ const teamFeedsFor = (token) => {
 export const useApprovalWebSocket = () => useContext(ApprovalWebSocketContext);
 
 export default function ApprovalWebSocketProvider({ children }) {
-  const BASE_URL = (window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "http://localhost:8080").replace(/\/+$/, "");
+  const BASE_URL = (XMS_BASE_URL || "http://localhost:8080");
 
   const clientRef = useRef(null);
   const listeners = useRef({});

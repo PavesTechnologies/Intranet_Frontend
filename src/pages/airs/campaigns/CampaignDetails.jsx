@@ -21,6 +21,7 @@ import EditCampaignModal from "./components/EditCampaignModal";
 import ReopenCampaignModal from "./components/ReopenCampaignModal";
 import CandidateActionModals from "./components/CandidateActionModals";
 import CampaignExportPanel from "./components/CampaignExportPanel";
+import ScoringShadowReport from "./components/ScoringShadowReport";
 import { getNoteCounts } from "./services/candidateActionsService";
 import { useAuth } from "../../../contexts/AuthContext";
 import { REJECTION_LAYER_LABELS } from "../constants/scoreLabels";
@@ -61,7 +62,7 @@ export default function CampaignDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { canManageCampaigns, canViewPipeline, canViewTimeline, canViewCampaigns, isHiringManager, isRecruiter } = useCampaignPermissions();
+  const { canManageCampaigns, canViewPipeline, canViewTimeline, canViewCampaigns, isHiringManager, isRecruiter, isHRAdmin } = useCampaignPermissions();
 
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -162,6 +163,8 @@ export default function CampaignDetails() {
     // Its own tab rather than scattered buttons, so every export for
     // this campaign is discoverable in one place.
     { id: "exports", label: "Exports", icon: Download, show: true },
+    // Scoring v2 (Phase 1) shadow comparison - HR_ADMIN only, never decides.
+    { id: "scoringV2", label: "Scoring v2 (shadow)", icon: Activity, show: isHRAdmin },
   ].filter((t) => t.show);
 
   const statusStyle = {
@@ -265,6 +268,7 @@ export default function CampaignDetails() {
       {activeTab === "timeline" && <TimelineTab campaignId={id} />}
 
       {activeTab === "exports" && <CampaignExportPanel campaignId={id} />}
+      {activeTab === "scoringV2" && isHRAdmin && <ScoringShadowReport campaignId={id} />}
 
       {canEdit && (<EditCampaignModal
           isOpen={editOpen}
@@ -468,6 +472,10 @@ function DetailsTab({ info, jd, scoring, limits, hm }) {
                 <Row label="Det. Cutoff" value={scoring.deterministic_threshold ?? "—"} />
                 <Row label="Sem. Cutoff" value={scoring.semantic_threshold} />
                 <Row label="AI Cutoff" value={scoring.ai_threshold} />
+                <Row
+                  label="Max Missing Core"
+                  value={scoring.max_missing_core_pct == null ? "—" : `${scoring.max_missing_core_pct}% (cap ${scoring.max_missing_core_skills ?? "—"})`}
+                />
               </div>
             </Card>
           </div>
@@ -1812,8 +1820,13 @@ function TimelineTab({ campaignId }) {
     ...availableTypes.map((t) => ({ value: t, label: stageLabel(t) })),
   ];
 
-  // Reload from scratch whenever the event-type filter changes
-  useEffect(() => { load(true); /* eslint-disable-next-line */ }, [eventType]);
+  // Reload from scratch whenever the event-type filter changes. `load` is
+  // deliberately not a dependency: it changes with `offset`, which load()
+  // itself advances, so depending on it would reload in a loop.
+  useEffect(() => {
+    load(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventType]);
 
   const hasMore = events.length < total;
 

@@ -73,14 +73,14 @@ export default function SettingsWeightConfig() {
 
   if (loading) {
     return (
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 flex justify-center py-10">
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 h-full flex justify-center py-10">
         <LoadingSpinner text="Loading platform defaults..." />
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 h-full">
       <div className="flex items-center justify-between mb-1">
         <div className="font-bold text-[14px] text-slate-900">Campaign scoring defaults</div>
         <span className={`text-[12px] font-semibold ${total === 100 ? "text-emerald-600" : "text-amber-600"}`}>

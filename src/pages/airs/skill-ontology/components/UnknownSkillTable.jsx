@@ -6,11 +6,20 @@ import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/ui/Modal";
 import { formatDate } from "../utils/skillOntologyUtils.jsx";
 import { bulkApproveUnknownSkills, bulkDeleteUnknownSkills } from "../services/skillOntologyService";
+import useCoreSkillUsage from "../hooks/useCoreSkillUsage";
+import CoreSkillDeleteWarning from "./CoreSkillDeleteWarning";
 
 export default function UnknownSkillTable({ skills, isLoading, onPromote, onBulkDone, onView }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [confirmAction, setConfirmAction] = useState(null); // "approve" | "delete" | null
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Only looked up while the bulk *delete* confirmation is open.
+  const coreUsage = useCoreSkillUsage(Array.from(selectedIds), confirmAction === "delete");
+  const [coreAcknowledged, setCoreAcknowledged] = useState(false);
+  useEffect(() => { setCoreAcknowledged(false); }, [confirmAction]);
+  const skillNames = Object.fromEntries(skills.map((s) => [s.id, s.rawSkill]));
+  const deleteBlocked =
+    confirmAction === "delete" && (coreUsage.loading || (coreUsage.usages.length > 0 && !coreAcknowledged));
 
   // Drop stale selections whenever the visible page changes (search/page/
   // refresh) so an id that's no longer on screen can never be bulk-actioned.
@@ -165,6 +174,15 @@ export default function UnknownSkillTable({ skills, isLoading, onPromote, onBulk
             </p>
           </div>
 
+          {confirmAction === "delete" && (
+            <CoreSkillDeleteWarning
+              {...coreUsage}
+              skillNames={skillNames}
+              acknowledged={coreAcknowledged}
+              onAcknowledge={setCoreAcknowledged}
+            />
+          )}
+
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="outline" size="small" onClick={closeConfirm} disabled={isSubmitting}>
               Cancel
@@ -174,6 +192,7 @@ export default function UnknownSkillTable({ skills, isLoading, onPromote, onBulk
               size="small"
               loading={isSubmitting}
               onClick={handleConfirmBulkAction}
+              disabled={deleteBlocked}
             >
               Confirm
             </Button>

@@ -82,6 +82,7 @@ import {
 import { useFinanceReviews } from "@/pages/expense-management/pages/finance/hooks/useFinanceVerification";
 import { useClientPagination } from "@/pages/expense-management/components/common/pagination";
 import Pagination from "@/components/Pagination/pagination";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 const formatDate = (value) => {
   if (!value) return "—";
@@ -446,7 +447,7 @@ export default function ExpenseReportDetailPage() {
 
       // Upload file to the report's receipt store
       const uploadRes = await api.post(`/xms/employee/expense-reports/${reportId}/receipts`, formData, {
-        baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
+        baseURL: XMS_BASE_URL,
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "multipart/form-data",
@@ -462,7 +463,7 @@ export default function ExpenseReportDetailPage() {
       // so check it separately, best-effort, purely to decide whether to warn here.
       try {
         const detailRes = await api.get(`/xms/employee/receipts/${receiptId}`, {
-          baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
+          baseURL: XMS_BASE_URL,
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
         const detail = detailRes.data?.data || detailRes.data;
@@ -485,7 +486,7 @@ export default function ExpenseReportDetailPage() {
         try {
           pollCount++;
           const ocrRes = await api.get(`/xms/employee/receipts/${receiptId}/ocr`, {
-            baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
+            baseURL: XMS_BASE_URL,
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
@@ -1061,7 +1062,7 @@ export default function ExpenseReportDetailPage() {
         ...payload,
         lineItemId: null
       }, {
-        baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
+        baseURL: XMS_BASE_URL,
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         }
@@ -1111,7 +1112,16 @@ export default function ExpenseReportDetailPage() {
 
   return (
     <div className="space-y-4">
-      <Breadcrumb items={breadcrumbs} />
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/expense-management/expenses/my"))}
+          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-gray-900"
+        >
+          &larr; Back
+        </button>
+        <Breadcrumb items={breadcrumbs} />
+      </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
         {/* Left column */}
@@ -2296,7 +2306,7 @@ const emptyForm = (defaultCostCenterId) => ({
   projectId: "",
 });
 
-function LineItemDrawer({
+export function LineItemDrawer({
   isOpen,
   onClose,
   reportId,
@@ -2948,7 +2958,7 @@ function LineItemDrawer({
           ...payload,
           lineItemId: null
         }, {
-          baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
+          baseURL: XMS_BASE_URL,
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           }

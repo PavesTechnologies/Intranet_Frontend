@@ -52,7 +52,7 @@ describe("SettingsAIProviders", () => {
     useAiProviders.mockReturnValue(baseState({ rows, total: 2 }));
     render(<SettingsAIProviders />);
 
-    for (const header of ["Provider", "Model", "API key", "Status", "Actions"]) {
+    for (const header of ["Provider", "Models", "API key", "Status", "Actions"]) {
       expect(screen.getByRole("columnheader", { name: header })).toBeInTheDocument();
     }
     const google = within(rowFor("Google Gemini"));

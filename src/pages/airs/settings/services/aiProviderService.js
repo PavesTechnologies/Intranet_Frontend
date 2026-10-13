@@ -71,28 +71,30 @@ export const listModels = async ({ provider, apiKey }) => {
   return unwrap(response.data) || [];
 };
 
-export const verifyAiProvider = async ({ provider, modelName, apiKey }) => {
+// `models` is the per-purpose setup: [{ usage, model_name, fallback_model_name }]
+// (see utils/modelSetup.js toRequestModels). Verify checks every model in it.
+export const verifyAiProvider = async ({ provider, models, apiKey }) => {
   const response = await api.post(
     `${BASE_URL}/ai-providers/verify`,
-    { provider, model_name: modelName, api_key: apiKey || null },
+    { provider, models, api_key: apiKey || null },
     { headers: authHeaders() },
   );
   return unwrap(response.data);
 };
 
-export const createProvider = async ({ provider, modelName, apiKey }) => {
+export const createProvider = async ({ provider, models, apiKey }) => {
   const response = await api.post(
     `${BASE_URL}/ai-providers`,
-    { provider, model_name: modelName, api_key: apiKey },
+    { provider, models, api_key: apiKey },
     { headers: authHeaders() },
   );
   return { row: unwrap(response.data), message: response.data?.message };
 };
 
-export const updateProvider = async (id, { modelName, apiKey }) => {
+export const updateProvider = async (id, { models, apiKey }) => {
   const response = await api.put(
     `${BASE_URL}/ai-providers/${id}`,
-    { model_name: modelName, api_key: apiKey || null },
+    { models, api_key: apiKey || null },
     { headers: authHeaders() },
   );
   return { row: unwrap(response.data), message: response.data?.message };

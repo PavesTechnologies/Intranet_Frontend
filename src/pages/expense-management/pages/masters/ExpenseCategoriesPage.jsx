@@ -21,8 +21,9 @@ import { Fonts } from "@/components/Fonts/Fonts";
 import { taxCodeService } from "@/pages/expense-management/api/expenseReportsApi";
 import Pagination from "@/components/Pagination/pagination";
 import CategoryTaxMappingModal from "@/pages/expense-management/components/masters/CategoryTaxMappingModal";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const expenseCategoryService = {
   getAll: (params) => {

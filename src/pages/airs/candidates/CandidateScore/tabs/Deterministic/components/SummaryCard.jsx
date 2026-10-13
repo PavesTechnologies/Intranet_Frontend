@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertTriangle, Target, Layers, CheckCircle2, Clock, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Target, Layers, CheckCircle2, Clock, ShieldCheck, XCircle, Info } from "lucide-react";
 import ScoreRing from "../../../../components/ScoreRing";
 import { renderDeterministicStatusBadge } from "../../../../utils/scoreBreakdownUtils.jsx";
 import { textOrDash, numberOr, isEmpty, formatDateTime, arr } from "../../../../utils/candidateDataUtils";
@@ -24,24 +24,17 @@ export default function SummaryCard({ summary }) {
   const passed = summary.status === "PASSED";
   const overallScore = isEmpty(summary.overall_score) ? 0 : numberOr(summary.overall_score);
 
-  const preferredCoveragePct =
-    summary.preferred_skills_total > 0
-      ? ((numberOr(summary.preferred_skills_matched) / summary.preferred_skills_total) * 100).toFixed(1)
-      : null;
-
   const failureReasons = arr(summary.failure_reasons);
+  // Every rule the deterministic layer checked, pass or fail (backend
+  // explain_decision) - explains e.g. a pass below the score threshold.
+  const decisionChecks = arr(summary.decision_checks);
+  const scoreCheck = decisionChecks.find((c) => c.check === "Score threshold");
+  const thresholdRankingOnly = scoreCheck && !scoreCheck.passed && !scoreCheck.can_reject;
 
-  // Coverage the hard gate actually checks: core skills only, or every
-  // mandatory skill on legacy JDs whose skills were never classified.
-  // Absent on breakdowns scored before the core-only gate existed.
-  const hasGateCoverage = !isEmpty(summary.core_coverage_pct);
-  const isLegacyGate = summary.gate_skill_scope === "ALL_MANDATORY";
-  const gateCoverageValue = hasGateCoverage
-    ? `${numberOr(summary.core_coverage_pct).toFixed(1)}%` +
-      (isLegacyGate || isEmpty(summary.missing_core_skill_count)
-        ? ""
-        : ` · ${numberOr(summary.missing_core_skill_count)} missing`)
-    : null;
+  // Core skills are the JD's hard skill requirement; absent on legacy JDs
+  // whose skills were never classified core/supporting.
+  const hasCore = !isEmpty(summary.core_skills_total) && summary.core_skills_total > 0;
+  const ratio = (matched, total) => `${numberOr(matched)} / ${numberOr(total)}`;
 
   return (
     <div className={`bg-white border rounded-2xl shadow-sm overflow-hidden ${passed ? "border-emerald-100" : "border-rose-100"}`}>
@@ -58,37 +51,61 @@ export default function SummaryCard({ summary }) {
               {renderDeterministicStatusBadge(summary.status)}
               <div className="text-[11.5px] text-slate-500 mt-2">
                 Threshold <span className="font-bold text-slate-900">{textOrDash(summary.threshold)}</span>
+                {thresholdRankingOnly && <span className="ml-1 text-slate-400">(ranking only)</span>}
               </div>
             </div>
           </div>
 
-          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {hasGateCoverage && (
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {hasCore && (
               <StatTile
                 icon={ShieldCheck}
-                label={isLegacyGate ? "Gate Coverage (all mandatory)" : "Core Coverage"}
-                value={gateCoverageValue}
+                label="Core Skills Matched"
+                value={ratio(summary.core_skills_matched, summary.core_skills_total)}
               />
             )}
             <StatTile
               icon={Target}
-              label="Mandatory Coverage"
-              value={isEmpty(summary.mandatory_coverage_pct) ? "-" : `${numberOr(summary.mandatory_coverage_pct).toFixed(1)}%`}
-            />
-            <StatTile icon={Layers} label="Preferred Coverage" value={preferredCoveragePct === null ? "-" : `${preferredCoveragePct}%`} />
-            <StatTile
-              icon={CheckCircle2}
-              label="Mandatory Matched"
-              value={`${numberOr(summary.mandatory_skills_matched)} / ${numberOr(summary.mandatory_skills_total)}`}
+              label="Required Skills Matched"
+              value={ratio(summary.mandatory_skills_matched, summary.mandatory_skills_total)}
             />
             <StatTile
-              icon={CheckCircle2}
-              label="Preferred Matched"
-              value={`${numberOr(summary.preferred_skills_matched)} / ${numberOr(summary.preferred_skills_total)}`}
+              icon={Layers}
+              label="Preferred Skills Matched"
+              value={
+                numberOr(summary.preferred_skills_total) > 0
+                  ? ratio(summary.preferred_skills_matched, summary.preferred_skills_total)
+                  : "None in JD"
+              }
             />
             <StatTile icon={Clock} label="Screened At" value={formatDateTime(summary.screened_at)} />
           </div>
         </div>
+
+        {decisionChecks.length > 0 && (
+          <div className="mt-4 rounded-xl border border-slate-200 p-3">
+            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-2">Why this decision</div>
+            <ul className="space-y-1.5">
+              {decisionChecks.map((c) => (
+                <li key={c.check} className="flex items-start gap-2 text-[11.5px]">
+                  {c.passed ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0 mt-0.5 text-emerald-600" />
+                  ) : c.can_reject ? (
+                    <XCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-rose-600" />
+                  ) : (
+                    <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-500" />
+                  )}
+                  <span className="text-slate-600">
+                    <span className="font-semibold text-slate-800">{c.check}</span>
+                    {!c.can_reject && <span className="ml-1 text-[10.5px] text-slate-400">(ranking only)</span>}
+                    {" — "}
+                    {c.detail}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {(!isEmpty(summary.failure_reason) || failureReasons.length > 0) && (
           <div className="mt-4 rounded-xl bg-rose-50 border border-rose-200 p-3 flex items-start gap-2">
