@@ -48,6 +48,7 @@ export const AP_ROUTES = {
   TDS_CHALLANS: `${BASE}/tds/challans`,
   RECURRING: `${BASE}/recurring`,
   GST_ITC: `${BASE}/gst`,
+  ACCOUNTING_EXPORT: `${BASE}/accounting-export`,
   VENDOR_NOTES: `${BASE}/vendor-notes`,
   WORK_ASSIGNMENT: `${BASE}/work-assignment`,
   PAYMENT_RUNS: `${BASE}/payments/runs`,

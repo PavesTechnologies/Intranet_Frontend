@@ -9,6 +9,7 @@ import { AP_AUTOMATION_PERMISSIONS } from "../pages/accounts-payable/constants/a
 import { PROCUREMENT_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/procurementPermissions";
 import { RECURRING_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/recurring";
 import { GST_ITC_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/gstItc";
+import { ACCOUNTING_EXPORT_PERMISSIONS } from "../pages/accounts-payable/constants/accountingExport";
 import { VENDOR_NOTE_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/vendorNotes";
 import { WORK_ASSIGN_LEAD_PERMISSIONS } from "../pages/accounts-payable/constants/workAssignment";
 
@@ -359,6 +360,8 @@ export const AP_SUBMENU = [
   { label: "TDS Tracking", to: AP_ROUTES.TDS_TRACKING, requiredPermissions: TDS_TRACKING_ANY_VIEW_PERMISSIONS },
   // GST input credit register: claim in GSTR-3B, IRN check, 180-day rule (gst_itc_route.py).
   { label: "GST Input Credit", to: AP_ROUTES.GST_ITC, requiredPermissions: GST_ITC_VIEW_PERMISSIONS },
+  // Invoices, payments, notes and TDS deposits as Tally / Zoho Books vouchers (accounting_export_route.py).
+  { label: "Accounting Export", to: AP_ROUTES.ACCOUNTING_EXPORT, requiredPermissions: ACCOUNTING_EXPORT_PERMISSIONS },
   // The page lists only the reports the backend says this user may run (reports_route.py);
   // payment access is the entry point today, management reporting permissions join in Phase 6.
   { label: "Reports", to: AP_ROUTES.REPORTS, requiredPermissions: [...PAYMENT_ANY_VIEW_PERMISSIONS, AP_MANAGEMENT_PERMISSIONS.REPORTS_VIEW] },
