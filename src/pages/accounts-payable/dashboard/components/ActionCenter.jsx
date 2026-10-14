@@ -4,6 +4,7 @@ import clsx from "clsx";
 import {
   AlertOctagon,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   FileText,
   Landmark,
@@ -62,10 +63,12 @@ function ActionRow({ action, currency }) {
  * Action Center — the top of the AP dashboard: what this user should do now, most urgent first,
  * across every AP area they work in. Each line opens the filtered list where the work is done;
  * areas with nothing pending show as "all clear"; quick actions are this user's shortcuts.
+ * Starts collapsed to its header and counts, so the dashboard below stays in view; a click opens it.
  * Everything comes from GET /dashboard/actions (built from the same role dashboards below it).
  */
 export default function ActionCenter() {
   const { data, isLoading, isError } = useActionCenter();
+  const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   if (isLoading || isError || !data) return null;
 
@@ -79,8 +82,14 @@ export default function ActionCenter() {
 
   return (
     <section aria-labelledby="action-center-title" className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls="action-center-body"
+        className="flex w-full flex-wrap items-center justify-between gap-2 rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+      >
+        <span className="flex items-center gap-2">
           {actions.length ? (
             <AlertOctagon className={clsx("h-5 w-5", critical ? "text-rose-500" : "text-amber-500")} aria-hidden="true" />
           ) : (
@@ -89,57 +98,67 @@ export default function ActionCenter() {
           <h2 id="action-center-title" className="text-base font-semibold text-slate-800">
             {actions.length ? "What needs your attention" : "You're all caught up"}
           </h2>
-        </div>
-        {actions.length > 0 && (
-          <p className="text-xs text-slate-500">
-            {[critical && `${critical} urgent`, high && `${high} due soon`, normal && `${normal} to do`].filter(Boolean).join(" · ")}
-          </p>
-        )}
-      </div>
-
-      {actions.length > 0 && (
-        <ul className="mt-3 space-y-2">
-          {shown.map((action) => (
-            <ActionRow key={action.key} action={action} currency={data.base_currency} />
-          ))}
-        </ul>
-      )}
-      {actions.length > VISIBLE && (
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-700"
-        >
-          {expanded ? "Show fewer" : `Show all ${actions.length}`}
-        </button>
-      )}
-
-      {(clear.length > 0 || quick.length > 0) && (
-        <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-3 lg:flex-row lg:items-center lg:justify-between">
-          {clear.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              {clear.map((area) => (
-                <span key={area.area} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> {area.label}: nothing pending
-                </span>
-              ))}
-            </div>
+        </span>
+        <span className="flex items-center gap-2 text-xs text-slate-500">
+          {actions.length > 0 && (
+            <span>
+              {critical > 0 && <span className="font-semibold text-rose-600">{critical} urgent</span>}
+              {critical > 0 && (high || normal) ? " · " : ""}
+              {[high && `${high} due soon`, normal && `${normal} to do`].filter(Boolean).join(" · ")}
+            </span>
           )}
-          {quick.length > 0 && (
-            <nav aria-label="Quick actions" className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500">
-                <Zap className="h-3.5 w-3.5" aria-hidden="true" /> Quick actions
-              </span>
-              {quick.map((q) => (
-                <Link
-                  key={q.link + q.label}
-                  to={q.link}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-indigo-300 hover:text-indigo-700"
-                >
-                  {q.label}
-                </Link>
+          <span className="font-medium text-indigo-600">{open ? "Hide" : actions.length ? "Show" : "Details"}</span>
+          <ChevronDown className={clsx("h-4 w-4 text-indigo-600 transition-transform", open && "rotate-180")} aria-hidden="true" />
+        </span>
+      </button>
+
+      {open && (
+        <div id="action-center-body">
+          {actions.length > 0 && (
+            <ul className="mt-3 space-y-2">
+              {shown.map((action) => (
+                <ActionRow key={action.key} action={action} currency={data.base_currency} />
               ))}
-            </nav>
+            </ul>
+          )}
+          {actions.length > VISIBLE && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-700"
+            >
+              {expanded ? "Show fewer" : `Show all ${actions.length}`}
+            </button>
+          )}
+
+          {(clear.length > 0 || quick.length > 0) && (
+            <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-3 lg:flex-row lg:items-center lg:justify-between">
+              {clear.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {clear.map((area) => (
+                    <span key={area.area} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> {area.label}: nothing pending
+                    </span>
+                  ))}
+                </div>
+              )}
+              {quick.length > 0 && (
+                <nav aria-label="Quick actions" className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500">
+                    <Zap className="h-3.5 w-3.5" aria-hidden="true" /> Quick actions
+                  </span>
+                  {quick.map((q) => (
+                    <Link
+                      key={q.link + q.label}
+                      to={q.link}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:border-indigo-300 hover:text-indigo-700"
+                    >
+                      {q.label}
+                    </Link>
+                  ))}
+                </nav>
+              )}
+            </div>
           )}
         </div>
       )}
