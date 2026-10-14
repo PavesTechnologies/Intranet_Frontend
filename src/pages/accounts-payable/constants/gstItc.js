@@ -28,3 +28,11 @@ export const RISK = {
   REVERSAL_DUE: "Unpaid > 180 days: reverse ITC",
   RECLAIM: "Paid: re-claim reversed ITC",
 };
+
+/** GSTR-2B match of a document / invoice - mirrors Backend gstr2b_service.py. */
+export const GSTR2B_MATCH = {
+  MATCHED: { label: "Matched", hint: "Filed by the supplier, tax agrees - claimable", tone: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+  MISMATCH: { label: "Mismatch", hint: "Tax filed differs from the books - ask the supplier to amend", tone: "bg-amber-50 text-amber-700 ring-amber-200" },
+  MISSING: { label: "Missing in 2B", hint: "In the books, not filed by the supplier - credit held", tone: "bg-rose-50 text-rose-700 ring-rose-200" },
+  NOT_IN_BOOKS: { label: "Not in books", hint: "Filed against us, not booked - get the invoice or dispute", tone: "bg-slate-100 text-slate-700 ring-slate-200" },
+};

@@ -10,6 +10,7 @@ import { formatMoney } from "../../dashboard/components/insights";
 
 vi.mock("../hooks/useGstItc", () => ({
   useGstRegister: vi.fn(), useClaimItc: vi.fn(), useSetIrn: vi.fn(), useSetEligibility: vi.fn(), useReverseItc: vi.fn(), useReclaimItc: vi.fn(),
+  useGstr2b: vi.fn(), useImportGstr2b: vi.fn(),
 }));
 vi.mock("../../hooks/useApPermissions", () => ({ useApPermissions: vi.fn() }));
 vi.mock("react-toastify", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -74,6 +75,16 @@ describe("GstItcPage", () => {
     renderPage();
     expect(screen.getByText("36AADCH8710J1ZH", { exact: false })).toBeInTheDocument();
     expect(screen.getByText(/Claimed · Sep 2026/)).toBeInTheDocument();
+  });
+
+  it("switches to the GSTR-2B match tab", async () => {
+    hooks.useGstr2b.mockReturnValue({ data: { imports: [], period: null, entries: [], missing_in_2b: [], counts: {} }, isLoading: false, isError: false });
+    hooks.useImportGstr2b.mockReturnValue(mutate());
+    renderPage();
+    expect(screen.getByText(/GSTR-2B not imported yet/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "GSTR-2B match" }));
+    expect(screen.getByText(/No GSTR-2B imported yet/)).toBeInTheDocument();
+    expect(screen.queryByText(/Ready to claim/)).toBeNull();
   });
 
   it("is read-only without the manage permission", () => {
