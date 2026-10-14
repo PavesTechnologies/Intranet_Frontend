@@ -13,6 +13,7 @@ import { AP_ROUTES } from "../../constants/routes";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { formatDateTime } from "../../invoice/components/bulk/BulkUploadParts";
 import SharePointImportCard from "../components/SharePointImportCard";
+import SegregationOfDutiesCard from "../components/SegregationOfDutiesCard";
 import { useAutomationSettings, useAutomationStats, useRunAutomationNow, useUpdateAutomationSettings } from "../hooks/useApAutomation";
 
 const FIELDS = ["price_tolerance_pct", "price_tolerance_amount", "quantity_tolerance", "require_grn", "auto_approve_max_amount"];
@@ -227,6 +228,8 @@ export default function APAutomationPage() {
       </div>
 
       <SharePointImportCard />
+
+      <SegregationOfDutiesCard />
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">

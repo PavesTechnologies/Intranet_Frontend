@@ -17,6 +17,10 @@ import { TDS_PERMISSIONS, TDS_ANY_VIEW_PERMISSIONS } from "../constants/tdsPermi
 import { TDS_CONFIG_PERMISSIONS } from "../constants/tdsConfigPermissions";
 import { VENDOR_PERMISSIONS, VENDOR_ANY_PERMISSIONS } from "../constants/vendorPermissions";
 import { AP_VENDOR_MANAGER_ROLES } from "../constants/apRoles";
+import { RECURRING_MANAGE_PERMISSIONS, RECURRING_VIEW_PERMISSIONS } from "../constants/recurring";
+import { GST_ITC_MANAGE_PERMISSIONS, GST_ITC_VIEW_PERMISSIONS } from "../constants/gstItc";
+import { VENDOR_NOTE_MANAGE_PERMISSIONS, VENDOR_NOTE_VIEW_PERMISSIONS } from "../constants/vendorNotes";
+import { WORK_ASSIGN_LEAD_PERMISSIONS } from "../constants/workAssignment";
 import {
   PAYMENT_TERM_PERMISSIONS,
   PAYMENT_TERM_VIEW_PERMISSIONS,
@@ -79,6 +83,18 @@ export function useApPermissions() {
     canBulkUploadInvoices: hasPermission(INVOICE_PERMISSIONS.INVOICE_BULK_UPLOAD),
     canManageEmailIntake: hasPermission(INVOICE_PERMISSIONS.EMAIL_INTAKE_MANAGE),
     canManageAutomation: hasPermission("AP_AUTOMATION_MANAGE"),
+    canViewRecurring: hasAnyPermission(RECURRING_VIEW_PERMISSIONS),
+    canManageRecurring: hasAnyPermission(RECURRING_MANAGE_PERMISSIONS),
+    canViewGstItc: hasAnyPermission(GST_ITC_VIEW_PERMISSIONS),
+    canManageGstItc: hasAnyPermission(GST_ITC_MANAGE_PERMISSIONS),
+    canViewVendorNotes: hasAnyPermission(VENDOR_NOTE_VIEW_PERMISSIONS),
+    canManageVendorNotes: hasAnyPermission(VENDOR_NOTE_MANAGE_PERMISSIONS),
+    canAssignWork: hasAnyPermission(WORK_ASSIGN_LEAD_PERMISSIONS),
+    // Bank verification / approval: Finance (approval must be a different person - backend-enforced).
+    canVerifyVendorBanks: hasAnyPermission(["VENDOR_BANK_VERIFY", "AP_AUTOMATION_MANAGE", "PAYMENT_PROCESS"]),
+    // Payment runs: Finance Executive prepares, Finance Manager approves (never the same person - backend-enforced).
+    canPreparePaymentRuns: hasPermission("PAYMENT_PROCESS"),
+    canApprovePaymentRuns: hasAnyPermission(["PAYMENT_RUN_APPROVE", "AP_AUTOMATION_MANAGE"]),
     canReviewOcr: hasPermission(INVOICE_PERMISSIONS.INVOICE_OCR_REVIEW),
     // The standalone Validation Queue page is part of the same OCR/intake pipeline — no
     // separate backend permission exists for it.

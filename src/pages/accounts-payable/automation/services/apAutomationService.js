@@ -28,6 +28,14 @@ export const apAutomationService = {
     const { data } = await api.put(`${BASE}/sharepoint-import`, { enabled });
     return data;
   },
+  async getSegregationOfDuties() {
+    const { data } = await api.get(`${BASE}/segregation-of-duties`);
+    return data;
+  },
+  async setSegregationOfDuties(rules) {
+    const { data } = await api.put(`${BASE}/segregation-of-duties`, { rules });
+    return data;
+  },
   async recheckInvoice(invoiceId) {
     const { data } = await api.post(`${BASE}/invoices/${encodeURIComponent(invoiceId)}/run`);
     return data;
