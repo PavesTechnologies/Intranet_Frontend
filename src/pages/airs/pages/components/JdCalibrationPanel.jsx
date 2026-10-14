@@ -32,6 +32,8 @@ function formFromView(view) {
     min: view.min_experience_years ?? "",
     tolerance: view.experience_tolerance_years ?? "",
     education: view.education_requirement || "MANDATORY",
+    // "" = the default (100% on a fresher JD, else 0%).
+    internships: view.internship_credit_pct ?? "",
   };
 }
 
@@ -43,7 +45,7 @@ function mergeForm(edited, fresh) {
   return {
     ...fresh,
     skills: Object.fromEntries(Object.entries(fresh.skills).map(([id, v]) => [id, edited.skills[id] || v])),
-    min: edited.min, tolerance: edited.tolerance, education: edited.education,
+    min: edited.min, tolerance: edited.tolerance, education: edited.education, internships: edited.internships,
   };
 }
 
@@ -112,6 +114,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
         min_experience_years: form.min === "" ? null : Number(form.min),
         experience_tolerance_years: form.tolerance === "" ? null : Number(form.tolerance),
         education_requirement: form.education,
+        internship_credit_pct: form.internships === "" ? null : Number(form.internships),
       };
       const saved = await saveJDCalibration(jdId, payload);
       setResult(saved);
@@ -239,7 +242,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
                           : `${c.skill}: ${c.field === "tier" ? "tier" : "meaning"} ${c.before ?? "—"} → ${c.after ?? "—"}`
                     )).join("; ")}</span>
                   )}
-                  {["min_experience_years", "experience_tolerance_years", "education_requirement"].filter((k) => v.changes?.[k]).map((k) => (
+                  {["min_experience_years", "experience_tolerance_years", "education_requirement", "internship_credit_pct"].filter((k) => v.changes?.[k]).map((k) => (
                     <span key={k} className="text-slate-500"> · {k.replaceAll("_", " ")}: {String(v.changes[k].before ?? "—")} → {String(v.changes[k].after ?? "—")}</span>
                   ))}
                 </li>
@@ -365,7 +368,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
       </div>
 
       {/* Experience & education */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-4 grid grid-cols-1 md:grid-cols-4 gap-4">
         <label className="text-xs text-slate-700 flex flex-col gap-1">
           <span className="font-bold">Minimum experience (years)</span>
           <input type="number" min="0" max="60" step="0.5" className={inputClass} disabled={readOnly}
@@ -392,6 +395,19 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
             {view.education_degree || view.education_field
               ? `${view.education_degree || "Any degree"}${view.education_field ? ` in ${view.education_field}` : ""}`
               : "No education requirement in this JD."}
+          </span>
+        </label>
+        <label className="text-xs text-slate-700 flex flex-col gap-1">
+          <span className="font-bold">Internships count as experience</span>
+          <select className={selectClass} disabled={readOnly} value={form.internships}
+            onChange={(e) => setForm((f) => ({ ...f, internships: e.target.value }))}>
+            <option value="">Default ({view.default_internship_credit_pct ?? 0}%{view.is_fresher_jd ? ", fresher JD" : ""})</option>
+            <option value="100">100% (in full)</option>
+            <option value="50">50% (half)</option>
+            <option value="0">Not at all</option>
+          </select>
+          <span className="text-[10px] text-slate-400">
+            Internship months not overlapping a job, towards the minimum. Default: 100% when the minimum is 1 year or less (a fresher JD), else not at all.
           </span>
         </label>
       </div>
