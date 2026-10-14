@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, History } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
@@ -33,7 +33,23 @@ function formFromView(view) {
   };
 }
 
-export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved }) {
+// Fresh server state with the user's unsaved edits kept: edited skills keep
+// their tier/meaning, skills added meanwhile (an unknown skill resolved in
+// another tab) arrive with the server's values, removed ones drop out.
+function mergeForm(edited, fresh) {
+  if (!edited) return fresh;
+  return {
+    ...fresh,
+    skills: Object.fromEntries(Object.entries(fresh.skills).map(([id, v]) => [id, edited.skills[id] || v])),
+    min: edited.min, tolerance: edited.tolerance, education: edited.education,
+  };
+}
+
+function sameForm(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active = true }) {
   const { user } = useAuth();
   const [view, setView] = useState(null);
   const [form, setForm] = useState(null);
@@ -42,20 +58,30 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved }) {
   const [result, setResult] = useState(null);
   const [versions, setVersions] = useState(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // keepEdits: refresh from the server without discarding unsaved changes.
+  const load = useCallback(async ({ keepEdits = false } = {}) => {
+    if (!keepEdits) setLoading(true);
     try {
       const data = await getJDCalibration(jdId);
       setView(data);
-      setForm(formFromView(data));
+      setForm((f) => (keepEdits ? mergeForm(f, formFromView(data)) : formFromView(data)));
     } catch {
-      setView(null);
+      if (!keepEdits) setView(null);
     } finally {
-      setLoading(false);
+      if (!keepEdits) setLoading(false);
     }
   }, [jdId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Coming back to the tab (the panel stays mounted while hidden): pick up
+  // changes made elsewhere - e.g. an unknown skill resolved in another tab -
+  // and keep this form's unsaved edits.
+  const wasActive = useRef(active);
+  useEffect(() => {
+    if (active && !wasActive.current) load({ keepEdits: true });
+    wasActive.current = active;
+  }, [active, load]);
 
   const coreCount = useMemo(
     () => (form ? Object.values(form.skills).filter((s) => s.tier === "CORE").length : 0), [form]);
@@ -94,14 +120,9 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved }) {
   // An unknown skill was resolved: take the new view, keeping unsaved edits to
   // the skills already on the form (a mapped skill arrives with its own tier).
   const onUnknownResolved = (calibration) => {
-    if (!calibration) { load(); return; }
-    const fresh = formFromView(calibration);
+    if (!calibration) { load({ keepEdits: true }); return; }
     setView(calibration);
-    setForm((f) => ({
-      ...fresh,
-      skills: Object.fromEntries(Object.entries(fresh.skills).map(([id, v]) => [id, f?.skills[id] || v])),
-      min: f ? f.min : fresh.min, tolerance: f ? f.tolerance : fresh.tolerance, education: f ? f.education : fresh.education,
-    }));
+    setForm((f) => mergeForm(f, formFromView(calibration)));
     setVersions(null);
     onSaved?.();
   };
@@ -123,6 +144,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved }) {
   const signedInRoles = [].concat(user?.roles || user?.role || []).join(", ") || "none";
   const missingSense = view.skills.filter((s) => s.ambiguous && !form.skills[s.jd_skill_id]?.sense_key);
   const blocking = view.blocking_unknown_skills || [];
+  const unsaved = !readOnly && !sameForm(form, formFromView(view));
 
   return (
     <div className="space-y-5">
@@ -282,7 +304,10 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved }) {
       )}
 
       {!readOnly && (
-        <div className="flex justify-end">
+        <div className="flex justify-end items-center gap-3">
+          {unsaved && (
+            <span className="text-[11px] font-semibold text-amber-700">Unsaved changes - they are kept if you switch tabs, but only saved here.</span>
+          )}
           <Button variant="primary" size="medium" onClick={save}
             disabled={saving || missingSense.length > 0 || blocking.length > 0}
             loading={saving} loadingText="Saving..."

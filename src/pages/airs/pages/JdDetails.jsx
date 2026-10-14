@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAirsStore } from "./airsStore";
 import { getJDById, exportSingleJD, downloadJDById, getJDSkills, getJDUnknownSkills, updateJDSkill, removeJDSkill } from "../service/jdservice";
@@ -145,17 +145,22 @@ export default function JdDetails() {
   // Bumped after a calibration save so the JD (and its badge) reload. Declared
   // before the fetch effect below, whose dependency array reads it.
   const [jdReloadKey, setJdReloadKey] = useState(0);
+  // The full-page spinner is only for the first load of a JD: a reload (after a
+  // calibration save or an unknown-skill resolution) updates in place, so the
+  // Calibration tab - and any unsaved edits in it - stays mounted.
+  const loadedJdIdRef = useRef(null);
   const currentJd = jdDetail || jd;
 
 
   useEffect(() => {
     const fetchJd = async () => {
-      setIsLoading(true);
+      if (loadedJdIdRef.current !== id) setIsLoading(true);
       try {
         const res = await getJDById(id);
         const data = res.data
         if (data) {
           setJdDetail(data);
+          loadedJdIdRef.current = id;
         }
       } catch (err) {
         toast.error("Failed to load job description from server.");
@@ -266,6 +271,10 @@ export default function JdDetails() {
 
   // Tabs: overview, skills, campaigns, versions, audit
   const [activeTab, setActiveTab] = useState("overview");
+  // Once the Calibration tab has been opened for this JD it stays mounted.
+  const [calibrationOpened, setCalibrationOpened] = useState(false);
+  useEffect(() => { setCalibrationOpened(false); }, [id]);
+  useEffect(() => { if (activeTab === "calibration") setCalibrationOpened(true); }, [activeTab]);
 
   const [dbCampaigns, setDbCampaigns] = useState([]);
   const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false);
@@ -1214,8 +1223,13 @@ export default function JdDetails() {
       )}
 
       {/* --- CALIBRATION TAB (HR_ADMIN edits; everyone else read-only) --- */}
-      {activeTab === "calibration" && (
-        <JdCalibrationPanel jdId={id} canCalibrate={isHRAdmin} onSaved={() => setJdReloadKey((k) => k + 1)} />
+      {/* Kept mounted (hidden) once opened, so unsaved calibration edits survive
+          switching tabs - e.g. to resolve unknown skills - and coming back. */}
+      {calibrationOpened && (
+        <div hidden={activeTab !== "calibration"}>
+          <JdCalibrationPanel jdId={id} canCalibrate={isHRAdmin} active={activeTab === "calibration"}
+            onSaved={() => setJdReloadKey((k) => k + 1)} />
+        </div>
       )}
 
       {/* --- EXTRACTED JSON TAB --- */}
