@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, History } from "lucide-react";
+import { AlertTriangle, CheckCircle2, History, Plus, Trash2 } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import JdCalibrationBadge from "../../components/JdCalibrationBadge";
-import JdUnknownSkillResolver from "./JdUnknownSkillResolver";
+import JdUnknownSkillResolver, { SkillSearch } from "./JdUnknownSkillResolver";
 import { useAuth } from "../../../../contexts/AuthContext";
-import { getJDCalibration, getJDCalibrationVersions, saveJDCalibration } from "../../service/jdservice";
+import {
+  addJDCalibrationSkill, getJDCalibration, getJDCalibrationVersions, removeJDCalibrationSkill, saveJDCalibration,
+} from "../../service/jdservice";
 
 // JD calibration: HR_ADMIN confirms or edits the JD's scoring inputs - skill tiers,
 // the meaning of ambiguous skills, minimum experience + its tolerance, education.
@@ -56,6 +58,13 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
+  // Add / remove a skill (applied at once, each saved as a calibration version).
+  const [addPick, setAddPick] = useState(null);         // a catalogue skill { id, canonicalName }
+  const [addName, setAddName] = useState("");           // or a new skill's name
+  const [addTier, setAddTier] = useState("SUPPORTING");
+  const [skillBusy, setSkillBusy] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(null);
+  const [skillMessage, setSkillMessage] = useState(null);
   const [versions, setVersions] = useState(null);
 
   // keepEdits: refresh from the server without discarding unsaved changes.
@@ -125,6 +134,51 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
     setForm((f) => mergeForm(f, formFromView(calibration)));
     setVersions(null);
     onSaved?.();
+  };
+
+  // A skill was added or removed: take the server's view, keeping unsaved edits
+  // to the other skills, and say what was saved.
+  const applySkillChange = (change, verb) => {
+    setView(change.calibration);
+    setForm((f) => mergeForm(f, formFromView(change.calibration)));
+    setVersions(null);
+    setSkillMessage(`'${change.skill}' ${verb}${change.calibration_version
+      ? ` - saved as calibration version ${change.calibration_version}` : ""}.${change.candidates_marked_out_of_date
+      ? ` ${change.candidates_marked_out_of_date} scored candidate(s) marked "score out of date".` : ""}`);
+    onSaved?.();
+  };
+
+  const addSkill = async () => {
+    const name = addName.trim();
+    if (!addPick && !name) return;
+    setSkillBusy(true);
+    setSkillMessage(null);
+    try {
+      const change = await addJDCalibrationSkill(jdId, addPick
+        ? { canonical_skill_id: addPick.id, tier: addTier }
+        : { new_skill_name: name, tier: addTier });
+      setAddPick(null);
+      setAddName("");
+      applySkillChange(change, `added as ${addTier.toLowerCase()}${change.created_new_skill ? " (new catalogue skill)" : ""}`);
+    } catch {
+      // the service already shows the server's reason
+    } finally {
+      setSkillBusy(false);
+    }
+  };
+
+  const removeSkill = async (skill) => {
+    setSkillBusy(true);
+    setSkillMessage(null);
+    try {
+      const change = await removeJDCalibrationSkill(jdId, skill.jd_skill_id);
+      applySkillChange(change, "removed from this JD");
+    } catch {
+      // the service already shows the server's reason
+    } finally {
+      setSkillBusy(false);
+      setConfirmRemove(null);
+    }
   };
 
   const toggleHistory = async () => {
@@ -221,6 +275,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
           <thead>
             <tr className="text-left text-[10px] uppercase text-slate-400">
               <th className="py-1.5">Skill</th><th className="py-1.5">Tier</th><th className="py-1.5">Meaning (ambiguous skills)</th>
+              {!readOnly && <th className="py-1.5" />}
             </tr>
           </thead>
           <tbody>
@@ -252,11 +307,59 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
                       </div>
                     ) : <span className="text-slate-400">—</span>}
                   </td>
+                  {!readOnly && (
+                    <td className="py-2 text-right whitespace-nowrap">
+                      {confirmRemove === s.jd_skill_id ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="text-[10px] text-slate-500">Remove from this JD?</span>
+                          <Button variant="danger" size="small" disabled={skillBusy} onClick={() => removeSkill(s)}>Remove</Button>
+                          <Button variant="outline" size="small" disabled={skillBusy} onClick={() => setConfirmRemove(null)}>Keep</Button>
+                        </span>
+                      ) : (
+                        <Button variant="outline" size="small" disabled={skillBusy} title="Remove this skill from the JD (e.g. one the extraction invented)"
+                          onClick={() => setConfirmRemove(s.jd_skill_id)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}
           </tbody>
         </table>
+        {!readOnly && (
+          <div className="mt-3 border-t border-slate-100 pt-3">
+            <h4 className="text-[11px] font-bold text-slate-600 mb-1">Add a skill the extraction missed</h4>
+            <div className="flex flex-wrap items-center gap-2">
+              {addPick ? (
+                <span className="text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+                  {addPick.canonicalName}
+                  <button type="button" className="ml-1.5 text-slate-400 hover:text-slate-700" onClick={() => setAddPick(null)}
+                    aria-label="Clear">×</button>
+                </span>
+              ) : (
+                <>
+                  <SkillSearch disabled={skillBusy} onPick={(skill) => { setAddPick(skill); setAddName(""); }} />
+                  <span className="text-[10px] text-slate-400">or a new skill:</span>
+                  <input className="border border-slate-200 rounded-lg px-2 py-1 text-xs w-44" placeholder="New skill name"
+                    value={addName} disabled={skillBusy} onChange={(e) => setAddName(e.target.value)} />
+                </>
+              )}
+              <select className={selectClass} value={addTier} disabled={skillBusy} onChange={(e) => setAddTier(e.target.value)}>
+                {TIERS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+              <Button variant="outline" size="small" disabled={skillBusy || (!addPick && !addName.trim())} onClick={addSkill}
+                title={addPick ? "Add this catalogue skill to the JD" : "Add to the catalogue and to this JD"}>
+                <Plus className="h-3.5 w-3.5" /> Add
+              </Button>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1">
+              Adding or removing a skill is saved straight away (a new calibration version); your other unsaved changes are kept.
+            </p>
+            {skillMessage && <p className="mt-1 text-[11px] text-emerald-700">{skillMessage}</p>}
+          </div>
+        )}
         <JdUnknownSkillResolver jdId={jdId} unknownSkills={view.unknown_skills} readOnly={readOnly}
           onResolved={onUnknownResolved} />
       </div>

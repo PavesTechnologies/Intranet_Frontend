@@ -433,3 +433,32 @@ export const resolveJDUnknownSkill = async (jdId, unknownSkillId, payload) => {
         throw error;
     }
 };
+
+// POST /job-descriptions/{jd_id}/calibration/skills (HR_ADMIN) - add a skill the
+// extraction missed: { canonical_skill_id, tier } from the catalogue, or
+// { new_skill_name, tier } (added to the catalogue). Saves a calibration version.
+export const addJDCalibrationSkill = async (jdId, payload) => {
+    try {
+        const response = await api.post(`${BASE_URL}/job-descriptions/${jdId}/calibration/skills`, payload, { headers: authHeader() });
+        toast.success(response.data?.message || "Skill added.");
+        return response.data?.data ?? response.data;
+    } catch (error) {
+        console.error("Error adding calibration skill:", error);
+        toast.error(getErrorMessage(error, "Failed to add the skill."));
+        throw error;
+    }
+};
+
+// DELETE /job-descriptions/{jd_id}/calibration/skills/{jd_skill_id} (HR_ADMIN) -
+// remove a skill from this JD (e.g. one the extraction invented). Saves a calibration version.
+export const removeJDCalibrationSkill = async (jdId, jdSkillId) => {
+    try {
+        const response = await api.delete(`${BASE_URL}/job-descriptions/${jdId}/calibration/skills/${jdSkillId}`, { headers: authHeader() });
+        toast.success(response.data?.message || "Skill removed.");
+        return response.data?.data ?? response.data;
+    } catch (error) {
+        console.error("Error removing calibration skill:", error);
+        toast.error(getErrorMessage(error, "Failed to remove the skill."));
+        throw error;
+    }
+};

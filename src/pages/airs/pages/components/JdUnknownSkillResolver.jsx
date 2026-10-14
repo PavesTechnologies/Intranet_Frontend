@@ -13,7 +13,7 @@ import { getSkills } from "../../skill-ontology/services/skillOntologyService";
 const RESOLUTION_LABEL = { MAPPED: "mapped", NEW_SKILL: "approved as new", DROPPED: "dropped" };
 const inputClass = "border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white";
 
-function SkillSearch({ onPick, disabled }) {
+export function SkillSearch({ onPick, disabled }) {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState([]);
 
