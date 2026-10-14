@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import clsx from "clsx";
 import { toast } from "react-toastify";
 import { Landmark } from "lucide-react";
@@ -8,8 +8,9 @@ import Breadcrumb from "../../../../components/Breadcrumb/Breadcrumb";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { AP_ROUTES } from "../../constants/routes";
-import { ELIGIBILITY, IRN_STATUS, ITC_STATUS, RISK } from "../../constants/gstItc";
-import { formatMoney } from "../../dashboard/components/insights";
+import { ELIGIBILITY, GSTR2B_MATCH, IRN_STATUS, ITC_STATUS, RISK } from "../../constants/gstItc";
+import { SegmentedTabs, formatMoney } from "../../dashboard/components/insights";
+import Gstr2bPanel from "../components/Gstr2bPanel";
 import { formatDate, formatMonth } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { useApPermissions } from "../../hooks/useApPermissions";
@@ -121,6 +122,8 @@ export default function GstItcPage() {
   const claim = useClaimItc();
   const { canManageGstItc } = useApPermissions();
   const [confirming, setConfirming] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "gstr2b" ? "gstr2b" : "register";
 
   const doClaim = async () => {
     setConfirming(false);
@@ -136,7 +139,11 @@ export default function GstItcPage() {
     <div className="space-y-4 p-4 sm:p-6">
       <Breadcrumb items={[{ label: "Accounts Payable", to: AP_ROUTES.DASHBOARD }, { label: "GST input credit" }]} />
       <PageHeader title="GST input credit" subtitle="GST paid to vendors that the company recovers in GSTR-3B - claim it on time, and keep it" />
-      {isLoading ? (
+      <SegmentedTabs value={tab} onChange={(v) => setParams(v === "gstr2b" ? { tab: v } : {}, { replace: true })}
+        tabs={[{ value: "register", label: "ITC register" }, { value: "gstr2b", label: "GSTR-2B match" }]} />
+      {tab === "gstr2b" ? (
+        <Gstr2bPanel canManage={canManageGstItc} />
+      ) : isLoading ? (
         <div className="flex justify-center rounded-xl border border-slate-200 bg-white py-20"><LoadingSpinner text="Loading the ITC register..." /></div>
       ) : isError ? (
         <p className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">{getApiErrorMessage(error, "Could not load the ITC register.")}</p>
@@ -144,7 +151,8 @@ export default function GstItcPage() {
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Tile label={`Ready to claim for ${monthLabel(data.summary.claim_period)}`} value={inr(data.summary.claimable_now)}
-              hint={`${data.summary.claimable_count} invoice(s) · GSTR-3B due ${formatDate(data.summary.claim_due)}`}
+              hint={`${data.summary.claimable_count} invoice(s) · GSTR-3B due ${formatDate(data.summary.claim_due)}`
+                + (data.summary.gstr2b_held ? ` · ${data.summary.gstr2b_held} held (not in GSTR-2B)` : "")}
               tone={data.summary.claimable_count ? "text-indigo-700" : "text-slate-800"}>
               {canManageGstItc && data.summary.claimable_count > 0 && (confirming ? (
                 <span className="flex items-center gap-2">
@@ -190,7 +198,7 @@ export default function GstItcPage() {
                 <table className="min-w-full text-sm">
                   <thead className="bg-slate-50 text-left text-xs font-medium text-slate-500">
                     <tr>
-                      {["Invoice", "Supplier GSTIN", "Taxable", "CGST", "SGST", "IGST", "ITC", "Eligibility", "IRN", "Status"].map((h) => (
+                      {["Invoice", "Supplier GSTIN", "Taxable", "CGST", "SGST", "IGST", "ITC", "Eligibility", "IRN", "GSTR-2B", "Status"].map((h) => (
                         <th key={h} className={clsx("px-3 py-2", ["Taxable", "CGST", "SGST", "IGST", "ITC"].includes(h) && "text-right")}>{h}</th>
                       ))}
                     </tr>
@@ -208,6 +216,7 @@ export default function GstItcPage() {
                         ))}
                         <td className="px-3 py-2"><Badge spec={ELIGIBILITY[r.itc_eligibility] || ELIGIBILITY.ELIGIBLE} /></td>
                         <td className={clsx("px-3 py-2 text-xs", IRN_STATUS[r.irn_status]?.tone)}>{IRN_STATUS[r.irn_status]?.label}</td>
+                        <td className="px-3 py-2 text-xs text-slate-500">{r.gstr2b ? GSTR2B_MATCH[r.gstr2b]?.label : "Not checked"}</td>
                         <td className="px-3 py-2 text-xs text-slate-600">
                           {ITC_STATUS[r.itc_status]}{r.claim_period ? ` · ${monthLabel(r.claim_period)}` : ""}
                           {r.risk && <div className="font-medium text-amber-700">{RISK[r.risk]}</div>}
@@ -232,7 +241,9 @@ export default function GstItcPage() {
               ))}
             </ul>
             <p className="mt-3 text-xs text-slate-400">
-              Matching with GSTR-2B (what each vendor actually filed) comes next - until then credit is claimed on the invoices recorded here.
+              {data.summary.gstr2b === "CHECKED"
+                ? `Checked against GSTR-2B up to ${monthLabel(data.summary.gstr2b_period)} - only invoices the supplier filed are claimable.`
+                : "GSTR-2B not imported yet - credit is claimed on the invoices recorded here. Import it on the GSTR-2B match tab."}
             </p>
           </section>
         </>
