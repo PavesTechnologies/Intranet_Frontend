@@ -19,6 +19,7 @@ import { VENDOR_PERMISSIONS, VENDOR_ANY_PERMISSIONS } from "../constants/vendorP
 import { AP_VENDOR_MANAGER_ROLES } from "../constants/apRoles";
 import { RECURRING_MANAGE_PERMISSIONS, RECURRING_VIEW_PERMISSIONS } from "../constants/recurring";
 import { GST_ITC_MANAGE_PERMISSIONS, GST_ITC_VIEW_PERMISSIONS } from "../constants/gstItc";
+import { ACCOUNTING_EXPORT_PERMISSIONS, ACCOUNTING_LEDGER_PERMISSIONS } from "../constants/accountingExport";
 import { VENDOR_NOTE_MANAGE_PERMISSIONS, VENDOR_NOTE_VIEW_PERMISSIONS } from "../constants/vendorNotes";
 import { WORK_ASSIGN_LEAD_PERMISSIONS } from "../constants/workAssignment";
 import {
@@ -87,6 +88,8 @@ export function useApPermissions() {
     canManageRecurring: hasAnyPermission(RECURRING_MANAGE_PERMISSIONS),
     canViewGstItc: hasAnyPermission(GST_ITC_VIEW_PERMISSIONS),
     canManageGstItc: hasAnyPermission(GST_ITC_MANAGE_PERMISSIONS),
+    canExportAccounting: hasAnyPermission(ACCOUNTING_EXPORT_PERMISSIONS),
+    canEditLedgers: hasAnyPermission(ACCOUNTING_LEDGER_PERMISSIONS),
     canViewVendorNotes: hasAnyPermission(VENDOR_NOTE_VIEW_PERMISSIONS),
     canManageVendorNotes: hasAnyPermission(VENDOR_NOTE_MANAGE_PERMISSIONS),
     canAssignWork: hasAnyPermission(WORK_ASSIGN_LEAD_PERMISSIONS),

@@ -102,6 +102,9 @@ const TAB_LABELS = {
   payments_made: "Payments made",
   tds_register: "TDS register",
   payment_term_exceptions: "Term exceptions",
+  msme_payments: "MSME payments",
+  msme_43bh: "MSME 43B(h)",
+  msme_form1: "MSME Form-1",
 };
 
 function cellValue(column, row) {
@@ -118,8 +121,8 @@ function cellValue(column, row) {
       </Link>
     );
   }
-  if (["due_status", "timeliness", "deposit_timeliness"].includes(column.key)) {
-    const bad = /overdue|late/i.test(String(value));
+  if (["due_status", "timeliness", "deposit_timeliness", "status", "outcome"].includes(column.key)) {
+    const bad = /overdue|late|disallowed/i.test(String(value));
     return <span className={clsx("whitespace-nowrap", bad && "font-semibold text-rose-700")}>{String(value)}</span>;
   }
   if (column.key === "receipt" && value === "Missing") return <span className="font-semibold text-amber-700">Missing</span>;

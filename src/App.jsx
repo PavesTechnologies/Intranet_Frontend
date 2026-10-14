@@ -62,6 +62,7 @@ import TdsFilingNewPage from "./pages/accounts-payable/tds-tracking/pages/TdsFil
 import BulkImportPage from "./pages/accounts-payable/bulk-import/pages/BulkImportPage.jsx";
 import RecurringSchedulesPage from "./pages/accounts-payable/recurring/pages/RecurringSchedulesPage.jsx";
 import GstItcPage from "./pages/accounts-payable/gst/pages/GstItcPage.jsx";
+import AccountingExportPage from "./pages/accounts-payable/accounting-export/pages/AccountingExportPage.jsx";
 import VendorNotesPage from "./pages/accounts-payable/vendor-notes/pages/VendorNotesPage.jsx";
 import WorkAssignmentPage from "./pages/accounts-payable/work-assignment/pages/WorkAssignmentPage.jsx";
 import PaymentRunsPage from "./pages/accounts-payable/payment-runs/pages/PaymentRunsPage.jsx";
@@ -70,6 +71,7 @@ const PAYMENT_RUN_VIEW_PERMISSIONS = ["PAYMENT_VIEW", "PAYMENT_PROCESS", "PAYMEN
 import { WORK_ASSIGN_LEAD_PERMISSIONS } from "./pages/accounts-payable/constants/workAssignment";
 import { VENDOR_NOTE_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/vendorNotes";
 import { GST_ITC_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/gstItc";
+import { ACCOUNTING_EXPORT_PERMISSIONS } from "./pages/accounts-payable/constants/accountingExport";
 import { RECURRING_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/recurring";
 import BulkImportJobPage from "./pages/accounts-payable/bulk-import/pages/BulkImportJobPage.jsx";
 import { PAYMENT_ANY_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/paymentPermissions";
@@ -768,6 +770,14 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute requiredPermissions={GST_ITC_VIEW_PERMISSIONS}>
                 <GstItcPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.ACCOUNTING_EXPORT}
+            element={
+              <ProtectedRoute requiredPermissions={ACCOUNTING_EXPORT_PERMISSIONS}>
+                <AccountingExportPage />
               </ProtectedRoute>
             }
           />
