@@ -10,6 +10,7 @@ import { getBillingTypeDisplayName } from "../../utils/billingType";
 import { formatCurrency, formatDisplayDate, formatProjectDuration } from "../../utils/format";
 import ConfigurationChanges, { ChangedFieldsContext, ChangedIndicator, getChangedFieldLabels, useIsFieldChanged } from "./ConfigurationChanges";
 import {
+  calculateDiscountedRate,
   getApiErrorMessage,
   getBillingRecurringSchedule,
   getBillingRecurringScheduleByBillingConfigurationId,
@@ -295,20 +296,60 @@ function RoleRatesTable({ roles, currency }) {
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-[11px] font-medium text-slate-500">
             <th className="px-3 py-2 font-medium">Role</th>
-            <th className="px-3 py-2 font-medium">Rate</th>
+            <th className="px-3 py-2 font-medium">Standard Rate</th>
+            <th className="px-3 py-2 font-medium">Discount / Net Rate</th>
             <th className="px-3 py-2 font-medium">Frequency</th>
             <th className="px-3 py-2 font-medium">Effective Period</th>
+            <th className="px-3 py-2 font-medium">Invoice</th>
+            <th className="px-3 py-2 font-medium">Commercial Notes</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 text-[13px]">
-          {roles.map((role, index) => (
-            <tr key={`${role.role}-${index}`}>
-              <td className="px-3 py-2 font-medium text-slate-800">{role.role || "—"}</td>
-              <td className="px-3 py-2 font-semibold tabular-nums text-slate-900">{formatMoney(role.rate, currency) || "—"}</td>
-              <td className="px-3 py-2 text-slate-600">{ratePeriodLabel(role.ratePeriod)}</td>
-              <td className="whitespace-nowrap px-3 py-2 text-slate-600">{rateDateRange(role) || "—"}</td>
-            </tr>
-          ))}
+          {roles.map((role, index) => {
+            const roleName = role.role || role.roleName || "—";
+            const hasDiscount = Boolean(role.hasDiscount);
+            const discType = role.discountType || "PERCENTAGE";
+            const discVal = role.discountValue;
+            const netRate = hasDiscount && role.rate && discVal
+              ? (role.discountedRate || calculateDiscountedRate(role.rate, discType, discVal))
+              : null;
+            const discLabel = discType === "PERCENTAGE" ? `${discVal}% off` : `${formatMoney(discVal, currency)} off`;
+            const isIncluded = role.includeInInvoice !== false;
+            const notes = role.remarks || role.notes || "";
+
+            return (
+              <tr key={`${roleName}-${index}`}>
+                <td className="px-3 py-2 font-medium text-slate-800">{roleName}</td>
+                <td className="px-3 py-2 font-semibold tabular-nums text-slate-900">{formatMoney(role.rate, currency) || "—"}</td>
+                <td className="px-3 py-2">
+                  {hasDiscount && netRate ? (
+                    <div>
+                      <span className="font-semibold text-indigo-700 tabular-nums">{formatMoney(netRate, currency)}</span>
+                      <span className="ml-1 text-[11px] text-slate-500">({discLabel})</span>
+                    </div>
+                  ) : (
+                    <span className="text-slate-400">None</span>
+                  )}
+                </td>
+                <td className="px-3 py-2 text-slate-600">{ratePeriodLabel(role.ratePeriod)}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-slate-600">{rateDateRange(role) || "—"}</td>
+                <td className="px-3 py-2">
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                      isIncluded
+                        ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200"
+                        : "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200"
+                    }`}
+                  >
+                    {isIncluded ? "Included" : "Excluded"}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-slate-600 max-w-[150px] truncate" title={notes}>
+                  {notes || "—"}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -405,7 +446,7 @@ function RoleRatesDrawer({ isOpen, onClose, roles, currency }) {
   const filtered = useMemo(() => {
     if (!query.trim()) return roles;
     const q = query.trim().toLowerCase();
-    return roles.filter((role) => (role.role || "").toLowerCase().includes(q));
+    return roles.filter((role) => (role.role || role.roleName || "").toLowerCase().includes(q));
   }, [roles, query]);
 
   return (
@@ -746,10 +787,29 @@ function FixedPricePricing({ billingConfig, currency, projectBudgetValue }) {
 
 function TimeMaterialPricing({ billingConfig, currency }) {
   const pricingModel = billingConfig.pricingModel || billingConfig.billingMode || "";
-  const roleRateRows = (billingConfig.timeAndMaterial?.roles || []).filter((roleRate) => roleRate.role || roleRate.rate);
+  const roleRateRows = (billingConfig.timeAndMaterial?.roles || []).filter((roleRate) => roleRate.role || roleRate.roleName || roleRate.rate);
   const standardRate = billingConfig.timeAndMaterial || {};
+  const discountPeriods = Array.isArray(standardRate.discountPeriods) ? standardRate.discountPeriods : [];
+
+  const hasDiscount = Boolean(standardRate.hasDiscount || discountPeriods.length > 0);
+  const discountType = standardRate.discountType || "PERCENTAGE";
+  const discountValue = standardRate.discountValue;
+  const netDiscountedRate = hasDiscount && standardRate.rate && discountValue
+    ? (standardRate.discountedRate || calculateDiscountedRate(standardRate.rate, discountType, discountValue))
+    : null;
+
+  const discountFormatted = hasDiscount && discountValue
+    ? (discountType === "PERCENTAGE" ? `${discountValue}%` : formatMoney(discountValue, currency))
+    : null;
+
+  const discountPeriod = (standardRate.discountStartDate || standardRate.discountEndDate)
+    ? `${standardRate.discountStartDate || "—"} to ${standardRate.discountEndDate || "—"}`
+    : null;
+
+  const isIncluded = standardRate.includeInInvoice !== false;
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <FieldList
         fields={[
           ...(pricingModel ? [{ label: "Pricing Mode", value: BILLING_MODE_LABELS[pricingModel] || pricingModel, tone: "brand" }] : []),
@@ -760,10 +820,111 @@ function TimeMaterialPricing({ billingConfig, currency }) {
                 value: `${formatMoney(standardRate.rate, currency) || "—"} ${ratePeriodSuffix(standardRate.ratePeriod)}`.trim(),
                 money: true,
               },
+              ...(discountPeriods.length === 0 && hasDiscount ? [
+                {
+                  label: "Client Discount",
+                  value: discountFormatted ? `${discountFormatted} (${discountType === "PERCENTAGE" ? "Percentage" : "Fixed"})` : "—",
+                },
+                ...(discountPeriod ? [{ label: "Discount Period", value: discountPeriod }] : []),
+                {
+                  label: "Net Discounted Rate",
+                  value: netDiscountedRate ? `${formatMoney(netDiscountedRate, currency)} ${ratePeriodSuffix(standardRate.ratePeriod)}`.trim() : "—",
+                  emphasize: true,
+                },
+              ] : []),
+              {
+                label: discountPeriods.length > 0 ? "Include Base Rate in Invoice" : "Invoice Inclusion",
+                value: isIncluded ? "Included in Invoice" : "Excluded from Invoice",
+                tone: isIncluded ? "brand" : "neutral",
+              },
+              ...(standardRate.remarks ? [{ label: "Commercial Notes", value: standardRate.remarks }] : []),
             ]
             : []),
         ]}
       />
+
+      {/* Multi-Period Standard Rate Schedule */}
+      {(pricingModel === "STANDARD" || !pricingModel) && discountPeriods.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+              Standard Rate Schedule ({discountPeriods.length} {discountPeriods.length === 1 ? "Period" : "Periods"})
+            </h4>
+            <span className="text-xs text-slate-500">Currency: <strong className="text-slate-800">{currency || "—"}</strong></span>
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200 text-xs">
+              <thead className="bg-slate-50 text-slate-600 font-semibold">
+                <tr>
+                  <th className="px-3 py-2 text-left">Period Name</th>
+                  <th className="px-3 py-2 text-left">Date Range</th>
+                  <th className="px-3 py-2 text-left">Discount</th>
+                  <th className="px-3 py-2 text-left">Net Rate</th>
+                  <th className="px-3 py-2 text-center">Invoice</th>
+                  <th className="px-3 py-2 text-left">Commercial Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {discountPeriods.map((p, idx) => {
+                  const numBase = Number(standardRate.rate);
+                  const dv = Number(p.discountValue);
+                  const discType = p.discountType || "PERCENTAGE";
+                  let netRateVal = p.netRate;
+                  if (netRateVal === null || netRateVal === undefined || netRateVal === "") {
+                    if (numBase > 0 && dv > 0) {
+                      const discAmount = discType === "PERCENTAGE" ? (numBase * dv / 100) : dv;
+                      netRateVal = Math.max(0, numBase - discAmount);
+                    }
+                  }
+                  const discLabel = discType === "PERCENTAGE" ? `${p.discountValue}%` : formatMoney(p.discountValue, currency);
+                  const isPeriodIncluded = p.includeInInvoice !== false;
+
+                  return (
+                    <tr key={p.discountId || idx} className="hover:bg-slate-50">
+                      <td className="px-3 py-2 font-medium text-slate-900">{p.periodName || `Period ${idx + 1}`}</td>
+                      <td className="px-3 py-2 tabular-nums text-slate-600">{p.effectiveFrom || "—"} to {p.effectiveTo || "—"}</td>
+                      <td className="px-3 py-2 text-slate-700">
+                        <span className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-700">
+                          {discLabel} ({discType === "PERCENTAGE" ? "%" : "Fixed"})
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 font-semibold text-indigo-900 tabular-nums">
+                        {netRateVal !== null && netRateVal !== undefined
+                          ? `${formatMoney(netRateVal, currency)} ${ratePeriodSuffix(standardRate.ratePeriod)}`.trim()
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {isPeriodIncluded ? (
+                          <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                            Included
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                            Excluded
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-slate-500 max-w-[200px] truncate" title={p.notes || ""}>
+                        {p.notes || "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="rounded-lg bg-slate-50 p-2.5 text-xs text-slate-600 flex items-start gap-1.5">
+            <Info className="h-4 w-4 shrink-0 text-slate-500 mt-0.5" />
+            <span>
+              <strong>Base-Rate Fallback:</strong> Outside configured discount periods, billing falls back automatically to the standard base rate of{" "}
+              <strong>{formatMoney(standardRate.rate, currency)} {ratePeriodSuffix(standardRate.ratePeriod)}</strong>.
+            </span>
+          </div>
+        </div>
+      )}
+
       {pricingModel === "ROLE_BASED" && (
         <div className="pb-1">
           <RoleRatesList roles={roleRateRows} currency={currency} />
@@ -836,7 +997,8 @@ function MilestonePlanPricing({ review, currency, projectBudgetValue }) {
 // genuinely different amount, and individual payment amounts appear only in
 // Payment Schedule.
 export default function ReviewActivateStep({ wizardData, onEditStep, leading, headerActions, pendingChanges }) {
-  const { projectInfo = {}, billingConfig = {}, controls = {}, approvalStatus, billingStatus } = wizardData;
+  const { billingConfig = {}, controls = {}, approvalStatus, billingStatus } = wizardData;
+  const projectInfo = wizardData.projectInfo || wizardData.project || {};
 
   const billingContext = projectInfo.billingContext || "PROJECT";
   const isProductService = billingContext === "PRODUCT_SERVICE";

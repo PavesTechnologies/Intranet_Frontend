@@ -77,6 +77,12 @@ export default function TimesheetDataTable({
     return records.reduce((acc, r) => acc + (Number(r.hours) || 0), 0);
   }, [records]);
 
+  const payableHours = useMemo(() => {
+    return records
+      .filter((r) => r.includeInInvoice !== false && r.isBillable !== false && r.excludedFromInvoice !== true)
+      .reduce((acc, r) => acc + (Number(r.hours) || 0), 0);
+  }, [records]);
+
   if (loading) {
     return (
       <div className="flex h-full flex-col items-center justify-center space-y-3 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
@@ -106,7 +112,7 @@ export default function TimesheetDataTable({
             />
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 tabular-nums text-xs font-semibold text-slate-600">
-            {records.length} records ({totalHours} hrs)
+            {records.length} records ({totalHours} hrs{payableHours !== totalHours ? ` · ${payableHours} payable hrs` : ""})
           </div>
         </div>
       </div>
@@ -180,23 +186,63 @@ export default function TimesheetDataTable({
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
             {filteredAndSorted.length > 0 ? (
-              pageRecords.map((rec, idx) => (
-                <tr key={rec.id || idx} className="transition-colors hover:bg-slate-50">
-                  <td className="px-4 py-2.5 font-semibold text-slate-900">{rec.employee || "Employee"}</td>
-                  <td className="px-4 py-2.5 tabular-nums text-slate-600">{rec.workDate}</td>
-                  <td className="px-4 py-2.5 text-slate-500">{rec.role || "Software Engineer"}</td>
-                  <td className="px-4 py-2.5 text-left font-semibold text-slate-900">{rec.hours} hrs</td>
-                  <td className="px-4 py-2.5 text-left tabular-nums text-slate-700">
-                    {currency} {Number(rec.rate || 0).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2.5 text-left tabular-nums font-semibold text-indigo-900">
-                    {currency} {Number(rec.amount || rec.hours * rec.rate || 0).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2.5 text-center">
-                    <StatusBadge label={rec.approvalStatus || "Approved"} size="sm" />
-                  </td>
-                </tr>
-              ))
+              pageRecords.map((rec, idx) => {
+                const isExcluded = rec.includeInInvoice === false || rec.isBillable === false || rec.excludedFromInvoice === true;
+                const hasDiscount = Boolean(
+                  rec.discountApplied ||
+                  rec.hasDiscount ||
+                  (rec.standardRate && Number(rec.standardRate) > Number(rec.rate))
+                );
+                const displayAmount = rec.amount !== undefined && rec.amount !== null
+                  ? rec.amount
+                  : Number(rec.hours || 0) * Number(rec.rate || 0);
+
+                return (
+                  <tr
+                    key={rec.id || idx}
+                    className={`transition-colors hover:bg-slate-50 ${isExcluded ? "bg-slate-50/40 opacity-80" : ""}`}
+                  >
+                    <td className="px-4 py-2.5 font-semibold text-slate-900">{rec.employee || "Employee"}</td>
+                    <td className="px-4 py-2.5 tabular-nums text-slate-600">{rec.workDate}</td>
+                    <td className="px-4 py-2.5 text-slate-500">{rec.role || "Software Engineer"}</td>
+                    <td className="px-4 py-2.5 text-left font-semibold text-slate-900">{rec.hours} hrs</td>
+                    <td className="px-4 py-2.5 text-left tabular-nums text-slate-700">
+                      <div className="flex flex-col">
+                        <span>{currency} {Number(rec.rate || 0).toLocaleString()}</span>
+                        {hasDiscount && (
+                          <span className="text-[10px] font-medium text-indigo-600">
+                            Discount applied {rec.standardRate ? `(base ${currency} ${Number(rec.standardRate).toLocaleString()})` : ""}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-left tabular-nums font-semibold text-indigo-900">
+                      {isExcluded ? (
+                        <div className="flex flex-col">
+                          <span className="text-slate-400 line-through">
+                            {currency} {Number(displayAmount).toLocaleString()}
+                          </span>
+                          <span className="text-[10px] font-medium text-amber-600">
+                            Excluded ({currency} 0.00 payable)
+                          </span>
+                        </div>
+                      ) : (
+                        <span>{currency} {Number(displayAmount).toLocaleString()}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <StatusBadge label={rec.approvalStatus || "Approved"} size="sm" />
+                        {isExcluded && (
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 ring-1 ring-inset ring-slate-200">
+                            Excluded
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-xs text-slate-500">

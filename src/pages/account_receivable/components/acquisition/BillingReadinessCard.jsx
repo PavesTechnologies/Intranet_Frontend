@@ -49,6 +49,12 @@ export default function BillingReadinessCard({
   const approvedHours = readiness.approvedHours ?? (isApprovedStatus ? laborRes.records?.reduce((acc, r) => acc + Number(r.hours || 0), 0) : 0);
   const pendingHours = readiness.pendingHours ?? 0;
 
+  const isExpenseEligible = Boolean(config?.expenseBillingEligible);
+  const expenseRes = acquisitionResults?.expense || {};
+  const expenseRecords = expenseRes.records || config?.existingSnapshot?.expenseRecords || [];
+  const expenseCount = expenseRecords.length;
+  const expenseAmount = Number(expenseRes.amount ?? config?.existingSnapshot?.expenseAmount ?? 0);
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
       {/* Header */}
@@ -96,12 +102,23 @@ export default function BillingReadinessCard({
               ? "Tax has been calculated successfully for this billing snapshot."
               : status === "IN_TAX"
               ? "Tax calculation is currently processing."
+              : isExpenseEligible && expenseCount > 0
+              ? "All required timesheets and eligible expenses are verified and ready for billing."
               : "All required timesheets are approved and billing is ready."}
           </p>
-          <div className="flex items-center gap-3 text-xs font-semibold text-emerald-800 border-t border-emerald-200/60 pt-1.5">
-            <span>Approved: <strong className="tabular-nums">{approvedCount}</strong></span>
-            <span>&middot;</span>
-            <span>Billable Hours: <strong className="tabular-nums">{approvedHours} hrs</strong></span>
+          <div className="flex flex-col gap-1.5 text-xs font-semibold text-emerald-800 border-t border-emerald-200/60 pt-1.5">
+            <div className="flex items-center gap-3">
+              <span>Labor Approved: <strong className="font-mono">{approvedCount}</strong></span>
+              <span>&middot;</span>
+              <span>Billable Hours: <strong className="font-mono">{approvedHours} hrs</strong></span>
+            </div>
+            {isExpenseEligible && (
+              <div className="flex items-center gap-3 text-emerald-900">
+                <span>Expenses: <strong className="font-mono">{expenseCount}</strong> records</span>
+                <span>&middot;</span>
+                <span>Cost Basis: <strong className="font-mono">{config?.currency || "USD"} {expenseAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+              </div>
+            )}
           </div>
         </div>
       ) : status === "PARTIALLY_READY" ? (
@@ -175,16 +192,22 @@ export default function BillingReadinessCard({
           )}
         </div>
       ) : status === "ACQUISITION_FAILED" || status === "FAILED" || status === "ERROR" ? (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-900 space-y-1">
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-900 space-y-2">
           <div className="flex items-center gap-1.5 font-bold text-rose-900 text-xs">
             <XCircle className="h-4 w-4 text-rose-600 flex-shrink-0" />
             Acquisition Failed
           </div>
           <p className="text-xs text-rose-800">
             {laborRes.error ||
+              expenseRes.error ||
               acquisitionResults?.message ||
               "We couldn't retrieve billing data at this time. Please try again."}
           </p>
+          {expenseRes.error && !laborRes.error && laborRes.records?.length > 0 && (
+            <div className="rounded border border-rose-200/60 bg-white/60 p-2 text-[11px] text-slate-700">
+              <span className="font-semibold text-slate-900">Timesheets:</span> {laborRes.records.length} records ({approvedHours} hrs) verified, but snapshot creation was blocked by expense currency conversion policy.
+            </div>
+          )}
         </div>
       ) : (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-800 space-y-1">
