@@ -109,11 +109,6 @@ export default function PaymentReadyPage() {
         actions={
           <div className="flex items-center gap-3">
             {canRecordPayment && (
-              <Link to={AP_ROUTES.PAYMENT_RUNS}>
-                <Button variant="primary">Payment runs</Button>
-              </Link>
-            )}
-            {canRecordPayment && (
               <Link to={`${AP_ROUTES.BULK_IMPORT}?type=payments`}>
                 <Button variant="outline">Bulk import payments</Button>
               </Link>
