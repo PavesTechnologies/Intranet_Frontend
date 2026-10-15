@@ -96,8 +96,6 @@ export function useApPermissions() {
     // Bank verification / approval: Finance (approval must be a different person - backend-enforced).
     canVerifyVendorBanks: hasAnyPermission(["VENDOR_BANK_VERIFY", "AP_AUTOMATION_MANAGE", "PAYMENT_PROCESS"]),
     // Payment runs: Finance Executive prepares, Finance Manager approves (never the same person - backend-enforced).
-    canPreparePaymentRuns: hasPermission("PAYMENT_PROCESS"),
-    canApprovePaymentRuns: hasAnyPermission(["PAYMENT_RUN_APPROVE", "AP_AUTOMATION_MANAGE"]),
     canReviewOcr: hasPermission(INVOICE_PERMISSIONS.INVOICE_OCR_REVIEW),
     // The standalone Validation Queue page is part of the same OCR/intake pipeline — no
     // separate backend permission exists for it.

@@ -51,8 +51,6 @@ export const AP_ROUTES = {
   ACCOUNTING_EXPORT: `${BASE}/accounting-export`,
   VENDOR_NOTES: `${BASE}/vendor-notes`,
   WORK_ASSIGNMENT: `${BASE}/work-assignment`,
-  PAYMENT_RUNS: `${BASE}/payments/runs`,
-  PAYMENT_RUN_DETAIL: (runId = ":runId") => `${BASE}/payments/runs/${runId}`,
   BULK_IMPORT: `${BASE}/bulk-import`,
   BULK_IMPORT_JOB: (jobId = ":jobId") => `${BASE}/bulk-import/${jobId}`,
   TDS_CHALLAN_NEW: `${BASE}/tds/challans/new`,

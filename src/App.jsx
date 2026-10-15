@@ -65,9 +65,6 @@ import GstItcPage from "./pages/accounts-payable/gst/pages/GstItcPage.jsx";
 import AccountingExportPage from "./pages/accounts-payable/accounting-export/pages/AccountingExportPage.jsx";
 import VendorNotesPage from "./pages/accounts-payable/vendor-notes/pages/VendorNotesPage.jsx";
 import WorkAssignmentPage from "./pages/accounts-payable/work-assignment/pages/WorkAssignmentPage.jsx";
-import PaymentRunsPage from "./pages/accounts-payable/payment-runs/pages/PaymentRunsPage.jsx";
-import PaymentRunDetailPage from "./pages/accounts-payable/payment-runs/pages/PaymentRunDetailPage.jsx";
-const PAYMENT_RUN_VIEW_PERMISSIONS = ["PAYMENT_VIEW", "PAYMENT_PROCESS", "PAYMENT_RUN_APPROVE", "AP_AUTOMATION_MANAGE"];
 import { WORK_ASSIGN_LEAD_PERMISSIONS } from "./pages/accounts-payable/constants/workAssignment";
 import { VENDOR_NOTE_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/vendorNotes";
 import { GST_ITC_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/gstItc";
@@ -730,22 +727,6 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute requiredPermissions={["PAYMENT_PROCESS", "TDS_TRACKING_UPDATE"]}>
                 <BulkImportJobPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path={AP_ROUTES.PAYMENT_RUNS}
-            element={
-              <ProtectedRoute requiredPermissions={PAYMENT_RUN_VIEW_PERMISSIONS}>
-                <PaymentRunsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path={AP_ROUTES.PAYMENT_RUN_DETAIL()}
-            element={
-              <ProtectedRoute requiredPermissions={PAYMENT_RUN_VIEW_PERMISSIONS}>
-                <PaymentRunDetailPage />
               </ProtectedRoute>
             }
           />

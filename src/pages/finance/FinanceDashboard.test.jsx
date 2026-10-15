@@ -16,11 +16,17 @@ const asRoles = (...roles) => {
 beforeEach(() => vi.clearAllMocks());
 
 describe("FinanceDashboard", () => {
-  it("shows Accounts Payable to a Finance Manager", () => {
-    asRoles("General", "Finance_Manager");
+  it("shows Accounts Payable to a Finance Executive", () => {
+    asRoles("General", "Finance_Executive");
     render(<FinanceDashboard />, { wrapper: MemoryRouter });
     expect(screen.getByText("Accounts Payable")).toBeInTheDocument();
     expect(screen.getByText("Accounts Receivable")).toBeInTheDocument();
+  });
+
+  it("does not show Accounts Payable to a Finance Manager", () => {
+    asRoles("General", "Finance_Manager");
+    render(<FinanceDashboard />, { wrapper: MemoryRouter });
+    expect(screen.queryByText("Accounts Payable")).toBeNull();
   });
 
   it("hides Accounts Payable from someone with no AP role", () => {
