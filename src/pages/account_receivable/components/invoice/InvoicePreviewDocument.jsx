@@ -937,13 +937,6 @@ export default function InvoicePreviewDocument({
 
         {/* Right: Authoritative Document Classification */}
         <div className="flex flex-col items-start sm:items-end sm:text-right shrink-0">
-          {isDocumentGenerated && (
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-50 border border-emerald-300 px-3 py-1 rounded-full shadow-2xs mb-2.5">
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-              ORIGINAL FOR RECIPIENT
-            </div>
-          )}
-
           <h1 className="text-2xl sm:text-3xl font-black text-[#0A0082] tracking-tight uppercase">
             {isDocumentGenerated ? "TAX INVOICE" : "DRAFT INVOICE"}
           </h1>

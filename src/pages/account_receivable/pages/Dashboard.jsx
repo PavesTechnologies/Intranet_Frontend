@@ -27,6 +27,7 @@ import {
   Activity,
   BarChart3,
   PieChart as PieChartIcon,
+  Eye,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -48,6 +49,14 @@ import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import { showStatusToast } from "../../../components/toastfy/toast";
+import SearchInput from "../../../components/filter/Searchbar";
+import Pagination from "../../../components/Pagination/pagination";
+import StatusBadge from "../../../components/status/statusbadge";
+import ARTable from "../components/common/ARTable";
+import ActionMenu from "../components/common/ActionMenu";
+import ARClearFiltersButton from "../components/common/ARClearFiltersButton";
+import { RegisterCard } from "../components/receivables/ConsoleUI";
+import { formatDisplayDate } from "../utils/format";
 import {
   getBillingConfigurationStats,
   getBillingConfigurationActivity,
@@ -96,6 +105,7 @@ export default function AccountReceivableDashboard() {
   const [selectedEntity, setSelectedEntity] = useState("ALL");
   const [customerSearch, setCustomerSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [ledgerPage, setLedgerPage] = useState(1);
 
   const currencyInfo = CURRENCIES[selectedCurrency] || CURRENCIES.USD;
 
@@ -360,6 +370,80 @@ export default function AccountReceivableDashboard() {
       return true;
     });
   }, [debtorLedger, customerSearch, statusFilter]);
+
+  // Tab counts use the search-filtered ledger, like the Invoice Pipeline.
+  const ledgerTabs = useMemo(() => {
+    const searched = debtorLedger.filter((item) => {
+      const q = customerSearch.toLowerCase();
+      return (
+        item.clientName.toLowerCase().includes(q) ||
+        item.invoiceId.toLowerCase().includes(q) ||
+        item.project.toLowerCase().includes(q)
+      );
+    });
+    return [
+      { key: "ALL", label: "All", value: searched.length },
+      { key: "OVERDUE", label: "Overdue", value: searched.filter((i) => i.status === "OVERDUE").length },
+      { key: "PENDING", label: "Pending Approval", value: searched.filter((i) => i.status === "PENDING_APPROVAL").length },
+      { key: "PAID", label: "Paid", value: searched.filter((i) => i.status === "PAID" || i.status === "PARTIALLY_PAID").length },
+    ];
+  }, [debtorLedger, customerSearch]);
+
+  const LEDGER_PAGE_SIZE = 6;
+  const ledgerTotalPages = Math.max(1, Math.ceil(filteredLedger.length / LEDGER_PAGE_SIZE));
+  const pagedLedger = filteredLedger.slice((ledgerPage - 1) * LEDGER_PAGE_SIZE, ledgerPage * LEDGER_PAGE_SIZE);
+
+  useEffect(() => {
+    setLedgerPage(1);
+  }, [customerSearch, statusFilter]);
+
+  const ledgerRows = pagedLedger.map((row) => ({
+    onRowClick: () => navigate(`/account-receivable/invoices/${row.invoiceId}`),
+    invoiceNumber: (
+      <div className="text-left">
+        <span className="font-mono font-bold text-indigo-700">{row.invoiceId}</span>
+      </div>
+    ),
+    client: <div className="text-left font-semibold text-slate-800">{row.clientName}</div>,
+    project: (
+      <div className="text-left">
+        <div className="font-bold text-slate-900">{row.project}</div>
+      </div>
+    ),
+    billingModel: <div className="flex items-center justify-start font-medium text-slate-700">{row.billingType}</div>,
+    dueDate: (
+      <div className="text-left">
+        <div className="font-medium text-slate-700">{formatDisplayDate(row.dueDate)}</div>
+        <div
+          className={`text-xs font-semibold ${
+            row.agingDays > 60 ? "text-rose-600" : row.agingDays > 30 ? "text-amber-600" : "text-slate-400"
+          }`}
+        >
+          {row.agingDays > 0 ? `${row.agingDays} days aging` : "Current"}
+        </div>
+      </div>
+    ),
+    taxableSubtotal: <div className="text-left tabular-nums font-medium text-slate-700">{formatMoney(row.amount)}</div>,
+    totalGross: <div className="text-left tabular-nums font-bold text-slate-900">{formatMoney(row.total)}</div>,
+    status: (
+      <div className="flex flex-col items-center justify-center gap-1">
+        <StatusBadge label={row.status} size="sm" />
+      </div>
+    ),
+    actions: (
+      <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+        <ActionMenu
+          items={[
+            {
+              label: "View Invoice",
+              icon: <Eye className="h-4 w-4 text-slate-600" />,
+              onClick: () => navigate(`/account-receivable/invoices/${row.invoiceId}`),
+            },
+          ]}
+        />
+      </div>
+    ),
+  }));
 
   // Urgent action items
   const actionItems = useMemo(() => [
@@ -956,151 +1040,69 @@ export default function AccountReceivableDashboard() {
         </div>
       </div>
 
-      {/* Row 5: Enterprise Debtor & Invoice Ledger Table */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Receipt className="h-4 w-4 text-blue-600" />
-              Corporate Debtor Ledger & Active Invoices
-            </h3>
-            <p className="text-xs text-slate-500">
-              Live corporate debtor balances, tax compliance status, and payment schedules.
-            </p>
-          </div>
-
-          {/* Search & Status Filters */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search invoice or client..."
+      {/* Row 5: Corporate Debtor Ledger — same layout as the Invoice Pipeline table */}
+      <RegisterCard
+        title="Corporate Debtor Ledger & Active Invoices"
+        subtitle="Live corporate debtor balances, tax compliance status, and payment schedules."
+        toolbar={
+          <>
+            <div className="min-w-0 flex-1">
+              <SearchInput
                 value={customerSearch}
                 onChange={(e) => setCustomerSearch(e.target.value)}
-                className="h-8 w-48 sm:w-60 rounded-md border border-slate-300 bg-white pl-8 pr-3 text-xs placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                onSearch={(val) => setCustomerSearch(val)}
+                placeholder="Search by invoice number, client, or project..."
               />
             </div>
-
-            <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5 text-xs">
-              {["ALL", "OVERDUE", "PENDING", "PAID"].map((st) => (
-                <button
-                  key={st}
-                  type="button"
-                  onClick={() => setStatusFilter(st)}
-                  className={`rounded px-2.5 py-1 font-medium transition-colors ${
-                    statusFilter === st
-                      ? "bg-slate-900 text-white"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  {st}
-                </button>
-              ))}
+            {(customerSearch || statusFilter !== "ALL") && (
+              <ARClearFiltersButton
+                onClick={() => {
+                  setCustomerSearch("");
+                  setStatusFilter("ALL");
+                }}
+                label="Clear filters"
+              />
+            )}
+          </>
+        }
+        tabs={{
+          label: "Debtor ledger status",
+          loading: false,
+          items: ledgerTabs.map((t) => ({
+            ...t,
+            active: statusFilter === t.key,
+            onClick: () => setStatusFilter(t.key === "ALL" || statusFilter === t.key ? "ALL" : t.key),
+          })),
+        }}
+        footer={
+          <>
+            <Pagination
+              currentPage={ledgerPage}
+              totalPages={ledgerTotalPages}
+              onPrevious={() => setLedgerPage((p) => Math.max(p - 1, 1))}
+              onNext={() => setLedgerPage((p) => Math.min(p + 1, ledgerTotalPages))}
+            />
+            <div className="flex justify-end">
+              <Button
+                variant="link"
+                size="small"
+                onClick={() => navigate(INVOICE_GEN_PATH)}
+                className="gap-1 p-0 text-xs font-semibold text-blue-600 hover:underline"
+              >
+                View Full Invoicing Register
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
             </div>
-          </div>
-        </div>
-
-        {/* Ledger Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 uppercase tracking-wider font-semibold">
-              <tr>
-                <th className="px-4 py-3">Invoice Number</th>
-                <th className="px-4 py-3">Client & Project</th>
-                <th className="px-4 py-3">Billing Model</th>
-                <th className="px-4 py-3">Due Date & Aging</th>
-                <th className="px-4 py-3 text-right">Taxable Subtotal</th>
-                <th className="px-4 py-3 text-right">Total Gross</th>
-                <th className="px-4 py-3 text-center">Status</th>
-                <th className="px-4 py-3 text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredLedger.map((row) => (
-                <tr
-                  key={row.invoiceId}
-                  className="hover:bg-slate-50/80 transition-colors"
-                >
-                  <td className="px-4 py-3 font-semibold text-slate-900">
-                    <span className="font-mono text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                      {row.invoiceId}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="font-semibold text-slate-900">{row.clientName}</div>
-                    <div className="text-[11px] text-slate-500">{row.project}</div>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 font-medium">
-                    {row.billingType}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="text-slate-800 font-medium">{row.dueDate}</div>
-                    <div
-                      className={`text-[10px] font-semibold ${
-                        row.agingDays > 60
-                          ? "text-rose-600"
-                          : row.agingDays > 30
-                          ? "text-amber-600"
-                          : "text-slate-400"
-                      }`}
-                    >
-                      {row.agingDays > 0 ? `${row.agingDays} days aging` : "Current"}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium text-slate-600 tabular-nums">
-                    {formatMoney(row.amount)}
-                  </td>
-                  <td className="px-4 py-3 text-right font-bold text-slate-900 tabular-nums">
-                    {formatMoney(row.total)}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-                        row.status === "PAID"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : row.status === "PARTIALLY_PAID"
-                          ? "bg-cyan-100 text-cyan-800"
-                          : row.status === "OVERDUE"
-                          ? "bg-rose-100 text-rose-800"
-                          : row.status === "PENDING_APPROVAL"
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-blue-100 text-blue-800"
-                      }`}
-                    >
-                      {row.status.replace("_", " ")}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <Button
-                      variant="outline"
-                      size="small"
-                      onClick={() => navigate(`/account-receivable/invoices/${row.invoiceId}`)}
-                      className="h-7 px-2 text-[11px] gap-1 border-slate-200 hover:border-blue-500 hover:text-blue-600"
-                    >
-                      View
-                      <ArrowUpRight className="h-3 w-3" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="border-t border-slate-100 bg-slate-50/50 p-3 flex items-center justify-between text-xs text-slate-500">
-          <span>Showing {filteredLedger.length} of {debtorLedger.length} corporate invoices</span>
-          <Button
-            variant="link"
-            size="small"
-            onClick={() => navigate(INVOICE_GEN_PATH)}
-            className="gap-1 p-0 text-xs font-semibold text-blue-600 hover:underline"
-          >
-            View Full Invoicing Register
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      >
+        <ARTable
+          headers={["Invoice Number", "Client", "Project", "Billing Model", "Due Date", "Taxable Subtotal", "Total Gross", "Status", "Actions"]}
+          columns={["invoiceNumber", "client", "project", "billingModel", "dueDate", "taxableSubtotal", "totalGross", "status", "actions"]}
+          rows={ledgerRows}
+          emptyMessage={customerSearch.trim() ? "No invoices match your search." : "No invoices for this status."}
+        />
+      </RegisterCard>
 
       {/* Row 6: Audit & Real Recent Activity Log */}
       <PageCard>

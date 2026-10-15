@@ -43,10 +43,6 @@ import {
   getInvoiceDeliveries,
   toDeliveryState,
 } from "../services/invoiceService";
-import {
-  getOutstandingReceivables,
-  RECEIVABLE_STATUS_LABELS,
-} from "../services/receivableService";
 import { formatBillingPeriod } from "../services/billingDataAcquisitionService";
 import {
   DEMO_SELLER,
@@ -237,8 +233,6 @@ export default function InvoiceDetail() {
   const [isSendToClientOpen, setIsSendToClientOpen] = useState(false);
   const [sendingToClient, setSendingToClient] = useState(false);
   const [deliveryState, setDeliveryState] = useState(() => toDeliveryState([]));
-  // The receivable created by the backend once the invoice is sent.
-  const [receivable, setReceivable] = useState(null);
 
   const latestRejectionReason = useMemo(() => {
     if (invoice?.rejectionReason) return invoice.rejectionReason;
@@ -616,22 +610,6 @@ export default function InvoiceDetail() {
     }
   }, [invoice?.invoiceId, invoice?.invoiceStatus]);
 
-  // A sent invoice has exactly one receivable; find it among the outstanding ones.
-  useEffect(() => {
-    if (!invoice?.invoiceId || deliveryState.deliveryStatus !== DEMO_DELIVERY_STATUS.SENT_TO_CLIENT) {
-      setReceivable(null);
-      return;
-    }
-    let cancelled = false;
-    getOutstandingReceivables(invoice.projectId ? { projectId: invoice.projectId } : {})
-      .then((rows) => {
-        if (!cancelled) setReceivable(rows.find((row) => row.invoiceId === invoice.invoiceId) || null);
-      })
-      .catch((err) => console.error("[InvoiceDetail] Error loading receivable:", err));
-    return () => {
-      cancelled = true;
-    };
-  }, [invoice?.invoiceId, invoice?.projectId, deliveryState.deliveryStatus]);
 
   /**
    * Send to Client action.
@@ -806,15 +784,7 @@ export default function InvoiceDetail() {
                 <div className="space-y-0.5 text-xs text-slate-600">
                   <p>
                     <span className="font-semibold text-slate-700">Sent On: </span>
-                    {deliveryState.sentAt
-                      ? new Date(deliveryState.sentAt).toLocaleString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                      : "—"}
+                    {formatDisplayDateTime(deliveryState.sentAt)}
                   </p>
                   {deliveryState.recipientEmail && (
                     <p>
@@ -842,34 +812,6 @@ export default function InvoiceDetail() {
             </div>
           </div>
 
-          {receivable && (
-            <div className="grid shrink-0 grid-cols-2 gap-x-6 gap-y-1 rounded-lg border border-teal-200 bg-white px-4 py-2.5 text-xs sm:grid-cols-4">
-              <div>
-                <p className="text-slate-500">Receivable</p>
-                <p className="font-semibold text-slate-900">
-                  {RECEIVABLE_STATUS_LABELS[receivable.status] || receivable.status}
-                </p>
-              </div>
-              <div>
-                <p className="text-slate-500">Outstanding</p>
-                <p className="font-semibold tabular-nums text-slate-900">
-                  {formatCurrency(receivable.outstandingBalance, receivable.currencyCode)}
-                </p>
-              </div>
-              <div>
-                <p className="text-slate-500">Due Date</p>
-                <p className="font-semibold text-slate-900">
-                  {receivable.dueDate ? formatDisplayDate(receivable.dueDate) : "—"}
-                </p>
-              </div>
-              <div>
-                <p className="text-slate-500">Overdue</p>
-                <p className={`font-semibold tabular-nums ${receivable.daysOverdue > 0 ? "text-rose-700" : "text-slate-900"}`}>
-                  {receivable.daysOverdue === null ? "—" : receivable.daysOverdue > 0 ? `${receivable.daysOverdue} days` : "Not overdue"}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       )}
 

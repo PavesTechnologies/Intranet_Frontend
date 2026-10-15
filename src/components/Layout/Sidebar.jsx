@@ -105,8 +105,16 @@ const accountReceivableSubmenu = [
     to: "/account-receivable/invoice-approval",
   },
   {
-    label: "Outstanding Receivables",
+    // Everything after an invoice is sent to the client.
+    label: "Receivables",
     to: "/account-receivable/receivables",
+    children: [
+      { label: "Outstanding Receivables", to: "/account-receivable/receivables" },
+      { label: "Payments", to: "/account-receivable/payments" },
+      { label: "Customer Ledger & Aging", to: "/account-receivable/customer-ledger" },
+      { label: "Credit & Debit Notes", to: "/account-receivable/adjustment-notes" },
+      { label: "Reminders & Collections", to: "/account-receivable/collections" },
+    ],
   },
   {
     label: "Configuration",
@@ -118,8 +126,8 @@ const accountReceivableSubmenu = [
 // Finance Manager (Checker) only gets Billing Approvals, Invoice Approval and the shared items.
 // Maker roles (Finance Executive / Super Admin / Admin) only get create/draft/workflow items with NO approvals.
 const CHECKER_ONLY_LABELS = ["Billing Approvals", "Invoice Approval"];
-// Read-only monitoring both roles need.
-const AR_SHARED_LABELS = ["Outstanding Receivables"];
+// Post-invoice receivables work both roles need.
+const AR_SHARED_LABELS = ["Receivables"];
 const accountReceivableMakerSubmenu = accountReceivableSubmenu.filter(
   (item) => !CHECKER_ONLY_LABELS.includes(item.label),
 );

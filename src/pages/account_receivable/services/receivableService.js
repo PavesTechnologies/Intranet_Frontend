@@ -39,6 +39,80 @@ export const AGING_BUCKETS = [
 
 export const NO_DUE_DATE_BUCKET = { key: "NO_DUE_DATE", label: "No due date" };
 
+/* ------------------------------------------------------------------ */
+/* Live aging                                                          */
+/* ------------------------------------------------------------------ */
+
+/** Local calendar date as yyyy-MM-dd (not UTC — a due date is a local day). */
+export const toLocalIsoDate = (date = new Date()) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+// Whole days from one local date to another; null when either is unparseable
+// (never NaN — a NaN would silently stop an invoice from ever turning overdue).
+const daysBetween = (from, to) => {
+  const a = toIsoDay(from);
+  const b = toIsoDay(to);
+  if (!a || !b) return null;
+  const [fy, fm, fd] = a.split("-").map(Number);
+  const [ty, tm, td] = b.split("-").map(Number);
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86400000);
+};
+
+/**
+ * Re-ages a receivable against `todayIso`. The backend computes
+ * daysOutstanding / daysOverdue once per request, and never moves the
+ * status to overdue, so a page left open overnight (or a cached list) would
+ * show yesterday's picture. Same rules as the backend: only while a balance
+ * is owed, floored at 0, null without the needed date.
+ */
+export const applyLiveAging = (receivable, todayIso = toLocalIsoDate()) => {
+  const owed = receivable.outstandingBalance > 0;
+  const sinceInvoice = owed ? daysBetween(receivable.invoiceDate, todayIso) : null;
+  const pastDue = owed ? daysBetween(receivable.dueDate, todayIso) : null;
+  return {
+    ...receivable,
+    daysOutstanding: sinceInvoice === null ? null : Math.max(0, sinceInvoice),
+    daysOverdue: pastDue === null ? null : Math.max(0, pastDue),
+    daysUntilDue: pastDue === null ? null : -pastDue,
+  };
+};
+
+/**
+ * Where a receivable stands today. Overdue wins over partially paid: money
+ * still owed past its due date is overdue however much has been received.
+ */
+export const RECEIVABLE_DUE_STATE = {
+  NOT_DUE: { key: "NOT_DUE", label: "Not Due" },
+  DUE_TODAY: { key: "DUE_TODAY", label: "Due Today" },
+  OVERDUE: { key: "OVERDUE", label: "Overdue" },
+  PARTIALLY_PAID: { key: "PARTIALLY_PAID", label: "Partially Paid" },
+  NO_DUE_DATE: { key: "NO_DUE_DATE", label: "No Due Date" },
+  SETTLED: { key: "SETTLED", label: "Settled" },
+};
+
+export const getReceivableDueState = (receivable) => {
+  if (receivable.status === RECEIVABLE_STATUS.SETTLED || !(receivable.outstandingBalance > 0)) {
+    return RECEIVABLE_DUE_STATE.SETTLED;
+  }
+  if (receivable.daysOverdue > 0) return RECEIVABLE_DUE_STATE.OVERDUE;
+  if (receivable.dueDate && receivable.daysUntilDue === 0) return RECEIVABLE_DUE_STATE.DUE_TODAY;
+  if (receivable.status === RECEIVABLE_STATUS.PARTIALLY_PAID) return RECEIVABLE_DUE_STATE.PARTIALLY_PAID;
+  if (!receivable.dueDate) return RECEIVABLE_DUE_STATE.NO_DUE_DATE;
+  return RECEIVABLE_DUE_STATE.NOT_DUE;
+};
+
+/** Short "when" text for a due date: "Due in 5 days", "Due today", "12 days overdue". */
+export const describeDue = (receivable) => {
+  if (!receivable.dueDate || receivable.daysUntilDue === null || receivable.daysUntilDue === undefined) return null;
+  if (receivable.daysOverdue > 0) return `${receivable.daysOverdue} day${receivable.daysOverdue === 1 ? "" : "s"} overdue`;
+  if (receivable.daysUntilDue === 0) return "Due today";
+  return `Due in ${receivable.daysUntilDue} day${receivable.daysUntilDue === 1 ? "" : "s"}`;
+};
+
 export const getAgingBucket = (receivable) => {
   const days = receivable?.daysOverdue;
   if (days === null || days === undefined) return NO_DUE_DATE_BUCKET;
@@ -53,6 +127,27 @@ const toNumber = (value) => {
 
 const toNullableNumber = (value) => (value === null || value === undefined ? null : Number(value));
 
+/**
+ * Normalises a backend LocalDate to "yyyy-MM-dd". Jackson may send it as
+ * [2026, 11, 11], "2026,11,11", "2026-11-11" or an ISO timestamp — every
+ * date calculation below needs the dashed form. Returns null if unparseable.
+ */
+export const toIsoDay = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  const pad = (n) => String(n).padStart(2, "0");
+  let parts = null;
+  if (Array.isArray(value)) parts = value.slice(0, 3).map(Number);
+  else if (value instanceof Date && !Number.isNaN(value.getTime())) parts = [value.getFullYear(), value.getMonth() + 1, value.getDate()];
+  else {
+    const str = String(value).trim();
+    const iso = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (iso) parts = iso.slice(1, 4).map(Number);
+    else if (str.includes(",")) parts = str.split(",").slice(0, 3).map((p) => Number(p.trim()));
+  }
+  if (!parts || parts.length < 3 || parts.some((n) => !Number.isFinite(n))) return null;
+  return `${parts[0]}-${pad(parts[1])}-${pad(parts[2])}`;
+};
+
 export const normalizeReceivable = (item = {}) => {
   const invoiceAmount = toNumber(item.invoiceAmount);
   const outstandingBalance = toNumber(item.outstandingBalance);
@@ -66,8 +161,8 @@ export const normalizeReceivable = (item = {}) => {
     projectId: item.projectId ?? null,
     projectName: item.projectName || "—",
     currencyCode: item.currencyCode || "USD",
-    invoiceDate: item.invoiceDate || null,
-    dueDate: item.dueDate || null,
+    invoiceDate: toIsoDay(item.invoiceDate),
+    dueDate: toIsoDay(item.dueDate),
     invoiceAmount,
     outstandingBalance,
     // No payment flow exists yet, so this is invoice amount minus what is
