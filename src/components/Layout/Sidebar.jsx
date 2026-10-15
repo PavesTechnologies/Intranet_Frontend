@@ -312,6 +312,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
   const [childMenu, setChildMenu] = useState(null);
   const [childMenuOwner, setChildMenuOwner] = useState(null);
   const [childTop, setChildTop] = useState(0);
+  const [childLeft, setChildLeft] = useState(null);
   const parentHoverRef = useRef(false);
   const childHoverRef = useRef(false);
   const closeTimerRef = useRef(null);
@@ -371,6 +372,8 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
     if (item.children) {
       const rect = e.currentTarget.getBoundingClientRect();
       setChildTop(computeSubmenuTop(rect, item.children.length) + 4);
+      // AP sections: open right beside the hovered row (the AP flyout's width follows its labels).
+      setChildLeft(owner === "ap" ? rect.right + 4 : null);
       setChildMenu(item.children);
       setChildMenuOwner(owner);
     } else {
@@ -404,6 +407,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
         setEoHovered(false);
         setArHovered(false);
         setXmsHovered(false);
+        setApHovered(false);
       }
     }, 260); // slightly higher = smoother
   };
@@ -493,16 +497,23 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
     closeAllSubmenus();
     if (apRef.current) {
       const rect = apRef.current.getBoundingClientRect();
-      setSubmenuTop(rect.top);
+      setSubmenuTop(computeSubmenuTop(rect, filteredApSubmenu.length));
     }
     setApHovered(true);
   };
 
+  // Same close logic as AR: the flyout stays open while the pointer is on it or on a section's pages.
   const handleApMouseLeave = () => {
-    hoverTimeout.current = setTimeout(() => {
-      setApHovered(false);
-    }, 200);
+    parentHoverRef.current = false;
+    scheduleClose();
   };
+
+  // A section is highlighted while one of its pages is open.
+  const isApItemActive = (item) =>
+    (item.children || [item]).some((c) => location.pathname === c.to || location.pathname.startsWith(`${c.to}/`));
+
+  // Only shown while the flyout that opened it is open.
+  const childMenuOpen = { eo: eoHovered, ar: arHovered, xms: xmsHovered, ap: apHovered }[childMenuOwner] ?? Boolean(childMenuOwner);
 
   const resourceManagementItems = isAdmin || isRM
     ? resourceManagementSubmenu
@@ -518,6 +529,11 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
     setArHovered(false);
     setXmsHovered(false);
     setApHovered(false);
+    // a second-level menu must close with its parent, or it is left floating over the new page
+    setChildMenu(null);
+    setChildMenuOwner(null);
+    parentHoverRef.current = false;
+    childHoverRef.current = false;
   }, [location.pathname]);
 
 
@@ -923,7 +939,7 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                     {filteredXmsSubmenu.map((item) => (
                       <li
                         key={item.label}
-                        onMouseEnter={(e) => handleParentHover(item, e)}
+                        onMouseEnter={(e) => handleParentHover(item, e, "xms")}
                         onMouseDown={(e) => handleParentLeave()}
                         className="relative group"
                       >
@@ -980,15 +996,23 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
                       className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-20" : "left-64"
                         }`}
                       style={{ top: `${submenuTop}px` }}
-                      onMouseEnter={handleApMouseEnter}
+                      onMouseEnter={() => {
+                        parentHoverRef.current = true;
+                        cancelClose();
+                      }}
                       onMouseLeave={handleApMouseLeave}
                     >
                       {filteredApSubmenu.map((item) => (
-                        <li key={item.label} className="group relative">
+                        <li
+                          key={item.label}
+                          className="group relative"
+                          onMouseEnter={(e) => handleParentHover(item, e, "ap")}
+                          onMouseDown={() => handleParentLeave()}
+                        >
                           <NavLink
                             to={item.to}
                             className={({ isActive }) =>
-                              `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive
+                              `flex items-center justify-between px-4 py-2 text-xs transition-colors ${isActive || isApItemActive(item)
                                 ? "bg-blue-100 text-[#0a174e] font-semibold"
                                 : "hover:bg-[#263383] hover:text-white"
                               }`
@@ -1081,11 +1105,11 @@ const Sidebar = ({ isCollapsed, activeApplication = APPLICATIONS.INTRANET }) => 
 
         </ul>
 
-        {childMenu && (
+        {childMenu && childMenuOpen && (
           <ul
-            className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${isCollapsed ? "left-[305px]" : "left-[480px]"
+            className={`fixed w-fit min-w-[220px] whitespace-nowrap bg-white text-[#0a174e] rounded-lg shadow-2xl z-[9999] py-2 border ${childLeft != null ? "" : isCollapsed ? "left-[305px]" : "left-[480px]"
               }`}
-            style={{ top: `${childTop - 4}px` }}
+            style={{ top: `${childTop - 4}px`, ...(childLeft != null ? { left: `${childLeft}px` } : {}) }}
             onMouseEnter={() => {
               childHoverRef.current = true;
               cancelClose();

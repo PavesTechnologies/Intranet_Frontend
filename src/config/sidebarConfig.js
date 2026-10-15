@@ -315,14 +315,10 @@ export const XMS_SUBMENU = [
  * additionally gates the entire flyout <li> on hasRole(AP_ALL_ROLES) (see Sidebar.jsx),
  * matching the Account Receivable module's pattern rather than EO/XMS's ungated one.
  *
- * Deliberately 5 flat items, not 9 — each links to that area's primary list/overview page,
- * which carries its own "create new" action as a page-level button (e.g. VendorListPage's
- * "Register Vendor", InvoiceListPage's "Upload Invoice") rather than as a separate sidebar
- * entry. Sub-views reached from within a page (Vendor Onboarding/Detail/Update, OCR Review
- * Queue, Validation Queue, Payment History, Mark as Paid) still have their own routes from
- * Phase 2 — they're just no longer direct sidebar destinations. System Configuration is the
- * exception: it's a masters/admin screen, not a business-object list, so it stays a direct
- * sidebar destination on its own.
+ * Dashboard and Notifications are direct links; everything else sits in four sections (see
+ * AP_SUBMENU). Each page links to its area's primary list/overview, which carries its own
+ * "create new" action as a page-level button; sub-views reached from within a page (Vendor
+ * Onboarding/Detail, OCR Review, Payment History, ...) have routes but no sidebar entry.
  *
  * Per-item role differentiation (e.g. Vendor Management restricted to Admin/Vendor_Intake)
  * is deferred to the business-logic phases — see constants/permissions.js's
@@ -336,48 +332,70 @@ export const XMS_SUBMENU = [
 // missing it shouldn't see a nav item whose page will just 403 on its own data.
 const _INVOICE_VIEW_PERMISSIONS = [INVOICE_PERMISSIONS.INVOICE_VIEW];
 
+// Grouped into four sections (hover a section for its pages; Sidebar.jsx opens the second level).
+// Each page keeps its own gate; a section whose pages are all hidden disappears, and a section left
+// with one page renders as a plain link to it (collapseSingleChild). A section links to its first
+// visible page. Routes are unchanged, so Action Center / dashboard / bookmarked links still work.
 export const AP_SUBMENU = [
   // AP roles see their role views; management users (no AP role) see the read-only Management view.
   { label: "Dashboard", to: AP_ROUTES.DASHBOARD, roleOrPermissions: { roles: AP_ALL_ROLES, permissions: AP_MANAGEMENT_ANY } },
-  // Same gate as the route itself: every AP user has their own notifications, and which ones
-  // they see is decided by the backend from the JWT, so there is nothing finer to filter on.
-  // Same gate as the Procurement route: an AP role plus at least one Procurement view
-  // permission (PR_VIEW / PR_APPROVAL_VIEW / QUOTATION_VIEW / VENDOR_SELECTION_VIEW / PO_VIEW).
-  { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES, requiredPermissions: PROCUREMENT_ANY_VIEW_PERMISSIONS },
+  // Every AP user has their own notifications; the backend decides which from the JWT.
   { label: "Notifications", to: AP_ROUTES.NOTIFICATIONS, allowedRoles: AP_ALL_ROLES },
-  // Backend-enforced UMS permissions (vendor_permissions.py) - VENDOR_VIEW / VENDOR_MANAGE / VENDOR_BANK_MANAGE.
-  { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES, requiredPermissions: VENDOR_ANY_PERMISSIONS },
-  { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
-  // Payment Management (Ready for Payment ⇄ Payment History, cross-linked from each page) and
-  // TDS Tracking are flat entries: the AP flyout doesn't open nested children. Gated on the
-  // permissions their backend endpoints enforce, so a user without them never sees a page that
-  // would only 403.
-  { label: "Payment Management", to: AP_ROUTES.PAYMENT_READY, requiredPermissions: PAYMENT_ANY_VIEW_PERMISSIONS },
-  // Rent / subscription schedules: expected, received, missing (recurring_route.py).
-  { label: "Recurring Invoices", to: AP_ROUTES.RECURRING, requiredPermissions: RECURRING_VIEW_PERMISSIONS },
-  // Vendor credit notes / our debit notes, set off against unpaid invoices (vendor_note_route.py).
-  { label: "Credit & Debit Notes", to: AP_ROUTES.VENDOR_NOTES, requiredPermissions: VENDOR_NOTE_VIEW_PERMISSIONS },
-  { label: "TDS Tracking", to: AP_ROUTES.TDS_TRACKING, requiredPermissions: TDS_TRACKING_ANY_VIEW_PERMISSIONS },
-  // GST input credit register: claim in GSTR-3B, IRN check, 180-day rule (gst_itc_route.py).
-  { label: "GST Input Credit", to: AP_ROUTES.GST_ITC, requiredPermissions: GST_ITC_VIEW_PERMISSIONS },
-  // Invoices, payments, notes and TDS deposits as Tally / Zoho Books vouchers (accounting_export_route.py).
-  { label: "Accounting Export", to: AP_ROUTES.ACCOUNTING_EXPORT, requiredPermissions: ACCOUNTING_EXPORT_PERMISSIONS },
-  // The page lists only the reports the backend says this user may run (reports_route.py);
-  // payment access is the entry point today, management reporting permissions join in Phase 6.
-  { label: "Reports", to: AP_ROUTES.REPORTS, requiredPermissions: [...PAYMENT_ANY_VIEW_PERMISSIONS, AP_MANAGEMENT_PERMISSIONS.REPORTS_VIEW] },
-  // Payments / TDS challans / filings from one Excel sheet (backend checks the permission per type).
-  { label: "Bulk Import", to: AP_ROUTES.BULK_IMPORT, requiredPermissions: ["PAYMENT_PROCESS", "TDS_TRACKING_UPDATE"] },
-  // Touchless PO-invoice settings - Finance Manager only (backend-enforced on /ap-automation).
-  { label: "AP Automation", to: AP_ROUTES.AP_AUTOMATION, requiredPermissions: [AP_AUTOMATION_PERMISSIONS.AP_AUTOMATION_MANAGE] },
-  // AP lead: team workload, routing rules, leave cover (work_assignment_route.py).
-  { label: "AP Team", to: AP_ROUTES.WORK_ASSIGNMENT, requiredPermissions: WORK_ASSIGN_LEAD_PERMISSIONS },
-  // { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
-  // Split into two role-exclusive entries (both pointing at the same route) rather than one
-  // AP_ALL_ROLES item — System Configuration's tabs are now Admin-only/Finance_Executive-only
-  // (see SystemConfigurationPage.jsx's canManageSystemConfig/canManageTdsConfig split), so
-  // Vendor_Intake/AP_Executive shouldn't see either nav entry at all, and Finance_Executive
-  // should see it labeled for what they'll actually land on (just the TDS tab), not the generic
-  // label that implies access to Fiscal Years/Tax Compliance/etc. they don't have.
-  { label: "System Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: [AP_ROLES.ADMIN] },
-  { label: "TDS Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: [AP_ROLES.FINANCE_EXECUTIVE] },
+  {
+    label: "Invoices & Vendors",
+    to: AP_ROUTES.INVOICE_LIST,
+    collapseSingleChild: true,
+    children: [
+      // INVOICE_VIEW: the one permission every AP invoice group (intake / approver / finance) carries.
+      { label: "Invoice Management", to: AP_ROUTES.INVOICE_LIST, requiredPermissions: _INVOICE_VIEW_PERMISSIONS },
+      // Rent / subscription schedules: expected, received, missing (recurring_route.py).
+      { label: "Recurring Invoices", to: AP_ROUTES.RECURRING, requiredPermissions: RECURRING_VIEW_PERMISSIONS },
+      // Vendor credit notes / our debit notes, set off against unpaid invoices (vendor_note_route.py).
+      { label: "Credit & Debit Notes", to: AP_ROUTES.VENDOR_NOTES, requiredPermissions: VENDOR_NOTE_VIEW_PERMISSIONS },
+      // VENDOR_VIEW / VENDOR_MANAGE / VENDOR_BANK_MANAGE (vendor_permissions.py).
+      { label: "Vendor Management", to: AP_ROUTES.VENDOR_LIST, allowedRoles: AP_ALL_ROLES, requiredPermissions: VENDOR_ANY_PERMISSIONS },
+      // Same gate as the Procurement route: an AP role plus any Procurement view permission.
+      { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES, requiredPermissions: PROCUREMENT_ANY_VIEW_PERMISSIONS },
+    ],
+  },
+  {
+    label: "Payments & Tax",
+    to: AP_ROUTES.PAYMENT_READY,
+    collapseSingleChild: true,
+    children: [
+      // Ready for Payment / Payment History (cross-linked from each page).
+      { label: "Payment Management", to: AP_ROUTES.PAYMENT_READY, requiredPermissions: PAYMENT_ANY_VIEW_PERMISSIONS },
+      { label: "TDS Tracking", to: AP_ROUTES.TDS_TRACKING, requiredPermissions: TDS_TRACKING_ANY_VIEW_PERMISSIONS },
+      // ITC register + GSTR-2B match (gst_itc_route.py, gstr2b_route.py).
+      { label: "GST Input Credit", to: AP_ROUTES.GST_ITC, requiredPermissions: GST_ITC_VIEW_PERMISSIONS },
+      // Payments / TDS challans / filings from one Excel sheet (backend checks the permission per type).
+      { label: "Bulk Import", to: AP_ROUTES.BULK_IMPORT, requiredPermissions: ["PAYMENT_PROCESS", "TDS_TRACKING_UPDATE"] },
+    ],
+  },
+  {
+    label: "Reports & Accounting",
+    to: AP_ROUTES.REPORTS,
+    collapseSingleChild: true,
+    children: [
+      // The page lists only the reports the backend says this user may run (reports_route.py).
+      { label: "Reports", to: AP_ROUTES.REPORTS, requiredPermissions: [...PAYMENT_ANY_VIEW_PERMISSIONS, AP_MANAGEMENT_PERMISSIONS.REPORTS_VIEW] },
+      // Invoices, payments, notes and TDS deposits as Tally / Zoho Books vouchers (accounting_export_route.py).
+      { label: "Accounting Export", to: AP_ROUTES.ACCOUNTING_EXPORT, requiredPermissions: ACCOUNTING_EXPORT_PERMISSIONS },
+    ],
+  },
+  {
+    label: "Settings",
+    to: AP_ROUTES.SYSTEM_CONFIG,
+    collapseSingleChild: true,
+    children: [
+      // Two role-exclusive entries for the same route: System Configuration's tabs are Admin-only /
+      // Finance_Executive-only (SystemConfigurationPage.jsx), so each sees it labelled for what they get.
+      { label: "System Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: [AP_ROLES.ADMIN] },
+      { label: "TDS Configuration", to: AP_ROUTES.SYSTEM_CONFIG, allowedRoles: [AP_ROLES.FINANCE_EXECUTIVE] },
+      // Touchless PO invoices, segregation of duties (backend-enforced on /ap-automation).
+      { label: "AP Automation", to: AP_ROUTES.AP_AUTOMATION, requiredPermissions: [AP_AUTOMATION_PERMISSIONS.AP_AUTOMATION_MANAGE] },
+      // AP lead: team workload, routing rules, leave cover (work_assignment_route.py).
+      { label: "AP Team", to: AP_ROUTES.WORK_ASSIGNMENT, requiredPermissions: WORK_ASSIGN_LEAD_PERMISSIONS },
+    ],
+  },
 ];
