@@ -19,6 +19,13 @@ const TIERS = [
 ];
 const CORE_WARNING_THRESHOLD = 5;
 const BASIS_LABEL = { cue: "from the JD text", title: "from the role title", assumed: "assumed (default)", hr: "confirmed" };
+// A meaning suggested by the JD itself (its text or role title) - choosing a
+// different one needs a confirmation. "assumed" (the skill's default) isn't one.
+const JD_SUGGESTION_BASES = new Set(["cue", "title"]);
+
+function senseLabel(skill, key) {
+  return skill.sense_options.find((o) => o.sense_key === key)?.label || key;
+}
 
 const selectClass = "border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white disabled:bg-slate-50 disabled:text-slate-500";
 const inputClass = "border border-slate-200 rounded-lg px-2 py-1 text-xs w-24 disabled:bg-slate-50";
@@ -60,6 +67,8 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
+  // Save paused: some chosen meanings differ from the JD's suggestion.
+  const [askSense, setAskSense] = useState(false);
   // Add / remove a skill (applied at once, each saved as a calibration version).
   const [addPick, setAddPick] = useState(null);         // a catalogue skill { id, canonicalName }
   const [addName, setAddName] = useState("");           // or a new skill's name
@@ -104,6 +113,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
   const setSkill = (id, patch) => setForm((f) => ({ ...f, skills: { ...f.skills, [id]: { ...f.skills[id], ...patch } } }));
 
   const save = async () => {
+    setAskSense(false);
     setSaving(true);
     setResult(null);
     try {
@@ -200,6 +210,12 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
   const readOnly = !(typeof view.can_calibrate === "boolean" ? view.can_calibrate : canCalibrate);
   const signedInRoles = [].concat(user?.roles || user?.role || []).join(", ") || "none";
   const missingSense = view.skills.filter((s) => s.ambiguous && !form.skills[s.jd_skill_id]?.sense_key);
+  const senseConflicts = view.skills.filter((s) => {
+    const chosen = form.skills[s.jd_skill_id]?.sense_key;
+    return s.ambiguous && chosen && s.suggested_sense_key && JD_SUGGESTION_BASES.has(s.suggested_sense_basis)
+      && chosen !== s.suggested_sense_key;
+  });
+  const requestSave = () => (senseConflicts.length > 0 ? setAskSense(true) : save());
   const blocking = view.blocking_unknown_skills || [];
   const unsaved = !readOnly && !sameForm(form, formFromView(view));
 
@@ -301,9 +317,14 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
                           <option value="">Choose a meaning…</option>
                           {s.sense_options.map((o) => <option key={o.sense_key} value={o.sense_key}>{o.label}</option>)}
                         </select>
-                        {!s.sense_key && s.suggested_sense_key && (
+                        {senseConflicts.includes(s) ? (
+                          <span className="text-[10px] font-semibold text-amber-700">
+                            The JD suggests: {senseLabel(s, s.suggested_sense_key)}
+                            {" "}({BASIS_LABEL[s.suggested_sense_basis] || s.suggested_sense_basis})
+                          </span>
+                        ) : !s.sense_key && s.suggested_sense_key && (
                           <span className="text-[10px] text-slate-400">
-                            Suggested: {s.sense_options.find((o) => o.sense_key === s.suggested_sense_key)?.label}
+                            Suggested: {senseLabel(s, s.suggested_sense_key)}
                             {" "}({BASIS_LABEL[s.suggested_sense_basis] || s.suggested_sense_basis})
                           </span>
                         )}
@@ -422,13 +443,36 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
         </div>
       )}
 
+      {!readOnly && askSense && senseConflicts.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 flex flex-col gap-2">
+          <div className="flex gap-1.5 font-semibold">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>Some meanings differ from what the JD suggests. Scoring counts only resume evidence in the meaning you choose.</span>
+          </div>
+          <ul className="list-disc pl-6 space-y-0.5">
+            {senseConflicts.map((s) => (
+              <li key={s.jd_skill_id}>
+                <span className="font-semibold">{s.name}</span>: you chose{" "}
+                <span className="font-semibold">{senseLabel(s, form.skills[s.jd_skill_id].sense_key)}</span>; the JD suggests{" "}
+                <span className="font-semibold">{senseLabel(s, s.suggested_sense_key)}</span>
+                {" "}({BASIS_LABEL[s.suggested_sense_basis] || s.suggested_sense_basis}).
+              </li>
+            ))}
+          </ul>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="small" disabled={saving} onClick={() => setAskSense(false)}>Go back</Button>
+            <Button variant="primary" size="small" disabled={saving} onClick={save}>Save with my choices</Button>
+          </div>
+        </div>
+      )}
+
       {!readOnly && (
         <div className="flex justify-end items-center gap-3">
           {unsaved && (
             <span className="text-[11px] font-semibold text-amber-700">Unsaved changes - they are kept if you switch tabs, but only saved here.</span>
           )}
-          <Button variant="primary" size="medium" onClick={save}
-            disabled={saving || missingSense.length > 0 || blocking.length > 0}
+          <Button variant="primary" size="medium" onClick={requestSave}
+            disabled={saving || (askSense && senseConflicts.length > 0) || missingSense.length > 0 || blocking.length > 0}
             loading={saving} loadingText="Saving..."
             title={blocking.length > 0 ? `Resolve these core skills first: ${blocking.join(", ")}`
               : missingSense.length > 0 ? `Choose the meaning of: ${missingSense.map((s) => s.name).join(", ")}` : undefined}>
