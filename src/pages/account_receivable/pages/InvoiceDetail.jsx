@@ -40,7 +40,13 @@ import {
   getInvoiceApprovalHistory,
   getInvoiceErrorMessage,
   sendInvoiceToClient,
+  getInvoiceDeliveries,
+  toDeliveryState,
 } from "../services/invoiceService";
+import {
+  getOutstandingReceivables,
+  RECEIVABLE_STATUS_LABELS,
+} from "../services/receivableService";
 import { formatBillingPeriod } from "../services/billingDataAcquisitionService";
 import {
   DEMO_SELLER,
@@ -49,9 +55,6 @@ import {
   DEMO_TAX_CONTEXT,
   DEMO_TERMS,
   DEMO_DELIVERY_STATUS,
-  DEMO_SENT_BY,
-  getDemoDelivery,
-  saveDemoDelivery,
 } from "../utils/invoiceDemoData";
 import { getActiveCompanyProfile } from "../services/companyProfileService";
 import { getTaxCalculation } from "../services/taxCalculationService";
@@ -61,6 +64,7 @@ import { RECORD_LOCK_ACTION, RECORD_LOCK_RESOURCE } from "../services/recordLock
 import useRecordLock from "../hooks/useRecordLock";
 
 const TAX_WORKSPACE_PATH = "/account-receivable/tax-calculation";
+const RECEIVABLES_PATH = "/account-receivable/receivables";
 const INVOICE_WORKSPACE_PATH = "/account-receivable/invoice-generation";
 const INVOICE_APPROVAL_PATH = "/account-receivable/invoice-approval";
 
@@ -228,14 +232,13 @@ export default function InvoiceDetail() {
   const [isReacquireModalOpen, setIsReacquireModalOpen] = useState(false);
   const [reacquiring, setReacquiring] = useState(false);
 
-  // Demo: Send to Client delivery state (separate from invoice approval status)
+  // Send to Client delivery state (separate from invoice approval status),
+  // read from the backend delivery history.
   const [isSendToClientOpen, setIsSendToClientOpen] = useState(false);
   const [sendingToClient, setSendingToClient] = useState(false);
-  const [deliveryState, setDeliveryState] = useState({
-    deliveryStatus: DEMO_DELIVERY_STATUS.NOT_SENT,
-    sentAt: null,
-    sentBy: null,
-  });
+  const [deliveryState, setDeliveryState] = useState(() => toDeliveryState([]));
+  // The receivable created by the backend once the invoice is sent.
+  const [receivable, setReceivable] = useState(null);
 
   const latestRejectionReason = useMemo(() => {
     if (invoice?.rejectionReason) return invoice.rejectionReason;
@@ -597,13 +600,38 @@ export default function InvoiceDetail() {
     }
   };
 
-  // Load demo delivery state from localStorage once invoice (and invoiceId) is known
-  useEffect(() => {
-    if (invoice?.invoiceId) {
-      const stored = getDemoDelivery(invoice.invoiceId);
-      setDeliveryState(stored);
+  const loadDeliveryState = async (invoiceId) => {
+    try {
+      const deliveries = await getInvoiceDeliveries(invoiceId);
+      setDeliveryState(toDeliveryState(deliveries));
+    } catch (err) {
+      console.error("[InvoiceDetail] Error loading delivery history:", err);
     }
-  }, [invoice?.invoiceId]);
+  };
+
+  // Delivery history is the source of truth for "sent" — load it once the invoice is known.
+  useEffect(() => {
+    if (invoice?.invoiceId && invoice?.invoiceStatus === "APPROVED") {
+      loadDeliveryState(invoice.invoiceId);
+    }
+  }, [invoice?.invoiceId, invoice?.invoiceStatus]);
+
+  // A sent invoice has exactly one receivable; find it among the outstanding ones.
+  useEffect(() => {
+    if (!invoice?.invoiceId || deliveryState.deliveryStatus !== DEMO_DELIVERY_STATUS.SENT_TO_CLIENT) {
+      setReceivable(null);
+      return;
+    }
+    let cancelled = false;
+    getOutstandingReceivables(invoice.projectId ? { projectId: invoice.projectId } : {})
+      .then((rows) => {
+        if (!cancelled) setReceivable(rows.find((row) => row.invoiceId === invoice.invoiceId) || null);
+      })
+      .catch((err) => console.error("[InvoiceDetail] Error loading receivable:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [invoice?.invoiceId, invoice?.projectId, deliveryState.deliveryStatus]);
 
   /**
    * Send to Client action.
@@ -623,29 +651,21 @@ export default function InvoiceDetail() {
         const msg = getInvoiceErrorMessage(apiErr, "Failed to send invoice to client.");
         showStatusToast(msg, "error");
         setSendingToClient(false);
+        loadDeliveryState(invoice.invoiceId);
         return;
       }
 
-      const resolvedEmail =
-        backendResult?.recipientEmail ||
-        backendResult?.email ||
-        invoice.email ||
-        null;
+      const resolvedEmail = backendResult?.recipientEmail || invoice.email || null;
 
-      const entry = {
-        deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT,
-        sentAt: new Date().toISOString(),
-        sentBy: DEMO_SENT_BY,
-        recipientEmail: resolvedEmail,
-      };
-      saveDemoDelivery(invoice.invoiceId, entry);
-      setDeliveryState(entry);
       setIsSendToClientOpen(false);
       showStatusToast(
-        backendResult?.message ||
-        `Invoice ${invoice.invoiceNumber || invoice.invoiceId} marked as sent${resolvedEmail ? ` to ${resolvedEmail}` : " to client"}.`,
+        `Invoice ${invoice.invoiceNumber || invoice.invoiceId} sent${resolvedEmail ? ` to ${resolvedEmail}` : " to client"}.`,
         "success"
       );
+      // Sending creates the receivable — continue the workflow there.
+      navigate(RECEIVABLES_PATH, {
+        state: { sentInvoiceId: invoice.invoiceId, from: "invoice-detail" },
+      });
     } catch (err) {
       const msg = getInvoiceErrorMessage(err, "Failed to send invoice to client.");
       showStatusToast(msg, "error");
@@ -796,12 +816,24 @@ export default function InvoiceDetail() {
                       })
                       : "—"}
                   </p>
-                  <p>
-                    <span className="font-semibold text-slate-700">Sent By: </span>
-                    {deliveryState.sentBy || DEMO_SENT_BY}
-                  </p>
-                  <p className="text-[11px] text-teal-600 italic">Demo delivery — no actual email was sent.</p>
+                  {deliveryState.recipientEmail && (
+                    <p>
+                      <span className="font-semibold text-slate-700">Sent To: </span>
+                      {deliveryState.recipientEmail}
+                    </p>
+                  )}
+                  {deliveryState.lastAttemptFailed && (
+                    <p className="text-rose-700">
+                      <span className="font-semibold">Latest resend failed: </span>
+                      {deliveryState.failureReason || "Email could not be delivered."}
+                    </p>
+                  )}
                 </div>
+              ) : deliveryState.lastAttemptFailed ? (
+                <p className="text-xs text-rose-700">
+                  <span className="font-semibold">Last attempt failed: </span>
+                  {deliveryState.failureReason || "Email could not be delivered."}
+                </p>
               ) : (
                 <p className="text-xs text-slate-600">
                   Invoice is approved and ready to be sent to the client.
@@ -809,6 +841,35 @@ export default function InvoiceDetail() {
               )}
             </div>
           </div>
+
+          {receivable && (
+            <div className="grid shrink-0 grid-cols-2 gap-x-6 gap-y-1 rounded-lg border border-teal-200 bg-white px-4 py-2.5 text-xs sm:grid-cols-4">
+              <div>
+                <p className="text-slate-500">Receivable</p>
+                <p className="font-semibold text-slate-900">
+                  {RECEIVABLE_STATUS_LABELS[receivable.status] || receivable.status}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500">Outstanding</p>
+                <p className="font-semibold tabular-nums text-slate-900">
+                  {formatCurrency(receivable.outstandingBalance, receivable.currencyCode)}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500">Due Date</p>
+                <p className="font-semibold text-slate-900">
+                  {receivable.dueDate ? formatDisplayDate(receivable.dueDate) : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500">Overdue</p>
+                <p className={`font-semibold tabular-nums ${receivable.daysOverdue > 0 ? "text-rose-700" : "text-slate-900"}`}>
+                  {receivable.daysOverdue === null ? "—" : receivable.daysOverdue > 0 ? `${receivable.daysOverdue} days` : "Not overdue"}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1293,7 +1354,7 @@ export default function InvoiceDetail() {
             >
               <MailCheck className="h-3.5 w-3.5" />
               {deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
-                ? "Sent to Client"
+                ? "Resend to Client"
                 : "Send to Client"}
             </Button>
           )}
@@ -1693,3 +1754,4 @@ export default function InvoiceDetail() {
     </div>
   );
 }
+

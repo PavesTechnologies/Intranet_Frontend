@@ -34,14 +34,28 @@ import {
   submitInvoiceForApproval,
   sendInvoiceToClient,
 } from "../services/invoiceService";
-import {
-  loadDemoDeliveryMap,
-  saveDemoDelivery,
-  DEMO_DELIVERY_STATUS,
-  DEMO_SENT_BY,
-} from "../utils/invoiceDemoData";
+import { DEMO_DELIVERY_STATUS } from "../utils/invoiceDemoData";
+import { getOutstandingReceivables } from "../services/receivableService";
+
+// The backend creates a receivable only after an invoice is successfully sent
+// to the client, so the receivables list is the sent-invoice set — one request
+// instead of a delivery-history call per row.
+const loadSentDeliveryMap = async () => {
+  try {
+    const receivables = await getOutstandingReceivables();
+    return Object.fromEntries(
+      receivables
+        .filter((r) => r.invoiceId)
+        .map((r) => [r.invoiceId, { deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT }])
+    );
+  } catch (err) {
+    console.error("[InvoiceGeneration] Error loading receivables:", err);
+    return {};
+  }
+};
 
 const PAGE_SIZE = 6;
+const RECEIVABLES_PATH = "/account-receivable/receivables";
 
 const PIPELINE_STAGES = [
   { key: "READY_FOR_INVOICE", label: "Ready for Invoice", countKey: "readyForInvoiceCount" },
@@ -82,11 +96,8 @@ export default function InvoiceGeneration() {
   const [sendTarget, setSendTarget] = useState(null);
   const [sendLoading, setSendLoading] = useState(false);
 
-  // Demo delivery map: invoiceId → { deliveryStatus, sentAt, sentBy }
-  // Loaded from localStorage on mount and after each refresh
-  const [demoDeliveryMap, setDemoDeliveryMap] = useState(() =>
-    loadDemoDeliveryMap()
-  );
+  // Delivery map: invoiceId → { deliveryStatus }, derived from backend receivables
+  const [deliveryMap, setDeliveryMap] = useState({});
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -146,8 +157,8 @@ export default function InvoiceGeneration() {
       setWorkspaceItems(rows || []);
       setBackendSummary(summary || null);
 
-      // Re-sync demo delivery map on each data refresh
-      setDemoDeliveryMap(loadDemoDeliveryMap());
+      // Re-sync delivery state from the backend on each data refresh
+      setDeliveryMap(await loadSentDeliveryMap());
 
       if (isManualRefresh) {
         showStatusToast(
@@ -287,53 +298,18 @@ export default function InvoiceGeneration() {
 
   // Invoice KPIs and pipeline counts
   const kpis = useMemo(() => {
-    const readyForInvoiceCount =
-      backendSummary?.readyForInvoiceCount ??
-      workspaceItems.filter((r) => r.workspaceStatus === "READY_FOR_INVOICE").length;
+    const countByStatus = (status) =>
+      workspaceItems.filter((row) => row.workspaceStatus === status).length;
+    const readyForInvoiceCount = countByStatus("READY_FOR_INVOICE");
+    const generatedCount = countByStatus("GENERATED");
+    const pendingApprovalCount = countByStatus("PENDING_APPROVAL");
+    const approvedCount = countByStatus("APPROVED");
+    const rejectedCount = countByStatus("REJECTED");
+    const invoicedCount = countByStatus("INVOICED");
 
-    const generatedCount =
-      backendSummary?.generatedCount ??
-      workspaceItems.filter((r) => r.workspaceStatus === "GENERATED").length;
-
-    const pendingApprovalCount =
-      backendSummary?.pendingApprovalCount ??
-      workspaceItems.filter((r) => r.workspaceStatus === "PENDING_APPROVAL").length;
-
-    const approvedCount =
-      backendSummary?.approvedCount ??
-      workspaceItems.filter((r) => r.workspaceStatus === "APPROVED").length;
-
-    const rejectedCount =
-      backendSummary?.rejectedCount ??
-      workspaceItems.filter((r) => r.workspaceStatus === "REJECTED").length;
-
-    const invoicedCount =
-      backendSummary?.invoicedCount ??
-      workspaceItems.filter((r) => r.workspaceStatus === "INVOICED").length;
-
-    // All records in workspace (including Ready for Invoice candidate and created invoices)
-    const allCount = backendSummary
-      ? (Number(backendSummary.readyForInvoiceCount || 0) +
-         Number(backendSummary.generatedCount || 0) +
-         Number(backendSummary.pendingApprovalCount || 0) +
-         Number(backendSummary.approvedCount || 0) +
-         Number(backendSummary.rejectedCount || 0) +
-         Number(backendSummary.invoicedCount || 0))
-      : workspaceItems.length;
-
-    // Total Invoices: authoritative total from the workspace response (all workspace items: candidates + created invoices)
-    const totalInvoices =
-      backendSummary?.totalInvoices ??
-      backendSummary?.totalCount ??
-      backendSummary?.total ??
-      (backendSummary
-        ? (Number(backendSummary.readyForInvoiceCount || 0) +
-           Number(backendSummary.generatedCount || 0) +
-           Number(backendSummary.pendingApprovalCount || 0) +
-           Number(backendSummary.approvedCount || 0) +
-           Number(backendSummary.rejectedCount || 0) +
-           Number(backendSummary.invoicedCount || 0))
-        : workspaceItems.length);
+    // Counts must use the same rows as the table and status filters.
+    const allCount = workspaceItems.length;
+    const totalInvoices = workspaceItems.length;
 
     // Total Invoiced Amount: summary.totalInvoicedAmount (strictly excludes Ready for Invoice candidate amount)
     const totalInvoicedAmount =
@@ -491,24 +467,23 @@ export default function InvoiceGeneration() {
 
       const clientEmail =
         backendResult?.recipientEmail ||
-        backendResult?.email ||
         sendTarget.email ||
         sendTarget.clientEmail ||
         null;
 
-      saveDemoDelivery(invId, {
-        deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT,
-        sentAt: new Date().toISOString(),
-        sentBy: DEMO_SENT_BY,
-        recipientEmail: clientEmail,
-      });
-      setDemoDeliveryMap(loadDemoDeliveryMap());
+      setDeliveryMap((prev) => ({
+        ...prev,
+        [invId]: { deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT },
+      }));
       showStatusToast(
-        backendResult?.message ||
-          `Invoice ${sendTarget.invoiceNumber || invId} sent${clientEmail ? ` to ${clientEmail}` : ""} successfully.`,
+        `Invoice ${sendTarget.invoiceNumber || invId} sent${clientEmail ? ` to ${clientEmail}` : ""} successfully.`,
         "success"
       );
       setSendTarget(null);
+      // Sending creates the receivable — continue the workflow there.
+      navigate(RECEIVABLES_PATH, {
+        state: { sentInvoiceId: invId, from: "invoice-generation" },
+      });
     } catch (err) {
       const msg = getInvoiceErrorMessage(err, "Failed to send invoice to client.");
       showStatusToast(msg, "error");
@@ -590,7 +565,7 @@ export default function InvoiceGeneration() {
       (item.billingScheduleId ? String(item.billingScheduleId) : null);
 
     const delivery =
-      demoDeliveryMap[iid] || {
+      deliveryMap[iid] || {
         deliveryStatus: DEMO_DELIVERY_STATUS.NOT_SENT,
       };
 
