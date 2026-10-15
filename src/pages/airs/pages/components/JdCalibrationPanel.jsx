@@ -23,6 +23,16 @@ const BASIS_LABEL = { cue: "from the JD text", title: "from the role title", ass
 // different one needs a confirmation. "assumed" (the skill's default) isn't one.
 const JD_SUGGESTION_BASES = new Set(["cue", "title"]);
 
+const ROLE_DOMAINS = [
+  { value: "SOFTWARE", label: "Software" },
+  { value: "IT_OPERATIONS", label: "IT operations" },
+  { value: "DATA", label: "Data" },
+  { value: "BUSINESS", label: "Business" },
+  { value: "OTHER", label: "Other" },
+];
+const DOMAIN_BASIS_LABEL = { title: "from the role title", skills: "from the core skills" };
+const domainLabel = (value) => ROLE_DOMAINS.find((d) => d.value === value)?.label || value;
+
 function senseLabel(skill, key) {
   return skill.sense_options.find((o) => o.sense_key === key)?.label || key;
 }
@@ -41,6 +51,8 @@ function formFromView(view) {
     education: view.education_requirement || "MANDATORY",
     // "" = the default (100% on a fresher JD, else 0%).
     internships: view.internship_credit_pct ?? "",
+    // "" = not set (no related education fields apply).
+    domain: view.role_domain ?? "",
   };
 }
 
@@ -53,6 +65,7 @@ function mergeForm(edited, fresh) {
     ...fresh,
     skills: Object.fromEntries(Object.entries(fresh.skills).map(([id, v]) => [id, edited.skills[id] || v])),
     min: edited.min, tolerance: edited.tolerance, education: edited.education, internships: edited.internships,
+    domain: edited.domain,
   };
 }
 
@@ -125,6 +138,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
         experience_tolerance_years: form.tolerance === "" ? null : Number(form.tolerance),
         education_requirement: form.education,
         internship_credit_pct: form.internships === "" ? null : Number(form.internships),
+        role_domain: form.domain || null,
       };
       const saved = await saveJDCalibration(jdId, payload);
       setResult(saved);
@@ -215,7 +229,10 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
     return s.ambiguous && chosen && s.suggested_sense_key && JD_SUGGESTION_BASES.has(s.suggested_sense_basis)
       && chosen !== s.suggested_sense_key;
   });
-  const requestSave = () => (senseConflicts.length > 0 ? setAskSense(true) : save());
+  // The role domain differs from the one suggested by the JD (title / core skills).
+  const domainConflict = Boolean(form.domain && view.suggested_role_domain && form.domain !== view.suggested_role_domain);
+  const requestSave = () => (senseConflicts.length > 0 || domainConflict ? setAskSense(true) : save());
+  const anyConflict = senseConflicts.length > 0 || domainConflict;
   const blocking = view.blocking_unknown_skills || [];
   const unsaved = !readOnly && !sameForm(form, formFromView(view));
 
@@ -258,7 +275,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
                           : `${c.skill}: ${c.field === "tier" ? "tier" : "meaning"} ${c.before ?? "—"} → ${c.after ?? "—"}`
                     )).join("; ")}</span>
                   )}
-                  {["min_experience_years", "experience_tolerance_years", "education_requirement", "internship_credit_pct"].filter((k) => v.changes?.[k]).map((k) => (
+                  {["min_experience_years", "experience_tolerance_years", "education_requirement", "internship_credit_pct", "role_domain"].filter((k) => v.changes?.[k]).map((k) => (
                     <span key={k} className="text-slate-500"> · {k.replaceAll("_", " ")}: {String(v.changes[k].before ?? "—")} → {String(v.changes[k].after ?? "—")}</span>
                   ))}
                 </li>
@@ -389,7 +406,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
       </div>
 
       {/* Experience & education */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-4 grid grid-cols-1 md:grid-cols-5 gap-4">
         <label className="text-xs text-slate-700 flex flex-col gap-1">
           <span className="font-bold">Minimum experience (years)</span>
           <input type="number" min="0" max="60" step="0.5" className={inputClass} disabled={readOnly}
@@ -431,6 +448,20 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
             Internship months not overlapping a job, towards the minimum. Default: 100% when the minimum is 1 year or less (a fresher JD), else not at all.
           </span>
         </label>
+        <label className="text-xs text-slate-700 flex flex-col gap-1">
+          <span className="font-bold">Role domain</span>
+          <select className={selectClass} disabled={readOnly} value={form.domain}
+            onChange={(e) => setForm((f) => ({ ...f, domain: e.target.value }))}>
+            <option value="">Not set</option>
+            {ROLE_DOMAINS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+          </select>
+          <span className={`text-[10px] ${domainConflict ? "font-semibold text-amber-700" : "text-slate-400"}`}>
+            {view.suggested_role_domain
+              ? `Suggested: ${domainLabel(view.suggested_role_domain)} (${DOMAIN_BASIS_LABEL[view.suggested_role_domain_basis] || view.suggested_role_domain_basis}). `
+              : "No suggestion from the title or core skills. "}
+            With mandatory education, related fields of this domain also qualify (Settings).
+          </span>
+        </label>
       </div>
 
       {result && (
@@ -443,11 +474,11 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
         </div>
       )}
 
-      {!readOnly && askSense && senseConflicts.length > 0 && (
+      {!readOnly && askSense && anyConflict && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 flex flex-col gap-2">
           <div className="flex gap-1.5 font-semibold">
             <AlertTriangle className="h-4 w-4 shrink-0" />
-            <span>Some meanings differ from what the JD suggests. Scoring counts only resume evidence in the meaning you choose.</span>
+            <span>Some choices differ from what the JD suggests. Scoring uses what you choose: resume evidence only in the chosen meaning, and the related education fields of the chosen role domain.</span>
           </div>
           <ul className="list-disc pl-6 space-y-0.5">
             {senseConflicts.map((s) => (
@@ -458,6 +489,14 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
                 {" "}({BASIS_LABEL[s.suggested_sense_basis] || s.suggested_sense_basis}).
               </li>
             ))}
+            {domainConflict && (
+              <li>
+                <span className="font-semibold">Role domain</span>: you chose{" "}
+                <span className="font-semibold">{domainLabel(form.domain)}</span>; the JD suggests{" "}
+                <span className="font-semibold">{domainLabel(view.suggested_role_domain)}</span>
+                {" "}({DOMAIN_BASIS_LABEL[view.suggested_role_domain_basis] || view.suggested_role_domain_basis}).
+              </li>
+            )}
           </ul>
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="small" disabled={saving} onClick={() => setAskSense(false)}>Go back</Button>
@@ -472,7 +511,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
             <span className="text-[11px] font-semibold text-amber-700">Unsaved changes - they are kept if you switch tabs, but only saved here.</span>
           )}
           <Button variant="primary" size="medium" onClick={requestSave}
-            disabled={saving || (askSense && senseConflicts.length > 0) || missingSense.length > 0 || blocking.length > 0}
+            disabled={saving || (askSense && anyConflict) || missingSense.length > 0 || blocking.length > 0}
             loading={saving} loadingText="Saving..."
             title={blocking.length > 0 ? `Resolve these core skills first: ${blocking.join(", ")}`
               : missingSense.length > 0 ? `Choose the meaning of: ${missingSense.map((s) => s.name).join(", ")}` : undefined}>

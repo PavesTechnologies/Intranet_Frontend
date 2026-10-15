@@ -5,6 +5,7 @@ import { Settings as SettingsIcon } from "lucide-react";
 import SettingsWeightConfig from "./components/SettingsWeightConfig";
 import SettingsAIProviders from "./components/SettingsAIProviders";
 import SettingsIntegrations from "./components/SettingsIntegrations";
+import SettingsEducationFields from "./components/SettingsEducationFields";
 
 const PROVIDER_LABEL = { microsoft: "Microsoft Calendar", google: "Google Calendar" };
 
@@ -74,6 +75,9 @@ export default function SettingsPage() {
           <SettingsIntegrations />
         </div>
       </div>
+
+      {/* HR_ADMIN only - renders nothing for other roles. */}
+      <SettingsEducationFields />
     </div>
   );
 }
