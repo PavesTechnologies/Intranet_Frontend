@@ -16,6 +16,7 @@ import DeactivateDialog from "./components/DeactivateDialog";
 import ReactivateDialog from "./components/ReactivateDialog";
 import ChildHandlingDialog from "./components/ChildHandlingDialog";
 import BulkImportDrawer from "./components/BulkImportDrawer";
+import CertificationMappings from "./components/CertificationMappings";
 import {
   createSkill,
   updateSkill,
@@ -236,7 +237,9 @@ export default function SkillOntologyPage() {
 
       <SkillTabs activeTab={activeTab} onChange={setActiveTab} />
 
-      {activeTab === "verified" ? (
+      {activeTab === "certifications" ? (
+        <CertificationMappings />
+      ) : activeTab === "verified" ? (
         <>
           <SkillFilters
             search={list.search}

@@ -1,19 +1,23 @@
 import React from "react";
-import { CheckCircle2, HelpCircle } from "lucide-react";
+import { Award, CheckCircle2, HelpCircle } from "lucide-react";
+import { useAuth } from "../../../../contexts/AuthContext";
 import { Tabs, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
 
 const TABS = [
   { value: "verified", label: "Verified Skills", icon: CheckCircle2 },
   { value: "unknown", label: "Unknown Skills", icon: HelpCircle },
+  { value: "certifications", label: "Certifications", icon: Award, hrAdminOnly: true },
 ];
 
 // Same Tabs/TabsList/TabsTrigger pattern as JdLibrary's Processed JD /
 // Processing JD tabs — white bordered pill container, blue-600 active state.
 export default function SkillTabs({ activeTab, onChange }) {
+  const { hasRole } = useAuth();
+  const isHrAdmin = hasRole(["HR_ADMIN"]);
   return (
     <Tabs value={activeTab} onValueChange={onChange}>
       <TabsList className="bg-white border border-slate-200 shadow-sm mb-6 p-1 h-auto">
-        {TABS.map(({ value, label, icon: Icon }) => (
+        {TABS.filter((t) => !t.hrAdminOnly || isHrAdmin).map(({ value, label, icon: Icon }) => (
           <TabsTrigger
             key={value}
             value={value}
