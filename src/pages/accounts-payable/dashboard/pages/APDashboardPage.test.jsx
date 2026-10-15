@@ -61,7 +61,11 @@ const DATA = {
     vendor_exposure: [{ key: "1", label: "Vertex", amount: 1285610, count: 3 }], top5_share: 64.3,
     efficiency: { median_days_to_approve: 3.5, median_days_approval_to_payment: 12, median_days_end_to_end: 18, sample: 9, pending_approvals: 4,
                   bottlenecks: [{ department: "IT", level: 2, count: 3, amount: 900, avg_wait_days: 4, max_wait_days: 7.5 }] },
-    compliance: [{ key: "term_exceptions", label: "Payment-term exceptions", count: 4, amount: 221360 }],
+    compliance: [
+      { key: "term_exceptions", label: "Payment-term exceptions", count: 4, amount: 221360 },
+      { key: "gst_claim", label: "GST input credit to claim (Sep 2026, due 20 Oct)", count: 12, amount: 247120.2, tone: "good" },
+      { key: "gst_at_risk", label: "GST credit at risk (180-day rule / IRN / GSTR-2B)", count: 1, amount: 11430 },
+    ],
     high_value_exceptions: [], high_value_threshold: 100000, note: "Read-only management view.",
   },
 };
@@ -163,8 +167,10 @@ describe("role view content", () => {
     expect(screen.getByText("Top 5 vendors hold 64.3% of what we owe")).toBeInTheDocument();
     expect(screen.getByText("18 d")).toBeInTheDocument();
     expect(screen.getByText("oldest 7.5 d")).toBeInTheDocument();
-    const compliance = screen.getByText("Compliance exceptions").closest("section");
+    const compliance = screen.getByText("Compliance & tax").closest("section");
     expect(within(compliance).getByText("Payment-term exceptions")).toBeInTheDocument();
+    expect(within(compliance).getByText(/GST input credit to claim/)).toBeInTheDocument();
+    expect(within(compliance).getByText(/GST credit at risk/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Record payment|Approve/i })).not.toBeInTheDocument();
   });
 

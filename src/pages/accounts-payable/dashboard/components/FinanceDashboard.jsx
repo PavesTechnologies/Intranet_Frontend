@@ -56,13 +56,15 @@ function UpcomingCard({ upcoming, currency }) {
     label: b.label,
     approved: amountIn(b.approved, currency),
     pipeline: amountIn(b.pipeline, currency),
+    recurring: amountIn(b.recurring, currency),
+    tds: amountIn(b.tds, currency),
     count: b.count,
   }));
   const open = upcoming.buckets.find((b) => b.key === openKey);
   return (
     <ChartCard
       title="Upcoming payments"
-      subtitle="Expected outflow by due date · click a column for its invoices"
+      subtitle="Expected outflow by due date, incl. estimates for recurring invoices not yet received · click a column for detail"
       className="lg:col-span-2"
     >
       <StackedMoneyBars
@@ -71,6 +73,8 @@ function UpcomingCard({ upcoming, currency }) {
         series={[
           { key: "approved", label: "Approved / ready", color: SERIES[0] },
           { key: "pipeline", label: "Still in review / approval", color: SERIES[1] },
+          { key: "recurring", label: "Recurring, not yet received (est.)", color: SERIES[2] },
+          { key: "tds", label: "TDS to deposit", color: SERIES[3] },
         ]}
         onBarClick={(p) => setOpenKey(p.key === openKey ? null : p.key)}
       />
@@ -78,13 +82,27 @@ function UpcomingCard({ upcoming, currency }) {
         <div className="mt-3 rounded-lg border border-slate-200">
           <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
             <p className="text-xs font-semibold text-slate-700">
-              {open.label} · largest {open.top_invoices.length} of {open.count}
+              {open.label} · largest {open.top_invoices.length} of {open.count} invoice(s)
+              {open.estimates?.length ? ` + ${open.estimates.length} estimate(s)` : ""}
             </p>
             <button type="button" className="text-xs text-slate-500 hover:text-slate-700" onClick={() => setOpenKey(null)}>
               Close
             </button>
           </div>
           <ul className="divide-y divide-slate-100 text-xs">
+            {(open.estimates || []).map((e) => (
+              <li key={`${e.kind}-${e.label}-${e.due_date}`} className="flex items-center justify-between gap-3 px-3 py-1.5">
+                <span className="min-w-0 truncate text-slate-700">
+                  <span className="mr-1.5 rounded bg-slate-100 px-1 py-0.5 text-[10px] font-medium uppercase text-slate-500">
+                    {e.kind === "TDS" ? "TDS" : "Est."}
+                  </span>
+                  {e.label} <span className="text-slate-500">· {e.vendor_name}</span>
+                </span>
+                <span className="shrink-0 tabular-nums text-slate-600">
+                  {formatDate(e.due_date)} · <span className="font-semibold text-slate-900">{formatMoney(e.amount, e.currency_code)}</span>
+                </span>
+              </li>
+            ))}
             {open.top_invoices.map((inv) => (
               <li key={inv.invoice_id} className="flex items-center justify-between gap-3 px-3 py-1.5">
                 <Link to={AP_ROUTES.INVOICE_DETAIL(inv.invoice_id)} className="min-w-0 truncate font-medium text-[#0A0082] hover:underline">

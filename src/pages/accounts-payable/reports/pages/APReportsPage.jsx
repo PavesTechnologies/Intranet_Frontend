@@ -102,6 +102,7 @@ const TAB_LABELS = {
   payments_made: "Payments made",
   tds_register: "TDS register",
   payment_term_exceptions: "Term exceptions",
+  gst_itc_register: "GST ITC register",
   msme_payments: "MSME payments",
   msme_43bh: "MSME 43B(h)",
   msme_form1: "MSME Form-1",
