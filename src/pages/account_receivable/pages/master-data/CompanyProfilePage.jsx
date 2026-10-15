@@ -18,7 +18,9 @@ import Button from "../../../../components/Button/Button";
 import Loader from "../../../../components/ui/Loader";
 import BackIconButton from "../../components/common/BackIconButton";
 import { showStatusToast } from "../../../../components/toastfy/toast";
+import { useAuth } from "../../../../contexts/AuthContext";
 import CompanyProfileModal from "../../components/master-data/CompanyProfileModal";
+import useSignatureImage from "../../hooks/useSignatureImage";
 import {
   getActiveCompanyProfile,
   getCompanyProfileErrorMessage,
@@ -26,10 +28,18 @@ import {
 
 export default function CompanyProfilePage() {
   const navigate = useNavigate();
+  const { hasRole } = useAuth();
+  const isFinanceExecutive = Boolean(
+    hasRole?.(["FINANCE_EXECUTIVE", "Finance_Executive"]) ?? true
+  );
+
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { imageUrl: signatureBlobUrl, loading: signatureLoading } = useSignatureImage(
+    profile?.signatureReference
+  );
 
   const fetchProfile = async (isManual = false) => {
     if (isManual) setLoading(true);
@@ -241,6 +251,70 @@ export default function CompanyProfilePage() {
                     </p>
                     <p className="font-medium text-slate-700">{profile.country}</p>
                   </div>
+                </div>
+              </div>
+            </PageCardContent>
+          </PageCard>
+
+          {/* Authorized Corporate Signatory Card */}
+          <PageCard>
+            <PageCardContent className="p-6 space-y-4">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+                      Authorized Corporate Signatory
+                    </h3>
+                    <StatusBadge label={profile.signatureReference ? "CONFIGURED" : "NOT CONFIGURED"} />
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Signature image snapshotted onto invoices for display and customer PDFs. Does not constitute digital signing or verified approval.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="small"
+                  onClick={() => setIsModalOpen(true)}
+                  disabled={!isFinanceExecutive}
+                  className="flex items-center gap-1.5"
+                  title={!isFinanceExecutive ? "Requires FINANCE_EXECUTIVE role" : undefined}
+                >
+                  <Edit3 className="h-3.5 w-3.5" /> Edit Signature
+                </Button>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="h-20 w-48 flex items-center justify-center p-2 rounded-lg bg-white border border-slate-300 shadow-2xs">
+                  {signatureLoading ? (
+                    <span className="text-xs text-slate-400">Loading signature...</span>
+                  ) : signatureBlobUrl ? (
+                    <img
+                      src={signatureBlobUrl}
+                      alt="Authorized Signatory Signature"
+                      className="max-h-full max-w-full object-contain"
+                      onError={(e) => {
+                        e.target.style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <span className="text-xs italic text-slate-400">No signature image</span>
+                  )}
+                </div>
+
+                <div className="space-y-1 text-xs">
+                  <div className="font-semibold text-slate-800">
+                    {profile.signatureReference ? "Authorized Signatory Signature Image Active" : "No Signature Image Configured"}
+                  </div>
+                  <p className="text-slate-500 text-[11px] leading-relaxed max-w-xl">
+                    {profile.signatureReference
+                      ? `Managed reference: ${profile.signatureReference}. Fetched via authenticated API client and snapshotted onto invoices so past invoices remain immutable.`
+                      : "When no signature is configured, invoices render a clean, standard signatory placeholder without fabricated signature marks."}
+                  </p>
+                  {!isFinanceExecutive && (
+                    <p className="text-amber-700 text-[10px] font-medium pt-0.5">
+                      Note: Modifying corporate signatory settings requires the FINANCE_EXECUTIVE role.
+                    </p>
+                  )}
                 </div>
               </div>
             </PageCardContent>

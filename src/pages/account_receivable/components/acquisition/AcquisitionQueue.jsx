@@ -181,7 +181,17 @@ export default function AcquisitionQueue({
           client: <div className="text-left font-medium text-slate-700">{cfg.client}</div>,
           project: (
             <div className="text-left">
-              <div className="font-semibold text-slate-900">{cfg.projectName}</div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-900">{cfg.projectName}</span>
+                {cfg.expenseBillingEligible ? (
+                  <span
+                    className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 border border-indigo-200"
+                    title="Eligible for Expense Management billing"
+                  >
+                    Expense Eligible
+                  </span>
+                ) : null}
+              </div>
               <div className="text-xs text-slate-400">{cfg.projectCode}</div>
             </div>
           ),

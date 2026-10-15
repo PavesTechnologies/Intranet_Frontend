@@ -339,6 +339,7 @@ import PaymentTermsMasterPage from "./pages/account_receivable/pages/master-data
 import TaxConfigurationMasterPage from "./pages/account_receivable/pages/master-data/TaxConfigurationMasterPage.jsx";
 import TaxConfigurationRegionDetailPage from "./pages/account_receivable/pages/master-data/TaxConfigurationRegionDetailPage.jsx";
 import CompanyProfilePage from "./pages/account_receivable/pages/master-data/CompanyProfilePage.jsx";
+import CurrencyExchangeRateMasterPage from "./pages/account_receivable/pages/master-data/CurrencyExchangeRateMasterPage.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -1059,6 +1060,14 @@ const AppRoutes = () => {
             <Route
               path="configurations/company-profile"
               element={<Navigate to="/account-receivable/master-data/company-profile" replace />}
+            />
+            <Route
+              path="master-data/exchange-rates"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><CurrencyExchangeRateMasterPage /></ProtectedRoute>}
+            />
+            <Route
+              path="configurations/exchange-rates"
+              element={<Navigate to="/account-receivable/master-data/exchange-rates" replace />}
             />
           </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />

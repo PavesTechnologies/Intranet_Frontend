@@ -208,11 +208,12 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
           const allConfigs = await fetchActiveBillingConfigurations();
           const matched = allConfigs.find(
             (cfg) =>
-              cfg.projectId === preview?.projectId ||
-              String(cfg.projectId) === String(passedState.item?.projectId) ||
-              cfg.projectCode === (preview?.projectCode || passedState.item?.projectCode) ||
-              cfg.projectName === (preview?.projectName || passedState.item?.projectName) ||
-              String(cfg.projectId) === "23"
+              (preview?.projectId && cfg.projectId === preview.projectId) ||
+              (passedState.item?.projectId && String(cfg.projectId) === String(passedState.item.projectId)) ||
+              (preview?.projectCode && cfg.projectCode === preview.projectCode) ||
+              (passedState.item?.projectCode && cfg.projectCode === passedState.item.projectCode) ||
+              (preview?.projectName && cfg.projectName === preview.projectName) ||
+              (passedState.item?.projectName && cfg.projectName === passedState.item.projectName)
           );
           if (matched) {
             setSnapshotData((prev) => ({
@@ -231,8 +232,8 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
                 matched.placeOfSupply ||
                 passedState.item?.placeOfSupply ||
                 prev?.placeOfSupply,
-              projectStartDate: matched.projectStartDate || matched.startDate || "2026-04-01",
-              projectEndDate: matched.projectEndDate || matched.endDate || "2027-03-31",
+              projectStartDate: matched.projectStartDate || matched.startDate || null,
+              projectEndDate: matched.projectEndDate || matched.endDate || null,
             }));
           }
         } catch (cfgErr) {
@@ -421,14 +422,20 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
         sellerGstin: previewData.sellerGstin || companyProfile?.taxRegistrationNumber || companyProfile?.gstin,
         sellerEmail: previewData.sellerEmail || companyProfile?.email,
         sellerPhone: previewData.sellerPhone || companyProfile?.phoneNumber || companyProfile?.phone,
-        sellerLogoReference: previewData.sellerLogoReference || companyProfile?.logoUrl,
+        sellerLogoReference: previewData.sellerLogoReference || companyProfile?.logoUrl || companyProfile?.logoReference,
+        sellerSignatureReference:
+          previewData.sellerSignatureReference ||
+          companyProfile?.signatureReference ||
+          companyProfile?.signatureUrl ||
+          null,
         sellerInfo: previewData.sellerInfo || (companyProfile ? {
           legalName: companyProfile.legalName || companyProfile.companyName,
           address: companyProfile.address,
           gstin: companyProfile.taxRegistrationNumber || companyProfile.gstin,
           email: companyProfile.email,
           phone: companyProfile.phoneNumber || companyProfile.phone,
-          logoUrl: companyProfile.logoUrl,
+          logoUrl: companyProfile.logoUrl || companyProfile.logoReference,
+          signatureUrl: companyProfile.signatureReference || companyProfile.signatureUrl,
         } : null),
         clientInfo: {
           clientName: previewData.clientName || clientName,

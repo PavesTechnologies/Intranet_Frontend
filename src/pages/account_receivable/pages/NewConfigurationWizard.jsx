@@ -14,6 +14,7 @@ import ProjectStep from "../components/billing-setup/ProjectStep";
 import BillingConfigurationStep from "../components/billing-setup/BillingConfigurationStep";
 import BillingControlsStep from "../components/billing-setup/BillingControlsStep";
 import ReviewActivateStep from "../components/billing-setup/ReviewActivateStep";
+import { isValidCurrency } from "../utils/format";
 import {
   extractBillingConfigurationId,
   fetchBillingConfigurationById,
@@ -53,6 +54,15 @@ const INITIAL_WIZARD_DATA = {
       effectiveTo: "",
       rateCardId: null,
       roles: [],
+      hasDiscount: false,
+      discountType: "PERCENTAGE",
+      discountValue: "",
+      discountedRate: "",
+      discountStartDate: "",
+      discountEndDate: "",
+      remarks: "",
+      includeInInvoice: true,
+      discountPeriods: [],
       overtimeRule: "NONE",
       minimumBillingHours: "",
       maximumBillableHoursPerDay: "",
@@ -183,7 +193,12 @@ function getMissingFields(step, data) {
     case 2: {
       const config = data.billingConfig || {};
       const project = data.projectInfo || {};
-      if (!(project.projectBudgetCurrency || project.currency)) missing.push("Billing Currency");
+      const currency = project.projectBudgetCurrency || project.currency;
+      if (!currency) {
+        missing.push("Billing Currency");
+      } else if (!isValidCurrency(currency)) {
+        missing.push("Valid ISO 4217 Billing Currency");
+      }
       if (!config.billingType) missing.push("Billing Type");
       // billingFrequencyId is the value the frequency PillSelectGroup actually
       // selects on (BillingConfigurationStep.jsx) and what RecurringBillingForm
@@ -195,13 +210,81 @@ function getMissingFields(step, data) {
       if (config.billingType === "TIME_MATERIAL") {
         if (!config.billingMode) missing.push("Pricing Model");
         else if (config.billingMode === "STANDARD") {
-          if (!config.timeAndMaterial?.rate) missing.push("Rate");
-          if (!config.timeAndMaterial?.ratePeriod) missing.push("Rate Period");
+          const tm = config.timeAndMaterial || {};
+          if (!tm.rate) missing.push("Rate");
+          else if (Number(tm.rate) <= 0) missing.push("Rate must be greater than 0");
+          if (!tm.ratePeriod) missing.push("Rate Period");
+
+          const periods = Array.isArray(tm.discountPeriods) ? tm.discountPeriods : [];
+          if (periods.length > 0) {
+            for (let i = 0; i < periods.length; i++) {
+              const p = periods[i];
+              const pLabel = p.periodName?.trim() || `Discount Period #${i + 1}`;
+              if (!p.periodName?.trim()) missing.push(`Period Name for discount period #${i + 1}`);
+              const dv = Number(p.discountValue);
+              if (p.discountValue === "" || p.discountValue === null || p.discountValue === undefined || Number.isNaN(dv) || dv <= 0) {
+                missing.push(`Valid positive discount value for ${pLabel}`);
+              } else if (p.discountType === "PERCENTAGE" && dv >= 100) {
+                missing.push(`Discount percentage must be less than 100% for ${pLabel}`);
+              } else if (p.discountType === "FIXED_AMOUNT" && tm.rate && dv >= Number(tm.rate)) {
+                missing.push(`Fixed discount must be less than standard rate for ${pLabel}`);
+              }
+              if (!p.effectiveFrom) missing.push(`Start date for ${pLabel}`);
+              if (!p.effectiveTo) missing.push(`End date for ${pLabel}`);
+              if (p.effectiveFrom && p.effectiveTo && p.effectiveFrom > p.effectiveTo) {
+                missing.push(`Start date cannot be after end date for ${pLabel}`);
+              }
+            }
+
+            for (let i = 0; i < periods.length; i++) {
+              for (let j = i + 1; j < periods.length; j++) {
+                const a = periods[i];
+                const b = periods[j];
+                if (a.effectiveFrom && a.effectiveTo && b.effectiveFrom && b.effectiveTo) {
+                  if (a.effectiveFrom <= b.effectiveTo && a.effectiveTo >= b.effectiveFrom) {
+                    missing.push(`Discount periods "${a.periodName || `#${i + 1}`}" and "${b.periodName || `#${j + 1}`}" overlap`);
+                  }
+                }
+              }
+            }
+          } else if (tm.hasDiscount) {
+            const dv = Number(tm.discountValue);
+            if (!tm.discountValue || Number.isNaN(dv) || dv <= 0) {
+              missing.push("Valid positive discount value");
+            } else if (tm.discountType === "PERCENTAGE" && dv >= 100) {
+              missing.push("Discount percentage must be less than 100%");
+            } else if (tm.discountType === "FIXED_AMOUNT" && dv >= Number(tm.rate)) {
+              missing.push("Fixed discount must be less than standard rate");
+            }
+            if (tm.discountStartDate && tm.discountEndDate && tm.discountStartDate > tm.discountEndDate) {
+              missing.push("Discount Start Date cannot be after Discount End Date");
+            }
+          }
         } else if (config.billingMode === "ROLE_BASED") {
           const roles = config.timeAndMaterial?.roles || [];
           if (roles.length === 0) missing.push("At least one role-based rate");
-          else if (!roles.every((r) => Boolean(r.role && r.rate && r.ratePeriod))) {
-            missing.push("Role, Rate, and Rate Period for every role row");
+          else {
+            if (!roles.every((r) => Boolean(r.role && r.rate && r.ratePeriod))) {
+              missing.push("Role, Rate, and Rate Period for every role row");
+            }
+            const invalidRate = roles.some((r) => Number(r.rate) <= 0);
+            if (invalidRate) missing.push("Rate must be greater than 0 for all roles");
+
+            for (const r of roles) {
+              if (r.hasDiscount || (r.discountType && r.discountType !== "NONE" && r.discountValue)) {
+                const dv = Number(r.discountValue);
+                if (Number.isNaN(dv) || dv <= 0) {
+                  missing.push(`Valid discount value for role ${r.role || "entry"}`);
+                } else if (r.discountType === "PERCENTAGE" && dv >= 100) {
+                  missing.push(`Discount percentage must be less than 100% for role ${r.role || "entry"}`);
+                } else if (r.discountType === "FIXED_AMOUNT" && dv >= Number(r.rate)) {
+                  missing.push(`Fixed discount must be less than rate for role ${r.role || "entry"}`);
+                }
+                if (r.discountStartDate && r.discountEndDate && r.discountStartDate > r.discountEndDate) {
+                  missing.push(`Discount Start Date cannot be after End Date for role ${r.role || "entry"}`);
+                }
+              }
+            }
           }
         }
       } else if (config.billingType === "RECURRING") {
@@ -610,6 +693,19 @@ export default function NewConfigurationWizard() {
   const handleNext = async () => {
     const validationMessage = getStepValidationMessage(currentStep, wizardData);
     if (validationMessage) {
+      if (currentStep === 2) {
+        setWizardData((prev) => ({
+          ...prev,
+          billingConfig: {
+            ...prev.billingConfig,
+            _validateTrigger: Date.now(),
+            timeAndMaterial: {
+              ...(prev.billingConfig?.timeAndMaterial || {}),
+              _validateTrigger: Date.now(),
+            },
+          },
+        }));
+      }
       showStatusToast(validationMessage, "warning");
       return;
     }
@@ -624,6 +720,19 @@ export default function NewConfigurationWizard() {
     }
     const validationMessage = getStepValidationMessage(currentStep, wizardData);
     if (validationMessage) {
+      if (currentStep === 2) {
+        setWizardData((prev) => ({
+          ...prev,
+          billingConfig: {
+            ...prev.billingConfig,
+            _validateTrigger: Date.now(),
+            timeAndMaterial: {
+              ...(prev.billingConfig?.timeAndMaterial || {}),
+              _validateTrigger: Date.now(),
+            },
+          },
+        }));
+      }
       showStatusToast(validationMessage, "warning");
       return;
     }

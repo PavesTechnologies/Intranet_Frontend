@@ -37,7 +37,6 @@ const LOCAL_STORAGE_PREFIX = "ar_configurations_";
 // localStorage-backed tool until real endpoints exist for them — per
 // instruction, no mock data or invented endpoints are added for them here.
 const MASTERS = [
-  { id: "proportion_rule", label: "Proportion Rule" },
   { id: "currency", label: "Currency Master" },
 ];
 
@@ -136,7 +135,7 @@ const SEED_DATA = {
 export default function Configurations() {
   const location = useLocation();
   const [selectedMaster, setSelectedMaster] = useState(
-    () => location.state?.master || "proportion_rule"
+    () => (location.state?.master && location.state?.master !== "proportion_rule" ? location.state.master : "currency")
   );
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -457,7 +456,7 @@ export default function Configurations() {
       {/* Page Header */}
       <PageHeader
         title="Configurations"
-        subtitle="Local configuration for masters pending backend integration (Proportion Rules, Currency)"
+        subtitle="Local configuration for masters pending backend integration (Currency)"
         actions={
           <div className="flex items-center gap-3">
             <Button

@@ -568,7 +568,10 @@ export default function InvoiceGeneration() {
   };
 
   const tableRows = paginatedInvoices.map((item) => {
-    const isReady = item.workspaceStatus === "READY_FOR_INVOICE";
+    const isReady =
+      item.workspaceStatus === "READY_FOR_INVOICE" ||
+      item.workspaceStatus === "READY_FOR_TAX" ||
+      item.workspaceStatus === "TAX_COMPLETED";
     const st = (item.workspaceStatus || item.invoiceStatus || "").toUpperCase();
 
     const iid =
@@ -703,8 +706,8 @@ export default function InvoiceGeneration() {
           <ActionMenu
             items={[
               {
-                label: "Generate Invoice",
-                icon: <FileText className="h-4 w-4 text-indigo-600" />,
+                label: "View",
+                icon: <Eye className="h-4 w-4 text-slate-600" />,
                 hidden: !isReady,
                 onClick: () => handleGenerateInvoice(item),
               },

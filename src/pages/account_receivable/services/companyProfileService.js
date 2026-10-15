@@ -20,6 +20,29 @@ const unwrapData = (response) => {
   return payload ?? null;
 };
 
+export const validateSignatureImageFile = (file) => {
+  if (!file) {
+    return { valid: false, error: "Please select an image file." };
+  }
+  const allowedTypes = ["image/png", "image/jpeg", "image/jpg"];
+  const extensionMatch = /\.(png|jpe?g)$/i.test(file.name || "");
+  if (!allowedTypes.includes(file.type?.toLowerCase()) && !extensionMatch) {
+    return {
+      valid: false,
+      error: "Invalid file format. Only PNG and JPG/JPEG images are approved.",
+    };
+  }
+  // Max file size: 2MB
+  const maxBytes = 2 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    return {
+      valid: false,
+      error: "Image file exceeds 2 MB limit. Please select a smaller file.",
+    };
+  }
+  return { valid: true, error: null };
+};
+
 export const normalizeCompanyProfile = (item) => {
   if (!item || typeof item !== "object" || Object.keys(item).length === 0) return null;
 
@@ -52,6 +75,19 @@ export const normalizeCompanyProfile = (item) => {
       ? String(item.paymentInstruction).trim() || null
       : null;
 
+  const signatureRef =
+    item.signatureReference !== undefined && item.signatureReference !== null
+      ? String(item.signatureReference).trim() || null
+      : item.signature_reference !== undefined && item.signature_reference !== null
+      ? String(item.signature_reference).trim() || null
+      : item.signatureUrl !== undefined && item.signatureUrl !== null
+      ? String(item.signatureUrl).trim() || null
+      : item.signature_url !== undefined && item.signature_url !== null
+      ? String(item.signature_url).trim() || null
+      : item.authorizedSignatorySignatureReference !== undefined && item.authorizedSignatorySignatureReference !== null
+      ? String(item.authorizedSignatorySignatureReference).trim() || null
+      : null;
+
   return {
     companyProfileId: item.companyProfileId || item.id || null,
     legalName: item.legalName ? String(item.legalName).trim() : null,
@@ -65,6 +101,8 @@ export const normalizeCompanyProfile = (item) => {
     email: item.email ? String(item.email).trim() : null,
     phone: item.phone ? String(item.phone).trim() : null,
     logoReference: item.logoReference || null,
+    signatureReference: signatureRef,
+    signatureUrl: signatureRef,
     isActive: Boolean(item.isActive ?? true),
     // Company Profile API defaults
     defaultInvoiceNotes: notesVal,
@@ -139,6 +177,87 @@ export const updateCompanyProfile = async (companyProfileId, payload) => {
   const response = await api.put(`${COMPANY_PROFILE_URL}/${companyProfileId}`, payload);
   const data = unwrapData(response);
   return normalizeCompanyProfile(data);
+};
+
+/**
+ * PUT /api/v1/company-profile/{id}/signature
+ * Uploads or replaces the authorized corporate signatory signature image.
+ * Multipart/form-data with part name "file".
+ */
+export const uploadCompanyProfileSignature = async (companyProfileId, file) => {
+  if (!companyProfileId) {
+    throw new Error("Company profile ID is required to upload signature.");
+  }
+  const validation = validateSignatureImageFile(file);
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await api.put(
+    `${COMPANY_PROFILE_URL}/${companyProfileId}/signature`,
+    formData
+  );
+  return unwrapData(response);
+};
+
+/**
+ * DELETE /api/v1/company-profile/{id}/signature
+ * Deletes the authorized corporate signatory signature image for the company profile.
+ */
+export const deleteCompanyProfileSignature = async (companyProfileId) => {
+  if (!companyProfileId) {
+    throw new Error("Company profile ID is required to delete signature.");
+  }
+  const response = await api.delete(
+    `${COMPANY_PROFILE_URL}/${companyProfileId}/signature`
+  );
+  return unwrapData(response);
+};
+
+/**
+ * GET /api/v1/company-profile/{id}/signature
+ * Fetches the signature metadata / reference for the company profile.
+ */
+export const getCompanyProfileSignature = async (companyProfileId) => {
+  if (!companyProfileId) return null;
+  try {
+    const response = await api.get(
+      `${COMPANY_PROFILE_URL}/${companyProfileId}/signature`
+    );
+    return unwrapData(response);
+  } catch (error) {
+    if (error?.response?.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+};
+
+/**
+ * GET /api/v1/company-profile/signature-assets/{ref}
+ * Fetches the protected signature image binary/blob via authenticated API client.
+ */
+export const fetchSignatureAssetBlob = async (signatureRef) => {
+  if (!signatureRef) return null;
+
+  let cleanRef = String(signatureRef).trim();
+  if (cleanRef.includes("/signature-assets/")) {
+    cleanRef = cleanRef.split("/signature-assets/").pop();
+  } else if (cleanRef.startsWith("http://") || cleanRef.startsWith("https://")) {
+    try {
+      const parsed = new URL(cleanRef);
+      cleanRef = parsed.pathname.split("/").pop();
+    } catch {
+      // keep cleanRef
+    }
+  }
+
+  const url = `${COMPANY_PROFILE_URL}/signature-assets/${encodeURIComponent(cleanRef)}`;
+  const response = await api.get(url, { responseType: "blob" });
+  return response.data;
 };
 
 /**
@@ -313,5 +432,10 @@ export default {
   getInvoiceContentDefaults,
   updateInvoiceContentDefaults,
   normalizeCompanyProfile,
+  validateSignatureImageFile,
+  uploadCompanyProfileSignature,
+  deleteCompanyProfileSignature,
+  getCompanyProfileSignature,
+  fetchSignatureAssetBlob,
   getCompanyProfileErrorMessage,
 };
