@@ -717,44 +717,25 @@ export default function InvoiceDetail() {
     invoice?.billingPeriod ||
     (invoice?.billingPeriodStart && invoice?.billingPeriodEnd
       ? formatBillingPeriod(invoice.billingPeriodStart, invoice.billingPeriodEnd)
-      : DEMO_TERMS.billingPeriod);
+      : "—");
 
   const projectName =
     invoice?.projectName ||
-    DEMO_PROJECT.name;
+    "—";
 
   const projectCode =
     invoice?.projectCode ||
     (invoice?.projectId ? `PRJ-${invoice.projectId}` : null) ||
-    DEMO_PROJECT.code;
+    "—";
 
   const clientName =
     invoice?.clientName ||
-    "Not provided";
+    "—";
 
   const effectiveTaxBreakdown =
     taxBreakdown.length > 0
       ? taxBreakdown
-      : invoice?.totalTax && invoice.totalTax > 0
-        ? [
-          {
-            id: "demo-cgst",
-            taxComponent: "Central Goods and Services Tax",
-            taxTypeCode: "CGST",
-            applicability: "SAME_JURISDICTION",
-            rate: 9.0,
-            amount: invoice.totalTax / 2,
-          },
-          {
-            id: "demo-sgst",
-            taxComponent: "State Goods and Services Tax",
-            taxTypeCode: "SGST",
-            applicability: "SAME_JURISDICTION",
-            rate: 9.0,
-            amount: invoice.totalTax / 2,
-          },
-        ]
-        : [];
+      : [];
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
