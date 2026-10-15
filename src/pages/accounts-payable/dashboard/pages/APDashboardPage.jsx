@@ -20,6 +20,7 @@ import ManagementDashboard from "../components/ManagementDashboard";
 import ApprovalsDashboard from "../components/ApprovalsDashboard";
 import MyWorkDashboard from "../components/MyWorkDashboard";
 import FinanceDashboard from "../components/FinanceDashboard";
+import ActionCenter from "../components/ActionCenter";
 import { SegmentedTabs } from "../components/insights";
 import Breadcrumb from "../../../../components/Breadcrumb/Breadcrumb";
 import { useAuth } from "../../../../contexts/AuthContext";
@@ -236,6 +237,7 @@ function RoleView({ view, tabs, onForbidden }) {
           </>
         }
       />
+      <ActionCenter />
       {tabs}
       {isLoading ? (
         <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-white py-24">

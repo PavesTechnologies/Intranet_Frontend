@@ -4,10 +4,10 @@ import { invalidateInvoices } from "./useInvoiceMutations";
 
 export const REVIEW_WORKBENCH_KEY = ["accountsPayable", "reviewWorkbench"];
 
-export function useReviewWorkbench(stage) {
+export function useReviewWorkbench(stage, assigned = "all") {
   return useQuery({
-    queryKey: [...REVIEW_WORKBENCH_KEY, stage],
-    queryFn: () => reviewWorkbenchService.getWorkbench(stage),
+    queryKey: [...REVIEW_WORKBENCH_KEY, stage, assigned],
+    queryFn: () => reviewWorkbenchService.getWorkbench(stage, assigned),
   });
 }
 

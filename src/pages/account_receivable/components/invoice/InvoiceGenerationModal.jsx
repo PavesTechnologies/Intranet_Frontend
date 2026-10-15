@@ -2,7 +2,6 @@ import React from "react";
 import { CheckCircle2, AlertTriangle, Send, X, FileText, ArrowRight } from "lucide-react";
 import Modal from "../../../../components/Modal/modal";
 import Button from "../../../../components/Button/Button";
-import StatusBadge from "../../../../components/status/statusbadge";
 import InvoiceGenerationProcessing from "./InvoiceGenerationProcessing";
 import InvoicePreviewDocument from "./InvoicePreviewDocument";
 
@@ -87,7 +86,6 @@ export default function InvoiceGenerationModal({
                   <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-md">
                     {invoiceNumber}
                   </span>
-                  <StatusBadge label={invoiceStatus === "GENERATED" ? "INVOICE GENERATED" : invoiceStatus} size="sm" />
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   The official authoritative invoice has been committed to Account Receivable. Review details or submit for approval below.

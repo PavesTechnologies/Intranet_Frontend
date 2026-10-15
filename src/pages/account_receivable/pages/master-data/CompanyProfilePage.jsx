@@ -16,7 +16,6 @@ import PageHeader from "../../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Button from "../../../../components/Button/Button";
 import Loader from "../../../../components/ui/Loader";
-import StatusBadge from "../../../../components/status/statusbadge";
 import BackIconButton from "../../components/common/BackIconButton";
 import { showStatusToast } from "../../../../components/toastfy/toast";
 import { useAuth } from "../../../../contexts/AuthContext";
@@ -174,7 +173,6 @@ export default function CompanyProfilePage() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2.5 flex-wrap">
                       <h2 className="text-xl font-bold text-slate-900">{profile.legalName}</h2>
-                      <StatusBadge label="ACTIVE" />
                     </div>
                     <p className="text-xs text-slate-500">
                       Authoritative seller entity configured for Account Receivable billing and invoices.

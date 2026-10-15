@@ -1112,7 +1112,16 @@ export default function ExpenseReportDetailPage() {
 
   return (
     <div className="space-y-4">
-      <Breadcrumb items={breadcrumbs} />
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/expense-management/expenses/my"))}
+          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-gray-900"
+        >
+          &larr; Back
+        </button>
+        <Breadcrumb items={breadcrumbs} />
+      </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
         {/* Left column */}
@@ -2297,7 +2306,7 @@ const emptyForm = (defaultCostCenterId) => ({
   projectId: "",
 });
 
-function LineItemDrawer({
+export function LineItemDrawer({
   isOpen,
   onClose,
   reportId,

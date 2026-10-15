@@ -9,6 +9,9 @@ export const AP_ROLES = {
   VENDOR_INTAKE: "Vendor_Intake",
   AP_EXECUTIVE: "AP_Executive",
   FINANCE_EXECUTIVE: "Finance_Executive",
+  // The checker: approves payment runs and vendor bank accounts, owns automation / duty-separation
+  // rules and AP work assignment (all granted by permission codes, not by this role).
+  FINANCE_MANAGER: "Finance_Manager",
   INVOICE_APPROVER: "Invoice_Approver",
 };
 

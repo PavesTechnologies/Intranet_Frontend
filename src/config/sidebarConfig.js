@@ -7,6 +7,11 @@ import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/con
 import { VENDOR_ANY_PERMISSIONS } from "../pages/accounts-payable/constants/vendorPermissions";
 import { AP_AUTOMATION_PERMISSIONS } from "../pages/accounts-payable/constants/apAutomation";
 import { PROCUREMENT_ANY_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/procurementPermissions";
+import { RECURRING_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/recurring";
+import { GST_ITC_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/gstItc";
+import { ACCOUNTING_EXPORT_PERMISSIONS } from "../pages/accounts-payable/constants/accountingExport";
+import { VENDOR_NOTE_VIEW_PERMISSIONS } from "../pages/accounts-payable/constants/vendorNotes";
+import { WORK_ASSIGN_LEAD_PERMISSIONS } from "../pages/accounts-payable/constants/workAssignment";
 
 /**
  * Canonical role identifiers.
@@ -348,7 +353,15 @@ export const AP_SUBMENU = [
   // permissions their backend endpoints enforce, so a user without them never sees a page that
   // would only 403.
   { label: "Payment Management", to: AP_ROUTES.PAYMENT_READY, requiredPermissions: PAYMENT_ANY_VIEW_PERMISSIONS },
+  // Rent / subscription schedules: expected, received, missing (recurring_route.py).
+  { label: "Recurring Invoices", to: AP_ROUTES.RECURRING, requiredPermissions: RECURRING_VIEW_PERMISSIONS },
+  // Vendor credit notes / our debit notes, set off against unpaid invoices (vendor_note_route.py).
+  { label: "Credit & Debit Notes", to: AP_ROUTES.VENDOR_NOTES, requiredPermissions: VENDOR_NOTE_VIEW_PERMISSIONS },
   { label: "TDS Tracking", to: AP_ROUTES.TDS_TRACKING, requiredPermissions: TDS_TRACKING_ANY_VIEW_PERMISSIONS },
+  // GST input credit register: claim in GSTR-3B, IRN check, 180-day rule (gst_itc_route.py).
+  { label: "GST Input Credit", to: AP_ROUTES.GST_ITC, requiredPermissions: GST_ITC_VIEW_PERMISSIONS },
+  // Invoices, payments, notes and TDS deposits as Tally / Zoho Books vouchers (accounting_export_route.py).
+  { label: "Accounting Export", to: AP_ROUTES.ACCOUNTING_EXPORT, requiredPermissions: ACCOUNTING_EXPORT_PERMISSIONS },
   // The page lists only the reports the backend says this user may run (reports_route.py);
   // payment access is the entry point today, management reporting permissions join in Phase 6.
   { label: "Reports", to: AP_ROUTES.REPORTS, requiredPermissions: [...PAYMENT_ANY_VIEW_PERMISSIONS, AP_MANAGEMENT_PERMISSIONS.REPORTS_VIEW] },
@@ -356,6 +369,8 @@ export const AP_SUBMENU = [
   { label: "Bulk Import", to: AP_ROUTES.BULK_IMPORT, requiredPermissions: ["PAYMENT_PROCESS", "TDS_TRACKING_UPDATE"] },
   // Touchless PO-invoice settings - Finance Manager only (backend-enforced on /ap-automation).
   { label: "AP Automation", to: AP_ROUTES.AP_AUTOMATION, requiredPermissions: [AP_AUTOMATION_PERMISSIONS.AP_AUTOMATION_MANAGE] },
+  // AP lead: team workload, routing rules, leave cover (work_assignment_route.py).
+  { label: "AP Team", to: AP_ROUTES.WORK_ASSIGNMENT, requiredPermissions: WORK_ASSIGN_LEAD_PERMISSIONS },
   // { label: "Procurement", to: AP_ROUTES.PROCUREMENT, allowedRoles: AP_ALL_ROLES },
   // Split into two role-exclusive entries (both pointing at the same route) rather than one
   // AP_ALL_ROLES item — System Configuration's tabs are now Admin-only/Finance_Executive-only

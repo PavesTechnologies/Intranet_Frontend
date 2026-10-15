@@ -163,6 +163,11 @@ export default function ApprovalsPage() {
         ? approvalCategory
         : "EXPENSE_REPORTS";
 
+  // Which cash advance stage this page acts on: managers approve at manager stage; a Finance-only
+  // user approves at finance stage. A user with both roles sees the manager stage here and the
+  // finance stage on the Finance tab.
+  const cashAdvanceStage = isManager || !isFinance ? "MANAGER" : "FINANCE";
+
   // -----------------------------
   // Status options
   // -----------------------------
@@ -395,6 +400,7 @@ export default function ApprovalsPage() {
             key={`cash-${activeTab}-${reloadKey}`}
             activeTab={activeTab}
             searchTerm={searchTerm}
+            stage={cashAdvanceStage}
           />
         ) : (
           <>

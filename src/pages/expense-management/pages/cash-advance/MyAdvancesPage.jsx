@@ -7,6 +7,7 @@ import {
   Edit2,
   Trash2,
   Send,
+  Receipt,
   XCircle,
   Clock,
   CheckCircle2,
@@ -29,6 +30,21 @@ import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal
 import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
+
+// Statuses in which an expense report can be linked to the advance (same list as the detail page).
+const LINKABLE_EXPENSE_STATUSES = [
+  "DISBURSED",
+  "IN_PROGRESS",
+  "EXPENSE_SUBMITTED",
+  "EXPENSE_VERIFIED",
+  "SETTLEMENT_PENDING",
+  "PARTIALLY_ADJUSTED",
+  "PARTIALLY_SETTLED",
+];
+
+const canSubmitLinkedExpenses = (adv) =>
+  LINKABLE_EXPENSE_STATUSES.includes((adv.status || "").toUpperCase()) &&
+  Number(adv.outstandingBalance ?? 0) > 0;
 
 const getNeededByDateValue = (adv) => {
   if (!adv) return null;
@@ -519,6 +535,17 @@ export default function MyAdvancesPage() {
                           >
                             <Eye size={15} />
                           </button>
+
+                          {/* Submit linked expenses (same action as the detail page's Stage 4 button) */}
+                          {canSubmitLinkedExpenses(adv) && (
+                            <button
+                              onClick={() => navigate(`/expense-management/expenses/create?cashAdvanceId=${adv.advanceId || adv.id}`)}
+                              title="Submit linked expenses"
+                              className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition"
+                            >
+                              <Receipt size={15} />
+                            </button>
+                          )}
 
                           {/* Draft Actions */}
                           {isDraft && (
