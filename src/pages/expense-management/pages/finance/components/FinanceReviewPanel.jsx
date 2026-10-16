@@ -24,6 +24,7 @@ import ReceiptViewer from "../../../approval-engine/components/ReceiptViewer";
 import CommentPromptModal from "../../../approval-engine/components/CommentPromptModal";
 import { useFinanceStatus, useFinanceReviews, useVerifyLineItem, useQueryLineItem, useAdjustLineTax } from "../hooks/useFinanceVerification";
 import FinanceTaxPanel, { AdjustTaxModal, needsTaxConfirmation } from "./FinanceTaxPanel";
+import LineAllocationDetails from "@/pages/expense-management/components/expense-reports/LineAllocationDetails";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatMoney, formatDate } from "../../../approval-engine/constants/approvalLabels";
 
@@ -386,6 +387,12 @@ export default function FinanceReviewPanel({ isOpen, onClose, reportId, queueIte
                       <Field label="Description" value={selectedLine.description} />
                     </div>
                   )}
+
+                  <LineAllocationDetails
+                    lineItemId={selectedLine.lineItemId}
+                    allocationReason={selectedLine.allocationReason}
+                    baseCurrencyCode={selectedLine.baseCurrencyCode || selectedLine.currencyCode}
+                  />
 
                   {!isLineEligible(selectedLine) && selectedLine.ineligibleReason && (
                     <div className="mt-3 border-t border-gray-100 pt-3 flex items-start gap-2 text-sm text-rose-700 font-medium bg-rose-50 p-2.5 rounded-lg border border-rose-200">
