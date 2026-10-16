@@ -319,7 +319,7 @@ import EmployeeExitDashboard from "./pages/employee-exit/EmployeeExitDashboard.j
 import ExitDetailsPage from "./pages/employee-exit/ExitDetailsPage.jsx";
 
 import AccountReceivableLayout from "./pages/account_receivable/pages/AccountReceivableLayout.jsx";
-import AccountReceivableDashboard from "./pages/account_receivable/pages/Dashboard.jsx";
+import AccountReceivableDashboard from "./pages/account_receivable/dashboard/pages/ARDashboardPage.jsx";
 import Overview from "./pages/account_receivable/pages/Overview.jsx";
 import BillingConfigurations from "./pages/account_receivable/pages/BillingConfigurations.jsx";
 import NewConfigurationWizard from "./pages/account_receivable/pages/NewConfigurationWizard.jsx";
