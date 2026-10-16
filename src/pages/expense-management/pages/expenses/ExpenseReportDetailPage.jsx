@@ -1251,6 +1251,11 @@ export default function ExpenseReportDetailPage() {
                   {correctionRequests.map((r) => (
                     <li key={r.lineItemId} className="text-sm text-orange-700">
                       <span className="font-medium">{lineItems.find((li) => li.lineItemId === r.lineItemId)?.merchantName || "Line item"}:</span>{" "}
+                      {r.category && r.category !== "OTHER" && (
+                        <span className="mr-1 inline-flex rounded border border-orange-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-800">
+                          {{ TAX_MISMATCH: "Tax mismatch", RECEIPT: "Receipt", AMOUNT: "Amount" }[r.category] || r.category}
+                        </span>
+                      )}
                       {r.comment || "Correction requested"}
                     </li>
                   ))}
@@ -1819,6 +1824,18 @@ export default function ExpenseReportDetailPage() {
                           <span className="text-sm font-semibold font-mono text-amber-600">
                             {formatAmount(lineItemToView.taxAmount)} {lineItemToView.currencyCode}
                           </span>
+                          {/* The saved breakdown (CGST / SGST / IGST / cess), as calculated or as Finance adjusted it. */}
+                          {lineItemToView.tax?.components?.length > 0 && (
+                            <span className="mt-0.5 block text-[11px] text-gray-500">
+                              {lineItemToView.tax.taxCode ? `${lineItemToView.tax.taxCode}: ` : ""}
+                              {lineItemToView.tax.components
+                                .map((c) => `${c.label || c.componentCode} ${formatAmount(c.taxAmount)}`)
+                                .join(" + ")}
+                              {lineItemToView.tax.taxSource === "FINANCE_ADJUSTED" && (
+                                <span className="ml-1 font-medium text-indigo-600">(adjusted by Finance)</span>
+                              )}
+                            </span>
+                          )}
                         </div>
                         <div>
                           <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block">Net Amount</span>

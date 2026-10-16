@@ -10,6 +10,7 @@ import SearchInput from "@/components/filter/Searchbar";
 import Modal from "@/components/Modal/modal";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import StatusBadge from "@/components/status/statusbadge";
+import PaymentStatusBadge from "@/pages/expense-management/components/expense-reports/PaymentStatusBadge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
@@ -327,7 +328,12 @@ export default function MyExpensesPage() {
     costCenter: <span className="text-xs">{r.costCenterName || "—"}</span>,
     currency: <span className="font-semibold text-xs text-gray-600">{r.currencyCode || "—"}</span>,
     totalAmount: <span className="font-mono font-semibold text-xs text-gray-900">{formatAmount(r.totalAmount)}</span>,
-    status: <StatusBadge label={r.reportStatus || "DRAFT"} size="sm" />,
+    status: (
+      <div className="flex flex-col items-start gap-1">
+        <StatusBadge label={r.reportStatus || "DRAFT"} size="sm" />
+        <PaymentStatusBadge report={r} />
+      </div>
+    ),
     created: <span className="text-xs">{formatDate(r.createdAt)}</span>,
     actions: (
       <div className="flex items-center gap-1 justify-center">
@@ -389,8 +395,6 @@ export default function MyExpensesPage() {
     { label: "Rejected", value: "REJECTED" },
     { label: "Cancelled", value: "CANCELLED" },
     { label: "Policy Rejected", value: "POLICY_REJECTED" },
-    { label: "Reimbursed", value: "REIMBURSED" },
-    { label: "Closed", value: "CLOSED" },
   ];
  
   return (

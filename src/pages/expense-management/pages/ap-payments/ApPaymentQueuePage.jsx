@@ -68,7 +68,7 @@ export default function ApPaymentQueuePage() {
     if (!searchTerm) return items;
     const q = searchTerm.toLowerCase();
     return items.filter((item) =>
-      [item.reportNumber, item.employeeId, item.costCenterName, item.title].some((v) => String(v || "").toLowerCase().includes(q))
+      [item.reportNumber, item.employeeId, item.costCenterName, item.title, item.paymentReference].some((v) => String(v || "").toLowerCase().includes(q))
     );
   }, [items, searchTerm]);
 
@@ -77,11 +77,12 @@ export default function ApPaymentQueuePage() {
     setSearchTerm("");
   };
 
-  const headers = ["Report", "Employee", "Cost Center", "Amount", "Approved On"];
+  // What the employee is owed (claimed less any cash advance) - or, once paid, what AP confirmed paying.
+  const headers = ["Report", "Employee", "Cost Center", isPaidTab ? "Amount Paid" : "Amount to Pay", "Approved On"];
   const columns = ["report", "employee", "costCenter", "amount", "approvedOn"];
   if (isPaidTab) {
-    headers.push("Paid On");
-    columns.push("paidOn");
+    headers.push("Paid On", "Reference");
+    columns.push("paidOn", "reference");
   }
   headers.push("Status", "Client invoice", "Action");
   columns.push("status", "invoice", "action");
@@ -95,9 +96,14 @@ export default function ApPaymentQueuePage() {
     ),
     employee: <EmployeeLabel employeeId={item.employeeId} />,
     costCenter: item.costCenterName || "—",
-    amount: <span className="font-mono font-semibold text-gray-900">{formatMoney(item.totalAmount, item.currencyCode)}</span>,
+    amount: (
+      <span className="font-mono font-semibold text-gray-900">
+        {formatMoney(item.paidAmount ?? item.reimbursableAmount ?? item.totalAmount, item.currencyCode)}
+      </span>
+    ),
     approvedOn: formatDate(item.approvedAt),
-    paidOn: formatDate(item.paymentCompletedAt),
+    paidOn: formatDate(item.paymentDate || item.paymentCompletedAt),
+    reference: <span className="font-mono text-xs text-gray-700">{item.paymentReference || "—"}</span>,
     status: <StatusBadge label={item.paymentRoutingStatus} size="sm" />,
     invoice: ["PENDING", "COMPLETED"].includes(item.invoiceHandoffStatus) ? (
       <InvoiceHandoffBadge status={item.invoiceHandoffStatus} />

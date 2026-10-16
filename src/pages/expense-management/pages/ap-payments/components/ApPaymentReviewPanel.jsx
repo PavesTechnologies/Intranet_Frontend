@@ -5,7 +5,7 @@ import StatusBadge from "@/components/status/statusbadge";
 import InvoiceHandoffBadge from "@/pages/expense-management/components/expense-reports/InvoiceHandoffBadge";
 import PolicyStatusBadge from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
 import LineAllocationDetails from "@/pages/expense-management/components/expense-reports/LineAllocationDetails";
-import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
+import ConfirmPaymentModal from "./ConfirmPaymentModal";
 import { showStatusToast } from "@/components/toastfy/toast";
 import EmployeeLabel from "../../../approval-engine/components/EmployeeLabel";
 import ApprovalStatusPill from "../../../approval-engine/components/ApprovalStatusPill";
@@ -112,19 +112,31 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
   const canComplete = paymentRoutingStatus === "APPROVED_FOR_PAYMENT";
   const isPaid = paymentRoutingStatus === "PAYMENT_COMPLETED";
 
-  const handleConfirmPayment = () => {
-    completePayment.mutate(reportId, {
+  const handleConfirmPayment = (payment) => {
+    completePayment.mutate({ reportId, payment }, {
       onSuccess: () => {
-        showStatusToast("Payment marked as completed", "success");
+        showStatusToast("Payment confirmed - the employee now sees this report as paid", "success");
         setConfirming(false);
         onClose();
       },
       onError: (err) => {
-        showStatusToast(err.response?.data?.message || "Failed to complete payment", "error");
-        setConfirming(false);
+        // Keep the form open so AP can correct the amount/date and retry.
+        showStatusToast(err.response?.data?.message || "Failed to confirm payment", "error");
       },
     });
   };
+
+  // What AP recorded, once paid (ExpenseReportResponse.paymentConfirmation, or the queue row's fields).
+  const confirmation = report?.paymentConfirmation || (queueItem?.paymentReference
+    ? {
+        paymentReference: queueItem.paymentReference,
+        paymentMethod: queueItem.paymentMethod,
+        paymentDate: queueItem.paymentDate,
+        amountPaid: queueItem.paidAmount,
+        confirmedAt: queueItem.paymentCompletedAt,
+        confirmedBy: queueItem.paymentCompletedBy,
+      }
+    : null);
 
   return (
     <div className="fixed inset-0 z-[65] flex flex-col bg-gray-50">
@@ -153,6 +165,18 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
           <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-800">
             <CheckCircle2 className="h-4 w-4" /> Payment completed for this report. No further action is needed.
           </p>
+          {confirmation && (
+            <p className="mt-0.5 text-xs text-emerald-800">
+              {formatMoney(confirmation.amountPaid, currencyCode)} paid on {formatDate(confirmation.paymentDate)}
+              {confirmation.paymentMethod ? ` by ${confirmation.paymentMethod.replace("_", " ").toLowerCase()}` : ""}
+              {confirmation.paymentReference ? ` · Ref ${confirmation.paymentReference}` : ""}
+              {confirmation.confirmedBy && (
+                <>
+                  {" "}· confirmed by <EmployeeLabel employeeId={confirmation.confirmedBy} />
+                </>
+              )}
+            </p>
+          )}
         </div>
       )}
 
@@ -389,16 +413,14 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
         </div>
       )}
 
-      <ConfirmationModal
+      <ConfirmPaymentModal
         isOpen={confirming}
-        title="Complete Payment"
-        message={`Mark ${reportNumber || "this report"} (${formatMoney(reimbursableAmount, currencyCode)} to the employee) as paid? This cannot be undone.`}
-        confirmText="Complete Payment"
-        cancelText="Cancel"
-        variant="success"
-        isLoading={completePayment.isPending}
-        onCancel={() => setConfirming(false)}
+        onClose={() => setConfirming(false)}
         onConfirm={handleConfirmPayment}
+        isSaving={completePayment.isPending}
+        reportNumber={reportNumber}
+        amountOwed={reimbursableAmount}
+        currencyCode={currencyCode}
       />
     </div>
   );
