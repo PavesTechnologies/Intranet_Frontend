@@ -34,6 +34,12 @@ export const expenseReportService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
+  // Every workflow event across correction rounds, oldest first: [{ action, performedBy, performedAt, comment }].
+  getHistory: (reportId) =>
+    api.get(`/xms/employee/expense-reports/${reportId}/history`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
   create: (payload) =>
     api.post("/xms/employee/expense-reports", payload, {
       baseURL: EXPENSE_API_BASE,

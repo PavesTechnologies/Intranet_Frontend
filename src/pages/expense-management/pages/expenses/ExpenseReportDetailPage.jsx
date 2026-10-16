@@ -57,6 +57,7 @@ import TaxBreakdownPanel, {
 import TaxStatusBadge from "@/pages/expense-management/components/expense-reports/TaxStatusBadge";
 import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
 import SummaryPanel from "@/pages/expense-management/components/expense-reports/SummaryPanel";
+import ReportHistoryTimeline from "@/pages/expense-management/components/expense-reports/ReportHistoryTimeline";
 import api from "@/api/axiosInstance";
 import Select from "react-select";
 import FormInput from "@/components/forms/FormInput";
@@ -1342,6 +1343,7 @@ export default function ExpenseReportDetailPage() {
         {/* Right column */}
         <div className="lg:col-span-1">
           <SummaryPanel report={{ ...report, status: report?.reportStatus }} lineItems={lineItems} />
+          <ReportHistoryTimeline reportId={reportId} />
         </div>
       </div>
 
