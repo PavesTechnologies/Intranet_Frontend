@@ -330,11 +330,15 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
                         </p>
                         {selectedRelevant.mySplits.map((s) => (
                           <p key={s.splitId} className="text-sm font-semibold text-indigo-700">
-                            {s.costCenterName} — {formatMoney(s.allocatedAmount, selectedLine.currencyCode)}{" "}
+                            {/* Split amounts are held in the organization base currency, not the line's own. */}
+                            {s.costCenterName} — {formatMoney(s.allocatedAmount, selectedLine.baseCurrencyCode || currencyCode)}{" "}
                             <span className="text-xs font-normal text-indigo-500">(your allocation)</span>
                           </p>
                         ))}
                       </div>
+                      {selectedLine.allocationReason && (
+                        <Field label="Cross-department reason" value={selectedLine.allocationReason} />
+                      )}
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -356,6 +360,11 @@ export default function ExpenseReviewPanel({ isOpen, onClose, reportId, mode, qu
                         <Field label="Before Tax" value={formatMoney(selectedLine.netAmount, selectedLine.currencyCode)} />
                       )}
                       <Field label="Report Total" value={formatMoney(totalAmount, currencyCode)} />
+                    </div>
+                  )}
+                  {!selectedRelevant?.isSplit && selectedLine.allocationReason && (
+                    <div className="mt-3">
+                      <Field label="Cross-department reason" value={selectedLine.allocationReason} />
                     </div>
                   )}
                   {isQueueMode && !selectedRelevant && (

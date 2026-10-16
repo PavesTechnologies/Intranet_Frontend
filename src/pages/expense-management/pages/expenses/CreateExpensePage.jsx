@@ -665,6 +665,7 @@ export default function CreateExpensePage() {
       costCenters.map((c) => ({
         value: c.costCenterId,
         label: `${c.costCenterCode} - ${c.costCenterName}`,
+        departmentUuid: c.departmentUuid,
       })),
     [costCenters]
   );
