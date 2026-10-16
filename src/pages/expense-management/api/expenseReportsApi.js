@@ -294,6 +294,16 @@ export const lookupService = {
     });
     return normalizeList(res.data, "data");
   },
+  // Active clients for a client-billable line item: [{ clientId, clientName }], sorted by name.
+  // XMS calls RMS with the user's own token, so only roles RMS allows (Admin / Resource Manager /
+  // Project Manager) get a list; others get 403.
+  getActiveClients: async () => {
+    const res = await api.get("/xms/clients", {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    });
+    return normalizeList(res.data, "data");
+  },
 };
 
 // Client invoice handoff queue (Epic 8) — separate from AP reimbursement (ApPaymentPage).
