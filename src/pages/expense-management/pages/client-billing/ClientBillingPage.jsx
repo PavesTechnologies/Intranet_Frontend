@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { AlertTriangle, Inbox, FileCheck2, Receipt, FolderKanban, RotateCcw, Send, Wallet, BadgeCheck } from "lucide-react";
+import { AlertTriangle, Inbox, FileCheck2, Receipt, Building2, RotateCcw, Send, Wallet, BadgeCheck } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb/Breadcrumb";
 import PageHeader from "@/components/ui/PageHeader";
 import FilterCard from "@/components/ui/FilterCard";
@@ -20,18 +20,18 @@ import { formatMoney, formatDate, formatDateTime } from "@/pages/expense-managem
 import { useEligibleExpenses, useHandedOff, useHandoffSummary, useMarkHandedOff } from "./hooks/useInvoiceHandoff";
 import Pagination from "@/components/Pagination/pagination";
 
-const unknownProjectKey = "__none__";
+const unknownClientKey = "__none__";
 
-/** Ready expenses grouped by project — invoicing works client/project at a time. */
-function groupByProject(items) {
+const projectLabel = (item) => (item.projectCode ? `${item.projectCode} — ${item.projectName}` : "—");
+
+/** Ready expenses grouped by client — AR invoices per client; project is optional per expense. */
+function groupByClient(items) {
   const groups = new Map();
   items.forEach((item) => {
-    const key = item.projectId || unknownProjectKey;
+    const key = item.resolvedClientId || unknownClientKey;
     if (!groups.has(key)) {
       groups.set(key, {
         key,
-        projectCode: item.projectCode,
-        projectName: item.projectName,
         clientName: item.resolvedClientName,
         currency: item.baseCurrencyCode,
         total: 0,
@@ -87,7 +87,7 @@ export default function ClientBillingPage() {
   };
 
   const readyItems = readyQuery.data?.content || [];
-  const readyGroups = groupByProject(readyItems.filter(matches));
+  const readyGroups = groupByClient(readyItems.filter(matches));
   const historyAll = historyQuery.data?.content || [];
   const historyItems = historyAll.filter(matches);
 
@@ -141,6 +141,7 @@ export default function ClientBillingPage() {
   const readyRows = (items) =>
     items.map((item) => ({
       date: formatDate(item.expenseDate),
+      project: <span className="text-xs text-gray-700">{projectLabel(item)}</span>,
       employee: <EmployeeLabel employeeId={item.employeeId} />,
       expense: (
         <div className="leading-tight text-left">
@@ -201,10 +202,10 @@ export default function ClientBillingPage() {
           textColor="text-indigo-700"
         />
         <StatCard
-          title="Projects waiting"
-          value={summary ? summary.readyProjectCount : "—"}
+          title="Clients waiting"
+          value={summary ? summary.readyClientCount : "—"}
           subtitle="With ready expenses"
-          icon={FolderKanban}
+          icon={Building2}
         />
         <SelectableStatCard
           title="Handed off"
@@ -297,11 +298,10 @@ export default function ClientBillingPage() {
                 <section key={g.key}>
                   <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex min-w-0 items-center gap-2">
-                      <FolderKanban size={15} className="shrink-0 text-indigo-500" />
+                      <Building2 size={15} className="shrink-0 text-indigo-500" />
                       <span className="truncate text-sm font-semibold text-slate-800">
-                        {g.key === unknownProjectKey ? "No project" : `${g.projectCode} — ${g.projectName}`}
+                        {g.key === unknownClientKey ? "No client" : g.clientName || "Unnamed client"}
                       </span>
-                      {g.clientName && <span className="text-xs text-slate-500">· {g.clientName}</span>}
                     </div>
                     <span className="text-xs text-slate-500">
                       {g.items.length} expense{g.items.length === 1 ? "" : "s"} ·{" "}
@@ -310,8 +310,8 @@ export default function ClientBillingPage() {
                   </div>
                   <div className="w-full overflow-x-auto">
                     <GenericTable
-                      headers={["Date", "Employee", "Expense", "Report", "Cost basis", "Receipts", "Action"]}
-                      columns={["date", "employee", "expense", "report", "amount", "receipts", "action"]}
+                      headers={["Date", "Project", "Employee", "Expense", "Report", "Cost basis", "Receipts", "Action"]}
+                      columns={["date", "project", "employee", "expense", "report", "amount", "receipts", "action"]}
                       rows={readyRows(g.items)}
                     />
                   </div>
@@ -341,11 +341,12 @@ export default function ClientBillingPage() {
           ) : (
             <div className="w-full overflow-x-auto">
               <GenericTable
-                headers={["Handed off", "Project", "Employee", "Expense", "Report", "Amount", "Invoice ref.", "Action"]}
-                columns={["handedOffAt", "project", "employee", "expense", "report", "amount", "invoiceReference", "action"]}
+                headers={["Handed off", "Client", "Project", "Employee", "Expense", "Report", "Amount", "Invoice ref.", "Action"]}
+                columns={["handedOffAt", "client", "project", "employee", "expense", "report", "amount", "invoiceReference", "action"]}
                 rows={historyItems.map((item) => ({
                   handedOffAt: <span className="whitespace-nowrap text-xs text-gray-600">{formatDateTime(item.handedOffAt)}</span>,
-                  project: item.projectCode ? `${item.projectCode} — ${item.projectName}` : "—",
+                  client: item.resolvedClientName || "—",
+                  project: projectLabel(item),
                   employee: <EmployeeLabel employeeId={item.employeeId} />,
                   expense: (
                     <div className="leading-tight">
@@ -386,7 +387,7 @@ export default function ClientBillingPage() {
           isOpen={!!target}
           onClose={closeHandoff}
           title={reprocess ? "Hand off again" : "Hand off to invoicing"}
-          subtitle={`${target.reportNumber} · ${target.projectCode ? `${target.projectCode} — ${target.projectName}` : "No project"}`}
+          subtitle={`${target.reportNumber} · ${target.resolvedClientName || "No client"}${target.projectCode ? ` · ${target.projectCode} — ${target.projectName}` : ""}`}
           size="md"
           footer={
             <div className="flex justify-end gap-2">
