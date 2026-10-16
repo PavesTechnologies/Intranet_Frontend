@@ -1836,6 +1836,11 @@ export default function ExpenseReportDetailPage() {
                       <DetailField icon={<Briefcase size={15} />} label="Client Billable?" value={lineItemToView.clientBillable ? "Yes" : "No"} />
                       {lineItemToView.clientBillable && (
                         <div className="col-span-2">
+                          <DetailField icon={<Briefcase size={15} />} label="Client" value={lineItemToView.resolvedClientName || "—"} />
+                        </div>
+                      )}
+                      {lineItemToView.clientBillable && (
+                        <div className="col-span-2">
                           <DetailField icon={<Briefcase size={15} />} label="Project" value={lineItemToView.projectName || "—"} />
                         </div>
                       )}
@@ -2338,6 +2343,7 @@ const emptyForm = (defaultCostCenterId) => ({
   tax: emptyTaxValue,
   costCenterId: defaultCostCenterId || "",
   clientBillable: false,
+  clientId: "",
   projectId: "",
 });
 
@@ -2359,6 +2365,9 @@ export function LineItemDrawer({
   const [ocrReceiptId, setOcrReceiptId] = useState(null);
   const [projects, setProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [clients, setClients] = useState([]);
+  const [loadingClients, setLoadingClients] = useState(false);
+  const [clientsError, setClientsError] = useState("");
   // Latest server tax preview for the form (drives validation and the request's tax fields).
   const [taxPreview, setTaxPreview] = useState(null);
 
@@ -2411,6 +2420,28 @@ export function LineItemDrawer({
     }
   }, [isOpen, lineItem?.lineItemId, savedLineItem?.lineItemId, fetchReceipts]);
 
+  // Active RMS clients via XMS (GET /xms/clients). A failure is shown inline under the Client
+  // field with a retry, rather than only as a toast, since it blocks saving a billable expense.
+  const loadClients = useCallback(async () => {
+    try {
+      setLoadingClients(true);
+      setClientsError("");
+      const list = await lookupService.getActiveClients();
+      setClients(Array.isArray(list) ? list : []);
+    } catch (err) {
+      console.error("Failed to load clients:", err);
+      // XMS forwards the user's own token to RMS, which only lets Admin / Resource Manager /
+      // Project Manager list clients — a 403 here is a role issue, not an outage.
+      setClientsError(
+        err.response?.status === 403
+          ? "Your role doesn't have access to the client list in RMS."
+          : err.response?.data?.message || "Could not load clients."
+      );
+    } finally {
+      setLoadingClients(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) {
       setSavedLineItem(null);
@@ -2434,12 +2465,13 @@ export function LineItemDrawer({
         setProjects(Array.isArray(list) ? list : []);
       } catch (err) {
         console.error("Failed to load assigned projects:", err);
-        showStatusToast("Could not load your assigned projects. You can still save this expense as non-billable.", "error");
+        showStatusToast("Could not load your assigned projects. Project is optional for billable expenses.", "error");
       } finally {
         setLoadingProjects(false);
       }
     };
     loadProjects();
+    loadClients();
 
     if (lineItem) {
       if (!savedLineItem ||
@@ -2457,6 +2489,8 @@ export function LineItemDrawer({
           tax: lineItem.lineItemId ? taxValueFromLine(lineItem) : taxValueFromOcr(lineItem.taxAmount),
           costCenterId: isOcr ? "" : (lineItem.costCenterId || defaultCostCenterId || ""),
           clientBillable: !!lineItem.clientBillable,
+          // Saved line items carry the client as resolvedClientId (the frozen snapshot).
+          clientId: lineItem.resolvedClientId || lineItem.clientId || "",
           projectId: lineItem.projectId || "",
         });
         setTaxPreview(null);
@@ -2485,7 +2519,7 @@ export function LineItemDrawer({
     }
     setFormErrors({});
     setSplitErrors({});
-  }, [isOpen, lineItem, defaultCostCenterId]);
+  }, [isOpen, lineItem, defaultCostCenterId, loadClients]);
 
   // Load existing splits only for a line item that actually exists yet (never call the splits
   // endpoint for a brand-new, not-yet-created line item — there is no lineItemId to call it with).
@@ -2886,8 +2920,8 @@ export function LineItemDrawer({
     } else if (formData.expenseDate > todayStr) {
       errors.expenseDate = "Expense date cannot be in the future.";
     }
-    if (formData.clientBillable && !formData.projectId) {
-      errors.projectId = "Project is required when billable.";
+    if (formData.clientBillable && !formData.clientId) {
+      errors.clientId = "Client is required when billable.";
     }
 
     setFormErrors(errors);
@@ -2950,6 +2984,9 @@ export function LineItemDrawer({
         ? taxRequestFieldsForConfirm(formData.tax, taxPreview)
         : taxRequestFields(formData.tax, taxPreview)),
       costCenterId: formData.costCenterId,
+      // Project is optional for a billable expense; if one is picked, the server checks it
+      // belongs to the selected client.
+      clientId: formData.clientBillable ? (formData.clientId || null) : null,
       projectId: formData.clientBillable ? (formData.projectId || null) : null,
       clientBillable: !!formData.clientBillable,
     };
@@ -3057,12 +3094,39 @@ export function LineItemDrawer({
     // No client-side status filter: /xms/employee/projects/assigned (PMS /api/my-work under
     // the hood) already restricts to the employee's ACTIVE/PLANNING projects server-side, and
     // does not even return a status field per project — filtering here would just empty the list.
+    // Only the selected client's projects: p.clientId is the project's RMS client as PMS reports it.
+    if (!formData.clientId) return [];
     return projects
+      .filter((p) => p.clientId === formData.clientId)
       .map((p) => ({
         value: p.projectId,
         label: `${p.projectCode} - ${p.projectName}`,
       }));
-  }, [projects]);
+  }, [projects, formData.clientId]);
+
+  // Switching client drops a picked project that doesn't belong to the new client.
+  const handleClientChange = (opt) => {
+    const clientId = opt ? opt.value : "";
+    setFormData((prev) => {
+      const project = projects.find((p) => p.projectId === prev.projectId);
+      const keepProject = !!project && !!clientId && project.clientId === clientId;
+      return { ...prev, clientId, projectId: keepProject ? prev.projectId : "" };
+    });
+    if (formErrors.clientId) setFormErrors((prev) => ({ ...prev, clientId: "" }));
+  };
+
+  const clientOptions = useMemo(() => {
+    const options = clients
+      .filter((c) => c.clientId)
+      .map((c) => ({ value: c.clientId, label: c.clientName || c.clientId }));
+    // Keep an edited line item's saved client visible even if RMS no longer lists it as active;
+    // the server rejects it on save with an explanatory message.
+    const savedId = lineItem?.resolvedClientId;
+    if (savedId && !loadingClients && !options.some((o) => o.value === savedId)) {
+      return [{ value: savedId, label: lineItem.resolvedClientName || "Previously selected client" }, ...options];
+    }
+    return options;
+  }, [clients, lineItem, loadingClients]);
 
   const selectedCurrency = currencyOptions.find((o) => o.value === formData.currencyId) || null;
   const selectedCostCenter = costCenterOptions.find((o) => o.value === formData.costCenterId) || null;
@@ -3353,18 +3417,69 @@ export function LineItemDrawer({
         {formData.clientBillable && (
           <div className="space-y-0.5">
             <label className="block text-xs font-semibold text-gray-600">
-              Project <span className="text-red-500">*</span>
+              Client <span className="text-red-500">*</span>
+            </label>
+            <Select
+              options={clientOptions}
+              value={clientOptions.find((o) => o.value === formData.clientId) || null}
+              onChange={handleClientChange}
+              placeholder={
+                loadingClients
+                  ? "Loading clients..."
+                  : clientsError
+                    ? "Clients unavailable"
+                    : "Select client..."
+              }
+              isSearchable
+              isLoading={loadingClients}
+              noOptionsMessage={() => (loadingClients ? "Loading..." : "No active clients found.")}
+              styles={compactSelectStyles}
+              isDisabled={submitting || loadingClients || !!clientsError}
+            />
+            {clientsError ? (
+              <span className="text-[11px] text-red-600 block mt-0.5">
+                {clientsError}{" "}
+                <button
+                  type="button"
+                  onClick={loadClients}
+                  className="font-semibold text-indigo-600 hover:text-indigo-800 underline"
+                >
+                  Retry
+                </button>
+              </span>
+            ) : !loadingClients && clientOptions.length === 0 ? (
+              <span className="text-[11px] text-gray-500 block mt-0.5">
+                No active clients are available, so this expense can't be marked billable yet.
+              </span>
+            ) : null}
+            {formErrors.clientId && <span className="text-[11px] text-red-600 block mt-0.5">{formErrors.clientId}</span>}
+          </div>
+        )}
+
+        {formData.clientBillable && (
+          <div className="space-y-0.5">
+            <label className="block text-xs font-semibold text-gray-600">
+              Project <span className="font-normal text-gray-400">(optional)</span>
             </label>
             <Select
               options={projectOptions}
               value={projectOptions.find((o) => o.value === formData.projectId) || null}
               onChange={(opt) => handleSelectChange("projectId", opt ? opt.value : "")}
-              placeholder={loadingProjects ? "Loading your assigned projects..." : "Select project..."}
+              placeholder={
+                loadingProjects
+                  ? "Loading your assigned projects..."
+                  : !formData.clientId
+                    ? "Select a client first"
+                    : "Select project..."
+              }
               isSearchable
+              isClearable
               isLoading={loadingProjects}
-              noOptionsMessage={() => (loadingProjects ? "Loading..." : "You have no assigned projects. Ask your PM to add you in PMS.")}
+              noOptionsMessage={() =>
+                loadingProjects ? "Loading..." : "You have no assigned projects for this client."
+              }
               styles={compactSelectStyles}
-              isDisabled={submitting || loadingProjects}
+              isDisabled={submitting || loadingProjects || !formData.clientId}
             />
             {formErrors.projectId && <span className="text-[11px] text-red-600 block mt-0.5">{formErrors.projectId}</span>}
           </div>

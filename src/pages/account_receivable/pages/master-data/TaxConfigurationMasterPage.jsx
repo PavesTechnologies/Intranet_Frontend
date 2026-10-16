@@ -323,11 +323,48 @@ export default function TaxConfigurationMasterPage() {
 
       <PageCard className="overflow-hidden">
         <PageCardContent className="space-y-4 p-4 sm:p-5">
-          <div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
             <h2 className="text-base font-semibold text-slate-900">Tax Regions</h2>
             <p className="mt-0.5 text-xs text-slate-500">
               {stats.totalTaxRules} tax rules across {currencyOptions.length - 1} currencies
             </p>
+            </div>
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end lg:w-auto lg:flex-nowrap">
+              <div className="min-w-0 flex-1 sm:min-w-[240px] lg:w-[280px] lg:flex-none">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={(event) => {
+                    setSearchQuery(event.target.value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Search tax regions..."
+                />
+              </div>
+              <div className="w-full sm:w-44">
+                <FilterListbox
+                  options={currencyOptions}
+                  value={currencyFilter}
+                  onChange={(value) => {
+                    setCurrencyFilter(value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="All currencies"
+                />
+              </div>
+              <div className="w-full sm:w-44">
+                <FilterListbox
+                  options={regimeOptions}
+                  value={regimeFilter}
+                  onChange={(value) => {
+                    setRegimeFilter(value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="All regimes"
+                />
+              </div>
+              {hasActiveFilters && <ARClearFiltersButton onClick={handleResetFilters} />}
+            </div>
           </div>
           <ARKPIStatusTabs
             label="Tax region summary filters"
@@ -340,44 +377,6 @@ export default function TaxConfigurationMasterPage() {
               onClick: () => handleKpiClick(kpi.key),
             }))}
           />
-          <div className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:grid-cols-2 xl:flex xl:items-center">
-            <div className="w-full xl:w-64">
-              <SearchInput
-                value={searchQuery}
-                onChange={(event) => {
-                  setSearchQuery(event.target.value);
-                  setCurrentPage(1);
-                }}
-                placeholder="Search tax regions..."
-              />
-            </div>
-            <div className="w-full sm:w-44">
-              <FilterListbox
-                options={currencyOptions}
-                value={currencyFilter}
-                onChange={(value) => {
-                  setCurrencyFilter(value);
-                  setCurrentPage(1);
-                }}
-                placeholder="All currencies"
-              />
-            </div>
-            <div className="w-full sm:w-44">
-              <FilterListbox
-                options={regimeOptions}
-                value={regimeFilter}
-                onChange={(value) => {
-                  setRegimeFilter(value);
-                  setCurrentPage(1);
-                }}
-                placeholder="All regimes"
-              />
-            </div>
-            {hasActiveFilters && (
-              <ARClearFiltersButton onClick={handleResetFilters} />
-            )}
-          </div>
-
           <ARTable
             headers={tableHeaders}
             columns={tableColumns}

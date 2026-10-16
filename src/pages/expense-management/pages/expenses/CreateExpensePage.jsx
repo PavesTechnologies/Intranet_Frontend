@@ -3135,9 +3135,26 @@ export default function CreateExpensePage() {
                       icon={
                         <Briefcase size={15} />
                       }
+                      label="Client"
+                      value={
+                        lineItemToView.resolvedClientName || "—"
+                      }
+                    />
+
+                  </div>
+                )}
+
+
+                {lineItemToView.clientBillable && (
+                  <div className="col-span-2">
+
+                    <DetailField
+                      icon={
+                        <Briefcase size={15} />
+                      }
                       label="Project"
                       value={
-                        lineItemToView.projectName
+                        lineItemToView.projectName || "—"
                       }
                     />
 

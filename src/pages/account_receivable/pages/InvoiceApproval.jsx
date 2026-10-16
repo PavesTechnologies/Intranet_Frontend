@@ -168,6 +168,7 @@ export default function InvoiceApproval() {
       recordLock.release();
       showStatusToast("Invoice approved successfully.", "success");
       setApproveTarget(null);
+      navigate("/account-receivable/invoice-approval", { replace: true });
       await loadData();
     } catch (err) {
       const msg = getInvoiceErrorMessage(err, "Failed to approve invoice.");
@@ -191,6 +192,7 @@ export default function InvoiceApproval() {
       showStatusToast("Invoice rejected.", "success");
       setRejectTarget(null);
       setRejectReason("");
+      navigate("/account-receivable/invoice-approval", { replace: true });
       await loadData();
     } catch (err) {
       const msg = getInvoiceErrorMessage(err, "Failed to reject invoice.");
@@ -554,26 +556,20 @@ export default function InvoiceApproval() {
       {/* 3. Main Data Card */}
       <PageCard>
         <PageCardContent className="p-4 sm:p-5 space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-base font-semibold text-slate-900">Invoice approvals</h2>
               <p className="mt-0.5 text-xs text-slate-500">Review invoices by approval status and track their latest action.</p>
             </div>
-            <p className="text-xs font-medium text-slate-600">
-              Total approval value <span className="ml-1 font-semibold text-slate-900">{loading ? "…" : formatCurrency(kpis.totalApprovalValue, kpis.currency)}</span>
-            </p>
-          </div>
-          {kpiSection}
-          <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/70 p-2 lg:flex-row lg:items-center lg:justify-between">
-            <div className="w-full lg:max-w-md">
-              <SearchInput
-                value={searchQuery}
-                onChange={handleSearchInputChange}
-                onSearch={(val) => setSearchQuery(val)}
-                placeholder="Search by invoice number, project, client, or snapshot..."
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex w-full items-center justify-end gap-2 lg:w-[420px]">
+              <div className="min-w-0 flex-1">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={handleSearchInputChange}
+                  onSearch={(val) => setSearchQuery(val)}
+                  placeholder="Search by invoice number, project, client, or snapshot..."
+                />
+              </div>
               {(statusTab !== STATUS_TABS.ALL || searchQuery) && (
                 <ARClearFiltersButton
                   onClick={() => {
@@ -586,6 +582,10 @@ export default function InvoiceApproval() {
               )}
             </div>
           </div>
+          <p className="text-xs font-medium text-slate-600">
+            Total approval value <span className="ml-1 font-semibold text-slate-900">{loading ? "…" : formatCurrency(kpis.totalApprovalValue, kpis.currency)}</span>
+          </p>
+          {kpiSection}
 
           <div className="overflow-x-auto">
             <ARTable
