@@ -228,6 +228,11 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
                                   {line.costCenterName && line.costCenterName !== costCenterName ? ` · ${line.costCenterName}` : ""}
                                 </p>
                                 {line.description && <p className="mt-0.5 line-clamp-2 text-xs text-gray-400">{line.description}</p>}
+                                <LineAllocationDetails
+                                  lineItemId={line.lineItemId}
+                                  allocationReason={line.allocationReason}
+                                  baseCurrencyCode={line.baseCurrencyCode || line.currencyCode}
+                                />
                                 {line.clientBillable && (
                                   <span className="mt-1 inline-flex rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
                                     Billable{line.resolvedClientName || line.projectName ? ` · ${line.resolvedClientName || line.projectName}` : ""}
@@ -281,6 +286,11 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
                             )}
                             <PolicyStatusBadge lineStatus={line.lineStatus} policyWarnings={line.policyWarnings} audience="reviewer" />
                           </div>
+                          <LineAllocationDetails
+                            lineItemId={line.lineItemId}
+                            allocationReason={line.allocationReason}
+                            baseCurrencyCode={line.baseCurrencyCode || line.currencyCode}
+                          />
                         </div>
                       ))}
                     </div>
