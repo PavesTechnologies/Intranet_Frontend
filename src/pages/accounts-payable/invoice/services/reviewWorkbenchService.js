@@ -7,8 +7,8 @@ const AP_BASE_URL = window.__APP_CONFIG__.AP_BASE_URL;
 const BASE = `${AP_BASE_URL}/invoice-review`;
 
 export const reviewWorkbenchService = {
-  async getWorkbench(stage) {
-    const { data } = await api.get(`${BASE}/workbench`, { params: { stage } });
+  async getWorkbench(stage, assigned = "all") {
+    const { data } = await api.get(`${BASE}/workbench`, { params: { stage, assigned } });
     return data;
   },
 

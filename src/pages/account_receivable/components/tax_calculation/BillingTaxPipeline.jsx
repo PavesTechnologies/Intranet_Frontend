@@ -6,7 +6,6 @@ import SearchInput from "../../../../components/filter/Searchbar";
 import ARClearFiltersButton from "../common/ARClearFiltersButton";
 import ARKPIStatusTabs from "../common/ARKPIStatusTabs";
 import ActionMenu from "../common/ActionMenu";
-import FilterListbox from "../common/ARFilterListbox";
 import Pagination from "../../../../components/Pagination/pagination";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import Button from "../../../../components/Button/Button";
@@ -19,7 +18,6 @@ import {
   PIPELINE_EMPTY_MESSAGES,
   countPipelineStages,
   filterByPipelineStage,
-  formatMonthKey,
 } from "../../utils/taxPipeline";
 
 const PAGE_SIZE = 10;
@@ -80,23 +78,6 @@ export default function BillingTaxPipeline({
     setCurrentPage(1);
   }, [stage, searchQuery, billingTypeFilter, regionFilter, monthFilter]);
 
-  const billingTypeOptions = useMemo(() => {
-    const types = Array.from(new Set(records.map((r) => r.billingType).filter(Boolean))).sort();
-    return [{ value: ALL, label: "All Billing Types" }, ...types.map((t) => ({ value: t, label: t }))];
-  }, [records]);
-
-  const regionOptions = useMemo(() => {
-    const regions = Array.from(new Set(records.map((r) => r.taxRegion).filter(Boolean))).sort();
-    return [{ value: ALL, label: "All Tax Regions" }, ...regions.map((r) => ({ value: r, label: r }))];
-  }, [records]);
-
-  const monthOptions = useMemo(() => {
-    const months = Array.from(
-      new Set(records.map((r) => r.billingDateKey && r.billingDateKey.slice(0, 7)).filter(Boolean))
-    ).sort().reverse();
-    return [{ value: ALL, label: "All Billing Periods" }, ...months.map((m) => ({ value: m, label: formatMonthKey(m) }))];
-  }, [records]);
-
   // Search + filters apply first; stage tabs then split that result, so tab
   // counts always describe what the user would see by clicking them.
   const filteredRecords = useMemo(() => {
@@ -138,12 +119,27 @@ export default function BillingTaxPipeline({
     // No overflow clipping on the card: it grows with its content and the page
     // does the vertical scrolling; filter dropdowns can extend past its edge.
     <PageCard>
-      {/* Title */}
-      <div className="px-4 pt-4 sm:px-5">
-        <h2 className="text-base font-semibold text-slate-900">Billing Tax Pipeline</h2>
-        <p className="mt-0.5 text-xs text-slate-500">
-          All billing types move through the same stages, from upcoming occurrence to invoice.
-        </p>
+      {/* Title and search */}
+      <div className="flex flex-col gap-3 px-4 pt-4 sm:px-5 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Billing Tax Pipeline</h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            All billing types move through the same stages, from upcoming occurrence to invoice.
+          </p>
+        </div>
+        <div className="flex w-full items-center justify-end gap-2 lg:w-[420px]">
+          <div className="min-w-0 flex-1">
+            <SearchInput
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onSearch={(val) => setSearchQuery(val)}
+              placeholder="Search by project, client, snapshot number..."
+            />
+          </div>
+          {hasActiveFilters && (
+            <ARClearFiltersButton onClick={clearFilters} label="Clear filters" />
+          )}
+        </div>
       </div>
 
       {/* Stage tabs — All, then the pipeline in order. The bottom rule is an
@@ -164,45 +160,6 @@ export default function BillingTaxPipeline({
           })),
         ]}
       />
-
-      {/* Filter toolbar — search is the widest control; wraps to two rows below lg */}
-      <div className="px-4 py-3 sm:px-5">
-        <div className="grid grid-cols-1 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:grid-cols-3 lg:grid-cols-[minmax(0,2.1fr)_repeat(3,minmax(0,1fr))_auto]">
-          <div className="relative sm:col-span-3 lg:col-span-1">
-            <SearchInput
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onSearch={(val) => setSearchQuery(val)}
-              placeholder="Search by project, client, snapshot number..."
-            />
-          </div>
-          <FilterListbox
-            options={billingTypeOptions}
-            value={billingTypeFilter}
-            onChange={setBillingTypeFilter}
-            placeholder="Billing Type"
-          />
-          <FilterListbox
-            options={regionOptions}
-            value={regionFilter}
-            onChange={setRegionFilter}
-            placeholder="Tax Region"
-          />
-          <FilterListbox
-            options={monthOptions}
-            value={monthFilter}
-            onChange={setMonthFilter}
-            placeholder="Billing Period"
-          />
-          {hasActiveFilters && (
-            <ARClearFiltersButton
-              onClick={clearFilters}
-              label="Clear filters"
-              className="justify-self-end sm:col-span-3 lg:col-span-1"
-            />
-          )}
-        </div>
-      </div>
 
       {/* Records */}
       <div className="border-t border-slate-200">

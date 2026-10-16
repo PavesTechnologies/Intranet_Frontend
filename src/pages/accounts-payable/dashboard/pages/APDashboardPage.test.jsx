@@ -16,6 +16,8 @@ vi.mock("react-router-dom", async (importOriginal) => {
 vi.mock("../hooks/useDashboardSummary", () => ({ useDashboardSummary: vi.fn() }));
 vi.mock("../hooks/useRoleDashboards", () => ({ useDashboardViews: vi.fn(), useRoleDashboard: vi.fn() }));
 vi.mock("../../../../contexts/AuthContext", () => ({ useAuth: vi.fn() }));
+// The Action Center has its own tests (ActionCenter.test.jsx).
+vi.mock("../components/ActionCenter", () => ({ default: () => null }));
 // Overview + Expense widgets render as light stubs; their own tests cover them.
 vi.mock("../components/DashboardWidgets", () => ({
   ChartCard: ({ title, children }) => (<section><h3>{title}</h3>{children}</section>),

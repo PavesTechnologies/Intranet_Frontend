@@ -154,8 +154,13 @@ const column = (key, label, align = "left") => ({ key, label, align });
 // --- Time & Material: resource-based lines (existing behaviour) -----------
 
 function buildTimeMaterialLines(items, currency) {
-  const hasWorkDate = items.some((it) => Boolean(it.workDate || it.date));
-  const hasHours = items.some((it) => it.hours !== undefined && it.hours !== null);
+  // Excluded entries (internal audit / non-billable / excluded from invoice) must not be presented as payable invoice lines
+  const payableItems = items.filter(
+    (it) => it.includeInInvoice !== false && it.isBillable !== false && it.excludedFromInvoice !== true
+  );
+  const targetItems = payableItems.length > 0 || items.length === 0 ? payableItems : items;
+  const hasWorkDate = targetItems.some((it) => Boolean(it.workDate || it.date));
+  const hasHours = targetItems.some((it) => it.hours !== undefined && it.hours !== null);
   const columns = [
     column("item", "Resource / Item"),
     column("role", "Role"),
@@ -164,8 +169,13 @@ function buildTimeMaterialLines(items, currency) {
     column("rate", "Rate"),
     column("amount", "Amount"),
   ];
-  const rows = items.map((it, idx) => {
+  const rows = targetItems.map((it, idx) => {
     const quantity = firstNumber(it.hours, it.quantity);
+    const hasDiscount = Boolean(
+      it.discountApplied ||
+      it.hasDiscount ||
+      (it.standardRate && Number(it.standardRate) > Number(it.rate))
+    );
     return {
       id: it.id || `item-${idx}`,
       item: firstText(it.resourceName, it.itemName, it.employee, it.description) || "Line Item",
@@ -173,6 +183,7 @@ function buildTimeMaterialLines(items, currency) {
       workDate: formatDateOrDash(it.workDate || it.date),
       quantity: quantity === null ? "—" : quantity.toFixed(2),
       rate: money(firstNumber(it.rate), currency),
+      discountApplied: hasDiscount,
       amount: money(firstNumber(it.amount, it.totalAmount), currency),
     };
   });

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Eye, CheckCircle2, XCircle, ClipboardCheck, Clock, FolderKanban, Building2, Calendar, Receipt, Wallet, Info, AlertTriangle, FilterX } from "lucide-react";
 import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
@@ -484,10 +485,11 @@ function ApprovalReviewDetails({ config }) {
 
 // Finance Manager (Checker) queue for the Maker-Checker billing configuration workflow.
 export default function BillingApprovals() {
+  const navigate = useNavigate();
   const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusTab, setStatusTab] = useState(STATUS_TABS.PENDING);
+  const [statusTab, setStatusTab] = useState(STATUS_TABS.ALL);
   const [currentPage, setCurrentPage] = useState(1);
 
   const [reviewingId, setReviewingId] = useState(null);
@@ -716,21 +718,6 @@ export default function BillingApprovals() {
 
   // Approving is a single click from the review screen — no extra "are you
   // sure" step, since the review screen itself is already the confirmation.
-  // After Approve/Reject, re-read the configuration from the backend and keep
-  // the review open on the RESULTING state — e.g. APPROVED + ACTIVE, or the
-  // previously approved version the backend restored after a rejected change.
-  // Nothing is derived here: whatever the backend now returns is shown.
-  const showRefreshedReview = async (billingConfigurationId) => {
-    try {
-      const refreshed = await getBillingConfigurationForApproval(billingConfigurationId);
-      setReviewTarget(refreshed);
-      return refreshed;
-    } catch {
-      setReviewTarget(null);
-      return null;
-    }
-  };
-
   const handleApprove = async () => {
     if (!reviewTarget) return;
     setApproveLoading(true);
@@ -743,8 +730,10 @@ export default function BillingApprovals() {
       const hadChanges = (reviewTarget.changes || []).length > 0;
       await approveBillingConfigurationRequest(billingConfigurationId);
       recordLock.release();
+      setReviewTarget(null);
       showStatusToast(hadChanges ? "Changes approved successfully." : "Billing Configuration approved successfully.", "success");
-      await Promise.all([loadAllApprovals(), showRefreshedReview(billingConfigurationId)]);
+      navigate("/account-receivable/billing-approvals", { replace: true });
+      await loadAllApprovals();
     } catch (error) {
       handleMutationError(error, "Failed to approve billing configuration.");
     } finally {
@@ -763,20 +752,14 @@ export default function BillingApprovals() {
     try {
       if (!(await ensureReviewLock())) return;
       const { billingConfigurationId } = rejectTarget;
-      const hadChanges = (rejectTarget.changes || []).length > 0;
       await rejectBillingConfigurationRequest(billingConfigurationId, rejectionReason.trim());
       recordLock.release();
       setRejectTarget(null);
+      setReviewTarget(null);
       setRejectionReason("");
-      const [, refreshed] = await Promise.all([loadAllApprovals(), showRefreshedReview(billingConfigurationId)]);
-      // For a rejected re-approval the backend restores the previously
-      // approved version — confirm that only when the refreshed record shows it.
-      showStatusToast(
-        hadChanges && refreshed?.approvalStatus === "APPROVED"
-          ? "Changes rejected. The previously approved configuration has been restored."
-          : "Billing Configuration rejected successfully.",
-        "success"
-      );
+      showStatusToast("Billing Configuration rejected successfully.", "success");
+      navigate("/account-receivable/billing-approvals", { replace: true });
+      await loadAllApprovals();
     } catch (error) {
       handleMutationError(error, "Failed to reject billing configuration.");
     } finally {
@@ -849,9 +832,31 @@ export default function BillingApprovals() {
       {/* 3. Main Data Card */}
       <PageCard>
         <PageCardContent className="p-4 sm:p-5 space-y-4">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">Billing requests</h2>
-            <p className="mt-0.5 text-xs text-slate-500">Review and track submitted billing configuration approvals.</p>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Billing requests</h2>
+              <p className="mt-0.5 text-xs text-slate-500">Review and track submitted billing configuration approvals.</p>
+            </div>
+            <div className="flex w-full items-center justify-end gap-2 lg:w-[420px]">
+              <div className="min-w-0 flex-1">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={handleSearchInputChange}
+                  onSearch={(val) => setSearchQuery(val)}
+                  placeholder="Search by project, code, or client..."
+                />
+              </div>
+              {(statusTab !== STATUS_TABS.ALL || searchQuery) && (
+                <ARClearFiltersButton
+                  onClick={() => {
+                    setStatusTab(STATUS_TABS.ALL);
+                    setSearchQuery("");
+                    setCurrentPage(1);
+                  }}
+                  title="Clear search and status filters"
+                />
+              )}
+            </div>
           </div>
           <ARKPIStatusTabs
             label="Billing request approval status"
@@ -864,27 +869,6 @@ export default function BillingApprovals() {
               onClick: () => handleKpiClick(kpi.key),
             }))}
           />
-          <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/70 p-2 lg:flex-row lg:items-center lg:justify-between">
-            <div className="w-full lg:max-w-md">
-              <SearchInput
-                value={searchQuery}
-                onChange={handleSearchInputChange}
-                onSearch={(val) => setSearchQuery(val)}
-                placeholder="Search by project, code, or client..."
-              />
-            </div>
-            {(statusTab !== STATUS_TABS.ALL || searchQuery) && (
-              <ARClearFiltersButton
-                onClick={() => {
-                  setStatusTab(STATUS_TABS.ALL);
-                  setSearchQuery("");
-                  setCurrentPage(1);
-                }}
-                title="Clear search and status filters"
-              />
-            )}
-          </div>
-
           <div className="overflow-x-auto">
             <ARTable
               headers={TABLE_HEADERS}

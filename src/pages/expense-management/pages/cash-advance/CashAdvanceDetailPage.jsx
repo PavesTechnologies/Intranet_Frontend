@@ -8,7 +8,7 @@ import { showStatusToast } from "@/components/toastfy/toast";
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import EmployeeLabel from "@/pages/expense-management/approval-engine/components/EmployeeLabel";
 import { useAuth } from "@/contexts/AuthContext";
-import { validateRepaymentAmount } from "@/pages/expense-management/pages/cash-advance/repaymentValidation";
+import SettleBalancePanel from "@/pages/expense-management/pages/cash-advance/components/SettleBalancePanel";
 import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
 import {
@@ -69,9 +69,6 @@ export default function CashAdvanceDetailPage() {
   const [settlement, setSettlement] = useState(null);
   const [utilization, setUtilization] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [repayment, setRepayment] = useState({ amount: "", paymentMethod: "BANK_TRANSFER", paymentReference: "", notes: "" });
-  const [repayError, setRepayError] = useState("");
-  const [repaying, setRepaying] = useState(false);
 
   const fetchAdvance = useCallback(async () => {
     setLoading(true);
@@ -147,36 +144,6 @@ export default function CashAdvanceDetailPage() {
   const currencyCode = advance.currencyCode || "INR";
 
   // Checked before the request is sent. The backend checks again and is the authority.
-  const validateRepayment = () =>
-    validateRepaymentAmount(repayment.amount, outstanding, (n) => formatMoney(n, currencyCode));
-
-  const handleRepay = async (e) => {
-    e.preventDefault();
-    const message = validateRepayment();
-    if (message) {
-      setRepayError(message);
-      return;
-    }
-    setRepayError("");
-    setRepaying(true);
-    try {
-      await cashAdvanceApi.repay(advance.advanceId || advance.id || advanceId, {
-        amount: Number(repayment.amount),
-        paymentMethod: repayment.paymentMethod,
-        paymentReference: repayment.paymentReference || null,
-        notes: repayment.notes || null,
-      });
-      showStatusToast("Repayment recorded", "success");
-      setRepayment({ amount: "", paymentMethod: "BANK_TRANSFER", paymentReference: "", notes: "" });
-      fetchAdvance();
-    } catch (err) {
-      const message = err.response?.data?.message || "Failed to record repayment";
-      setRepayError(message);
-      showStatusToast(message, "error");
-    } finally {
-      setRepaying(false);
-    }
-  };
 
   return (
     <div className="space-y-4">
@@ -407,62 +374,13 @@ export default function CashAdvanceDetailPage() {
         </div>
 
         {canRepay && (
-          <form onSubmit={handleRepay} className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Record employee repayment</p>
-              <p className="text-[11px] text-gray-600">
-                Outstanding: {formatMoney(outstanding, currencyCode)}. The advance closes when the balance reaches zero.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-              <label className="block">
-                <span className="text-[10px] font-semibold uppercase text-gray-500">Amount</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={repayment.amount}
-                  disabled={repaying}
-                  onChange={(e) => setRepayment({ ...repayment, amount: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-[10px] font-semibold uppercase text-gray-500">Payment method</span>
-                <select
-                  value={repayment.paymentMethod}
-                  disabled={repaying}
-                  onChange={(e) => setRepayment({ ...repayment, paymentMethod: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-                >
-                  {["BANK_TRANSFER", "CASH", "UPI", "CHEQUE"].map((m) => (
-                    <option key={m} value={m}>{m.replace("_", " ")}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block md:col-span-2">
-                <span className="text-[10px] font-semibold uppercase text-gray-500">Payment reference</span>
-                <input
-                  type="text"
-                  maxLength={255}
-                  value={repayment.paymentReference}
-                  disabled={repaying}
-                  onChange={(e) => setRepayment({ ...repayment, paymentReference: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-                />
-              </label>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-rose-700" role="alert">{repayError}</p>
-              <Button type="submit" variant="success" disabled={repaying} loading={repaying}>
-                Record repayment
-              </Button>
-            </div>
-          </form>
+          <SettleBalancePanel
+            advanceId={advance.advanceId || advance.id || advanceId}
+            advanceNumber={formatAdvanceNumber(advance)}
+            outstanding={outstanding}
+            currencyCode={currencyCode}
+            onSettled={fetchAdvance}
+          />
         )}
 
         {advance.notes && (

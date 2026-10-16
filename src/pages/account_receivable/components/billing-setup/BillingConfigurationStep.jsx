@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Plus, Pencil, Trash2, Loader2, Landmark, Wallet, Layers, Lock, AlertCircle } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Plus, Pencil, Trash2, Loader2, Landmark, Wallet, Layers, Lock, AlertCircle, Tag, ChevronDown, ChevronUp } from "lucide-react";
 
 import FormInput from "../../../../components/forms/FormInput";
 import FormSelect from "../../../../components/forms/FormSelect";
@@ -21,7 +21,7 @@ import {
   RECURRING_RENEWAL_MODE_OPTIONS,
   PAYMENT_STRUCTURE_OPTIONS,
 } from "../../data/wizardOptions";
-import { formatCurrency, formatDisplayDate, formatIndianNumber } from "../../utils/format";
+import { formatCurrency, formatDisplayDate, formatIndianNumber, isValidCurrency } from "../../utils/format";
 import { getBillingTypeDisplayName } from "../../utils/billingType";
 import {
   getRecurringDateErrors,
@@ -36,6 +36,14 @@ import {
   saveTmRateCard,
   deleteTmRateCard,
   getApiErrorMessage,
+  calculateDiscountedRate,
+  getTmRateDiscounts,
+  createTmRateDiscount,
+  updateTmRateDiscount,
+  deleteTmRateDiscount,
+  syncStandardRateDiscounts,
+  normalizeTmRateDiscount,
+  calculateRateDiscountPreview,
   getFixedPriceByBillingConfiguration,
   createFixedPriceConfiguration,
   updateFixedPriceConfiguration,
@@ -216,6 +224,49 @@ function getEffectiveDateErrors({ effectiveFrom, effectiveTo, projectStartDate, 
 
 const hasEffectiveDateErrors = (errors) => Boolean(errors?.effectiveFrom || errors?.effectiveTo);
 
+const DISCOUNT_TYPE_OPTIONS = [
+  { value: "PERCENTAGE", label: "Percentage (%)" },
+  { value: "FIXED_AMOUNT", label: "Fixed Amount" },
+];
+
+function getRatePeriodSuffix(ratePeriod) {
+  switch (ratePeriod) {
+    case "HOURLY": return "/ hr";
+    case "DAILY": return "/ day";
+    case "WEEKLY": return "/ week";
+    case "MONTHLY": return "/ month";
+    case "ANNUAL": return "/ yr";
+    default: return "";
+  }
+}
+
+function getDiscountDateErrors({ discountStartDate, discountEndDate, effectiveFrom, effectiveTo, projectStartDate, projectEndDate }) {
+  const errors = { discountStartDate: "", discountEndDate: "" };
+  if (!discountStartDate && !discountEndDate) return errors;
+
+  if (discountStartDate && discountEndDate && discountStartDate > discountEndDate) {
+    errors.discountEndDate = "Discount End Date must be on or after Start Date.";
+  }
+
+  const rangeStart = effectiveFrom || projectStartDate;
+  const rangeEnd = effectiveTo || projectEndDate;
+
+  if (discountStartDate && rangeStart && discountStartDate < rangeStart) {
+    errors.discountStartDate = `Discount Start Date cannot be before effective start (${rangeStart}).`;
+  }
+  if (discountStartDate && rangeEnd && discountStartDate > rangeEnd) {
+    errors.discountStartDate = `Discount Start Date cannot be after effective end (${rangeEnd}).`;
+  }
+  if (discountEndDate && rangeEnd && discountEndDate > rangeEnd) {
+    errors.discountEndDate = `Discount End Date cannot be after effective end (${rangeEnd}).`;
+  }
+  if (discountEndDate && rangeStart && discountEndDate < rangeStart) {
+    errors.discountEndDate = `Discount End Date cannot be before effective start (${rangeStart}).`;
+  }
+
+  return errors;
+}
+
 const EMPTY_RATE_CARD = {
   role: "",
   roleName: "",
@@ -225,6 +276,14 @@ const EMPTY_RATE_CARD = {
   effectiveTo: "",
   rateCardId: null,
   isSaved: false,
+  remarks: "",
+  hasDiscount: false,
+  discountType: "PERCENTAGE",
+  discountValue: "",
+  discountedRate: "",
+  discountStartDate: "",
+  discountEndDate: "",
+  includeInInvoice: true,
 };
 
 // TM rate card dates come back from the backend as Java LocalDate arrays
@@ -244,18 +303,59 @@ function normalizeRateCardDate(date) {
   return date || "";
 }
 
-const mapRateCard = (card = {}, includeRole = true) => ({
-  ...(includeRole
-    ? { role: card.roleName || card.role || card.name || "" }
-    : {}),
-  roleName: card.roleName || card.role || card.name || "",
-  rate: card.rate ?? card.amount ?? "",
-  ratePeriod: card.ratePeriod || card.period || "HOURLY",
-  effectiveFrom: normalizeRateCardDate(card.effectiveFrom || card.validFrom),
-  effectiveTo: normalizeRateCardDate(card.effectiveTo || card.validTo),
-  rateCardId: card.id || card.rateCardId || card.tmRateCardId || null,
-  isSaved: Boolean(card.id || card.rateCardId || card.tmRateCardId),
-});
+const mapRateCard = (card = {}, includeRole = true) => {
+  const rate = card.rate ?? card.amount ?? "";
+  const hasDiscount = Boolean(
+    card.hasDiscount ?? (card.discountType && card.discountType !== "NONE" && Number(card.discountValue) > 0)
+  );
+  const discountType = card.discountType || (card.discountValue ? "PERCENTAGE" : "NONE");
+  const discountValue = card.discountValue !== undefined && card.discountValue !== null ? card.discountValue : "";
+  const calculatedDiscounted = hasDiscount && rate && discountValue
+    ? calculateDiscountedRate(rate, discountType, discountValue)
+    : "";
+  const discountedRate = card.discountedRate !== undefined && card.discountedRate !== null && card.discountedRate !== ""
+    ? card.discountedRate
+    : calculatedDiscounted;
+
+  const rawPeriods = Array.isArray(card.discountPeriods) ? card.discountPeriods : [];
+  const discountPeriods = rawPeriods.length > 0
+    ? rawPeriods.map(normalizeTmRateDiscount)
+    : (hasDiscount && discountValue
+      ? [
+          {
+            periodName: "Discount Period 1",
+            discountType: discountType || "PERCENTAGE",
+            discountValue,
+            effectiveFrom: normalizeRateCardDate(card.discountStartDate) || normalizeRateCardDate(card.effectiveFrom) || "",
+            effectiveTo: normalizeRateCardDate(card.discountEndDate) || normalizeRateCardDate(card.effectiveTo) || "",
+            notes: card.remarks || card.notes || "",
+            includeInInvoice: card.includeInInvoice !== false,
+          },
+        ]
+      : []);
+
+  return {
+    ...(includeRole
+      ? { role: card.roleName || card.role || card.name || "" }
+      : {}),
+    roleName: card.roleName || card.role || card.name || "",
+    rate,
+    ratePeriod: card.ratePeriod || card.period || "HOURLY",
+    effectiveFrom: normalizeRateCardDate(card.effectiveFrom || card.validFrom),
+    effectiveTo: normalizeRateCardDate(card.effectiveTo || card.validTo),
+    rateCardId: card.id || card.rateCardId || card.tmRateCardId || null,
+    isSaved: Boolean(card.id || card.rateCardId || card.tmRateCardId),
+    remarks: card.remarks || card.notes || "",
+    hasDiscount: Boolean(hasDiscount || discountPeriods.length > 0),
+    discountType: hasDiscount ? discountType : "PERCENTAGE",
+    discountValue: hasDiscount ? discountValue : "",
+    discountedRate: hasDiscount ? discountedRate : (rate || ""),
+    discountStartDate: normalizeRateCardDate(card.discountStartDate),
+    discountEndDate: normalizeRateCardDate(card.discountEndDate),
+    includeInInvoice: card.includeInInvoice !== false,
+    discountPeriods,
+  };
+};
 
 function normalizeBillingType(type) {
   const name = String(type?.billingTypeName || "").trim();
@@ -400,6 +500,49 @@ function TimeAndMaterialForm({
   // RecurringBillingForm already apply to these same props.
   const projectStartDateOnly = toDateOnly(projectStartDate);
   const projectEndDateOnly = toDateOnly(projectEndDate);
+  const isCurrencyValid = isValidCurrency(currency);
+
+  const rawPeriods = Array.isArray(value.discountPeriods)
+    ? value.discountPeriods
+    : (value.hasDiscount && value.discountValue
+      ? [
+          {
+            periodName: "Discount Period 1",
+            discountType: value.discountType || "PERCENTAGE",
+            discountValue: value.discountValue,
+            effectiveFrom: value.discountStartDate || value.effectiveFrom || "",
+            effectiveTo: value.discountEndDate || value.effectiveTo || "",
+            notes: value.remarks || value.notes || "",
+            includeInInvoice: value.includeInInvoice !== false,
+          },
+        ]
+      : []);
+
+  const getPeriodStableKey = (p, idx) =>
+    String(p?.discountId || p?._uid || p?.periodId || p?.id || `period-key-${idx}`);
+
+  const discountPeriods = rawPeriods.map((p, idx) => ({
+    ...p,
+    _uid: p._uid || (p.discountId ? `period-${p.discountId}` : `period-uid-${idx}`),
+    periodName: p.periodName || `Period ${idx + 1}`,
+    discountType: p.discountType || "PERCENTAGE",
+    includeInInvoice: p.includeInInvoice !== false,
+  }));
+
+  const [expandedPeriodKeys, setExpandedPeriodKeys] = useState(() => new Set());
+
+  const toggleExpandPeriod = (key) => {
+    setExpandedPeriodKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
   const standardRate = {
     ...EMPTY_RATE_CARD,
     rate: value.rate || "",
@@ -408,7 +551,205 @@ function TimeAndMaterialForm({
     effectiveTo: value.effectiveTo || "",
     rateCardId: value.rateCardId || null,
     isSaved: Boolean(value.rateCardId),
+    remarks: value.remarks || value.notes || "",
+    hasDiscount: Boolean(value.hasDiscount || discountPeriods.length > 0),
+    discountType: value.discountType || "PERCENTAGE",
+    discountValue: value.discountValue !== undefined && value.discountValue !== null ? value.discountValue : "",
+    discountedRate: value.discountedRate || "",
+    discountStartDate: value.discountStartDate || "",
+    discountEndDate: value.discountEndDate || "",
+    includeInInvoice: value.includeInInvoice !== false,
+    discountPeriods,
   };
+
+  const getPeriodOverlapError = (period, idx, periods) => {
+    if (!period.effectiveFrom || !period.effectiveTo) return null;
+    for (let i = 0; i < periods.length; i++) {
+      if (i === idx) continue;
+      const other = periods[i];
+      if (other.effectiveFrom && other.effectiveTo) {
+        if (period.effectiveFrom <= other.effectiveTo && period.effectiveTo >= other.effectiveFrom) {
+          return `Overlaps with "${other.periodName || `Period ${i + 1}`}" (${other.effectiveFrom} to ${other.effectiveTo}). Periods must not overlap.`;
+        }
+      }
+    }
+    return null;
+  };
+
+  const getPeriodValidationErrors = (period, idx, periods) => {
+    const errors = {
+      periodName: "",
+      discountValue: "",
+      effectiveFrom: "",
+      effectiveTo: "",
+      overlap: "",
+    };
+    if (!period.periodName?.trim()) {
+      errors.periodName = "Period name is required.";
+    }
+    const dv = Number(period.discountValue);
+    if (period.discountValue === "" || period.discountValue === null || period.discountValue === undefined) {
+      errors.discountValue = "Discount value is required.";
+    } else if (Number.isNaN(dv) || dv <= 0) {
+      errors.discountValue = "Discount value must be greater than 0.";
+    } else if (period.discountType === "PERCENTAGE" && dv >= 100) {
+      errors.discountValue = "Percentage discount must be less than 100%.";
+    } else if (period.discountType === "FIXED_AMOUNT" && standardRate.rate && dv >= Number(standardRate.rate)) {
+      errors.discountValue = `Fixed discount must be less than base rate (${formatCurrency(standardRate.rate, currency)}).`;
+    }
+
+    if (!period.effectiveFrom) {
+      errors.effectiveFrom = "Start date is required.";
+    } else if (projectStartDateOnly && period.effectiveFrom < projectStartDateOnly) {
+      errors.effectiveFrom = `Cannot precede project start date (${projectStartDateOnly}).`;
+    } else if (standardRate.effectiveFrom && period.effectiveFrom < standardRate.effectiveFrom) {
+      errors.effectiveFrom = `Cannot precede rate card start date (${standardRate.effectiveFrom}).`;
+    }
+
+    if (!period.effectiveTo) {
+      errors.effectiveTo = "End date is required.";
+    } else if (period.effectiveFrom && period.effectiveTo < period.effectiveFrom) {
+      errors.effectiveTo = "End date must be on or after start date.";
+    } else if (projectEndDateOnly && period.effectiveTo > projectEndDateOnly) {
+      errors.effectiveTo = `Cannot exceed project end date (${projectEndDateOnly}).`;
+    } else if (standardRate.effectiveTo && period.effectiveTo > standardRate.effectiveTo) {
+      errors.effectiveTo = `Cannot exceed rate card end date (${standardRate.effectiveTo}).`;
+    }
+
+    errors.overlap = getPeriodOverlapError(period, idx, periods) || "";
+    return errors;
+  };
+
+  const addDiscountPeriod = () => {
+    if (!standardRate.rate || Number(standardRate.rate) <= 0) {
+      showStatusToast("Please enter a valid standard base rate before adding discount periods.", "warning");
+      return;
+    }
+
+    const existingPeriods = standardRate.discountPeriods || [];
+    if (existingPeriods.length > 0) {
+      for (let i = 0; i < existingPeriods.length; i++) {
+        const p = existingPeriods[i];
+        const pErrors = getPeriodValidationErrors(p, i, existingPeriods);
+        const errorList = Object.values(pErrors).filter(Boolean);
+        if (errorList.length > 0) {
+          const key = getPeriodStableKey(p, i);
+          setExpandedPeriodKeys((prev) => new Set([...prev, key]));
+          showStatusToast(
+            `Please complete "${p.periodName || `Period ${i + 1}`}" (${errorList[0]}) before adding another rate period.`,
+            "warning",
+          );
+          return;
+        }
+      }
+    }
+
+    let defaultStart = "";
+    let defaultEnd = "";
+    if (existingPeriods.length === 0) {
+      defaultStart = standardRate.effectiveFrom || projectStartDateOnly || "";
+      defaultEnd = standardRate.effectiveTo || projectEndDateOnly || "";
+    } else {
+      const lastPeriod = existingPeriods[existingPeriods.length - 1];
+      if (lastPeriod.effectiveTo) {
+        const lastEndDate = new Date(lastPeriod.effectiveTo);
+        if (!Number.isNaN(lastEndDate.getTime())) {
+          const nextDay = new Date(lastEndDate);
+          nextDay.setDate(nextDay.getDate() + 1);
+          const nextDayStr = nextDay.toISOString().slice(0, 10);
+          if (!projectEndDateOnly || nextDayStr <= projectEndDateOnly) {
+            defaultStart = nextDayStr;
+            defaultEnd = standardRate.effectiveTo || projectEndDateOnly || nextDayStr;
+          }
+        }
+      }
+      if (!defaultStart) {
+        defaultStart = standardRate.effectiveFrom || projectStartDateOnly || "";
+        defaultEnd = standardRate.effectiveTo || projectEndDateOnly || "";
+      }
+    }
+
+    const nextIdx = existingPeriods.length + 1;
+    const uid = `period-new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const newPeriod = {
+      _uid: uid,
+      periodName: `Period ${nextIdx}`,
+      discountType: "PERCENTAGE",
+      discountValue: "",
+      effectiveFrom: defaultStart,
+      effectiveTo: defaultEnd,
+      notes: "",
+      includeInInvoice: true,
+      discountAmount: null,
+      netRate: null,
+    };
+    const nextPeriods = [...existingPeriods, newPeriod];
+    setExpandedPeriodKeys((prev) => new Set([...prev, uid]));
+    update({
+      discountPeriods: nextPeriods,
+      hasDiscount: true,
+    });
+  };
+
+  const updateDiscountPeriod = (idx, patch) => {
+    const nextPeriods = (standardRate.discountPeriods || []).map((p, i) =>
+      i === idx ? { ...p, ...patch } : p
+    );
+    update({
+      discountPeriods: nextPeriods,
+      hasDiscount: nextPeriods.length > 0,
+    });
+  };
+
+  const removeDiscountPeriod = async (idx) => {
+    const p = (standardRate.discountPeriods || [])[idx];
+    const key = getPeriodStableKey(p, idx);
+    if (p?.discountId) {
+      const confirmed = window.confirm(
+        `Remove discount period "${p.periodName || `Period ${idx + 1}`}"? This cannot be undone.`
+      );
+      if (!confirmed) return;
+      try {
+        await deleteTmRateDiscount(p.discountId);
+        showStatusToast("Discount period removed", "success");
+      } catch (err) {
+        showStatusToast(getApiErrorMessage(err, "Failed to remove discount period"), "error");
+        return;
+      }
+    }
+    setExpandedPeriodKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+    const nextPeriods = (standardRate.discountPeriods || []).filter((_, i) => i !== idx);
+    update({
+      discountPeriods: nextPeriods,
+      hasDiscount: nextPeriods.length > 0,
+    });
+  };
+
+  useEffect(() => {
+    if (value?._validateTrigger) {
+      const periods = standardRate.discountPeriods || [];
+      const invalidKeys = new Set();
+      periods.forEach((p, i) => {
+        const pErrors = getPeriodValidationErrors(p, i, periods);
+        if (Object.values(pErrors).some(Boolean)) {
+          invalidKeys.add(getPeriodStableKey(p, i));
+        }
+      });
+      if (invalidKeys.size > 0) {
+        setExpandedPeriodKeys((prev) => new Set([...prev, ...invalidKeys]));
+      }
+    }
+  }, [value?._validateTrigger]);
+
+
+  const standardDiscountedRate = standardRate.hasDiscount && standardRate.rate && standardRate.discountValue
+    ? calculateDiscountedRate(standardRate.rate, standardRate.discountType, standardRate.discountValue)
+    : standardRate.rate;
+
   // Effective From/To on Timesheet-based (Time & Material) rates must fall
   // within the project's own start/end date, same as Fixed Price/Recurring.
   const standardDateErrors = isOneTime
@@ -420,14 +761,35 @@ function TimeAndMaterialForm({
         projectEndDate: projectEndDateOnly,
       });
 
+  const standardDiscountDateErrors = standardRate.hasDiscount
+    ? getDiscountDateErrors({
+        discountStartDate: standardRate.discountStartDate,
+        discountEndDate: standardRate.discountEndDate,
+        effectiveFrom: standardRate.effectiveFrom,
+        effectiveTo: standardRate.effectiveTo,
+        projectStartDate: projectStartDateOnly,
+        projectEndDate: projectEndDateOnly,
+      })
+    : { discountStartDate: "", discountEndDate: "" };
+
   const [rows, setRows] = useState(() =>
     (value.roles || []).map((r) => mapRateCard(r)),
   );
   const [loadingRows, setLoadingRows] = useState(false);
+  const [expandedRowIndices, setExpandedRowIndices] = useState(() => new Set());
   // Tracks which pricing modes have already been hydrated from the server for this
   // billing configuration, so a later Save Draft (which assigns billingConfigurationId
   // for the first time) doesn't re-fetch and clobber rows the user is mid-editing.
   const loadedModesRef = useRef(new Set());
+
+  const toggleExpandRow = (idx) => {
+    setExpandedRowIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
 
   const syncParent = (nextRows) => {
     setRows(nextRows);
@@ -442,6 +804,14 @@ function TimeAndMaterialForm({
           effectiveFrom,
           effectiveTo,
           rateCardId,
+          remarks,
+          hasDiscount,
+          discountType,
+          discountValue,
+          discountedRate,
+          discountStartDate,
+          discountEndDate,
+          includeInInvoice,
         }) => ({
           role,
           roleName: roleName || role,
@@ -450,6 +820,14 @@ function TimeAndMaterialForm({
           effectiveFrom,
           effectiveTo,
           rateCardId,
+          remarks: remarks || "",
+          hasDiscount: Boolean(hasDiscount),
+          discountType: discountType || "PERCENTAGE",
+          discountValue: discountValue ?? "",
+          discountedRate: discountedRate ?? "",
+          discountStartDate: discountStartDate || "",
+          discountEndDate: discountEndDate || "",
+          includeInInvoice: includeInInvoice !== false,
         }),
       ),
     });
@@ -564,7 +942,21 @@ function TimeAndMaterialForm({
         if (billingMode === "STANDARD") {
           const commonRate = mapped.find((card) => !card.role) || mapped[0];
           if (commonRate) {
-            update(mapRateCard(commonRate, false));
+            let discountPeriods = commonRate.discountPeriods || [];
+            if ((!discountPeriods || discountPeriods.length === 0) && commonRate.rateCardId) {
+              try {
+                const discounts = await getTmRateDiscounts(commonRate.rateCardId);
+                if (Array.isArray(discounts) && discounts.length > 0) {
+                  discountPeriods = discounts.map(normalizeTmRateDiscount);
+                }
+              } catch (e) {
+                console.warn("Failed to load rate discounts:", e);
+              }
+            }
+            update({
+              ...mapRateCard(commonRate, false),
+              discountPeriods,
+            });
           }
           return;
         }
@@ -588,6 +980,26 @@ function TimeAndMaterialForm({
   }, [billingMode, billingConfigurationId]);
 
   const buildTmRateCardPayload = (row, billingConfigurationId) => {
+    const periods = Array.isArray(row.discountPeriods) ? row.discountPeriods : [];
+    const hasDiscount = Boolean(
+      periods.length > 0 ||
+      row.hasDiscount ||
+      (row.discountType && row.discountType !== "NONE" && Number(row.discountValue) > 0)
+    );
+    const firstPeriod = periods[0] || {};
+    const discountType = hasDiscount
+      ? (firstPeriod.discountType || row.discountType || "PERCENTAGE")
+      : null;
+    const discountValue = hasDiscount
+      ? (firstPeriod.discountValue !== undefined && firstPeriod.discountValue !== null && firstPeriod.discountValue !== ""
+          ? Number(firstPeriod.discountValue)
+          : (row.discountValue !== "" && row.discountValue !== null && row.discountValue !== undefined ? Number(row.discountValue) : null))
+      : null;
+    const numRate = Number(row.rate);
+    const discountedRate = hasDiscount && numRate > 0 && discountValue !== null
+      ? calculateDiscountedRate(numRate, discountType, discountValue)
+      : null;
+
     const payload = {
       rateCardId: row.rateCardId || null,
       billingConfigurationId,
@@ -599,15 +1011,107 @@ function TimeAndMaterialForm({
       ratePeriod: row.ratePeriod || "HOURLY",
       effectiveFrom: row.effectiveFrom || "",
       effectiveTo: row.effectiveTo || "",
-      remarks: "",
+      remarks: row.remarks || row.notes || "",
+      hasDiscount,
+      discountType,
+      discountValue,
+      discountedRate,
+      discountStartDate: hasDiscount ? (firstPeriod.effectiveFrom || row.discountStartDate || "") : null,
+      discountEndDate: hasDiscount ? (firstPeriod.effectiveTo || row.discountEndDate || "") : null,
+      includeInInvoice: row.includeInInvoice !== false,
+      discountPeriods: periods,
     };
     return payload;
   };
 
   const saveStandardRate = async () => {
+    if (!currency || !isValidCurrency(currency)) {
+      showStatusToast(
+        "Missing or unsupported project billing currency. Please configure a valid currency.",
+        "error",
+      );
+      return;
+    }
+
+    if (!standardRate.rate || Number(standardRate.rate) <= 0) {
+      showStatusToast("Please enter a valid standard base rate greater than 0.", "error");
+      return;
+    }
+
     if (!isOneTime && hasEffectiveDateErrors(standardDateErrors)) {
       showStatusToast("Please fix the highlighted Effective From/To errors before saving.", "error");
       return;
+    }
+
+    const periods = standardRate.discountPeriods || [];
+    const invalidPeriodKeys = new Set();
+    periods.forEach((p, i) => {
+      const pErrors = getPeriodValidationErrors(p, i, periods);
+      if (Object.values(pErrors).some(Boolean)) {
+        invalidPeriodKeys.add(getPeriodStableKey(p, i));
+      }
+    });
+    if (invalidPeriodKeys.size > 0) {
+      setExpandedPeriodKeys((prev) => new Set([...prev, ...invalidPeriodKeys]));
+    }
+
+    for (let i = 0; i < periods.length; i++) {
+      const p = periods[i];
+      const pName = p.periodName?.trim();
+      if (!pName) {
+        showStatusToast(`Period name is required for period #${i + 1}.`, "error");
+        return;
+      }
+      const dv = Number(p.discountValue);
+      if (p.discountValue === "" || p.discountValue === null || Number.isNaN(dv) || dv <= 0) {
+        showStatusToast(`Please enter a valid positive discount value for "${pName}".`, "error");
+        return;
+      }
+      if (p.discountType === "PERCENTAGE" && dv >= 100) {
+        showStatusToast(`Discount percentage must be less than 100% for "${pName}".`, "error");
+        return;
+      }
+      if (p.discountType === "FIXED_AMOUNT" && dv >= Number(standardRate.rate)) {
+        showStatusToast(`Fixed discount must be less than base rate for "${pName}".`, "error");
+        return;
+      }
+      if (!p.effectiveFrom || !p.effectiveTo) {
+        showStatusToast(`Start and End dates are required for "${pName}".`, "error");
+        return;
+      }
+      if (p.effectiveFrom > p.effectiveTo) {
+        showStatusToast(`Start date cannot be after end date for "${pName}".`, "error");
+        return;
+      }
+      if (projectStartDateOnly && p.effectiveFrom < projectStartDateOnly) {
+        showStatusToast(`Period "${pName}" start date cannot precede project start date (${projectStartDateOnly}).`, "error");
+        return;
+      }
+      if (projectEndDateOnly && p.effectiveTo > projectEndDateOnly) {
+        showStatusToast(`Period "${pName}" end date cannot exceed project end date (${projectEndDateOnly}).`, "error");
+        return;
+      }
+      if (standardRate.effectiveFrom && p.effectiveFrom < standardRate.effectiveFrom) {
+        showStatusToast(`Period "${pName}" start date cannot precede standard rate effective from date.`, "error");
+        return;
+      }
+      if (standardRate.effectiveTo && p.effectiveTo > standardRate.effectiveTo) {
+        showStatusToast(`Period "${pName}" end date cannot exceed standard rate effective to date.`, "error");
+        return;
+      }
+    }
+
+    for (let i = 0; i < periods.length; i++) {
+      for (let j = i + 1; j < periods.length; j++) {
+        const a = periods[i];
+        const b = periods[j];
+        if (a.effectiveFrom && a.effectiveTo && b.effectiveFrom && b.effectiveTo) {
+          if (a.effectiveFrom <= b.effectiveTo && a.effectiveTo >= b.effectiveFrom) {
+            showStatusToast(`Discount periods "${a.periodName || `#${i + 1}`}" and "${b.periodName || `#${j + 1}`}" overlap. Periods must not overlap.`, "error");
+            return;
+          }
+        }
+      }
     }
 
     update({ ...standardRate, saving: true });
@@ -630,20 +1134,34 @@ function TimeAndMaterialForm({
 
       const payload = buildTmRateCardPayload(standardRate, resolvedConfigId);
       const saved = await saveTmRateCard(resolvedConfigId, payload);
+      const targetRateCardId = saved.rateCardId || saved.id || standardRate.rateCardId;
+
+      let syncedPeriods = periods;
+      if (targetRateCardId) {
+        try {
+          syncedPeriods = await syncStandardRateDiscounts(
+            targetRateCardId,
+            periods,
+            currency,
+            Number(standardRate.rate),
+            standardRate.ratePeriod || "HOURLY",
+          );
+        } catch (syncErr) {
+          console.warn("Failed to sync some discount periods:", syncErr);
+        }
+      }
 
       const mappedSaved = mapRateCard(saved, false);
       update({
         ...mappedSaved,
-        // The save response doesn't always echo back effectiveFrom/effectiveTo,
-        // so mapRateCard would otherwise blank out the dates the user just
-        // entered (and that were just persisted) — fall back to what's already
-        // in state. mappedSaved's dates are already normalized to "yyyy-mm-dd"
-        // (see normalizeRateCardDate), so this must not read saved.effectiveFrom/
-        // effectiveTo directly — those are still raw LocalDate arrays.
         effectiveFrom: mappedSaved.effectiveFrom || standardRate.effectiveFrom,
         effectiveTo: mappedSaved.effectiveTo || standardRate.effectiveTo,
+        remarks: mappedSaved.remarks || standardRate.remarks,
+        includeInInvoice: standardRate.includeInInvoice !== false,
+        discountPeriods: syncedPeriods,
+        saving: false,
       });
-      showStatusToast("Rate card saved", "success");
+      showStatusToast("Rate card and rate schedule saved", "success");
     } catch (error) {
       showStatusToast(
         getApiErrorMessage(error, "Unable to save rate card."),
@@ -690,6 +1208,34 @@ function TimeAndMaterialForm({
     ) {
       showStatusToast("Please fix the highlighted Effective From/To errors before saving.", "error");
       return;
+    }
+
+    if (row.hasDiscount) {
+      const dv = Number(row.discountValue);
+      if (!row.discountValue || Number.isNaN(dv) || dv <= 0) {
+        showStatusToast("Please enter a valid positive discount value for this role.", "error");
+        return;
+      }
+      if (row.discountType === "PERCENTAGE" && dv >= 100) {
+        showStatusToast("Discount percentage must be less than 100%.", "error");
+        return;
+      }
+      if (row.discountType === "FIXED_AMOUNT" && dv >= Number(row.rate)) {
+        showStatusToast("Fixed discount amount must be less than role rate.", "error");
+        return;
+      }
+      const discErrors = getDiscountDateErrors({
+        discountStartDate: row.discountStartDate,
+        discountEndDate: row.discountEndDate,
+        effectiveFrom: row.effectiveFrom,
+        effectiveTo: row.effectiveTo,
+        projectStartDate: projectStartDateOnly,
+        projectEndDate: projectEndDateOnly,
+      });
+      if (hasEffectiveDateErrors(discErrors)) {
+        showStatusToast("Please fix the highlighted Discount Date errors before saving.", "error");
+        return;
+      }
     }
 
     const updating = [...rows];
@@ -745,50 +1291,416 @@ function TimeAndMaterialForm({
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-200 p-4">
         {billingMode === "STANDARD" && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <FormInput
-              label={`Rate (${currency}) *`}
-              name="rate"
-              type="number"
-              value={standardRate.rate}
-              onChange={(event) => update({ rate: event.target.value })}
-              placeholder={`e.g. 1800 (${currency})`}
-              disabled={isExisting}
-            />
-            <FormSelect
-              anchorOptions
-              label="Rate Period *"
-              name="ratePeriod"
-              value={standardRate.ratePeriod}
-              onChange={(event) => update({ ratePeriod: event.target.value })}
-              options={RATE_PERIOD_OPTIONS}
-            />
-            {!isOneTime && (
-              <>
-                <FormDatePicker
-                  label="Effective From"
-                  name="effectiveFrom"
-                  value={standardRate.effectiveFrom}
-                  onChange={(event) =>
-                    update({ effectiveFrom: event.target.value })
-                  }
-                  min={projectStartDateOnly || undefined}
-                  max={projectEndDateOnly || undefined}
-                  error={standardDateErrors.effectiveFrom}
-                />
-                <FormDatePicker
-                  label="Effective To"
-                  name="effectiveTo"
-                  value={standardRate.effectiveTo}
-                  onChange={(event) => update({ effectiveTo: event.target.value })}
-                  min={standardRate.effectiveFrom || projectStartDateOnly || undefined}
-                  max={projectEndDateOnly || undefined}
-                  error={standardDateErrors.effectiveTo}
-                />
-              </>
+          <div className="space-y-5">
+            {!isCurrencyValid && (
+              <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+                <span>
+                  Missing or unsupported project billing currency ({currency || "Not Specified"}). Standard rate schedule requires a valid ISO 4217 currency code.
+                </span>
+              </div>
             )}
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <FormInput
+                label={`Rate (${currency}) *`}
+                name="rate"
+                type="number"
+                value={standardRate.rate}
+                onChange={(event) => update({ rate: event.target.value })}
+                placeholder={`e.g. 1800 (${currency})`}
+                disabled={isExisting}
+              />
+              <FormSelect
+                anchorOptions
+                label="Rate Period *"
+                name="ratePeriod"
+                value={standardRate.ratePeriod}
+                onChange={(event) => update({ ratePeriod: event.target.value })}
+                options={RATE_PERIOD_OPTIONS}
+              />
+              {!isOneTime && (
+                <>
+                  <FormDatePicker
+                    label="Effective From"
+                    name="effectiveFrom"
+                    value={standardRate.effectiveFrom}
+                    onChange={(event) =>
+                      update({ effectiveFrom: event.target.value })
+                    }
+                    min={projectStartDateOnly || undefined}
+                    max={projectEndDateOnly || undefined}
+                    error={standardDateErrors.effectiveFrom}
+                  />
+                  <FormDatePicker
+                    label="Effective To"
+                    name="effectiveTo"
+                    value={standardRate.effectiveTo}
+                    onChange={(event) => update({ effectiveTo: event.target.value })}
+                    min={standardRate.effectiveFrom || projectStartDateOnly || undefined}
+                    max={projectEndDateOnly || undefined}
+                    error={standardDateErrors.effectiveTo}
+                  />
+                </>
+              )}
+            </div>
+
+            {/* Standard Rate Schedule Section */}
+            <div className="space-y-4 pt-3 border-t border-slate-200">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900">Standard Rate Schedule</h4>
+                  <p className="text-xs text-slate-500">
+                    Configure repeatable discount periods, invoice inclusion, and live net rates for this standard rate card.
+                  </p>
+                </div>
+                {!isExisting && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="small"
+                    onClick={addDiscountPeriod}
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Rate Period
+                  </Button>
+                )}
+              </div>
+
+              {(standardRate.discountPeriods || []).length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center space-y-2 bg-slate-50/50">
+                  <p className="text-sm text-slate-600">No discount periods configured for this rate card.</p>
+                  <p className="text-xs text-slate-400">
+                    The standard base rate of <span className="font-semibold text-slate-700">{formatCurrency(standardRate.rate || 0, currency)} {getRatePeriodSuffix(standardRate.ratePeriod)}</span> will apply throughout the project.
+                  </p>
+                  {!isExisting && (
+                    <div className="pt-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="small"
+                        onClick={addDiscountPeriod}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add Rate Period
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {standardRate.discountPeriods.map((period, idx) => {
+                    const key = getPeriodStableKey(period, idx);
+                    const isExpanded = expandedPeriodKeys.has(key);
+                    const periodErrors = getPeriodValidationErrors(
+                      period,
+                      idx,
+                      standardRate.discountPeriods,
+                    );
+                    const errorList = Object.values(periodErrors).filter(Boolean);
+                    const hasErrors = errorList.length > 0;
+                    const preview = calculateRateDiscountPreview({
+                      baseRate: standardRate.rate,
+                      discountType: period.discountType,
+                      discountValue: period.discountValue,
+                      ratePeriod: standardRate.ratePeriod,
+                    });
+
+                    return (
+                      <div
+                        key={key}
+                        data-testid={`discount-period-card-${idx}`}
+                        className={`rounded-xl border transition-all ${
+                          hasErrors
+                            ? "border-red-300 bg-red-50/20"
+                            : isExpanded
+                            ? "border-indigo-200 bg-white shadow-sm"
+                            : "border-slate-200 bg-slate-50/60 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        {/* Collapsed Card Summary / Header Bar */}
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => toggleExpandPeriod(key)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              toggleExpandPeriod(key);
+                            }
+                          }}
+                          className="flex flex-col gap-2 p-3 sm:p-4 cursor-pointer select-none transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
+                                {idx + 1}
+                              </span>
+                              <h5 className="text-sm font-semibold text-slate-900">
+                                {period.periodName || `Discount Period ${idx + 1}`}
+                              </h5>
+
+                              {/* Include in Invoice Status */}
+                              {period.includeInInvoice !== false ? (
+                                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                                  Included in Invoice
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                                  Excluded from Invoice
+                                </span>
+                              )}
+
+                              {/* Validation Status */}
+                              {hasErrors && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
+                                  <AlertCircle className="h-3 w-3 text-red-600 shrink-0" />
+                                  <span>{errorList[0]}</span>
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {!isExisting && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeDiscountPeriod(idx);
+                                  }}
+                                  className="rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                                  title="Remove discount period"
+                                  aria-label={`Remove ${period.periodName || `Period ${idx + 1}`}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleExpandPeriod(key);
+                                }}
+                                className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                                title={isExpanded ? "Collapse period" : "Expand period"}
+                                aria-expanded={isExpanded}
+                                aria-label={isExpanded ? `Collapse ${period.periodName || `Period ${idx + 1}`}` : `Expand ${period.periodName || `Period ${idx + 1}`}`}
+                              >
+                                {isExpanded ? (
+                                  <ChevronUp className="h-4 w-4" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Compact Summary details */}
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 pt-1">
+                            <div>
+                              <span className="text-slate-400">Dates: </span>
+                              <span className="font-medium text-slate-700">
+                                {period.effectiveFrom && period.effectiveTo
+                                  ? `${period.effectiveFrom} to ${period.effectiveTo}`
+                                  : (period.effectiveFrom || period.effectiveTo || "Dates not configured")}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400">Discount: </span>
+                              <span className="font-semibold text-indigo-700">
+                                {period.discountType === "PERCENTAGE"
+                                  ? `${period.discountValue !== "" && period.discountValue !== null && period.discountValue !== undefined ? period.discountValue : 0}% (${period.discountType})`
+                                  : `${formatCurrency(period.discountValue || 0, currency)} (${period.discountType})`}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400">Net Rate: </span>
+                              <span className="font-bold text-slate-900">
+                                {preview.isValid && preview.netRate !== null
+                                  ? `${formatCurrency(preview.netRate, currency)} ${getRatePeriodSuffix(standardRate.ratePeriod)}`
+                                  : "—"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Expanded Card Content */}
+                        {isExpanded && (
+                          <div className="border-t border-slate-200/80 p-4 space-y-4">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                              <FormInput
+                                label="Period Name *"
+                                name={`periodName-${idx}`}
+                                value={period.periodName || ""}
+                                onChange={(e) => updateDiscountPeriod(idx, { periodName: e.target.value })}
+                                placeholder="e.g. Q1 Introductory Client Discount"
+                                error={periodErrors.periodName}
+                                disabled={isExisting}
+                              />
+                              <FormSelect
+                                anchorOptions
+                                label="Discount Type *"
+                                name={`discountType-${idx}`}
+                                value={period.discountType || "PERCENTAGE"}
+                                onChange={(e) => updateDiscountPeriod(idx, { discountType: e.target.value })}
+                                options={DISCOUNT_TYPE_OPTIONS}
+                                disabled={isExisting}
+                              />
+                              <FormInput
+                                label={
+                                  period.discountType === "PERCENTAGE"
+                                    ? "Discount Percentage (%) *"
+                                    : `Discount Amount (${currency}) *`
+                                }
+                                name={`discountValue-${idx}`}
+                                type="number"
+                                value={period.discountValue !== undefined && period.discountValue !== null ? period.discountValue : ""}
+                                onChange={(e) => updateDiscountPeriod(idx, { discountValue: e.target.value })}
+                                placeholder={
+                                  period.discountType === "PERCENTAGE"
+                                    ? "e.g. 50"
+                                    : `e.g. 200 (${currency})`
+                                }
+                                error={periodErrors.discountValue}
+                                disabled={isExisting}
+                              />
+                              <div className="grid grid-cols-2 gap-2">
+                                <FormDatePicker
+                                  label="Effective Start Date *"
+                                  name={`effectiveFrom-${idx}`}
+                                  value={period.effectiveFrom || ""}
+                                  onChange={(e) => updateDiscountPeriod(idx, { effectiveFrom: e.target.value })}
+                                  min={standardRate.effectiveFrom || projectStartDateOnly || undefined}
+                                  max={standardRate.effectiveTo || projectEndDateOnly || undefined}
+                                  error={periodErrors.effectiveFrom}
+                                  disabled={isExisting}
+                                />
+                                <FormDatePicker
+                                  label="Effective End Date *"
+                                  name={`effectiveTo-${idx}`}
+                                  value={period.effectiveTo || ""}
+                                  onChange={(e) => updateDiscountPeriod(idx, { effectiveTo: e.target.value })}
+                                  min={period.effectiveFrom || standardRate.effectiveFrom || projectStartDateOnly || undefined}
+                                  max={standardRate.effectiveTo || projectEndDateOnly || undefined}
+                                  error={periodErrors.effectiveTo}
+                                  disabled={isExisting}
+                                />
+                              </div>
+                            </div>
+
+                            {periodErrors.overlap && (
+                              <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs font-medium text-red-700">
+                                <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                                <span>{periodErrors.overlap}</span>
+                              </div>
+                            )}
+
+                            {/* Live Net-Rate Preview for this period */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-indigo-100 bg-indigo-50/70 p-3.5">
+                              <div>
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700">
+                                  Live Net-Rate Preview
+                                </span>
+                                {preview.isValid ? (
+                                  <div className="mt-1 flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700">
+                                    <span>
+                                      Base: <span className="line-through text-slate-500">{formatCurrency(preview.baseRate, currency)}</span>
+                                    </span>
+                                    <span>→</span>
+                                    <span>
+                                      Discount:{" "}
+                                      <span className="font-semibold text-indigo-700">
+                                        {period.discountType === "PERCENTAGE"
+                                          ? `${period.discountValue}% (${formatCurrency(preview.discountAmount, currency)} off)`
+                                          : `-${formatCurrency(preview.discountAmount, currency)} off`}
+                                      </span>
+                                    </span>
+                                    <span>→</span>
+                                    <span className="rounded bg-white px-2 py-0.5 text-base font-bold text-indigo-900 shadow-sm ring-1 ring-indigo-200">
+                                      {formatCurrency(preview.netRate, currency)} {getRatePeriodSuffix(standardRate.ratePeriod)}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="mt-1 text-xs text-slate-500 italic">
+                                    {preview.error || "Enter valid base rate and discount to calculate live net rate."}
+                                  </div>
+                                )}
+                              </div>
+                              {period.effectiveFrom && period.effectiveTo && (
+                                <div className="text-right text-xs font-medium text-indigo-700">
+                                  Schedule: {period.effectiveFrom} to {period.effectiveTo}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Commercial Agreement / Notes */}
+                            <div>
+                              <FormTextArea
+                                label="Commercial Agreement / Discount Notes"
+                                name={`notes-${idx}`}
+                                value={period.notes || ""}
+                                onChange={(e) => updateDiscountPeriod(idx, { notes: e.target.value })}
+                                placeholder="e.g. Introductory client discount agreed per MSA schedule A..."
+                                rows={2}
+                                disabled={isExisting}
+                              />
+                            </div>
+
+                            {/* Include in Invoice Checkbox */}
+                            <div className="flex items-start gap-2.5 pt-1">
+                              <input
+                                id={`period-include-invoice-${idx}`}
+                                type="checkbox"
+                                checked={period.includeInInvoice !== false}
+                                onChange={(e) => updateDiscountPeriod(idx, { includeInInvoice: e.target.checked })}
+                                disabled={isExisting}
+                                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#0A0082] focus:ring-[#0A0082]"
+                              />
+                              <label htmlFor={`period-include-invoice-${idx}`} className="cursor-pointer select-none">
+                                <span className="text-xs font-semibold text-slate-900">Include in Invoice</span>
+                                <span className="block text-[11px] text-slate-500">
+                                  When enabled, billable work covered by this discount period is included in customer invoice generation at the discounted rate.
+                                </span>
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Automatic Base-Rate Fallback Notice */}
+              <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-600 flex items-start gap-2">
+                <div className="mt-1 h-2 w-2 rounded-full bg-slate-400 shrink-0" />
+                <span>
+                  <strong className="text-slate-800">Automatic Base-Rate Fallback:</strong> Outside configured discount periods, billing falls back automatically to the standard base rate of{" "}
+                  <strong className="text-slate-900">
+                    {formatCurrency(standardRate.rate || 0, currency)} {getRatePeriodSuffix(standardRate.ratePeriod)}
+                  </strong>.
+                </span>
+              </div>
+            </div>
+
+            {/* Overall Rate Card Invoice Inclusion */}
+            <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4">
+              <input
+                id="standard-include-invoice"
+                type="checkbox"
+                checked={standardRate.includeInInvoice !== false}
+                onChange={(e) => update({ includeInInvoice: e.target.checked })}
+                disabled={isExisting}
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-[#0A0082] focus:ring-[#0A0082]"
+              />
+              <label htmlFor="standard-include-invoice" className="cursor-pointer select-none">
+                <span className="text-sm font-semibold text-slate-900">Include Base Rate in Invoice</span>
+                <span className="block text-xs text-slate-500 mt-0.5">
+                  When enabled, billable work outside active discount periods is included in customer invoice generation at the standard base rate.
+                </span>
+              </label>
+            </div>
+
             {!isExisting && (
-              <div className="md:col-span-2">
+              <div className="pt-2">
                 <Button
                   variant="outline"
                   size="small"
@@ -806,9 +1718,14 @@ function TimeAndMaterialForm({
         {billingMode === "ROLE_BASED" && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-slate-900">
-                Role-Based Rates
-              </h4>
+              <div>
+                <h4 className="text-sm font-semibold text-slate-900">
+                  Role-Based Rates
+                </h4>
+                <p className="text-xs text-slate-500">
+                  Maintain independent standard rates, optional discounts, and invoice inclusion for each role.
+                </p>
+              </div>
               {!isExisting && (
                 <Button variant="outline" size="small" onClick={addRole}>
                   <Plus className="h-3.5 w-3.5" /> Add Role
@@ -829,9 +1746,11 @@ function TimeAndMaterialForm({
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50">
+                      <th className="px-3 py-3 text-center w-12 font-semibold text-slate-600" title="Include in invoice">Inv.</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Role</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Rate ({currency})</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Standard Rate ({currency})</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-600">Rate Period</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Discount / Net Rate</th>
                       {!isOneTime && (
                         <>
                           <th className="px-4 py-3 text-left font-semibold text-slate-600">Effective From</th>
@@ -839,7 +1758,7 @@ function TimeAndMaterialForm({
                         </>
                       )}
                       {!isExisting && (
-                        <th className="px-4 py-3 text-center w-24 font-semibold text-slate-600">Actions</th>
+                        <th className="px-4 py-3 text-center w-28 font-semibold text-slate-600">Actions</th>
                       )}
                     </tr>
                   </thead>
@@ -853,117 +1772,263 @@ function TimeAndMaterialForm({
                             projectStartDate: projectStartDateOnly,
                             projectEndDate: projectEndDateOnly,
                           });
+                      const roleDiscountDateErrors = item.hasDiscount
+                        ? getDiscountDateErrors({
+                            discountStartDate: item.discountStartDate,
+                            discountEndDate: item.discountEndDate,
+                            effectiveFrom: item.effectiveFrom,
+                            effectiveTo: item.effectiveTo,
+                            projectStartDate: projectStartDateOnly,
+                            projectEndDate: projectEndDateOnly,
+                          })
+                        : { discountStartDate: "", discountEndDate: "" };
+
+                      const isExpanded = expandedRowIndices.has(index);
+                      const netRoleRate = item.hasDiscount && item.rate && item.discountValue
+                        ? calculateDiscountedRate(item.rate, item.discountType, item.discountValue)
+                        : item.rate;
+
                       return (
-                      <tr
-                        key={index}
-                        className="align-top transition-colors hover:bg-slate-50"
-                      >
-                        <td className="px-4 py-3 min-w-[160px]">
-                          <FormInput
-                            value={item.role}
-                            onChange={(e) =>
-                              handleRoleChange(index, "role", e.target.value)
-                            }
-                            placeholder="e.g. Senior Developer"
-                            disabled={isExisting}
-                          />
-                        </td>
-                        <td className="px-4 py-3 min-w-[140px]">
-                          <FormInput
-                            type="number"
-                            value={item.rate}
-                            onChange={(e) =>
-                              handleRoleChange(index, "rate", e.target.value)
-                            }
-                            placeholder="e.g. 1500"
-                            disabled={isExisting}
-                          />
-                        </td>
-                        <td className="px-4 py-3 min-w-[170px]">
-                          <FormSelect
-                            value={item.ratePeriod || "HOURLY"}
-                            onChange={(e) =>
-                              handleRoleChange(
-                                index,
-                                "ratePeriod",
-                                e.target.value,
-                              )
-                            }
-                            options={RATE_PERIOD_OPTIONS}
-                            anchorOptions
-                          />
-                        </td>
-                        {!isOneTime && (
-                          <>
-                            <td className="px-4 py-3 min-w-[160px]">
-                              <FormDatePicker
-                                value={item.effectiveFrom}
-                                onChange={(e) =>
-                                  handleRoleChange(
-                                    index,
-                                    "effectiveFrom",
-                                    e.target.value,
-                                  )
-                                }
-                                min={projectStartDateOnly || undefined}
-                                max={projectEndDateOnly || undefined}
-                                error={roleDateErrors.effectiveFrom}
-                              />
-                            </td>
-                            <td className="px-4 py-3 min-w-[160px]">
-                              <FormDatePicker
-                                value={item.effectiveTo}
-                                onChange={(e) =>
-                                  handleRoleChange(
-                                    index,
-                                    "effectiveTo",
-                                    e.target.value,
-                                  )
-                                }
-                                min={item.effectiveFrom || projectStartDateOnly || undefined}
-                                max={projectEndDateOnly || undefined}
-                                error={roleDateErrors.effectiveTo}
-                              />
-                            </td>
-                          </>
-                        )}
-                        {!isExisting && (
-                          <td className="px-4 py-3 text-center">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => saveRow(index)}
-                                disabled={item.saving || item.deleting}
-                                className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                title="Save rate"
-                              >
-                                {item.saving ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Check className="h-4 w-4" />
-                                )}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeRole(index)}
-                                disabled={item.saving || item.deleting}
-                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                title="Remove role"
-                              >
-                                {item.deleting ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </div>
+                      <React.Fragment key={index}>
+                        <tr
+                          className={`align-top transition-colors hover:bg-slate-50 ${isExpanded ? "bg-slate-50/60" : ""}`}
+                        >
+                          <td className="px-3 py-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={item.includeInInvoice !== false}
+                              onChange={(e) =>
+                                handleRoleChange(index, "includeInInvoice", e.target.checked)
+                              }
+                              disabled={isExisting}
+                              className="h-4 w-4 rounded border-slate-300 text-[#0A0082] focus:ring-[#0A0082]"
+                              title={item.includeInInvoice !== false ? "Included in Invoice" : "Excluded from Invoice"}
+                            />
                           </td>
+                          <td className="px-4 py-3 min-w-[160px]">
+                            <FormInput
+                              value={item.role}
+                              onChange={(e) =>
+                                handleRoleChange(index, "role", e.target.value)
+                              }
+                              placeholder="e.g. Senior Developer"
+                              disabled={isExisting}
+                            />
+                          </td>
+                          <td className="px-4 py-3 min-w-[130px]">
+                            <FormInput
+                              type="number"
+                              value={item.rate}
+                              onChange={(e) =>
+                                handleRoleChange(index, "rate", e.target.value)
+                              }
+                              placeholder="e.g. 1500"
+                              disabled={isExisting}
+                            />
+                          </td>
+                          <td className="px-4 py-3 min-w-[140px]">
+                            <FormSelect
+                              value={item.ratePeriod || "HOURLY"}
+                              onChange={(e) =>
+                                handleRoleChange(
+                                  index,
+                                  "ratePeriod",
+                                  e.target.value,
+                                )
+                              }
+                              options={RATE_PERIOD_OPTIONS}
+                              anchorOptions
+                            />
+                          </td>
+                          <td className="px-4 py-3 min-w-[160px]">
+                            {item.hasDiscount && item.discountValue ? (
+                              <span className="inline-flex flex-col gap-0.5">
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                                  {item.discountType === "PERCENTAGE" ? `${item.discountValue}% off` : `-${formatCurrency(item.discountValue, currency)}`}
+                                  {" "}→{" "}{formatCurrency(netRoleRate, currency)} {getRatePeriodSuffix(item.ratePeriod)}
+                                </span>
+                                {item.discountStartDate && item.discountEndDate && (
+                                  <span className="text-[10px] text-slate-500">
+                                    {item.discountStartDate} to {item.discountEndDate}
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-400 italic">No discount</span>
+                            )}
+                          </td>
+                          {!isOneTime && (
+                            <>
+                              <td className="px-4 py-3 min-w-[150px]">
+                                <FormDatePicker
+                                  value={item.effectiveFrom}
+                                  onChange={(e) =>
+                                    handleRoleChange(
+                                      index,
+                                      "effectiveFrom",
+                                      e.target.value,
+                                    )
+                                  }
+                                  min={projectStartDateOnly || undefined}
+                                  max={projectEndDateOnly || undefined}
+                                  error={roleDateErrors.effectiveFrom}
+                                />
+                              </td>
+                              <td className="px-4 py-3 min-w-[150px]">
+                                <FormDatePicker
+                                  value={item.effectiveTo}
+                                  onChange={(e) =>
+                                    handleRoleChange(
+                                      index,
+                                      "effectiveTo",
+                                      e.target.value,
+                                    )
+                                  }
+                                  min={item.effectiveFrom || projectStartDateOnly || undefined}
+                                  max={projectEndDateOnly || undefined}
+                                  error={roleDateErrors.effectiveTo}
+                                />
+                              </td>
+                            </>
+                          )}
+                          {!isExisting && (
+                            <td className="px-4 py-3 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => toggleExpandRow(index)}
+                                  title={isExpanded ? "Hide discount & notes" : "Configure discount & notes"}
+                                  className={item.hasDiscount ? "text-indigo-600 bg-indigo-50 hover:bg-indigo-100" : "text-slate-500 hover:bg-slate-100"}
+                                >
+                                  <Tag className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => saveRow(index)}
+                                  disabled={item.saving || item.deleting}
+                                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                  title="Save rate"
+                                >
+                                  {item.saving ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Check className="h-4 w-4" />
+                                  )}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeRole(index)}
+                                  disabled={item.saving || item.deleting}
+                                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  title="Remove role"
+                                >
+                                  {item.deleting ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+
+                        {/* Expandable Discount & Notes Panel */}
+                        {isExpanded && (
+                          <tr className="bg-slate-50/80 border-b border-slate-200">
+                            <td colSpan={isOneTime ? 6 : 8} className="px-6 py-4">
+                              <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Tag className="h-4 w-4 text-indigo-600" />
+                                    <h5 className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+                                      Discount & Notes for {item.roleName || item.role || `Role #${index + 1}`}
+                                    </h5>
+                                  </div>
+                                  <ToggleSwitch
+                                    label="Apply Discount"
+                                    checked={Boolean(item.hasDiscount)}
+                                    onChange={(checked) => {
+                                      handleRoleChange(index, "hasDiscount", checked);
+                                      if (!checked) {
+                                        handleRoleChange(index, "discountValue", "");
+                                        handleRoleChange(index, "discountStartDate", "");
+                                        handleRoleChange(index, "discountEndDate", "");
+                                      } else if (!item.discountType) {
+                                        handleRoleChange(index, "discountType", "PERCENTAGE");
+                                      }
+                                    }}
+                                    disabled={isExisting}
+                                  />
+                                </div>
+
+                                {item.hasDiscount && (
+                                  <div className="space-y-3 pt-2 border-t border-slate-100">
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                      <FormSelect
+                                        label="Discount Type"
+                                        value={item.discountType || "PERCENTAGE"}
+                                        onChange={(e) => handleRoleChange(index, "discountType", e.target.value)}
+                                        options={DISCOUNT_TYPE_OPTIONS}
+                                        disabled={isExisting}
+                                        anchorOptions
+                                      />
+                                      <FormInput
+                                        label={item.discountType === "PERCENTAGE" ? "Discount %" : `Discount (${currency})`}
+                                        type="number"
+                                        value={item.discountValue}
+                                        onChange={(e) => handleRoleChange(index, "discountValue", e.target.value)}
+                                        placeholder="e.g. 10"
+                                        disabled={isExisting}
+                                      />
+                                      <FormDatePicker
+                                        label="Discount Start"
+                                        value={item.discountStartDate}
+                                        onChange={(e) => handleRoleChange(index, "discountStartDate", e.target.value)}
+                                        min={item.effectiveFrom || projectStartDateOnly || undefined}
+                                        max={item.effectiveTo || projectEndDateOnly || undefined}
+                                        error={roleDiscountDateErrors.discountStartDate}
+                                        disabled={isExisting}
+                                      />
+                                      <FormDatePicker
+                                        label="Discount End"
+                                        value={item.discountEndDate}
+                                        onChange={(e) => handleRoleChange(index, "discountEndDate", e.target.value)}
+                                        min={item.discountStartDate || item.effectiveFrom || projectStartDateOnly || undefined}
+                                        max={item.effectiveTo || projectEndDateOnly || undefined}
+                                        error={roleDiscountDateErrors.discountEndDate}
+                                        disabled={isExisting}
+                                      />
+                                    </div>
+                                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 px-3.5 py-2 text-xs text-indigo-900">
+                                      Calculated Net Rate: <span className="font-bold">{formatCurrency(netRoleRate, currency)} {getRatePeriodSuffix(item.ratePeriod)}</span>
+                                      {item.discountStartDate && item.discountEndDate && (
+                                        <span className="ml-2 text-indigo-600">· Active: {item.discountStartDate} to {item.discountEndDate}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div>
+                                  <FormInput
+                                    label="Commercial Notes"
+                                    value={item.remarks || ""}
+                                    onChange={(e) => handleRoleChange(index, "remarks", e.target.value)}
+                                    placeholder="Commercial agreement notes for this role..."
+                                    disabled={isExisting}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
                         )}
-                      </tr>
+                      </React.Fragment>
                       );
                     })}
                   </tbody>
@@ -3585,7 +4650,7 @@ export default function BillingConfigurationStep({
   onChange,
   setupMode,
   projectInfo = {},
-  onProjectInfoChange,
+  onProjectInfoChange = () => {},
   ensureBillingConfigurationId,
 }) {
   const isExisting = false; // Billing mode and rates are always configurable for new billing setups

@@ -568,7 +568,10 @@ export default function InvoiceGeneration() {
   };
 
   const tableRows = paginatedInvoices.map((item) => {
-    const isReady = item.workspaceStatus === "READY_FOR_INVOICE";
+    const isReady =
+      item.workspaceStatus === "READY_FOR_INVOICE" ||
+      item.workspaceStatus === "READY_FOR_TAX" ||
+      item.workspaceStatus === "TAX_COMPLETED";
     const st = (item.workspaceStatus || item.invoiceStatus || "").toUpperCase();
 
     const iid =
@@ -703,8 +706,8 @@ export default function InvoiceGeneration() {
           <ActionMenu
             items={[
               {
-                label: "Generate Invoice",
-                icon: <FileText className="h-4 w-4 text-indigo-600" />,
+                label: "View",
+                icon: <Eye className="h-4 w-4 text-slate-600" />,
                 hidden: !isReady,
                 onClick: () => handleGenerateInvoice(item),
               },
@@ -824,13 +827,34 @@ export default function InvoiceGeneration() {
       {/* Invoice Pipeline Section */}
       <PageCard>
         {/* Title */}
-        <div className="px-4 pt-4 sm:px-5">
-          <h2 className="text-base font-semibold text-slate-900">
-            Invoice Pipeline
-          </h2>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Track invoice candidates and approval status from invoice generation through approval.
-          </p>
+        <div className="flex flex-col gap-3 px-4 pt-4 sm:px-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Invoice Pipeline</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Track invoice candidates and approval status from invoice generation through approval.
+            </p>
+          </div>
+          <div className="flex w-full items-center justify-end gap-2 lg:w-[420px]">
+            <div className="min-w-0 flex-1">
+              <SearchInput
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Search by invoice number, project, client, snapshot..."
+              />
+            </div>
+            {searchQuery && (
+              <ARClearFiltersButton
+                onClick={() => {
+                  setSearchQuery("");
+                  setCurrentPage(1);
+                }}
+                label="Clear filters"
+              />
+            )}
+          </div>
         </div>
 
         {/* Pipeline Stage Tabs */}
@@ -849,31 +873,6 @@ export default function InvoiceGeneration() {
             })),
           ]}
         />
-
-        {/* Search Toolbar — placed inside the pipeline card */}
-        <div className="px-4 py-3 sm:px-5">
-          <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative w-full lg:max-w-md">
-            <SearchInput
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              placeholder="Search by invoice number, project, client, snapshot..."
-            />
-            </div>
-            {searchQuery && (
-              <ARClearFiltersButton
-                onClick={() => {
-                  setSearchQuery("");
-                  setCurrentPage(1);
-                }}
-                label="Clear filters"
-              />
-            )}
-          </div>
-        </div>
 
         {/* Invoice Queue Table */}
         <div className="border-t border-slate-100 p-4 sm:p-5 space-y-3">

@@ -56,6 +56,12 @@ import TaxBreakdownPanel, {
 } from "@/pages/expense-management/components/expense-reports/TaxBreakdownPanel";
 import TaxStatusBadge from "@/pages/expense-management/components/expense-reports/TaxStatusBadge";
 import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
+import {
+  formatDeadlineDate,
+  getSubmissionDeadlineInfo,
+  validateReportingPeriod,
+  validateTripDates,
+} from "@/pages/expense-management/components/expense-reports/submissionDeadline";
 import SummaryPanel from "@/pages/expense-management/components/expense-reports/SummaryPanel";
 import api from "@/api/axiosInstance";
 import Select from "react-select";
@@ -204,6 +210,7 @@ export default function ExpenseReportDetailPage() {
   // point of the correction loop), not just DRAFT. Also gates Add/Edit/Delete Line Item and
   // Submit, since the backend rejects all of those once the report leaves this status set.
   const isReportEditable = REPORT_EDITABLE_STATUSES.includes(report?.reportStatus);
+  const deadlineInfo = getSubmissionDeadlineInfo(report);
 
   // Every policy violation the employee hasn't explained yet. The backend's submission gate needs
   // an explanation for each (WARN or BLOCK); once explained, the approver and Finance decide.
@@ -304,7 +311,7 @@ export default function ExpenseReportDetailPage() {
   };
 
   const [isEditReportOpen, setIsEditReportOpen] = useState(false);
-  const [editFormData, setEditFormData] = useState({ title: "", businessPurpose: "", costCenterId: "", currencyId: "" });
+  const [editFormData, setEditFormData] = useState({ title: "", businessPurpose: "", costCenterId: "", currencyId: "", tripStartDate: "", tripEndDate: "", reportingPeriodStart: "", reportingPeriodEnd: "" });
   const [editFormErrors, setEditFormErrors] = useState({});
   const [savingReport, setSavingReport] = useState(false);
   const [isDeleteReportOpen, setIsDeleteReportOpen] = useState(false);
@@ -772,6 +779,10 @@ export default function ExpenseReportDetailPage() {
       businessPurpose: report.businessPurpose || "",
       costCenterId: report.costCenterId || "",
       currencyId: report.currencyId || "",
+      tripStartDate: (report.tripStartDate || "").slice(0, 10),
+      tripEndDate: (report.tripEndDate || "").slice(0, 10),
+      reportingPeriodStart: (report.reportingPeriodStart || "").slice(0, 10),
+      reportingPeriodEnd: (report.reportingPeriodEnd || "").slice(0, 10),
     });
     setEditFormErrors({});
     setIsEditReportOpen(true);
@@ -795,6 +806,10 @@ export default function ExpenseReportDetailPage() {
     if (!editFormData.currencyId) errors.currencyId = "Report currency is required.";
     const businessPurposeError = validateBusinessPurpose(editFormData.businessPurpose);
     if (businessPurposeError) errors.businessPurpose = businessPurposeError;
+    const tripDateError = validateTripDates(editFormData.tripStartDate, editFormData.tripEndDate);
+    if (tripDateError) errors[editFormData.tripStartDate ? "tripEndDate" : "tripStartDate"] = tripDateError;
+    const periodError = validateReportingPeriod(editFormData.reportingPeriodStart, editFormData.reportingPeriodEnd);
+    if (periodError) errors.reportingPeriodEnd = periodError;
     setEditFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -808,6 +823,10 @@ export default function ExpenseReportDetailPage() {
       businessPurpose: editFormData.businessPurpose ? editFormData.businessPurpose.trim() : "",
       costCenterId: editFormData.costCenterId,
       currencyId: editFormData.currencyId,
+      tripStartDate: editFormData.tripStartDate,
+      tripEndDate: editFormData.tripEndDate,
+      reportingPeriodStart: editFormData.reportingPeriodStart || null,
+      reportingPeriodEnd: editFormData.reportingPeriodEnd || null,
     };
 
     try {
@@ -840,6 +859,15 @@ export default function ExpenseReportDetailPage() {
   };
 
   const submitNow = () => {
+    // UI guard only: the backend enforces the same deadline on the submit call.
+    if (deadlineInfo?.isOverdue) {
+      showStatusToast(
+        `The submission deadline passed on ${formatDeadlineDate(deadlineInfo.deadline)}. This report can no longer be submitted.`,
+        "error",
+        4000,
+      );
+      return;
+    }
     submitReport.mutate(reportId, {
       onSuccess: () => {
         showStatusToast(["AWAITING_CORRECTION", "QUERY_RAISED"].includes(report.reportStatus) ? "Report resubmitted" : "Report submitted for approval", "success");
@@ -1174,6 +1202,13 @@ export default function ExpenseReportDetailPage() {
                   />
                 </div>
                 <p className="text-xs text-gray-400 font-mono mt-1">{report.reportNumber}</p>
+                {deadlineInfo && (
+                  <p className={`mt-1.5 text-xs font-medium ${deadlineInfo.isOverdue ? "text-red-700" : "text-gray-600"}`}>
+                    {deadlineInfo.isOverdue
+                      ? `Overdue: submission was due ${formatDeadlineDate(deadlineInfo.deadline)}`
+                      : `Submit by ${formatDeadlineDate(deadlineInfo.deadline)} (${deadlineInfo.daysRemaining} day${deadlineInfo.daysRemaining === 1 ? "" : "s"} left)`}
+                  </p>
+                )}
               </div>
 
               {canManage && (
