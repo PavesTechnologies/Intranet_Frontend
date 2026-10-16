@@ -31,6 +31,23 @@ import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { expenseReportService } from "@/pages/expense-management/api/expenseReportsApi";
 import CashAdvanceWorkflowStepper from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceWorkflowStepper";
 import CashAdvanceAdjustmentCard from "@/pages/expense-management/pages/cash-advance/components/CashAdvanceAdjustmentCard";
+import RecordDisbursementModal from "@/pages/expense-management/components/disbursement/RecordDisbursementModal";
+import DisbursementConfirmationFields from "@/pages/expense-management/components/disbursement/DisbursementConfirmationFields";
+import {
+  buildDisbursementFormData,
+  EMPTY_DISBURSEMENT_CONFIRMATION,
+} from "@/pages/expense-management/components/disbursement/disbursementConfirmation";
+import {
+  buildSettlementFormData,
+  EMPTY_PAYROLL_DEDUCTION,
+  getSettlementDifference,
+  SETTLEMENT_ACTION,
+  SETTLEMENT_MODES,
+  SETTLEMENT_SUCCESS_MESSAGE,
+  validateSettlement,
+} from "@/pages/expense-management/components/disbursement/settlementRecord";
+import { DEFAULT_REVIEW_CYCLE } from "@/pages/expense-management/components/disbursement/settlementRecord";
+import { getNextReviewDate, REVIEW_CYCLE_OPTIONS } from "@/pages/expense-management/pages/cash-advance/settlementCycles";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEmployeeDirectory } from "@/pages/expense-management/approval-engine/hooks/useEmployeeDirectory";
 
@@ -107,8 +124,12 @@ export default function ReimbursementsPage() {
   const [detailLoading, setDetailLoading] = useState(false);
 
   const [settlingAdvance, setSettlingAdvance] = useState(null);
-  const [settlementAction, setSettlementAction] = useState("SETTLE");
+  const [settlementAction, setSettlementAction] = useState(SETTLEMENT_ACTION.SETTLE);
   const [settlementNotes, setSettlementNotes] = useState("");
+  const [settlementConfirmation, setSettlementConfirmation] = useState(EMPTY_DISBURSEMENT_CONFIRMATION);
+  const [settlementPayroll, setSettlementPayroll] = useState(EMPTY_PAYROLL_DEDUCTION);
+  const [settlementErrors, setSettlementErrors] = useState({});
+  const [settlementReviewCycle, setSettlementReviewCycle] = useState(DEFAULT_REVIEW_CYCLE);
 
   const [creatingAdjustment, setCreatingAdjustment] = useState(false);
   const [newAdjForm, setNewAdjForm] = useState({
@@ -128,6 +149,7 @@ export default function ReimbursementsPage() {
   const [deletingAdjustment, setDeletingAdjustment] = useState(null);
   const [rejectingAdvance, setRejectingAdvance] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [disbursingAdvance, setDisbursingAdvance] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   const breadcrumbs = [
@@ -306,12 +328,17 @@ export default function ReimbursementsPage() {
   }, [reimbursements, statusFilter, searchTerm]);
 
   // Action handlers
-  const handleDisburse = async (adv) => {
-    const advanceId = adv.advanceId || adv.id;
+  // Opens the confirmation modal. The advance is only disbursed once mode and proof are recorded.
+  const handleDisburse = (adv) => setDisbursingAdvance(adv);
+
+  const handleConfirmDisburse = async (values) => {
+    if (!disbursingAdvance) return;
+    const advanceId = disbursingAdvance.advanceId || disbursingAdvance.id;
     setActionLoading(true);
     try {
-      await cashAdvanceApi.disburse(advanceId);
+      await cashAdvanceApi.disburse(advanceId, buildDisbursementFormData(values));
       showStatusToast(`Cash advance #${String(advanceId).slice(0, 8)} disbursed successfully!`, "success");
+      setDisbursingAdvance(null);
       fetchAdvances();
     } catch (err) {
       showStatusToast(err.response?.data?.message || "Failed to disburse cash advance", "error");
@@ -338,34 +365,47 @@ export default function ReimbursementsPage() {
     }
   };
 
+  // Records the settlement as an adjustment entry. The advance is never closed from here: the server
+  // closes it only once the balance is actually zero, so a failed record can no longer look settled.
   const handleConfirmSettlement = async (e) => {
     e.preventDefault();
     if (!settlingAdvance) return;
     const advanceId = settlingAdvance.advanceId || settlingAdvance.id;
+    const advanceAmount = Number(settlingAdvance.amount) || 0;
+    const verifiedExpenseAmount = Number(settlingAdvance.verifiedExpenseAmount || 0);
+    const diff = getSettlementDifference(advanceAmount, verifiedExpenseAmount);
+
+    const errors = validateSettlement({
+      action: settlementAction,
+      diff,
+      confirmation: settlementConfirmation,
+      payroll: settlementPayroll,
+      reviewCycle: settlementReviewCycle,
+    });
+    setSettlementErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     setActionLoading(true);
     try {
-      const advAmt = Number(settlingAdvance.amount) || 0;
-      const expAmt = Number(settlingAdvance.verifiedExpenseAmount || 0);
-      const diff = advAmt - expAmt;
+      await cashAdvanceApi.createReimbursementAdjustment(
+        buildSettlementFormData({
+          advanceId,
+          expenseReportId: settlingAdvance.linkedExpenseReport?.reportId || settlingAdvance.linkedExpenseReport?.id,
+          action: settlementAction,
+          advanceAmount,
+          verifiedExpenseAmount,
+          currencyCode: settlingAdvance.currencyCode,
+          confirmation: settlementConfirmation,
+          payroll: settlementPayroll,
+          reviewCycle: settlementReviewCycle,
+          notes: settlementNotes,
+        })
+      );
 
-      try {
-        await cashAdvanceApi.createReimbursementAdjustment({
-          cashAdvanceId: advanceId,
-          expenseReportId: settlingAdvance.linkedExpenseReport?.reportId || settlingAdvance.linkedExpenseReport?.id || null,
-          adjustmentAmount: Math.abs(diff),
-          notes: settlementNotes.trim() || `Settlement adjustment (${diff > 0 ? "Repayment" : diff < 0 ? "Additional Reimbursement" : "Zero Balance"})`,
-        });
-      } catch (err) {
-        console.log("Optional reimbursement adjustment call log:", err);
-      }
-
-      await cashAdvanceApi.update(advanceId, {
-        status: "CLOSED",
-        settledAt: new Date().toISOString(),
-        settlementNotes: settlementNotes.trim() || "Settled & Closed by Finance",
-      });
-
-      showStatusToast(`Cash advance #${String(advanceId).slice(0, 8)} settled and closed successfully!`, "success");
+      showStatusToast(
+        `Cash advance #${String(advanceId).slice(0, 8)}: ${SETTLEMENT_SUCCESS_MESSAGE[settlementAction]}`,
+        "success"
+      );
       setSettlingAdvance(null);
       setSettlementNotes("");
       fetchAdvances();
@@ -675,7 +715,10 @@ export default function ReimbursementsPage() {
                                   variant="primary"
                                   onClick={() => {
                                     setSettlingAdvance(adv);
-                                    setSettlementAction("SETTLE");
+                                    setSettlementAction(SETTLEMENT_ACTION.SETTLE);
+                                    setSettlementConfirmation(EMPTY_DISBURSEMENT_CONFIRMATION);
+                                    setSettlementPayroll(EMPTY_PAYROLL_DEDUCTION);
+                                    setSettlementErrors({});
                                   }}
                                   className="!py-1 !px-2.5 !text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white"
                                 >
@@ -1340,7 +1383,7 @@ export default function ReimbursementsPage() {
                         className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                       />
                       <span>
-                        Mark as Settled{" "}
+                        Settle now (cash or bank transfer){" "}
                         <span className="text-gray-500 font-normal">
                           {balance > 0
                             ? `(Employee to refund ${formatMoney(balance, currency)})`
@@ -1360,10 +1403,80 @@ export default function ReimbursementsPage() {
                         onChange={(e) => setSettlementAction(e.target.value)}
                         className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                       />
-                      <span>Adjust to next advance</span>
+                      <span>
+                        Carry forward to next advance{" "}
+                        <span className="text-gray-500 font-normal">(no payment now, balance stays outstanding)</span>
+                      </span>
                     </label>
+
+                    {balance > 0 && (
+                      <label className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-gray-800">
+                        <input
+                          type="radio"
+                          name="settlementAction"
+                          value="PAYROLL_DEDUCTION"
+                          checked={settlementAction === "PAYROLL_DEDUCTION"}
+                          onChange={(e) => setSettlementAction(e.target.value)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                        />
+                        <span>
+                          Recover from salary{" "}
+                          <span className="text-gray-500 font-normal">(needs authorization and payroll confirmation)</span>
+                        </span>
+                      </label>
+                    )}
+                    {settlementErrors.action && <p className="text-[11px] text-red-600">{settlementErrors.action}</p>}
                   </div>
                 </div>
+
+                {settlementAction === SETTLEMENT_ACTION.ADJUST && (
+                  <div className="space-y-2 rounded-lg border border-gray-200 p-3">
+                    <FormSelect
+                      label="Review cycle"
+                      name="settlementReviewCycle"
+                      value={settlementReviewCycle}
+                      onChange={(e) => setSettlementReviewCycle(e.target.value)}
+                      options={REVIEW_CYCLE_OPTIONS.filter((o) => o.value !== "MONTHLY")}
+                    />
+                    <p className="text-xs text-gray-500">
+                      Review date: {getNextReviewDate(settlementReviewCycle) || "—"}. The balance stays outstanding until then.
+                    </p>
+                  </div>
+                )}
+
+                {settlementAction === SETTLEMENT_ACTION.SETTLE && balance !== 0 && (
+                  <div className="space-y-3 rounded-lg border border-gray-200 p-3">
+                    <p className="text-xs font-bold text-gray-800">Payment proof</p>
+                    <DisbursementConfirmationFields
+                      values={settlementConfirmation}
+                      errors={settlementErrors}
+                      modes={SETTLEMENT_MODES}
+                      onFieldChange={(key, value) => setSettlementConfirmation((prev) => ({ ...prev, [key]: value }))}
+                    />
+                  </div>
+                )}
+
+                {settlementAction === SETTLEMENT_ACTION.PAYROLL_DEDUCTION && (
+                  <div className="space-y-3 rounded-lg border border-gray-200 p-3">
+                    <p className="text-xs font-bold text-gray-800">Salary deduction authorization</p>
+                    <FormInput
+                      label="Authorization reference"
+                      name="authorizationReference"
+                      value={settlementPayroll.authorizationReference}
+                      onChange={(e) => setSettlementPayroll((prev) => ({ ...prev, authorizationReference: e.target.value }))}
+                      requiredMark
+                      error={settlementErrors.authorizationReference}
+                    />
+                    <FormInput
+                      label="Payroll confirmation reference"
+                      name="payrollConfirmationReference"
+                      value={settlementPayroll.payrollConfirmationReference}
+                      onChange={(e) => setSettlementPayroll((prev) => ({ ...prev, payrollConfirmationReference: e.target.value }))}
+                      requiredMark
+                      error={settlementErrors.payrollConfirmationReference}
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Remarks</label>
@@ -1397,6 +1510,38 @@ export default function ReimbursementsPage() {
       })()}
 
       {/* Reject Modal */}
+      {disbursingAdvance && (
+        <RecordDisbursementModal
+          title="Disburse Cash Advance"
+          submitLabel="Confirm Disburse"
+          isSubmitting={actionLoading}
+          onCancel={() => setDisbursingAdvance(null)}
+          onSubmit={handleConfirmDisburse}
+          summary={
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-xs font-medium text-gray-600">Advance:</span>
+                <span className="text-xs font-bold text-gray-900">
+                  #{String(disbursingAdvance.advanceId || disbursingAdvance.id).slice(0, 8)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs font-medium text-gray-600">Amount:</span>
+                <span className="text-xs font-bold text-gray-900">
+                  {disbursingAdvance.currencyCode || "INR"} {Number(disbursingAdvance.amount || 0).toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs font-medium text-gray-600">Employee:</span>
+                <span className="text-xs font-bold text-gray-900">
+                  {disbursingAdvance.employeeName || disbursingAdvance.employeeId || "—"}
+                </span>
+              </div>
+            </div>
+          }
+        />
+      )}
+
       {rejectingAdvance && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95">

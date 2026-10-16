@@ -16,6 +16,7 @@ import { useApprovalLiveSync } from "../hooks/useApprovalLiveSync";
 import { formatMoney } from "../constants/approvalLabels";
 import { resolveQueueItem } from "../utils/approvalAmounts";
 import EmployeeLabel from "../components/EmployeeLabel";
+import SourceBadge from "../components/SourceBadge";
 import LineItemReviewPanel from "../components/LineItemReviewPanel";
 import CommentPromptModal from "../components/CommentPromptModal";
 import MyDelegateCard from "../components/MyDelegateCard";
@@ -248,6 +249,7 @@ export default function PendingApprovalsPage({ searchTerm = "", hideHeader = fal
                           </td>
                           <td className="px-2.5 py-1.5">
                             <span className="font-mono text-[11px] font-semibold text-gray-700">{item.reportNumber}</span>
+                            <SourceBadge cashAdvanceId={item.cashAdvanceId} />
                             {needsCorrection && (
                               <span className="ml-1.5 inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-800">
                                 Awaiting employee
