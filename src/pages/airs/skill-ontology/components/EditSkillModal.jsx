@@ -17,6 +17,7 @@ export default function EditSkillModal({ open, skill, existingSkills = [], categ
     setValues({
       canonicalName: skill.canonicalName,
       category: skill.category,
+      description: skill.description || "",
       aliases: skill.aliases || [],
       parentSkillId: skill.parentSkillId || "",
       parentSkillName: skill.parentSkillName || "",

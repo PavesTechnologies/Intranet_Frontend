@@ -127,6 +127,7 @@ export default function SkillDetailPage() {
       const res = await updateSkillApi(skill.id, {
         canonical_name: values.canonicalName,
         category: values.category,
+        description: values.description,
         aliases: values.aliases,
         remove_aliases: removedAliases,
         parent_skill_id: values.parentSkillId || null,
@@ -277,6 +278,7 @@ export default function SkillDetailPage() {
           id: skill.id,
           canonicalName: skill.canonicalName,
           category: skill.category,
+          description: skill.description,
           aliases: detail.aliasNames,
           parentSkillId: skill.parentSkillId,
           parentSkillName: skill.parentSkillName,

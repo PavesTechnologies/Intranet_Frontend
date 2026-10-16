@@ -75,6 +75,7 @@ export default function SkillOntologyPage() {
       const res = await createSkill({
         canonical_name: values.canonicalName,
         category: values.category,
+        description: values.description,
         aliases: values.aliases,
         parent_skill_id: values.parentSkillId || null,
         confidence: values.confidence,
@@ -114,6 +115,7 @@ export default function SkillOntologyPage() {
       const res = await updateSkill(editSkill.id, {
         canonical_name: values.canonicalName,
         category: values.category,
+        description: values.description,
         aliases: values.aliases,
         remove_aliases: removedAliases,
         parent_skill_id: values.parentSkillId || null,

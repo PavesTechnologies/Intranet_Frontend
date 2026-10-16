@@ -106,6 +106,21 @@ export default function SkillForm({ values, errors, onFieldChange, excludeSkillI
       </div>
 
       <div>
+        <FieldLabel>Short description</FieldLabel>
+        <textarea
+          rows={2}
+          maxLength={500}
+          value={values.description || ""}
+          onChange={(e) => onFieldChange("description", e.target.value)}
+          placeholder="What the skill means here, e.g. Building ServiceNow catalogue items and request fulfilment"
+          className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-200 text-[13px] outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <p className="text-[10px] text-slate-400 mt-1">
+          Optional. Scoring compares it with resume lines to find a skill described in other words.
+        </p>
+      </div>
+
+      <div>
         <FieldLabel>Aliases</FieldLabel>
         <div className="mt-1">
           <AliasEditor

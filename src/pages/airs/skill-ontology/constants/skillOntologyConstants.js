@@ -77,6 +77,7 @@ export const BULK_IMPORT_ACCEPTED_TYPES = [".xlsx"];
 export const EMPTY_SKILL_FORM = {
   canonicalName: "",
   category: "",
+  description: "",
   aliases: [],
   parentSkillId: "",
   confidence: SKILL_CONFIDENCE.UNVERIFIED,
