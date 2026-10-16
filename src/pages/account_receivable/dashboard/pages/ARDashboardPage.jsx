@@ -206,6 +206,22 @@ export default function ARDashboardPage() {
   const money = useMemo(() => createMoneyFormatter(filters.currency), [filters.currency]);
   const kpis = useMemo(() => buildKpis(filters.period, money), [filters.period, money]);
   const stages = useMemo(() => buildStages(stats, filters.period), [stats, filters.period]);
+  // The setup-approval worklist item follows the live pending count once it loads.
+  const worklist = useMemo(
+    () =>
+      WORKLIST_ITEMS.map((item) => {
+        if (item.id !== "setup-approvals" || stats?.pending == null) return item;
+        const n = stats.pending;
+        return {
+          ...item,
+          title: `${n} billing ${n === 1 ? "setup" : "setups"} awaiting checker approval`,
+          tone: n ? "warning" : "success",
+          badge: n ? "Pending Review" : "All Clear",
+          subtitle: n ? item.subtitle : "No setups are waiting for review",
+        };
+      }),
+    [stats]
+  );
 
   return (
     <div className="space-y-6 pb-12">
@@ -256,7 +272,7 @@ export default function ARDashboardPage() {
       <KpiGrid kpis={kpis} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        <PriorityWorklist items={WORKLIST_ITEMS} className="lg:col-span-7 xl:col-span-8" />
+        <PriorityWorklist items={worklist} className="lg:col-span-7 xl:col-span-8" />
         <AgingSchedule buckets={AGING_BUCKETS} formatMoney={money.format} className="lg:col-span-5 xl:col-span-4" />
       </div>
 

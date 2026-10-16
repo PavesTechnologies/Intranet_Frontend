@@ -131,7 +131,7 @@ describe("ARDashboardPage", () => {
 
   it("renders worklist items as links with visible calls to action", async () => {
     await renderLoaded();
-    const link = screen.getByRole("link", { name: /3 billing setups awaiting checker approval/i });
+    const link = screen.getByRole("link", { name: /2 billing setups awaiting checker approval/i });
     expect(link).toHaveAttribute("href", "/account-receivable/billing-approvals");
     expect(within(link).getByText("Open Approvals")).toBeInTheDocument();
   });

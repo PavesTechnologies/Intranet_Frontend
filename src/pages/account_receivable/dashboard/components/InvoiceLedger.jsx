@@ -154,7 +154,7 @@ export default function InvoiceLedger({ rows, filters, setFilter, toggleSort, re
                     column.sortable && sort === column.key ? (dir === "asc" ? "ascending" : "descending") : undefined
                   }
                   className={`whitespace-nowrap px-4 py-2.5 font-semibold uppercase tracking-wide ${
-                    column.align === "right" ? "text-right" : ""
+                    column.align === "right" ? "text-right" : "text-left"
                   }`}
                 >
                   {column.srOnly ? (
@@ -196,12 +196,12 @@ export default function InvoiceLedger({ rows, filters, setFilter, toggleSort, re
                 const agingTone = getAgingTone(row.agingDays);
                 return (
                   <tr key={row.invoiceId} className="transition-colors hover:bg-slate-50">
-                    <td className="whitespace-nowrap px-4 py-3">
+                    <td className="whitespace-nowrap px-4 py-3 text-left">
                       <span translate="no" className="font-mono font-semibold text-indigo-700">
                         {row.invoiceId}
                       </span>
                     </td>
-                    <td className="max-w-[240px] px-4 py-3">
+                    <td className="max-w-[240px] px-4 py-3 text-left">
                       <div className="truncate font-semibold text-slate-900" title={row.clientName}>
                         {row.clientName}
                       </div>
@@ -209,8 +209,8 @@ export default function InvoiceLedger({ rows, filters, setFilter, toggleSort, re
                         {row.project}
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{row.billingType}</td>
-                    <td className="whitespace-nowrap px-4 py-3">
+                    <td className="whitespace-nowrap px-4 py-3 text-left text-slate-600">{row.billingType}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-left">
                       <div className="font-medium tabular-nums text-slate-800">{formatDisplayDate(row.dueDate)}</div>
                       <div className={`text-[11px] font-medium tabular-nums ${AGING_TEXT[agingTone]}`}>
                         {row.agingDays > 0 ? `${row.agingDays} days aging` : "Current"}
@@ -222,7 +222,7 @@ export default function InvoiceLedger({ rows, filters, setFilter, toggleSort, re
                     <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-slate-900">
                       {formatMoney(row.total)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3">
+                    <td className="whitespace-nowrap px-4 py-3 text-left">
                       <StatusBadge tone={statusInfo.tone}>{statusInfo.label}</StatusBadge>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Calculator, Clock, FileClock, ListChecks, Settings2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Calculator, CheckCircle2, Clock, FileClock, ListChecks, Settings2 } from "lucide-react";
 
 import DashboardCard from "./DashboardCard";
 import StatusBadge from "./StatusBadge";
@@ -9,6 +9,7 @@ const TONE_ICON = {
   danger: AlertTriangle,
   warning: Clock,
   info: Calculator,
+  success: CheckCircle2,
   neutral: FileClock,
 };
 
@@ -16,6 +17,7 @@ const TONE_ACCENT = {
   danger: "border-l-rose-500",
   warning: "border-l-amber-500",
   info: "border-l-indigo-500",
+  success: "border-l-emerald-500",
   neutral: "border-l-slate-300",
 };
 
