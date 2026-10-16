@@ -67,6 +67,7 @@ export default function BillingTaxPipeline({
   stage = ALL,
   onStageChange,
   getRowAction,
+  onClearFilters,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [billingTypeFilter, setBillingTypeFilter] = useState(ALL);
@@ -102,13 +103,18 @@ export default function BillingTaxPipeline({
   const pageRecords = visibleRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const hasActiveFilters =
-    searchQuery.trim() !== "" || billingTypeFilter !== ALL || regionFilter !== ALL || monthFilter !== ALL;
+    searchQuery.trim() !== "" ||
+    billingTypeFilter !== ALL ||
+    regionFilter !== ALL ||
+    monthFilter !== ALL ||
+    stage !== ALL;
 
   const clearFilters = () => {
     setSearchQuery("");
     setBillingTypeFilter(ALL);
     setRegionFilter(ALL);
     setMonthFilter(ALL);
+    onClearFilters?.();
   };
 
   const emptyMessage = hasActiveFilters

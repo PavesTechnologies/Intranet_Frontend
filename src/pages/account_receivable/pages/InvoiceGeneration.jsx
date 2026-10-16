@@ -444,6 +444,12 @@ export default function InvoiceGeneration() {
     }
   };
 
+  const handleClearFilters = () => {
+    setStatusFilter("ALL");
+    setSearchQuery("");
+    setCurrentPage(1);
+  };
+
   const handleConfirmSend = async () => {
     if (!sendTarget) return;
     const invId = sendTarget.invoiceId || sendTarget.billingSnapshotId || sendTarget.snapshotId;
@@ -820,12 +826,9 @@ export default function InvoiceGeneration() {
                 placeholder="Search by invoice number, project, client, snapshot..."
               />
             </div>
-            {searchQuery && (
+            {(searchQuery || statusFilter !== "ALL") && (
               <ARClearFiltersButton
-                onClick={() => {
-                  setSearchQuery("");
-                  setCurrentPage(1);
-                }}
+                onClick={handleClearFilters}
                 label="Clear filters"
               />
             )}

@@ -1,12 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FolderKanban,
-  FileText,
   CheckCircle2,
   ArrowRight,
-  TrendingUp,
-  TrendingDown,
   DollarSign,
   AlertTriangle,
   Clock,
@@ -14,14 +11,7 @@ import {
   Calculator,
   ShieldCheck,
   RefreshCw,
-  Search,
-  Filter,
-  ArrowUpRight,
   ChevronRight,
-  Building2,
-  Calendar,
-  CreditCard,
-  Receipt,
   FileCheck2,
   FileClock,
   Activity,
@@ -33,8 +23,6 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell,
@@ -42,43 +30,42 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
 } from "recharts";
 
-import PageHeader from "../../../components/ui/PageHeader";
 import { PageCard, PageCardContent } from "../../../components/Cards/PageCard";
 import Button from "../../../components/Button/Button";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import SearchInput from "../../../components/filter/Searchbar";
 import Pagination from "../../../components/Pagination/pagination";
-import StatusBadge from "../../../components/status/statusbadge";
 import ARTable from "../components/common/ARTable";
 import ActionMenu from "../components/common/ActionMenu";
 import ARClearFiltersButton from "../components/common/ARClearFiltersButton";
+import ReceivableStatusBadge from "../components/common/ReceivableStatusBadge";
 import { RegisterCard } from "../components/receivables/ConsoleUI";
-import { formatDisplayDate } from "../utils/format";
+import useBusinessDate from "../hooks/useBusinessDate";
+import { formatCurrency, formatDisplayDate } from "../utils/format";
+import { isEndpointUnavailable } from "../utils/apiAvailability";
+import { getBillingConfigurations, getApiErrorMessage } from "../services/billingConfigService";
+import { fetchActiveBillingConfigurations, getAcquisitionKpis } from "../services/billingDataAcquisitionService";
+import { getInvoiceGenerationWorkspace } from "../services/invoiceService";
+import { getPayments } from "../services/paymentService";
 import {
-  getBillingConfigurationStats,
-  getBillingConfigurationActivity,
-  getApiErrorMessage,
-} from "../services/billingConfigService";
+  getOutstandingReceivables,
+  applyLiveAging,
+  getAgingBucket,
+  toIsoDay,
+  AGING_BUCKETS,
+} from "../services/receivableService";
 
 // Navigation Routes
 const OVERVIEW_PATH = "/account-receivable/project-billing-setup/overview";
-const WORKSPACE_PATH = "/account-receivable/project-billing-setup/workspace";
 const BILLING_APPROVALS_PATH = "/account-receivable/billing-approvals";
 const ACQUISITION_PATH = "/account-receivable/billing-data-acquisition/workspace";
 const TAX_PATH = "/account-receivable/tax-calculation";
 const INVOICE_GEN_PATH = "/account-receivable/invoice-generation";
 const INVOICE_APPROVAL_PATH = "/account-receivable/invoice-approval";
+const RECEIVABLES_PATH = "/account-receivable/receivables";
 const MASTER_DATA_PATH = "/account-receivable/master-data";
-
-// Currency Configuration
-const CURRENCIES = {
-  USD: { symbol: "$", code: "USD", rate: 1.0, locale: "en-US" },
-  INR: { symbol: "₹", code: "INR", rate: 86.5, locale: "en-IN" },
-  EUR: { symbol: "€", code: "EUR", rate: 0.92, locale: "de-DE" },
-};
 
 const CHART_COLORS = {
   primary: "#1e3a8a",   // Deep Navy / Enterprise blue
@@ -90,306 +77,281 @@ const CHART_COLORS = {
   slate: "#64748b",     // Muted slate
 };
 
+const AGING_COLORS = {
+  CURRENT: "#10b981",
+  "1_30": "#3b82f6",
+  "31_60": "#f59e0b",
+  "61_90": "#f97316",
+  "90_PLUS": "#ef4444",
+};
+
+// Sample chart data — these two charts stay on mock data until the
+// billed-vs-collected and billing-model APIs exist.
+const MOCK_TREND = [
+  { period: "May", invoiced: 1850000, collected: 1720000, projected: 1900000 },
+  { period: "Jun", invoiced: 2100000, collected: 1950000, projected: 2050000 },
+  { period: "Jul", invoiced: 2350000, collected: 2180000, projected: 2300000 },
+  { period: "Aug", invoiced: 2500000, collected: 2420000, projected: 2550000 },
+  { period: "Sep", invoiced: 2720000, collected: 2610000, projected: 2700000 },
+  { period: "Oct", invoiced: 2845000, collected: 2780000, projected: 2900000 },
+];
+const MOCK_BILLING_MODELS = [
+  { name: "Time & Material (T&M)", value: 48, amount: 1365600, color: "#1e3a8a" },
+  { name: "Fixed Milestone", value: 26, amount: 739700, color: "#0284c7" },
+  { name: "Retainer Services", value: 16, amount: 455200, color: "#10b981" },
+  { name: "Software & Tool Billing", value: 10, amount: 284500, color: "#f59e0b" },
+];
+
+const LEDGER_TABS = [
+  { key: "ALL", label: "All", test: () => true },
+  { key: "OVERDUE", label: "Overdue", test: (r) => r.daysOverdue > 0 },
+  { key: "DUE_SOON", label: "Due in 7 Days", test: (r) => r.daysUntilDue >= 0 && r.daysUntilDue <= 7 },
+  { key: "PARTIAL", label: "Partially Paid", test: (r) => r.amountReceived > 0 },
+];
+const LEDGER_PAGE_SIZE = 6;
+
+const PERIOD_LABELS = { MTD: "month to date", QTD: "quarter to date", YTD: "year to date" };
+
+const compactNumber = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const sum = (rows, key) => rows.reduce((s, r) => s + (Number(r[key]) || 0), 0);
+
+// First day of the selected period, as yyyy-MM-dd.
+const periodStart = (today, period) => {
+  const [y, m] = today.split("-").map(Number);
+  if (period === "YTD") return `${y}-01-01`;
+  const month = period === "QTD" ? Math.floor((m - 1) / 3) * 3 + 1 : m;
+  return `${y}-${String(month).padStart(2, "0")}-01`;
+};
+
+// Settled value of a Promise.allSettled entry, or the fallback.
+const settled = (result, fallback) => (result.status === "fulfilled" ? result.value : fallback);
+
 export default function AccountReceivableDashboard() {
   const navigate = useNavigate();
+  const today = useBusinessDate();
 
-  // Backend state
-  const [stats, setStats] = useState(null);
-  const [activity, setActivity] = useState([]);
+  // Backend state — each source loads on its own, so one failing API only
+  // blanks its own figures.
+  const [configs, setConfigs] = useState([]);
+  const [acquisition, setAcquisition] = useState([]);
+  const [invoiceRows, setInvoiceRows] = useState([]);
+  const [rawReceivables, setRawReceivables] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [paymentsUnavailable, setPaymentsUnavailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Enterprise Filter Controls
-  const [selectedCurrency, setSelectedCurrency] = useState("USD");
+  // Filter Controls
+  const [selectedCurrency, setSelectedCurrency] = useState(null);
   const [selectedPeriod, setSelectedPeriod] = useState("MTD");
-  const [selectedEntity, setSelectedEntity] = useState("ALL");
   const [customerSearch, setCustomerSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [ledgerPage, setLedgerPage] = useState(1);
 
-  const currencyInfo = CURRENCIES[selectedCurrency] || CURRENCIES.USD;
-
-  // Format currency helper
-  const formatMoney = (amountInUsd) => {
-    const converted = (amountInUsd || 0) * currencyInfo.rate;
-    return new Intl.NumberFormat(currencyInfo.locale, {
-      style: "currency",
-      currency: currencyInfo.code,
-      maximumFractionDigits: 0,
-    }).format(converted);
-  };
-
-  const loadData = async (isManual = false) => {
+  const loadData = useCallback(async (isManual = false) => {
     if (isManual) setRefreshing(true);
-    try {
-      const [statsResult, activityResult] = await Promise.all([
-        getBillingConfigurationStats(),
-        getBillingConfigurationActivity(),
-      ]);
-      setStats(statsResult);
-      setActivity(activityResult || []);
-      if (isManual) {
-        showStatusToast("Account Receivable metrics refreshed successfully.", "success");
-      }
-    } catch (error) {
-      showStatusToast(
-        getApiErrorMessage(error, "Failed to load Account Receivable overview."),
-        "error"
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    const [configRes, acquisitionRes, invoiceRes, receivableRes, paymentRes] = await Promise.allSettled([
+      getBillingConfigurations(),
+      fetchActiveBillingConfigurations(),
+      getInvoiceGenerationWorkspace(),
+      getOutstandingReceivables(),
+      getPayments(),
+    ]);
+
+    setConfigs(settled(configRes, []));
+    setAcquisition(settled(acquisitionRes, []));
+    setInvoiceRows(settled(invoiceRes, { rows: [] }).rows || []);
+    setRawReceivables(settled(receivableRes, []));
+    setPayments(settled(paymentRes, []));
+    setPaymentsUnavailable(paymentRes.status === "rejected" && isEndpointUnavailable(paymentRes.reason));
+
+    const failed = [configRes, invoiceRes, receivableRes].find((r) => r.status === "rejected");
+    if (failed) {
+      showStatusToast(getApiErrorMessage(failed.reason, "Some Account Receivable figures could not be loaded."), "error");
+    } else if (isManual) {
+      showStatusToast("Account Receivable metrics refreshed successfully.", "success");
     }
-  };
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData, today]);
 
-  // Enterprise Mock Financial Metrics (Tailored to AR End-to-End lifecycle)
+  const receivables = useMemo(() => rawReceivables.map((r) => applyLiveAging(r, today)), [rawReceivables, today]);
+
+  /* ---------------------------- Currency ---------------------------- */
+
+  // Amounts are never converted or summed across currencies: the dashboard
+  // shows one billing currency at a time.
+  const currencies = useMemo(() => {
+    const totals = {};
+    receivables.forEach((r) => (totals[r.currencyCode] = (totals[r.currencyCode] || 0) + r.outstandingBalance));
+    invoiceRows.forEach((r) => (totals[r.currencyCode] = totals[r.currencyCode] || 0));
+    payments.forEach((p) => (totals[p.currencyCode] = totals[p.currencyCode] || 0));
+    return Object.entries(totals).sort((a, b) => b[1] - a[1]).map(([c]) => c);
+  }, [receivables, invoiceRows, payments]);
+
+  const activeCurrency = currencies.includes(selectedCurrency) ? selectedCurrency : currencies[0] || "USD";
+  const formatMoney = (amount) => formatCurrency(amount || 0, activeCurrency);
+  const inCurrency = (rows) => rows.filter((r) => r.currencyCode === activeCurrency);
+  const show = (value) => (loading ? "…" : value);
+
+  /* ----------------------------- Metrics ----------------------------- */
+
+  const setupStats = useMemo(
+    () => ({
+      total: configs.length,
+      active: configs.filter((c) => c.billingStatus === "ACTIVE").length,
+      pending: configs.filter((c) => c.approvalStatus === "PENDING_APPROVAL").length,
+      draft: configs.filter((c) => c.approvalStatus === "DRAFT").length,
+    }),
+    [configs]
+  );
+
+  const acquisitionKpis = useMemo(() => getAcquisitionKpis(acquisition), [acquisition]);
+
+  const book = useMemo(() => inCurrency(receivables), [receivables, activeCurrency]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bookInvoices = useMemo(() => inCurrency(invoiceRows), [invoiceRows, activeCurrency]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const financialMetrics = useMemo(() => {
-    // Dynamic multiplier based on time period
-    const multiplier = selectedPeriod === "MTD" ? 1 : selectedPeriod === "QTD" ? 2.8 : 9.5;
+    const totalOutstanding = sum(book, "outstandingBalance");
+    const overdue = book.filter((r) => r.daysOverdue > 0);
+    const overdueAmount = sum(overdue, "outstandingBalance");
+    const aged = book.filter((r) => r.daysOutstanding !== null);
+    const weightedDays = aged.reduce((s, r) => s + r.daysOutstanding * r.outstandingBalance, 0);
+    const agedBalance = sum(aged, "outstandingBalance");
+
+    const readyRows = bookInvoices.filter((r) => r.workspaceStatus === "READY_FOR_INVOICE");
+    const approvalRows = bookInvoices.filter((r) => r.workspaceStatus === "PENDING_APPROVAL");
+
+    const from = periodStart(today, selectedPeriod);
+    const periodPayments = inCurrency(payments).filter((p) => {
+      const day = toIsoDay(p.paymentDate);
+      return day && day >= from && day <= today;
+    });
 
     return {
-      totalOutstanding: 2845000 * multiplier,
-      totalOutstandingChange: "+8.4%",
-      overdueAmount: 432500 * multiplier,
-      overduePercentage: "15.2%",
-      unbilledWip: 924000 * multiplier,
-      unbilledWipChange: "+12.1%",
-      dsoDays: 39.2, // Days Sales Outstanding
-      dsoTarget: 45.0,
-      collectedMtd: 1780000 * multiplier,
-      collectionEfficiency: "94.6%",
-      inApprovalAmount: 642000 * multiplier,
-      inApprovalCount: 14,
+      totalOutstanding,
+      openInvoices: book.length,
+      clients: new Set(book.map((r) => r.clientId)).size,
+      overdueAmount,
+      overdueCount: overdue.length,
+      overduePercentage: totalOutstanding > 0 ? Math.round((overdueAmount / totalOutstanding) * 100) : 0,
+      criticalAmount: sum(overdue.filter((r) => r.daysOverdue > 60), "outstandingBalance"),
+      avgDaysOutstanding: agedBalance > 0 ? Math.round(weightedDays / agedBalance) : null,
+      oldestDays: aged.length ? Math.max(...aged.map((r) => r.daysOutstanding)) : null,
+      unbilledAmount: sum(readyRows, "grandTotal"),
+      unbilledCount: readyRows.length,
+      collected: sum(periodPayments, "amount"),
+      paymentCount: periodPayments.length,
+      unallocated: sum(periodPayments, "unallocatedAmount"),
+      inApprovalAmount: sum(approvalRows, "grandTotal"),
+      inApprovalCount: approvalRows.length,
     };
-  }, [selectedPeriod]);
+  }, [book, bookInvoices, payments, today, selectedPeriod, activeCurrency]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Every invoice-workspace row (any currency) for stage counts.
+  const invoiceCounts = useMemo(() => {
+    const count = (status) => invoiceRows.filter((r) => r.workspaceStatus === status).length;
+    return { ready: count("READY_FOR_INVOICE"), generated: count("GENERATED"), pending: count("PENDING_APPROVAL") };
+  }, [invoiceRows]);
 
   // AR Pipeline Funnel (Tracing each module stage)
-  const pipelineStages = useMemo(() => [
+  const pipelineStages = [
     {
       id: "setup",
       name: "1. Billing Setups",
       description: "Project rate models & contracts",
-      count: stats?.total ?? 18,
-      active: stats?.active ?? 14,
-      pending: stats?.draft ?? 4,
-      amount: 4850000,
+      count: setupStats.total,
+      meta: `${setupStats.active} active`,
       path: OVERVIEW_PATH,
       icon: FolderKanban,
-      color: "border-sky-500 bg-sky-50 text-sky-700",
-      badgeColor: "bg-sky-100 text-sky-800",
     },
     {
       id: "approvals",
       name: "2. Billing Approvals",
       description: "Maker-Checker setup review",
-      count: 3,
-      sublabel: "3 Pending Review",
-      amount: 820000,
+      count: setupStats.pending,
+      meta: "pending review",
       path: BILLING_APPROVALS_PATH,
       icon: ShieldCheck,
-      color: "border-amber-500 bg-amber-50 text-amber-700",
-      badgeColor: "bg-amber-100 text-amber-800",
     },
     {
       id: "acquisition",
       name: "3. Data Acquisition",
       description: "Timesheets, expenses & tool charges",
-      count: 24,
-      sublabel: "24 Snapshots locked",
-      amount: financialMetrics.unbilledWip,
+      count: acquisitionKpis.notAcquired,
+      meta: "awaiting acquisition",
       path: ACQUISITION_PATH,
       icon: Layers,
-      color: "border-indigo-500 bg-indigo-50 text-indigo-700",
-      badgeColor: "bg-indigo-100 text-indigo-800",
     },
     {
       id: "tax",
       name: "4. Tax Calculation",
       description: "Dynamic GST / VAT / Sales Tax",
-      count: 18,
-      sublabel: "Tax Engine evaluated",
-      amount: 320000,
+      count: acquisitionKpis.readyForTax,
+      meta: "awaiting tax",
       path: TAX_PATH,
       icon: Calculator,
-      color: "border-purple-500 bg-purple-50 text-purple-700",
-      badgeColor: "bg-purple-100 text-purple-800",
     },
     {
       id: "generation",
       name: "5. Invoice Generation",
       description: "Drafting & numbering",
-      count: 12,
-      sublabel: "Draft invoices ready",
-      amount: 1140000,
+      count: invoiceCounts.ready + invoiceCounts.generated,
+      meta: formatMoney(sum(bookInvoices.filter((r) => ["READY_FOR_INVOICE", "GENERATED"].includes(r.workspaceStatus)), "grandTotal")),
       path: INVOICE_GEN_PATH,
       icon: FileClock,
-      color: "border-blue-500 bg-blue-50 text-blue-700",
-      badgeColor: "bg-blue-100 text-blue-800",
     },
     {
       id: "invoice-approval",
       name: "6. Invoice Approvals",
       description: "Checker sign-off & issuance",
-      count: 7,
-      sublabel: "Pending FM approval",
-      amount: financialMetrics.inApprovalAmount,
+      count: invoiceCounts.pending,
+      meta: formatMoney(financialMetrics.inApprovalAmount),
       path: INVOICE_APPROVAL_PATH,
       icon: FileCheck2,
-      color: "border-emerald-500 bg-emerald-50 text-emerald-700",
-      badgeColor: "bg-emerald-100 text-emerald-800",
     },
-  ], [stats, financialMetrics]);
+  ];
 
-  // Chart Data: Invoicing Velocity vs Collections Realization
-  const trendData = useMemo(() => [
-    { period: "May", invoiced: 1850000, collected: 1720000, projected: 1900000 },
-    { period: "Jun", invoiced: 2100000, collected: 1950000, projected: 2050000 },
-    { period: "Jul", invoiced: 2350000, collected: 2180000, projected: 2300000 },
-    { period: "Aug", invoiced: 2500000, collected: 2420000, projected: 2550000 },
-    { period: "Sep", invoiced: 2720000, collected: 2610000, projected: 2700000 },
-    { period: "Oct", invoiced: 2845000, collected: 2780000, projected: 2900000 },
-  ], []);
+  // AR Aging Schedule from live receivables
+  const agingData = useMemo(
+    () =>
+      AGING_BUCKETS.map((bucket) => {
+        const rows = book.filter((r) => getAgingBucket(r).key === bucket.key);
+        return { key: bucket.key, bucket: bucket.label, amount: sum(rows, "outstandingBalance"), count: rows.length, color: AGING_COLORS[bucket.key] };
+      }),
+    [book]
+  );
 
-  // Chart Data: AR Aging Schedule Breakdown (0-30, 31-60, 61-90, 90+)
-  const agingData = useMemo(() => [
-    { bucket: "Current (<30d)", amount: 1680000, count: 42, color: "#10b981" },
-    { bucket: "31-60 Days", amount: 620000, count: 18, color: "#3b82f6" },
-    { bucket: "61-90 Days", amount: 310000, count: 8, color: "#f59e0b" },
-    { bucket: "91-120 Days", amount: 145000, count: 4, color: "#f97316" },
-    { bucket: ">120 Days", amount: 90000, count: 2, color: "#ef4444" },
-  ], []);
+  // Clients with money more than 60 days past due.
+  const criticalClients = useMemo(() => {
+    const byClient = new Map();
+    book
+      .filter((r) => r.daysOverdue > 60)
+      .forEach((r) => byClient.set(r.clientName, (byClient.get(r.clientName) || 0) + r.outstandingBalance));
+    return [...byClient.entries()].sort((a, b) => b[1] - a[1]);
+  }, [book]);
 
-  // Chart Data: Revenue Distribution by Billing Model
-  const billingModelDistribution = useMemo(() => [
-    { name: "Time & Material (T&M)", value: 48, amount: 1365600, color: "#1e3a8a" },
-    { name: "Fixed Milestone", value: 26, amount: 739700, color: "#0284c7" },
-    { name: "Retainer Services", value: 16, amount: 455200, color: "#10b981" },
-    { name: "Software & Tool Billing", value: 10, amount: 284500, color: "#f59e0b" },
-  ], []);
+  /* ---------------------------- Debtor ledger ---------------------------- */
 
-  // Top Customer Invoices / Debtor Ledger
-  const debtorLedger = useMemo(() => [
-    {
-      invoiceId: "INV-2025-0891",
-      clientName: "Acme Global Solutions",
-      project: "Enterprise Core Migration",
-      billingType: "T&M (Role-based)",
-      dueDate: "2026-10-25",
-      agingDays: 14,
-      amount: 142500,
-      tax: 25650,
-      total: 168150,
-      status: "ISSUED",
-      urgency: "normal",
-    },
-    {
-      invoiceId: "INV-2025-0842",
-      clientName: "Nexis Financial Corp",
-      project: "Cloud Data Warehouse",
-      billingType: "Fixed Milestone",
-      dueDate: "2026-09-30",
-      agingDays: 42,
-      amount: 215000,
-      tax: 38700,
-      total: 253700,
-      status: "OVERDUE",
-      urgency: "high",
-    },
-    {
-      invoiceId: "INV-2025-0904",
-      clientName: "Vanguard Health Systems",
-      project: "HIPAA Security Portal",
-      billingType: "T&M (Standard)",
-      dueDate: "2026-10-18",
-      agingDays: 6,
-      amount: 88400,
-      tax: 15912,
-      total: 104312,
-      status: "PARTIALLY_PAID",
-      urgency: "normal",
-    },
-    {
-      invoiceId: "INV-2025-0918",
-      clientName: "Apex Retail Group",
-      project: "Omnichannel POS Integration",
-      billingType: "Software & Tools",
-      dueDate: "2026-11-05",
-      agingDays: 0,
-      amount: 64200,
-      tax: 11556,
-      total: 75756,
-      status: "PENDING_APPROVAL",
-      urgency: "medium",
-    },
-    {
-      invoiceId: "INV-2025-0789",
-      clientName: "Solaria Energy Tech",
-      project: "Smart Grid Analytics",
-      billingType: "Retainer",
-      dueDate: "2026-08-15",
-      agingDays: 88,
-      amount: 125000,
-      tax: 22500,
-      total: 147500,
-      status: "OVERDUE",
-      urgency: "critical",
-    },
-    {
-      invoiceId: "INV-2025-0925",
-      clientName: "Kinetix Robotics",
-      project: "Automated Inspection AI",
-      billingType: "T&M (Role-based)",
-      dueDate: "2026-10-10",
-      agingDays: 2,
-      amount: 198000,
-      tax: 35640,
-      total: 233640,
-      status: "PAID",
-      urgency: "normal",
-    },
-  ], []);
+  const searchedLedger = useMemo(() => {
+    const q = customerSearch.trim().toLowerCase();
+    if (!q) return receivables;
+    return receivables.filter((r) => [r.invoiceNumber, r.clientName, r.projectName].some((v) => String(v || "").toLowerCase().includes(q)));
+  }, [receivables, customerSearch]);
 
-  // Filtered debtor ledger
   const filteredLedger = useMemo(() => {
-    return debtorLedger.filter((item) => {
-      const matchesSearch =
-        item.clientName.toLowerCase().includes(customerSearch.toLowerCase()) ||
-        item.invoiceId.toLowerCase().includes(customerSearch.toLowerCase()) ||
-        item.project.toLowerCase().includes(customerSearch.toLowerCase());
-
-      if (!matchesSearch) return false;
-
-      if (statusFilter === "ALL") return true;
-      if (statusFilter === "OVERDUE") return item.status === "OVERDUE";
-      if (statusFilter === "PENDING") return item.status === "PENDING_APPROVAL";
-      if (statusFilter === "PAID") return item.status === "PAID" || item.status === "PARTIALLY_PAID";
-      return true;
-    });
-  }, [debtorLedger, customerSearch, statusFilter]);
+    const test = LEDGER_TABS.find((t) => t.key === statusFilter)?.test || (() => true);
+    return searchedLedger.filter(test);
+  }, [searchedLedger, statusFilter]);
 
   // Tab counts use the search-filtered ledger, like the Invoice Pipeline.
-  const ledgerTabs = useMemo(() => {
-    const searched = debtorLedger.filter((item) => {
-      const q = customerSearch.toLowerCase();
-      return (
-        item.clientName.toLowerCase().includes(q) ||
-        item.invoiceId.toLowerCase().includes(q) ||
-        item.project.toLowerCase().includes(q)
-      );
-    });
-    return [
-      { key: "ALL", label: "All", value: searched.length },
-      { key: "OVERDUE", label: "Overdue", value: searched.filter((i) => i.status === "OVERDUE").length },
-      { key: "PENDING", label: "Pending Approval", value: searched.filter((i) => i.status === "PENDING_APPROVAL").length },
-      { key: "PAID", label: "Paid", value: searched.filter((i) => i.status === "PAID" || i.status === "PARTIALLY_PAID").length },
-    ];
-  }, [debtorLedger, customerSearch]);
+  const ledgerTabs = LEDGER_TABS.map((t) => ({ key: t.key, label: t.label, value: searchedLedger.filter(t.test).length }));
 
-  const LEDGER_PAGE_SIZE = 6;
   const ledgerTotalPages = Math.max(1, Math.ceil(filteredLedger.length / LEDGER_PAGE_SIZE));
   const pagedLedger = filteredLedger.slice((ledgerPage - 1) * LEDGER_PAGE_SIZE, ledgerPage * LEDGER_PAGE_SIZE);
 
@@ -397,37 +359,39 @@ export default function AccountReceivableDashboard() {
     setLedgerPage(1);
   }, [customerSearch, statusFilter]);
 
+  const openInvoice = (row) => navigate(`/account-receivable/invoices/${row.invoiceId}`);
+
   const ledgerRows = pagedLedger.map((row) => ({
-    onRowClick: () => navigate(`/account-receivable/invoices/${row.invoiceId}`),
+    onRowClick: () => openInvoice(row),
     invoiceNumber: (
       <div className="text-left">
-        <span className="font-mono font-bold text-indigo-700">{row.invoiceId}</span>
+        <span className="font-mono font-bold text-indigo-700">{row.invoiceNumber}</span>
       </div>
     ),
     client: <div className="text-left font-semibold text-slate-800">{row.clientName}</div>,
     project: (
       <div className="text-left">
-        <div className="font-bold text-slate-900">{row.project}</div>
+        <div className="font-bold text-slate-900">{row.projectName}</div>
       </div>
     ),
-    billingModel: <div className="flex items-center justify-start font-medium text-slate-700">{row.billingType}</div>,
+    invoiceDate: <div className="text-left font-medium text-slate-700">{row.invoiceDate ? formatDisplayDate(row.invoiceDate) : "—"}</div>,
     dueDate: (
       <div className="text-left">
-        <div className="font-medium text-slate-700">{formatDisplayDate(row.dueDate)}</div>
+        <div className="font-medium text-slate-700">{row.dueDate ? formatDisplayDate(row.dueDate) : "—"}</div>
         <div
           className={`text-xs font-semibold ${
-            row.agingDays > 60 ? "text-rose-600" : row.agingDays > 30 ? "text-amber-600" : "text-slate-400"
+            row.daysOverdue > 60 ? "text-rose-600" : row.daysOverdue > 30 ? "text-amber-600" : row.daysOverdue > 0 ? "text-rose-500" : "text-slate-400"
           }`}
         >
-          {row.agingDays > 0 ? `${row.agingDays} days aging` : "Current"}
+          {row.daysOverdue > 0 ? `${plural(row.daysOverdue, "day")} overdue` : "Current"}
         </div>
       </div>
     ),
-    taxableSubtotal: <div className="text-left tabular-nums font-medium text-slate-700">{formatMoney(row.amount)}</div>,
-    totalGross: <div className="text-left tabular-nums font-bold text-slate-900">{formatMoney(row.total)}</div>,
+    invoiceAmount: <div className="text-left tabular-nums font-medium text-slate-700">{formatCurrency(row.invoiceAmount, row.currencyCode)}</div>,
+    outstanding: <div className="text-left tabular-nums font-bold text-slate-900">{formatCurrency(row.outstandingBalance, row.currencyCode)}</div>,
     status: (
       <div className="flex flex-col items-center justify-center gap-1">
-        <StatusBadge label={row.status} size="sm" />
+        <ReceivableStatusBadge receivable={row} />
       </div>
     ),
     actions: (
@@ -437,7 +401,7 @@ export default function AccountReceivableDashboard() {
             {
               label: "View Invoice",
               icon: <Eye className="h-4 w-4 text-slate-600" />,
-              onClick: () => navigate(`/account-receivable/invoices/${row.invoiceId}`),
+              onClick: () => openInvoice(row),
             },
           ]}
         />
@@ -445,18 +409,24 @@ export default function AccountReceivableDashboard() {
     ),
   }));
 
-  // Urgent action items
-  const actionItems = useMemo(() => [
+  /* ------------------------------ Worklist ------------------------------ */
+
+  const actionItems = [
     {
-      title: "2 Invoices overdue by >60 days",
-      subtitle: "Solaria Energy ($147.5k) & Nexis Financial ($253.7k)",
+      count: criticalClients.length,
+      title: `${plural(criticalClients.length, "client")} overdue by >60 days`,
+      subtitle: criticalClients
+        .slice(0, 2)
+        .map(([name, amount]) => `${name} (${formatMoney(amount)})`)
+        .join(" & "),
       type: "danger",
       icon: AlertTriangle,
       badge: "Action Required",
-      to: "/account-receivable/invoice-approval",
+      to: RECEIVABLES_PATH,
     },
     {
-      title: "3 Billing setups pending Checker approval",
+      count: setupStats.pending,
+      title: `${plural(setupStats.pending, "billing setup")} pending Checker approval`,
       subtitle: "Requires Finance Manager verification",
       type: "warning",
       icon: Clock,
@@ -464,35 +434,48 @@ export default function AccountReceivableDashboard() {
       to: BILLING_APPROVALS_PATH,
     },
     {
-      title: "6 Billing snapshots ready for tax calculation",
-      subtitle: "Acquisition locked for September cycle",
+      count: acquisitionKpis.readyForTax,
+      title: `${plural(acquisitionKpis.readyForTax, "billing snapshot")} ready for tax calculation`,
+      subtitle: "Acquired and waiting for the tax engine",
       type: "info",
       icon: Calculator,
       badge: "Tax Console",
       to: TAX_PATH,
     },
     {
-      title: "4 Draft invoices pending Maker submission",
-      subtitle: "Drafted, waiting for line item check",
+      count: invoiceCounts.ready + invoiceCounts.generated,
+      title: `${plural(invoiceCounts.ready + invoiceCounts.generated, "invoice")} waiting in the draft queue`,
+      subtitle: `${invoiceCounts.ready} ready to generate · ${invoiceCounts.generated} generated, not yet submitted`,
       type: "neutral",
       icon: FileClock,
       badge: "Draft Queue",
       to: INVOICE_GEN_PATH,
     },
-  ], []);
+  ].filter((item) => item.count > 0);
+
+  /* ------------------------------ Activity ------------------------------ */
+
+  const activity = configs
+    .filter((config) => config.lastUpdated)
+    .slice(0, 5)
+    .map((config) => ({
+      configId: config.id,
+      action: `${config.approvalStatusLabel} Configuration — ${config.projectName || config.client || "Billing setup"}`,
+      user: config.updatedBy || "System",
+      time: config.lastUpdated,
+    }));
+
+  const sampleBadge = (
+    <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+      Sample data
+    </span>
+  );
 
   return (
     <div className="space-y-6 pb-12">
       {/* Top Header with Financial Controls */}
       <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">
-              Enterprise AR Console
-            </span>
-            <span className="text-xs text-slate-400">•</span>
-            <span className="text-xs text-slate-500">Live Maker-Checker Engine</span>
-          </div>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
             Accounts Receivable Hub
           </h1>
@@ -503,25 +486,27 @@ export default function AccountReceivableDashboard() {
 
         {/* Global Financial Control Toolbar */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Currency Toggle */}
-          <div className="inline-flex rounded-lg border border-slate-300 bg-white p-1 shadow-sm">
-            {Object.keys(CURRENCIES).map((curr) => (
-              <button
-                key={curr}
-                type="button"
-                onClick={() => setSelectedCurrency(curr)}
-                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
-                  selectedCurrency === curr
-                    ? "bg-slate-900 text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                }`}
-              >
-                {curr} ({CURRENCIES[curr].symbol})
-              </button>
-            ))}
-          </div>
+          {/* Currency Toggle — billing currencies present in the data */}
+          {currencies.length > 1 && (
+            <div className="inline-flex rounded-lg border border-slate-300 bg-white p-1 shadow-sm">
+              {currencies.map((curr) => (
+                <button
+                  key={curr}
+                  type="button"
+                  onClick={() => setSelectedCurrency(curr)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    activeCurrency === curr
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
+                >
+                  {curr}
+                </button>
+              ))}
+            </div>
+          )}
 
-          {/* Period Selector */}
+          {/* Period Selector — drives Cash Realized */}
           <div className="inline-flex rounded-lg border border-slate-300 bg-white p-1 shadow-sm">
             {["MTD", "QTD", "YTD"].map((p) => (
               <button
@@ -566,17 +551,16 @@ export default function AccountReceivableDashboard() {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
-              {formatMoney(financialMetrics.totalOutstanding)}
+            <div className="truncate text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
+              {show(formatMoney(financialMetrics.totalOutstanding))}
             </div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
-              <TrendingUp className="h-3.5 w-3.5" />
-              <span>{financialMetrics.totalOutstandingChange} vs prior period</span>
+            <div className="mt-1 flex items-center gap-1.5 text-xs text-blue-600 font-medium">
+              <span>{show(`Across ${plural(financialMetrics.clients, "client")}`)}</span>
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-400">
-            <span>Current invoices</span>
-            <span className="font-semibold text-slate-700">62 Invoices</span>
+            <span>Open invoices</span>
+            <span className="font-semibold text-slate-700">{show(plural(financialMetrics.openInvoices, "Invoice"))}</span>
           </div>
         </div>
 
@@ -591,24 +575,24 @@ export default function AccountReceivableDashboard() {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold tracking-tight text-rose-900 tabular-nums">
-              {formatMoney(financialMetrics.overdueAmount)}
+            <div className="truncate text-2xl font-bold tracking-tight text-rose-900 tabular-nums">
+              {show(formatMoney(financialMetrics.overdueAmount))}
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-xs text-rose-600 font-medium">
-              <span>{financialMetrics.overduePercentage} of total book</span>
+              <span>{show(`${financialMetrics.overduePercentage}% of total book`)}</span>
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-rose-100 pt-2 text-[11px] text-rose-700/70">
             <span>Critical (&gt;60 days)</span>
-            <span className="font-bold text-rose-700">$235,000</span>
+            <span className="font-bold text-rose-700">{show(formatMoney(financialMetrics.criticalAmount))}</span>
           </div>
         </div>
 
-        {/* KPI 3: Days Sales Outstanding (DSO) */}
+        {/* KPI 3: Average days outstanding (balance-weighted) */}
         <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Days Sales Out (DSO)
+              Avg Days Outstanding
             </span>
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
               <Clock className="h-4 w-4" />
@@ -617,22 +601,23 @@ export default function AccountReceivableDashboard() {
           <div className="mt-3">
             <div className="flex items-baseline gap-1.5">
               <span className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
-                {financialMetrics.dsoDays}
+                {show(financialMetrics.avgDaysOutstanding ?? "—")}
               </span>
               <span className="text-xs font-medium text-slate-500">days</span>
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
-              <TrendingDown className="h-3.5 w-3.5" />
-              <span>Target &lt; {financialMetrics.dsoTarget} days (Healthy)</span>
+              <span>Weighted by open balance</span>
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-400">
-            <span>Industry benchmark</span>
-            <span className="font-semibold text-slate-700">45.0 days</span>
+            <span>Oldest open invoice</span>
+            <span className="font-semibold text-slate-700">
+              {show(financialMetrics.oldestDays === null ? "—" : plural(financialMetrics.oldestDays, "day"))}
+            </span>
           </div>
         </div>
 
-        {/* KPI 4: Unbilled WIP (Acquired not yet invoiced) */}
+        {/* KPI 4: Unbilled — tax completed, invoice not yet generated */}
         <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -643,40 +628,42 @@ export default function AccountReceivableDashboard() {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
-              {formatMoney(financialMetrics.unbilledWip)}
+            <div className="truncate text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
+              {show(formatMoney(financialMetrics.unbilledAmount))}
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-xs text-indigo-600 font-medium">
-              <span>{financialMetrics.unbilledWipChange} Timesheets locked</span>
+              <span>{show(`${plural(financialMetrics.unbilledCount, "period")} ready to invoice`)}</span>
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-400">
-            <span>Ready for tax step</span>
-            <span className="font-semibold text-slate-700">18 Projects</span>
+            <span>Awaiting acquisition</span>
+            <span className="font-semibold text-slate-700">{show(plural(acquisitionKpis.notAcquired, "Project"))}</span>
           </div>
         </div>
 
-        {/* KPI 5: Collections MTD */}
+        {/* KPI 5: Cash realized in the selected period */}
         <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Cash Realized (MTD)
+              Cash Realized ({selectedPeriod})
             </span>
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
               <CheckCircle2 className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
-              {formatMoney(financialMetrics.collectedMtd)}
+            <div className="truncate text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
+              {show(paymentsUnavailable ? "—" : formatMoney(financialMetrics.collected))}
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
-              <span>{financialMetrics.collectionEfficiency} collection rate</span>
+              <span>
+                {show(paymentsUnavailable ? "Payments API not available yet" : `${plural(financialMetrics.paymentCount, "payment")} ${PERIOD_LABELS[selectedPeriod]}`)}
+              </span>
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-400">
-            <span>Realization goal</span>
-            <span className="font-semibold text-slate-700">95.0% target</span>
+            <span>Unallocated</span>
+            <span className="font-semibold text-slate-700">{show(paymentsUnavailable ? "—" : formatMoney(financialMetrics.unallocated))}</span>
           </div>
         </div>
 
@@ -691,16 +678,16 @@ export default function AccountReceivableDashboard() {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
-              {formatMoney(financialMetrics.inApprovalAmount)}
+            <div className="truncate text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
+              {show(formatMoney(financialMetrics.inApprovalAmount))}
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-xs text-amber-600 font-medium">
-              <span>{financialMetrics.inApprovalCount} Invoices in queue</span>
+              <span>{show(`${plural(financialMetrics.inApprovalCount, "Invoice")} in queue`)}</span>
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-400">
-            <span>Checker sign-off</span>
-            <span className="font-semibold text-amber-700">Finance Manager</span>
+            <span>Billing setups pending</span>
+            <span className="font-semibold text-amber-700">{show(setupStats.pending)}</span>
           </div>
         </div>
       </div>
@@ -743,12 +730,12 @@ export default function AccountReceivableDashboard() {
                 </div>
 
                 <div className="mt-3 border-t border-slate-200/80 pt-2">
-                  <div className="flex items-baseline justify-between">
+                  <div className="flex items-baseline justify-between gap-2">
                     <span className="text-base font-bold text-slate-900 tabular-nums">
-                      {stage.count}
+                      {show(stage.count)}
                     </span>
-                    <span className="text-xs font-semibold text-slate-600 tabular-nums">
-                      {formatMoney(stage.amount)}
+                    <span className="truncate text-xs font-semibold text-slate-600 tabular-nums">
+                      {show(stage.meta)}
                     </span>
                   </div>
                   <div className="mt-1 flex items-center justify-between text-[10px] text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity font-medium">
@@ -764,13 +751,14 @@ export default function AccountReceivableDashboard() {
 
       {/* Row 3: Visual Analytics (Revenue vs Collections Trend & Aging Breakdown) */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        {/* Trend Area Chart (8 Cols) */}
+        {/* Trend Area Chart (8 Cols) — sample data */}
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-7 xl:col-span-8">
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-blue-600" />
                 Invoicing Velocity & Cash Realization Trend
+                {sampleBadge}
               </h3>
               <p className="text-xs text-slate-500">
                 Monthly billed invoices vs actual collected cash vs projected ARR trajectory.
@@ -794,7 +782,7 @@ export default function AccountReceivableDashboard() {
 
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+              <AreaChart data={MOCK_TREND} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="invoicedFill" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.25} />
@@ -814,7 +802,7 @@ export default function AccountReceivableDashboard() {
                 <YAxis
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(val) => `${currencyInfo.symbol}${(val / 1000).toFixed(0)}k`}
+                  tickFormatter={(val) => compactNumber.format(val)}
                   tick={{ fontSize: 11, fill: "#64748b" }}
                 />
                 <Tooltip
@@ -850,7 +838,7 @@ export default function AccountReceivableDashboard() {
           </div>
         </div>
 
-        {/* Aging Schedule Risk Stack (4 Cols) */}
+        {/* Aging Schedule Risk Stack (4 Cols) — live receivables */}
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-5 xl:col-span-4 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -865,15 +853,15 @@ export default function AccountReceivableDashboard() {
 
             <div className="space-y-3">
               {agingData.map((item) => {
-                const percentage = Math.round((item.amount / 2845000) * 100);
+                const percentage = financialMetrics.totalOutstanding > 0 ? Math.round((item.amount / financialMetrics.totalOutstanding) * 100) : 0;
                 return (
-                  <div key={item.bucket} className="space-y-1">
+                  <div key={item.key} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-medium text-slate-700">{item.bucket}</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-slate-400 text-[11px]">{item.count} inv</span>
+                        <span className="text-slate-400 text-[11px]">{show(item.count)} inv</span>
                         <span className="font-semibold text-slate-900 tabular-nums">
-                          {formatMoney(item.amount)}
+                          {show(formatMoney(item.amount))}
                         </span>
                       </div>
                     </div>
@@ -893,24 +881,33 @@ export default function AccountReceivableDashboard() {
             </div>
           </div>
 
-          <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-xs text-amber-900 flex items-start gap-2.5">
-            <ShieldCheck className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-semibold text-amber-800">Dunning Rule Triggered:</span>{" "}
-              2 enterprise accounts past 60 days are marked for automated finance escalation and freeze.
-            </div>
-          </div>
+          {!loading &&
+            (criticalClients.length > 0 ? (
+              <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-xs text-amber-900 flex items-start gap-2.5">
+                <ShieldCheck className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-amber-800">Escalation needed:</span>{" "}
+                  {plural(criticalClients.length, "client account")} {criticalClients.length === 1 ? "is" : "are"} more than 60 days past due.
+                </div>
+              </div>
+            ) : (
+              <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 text-xs text-emerald-900 flex items-start gap-2.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                <div>No client account is more than 60 days past due.</div>
+              </div>
+            ))}
         </div>
       </div>
 
       {/* Row 4: Billing Model Distribution & Immediate Action Items */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        {/* Billing Model Distribution Donut (4 Cols) */}
+        {/* Billing Model Distribution Donut (4 Cols) — sample data */}
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-5 xl:col-span-4">
           <div className="mb-2">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <PieChartIcon className="h-4 w-4 text-indigo-600" />
               Revenue by Billing Model
+              {sampleBadge}
             </h3>
             <p className="text-xs text-slate-500">
               Contribution by Rate Models configured in Project Wizard.
@@ -921,7 +918,7 @@ export default function AccountReceivableDashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={billingModelDistribution}
+                  data={MOCK_BILLING_MODELS}
                   cx="50%"
                   cy="50%"
                   innerRadius={55}
@@ -929,7 +926,7 @@ export default function AccountReceivableDashboard() {
                   paddingAngle={3}
                   dataKey="value"
                 >
-                  {billingModelDistribution.map((entry, index) => (
+                  {MOCK_BILLING_MODELS.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -949,7 +946,7 @@ export default function AccountReceivableDashboard() {
           </div>
 
           <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-            {billingModelDistribution.map((model) => (
+            {MOCK_BILLING_MODELS.map((model) => (
               <div key={model.name} className="flex items-center gap-2">
                 <span
                   className="h-2.5 w-2.5 rounded-full shrink-0"
@@ -976,53 +973,66 @@ export default function AccountReceivableDashboard() {
                   Critical operational bottlenecks requiring Maker attention or Checker approval.
                 </p>
               </div>
-              <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-600/10">
-                4 Critical Items
-              </span>
+              {!loading && actionItems.length > 0 && (
+                <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-600/10">
+                  {plural(actionItems.length, "Open Item")}
+                </span>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 mt-3">
-              {actionItems.map((item, idx) => {
-                const ItemIcon = item.icon;
-                return (
-                  <div
-                    key={idx}
-                    onClick={() => navigate(item.to)}
-                    className="flex cursor-pointer flex-col justify-between rounded-lg border border-slate-200 p-3.5 transition-all hover:border-blue-500 hover:bg-blue-50/20 hover:shadow-xs group"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span
-                          className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${
-                            item.type === "danger"
-                              ? "bg-rose-100 text-rose-800"
-                              : item.type === "warning"
-                              ? "bg-amber-100 text-amber-800"
-                              : item.type === "info"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-slate-100 text-slate-700"
-                          }`}
-                        >
-                          {item.badge}
-                        </span>
-                        <ItemIcon className="h-4 w-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
+            {loading ? (
+              <div className="py-8 text-center text-sm text-slate-500">Loading worklist…</div>
+            ) : actionItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                </div>
+                <p className="text-sm font-medium text-slate-500">Nothing waiting — every stage is clear.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 mt-3">
+                {actionItems.map((item) => {
+                  const ItemIcon = item.icon;
+                  return (
+                    <div
+                      key={item.badge}
+                      onClick={() => navigate(item.to)}
+                      className="flex cursor-pointer flex-col justify-between rounded-lg border border-slate-200 p-3.5 transition-all hover:border-blue-500 hover:bg-blue-50/20 hover:shadow-xs group"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${
+                              item.type === "danger"
+                                ? "bg-rose-100 text-rose-800"
+                                : item.type === "warning"
+                                ? "bg-amber-100 text-amber-800"
+                                : item.type === "info"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
+                            {item.badge}
+                          </span>
+                          <ItemIcon className="h-4 w-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                        </div>
+                        <h4 className="mt-2 text-xs font-bold text-slate-900 group-hover:text-blue-600">
+                          {item.title}
+                        </h4>
+                        <p className="mt-1 text-[11px] text-slate-500 line-clamp-1">
+                          {item.subtitle}
+                        </p>
                       </div>
-                      <h4 className="mt-2 text-xs font-bold text-slate-900 group-hover:text-blue-600">
-                        {item.title}
-                      </h4>
-                      <p className="mt-1 text-[11px] text-slate-500 line-clamp-1">
-                        {item.subtitle}
-                      </p>
-                    </div>
 
-                    <div className="mt-3 flex items-center justify-end text-[11px] font-semibold text-blue-600 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span>Process now</span>
-                      <ArrowRight className="h-3 w-3" />
+                      <div className="mt-3 flex items-center justify-end text-[11px] font-semibold text-blue-600 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span>Process now</span>
+                        <ArrowRight className="h-3 w-3" />
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="mt-4 border-t border-slate-100 pt-3 flex items-center justify-between text-xs text-slate-500">
@@ -1040,10 +1050,10 @@ export default function AccountReceivableDashboard() {
         </div>
       </div>
 
-      {/* Row 5: Corporate Debtor Ledger — same layout as the Invoice Pipeline table */}
+      {/* Row 5: Corporate Debtor Ledger — live outstanding receivables */}
       <RegisterCard
         title="Corporate Debtor Ledger & Active Invoices"
-        subtitle="Live corporate debtor balances, tax compliance status, and payment schedules."
+        subtitle="Live client balances and payment schedules for every invoice sent and still owed."
         toolbar={
           <>
             <div className="min-w-0 flex-1">
@@ -1067,7 +1077,7 @@ export default function AccountReceivableDashboard() {
         }
         tabs={{
           label: "Debtor ledger status",
-          loading: false,
+          loading,
           items: ledgerTabs.map((t) => ({
             ...t,
             active: statusFilter === t.key,
@@ -1086,10 +1096,10 @@ export default function AccountReceivableDashboard() {
               <Button
                 variant="link"
                 size="small"
-                onClick={() => navigate(INVOICE_GEN_PATH)}
+                onClick={() => navigate(RECEIVABLES_PATH)}
                 className="gap-1 p-0 text-xs font-semibold text-blue-600 hover:underline"
               >
-                View Full Invoicing Register
+                View All Outstanding Receivables
                 <ArrowRight className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -1097,10 +1107,17 @@ export default function AccountReceivableDashboard() {
         }
       >
         <ARTable
-          headers={["Invoice Number", "Client", "Project", "Billing Model", "Due Date", "Taxable Subtotal", "Total Gross", "Status", "Actions"]}
-          columns={["invoiceNumber", "client", "project", "billingModel", "dueDate", "taxableSubtotal", "totalGross", "status", "actions"]}
+          headers={["Invoice Number", "Client", "Project", "Invoice Date", "Due Date", "Invoice Amount", "Outstanding", "Status", "Actions"]}
+          columns={["invoiceNumber", "client", "project", "invoiceDate", "dueDate", "invoiceAmount", "outstanding", "status", "actions"]}
           rows={ledgerRows}
-          emptyMessage={customerSearch.trim() ? "No invoices match your search." : "No invoices for this status."}
+          loading={loading}
+          emptyMessage={
+            customerSearch.trim()
+              ? "No invoices match your search."
+              : receivables.length === 0
+              ? "Nothing outstanding. Invoices appear here once they are sent to the client."
+              : "No invoices for this status."
+          }
         />
       </RegisterCard>
 
@@ -1144,20 +1161,18 @@ export default function AccountReceivableDashboard() {
             </div>
           ) : (
             <ul className="divide-y divide-slate-100">
-              {activity.slice(0, 5).map((item, index) => (
+              {activity.map((item, index) => (
                 <li
                   key={`${item.configId || index}-${index}`}
                   className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-xs"
                 >
                   <div className="flex items-center gap-2">
                     <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-                    <span className="font-medium text-slate-700">
-                      {item.action || "Billing setup updated"}
-                    </span>
+                    <span className="font-medium text-slate-700">{item.action}</span>
                   </div>
 
                   <div className="text-slate-400">
-                    <span className="font-medium text-slate-600">{item.user || "System"}</span> · {item.time || "Recently"}
+                    <span className="font-medium text-slate-600">{item.user}</span> · {item.time || "Recently"}
                   </div>
                 </li>
               ))}

@@ -3,88 +3,130 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   DollarSign,
   AlertTriangle,
-  CalendarCheck,
-  CalendarClock,
-  Clock,
-  Building2,
-  BarChart3,
-  Users,
-  ShieldAlert,
-  BellRing,
-  Briefcase,
-  Eye,
-  FileText,
-  Mail,
-  Banknote,
-  FileMinus,
-  FilePlus,
-  BookOpen,
+  CalendarDays,
+  TrendingUp,
+  FileStack,
 } from "lucide-react";
 
 import SearchInput from "../../../components/filter/Searchbar";
 import Pagination from "../../../components/Pagination/pagination";
-import StatusBadge from "../../../components/status/statusbadge";
-import LoadingSpinner from "../../../components/LoadingSpinner";
-import ARClearFiltersButton from "../components/common/ARClearFiltersButton";
 import ARTable from "../components/common/ARTable";
-import ActionMenu from "../components/common/ActionMenu";
-import DetailsDrawer from "../components/common/DetailsDrawer";
+import ARFilterListbox from "../components/common/ARFilterListbox";
+import ARClearFiltersButton from "../components/common/ARClearFiltersButton";
 import ReceivableStatusBadge from "../components/common/ReceivableStatusBadge";
+import { ConsoleHeader, StatTile, StatTileGrid, RegisterCard } from "../components/receivables/ConsoleUI";
 import {
-  ConsoleHeader,
-  StatTile,
-  StatTileGrid,
-  SectionCard,
-  RegisterCard,
-  Segmented,
-  AgingBars,
-} from "../components/receivables/ConsoleUI";
+  ChartPanel,
+  AgingChart,
+  ClientDonut,
+  CollectionTrend,
+  FilterSelect,
+  ExportMenu,
+} from "../components/receivables/ReceivablesWidgets";
+import InvoiceDetailPanel from "../components/receivables/InvoiceDetailPanel";
 import useOutstandingReceivables from "../hooks/useOutstandingReceivables";
-import { formatCurrency, formatDisplayDate, formatDisplayDateTime } from "../utils/format";
+import { formatCurrency, formatDisplayDate } from "../utils/format";
 import {
   getReceivableDueState,
   getAgingBucket,
-  describeDue,
   RECEIVABLE_DUE_STATE,
   AGING_BUCKETS,
   NO_DUE_DATE_BUCKET,
 } from "../services/receivableService";
-import { getInvoiceDeliveries } from "../services/invoiceService";
 
-const PAGE_SIZE = 10;
-const ALL = "ALL";
-const { NOT_DUE, DUE_TODAY, OVERDUE, PARTIALLY_PAID, NO_DUE_DATE } = RECEIVABLE_DUE_STATE;
+/* ------------------------------------------------------------------ */
+/* Constants                                                           */
+/* ------------------------------------------------------------------ */
 
+const AR = "/account-receivable";
 const PATHS = {
-  payments: "/account-receivable/payments",
-  ledger: "/account-receivable/customer-ledger",
-  notes: "/account-receivable/adjustment-notes",
-  collections: "/account-receivable/collections",
+  payments: `${AR}/payments`,
+  ledger: `${AR}/customer-ledger`,
+  notes: `${AR}/adjustment-notes`,
+  collections: `${AR}/collections`,
 };
 
-// Calm → urgent, matching the Dashboard's aging palette.
+const { NOT_DUE, DUE_TODAY, OVERDUE, PARTIALLY_PAID } = RECEIVABLE_DUE_STATE;
+
 const AGING_COLORS = {
-  CURRENT: "#10b981",
+  CURRENT: "#22c55e",
   "1_30": "#3b82f6",
-  "31_60": "#f59e0b",
-  "61_90": "#f97316",
+  "31_60": "#facc15",
+  "61_90": "#fb923c",
   "90_PLUS": "#ef4444",
   NO_DUE_DATE: "#94a3b8",
 };
+const AGING_SHORT = { CURRENT: "Not Due", "1_30": "1-30 Days", "31_60": "31-60 Days", "61_90": "61-90 Days", "90_PLUS": "90+ Days", NO_DUE_DATE: "No Due Date" };
 
-const TABLE_HEADERS = ["Invoice No.", "Client", "Project", "Invoice Date", "Due Date", "Invoice Amount", "Outstanding", "Status", "Actions"];
-const TABLE_COLUMNS = ["invoiceNumber", "client", "project", "invoiceDate", "dueDate", "invoiceAmount", "outstanding", "status", "actions"];
+const CLIENT_COLORS = ["#2563eb", "#3b82f6", "#facc15", "#22c55e", "#cbd5e1"];
 
-const sum = (rows) => rows.reduce((s, r) => s + r.outstandingBalance, 0);
+const TABS = [
+  { key: "OPEN", label: "Open Invoices", test: () => true },
+  { key: "OVERDUE", label: "Overdue", test: (r) => r.daysOverdue > 0 },
+  { key: "DUE_SOON", label: "Due Soon", test: (r) => r.daysUntilDue >= 0 && r.daysUntilDue <= 7 },
+  { key: "PARTIAL", label: "Partially Paid", test: (r) => r.amountReceived > 0 },
+];
 
-function DetailRow({ label, children }) {
-  return (
-    <div className="grid grid-cols-5 gap-3 py-2 text-sm">
-      <dt className="col-span-2 text-slate-500">{label}</dt>
-      <dd className="col-span-3 font-medium text-slate-900">{children}</dd>
-    </div>
+const STATUS_OPTIONS = [
+  { value: "", label: "All statuses" },
+  { value: NOT_DUE.key, label: NOT_DUE.label },
+  { value: DUE_TODAY.key, label: DUE_TODAY.label },
+  { value: OVERDUE.key, label: OVERDUE.label },
+  { value: PARTIALLY_PAID.key, label: PARTIALLY_PAID.label },
+];
+
+const AGING_OPTIONS = [{ value: "", label: "All aging" }, ...[...AGING_BUCKETS, NO_DUE_DATE_BUCKET].map((b) => ({ value: b.key, label: b.label }))];
+
+const TABLE_HEADERS_TAIL = ["Invoice No", "Client", "Project", "Invoice Date", "Due Date", "Amount", "Received", "Outstanding", "Status", "Aging"];
+const TABLE_COLUMNS = ["select", "invoiceNumber", "client", "project", "invoiceDate", "dueDate", "amount", "received", "outstanding", "status", "aging"];
+
+const compactNumber = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+const sumOutstanding = (rows) => rows.reduce((s, r) => s + r.outstandingBalance, 0);
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+const shiftMonth = (key, delta) => {
+  const [y, m] = key.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
+const monthLabel = (key) => {
+  const [y, m] = key.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleString("en", { month: "short" });
+};
+
+// CSV export of the visible / selected invoices.
+const downloadCsv = (rows, filename) => {
+  const head = ["Invoice No", "Client", "Project", "Invoice Date", "Due Date", "Currency", "Amount", "Received", "Outstanding", "Status", "Days Overdue"];
+  const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = rows.map((r) =>
+    [
+      r.invoiceNumber,
+      r.clientName,
+      r.projectName,
+      r.invoiceDate || "",
+      r.dueDate || "",
+      r.currencyCode,
+      r.invoiceAmount.toFixed(2),
+      r.amountReceived.toFixed(2),
+      r.outstandingBalance.toFixed(2),
+      getReceivableDueState(r).label,
+      r.daysOverdue ?? "",
+    ]
+      .map(esc)
+      .join(",")
   );
-}
+  const blob = new Blob([[head.map(esc).join(","), ...lines].join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+/* ------------------------------------------------------------------ */
+/* Page                                                                */
+/* ------------------------------------------------------------------ */
 
 export default function Receivables() {
   const navigate = useNavigate();
@@ -94,275 +136,259 @@ export default function Receivables() {
 
   // Re-aged against today and refetched when the date rolls over, so an
   // invoice whose due date passes turns overdue without a reload.
-  const { receivables, loading, error } = useOutstandingReceivables();
+  const { receivables, loading, error, today } = useOutstandingReceivables();
 
   const [currency, setCurrency] = useState(null);
-  const [statusFilter, setStatusFilter] = useState(ALL);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [trendMonths, setTrendMonths] = useState(6);
 
-  const [selected, setSelected] = useState(null);
-  const [deliveries, setDeliveries] = useState([]);
-  const [deliveriesLoading, setDeliveriesLoading] = useState(false);
+  // Table filters
+  const [tab, setTab] = useState("OPEN");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [agingFilter, setAgingFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 8;
+  const [checked, setChecked] = useState(() => new Set());
+  const [selectedId, setSelectedId] = useState(null);
+  const [panelClosed, setPanelClosed] = useState(false);
 
-  /* ------------------------------ Currency ------------------------------ */
+  /* ---------------------------- Scope & currency ---------------------------- */
 
-  // Amounts never mix currencies: the whole console works in one at a time,
-  // defaulting to the one with the most money owed.
+  // Amounts never mix currencies: the page works in one at a time.
   const currencies = useMemo(() => {
     const totals = {};
-    receivables.forEach((r) => {
-      totals[r.currencyCode] = (totals[r.currencyCode] || 0) + r.outstandingBalance;
-    });
-    return Object.entries(totals).sort((a, b) => b[1] - a[1]).map(([code]) => code);
+    receivables.forEach((r) => (totals[r.currencyCode] = (totals[r.currencyCode] || 0) + r.outstandingBalance));
+    return Object.entries(totals).sort((a, b) => b[1] - a[1]).map(([c]) => c);
   }, [receivables]);
 
-  const activeCurrency = currencies.includes(currency) ? currency : currencies[0] || null;
-  // The just-sent invoice decides the starting currency, so it is visible.
   useEffect(() => {
     if (!sentInvoiceId || currency) return;
     const sent = receivables.find((r) => r.invoiceId === sentInvoiceId);
     if (sent) setCurrency(sent.currencyCode);
   }, [receivables, sentInvoiceId, currency]);
 
-  const book = useMemo(
-    () => (activeCurrency ? receivables.filter((r) => r.currencyCode === activeCurrency) : []),
-    [receivables, activeCurrency]
-  );
-  const money = (amount) => formatCurrency(amount, activeCurrency || "USD");
+  const activeCurrency = currencies.includes(currency) ? currency : currencies[0] || "USD";
+  const book = useMemo(() => receivables.filter((r) => r.currencyCode === activeCurrency), [receivables, activeCurrency]);
+  const money = (v) => formatCurrency(v, activeCurrency);
+  const compactMoney = (v) => compactNumber.format(v || 0);
 
-  /* ------------------------------ Metrics ------------------------------ */
+  /* ------------------------------- KPIs ------------------------------- */
 
-  const metrics = useMemo(() => {
+  const kpi = useMemo(() => {
     const overdue = book.filter((r) => r.daysOverdue > 0);
-    const critical = overdue.filter((r) => r.daysOverdue > 60);
-    const dueToday = book.filter((r) => r.daysUntilDue === 0);
-    const dueSoon = book.filter((r) => r.daysUntilDue >= 1 && r.daysUntilDue <= 7);
-    const ages = book.map((r) => r.daysOutstanding).filter((d) => d !== null && d !== undefined);
-    const total = sum(book);
-
-    const byClient = new Map();
-    book.forEach((r) => {
-      const c = byClient.get(r.clientId) || { clientId: r.clientId, clientName: r.clientName, total: 0, overdue: 0, invoices: 0 };
-      c.total += r.outstandingBalance;
-      c.invoices += 1;
-      if (r.daysOverdue > 0) c.overdue += r.outstandingBalance;
-      byClient.set(r.clientId, c);
-    });
-    const debtors = [...byClient.values()].sort((a, b) => b.total - a.total);
-
+    const dueSoon = book.filter((r) => r.daysUntilDue >= 0 && r.daysUntilDue <= 30);
+    const billed = book.reduce((s, r) => s + r.invoiceAmount, 0);
+    const received = book.reduce((s, r) => s + r.amountReceived, 0);
+    const total = sumOutstanding(book);
+    const overdueAmount = sumOutstanding(overdue);
     return {
       total,
-      count: book.length,
-      overdue,
-      overdueAmount: sum(overdue),
-      overduePct: total > 0 ? Math.round((sum(overdue) / total) * 100) : 0,
-      critical,
-      criticalAmount: sum(critical),
-      dueToday,
-      dueSoon,
-      avgDays: ages.length ? Math.round(ages.reduce((a, b) => a + b, 0) / ages.length) : null,
-      oldestDays: ages.length ? Math.max(...ages) : null,
-      notDue: book.filter((r) => getReceivableDueState(r).key === NOT_DUE.key).length,
-      debtors,
+      overdue: overdueAmount,
+      overdueCount: overdue.length,
+      overdueShare: total > 0 ? Math.round((overdueAmount / total) * 100) : 0,
+      critical: sumOutstanding(overdue.filter((r) => r.daysOverdue > 60)),
+      dueSoon: sumOutstanding(dueSoon),
+      dueSoonCount: dueSoon.length,
+      dueThisWeek: sumOutstanding(dueSoon.filter((r) => r.daysUntilDue <= 7)),
+      collectionRate: billed > 0 ? Math.round((received / billed) * 100) : 0,
+      received,
+      invoices: book.length,
+      partial: book.filter((r) => r.amountReceived > 0).length,
+      clients: new Set(book.map((r) => r.clientId)).size,
     };
   }, [book]);
 
+  /* ------------------------------ Charts ------------------------------ */
+
   const agingRows = useMemo(() => {
-    const buckets = [...AGING_BUCKETS, NO_DUE_DATE_BUCKET].map((b) => ({ key: b.key, label: b.key === "CURRENT" ? "Current (not overdue)" : b.label, count: 0, amount: 0, color: AGING_COLORS[b.key] }));
-    const byKey = Object.fromEntries(buckets.map((b) => [b.key, b]));
+    const rows = [...AGING_BUCKETS, NO_DUE_DATE_BUCKET].map((b) => ({
+      key: b.key,
+      label: b.label,
+      shortLabel: AGING_SHORT[b.key],
+      amount: 0,
+      count: 0,
+      color: AGING_COLORS[b.key],
+    }));
+    const byKey = Object.fromEntries(rows.map((r) => [r.key, r]));
     book.forEach((r) => {
       const b = byKey[getAgingBucket(r).key];
-      b.count += 1;
       b.amount += r.outstandingBalance;
+      b.count += 1;
     });
-    return buckets.filter((b) => b.key !== NO_DUE_DATE_BUCKET.key || b.count > 0);
+    return rows.filter((r) => r.key !== NO_DUE_DATE_BUCKET.key || r.count > 0);
   }, [book]);
+
+  // Top 4 clients by balance, the rest folded into "Others".
+  const clientSlices = useMemo(() => {
+    const totals = new Map();
+    book.forEach((r) => totals.set(r.clientName, (totals.get(r.clientName) || 0) + r.outstandingBalance));
+    const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1]);
+    const head = sorted.slice(0, 4).map(([name, value], i) => ({ name, value, color: CLIENT_COLORS[i] }));
+    const rest = sorted.slice(4).reduce((s, [, v]) => s + v, 0);
+    return rest > 0 ? [...head, { name: "Others", value: rest, color: CLIENT_COLORS[4] }] : head;
+  }, [book]);
+
+  // Billed vs received per invoice month (payment dates arrive with the payments API).
+  const trend = useMemo(() => {
+    const current = today.slice(0, 7);
+    const months = Array.from({ length: trendMonths }, (_, i) => shiftMonth(current, i - (trendMonths - 1)));
+    const byMonth = Object.fromEntries(months.map((k) => [k, { key: k, label: monthLabel(k), billed: 0, received: 0 }]));
+    book.forEach((r) => {
+      const m = byMonth[(r.invoiceDate || "").slice(0, 7)];
+      if (!m) return;
+      m.billed += r.invoiceAmount;
+      m.received += r.amountReceived;
+    });
+    return months.map((k) => byMonth[k]);
+  }, [book, today, trendMonths]);
 
   /* ------------------------------- Table ------------------------------- */
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [statusFilter, searchQuery, activeCurrency]);
+  const tabCounts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.key, book.filter(t.test).length])), [book]);
 
-  const searched = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return book;
-    return book.filter((r) => [r.invoiceNumber, r.clientName, r.projectName].some((v) => String(v || "").toLowerCase().includes(query)));
-  }, [book, searchQuery]);
-
-  const statusCounts = useMemo(() => {
-    const counts = { [ALL]: searched.length };
-    searched.forEach((r) => {
-      const key = getReceivableDueState(r).key;
-      counts[key] = (counts[key] || 0) + 1;
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const tabTest = TABS.find((t) => t.key === tab)?.test || (() => true);
+    return book.filter((r) => {
+      if (!tabTest(r)) return false;
+      if (statusFilter && getReceivableDueState(r).key !== statusFilter) return false;
+      if (agingFilter && getAgingBucket(r).key !== agingFilter) return false;
+      if (q && ![r.invoiceNumber, r.clientName, r.projectName].some((v) => String(v || "").toLowerCase().includes(q))) return false;
+      return true;
     });
-    return counts;
-  }, [searched]);
+  }, [book, tab, search, statusFilter, agingFilter]);
 
-  const filtered = useMemo(
-    () => (statusFilter === ALL ? searched : searched.filter((r) => getReceivableDueState(r).key === statusFilter)),
-    [searched, statusFilter]
-  );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  useEffect(() => setPage(1), [tab, search, statusFilter, agingFilter, activeCurrency]);
 
-  // Bring the just-sent invoice's receivable into view once the list loads.
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  // Land on the just-sent invoice's page and open it.
   useEffect(() => {
     if (loading || !sentInvoiceId) return;
     const index = filtered.findIndex((r) => r.invoiceId === sentInvoiceId);
-    if (index >= 0) setCurrentPage(Math.floor(index / PAGE_SIZE) + 1);
+    if (index >= 0) {
+      setPage(Math.floor(index / pageSize) + 1);
+      setSelectedId(filtered[index].receivableId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, sentInvoiceId, activeCurrency]);
 
-  const toggleStatus = (key) => setStatusFilter((prev) => (key === ALL || prev === key ? ALL : key));
-  const hasActiveFilters = Boolean(searchQuery || statusFilter !== ALL);
+  // The panel shows the selected invoice, or the first row until the user closes it.
+  const selected =
+    receivables.find((r) => r.receivableId === selectedId) || (!panelClosed && pageRows.length > 0 ? pageRows[0] : null);
 
-  const statusOptions = [
-    { value: ALL, label: "All", count: statusCounts[ALL] ?? 0 },
-    { value: NOT_DUE.key, label: NOT_DUE.label, count: statusCounts[NOT_DUE.key] ?? 0 },
-    { value: DUE_TODAY.key, label: DUE_TODAY.label, count: statusCounts[DUE_TODAY.key] ?? 0 },
-    { value: OVERDUE.key, label: OVERDUE.label, count: statusCounts[OVERDUE.key] ?? 0 },
-    ...[PARTIALLY_PAID, NO_DUE_DATE].filter((s) => statusCounts[s.key] > 0).map((s) => ({ value: s.key, label: s.label, count: statusCounts[s.key] })),
+  const hasActiveFilters = Boolean(search.trim() || statusFilter || agingFilter || tab !== "OPEN");
+  const resetTableFilters = () => {
+    setSearch("");
+    setStatusFilter("");
+    setAgingFilter("");
+    setTab("OPEN");
+  };
+
+  const toggleChecked = (id) =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  const allOnPageChecked = pageRows.length > 0 && pageRows.every((r) => checked.has(r.receivableId));
+  const togglePage = () =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      pageRows.forEach((r) => (allOnPageChecked ? next.delete(r.receivableId) : next.add(r.receivableId)));
+      return next;
+    });
+  const checkedRows = receivables.filter((r) => checked.has(r.receivableId));
+
+  // Next steps for the selected invoice — each hands it to its screen pre-selected.
+  const panelActions = (r) => ({
+    recordPayment: () => navigate(PATHS.payments, { state: { recordPaymentFor: { clientId: r.clientId, receivableId: r.receivableId } } }),
+    addFollowUp: () => navigate(PATHS.collections, { state: { tab: "reminders", sendReminderFor: r.receivableId } }),
+    creditNote: () => navigate(PATHS.notes, { state: { raiseNote: { noteType: "CREDIT", receivableId: r.receivableId } } }),
+    debitNote: () => navigate(PATHS.notes, { state: { raiseNote: { noteType: "DEBIT", receivableId: r.receivableId } } }),
+    openCase: () => navigate(PATHS.collections, { state: { tab: "cases", openCaseFor: { clientId: r.clientId, receivableIds: [r.receivableId] } } }),
+    viewLedger: () => navigate(PATHS.ledger, { state: { tab: "ledger", clientId: r.clientId, currencyCode: r.currencyCode } }),
+    openInvoice: () => navigate(`${AR}/invoices/${r.invoiceId}`),
+    viewFollowUps: () => navigate(PATHS.collections, { state: { tab: "reminders" } }),
+  });
+
+  const show = (v) => (loading ? "…" : v);
+  const checkbox = "h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500";
+
+  // Same cell styling as the Dashboard's debtor ledger (ARTable).
+  const tableHeaders = [
+    <input key="all" type="checkbox" aria-label="Select all on this page" checked={allOnPageChecked} onChange={togglePage} className={checkbox} />,
+    ...TABLE_HEADERS_TAIL,
   ];
-
-  /* ----------------------------- Navigation ----------------------------- */
-
-  const openInvoice = (r) => navigate(`/account-receivable/invoices/${r.invoiceId}`);
-
-  // Next steps in the AR flow — each hands the receivable to its screen pre-selected.
-  const nextStepItems = (r) => [
-    {
-      label: "Record Payment",
-      icon: <Banknote className="h-4 w-4 text-emerald-600" />,
-      onClick: () => navigate(PATHS.payments, { state: { recordPaymentFor: { clientId: r.clientId, receivableId: r.receivableId } } }),
-    },
-    {
-      label: "Raise Credit Note",
-      icon: <FileMinus className="h-4 w-4 text-emerald-600" />,
-      onClick: () => navigate(PATHS.notes, { state: { raiseNote: { noteType: "CREDIT", receivableId: r.receivableId } } }),
-    },
-    {
-      label: "Raise Debit Note",
-      icon: <FilePlus className="h-4 w-4 text-rose-600" />,
-      onClick: () => navigate(PATHS.notes, { state: { raiseNote: { noteType: "DEBIT", receivableId: r.receivableId } } }),
-    },
-    {
-      label: "Send Reminder",
-      icon: <BellRing className="h-4 w-4 text-amber-600" />,
-      onClick: () => navigate(PATHS.collections, { state: { tab: "reminders", sendReminderFor: r.receivableId } }),
-    },
-    {
-      label: "Open Collection Case",
-      icon: <Briefcase className="h-4 w-4 text-rose-600" />,
-      hidden: !(r.daysOverdue > 0),
-      onClick: () => navigate(PATHS.collections, { state: { tab: "cases", openCaseFor: { clientId: r.clientId, receivableIds: [r.receivableId] } } }),
-    },
-    {
-      label: "View Customer Ledger",
-      icon: <BookOpen className="h-4 w-4 text-slate-600" />,
-      onClick: () => navigate(PATHS.ledger, { state: { tab: "ledger", clientId: r.clientId, currencyCode: r.currencyCode } }),
-    },
-  ];
-
-  /* ------------------------------ Drawer ------------------------------ */
-
-  useEffect(() => {
-    if (!selected?.invoiceId) {
-      setDeliveries([]);
-      return;
-    }
-    let cancelled = false;
-    setDeliveriesLoading(true);
-    getInvoiceDeliveries(selected.invoiceId)
-      .then((rows) => !cancelled && setDeliveries(rows))
-      .catch((err) => {
-        console.error("[Receivables] Error loading delivery history:", err);
-        if (!cancelled) setDeliveries([]);
-      })
-      .finally(() => !cancelled && setDeliveriesLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [selected?.invoiceId]);
-
-  // Keep the open drawer in step with live aging (e.g. it turns overdue at midnight).
-  const selectedLive = selected ? receivables.find((r) => r.receivableId === selected.receivableId) || selected : null;
-
   const tableRows = pageRows.map((r) => {
-    const dueText = describeDue(r);
+    const isSelected = selected?.receivableId === r.receivableId;
     return {
-      onRowClick: () => setSelected(r),
-      rowClass: r.invoiceId === sentInvoiceId ? "bg-teal-50/80" : "",
-      invoiceNumber: (
-        <div className="text-left">
-          <span className="font-mono font-bold text-indigo-700">{r.invoiceNumber}</span>
+      onRowClick: () => {
+        setSelectedId(r.receivableId);
+        setPanelClosed(false);
+      },
+      rowClass: isSelected ? "bg-blue-50/70" : r.invoiceId === sentInvoiceId ? "bg-teal-50/70" : "",
+      select: (
+        <div onClick={(e) => e.stopPropagation()}>
+          <input type="checkbox" aria-label={`Select ${r.invoiceNumber}`} checked={checked.has(r.receivableId)} onChange={() => toggleChecked(r.receivableId)} className={checkbox} />
         </div>
       ),
-      client: <div className="text-left font-semibold text-slate-800">{r.clientName}</div>,
+      invoiceNumber: <span className="whitespace-nowrap font-mono font-bold text-indigo-700">{r.invoiceNumber}</span>,
+      client: <div className="font-semibold text-slate-800">{r.clientName}</div>,
       project: (
-        <div className="text-left">
-          <div className="font-bold text-slate-900">{r.projectName}</div>
+        <div className="max-w-[14rem] truncate font-bold text-slate-900" title={r.projectName}>
+          {r.projectName}
         </div>
       ),
-      invoiceDate: (
-        <div className="flex items-center justify-start font-medium text-slate-700">
-          {r.invoiceDate ? formatDisplayDate(r.invoiceDate) : "—"}
-        </div>
-      ),
+      invoiceDate: <div className="whitespace-nowrap font-medium text-slate-700">{r.invoiceDate ? formatDisplayDate(r.invoiceDate) : "—"}</div>,
       dueDate: (
-        <div className="text-left">
+        <div className="whitespace-nowrap">
           <div className="font-medium text-slate-700">{r.dueDate ? formatDisplayDate(r.dueDate) : "—"}</div>
-          {dueText && (
-            <div
-              className={`text-xs font-semibold ${
-                r.daysOverdue > 60 ? "text-rose-600" : r.daysOverdue > 0 ? "text-amber-600" : r.daysUntilDue === 0 ? "text-blue-600" : "text-slate-400"
-              }`}
-            >
-              {dueText}
+          {r.daysOverdue > 0 ? (
+            <div className={`text-xs font-semibold ${r.daysOverdue > 60 ? "text-rose-600" : r.daysOverdue > 30 ? "text-amber-600" : "text-rose-500"}`}>
+              {plural(r.daysOverdue, "day")} overdue
             </div>
-          )}
+          ) : r.daysUntilDue !== null && r.daysUntilDue !== undefined ? (
+            <div className="text-xs font-semibold text-slate-400">{r.daysUntilDue === 0 ? "Due today" : `Due in ${plural(r.daysUntilDue, "day")}`}</div>
+          ) : null}
         </div>
       ),
-      invoiceAmount: <div className="text-left tabular-nums font-medium text-slate-700">{formatCurrency(r.invoiceAmount, r.currencyCode)}</div>,
-      outstanding: <div className="text-left tabular-nums font-bold text-slate-900">{formatCurrency(r.outstandingBalance, r.currencyCode)}</div>,
+      amount: <div className="whitespace-nowrap tabular-nums font-medium text-slate-700">{formatCurrency(r.invoiceAmount, r.currencyCode)}</div>,
+      received: <div className="whitespace-nowrap tabular-nums font-medium text-emerald-700">{formatCurrency(r.amountReceived, r.currencyCode)}</div>,
+      outstanding: <div className="whitespace-nowrap tabular-nums font-bold text-slate-900">{formatCurrency(r.outstandingBalance, r.currencyCode)}</div>,
       status: (
-        <div className="flex flex-col items-center justify-center gap-1">
+        <div className="flex justify-center">
           <ReceivableStatusBadge receivable={r} />
         </div>
       ),
-      actions: (
-        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-          <ActionMenu
-            items={[
-              { label: "View Details", icon: <Eye className="h-4 w-4 text-slate-600" />, onClick: () => setSelected(r) },
-              { label: "Open Invoice", icon: <FileText className="h-4 w-4 text-indigo-600" />, onClick: () => openInvoice(r), disabled: !r.invoiceId },
-              ...nextStepItems(r),
-            ]}
-          />
+      aging: (
+        <div className={`whitespace-nowrap font-medium ${r.daysOverdue > 0 ? "font-semibold text-rose-600" : "text-slate-700"}`}>
+          {r.daysOutstanding === null ? "—" : plural(r.daysOutstanding, "day")}
         </div>
       ),
     };
   });
 
-  const show = (value) => (loading ? "…" : value);
+  /* ------------------------------- Render ------------------------------- */
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header with currency control */}
+    <div className="space-y-5 pb-12">
       <ConsoleHeader
         title="Outstanding Receivables"
-        subtitle="Track every invoice sent to a client until it is paid — what is owed, when it falls due, and what is overdue."
+        subtitle="Track, monitor and manage client receivables, payments and collections."
         actions={
-          currencies.length > 0 && (
-            <Segmented
-              label="Currency"
-              dark
-              value={activeCurrency}
-              onChange={setCurrency}
-              options={currencies.map((code) => ({ value: code, label: code }))}
+          <>
+            {currencies.length > 1 && (
+              <FilterSelect value={activeCurrency} onChange={setCurrency} className="w-24" options={currencies.map((c) => ({ value: c, label: c }))} />
+            )}
+            <ExportMenu
+              items={[
+                { label: `Export current view (${filtered.length})`, onClick: () => downloadCsv(filtered, `outstanding-receivables-${today}.csv`), disabled: filtered.length === 0 },
+                { label: `Export selected (${checkedRows.length})`, onClick: () => downloadCsv(checkedRows, `receivables-selected-${today}.csv`), disabled: checkedRows.length === 0 },
+              ]}
             />
-          )
+          </>
         }
       />
 
@@ -373,276 +399,169 @@ export default function Receivables() {
         </div>
       )}
 
-      {/* Row 1: Executive tiles */}
-      <StatTileGrid columns={6}>
+      {/* KPIs */}
+      <StatTileGrid columns={5}>
         <StatTile
           label="Total Outstanding"
+          value={show(money(kpi.total))}
           icon={DollarSign}
           iconClass="bg-blue-50 text-blue-700"
-          value={show(money(metrics.total))}
-          hint={`Across ${metrics.count} open invoice${metrics.count === 1 ? "" : "s"}`}
-          footerLabel="Show all"
-          footerValue={`${metrics.count} Invoices`}
-          onClick={() => toggleStatus(ALL)}
-          active={statusFilter === ALL}
+          hint="All open invoices"
+          footerLabel="Open invoices"
+          footerValue={show(plural(kpi.invoices, "invoice"))}
         />
         <StatTile
           label="Overdue Exposure"
           variant="danger"
+          value={show(money(kpi.overdue))}
           icon={AlertTriangle}
           iconClass="bg-rose-100 text-rose-700"
-          value={show(money(metrics.overdueAmount))}
-          hint={`${metrics.overduePct}% of the book`}
+          hint={show(`${kpi.overdueShare}% of total book · ${plural(kpi.overdueCount, "invoice")}`)}
           hintClass="text-rose-600"
           footerLabel="Critical (>60 days)"
-          footerValue={money(metrics.criticalAmount)}
-          footerValueClass="text-rose-700"
-          onClick={() => toggleStatus(OVERDUE.key)}
-          active={statusFilter === OVERDUE.key}
+          footerValue={show(money(kpi.critical))}
+          footerValueClass="font-bold text-rose-700"
         />
         <StatTile
-          label="Due Today"
-          variant={metrics.dueToday.length ? "warning" : "default"}
-          icon={CalendarCheck}
+          label="Due in 0-30 Days"
+          value={show(money(kpi.dueSoon))}
+          icon={CalendarDays}
           iconClass="bg-amber-50 text-amber-700"
-          value={show(money(sum(metrics.dueToday)))}
-          hint={`${metrics.dueToday.length} invoice${metrics.dueToday.length === 1 ? "" : "s"} expected today`}
-          hintClass="text-amber-700"
-          footerLabel="Becomes overdue"
-          footerValue="Tomorrow"
-          onClick={() => toggleStatus(DUE_TODAY.key)}
-          active={statusFilter === DUE_TODAY.key}
+          hint={show(plural(kpi.dueSoonCount, "upcoming payment"))}
+          hintClass="text-amber-600"
+          footerLabel="Due this week"
+          footerValue={show(money(kpi.dueThisWeek))}
         />
         <StatTile
-          label="Due Next 7 Days"
-          icon={CalendarClock}
-          iconClass="bg-indigo-50 text-indigo-700"
-          value={show(money(sum(metrics.dueSoon)))}
-          hint={`${metrics.dueSoon.length} invoice${metrics.dueSoon.length === 1 ? "" : "s"} falling due`}
-          hintClass="text-indigo-600"
-          footerLabel="Not yet due"
-          footerValue={`${metrics.notDue} Invoices`}
-          onClick={() => toggleStatus(NOT_DUE.key)}
-          active={statusFilter === NOT_DUE.key}
-        />
-        <StatTile
-          label="Avg Days Outstanding"
-          icon={Clock}
+          label="Collection Rate"
+          value={show(`${kpi.collectionRate}%`)}
+          icon={TrendingUp}
           iconClass="bg-emerald-50 text-emerald-700"
-          value={show(metrics.avgDays === null ? "—" : `${metrics.avgDays} days`)}
-          hint="Since invoice date, open invoices"
-          footerLabel="Oldest open invoice"
-          footerValue={metrics.oldestDays === null ? "—" : `${metrics.oldestDays} days`}
+          hint="Received vs billed, open invoices"
+          hintClass="text-emerald-600"
+          footerLabel="Received to date"
+          footerValue={show(money(kpi.received))}
         />
         <StatTile
-          label="Clients Owing"
-          icon={Building2}
-          iconClass="bg-slate-100 text-slate-700"
-          value={show(metrics.debtors.length)}
-          hint={`${metrics.debtors.filter((d) => d.overdue > 0).length} with overdue balances`}
-          hintClass="text-slate-500"
-          footerLabel="Largest debtor"
-          footerValue={metrics.debtors[0]?.clientName || "—"}
+          label="Open Invoices"
+          value={show(kpi.invoices)}
+          icon={FileStack}
+          iconClass="bg-indigo-50 text-indigo-700"
+          hint={show(`Across ${plural(kpi.clients, "client")}`)}
+          hintClass="text-indigo-600"
+          footerLabel="Partially paid"
+          footerValue={show(plural(kpi.partial, "invoice"))}
         />
       </StatTileGrid>
 
-      {/* Row 2: Aging schedule + top debtors */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        <SectionCard
-          className="lg:col-span-7 xl:col-span-8"
-          icon={BarChart3}
-          title="Aging Schedule"
-          subtitle="Outstanding balance by days past the due date. Select a bucket to see its customers in the ledger."
-          right={<span className="text-xs text-slate-500">Total <span className="font-semibold tabular-nums text-slate-900">{money(metrics.total)}</span></span>}
-        >
-          {loading ? (
-            <LoadingSpinner text="Loading aging..." />
-          ) : metrics.count === 0 ? (
-            <p className="py-10 text-center text-sm text-slate-500">Nothing outstanding to age.</p>
+      {/* Charts */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <ChartPanel title="Aging Analysis">
+          {book.length === 0 ? (
+            <p className="py-16 text-center text-sm text-slate-500">{loading ? "Loading…" : "Nothing outstanding to age."}</p>
           ) : (
-            <>
-              <AgingBars rows={agingRows} total={metrics.total} formatAmount={money} onSelect={() => navigate(PATHS.ledger, { state: { tab: "aging" } })} />
-              {metrics.critical.length > 0 && (
-                <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-xs text-amber-900">
-                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                  <div>
-                    <span className="font-semibold text-amber-800">Escalation candidates:</span> {metrics.critical.length} invoice
-                    {metrics.critical.length === 1 ? " is" : "s are"} more than 60 days overdue ({money(metrics.criticalAmount)}). Consider opening collection cases.
-                  </div>
-                </div>
-              )}
-            </>
+            <AgingChart rows={agingRows} formatAmount={money} compactAmount={compactMoney} />
           )}
-        </SectionCard>
+        </ChartPanel>
 
-        <SectionCard
-          className="lg:col-span-5 xl:col-span-4"
-          icon={Users}
-          iconClass="text-indigo-600"
-          title="Top Debtors"
-          subtitle="Clients owing the most, with the overdue part of their balance."
+        <ChartPanel
+          title="Receivables by Client"
+          action={
+            <button type="button" onClick={() => navigate(PATHS.ledger, { state: { tab: "aging", currencyCode: activeCurrency } })} className="text-xs font-semibold text-blue-600 hover:underline">
+              View Report
+            </button>
+          }
         >
-          {loading ? (
-            <LoadingSpinner text="Loading clients..." />
-          ) : metrics.debtors.length === 0 ? (
-            <p className="py-10 text-center text-sm text-slate-500">No client balances.</p>
+          {clientSlices.length === 0 ? (
+            <p className="py-16 text-center text-sm text-slate-500">{loading ? "Loading…" : "No client balances."}</p>
           ) : (
-            <ul className="divide-y divide-slate-100">
-              {metrics.debtors.slice(0, 5).map((d) => (
-                <li key={d.clientId}>
-                  <button
-                    type="button"
-                    onClick={() => navigate(PATHS.ledger, { state: { tab: "ledger", clientId: d.clientId, currencyCode: activeCurrency } })}
-                    className="group flex w-full items-center justify-between gap-3 py-2.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-semibold text-slate-900 group-hover:text-blue-600">{d.clientName}</p>
-                      <p className="text-[11px] text-slate-500">
-                        {d.invoices} invoice{d.invoices === 1 ? "" : "s"}
-                        {d.overdue > 0 && <span className="font-semibold text-rose-600"> · {money(d.overdue)} overdue</span>}
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-xs font-bold tabular-nums text-slate-900">{money(d.total)}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <ClientDonut slices={clientSlices} centerValue={compactMoney(kpi.total)} formatAmount={money} />
           )}
-        </SectionCard>
+        </ChartPanel>
+
+        <ChartPanel
+          title="Collection Trend"
+          action={
+            <FilterSelect
+              value={String(trendMonths)}
+              onChange={(v) => setTrendMonths(Number(v))}
+              className="w-36"
+              options={[
+                { value: "6", label: "Last 6 Months" },
+                { value: "12", label: "Last 12 Months" },
+              ]}
+            />
+          }
+        >
+          <CollectionTrend data={trend} formatAmount={money} compactAmount={compactMoney} />
+          <p className="mt-1 text-[11px] text-slate-400">By invoice month, open invoices.</p>
+        </ChartPanel>
       </div>
 
-      {/* Row 3: Invoice register — same layout as the Invoice Pipeline table */}
-      <RegisterCard
-        title="Open Invoices"
-        subtitle="Earliest due date first, so overdue invoices lead the list. An invoice drops off once it is paid in full."
-        toolbar={
-          <>
-            <div className="min-w-0 flex-1">
-              <SearchInput
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onSearch={(val) => setSearchQuery(val)}
-                placeholder="Search by invoice number, client, or project..."
-              />
-            </div>
-            {hasActiveFilters && (
-              <ARClearFiltersButton
-                onClick={() => {
-                  setSearchQuery("");
-                  setStatusFilter(ALL);
-                }}
-                label="Clear filters"
-              />
-            )}
-          </>
-        }
-        tabs={{
-          label: "Receivable status",
-          loading,
-          items: statusOptions.map((o) => ({
-            key: o.value,
-            label: o.label,
-            value: o.count,
-            active: statusFilter === o.value,
-            onClick: () => setStatusFilter(o.value === ALL || statusFilter === o.value ? ALL : o.value),
-          })),
-        }}
-        footer={
-          !loading &&
-          filtered.length > 0 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPrevious={() => setCurrentPage((page) => Math.max(page - 1, 1))}
-              onNext={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
-            />
-          )
-        }
-      >
-        <ARTable
-          headers={TABLE_HEADERS}
-          columns={TABLE_COLUMNS}
-          rows={tableRows}
-          loading={loading}
-          emptyMessage={
-            hasActiveFilters ? "No invoices match the selected filters." : "Nothing outstanding. An invoice appears here once it is sent to the client."
+      {/* Invoices, with the detail panel below */}
+      <div className="space-y-4">
+        <RegisterCard
+          title="Outstanding Invoices"
+          subtitle="Every invoice sent to a client with a balance still due. Select a row to see its details and next steps."
+          wideToolbar
+          toolbar={
+            <>
+              <div className="min-w-0 flex-1 lg:w-80 lg:flex-none">
+                <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} onSearch={setSearch} placeholder="Search by invoice no, client, project..." />
+              </div>
+              <div className="w-full sm:w-40">
+                <ARFilterListbox options={STATUS_OPTIONS} value={statusFilter} onChange={setStatusFilter} placeholder="All statuses" />
+              </div>
+              <div className="w-full sm:w-40">
+                <ARFilterListbox options={AGING_OPTIONS} value={agingFilter} onChange={setAgingFilter} placeholder="All aging" />
+              </div>
+              {hasActiveFilters && <ARClearFiltersButton onClick={resetTableFilters} label="Clear filters" />}
+            </>
           }
-        />
-      </RegisterCard>
+          tabs={{
+            label: "Invoice views",
+            loading,
+            items: TABS.map((t) => ({
+              key: t.key,
+              label: t.label,
+              value: tabCounts[t.key],
+              active: tab === t.key,
+              onClick: () => setTab(t.key === "OPEN" || tab === t.key ? "OPEN" : t.key),
+            })),
+          }}
+          footer={
+            !loading && filtered.length > 0 && (
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPrevious={() => setPage((p) => Math.max(p - 1, 1))}
+                onNext={() => setPage((p) => Math.min(p + 1, totalPages))}
+              />
+            )
+          }
+        >
+          <ARTable
+            headers={tableHeaders}
+            columns={TABLE_COLUMNS}
+            rows={tableRows}
+            loading={loading}
+            emptyMessage={receivables.length === 0 ? "Nothing outstanding. An invoice appears here once it is sent to the client." : "No invoices match the selected filters."}
+          />
+        </RegisterCard>
 
-      {/* Receivable details */}
-      <DetailsDrawer
-        isOpen={Boolean(selectedLive)}
-        onClose={() => setSelected(null)}
-        title={selectedLive?.invoiceNumber}
-        subtitle={selectedLive ? `${selectedLive.clientName} · ${selectedLive.projectName}` : ""}
-        badge={selectedLive && <ReceivableStatusBadge receivable={selectedLive} />}
-      >
-        {selectedLive && (
-          <div className="space-y-4 pb-3">
-            <dl className="divide-y divide-slate-100">
-              <DetailRow label="Invoice amount">
-                <span className="tabular-nums">{formatCurrency(selectedLive.invoiceAmount, selectedLive.currencyCode)}</span>
-              </DetailRow>
-              <DetailRow label="Amount received">
-                <span className="tabular-nums">{formatCurrency(selectedLive.amountReceived, selectedLive.currencyCode)}</span>
-              </DetailRow>
-              <DetailRow label="Outstanding balance">
-                <span className="font-bold tabular-nums">{formatCurrency(selectedLive.outstandingBalance, selectedLive.currencyCode)}</span>
-              </DetailRow>
-              <DetailRow label="Invoice date">{selectedLive.invoiceDate ? formatDisplayDate(selectedLive.invoiceDate) : "—"}</DetailRow>
-              <DetailRow label="Due date">
-                {selectedLive.dueDate ? formatDisplayDate(selectedLive.dueDate) : "—"}
-                {describeDue(selectedLive) && (
-                  <span className={`block text-xs ${selectedLive.daysOverdue > 0 ? "text-rose-600" : "text-slate-500"}`}>{describeDue(selectedLive)}</span>
-                )}
-              </DetailRow>
-              <DetailRow label="Days outstanding">
-                <span className="tabular-nums">{selectedLive.daysOutstanding ?? "—"}</span>
-              </DetailRow>
-              <DetailRow label="Sent on">{selectedLive.createdAt ? formatDisplayDateTime(selectedLive.createdAt) : "—"}</DetailRow>
-            </dl>
-
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Delivery history</p>
-              {deliveriesLoading ? (
-                <LoadingSpinner size="sm" text="Loading delivery history..." />
-              ) : deliveries.length === 0 ? (
-                <p className="text-sm text-slate-500">No delivery records found.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {deliveries.map((d) => {
-                    const failed = String(d.deliveryStatus).toUpperCase() === "FAILED";
-                    return (
-                      <li key={d.deliveryId} className="flex items-start gap-2.5 rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                        <Mail className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${failed ? "text-rose-500" : "text-teal-600"}`} />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="font-semibold text-slate-800">{d.recipientEmail || "—"}</span>
-                            <StatusBadge label={d.deliveryStatus} size="sm" />
-                          </div>
-                          <p className="mt-0.5 text-slate-500">{formatDisplayDateTime(d.sentAt || d.failedAt || d.createdAt) || "—"}</p>
-                          {failed && d.failureReason && <p className="mt-0.5 text-rose-700">{d.failureReason}</p>}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => openInvoice(selectedLive)}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0A0082] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-              >
-                <FileText className="h-4 w-4" /> Open invoice
-              </button>
-            </div>
+        {selected && (
+          <div>
+            <InvoiceDetailPanel
+              receivable={selected}
+              onClose={() => {
+                setSelectedId(null);
+                setPanelClosed(true);
+              }}
+              actions={panelActions(selected)}
+            />
           </div>
         )}
-      </DetailsDrawer>
+      </div>
     </div>
   );
 }
