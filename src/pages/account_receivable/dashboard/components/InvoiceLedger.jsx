@@ -139,7 +139,8 @@ export default function InvoiceLedger({ rows, filters, setFilter, toggleSort, re
         </>
       }
     >
-      <div className="overflow-x-auto">
+      {/* relative: keeps sr-only (absolute) header text inside the scroll box */}
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-[880px] text-left text-xs">
           <caption className="sr-only">
             Active invoices, sorted by {COLUMNS.find((c) => c.key === sort)?.label} {dir === "asc" ? "ascending" : "descending"}
