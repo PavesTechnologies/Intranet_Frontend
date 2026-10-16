@@ -70,13 +70,14 @@ export const useApPaymentSummary = () =>
     staleTime: 30_000,
   });
 
+/** mutate({ reportId, confirmation }) - confirmation is the FormData from buildDisbursementFormData. */
 export const useCompletePayment = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (reportId) => apPaymentApi.completePayment(reportId).then(unwrap),
+    mutationFn: ({ reportId, confirmation }) => apPaymentApi.completePayment(reportId, confirmation).then(unwrap),
     // Refresh on failure too - e.g. a duplicate-completion attempt means this row was already
     // stale (someone else completed it first), so re-fetching clears it immediately.
-    onSettled: (_data, _err, reportId) => {
+    onSettled: (_data, _err, { reportId }) => {
       qc.invalidateQueries({ queryKey: ["apPaymentQueue"] });
       qc.invalidateQueries({ queryKey: ["apPaymentHistory"] });
       qc.invalidateQueries({ queryKey: ["apPaymentSummary"] });

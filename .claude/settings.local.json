@@ -21,6 +21,9 @@
       "Bash(node -c \"src/pages/expense-management/approval-engine/components/__tests__/CashAdvanceApprovalsList.test.js\")",
       "Bash(npm test *)",
       "Read(//c/Users/Lokeshwari.Busam/Desktop/Myfiles/projects/Expense_Management_Service/src/main/java/com/expense_management_service/service/impl/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Lokeshwari.Busam\\Desktop\\Myfiles\\projects\\Expense_Management_Service\\src\\main\\java\\com\\expense_management_service\\mapper"
     ]
   }
 }

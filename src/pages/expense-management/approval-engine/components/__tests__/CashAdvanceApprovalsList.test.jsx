@@ -2,8 +2,10 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CashAdvanceApprovalsList from '../CashAdvanceApprovalsList';
-import * as cashAdvanceApi from '../../../api/cashAdvanceApi';
+import { cashAdvanceApi } from '../../../api/cashAdvanceApi';
 import * as authContext from '@/contexts/AuthContext';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 
 /**
  * EP04-S2 Test Suite: Manager Cash Advance Approval
@@ -11,13 +13,22 @@ import * as authContext from '@/contexts/AuthContext';
  * Tests approval workflow, confirmation dialogs, and rejection handling
  */
 
-jest.mock('../../../api/cashAdvanceApi');
-jest.mock('@/contexts/AuthContext');
-jest.mock('@/components/toastfy/toast');
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useNavigate: () => jest.fn(),
+vi.mock('../../../api/cashAdvanceApi');
+vi.mock('@/contexts/AuthContext');
+vi.mock('@/components/toastfy/toast');
+vi.mock('react-router-dom', async () => ({
+  ...await vi.importActual('react-router-dom'),
+  useNavigate: () => vi.fn(),
 }));
+
+function renderWithProviders(ui) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
 
 describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
   const mockAdvances = [
@@ -29,6 +40,7 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
       amount: 5000,
       currencyCode: 'USD',
       employeeId: 'emp-1',
+      managerId: 'mgr-1',
       employeeName: 'John Doe',
       status: 'SUBMITTED',
       neededByDate: '2026-10-20',
@@ -36,19 +48,19 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
   ];
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     cashAdvanceApi.getMyApprovals.mockResolvedValue({
       data: { data: mockAdvances },
     });
     authContext.useAuth.mockReturnValue({
       user: { id: 'mgr-1' },
-      hasRole: jest.fn(() => true),
+      hasRole: vi.fn(() => true),
     });
   });
 
   describe('Approval Confirmation Dialog', () => {
     it('should show approval confirmation modal when approve button clicked', async () => {
-      render(<CashAdvanceApprovalsList activeTab="pending" />);
+      renderWithProviders(<CashAdvanceApprovalsList activeTab="pending" />);
 
       await waitFor(() => {
         const approveButton = screen.getByRole('button', { name: /approve/i });
@@ -62,7 +74,7 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
     });
 
     it('should display advance details in confirmation dialog', async () => {
-      render(<CashAdvanceApprovalsList activeTab="pending" />);
+      renderWithProviders(<CashAdvanceApprovalsList activeTab="pending" />);
 
       await waitFor(() => {
         const approveButton = screen.getByRole('button', { name: /approve/i });
@@ -70,12 +82,12 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText(/5000.*USD/i)).toBeInTheDocument();
+        expect(screen.getByText(/USD 5,000.00/, { selector: 'strong' })).toBeInTheDocument();
       });
     });
 
     it('should allow adding optional remarks before approval', async () => {
-      render(<CashAdvanceApprovalsList activeTab="pending" />);
+      renderWithProviders(<CashAdvanceApprovalsList activeTab="pending" />);
 
       await waitFor(() => {
         const approveButton = screen.getByRole('button', { name: /approve/i });
@@ -89,7 +101,7 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
     });
 
     it('should close confirmation dialog on cancel', async () => {
-      render(<CashAdvanceApprovalsList activeTab="pending" />);
+      renderWithProviders(<CashAdvanceApprovalsList activeTab="pending" />);
 
       await waitFor(() => {
         const approveButton = screen.getByRole('button', { name: /approve/i });
@@ -111,7 +123,7 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
         data: { data: { ...mockAdvances[0], status: 'APPROVED' } },
       });
 
-      render(<CashAdvanceApprovalsList activeTab="pending" />);
+      renderWithProviders(<CashAdvanceApprovalsList activeTab="pending" />);
 
       await waitFor(() => {
         const approveButton = screen.getByRole('button', { name: /approve/i });
@@ -131,7 +143,7 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
         new Promise(resolve => setTimeout(() => resolve({ data: { data: mockAdvances[0] } }), 500))
       );
 
-      render(<CashAdvanceApprovalsList activeTab="pending" />);
+      renderWithProviders(<CashAdvanceApprovalsList activeTab="pending" />);
 
       await waitFor(() => {
         const approveButton = screen.getByRole('button', { name: /approve/i });
@@ -149,7 +161,7 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
 
   describe('Rejection Dialog', () => {
     it('should show rejection reason modal when reject clicked', async () => {
-      render(<CashAdvanceApprovalsList activeTab="pending" />);
+      renderWithProviders(<CashAdvanceApprovalsList activeTab="pending" />);
 
       await waitFor(() => {
         const rejectButton = screen.getByRole('button', { name: /reject/i });
@@ -157,12 +169,12 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText(/reject cash advance request/i)).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /reject cash advance request/i })).toBeInTheDocument();
       });
     });
 
     it('should require rejection reason', async () => {
-      render(<CashAdvanceApprovalsList activeTab="pending" />);
+      renderWithProviders(<CashAdvanceApprovalsList activeTab="pending" />);
 
       await waitFor(() => {
         const rejectButton = screen.getByRole('button', { name: /reject/i });
@@ -183,7 +195,7 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
         data: { data: { ...mockAdvances[0], status: 'REJECTED' } },
       });
 
-      render(<CashAdvanceApprovalsList activeTab="pending" />);
+      renderWithProviders(<CashAdvanceApprovalsList activeTab="pending" />);
 
       await waitFor(() => {
         const rejectButton = screen.getByRole('button', { name: /reject/i });
@@ -204,7 +216,7 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
 
   describe('List Filtering', () => {
     it('should filter by pending status', async () => {
-      render(<CashAdvanceApprovalsList activeTab="pending" />);
+      renderWithProviders(<CashAdvanceApprovalsList activeTab="pending" />);
 
       await waitFor(() => {
         expect(screen.getByText(/business trip/i)).toBeInTheDocument();
@@ -221,7 +233,7 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
         data: { data: approvedAdvances },
       });
 
-      render(<CashAdvanceApprovalsList activeTab="approved" />);
+      renderWithProviders(<CashAdvanceApprovalsList activeTab="approved" />);
 
       await waitFor(() => {
         expect(screen.getByText(/business trip/i)).toBeInTheDocument();
@@ -235,7 +247,7 @@ describe('CashAdvanceApprovalsList - EP04-S2: Manager Approval', () => {
         response: { data: { message: 'Cannot approve - manager not authorized' } },
       });
 
-      render(<CashAdvanceApprovalsList activeTab="pending" />);
+      renderWithProviders(<CashAdvanceApprovalsList activeTab="pending" />);
 
       await waitFor(() => {
         const approveButton = screen.getByRole('button', { name: /approve/i });

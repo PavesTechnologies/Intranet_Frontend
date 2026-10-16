@@ -2,8 +2,10 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import RequestAdvancePage from '../RequestAdvancePage';
-import * as cashAdvanceApi from '../../../api/cashAdvanceApi';
-import * as lookupService from '../../../api/expenseReportsApi';
+import { cashAdvanceApi } from '../../../api/cashAdvanceApi';
+import { lookupService } from '../../../api/expenseReportsApi';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 
 /**
  * EP04-S1 Test Suite: Employee Cash Advance Request
@@ -11,13 +13,34 @@ import * as lookupService from '../../../api/expenseReportsApi';
  * Tests validation, submission, error handling, and UX workflows
  */
 
-jest.mock('../../../api/cashAdvanceApi');
-jest.mock('../../../api/expenseReportsApi');
-jest.mock('@/components/toastfy/toast');
+const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
+
+vi.mock('react-router-dom', async () => ({
+  ...await vi.importActual('react-router-dom'),
+  useNavigate: () => mockNavigate,
+}));
+
+vi.mock('../../../api/cashAdvanceApi');
+vi.mock('../../../api/expenseReportsApi');
+vi.mock('@/components/toastfy/toast');
+
+function renderWithProviders(ui) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+async function selectCurrency() {
+  fireEvent.click(screen.getByRole('button', { name: /select currency/i }));
+  fireEvent.click(await screen.findByRole('option', { name: /USD/ }));
+}
 
 describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     lookupService.getActiveCostCenters.mockResolvedValue([
       { costCenterId: 'cc-1', costCenterCode: 'ENG', costCenterName: 'Engineering' },
     ]);
@@ -31,9 +54,11 @@ describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
 
   describe('Form Validation', () => {
     it('should validate required fields', async () => {
-      render(<RequestAdvancePage />);
+      renderWithProviders(<RequestAdvancePage />);
 
       const submitButton = screen.getByRole('button', { name: /submit request/i });
+      // The button is disabled until currencies and balances finish loading.
+      await waitFor(() => expect(submitButton).toBeEnabled());
       fireEvent.click(submitButton);
 
       await waitFor(() => {
@@ -43,34 +68,41 @@ describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
     });
 
     it('should validate positive amount', async () => {
-      render(<RequestAdvancePage />);
+      renderWithProviders(<RequestAdvancePage />);
 
       const amountInput = screen.getByLabelText(/amount/i);
       await userEvent.type(amountInput, '-100');
 
       const submitButton = screen.getByRole('button', { name: /submit request/i });
+      // The button is disabled until currencies and balances finish loading.
+      await waitFor(() => expect(submitButton).toBeEnabled());
       fireEvent.click(submitButton);
 
-      await waitFor(() => {
-        expect(screen.getByText(/enter a valid advance amount/i)).toBeInTheDocument();
-      });
+      // The amount input has min="0", so the browser blocks submission before the
+      // custom message can render. The request must never reach the API.
+      await waitFor(() => expect(amountInput).toBeInvalid());
+      expect(cashAdvanceApi.create).not.toHaveBeenCalled();
     });
 
     it('should validate settlement date is after needed date', async () => {
-      render(<RequestAdvancePage />);
+      renderWithProviders(<RequestAdvancePage />);
 
       const neededDateInput = screen.getByLabelText(/needed by date/i);
       const settlementDateInput = screen.getByLabelText(/settlement expected date/i);
 
-      await userEvent.type(neededDateInput, '2026-10-20');
-      await userEvent.type(settlementDateInput, '2026-10-10');
+      // Date inputs are set directly: typing into them character by character is unreliable in jsdom.
+      fireEvent.change(neededDateInput, { target: { value: '2026-10-20' } });
+      fireEvent.change(settlementDateInput, { target: { value: '2026-10-10' } });
 
       const submitButton = screen.getByRole('button', { name: /submit request/i });
+      // The button is disabled until currencies and balances finish loading.
+      await waitFor(() => expect(submitButton).toBeEnabled());
       fireEvent.click(submitButton);
 
-      await waitFor(() => {
-        expect(screen.getByText(/settlement expected date cannot be before/i)).toBeInTheDocument();
-      });
+      // The settlement input now carries min = needed-by date, so the browser rejects the earlier
+      // date natively and the request is never sent.
+      await waitFor(() => expect(settlementDateInput).toBeInvalid());
+      expect(cashAdvanceApi.create).not.toHaveBeenCalled();
     });
   });
 
@@ -80,24 +112,25 @@ describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
         new Promise(resolve => setTimeout(() => resolve({ data: { data: { advanceId: 'adv-1' } } }), 500))
       );
 
-      render(<RequestAdvancePage />);
+      renderWithProviders(<RequestAdvancePage />);
 
       // Fill form
       const titleInput = screen.getByLabelText(/title/i);
       const amountInput = screen.getByLabelText(/amount/i);
-      const currencySelect = screen.getByLabelText(/currency/i);
       const purposeTextarea = screen.getByLabelText(/purpose/i);
       const neededDateInput = screen.getByLabelText(/needed by date/i);
       const settlementDateInput = screen.getByLabelText(/settlement expected date/i);
 
       await userEvent.type(titleInput, 'Business Trip');
       await userEvent.type(amountInput, '5000');
-      fireEvent.change(currencySelect, { target: { value: 'cur-1' } });
+      await selectCurrency();
       await userEvent.type(purposeTextarea, 'Client meeting');
       await userEvent.type(neededDateInput, '2026-10-15');
       await userEvent.type(settlementDateInput, '2026-10-25');
 
       const submitButton = screen.getByRole('button', { name: /submit request/i });
+      // The button is disabled until currencies and balances finish loading.
+      await waitFor(() => expect(submitButton).toBeEnabled());
       fireEvent.click(submitButton);
 
       // Check button is disabled during submission
@@ -109,34 +142,29 @@ describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
 
   describe('Successful Submission', () => {
     it('should submit valid form and redirect', async () => {
-      const mockNavigate = jest.fn();
-      jest.mock('react-router-dom', () => ({
-        ...jest.requireActual('react-router-dom'),
-        useNavigate: () => mockNavigate,
-      }));
-
       cashAdvanceApi.create.mockResolvedValue({
         data: { data: { advanceId: 'adv-1', status: 'DRAFT' } },
       });
 
-      render(<RequestAdvancePage />);
+      renderWithProviders(<RequestAdvancePage />);
 
       // Fill form
       const titleInput = screen.getByLabelText(/title/i);
       const amountInput = screen.getByLabelText(/amount/i);
-      const currencySelect = screen.getByLabelText(/currency/i);
       const purposeTextarea = screen.getByLabelText(/purpose/i);
       const neededDateInput = screen.getByLabelText(/needed by date/i);
       const settlementDateInput = screen.getByLabelText(/settlement expected date/i);
 
       await userEvent.type(titleInput, 'Business Trip');
       await userEvent.type(amountInput, '5000');
-      fireEvent.change(currencySelect, { target: { value: 'cur-1' } });
+      await selectCurrency();
       await userEvent.type(purposeTextarea, 'Client meeting');
       await userEvent.type(neededDateInput, '2026-10-15');
       await userEvent.type(settlementDateInput, '2026-10-25');
 
       const submitButton = screen.getByRole('button', { name: /submit request/i });
+      // The button is disabled until currencies and balances finish loading.
+      await waitFor(() => expect(submitButton).toBeEnabled());
       fireEvent.click(submitButton);
 
       await waitFor(() => {
@@ -157,23 +185,24 @@ describe('RequestAdvancePage - EP04-S1: Cash Advance Request', () => {
         response: { data: { message: 'Amount exceeds policy limit' } },
       });
 
-      render(<RequestAdvancePage />);
+      renderWithProviders(<RequestAdvancePage />);
 
       const titleInput = screen.getByLabelText(/title/i);
       const amountInput = screen.getByLabelText(/amount/i);
-      const currencySelect = screen.getByLabelText(/currency/i);
       const purposeTextarea = screen.getByLabelText(/purpose/i);
       const neededDateInput = screen.getByLabelText(/needed by date/i);
       const settlementDateInput = screen.getByLabelText(/settlement expected date/i);
 
       await userEvent.type(titleInput, 'Business Trip');
       await userEvent.type(amountInput, '50000');
-      fireEvent.change(currencySelect, { target: { value: 'cur-1' } });
+      await selectCurrency();
       await userEvent.type(purposeTextarea, 'Client meeting');
       await userEvent.type(neededDateInput, '2026-10-15');
       await userEvent.type(settlementDateInput, '2026-10-25');
 
       const submitButton = screen.getByRole('button', { name: /submit request/i });
+      // The button is disabled until currencies and balances finish loading.
+      await waitFor(() => expect(submitButton).toBeEnabled());
       fireEvent.click(submitButton);
 
       await waitFor(() => {

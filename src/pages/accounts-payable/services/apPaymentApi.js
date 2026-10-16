@@ -22,9 +22,10 @@ export const apPaymentApi = {
   getDetails: (reportId) =>
     api.get(`/xms/ap-payments/${reportId}`, withBase()),
 
-  // ExpenseReportResponse
-  completePayment: (reportId) =>
-    api.post(`/xms/ap-payments/${reportId}/complete`, {}, withBase()),
+  // ExpenseReportResponse. confirmation (optional FormData): disbursement mode and proof. Expense
+  // Management passes it; the AP module still calls this without one.
+  completePayment: (reportId, confirmation) =>
+    api.post(`/xms/ap-payments/${reportId}/complete`, confirmation ?? {}, withBase()),
 };
 
 export default apPaymentApi;

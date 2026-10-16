@@ -84,8 +84,10 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }),
 
-  disburse: (advanceId) =>
-    api.post(`/xms/employee/cash-advances/${advanceId}/disburse`, null, {
+  // confirmation: FormData from buildDisbursementFormData (disbursementMode plus cash acknowledgment
+  // or bank transfer reference). The advance is only recorded as disbursed once this succeeds.
+  disburse: (advanceId, confirmation) =>
+    api.post(`/xms/employee/cash-advances/${advanceId}/disburse`, confirmation ?? null, {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
@@ -110,11 +112,10 @@ export const cashAdvanceApi = {
       headers: authHeaders(),
     }),
 
-  repay: (advanceId, payload) =>
-    api.post(`/xms/employee/cash-advances/${advanceId}/repayments`, {
-      advanceId,
-      ...payload,
-    }, {
+  // formData: amount plus the payment mode and proof (buildDisbursementFormData). Multipart so the
+  // proof file can be uploaded with the repayment.
+  repay: (advanceId, formData) =>
+    api.post(`/xms/employee/cash-advances/${advanceId}/repayments`, formData, {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
