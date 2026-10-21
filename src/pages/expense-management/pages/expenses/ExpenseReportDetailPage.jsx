@@ -56,6 +56,12 @@ import TaxBreakdownPanel, {
 } from "@/pages/expense-management/components/expense-reports/TaxBreakdownPanel";
 import TaxStatusBadge from "@/pages/expense-management/components/expense-reports/TaxStatusBadge";
 import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
+import {
+  formatDeadlineDate,
+  getSubmissionDeadlineInfo,
+  validateReportingPeriod,
+  validateTripDates,
+} from "@/pages/expense-management/components/expense-reports/submissionDeadline";
 import SummaryPanel from "@/pages/expense-management/components/expense-reports/SummaryPanel";
 import api from "@/api/axiosInstance";
 import Select from "react-select";
@@ -116,6 +122,50 @@ const SORT_OPTIONS = [
   { label: "Merchant (A-Z)", value: "merchant_asc" },
 ];
 
+/**
+ * The server's already-claimed check on a receipt (upload, receipt list or OCR result):
+ * BLOCKING = submission will be refused, WARNING = must be explained before submitting.
+ * Returns null when the receipt hasn't been claimed anywhere else.
+ */
+const duplicateNotice = (payload) => {
+  const status = payload?.duplicateStatus;
+  if (status !== "BLOCKING" && status !== "WARNING") return null;
+  return {
+    status,
+    message: payload.duplicateMessage || "This receipt matches one that has already been claimed.",
+  };
+};
+
+const notifyDuplicateReceipt = (payload) => {
+  const notice = duplicateNotice(payload);
+  if (!notice) return;
+  if (notice.status === "BLOCKING") {
+    showStatusToast(`Duplicate receipt — ${notice.message}`, "error");
+  } else {
+    showStatusToast(notice.message, "warning");
+  }
+};
+
+const DuplicateReceiptBanner = ({ notice, className = "" }) => {
+  if (!notice) return null;
+  const blocking = notice.status === "BLOCKING";
+  return (
+    <div
+      role="alert"
+      className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${
+        blocking ? "border-red-200 bg-red-50 text-red-800" : "border-amber-200 bg-amber-50 text-amber-800"
+      } ${className}`}
+    >
+      <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+      <div>
+        <p className="font-semibold">{blocking ? "Duplicate receipt" : "Possible duplicate receipt"}</p>
+        <p>{notice.message}</p>
+        {blocking && <p className="mt-0.5">This report can't be submitted while it contains this receipt.</p>}
+      </div>
+    </div>
+  );
+};
+
 export default function ExpenseReportDetailPage() {
   const { reportId } = useParams();
   const navigate = useNavigate();
@@ -160,6 +210,7 @@ export default function ExpenseReportDetailPage() {
   // point of the correction loop), not just DRAFT. Also gates Add/Edit/Delete Line Item and
   // Submit, since the backend rejects all of those once the report leaves this status set.
   const isReportEditable = REPORT_EDITABLE_STATUSES.includes(report?.reportStatus);
+  const deadlineInfo = getSubmissionDeadlineInfo(report);
 
   // Every policy violation the employee hasn't explained yet. The backend's submission gate needs
   // an explanation for each (WARN or BLOCK); once explained, the approver and Finance decide.
@@ -260,7 +311,7 @@ export default function ExpenseReportDetailPage() {
   };
 
   const [isEditReportOpen, setIsEditReportOpen] = useState(false);
-  const [editFormData, setEditFormData] = useState({ title: "", businessPurpose: "", costCenterId: "", currencyId: "" });
+  const [editFormData, setEditFormData] = useState({ title: "", businessPurpose: "", costCenterId: "", currencyId: "", tripStartDate: "", tripEndDate: "", reportingPeriodStart: "", reportingPeriodEnd: "" });
   const [editFormErrors, setEditFormErrors] = useState({});
   const [savingReport, setSavingReport] = useState(false);
   const [isDeleteReportOpen, setIsDeleteReportOpen] = useState(false);
@@ -372,7 +423,7 @@ export default function ExpenseReportDetailPage() {
   }, [fetchAll, fetchLookups]);
 
   const costCenterOptions = useMemo(
-    () => costCenters.map((c) => ({ value: c.costCenterId, label: `${c.costCenterCode} - ${c.costCenterName}` })),
+    () => costCenters.map((c) => ({ value: c.costCenterId, label: `${c.costCenterCode} - ${c.costCenterName}`, departmentUuid: c.departmentUuid })),
     [costCenters]
   );
   const currencyOptions = useMemo(
@@ -458,24 +509,8 @@ export default function ExpenseReportDetailPage() {
       if (!receiptId) {
         throw new Error("Failed to retrieve receipt ID from upload response");
       }
-      // The upload endpoint deliberately returns only { receiptId, processingStatus } - the
-      // advisory duplicate-file-reuse flag only comes back on the full receipt (GET /receipts/{id}),
-      // so check it separately, best-effort, purely to decide whether to warn here.
-      try {
-        const detailRes = await api.get(`/xms/employee/receipts/${receiptId}`, {
-          baseURL: XMS_BASE_URL,
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
-        const detail = detailRes.data?.data || detailRes.data;
-        if (detail?.possibleDuplicateFileReuse) {
-          showStatusToast(
-            "This exact receipt file was already uploaded elsewhere — it's still being scanned, but please check this isn't an accidental duplicate.",
-            "warning"
-          );
-        }
-      } catch {
-        // best-effort only - never blocks the OCR scan flow
-      }
+      // Already-claimed check on the file itself; same-invoice matches come back with the OCR result.
+      notifyDuplicateReceipt(uploadRes.data?.data);
 
       setScanningProgress(20);
 
@@ -579,6 +614,7 @@ export default function ExpenseReportDetailPage() {
 
             // Close selection dialog and open the full-screen OCR review modal
             setIsSelectionDialogOpen(false);
+            setOcrDuplicate(duplicateNotice(responsePayload));
             setOcrTaxWarning(taxWarning);
             setOcrTaxPreview(null);
             setOcrReviewData(reviewData);
@@ -743,6 +779,10 @@ export default function ExpenseReportDetailPage() {
       businessPurpose: report.businessPurpose || "",
       costCenterId: report.costCenterId || "",
       currencyId: report.currencyId || "",
+      tripStartDate: (report.tripStartDate || "").slice(0, 10),
+      tripEndDate: (report.tripEndDate || "").slice(0, 10),
+      reportingPeriodStart: (report.reportingPeriodStart || "").slice(0, 10),
+      reportingPeriodEnd: (report.reportingPeriodEnd || "").slice(0, 10),
     });
     setEditFormErrors({});
     setIsEditReportOpen(true);
@@ -766,6 +806,10 @@ export default function ExpenseReportDetailPage() {
     if (!editFormData.currencyId) errors.currencyId = "Report currency is required.";
     const businessPurposeError = validateBusinessPurpose(editFormData.businessPurpose);
     if (businessPurposeError) errors.businessPurpose = businessPurposeError;
+    const tripDateError = validateTripDates(editFormData.tripStartDate, editFormData.tripEndDate);
+    if (tripDateError) errors[editFormData.tripStartDate ? "tripEndDate" : "tripStartDate"] = tripDateError;
+    const periodError = validateReportingPeriod(editFormData.reportingPeriodStart, editFormData.reportingPeriodEnd);
+    if (periodError) errors.reportingPeriodEnd = periodError;
     setEditFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -779,6 +823,10 @@ export default function ExpenseReportDetailPage() {
       businessPurpose: editFormData.businessPurpose ? editFormData.businessPurpose.trim() : "",
       costCenterId: editFormData.costCenterId,
       currencyId: editFormData.currencyId,
+      tripStartDate: editFormData.tripStartDate,
+      tripEndDate: editFormData.tripEndDate,
+      reportingPeriodStart: editFormData.reportingPeriodStart || null,
+      reportingPeriodEnd: editFormData.reportingPeriodEnd || null,
     };
 
     try {
@@ -811,6 +859,15 @@ export default function ExpenseReportDetailPage() {
   };
 
   const submitNow = () => {
+    // UI guard only: the backend enforces the same deadline on the submit call.
+    if (deadlineInfo?.isOverdue) {
+      showStatusToast(
+        `The submission deadline passed on ${formatDeadlineDate(deadlineInfo.deadline)}. This report can no longer be submitted.`,
+        "error",
+        4000,
+      );
+      return;
+    }
     submitReport.mutate(reportId, {
       onSuccess: () => {
         showStatusToast(["AWAITING_CORRECTION", "QUERY_RAISED"].includes(report.reportStatus) ? "Report resubmitted" : "Report submitted for approval", "success");
@@ -997,6 +1054,8 @@ export default function ExpenseReportDetailPage() {
   const [ocrTaxPreview, setOcrTaxPreview] = useState(null);
   // Shown until the user edits the amount or tax: OCR's GST looked implausible or the scan was low-confidence.
   const [ocrTaxWarning, setOcrTaxWarning] = useState("");
+  // Already-claimed check for the scanned receipt (file, invoice or merchant/amount/date match).
+  const [ocrDuplicate, setOcrDuplicate] = useState(null);
 
   const handleOcrInputChange = (e) => {
     const { name, value } = e.target;
@@ -1143,6 +1202,13 @@ export default function ExpenseReportDetailPage() {
                   />
                 </div>
                 <p className="text-xs text-gray-400 font-mono mt-1">{report.reportNumber}</p>
+                {deadlineInfo && (
+                  <p className={`mt-1.5 text-xs font-medium ${deadlineInfo.isOverdue ? "text-red-700" : "text-gray-600"}`}>
+                    {deadlineInfo.isOverdue
+                      ? `Overdue: submission was due ${formatDeadlineDate(deadlineInfo.deadline)}`
+                      : `Submit by ${formatDeadlineDate(deadlineInfo.deadline)} (${deadlineInfo.daysRemaining} day${deadlineInfo.daysRemaining === 1 ? "" : "s"} left)`}
+                  </p>
+                )}
               </div>
 
               {canManage && (
@@ -1801,6 +1867,11 @@ export default function ExpenseReportDetailPage() {
                       <DetailField icon={<Briefcase size={15} />} label="Client Billable?" value={lineItemToView.clientBillable ? "Yes" : "No"} />
                       {lineItemToView.clientBillable && (
                         <div className="col-span-2">
+                          <DetailField icon={<Briefcase size={15} />} label="Client" value={lineItemToView.resolvedClientName || "—"} />
+                        </div>
+                      )}
+                      {lineItemToView.clientBillable && (
+                        <div className="col-span-2">
                           <DetailField icon={<Briefcase size={15} />} label="Project" value={lineItemToView.projectName || "—"} />
                         </div>
                       )}
@@ -1834,9 +1905,21 @@ export default function ExpenseReportDetailPage() {
                               >
                                 <div className="flex items-center gap-2 min-w-0">
                                   <FileText size={16} className="text-indigo-500 shrink-0" />
-                                  <span className="text-xs font-medium text-gray-700 truncate" title={r.fileName}>
-                                    {r.fileName}
-                                  </span>
+                                  <div className="min-w-0">
+                                    <span className="block text-xs font-medium text-gray-700 truncate" title={r.originalFileName || r.fileName}>
+                                      {r.originalFileName || r.fileName}
+                                    </span>
+                                    {duplicateNotice(r) && (
+                                      <span
+                                        className={`block text-[10px] font-medium truncate ${
+                                          duplicateNotice(r).status === "BLOCKING" ? "text-red-700" : "text-amber-700"
+                                        }`}
+                                        title={duplicateNotice(r).message}
+                                      >
+                                        {duplicateNotice(r).status === "BLOCKING" ? "Duplicate receipt" : "Possible duplicate receipt"}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
                                   <button
@@ -1908,6 +1991,8 @@ export default function ExpenseReportDetailPage() {
               <X size={20} />
             </button>
           </div>
+
+          <DuplicateReceiptBanner notice={ocrDuplicate} className="mx-6 mt-3 shrink-0" />
 
           {/* Body - 50% / 50% split */}
           <div className="flex-1 flex min-h-0">
@@ -2303,6 +2388,8 @@ const emptyForm = (defaultCostCenterId) => ({
   tax: emptyTaxValue,
   costCenterId: defaultCostCenterId || "",
   clientBillable: false,
+  clientId: "",
+  allocationReason: "",
   projectId: "",
 });
 
@@ -2324,6 +2411,11 @@ export function LineItemDrawer({
   const [ocrReceiptId, setOcrReceiptId] = useState(null);
   const [projects, setProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [clients, setClients] = useState([]);
+  const [loadingClients, setLoadingClients] = useState(false);
+  const [clientsError, setClientsError] = useState("");
+  // The caller's home department, to tell when a chosen cost center needs a cross-department reason.
+  const [homeDepartmentUuid, setHomeDepartmentUuid] = useState(null);
   // Latest server tax preview for the form (drives validation and the request's tax fields).
   const [taxPreview, setTaxPreview] = useState(null);
 
@@ -2376,6 +2468,28 @@ export function LineItemDrawer({
     }
   }, [isOpen, lineItem?.lineItemId, savedLineItem?.lineItemId, fetchReceipts]);
 
+  // Active RMS clients via XMS (GET /xms/clients). A failure is shown inline under the Client
+  // field with a retry, rather than only as a toast, since it blocks saving a billable expense.
+  const loadClients = useCallback(async () => {
+    try {
+      setLoadingClients(true);
+      setClientsError("");
+      const list = await lookupService.getActiveClients();
+      setClients(Array.isArray(list) ? list : []);
+    } catch (err) {
+      console.error("Failed to load clients:", err);
+      // XMS forwards the user's own token to RMS, which only lets Admin / Resource Manager /
+      // Project Manager list clients — a 403 here is a role issue, not an outage.
+      setClientsError(
+        err.response?.status === 403
+          ? "Your role doesn't have access to the client list in RMS."
+          : err.response?.data?.message || "Could not load clients."
+      );
+    } finally {
+      setLoadingClients(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) {
       setSavedLineItem(null);
@@ -2399,12 +2513,16 @@ export function LineItemDrawer({
         setProjects(Array.isArray(list) ? list : []);
       } catch (err) {
         console.error("Failed to load assigned projects:", err);
-        showStatusToast("Could not load your assigned projects. You can still save this expense as non-billable.", "error");
+        showStatusToast("Could not load your assigned projects. Project is optional for billable expenses.", "error");
       } finally {
         setLoadingProjects(false);
       }
     };
     loadProjects();
+    loadClients();
+    lookupService.getAllocationContext()
+      .then((ctx) => setHomeDepartmentUuid(ctx?.homeDepartmentUuid || null))
+      .catch(() => setHomeDepartmentUuid(null)); // unknown department: the server decides at submit
 
     if (lineItem) {
       if (!savedLineItem ||
@@ -2422,6 +2540,9 @@ export function LineItemDrawer({
           tax: lineItem.lineItemId ? taxValueFromLine(lineItem) : taxValueFromOcr(lineItem.taxAmount),
           costCenterId: isOcr ? "" : (lineItem.costCenterId || defaultCostCenterId || ""),
           clientBillable: !!lineItem.clientBillable,
+          // Saved line items carry the client as resolvedClientId (the frozen snapshot).
+          clientId: lineItem.resolvedClientId || lineItem.clientId || "",
+          allocationReason: lineItem.allocationReason || "",
           projectId: lineItem.projectId || "",
         });
         setTaxPreview(null);
@@ -2450,7 +2571,7 @@ export function LineItemDrawer({
     }
     setFormErrors({});
     setSplitErrors({});
-  }, [isOpen, lineItem, defaultCostCenterId]);
+  }, [isOpen, lineItem, defaultCostCenterId, loadClients]);
 
   // Load existing splits only for a line item that actually exists yet (never call the splits
   // endpoint for a brand-new, not-yet-created line item — there is no lineItemId to call it with).
@@ -2759,8 +2880,10 @@ export function LineItemDrawer({
       const isPendingDuplicate = pendingFiles.some(
         (pf) => pf.name === file.name && pf.size === file.size
       );
+      // Uploads are sent under a sanitized name, which is what the server stores as originalFileName.
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
       const isUploadedDuplicate = receipts.some(
-        (r) => r.fileName === file.name && r.fileSize === file.size
+        (r) => (r.originalFileName || r.fileName) === safeName && r.fileSize === file.size
       );
 
       if (isPendingDuplicate || isUploadedDuplicate) {
@@ -2851,8 +2974,11 @@ export function LineItemDrawer({
     } else if (formData.expenseDate > todayStr) {
       errors.expenseDate = "Expense date cannot be in the future.";
     }
-    if (formData.clientBillable && !formData.projectId) {
-      errors.projectId = "Project is required when billable.";
+    if (formData.clientBillable && !formData.clientId) {
+      errors.clientId = "Client is required when billable.";
+    }
+    if (crossDepartmentCostCenters.length > 0 && !(formData.allocationReason || "").trim()) {
+      errors.allocationReason = "Explain why this expense is charged to another department.";
     }
 
     setFormErrors(errors);
@@ -2915,6 +3041,10 @@ export function LineItemDrawer({
         ? taxRequestFieldsForConfirm(formData.tax, taxPreview)
         : taxRequestFields(formData.tax, taxPreview)),
       costCenterId: formData.costCenterId,
+      // Project is optional for a billable expense; if one is picked, the server checks it
+      // belongs to the selected client.
+      clientId: formData.clientBillable ? (formData.clientId || null) : null,
+      allocationReason: crossDepartmentCostCenters.length > 0 ? (formData.allocationReason || "").trim() || null : null,
       projectId: formData.clientBillable ? (formData.projectId || null) : null,
       clientBillable: !!formData.clientBillable,
     };
@@ -2932,7 +3062,8 @@ export function LineItemDrawer({
             const safeName = pf.name.replace(/[^a-zA-Z0-9._-]/g, "_");
             formDataUpload.append("file", pf.file, safeName);
             try {
-              await receiptService.upload(lineItemId, formDataUpload);
+              const uploadRes = await receiptService.upload(lineItemId, formDataUpload);
+              notifyDuplicateReceipt(uploadRes?.data?.data);
             } catch (uploadErr) {
               console.error(`Failed to upload ${pf.name}:`, uploadErr);
               showStatusToast(`Failed to upload ${pf.name}`, "error");
@@ -2985,7 +3116,8 @@ export function LineItemDrawer({
             const safeName = pf.name.replace(/[^a-zA-Z0-9._-]/g, "_");
             formDataUpload.append("file", pf.file, safeName);
             try {
-              await receiptService.upload(lineItemId, formDataUpload);
+              const uploadRes = await receiptService.upload(lineItemId, formDataUpload);
+              notifyDuplicateReceipt(uploadRes?.data?.data);
             } catch (uploadErr) {
               console.error(`Failed to upload ${pf.name}:`, uploadErr);
               showStatusToast(`Failed to upload ${pf.name}`, "error");
@@ -3022,12 +3154,54 @@ export function LineItemDrawer({
     // No client-side status filter: /xms/employee/projects/assigned (PMS /api/my-work under
     // the hood) already restricts to the employee's ACTIVE/PLANNING projects server-side, and
     // does not even return a status field per project — filtering here would just empty the list.
+    // Only the selected client's projects: p.clientId is the project's RMS client as PMS reports it.
+    if (!formData.clientId) return [];
     return projects
+      .filter((p) => p.clientId === formData.clientId)
       .map((p) => ({
         value: p.projectId,
         label: `${p.projectCode} - ${p.projectName}`,
       }));
-  }, [projects]);
+  }, [projects, formData.clientId]);
+
+  // Switching client drops a picked project that doesn't belong to the new client.
+  const handleClientChange = (opt) => {
+    const clientId = opt ? opt.value : "";
+    setFormData((prev) => {
+      const project = projects.find((p) => p.projectId === prev.projectId);
+      const keepProject = !!project && !!clientId && project.clientId === clientId;
+      return { ...prev, clientId, projectId: keepProject ? prev.projectId : "" };
+    });
+    if (formErrors.clientId) setFormErrors((prev) => ({ ...prev, clientId: "" }));
+  };
+
+  // Cost centers this line is charged to that sit outside the caller's home department: the split
+  // rows when splitting, otherwise the line's own cost center. Each needs a reason (server re-checks
+  // at submit). Unknown home or cost-center department = not cross-department.
+  const crossDepartmentCostCenters = useMemo(() => {
+    if (!homeDepartmentUuid) return [];
+    const ids = splitEnabled
+      ? splitRows.map((row) => row.costCenterId).filter(Boolean)
+      : [formData.costCenterId].filter(Boolean);
+    const home = String(homeDepartmentUuid).toLowerCase();
+    return [...new Set(ids)]
+      .map((id) => costCenterOptions.find((o) => o.value === id))
+      .filter((o) => o?.departmentUuid && String(o.departmentUuid).toLowerCase() !== home)
+      .map((o) => o.label);
+  }, [homeDepartmentUuid, splitEnabled, splitRows, formData.costCenterId, costCenterOptions]);
+
+  const clientOptions = useMemo(() => {
+    const options = clients
+      .filter((c) => c.clientId)
+      .map((c) => ({ value: c.clientId, label: c.clientName || c.clientId }));
+    // Keep an edited line item's saved client visible even if RMS no longer lists it as active;
+    // the server rejects it on save with an explanatory message.
+    const savedId = lineItem?.resolvedClientId;
+    if (savedId && !loadingClients && !options.some((o) => o.value === savedId)) {
+      return [{ value: savedId, label: lineItem.resolvedClientName || "Previously selected client" }, ...options];
+    }
+    return options;
+  }, [clients, lineItem, loadingClients]);
 
   const selectedCurrency = currencyOptions.find((o) => o.value === formData.currencyId) || null;
   const selectedCostCenter = costCenterOptions.find((o) => o.value === formData.costCenterId) || null;
@@ -3224,6 +3398,32 @@ export function LineItemDrawer({
           )}
         </div>
 
+        {crossDepartmentCostCenters.length > 0 && (
+          <div className="space-y-0.5 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+            <label htmlFor="allocationReason" className="block text-xs font-semibold text-amber-900">
+              Reason for charging another department <span className="text-red-500">*</span>
+            </label>
+            <p className="text-[11px] text-amber-800">
+              {crossDepartmentCostCenters.join(", ")} {crossDepartmentCostCenters.length === 1 ? "is" : "are"} outside
+              your department. Charge the cost center of the event or purpose this expense was for, and say why.
+            </p>
+            <textarea
+              id="allocationReason"
+              name="allocationReason"
+              value={formData.allocationReason}
+              onChange={handleInputChange}
+              placeholder="e.g. Joint Engineering–HR campus hiring event"
+              rows={2}
+              maxLength={500}
+              disabled={submitting}
+              className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs shadow-sm outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed resize-none"
+            />
+            {formErrors.allocationReason && (
+              <span className="text-[11px] text-red-600 block mt-0.5">{formErrors.allocationReason}</span>
+            )}
+          </div>
+        )}
+
         <div className="space-y-0.5">
           <label htmlFor="description" className="block text-xs font-semibold text-gray-600">
             Description
@@ -3318,18 +3518,69 @@ export function LineItemDrawer({
         {formData.clientBillable && (
           <div className="space-y-0.5">
             <label className="block text-xs font-semibold text-gray-600">
-              Project <span className="text-red-500">*</span>
+              Client <span className="text-red-500">*</span>
+            </label>
+            <Select
+              options={clientOptions}
+              value={clientOptions.find((o) => o.value === formData.clientId) || null}
+              onChange={handleClientChange}
+              placeholder={
+                loadingClients
+                  ? "Loading clients..."
+                  : clientsError
+                    ? "Clients unavailable"
+                    : "Select client..."
+              }
+              isSearchable
+              isLoading={loadingClients}
+              noOptionsMessage={() => (loadingClients ? "Loading..." : "No active clients found.")}
+              styles={compactSelectStyles}
+              isDisabled={submitting || loadingClients || !!clientsError}
+            />
+            {clientsError ? (
+              <span className="text-[11px] text-red-600 block mt-0.5">
+                {clientsError}{" "}
+                <button
+                  type="button"
+                  onClick={loadClients}
+                  className="font-semibold text-indigo-600 hover:text-indigo-800 underline"
+                >
+                  Retry
+                </button>
+              </span>
+            ) : !loadingClients && clientOptions.length === 0 ? (
+              <span className="text-[11px] text-gray-500 block mt-0.5">
+                No active clients are available, so this expense can't be marked billable yet.
+              </span>
+            ) : null}
+            {formErrors.clientId && <span className="text-[11px] text-red-600 block mt-0.5">{formErrors.clientId}</span>}
+          </div>
+        )}
+
+        {formData.clientBillable && (
+          <div className="space-y-0.5">
+            <label className="block text-xs font-semibold text-gray-600">
+              Project <span className="font-normal text-gray-400">(optional)</span>
             </label>
             <Select
               options={projectOptions}
               value={projectOptions.find((o) => o.value === formData.projectId) || null}
               onChange={(opt) => handleSelectChange("projectId", opt ? opt.value : "")}
-              placeholder={loadingProjects ? "Loading your assigned projects..." : "Select project..."}
+              placeholder={
+                loadingProjects
+                  ? "Loading your assigned projects..."
+                  : !formData.clientId
+                    ? "Select a client first"
+                    : "Select project..."
+              }
               isSearchable
+              isClearable
               isLoading={loadingProjects}
-              noOptionsMessage={() => (loadingProjects ? "Loading..." : "You have no assigned projects. Ask your PM to add you in PMS.")}
+              noOptionsMessage={() =>
+                loadingProjects ? "Loading..." : "You have no assigned projects for this client."
+              }
               styles={compactSelectStyles}
-              isDisabled={submitting || loadingProjects}
+              isDisabled={submitting || loadingProjects || !formData.clientId}
             />
             {formErrors.projectId && <span className="text-[11px] text-red-600 block mt-0.5">{formErrors.projectId}</span>}
           </div>
@@ -3370,13 +3621,24 @@ export function LineItemDrawer({
                         }`}
                       >
                         <div className="shrink-0 p-1.5 rounded-lg bg-blue-50 text-blue-600">
-                          {isImageFile(r.fileName) ? <ImageIcon size={14} /> : <FileText size={14} />}
+                          {isImageFile(r.originalFileName || r.fileName) ? <ImageIcon size={14} /> : <FileText size={14} />}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold text-gray-800 truncate">{r.fileName || "Receipt"}</p>
+                          <p className="text-xs font-semibold text-gray-800 truncate">{r.originalFileName || r.fileName || "Receipt"}</p>
                           <p className="text-[10px] text-gray-400">
                             {formatFileSize(r.fileSize)} &bull; {formatDate(r.uploadedAt)}
                           </p>
+                          {duplicateNotice(r) && (
+                            <p
+                              className={`mt-0.5 text-[10px] font-medium ${
+                                duplicateNotice(r).status === "BLOCKING" ? "text-red-700" : "text-amber-700"
+                              }`}
+                              title={duplicateNotice(r).message}
+                            >
+                              {duplicateNotice(r).status === "BLOCKING" ? "Duplicate: " : "Possible duplicate: "}
+                              {duplicateNotice(r).message}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-0.5 shrink-0">
                           <Button

@@ -109,6 +109,12 @@ export const splitService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
+  // Read-only view for Finance verification / AP payment (any report, not just the caller's own).
+  getForReview: (lineItemId) =>
+    api.get(`/xms/finance/expense-line-items/${lineItemId}/splits`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
 };
 
 export const receiptService = {
@@ -289,6 +295,25 @@ export const lookupService = {
   // all, which cannot be submitted as a client-billable expense's project.
   getAssignedProjects: async () => {
     const res = await api.get("/xms/employee/projects/assigned", {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    });
+    return normalizeList(res.data, "data");
+  },
+  // Active clients for a client-billable line item: [{ clientId, clientName }], sorted by name.
+  // XMS calls RMS with the user's own token, so only roles RMS allows (Admin / Resource Manager /
+  // Project Manager) get a list; others get 403.
+  // { homeDepartmentUuid } for the caller — lets the expense form ask for a reason when a chosen
+  // cost center (or split share) belongs to another department.
+  getAllocationContext: async () => {
+    const res = await api.get("/xms/employee/allocation-context", {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    });
+    return res.data?.data || null;
+  },
+  getActiveClients: async () => {
+    const res = await api.get("/xms/clients", {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     });

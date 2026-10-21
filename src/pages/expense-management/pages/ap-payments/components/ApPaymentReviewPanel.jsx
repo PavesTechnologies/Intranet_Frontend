@@ -4,7 +4,8 @@ import Button from "@/components/Button/Button";
 import StatusBadge from "@/components/status/statusbadge";
 import InvoiceHandoffBadge from "@/pages/expense-management/components/expense-reports/InvoiceHandoffBadge";
 import PolicyStatusBadge from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
-import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
+import RecordDisbursementModal from "@/pages/expense-management/components/disbursement/RecordDisbursementModal";
+import { buildDisbursementFormData } from "@/pages/expense-management/components/disbursement/disbursementConfirmation";
 import { showStatusToast } from "@/components/toastfy/toast";
 import EmployeeLabel from "../../../approval-engine/components/EmployeeLabel";
 import ApprovalStatusPill from "../../../approval-engine/components/ApprovalStatusPill";
@@ -111,18 +112,22 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
   const canComplete = paymentRoutingStatus === "APPROVED_FOR_PAYMENT";
   const isPaid = paymentRoutingStatus === "PAYMENT_COMPLETED";
 
-  const handleConfirmPayment = () => {
-    completePayment.mutate(reportId, {
-      onSuccess: () => {
-        showStatusToast("Payment marked as completed", "success");
-        setConfirming(false);
-        onClose();
-      },
-      onError: (err) => {
-        showStatusToast(err.response?.data?.message || "Failed to complete payment", "error");
-        setConfirming(false);
-      },
-    });
+  // The report only moves to PAYMENT_COMPLETED once the server accepts the recorded payment.
+  // Nothing here marks it paid optimistically.
+  const handleConfirmPayment = (values) => {
+    completePayment.mutate(
+      { reportId, confirmation: buildDisbursementFormData(values) },
+      {
+        onSuccess: () => {
+          showStatusToast("Payment recorded", "success");
+          setConfirming(false);
+          onClose();
+        },
+        onError: (err) => {
+          showStatusToast(err.response?.data?.message || "Failed to record payment", "error");
+        },
+      }
+    );
   };
 
   return (
@@ -223,6 +228,11 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
                                   {line.costCenterName && line.costCenterName !== costCenterName ? ` · ${line.costCenterName}` : ""}
                                 </p>
                                 {line.description && <p className="mt-0.5 line-clamp-2 text-xs text-gray-400">{line.description}</p>}
+                                <LineAllocationDetails
+                                  lineItemId={line.lineItemId}
+                                  allocationReason={line.allocationReason}
+                                  baseCurrencyCode={line.baseCurrencyCode || line.currencyCode}
+                                />
                                 {line.clientBillable && (
                                   <span className="mt-1 inline-flex rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
                                     Billable{line.resolvedClientName || line.projectName ? ` · ${line.resolvedClientName || line.projectName}` : ""}
@@ -276,6 +286,11 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
                             )}
                             <PolicyStatusBadge lineStatus={line.lineStatus} policyWarnings={line.policyWarnings} audience="reviewer" />
                           </div>
+                          <LineAllocationDetails
+                            lineItemId={line.lineItemId}
+                            allocationReason={line.allocationReason}
+                            baseCurrencyCode={line.baseCurrencyCode || line.currencyCode}
+                          />
                         </div>
                       ))}
                     </div>
@@ -378,17 +393,24 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
         </div>
       )}
 
-      <ConfirmationModal
-        isOpen={confirming}
-        title="Complete Payment"
-        message={`Mark ${reportNumber || "this report"} (${formatMoney(reimbursableAmount, currencyCode)} to the employee) as paid? This cannot be undone.`}
-        confirmText="Complete Payment"
-        cancelText="Cancel"
-        variant="success"
-        isLoading={completePayment.isPending}
-        onCancel={() => setConfirming(false)}
-        onConfirm={handleConfirmPayment}
-      />
+      {confirming && (
+        <RecordDisbursementModal
+          title="Record Payment"
+          submitLabel="Record Payment"
+          isSubmitting={completePayment.isPending}
+          onCancel={() => setConfirming(false)}
+          onSubmit={handleConfirmPayment}
+          summary={
+            <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+              <p className="text-xs text-blue-700">
+                Record the payment of <strong className="text-blue-900">{formatMoney(reimbursableAmount, currencyCode)}</strong> to
+                the employee for <strong className="text-blue-900">{reportNumber || "this report"}</strong>. The report is marked
+                paid only after this is recorded.
+              </p>
+            </div>
+          }
+        />
+      )}
     </div>
   );
 }
