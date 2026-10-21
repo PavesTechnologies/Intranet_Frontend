@@ -3196,16 +3196,22 @@ export function LineItemDrawer({
 
   // Cost centers this line is charged to that sit outside the caller's home department: the split
   // rows when splitting, otherwise the line's own cost center. Each needs a reason (server re-checks
-  // at submit). Unknown home or cost-center department = not cross-department.
+  // at submit). A cost center with no department is never cross-department. With the home department
+  // unknown, a line split across two or more departments still needs one - every share is listed.
   const crossDepartmentCostCenters = useMemo(() => {
-    if (!homeDepartmentUuid) return [];
     const ids = splitEnabled
       ? splitRows.map((row) => row.costCenterId).filter(Boolean)
       : [formData.costCenterId].filter(Boolean);
-    const home = String(homeDepartmentUuid).toLowerCase();
-    return [...new Set(ids)]
+    const options = [...new Set(ids)]
       .map((id) => costCenterOptions.find((o) => o.value === id))
-      .filter((o) => o?.departmentUuid && String(o.departmentUuid).toLowerCase() !== home)
+      .filter((o) => o?.departmentUuid);
+    if (!homeDepartmentUuid) {
+      const departments = new Set(options.map((o) => String(o.departmentUuid).toLowerCase()));
+      return departments.size > 1 ? options.map((o) => o.label) : [];
+    }
+    const home = String(homeDepartmentUuid).toLowerCase();
+    return options
+      .filter((o) => String(o.departmentUuid).toLowerCase() !== home)
       .map((o) => o.label);
   }, [homeDepartmentUuid, splitEnabled, splitRows, formData.costCenterId, costCenterOptions]);
 
@@ -3423,8 +3429,10 @@ export function LineItemDrawer({
               Reason for charging another department <span className="text-red-500">*</span>
             </label>
             <p className="text-[11px] text-amber-800">
-              {crossDepartmentCostCenters.join(", ")} {crossDepartmentCostCenters.length === 1 ? "is" : "are"} outside
-              your department. Charge the cost center of the event or purpose this expense was for, and say why.
+              {homeDepartmentUuid
+                ? `${crossDepartmentCostCenters.join(", ")} ${crossDepartmentCostCenters.length === 1 ? "is" : "are"} outside your department.`
+                : `${crossDepartmentCostCenters.join(", ")} belong to different departments.`}{" "}
+              Charge the cost center of the event or purpose this expense was for, and say why.
             </p>
             <textarea
               id="allocationReason"
