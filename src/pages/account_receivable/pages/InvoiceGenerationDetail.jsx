@@ -11,7 +11,6 @@ import {
 import PageHeader from "../../../components/ui/PageHeader";
 import Button from "../../../components/Button/Button";
 import Loader from "../../../components/ui/Loader";
-import StatusBadge from "../../../components/status/statusbadge";
 import BackIconButton from "../components/common/BackIconButton";
 import { showStatusToast } from "../../../components/toastfy/toast";
 import { getActiveCompanyProfile } from "../services/companyProfileService";
@@ -209,11 +208,12 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
           const allConfigs = await fetchActiveBillingConfigurations();
           const matched = allConfigs.find(
             (cfg) =>
-              cfg.projectId === preview?.projectId ||
-              String(cfg.projectId) === String(passedState.item?.projectId) ||
-              cfg.projectCode === (preview?.projectCode || passedState.item?.projectCode) ||
-              cfg.projectName === (preview?.projectName || passedState.item?.projectName) ||
-              String(cfg.projectId) === "23"
+              (preview?.projectId && cfg.projectId === preview.projectId) ||
+              (passedState.item?.projectId && String(cfg.projectId) === String(passedState.item.projectId)) ||
+              (preview?.projectCode && cfg.projectCode === preview.projectCode) ||
+              (passedState.item?.projectCode && cfg.projectCode === passedState.item.projectCode) ||
+              (preview?.projectName && cfg.projectName === preview.projectName) ||
+              (passedState.item?.projectName && cfg.projectName === passedState.item.projectName)
           );
           if (matched) {
             setSnapshotData((prev) => ({
@@ -232,8 +232,8 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
                 matched.placeOfSupply ||
                 passedState.item?.placeOfSupply ||
                 prev?.placeOfSupply,
-              projectStartDate: matched.projectStartDate || matched.startDate || "2026-04-01",
-              projectEndDate: matched.projectEndDate || matched.endDate || "2027-03-31",
+              projectStartDate: matched.projectStartDate || matched.startDate || null,
+              projectEndDate: matched.projectEndDate || matched.endDate || null,
             }));
           }
         } catch (cfgErr) {
@@ -422,14 +422,20 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
         sellerGstin: previewData.sellerGstin || companyProfile?.taxRegistrationNumber || companyProfile?.gstin,
         sellerEmail: previewData.sellerEmail || companyProfile?.email,
         sellerPhone: previewData.sellerPhone || companyProfile?.phoneNumber || companyProfile?.phone,
-        sellerLogoReference: previewData.sellerLogoReference || companyProfile?.logoUrl,
+        sellerLogoReference: previewData.sellerLogoReference || companyProfile?.logoUrl || companyProfile?.logoReference,
+        sellerSignatureReference:
+          previewData.sellerSignatureReference ||
+          companyProfile?.signatureReference ||
+          companyProfile?.signatureUrl ||
+          null,
         sellerInfo: previewData.sellerInfo || (companyProfile ? {
           legalName: companyProfile.legalName || companyProfile.companyName,
           address: companyProfile.address,
           gstin: companyProfile.taxRegistrationNumber || companyProfile.gstin,
           email: companyProfile.email,
           phone: companyProfile.phoneNumber || companyProfile.phone,
-          logoUrl: companyProfile.logoUrl,
+          logoUrl: companyProfile.logoUrl || companyProfile.logoReference,
+          signatureUrl: companyProfile.signatureReference || companyProfile.signatureUrl,
         } : null),
         clientInfo: {
           clientName: previewData.clientName || clientName,
@@ -729,21 +735,7 @@ export default function InvoiceGenerationDetail({ minPresentationDuration = DEFA
         <BackIconButton onClick={handleBack} label="Back to Invoice Queue" />
         <div className="flex-1">
           <PageHeader
-            title={
-              <span className="flex flex-wrap items-center gap-2.5">
-                Invoice Generation
-                <StatusBadge
-                  label={
-                    generating
-                      ? "GENERATING"
-                      : isInvoiceGenerated
-                      ? (invoice?.invoiceStatus === "GENERATED" || !invoice?.invoiceStatus ? "INVOICE GENERATED" : invoiceStatus)
-                      : (taxCalc?.status === "TAX_COMPLETED" || snapshotData?.status === "TAX_COMPLETED" ? "Tax Completed" : "Draft Preview")
-                  }
-                  size="sm"
-                />
-              </span>
-            }
+            title="Invoice Generation"
             subtitle={
               generating
                 ? "Creating authoritative official invoice..."

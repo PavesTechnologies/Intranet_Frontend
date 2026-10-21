@@ -4,7 +4,7 @@
 // category are suggested for NON_PO invoices; anything that needs a person's eye is listed with the
 // reason and reviewed on its own. The server re-checks every invoice before acting.
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import clsx from "clsx";
 import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Info, Send, XCircle } from "lucide-react";
@@ -18,6 +18,7 @@ import useDepartments from "../../system-configuration/hooks/useDepartments";
 import { usePurchaseCategoriesByDepartment } from "../../system-configuration/hooks/usePurchaseCategories";
 import { useBulkReviewMutation, useBulkSendMutation, useReviewWorkbench } from "../hooks/useReviewWorkbench";
 import { useRecheckInvoice } from "../../automation/hooks/useApAutomation";
+import { useClaimInvoices } from "../../work-assignment/hooks/useWorkAssignment";
 import { AUTOMATION_OUTCOME } from "../../constants/apAutomation";
 import { formatDateTime } from "../components/bulk/BulkUploadParts";
 
@@ -196,19 +197,39 @@ function ResultsPanel({ response, onClose }) {
 
 export default function InvoiceReviewWorkbenchPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [stage, setStage] = useState("to_review");
   const [filter, setFilter] = useState("all");
+  const assigned = ["me", "unassigned"].includes(searchParams.get("assigned")) ? searchParams.get("assigned") : "all";
+  const setAssigned = (value) => {
+    const next = new URLSearchParams(searchParams);
+    if (value === "all") next.delete("assigned");
+    else next.set("assigned", value);
+    setSearchParams(next, { replace: true });
+    setSelected(new Set());
+  };
+  const claim = useClaimInvoices();
   const [selected, setSelected] = useState(() => new Set());
   const [overrides, setOverrides] = useState({});
   const [bulkDept, setBulkDept] = useState(null);
   const [bulkCat, setBulkCat] = useState(null);
   const [response, setResponse] = useState(null);
-  const { data, isLoading, isError, error } = useReviewWorkbench(stage);
+  const { data, isLoading, isError, error } = useReviewWorkbench(stage, assigned);
   const { data: departments = [] } = useDepartments();
   const bulkReview = useBulkReviewMutation();
   const bulkSend = useBulkSendMutation();
   const recheck = useRecheckInvoice();
   const busy = bulkReview.isPending || bulkSend.isPending || recheck.isPending;
+
+  const claimRow = async (row) => {
+    try {
+      const result = await claim.mutateAsync([row.invoice_id]);
+      if (result.claimed.length) toast.success(`${row.invoice_number} is now yours.`);
+      else toast.info(result.skipped[0]?.reason || "Could not claim this invoice.");
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not claim this invoice."));
+    }
+  };
 
   const recheckRow = async (row) => {
     try {
@@ -307,6 +328,17 @@ export default function InvoiceReviewWorkbenchPage() {
             { value: "reviewed", label: "Reviewed, not sent" },
           ]}
         />
+        {(assigned !== "all" || rows.some((r) => r.assignee)) && (
+          <SegmentedTabs
+            value={assigned}
+            onChange={setAssigned}
+            tabs={[
+              { value: "all", label: "Everyone" },
+              { value: "me", label: "Mine", count: data?.counts?.mine },
+              { value: "unassigned", label: "Unassigned", count: data?.counts?.unassigned },
+            ]}
+          />
+        )}
         <SegmentedTabs
           value={filter}
           onChange={setFilter}
@@ -409,6 +441,21 @@ export default function InvoiceReviewWorkbenchPage() {
                           {row.invoice_type === "PO" ? "PO" : "Non-PO"} · received {formatDateTime(row.created_at)}
                           {row.source === "EMAIL" ? " · by email" : row.batch_id ? ` · batch #${row.batch_id}` : ""}
                         </p>
+                        {row.assignee ? (
+                          <p className={clsx("text-xs", row.assigned_to_me ? "font-medium text-[#0A0082]" : "text-slate-500")}>
+                            {row.assigned_to_me ? "Assigned to you" : `With ${row.assignee.name}`}
+                          </p>
+                        ) : rows.some((r) => r.assignee) || assigned !== "all" ? (
+                          <p className="flex items-center gap-2 text-xs text-amber-700">
+                            Unassigned
+                            {data?.can_review && (
+                              <button type="button" className="font-medium text-[#0A0082] underline-offset-2 hover:underline"
+                                onClick={() => claimRow(row)} disabled={claim.isPending}>
+                                Claim
+                              </button>
+                            )}
+                          </p>
+                        ) : null}
                       </td>
                       <td className="px-3 py-3 text-left font-medium text-slate-800">{formatMoney(row.net_amount, row.currency_code)}</td>
                       <td className="px-3 py-3 text-left">

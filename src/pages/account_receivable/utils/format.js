@@ -13,16 +13,46 @@ export function formatIndianNumber(amount) {
   }).format(value);
 }
 
+export function isValidCurrency(currency) {
+  if (!currency || typeof currency !== "string" || currency.trim().length !== 3) return false;
+  try {
+    new Intl.NumberFormat("en-US", { style: "currency", currency: currency.trim().toUpperCase() });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function formatCurrency(amount, currency = "INR") {
   const value = Number(amount) || 0;
-  const normalizedCurrency = String(currency || "INR").toUpperCase();
-  const isInr = normalizedCurrency === "INR";
-  const symbol = isInr ? "₹" : `${normalizedCurrency} `;
-  const locale = isInr ? "en-IN" : "en-US";
-  return `${symbol}${new Intl.NumberFormat(locale, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)}`;
+  const normalizedCurrency = String(currency || "INR").trim().toUpperCase();
+  try {
+    const localeMap = {
+      INR: "en-IN",
+      USD: "en-US",
+      EUR: "en-IE",
+      GBP: "en-GB",
+      AUD: "en-AU",
+      CAD: "en-CA",
+      SGD: "en-SG",
+      JPY: "ja-JP",
+      AED: "ar-AE",
+    };
+    const locale = localeMap[normalizedCurrency] || "en-US";
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: normalizedCurrency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    const symbol = normalizedCurrency === "INR" ? "₹" : `${normalizedCurrency} `;
+    const locale = normalizedCurrency === "INR" ? "en-IN" : "en-US";
+    return `${symbol}${new Intl.NumberFormat(locale, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)}`;
+  }
 }
 
 const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

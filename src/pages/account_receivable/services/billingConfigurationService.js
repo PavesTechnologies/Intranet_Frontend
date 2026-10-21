@@ -172,32 +172,310 @@ const normalizePricingModelValue = (value) => {
   return normalized;
 };
 
-const normalizeTmRateCard = (card = {}) => ({
-  ...card,
-  roleName:
-    firstPresent(
-      card.roleName,
-      card.role,
-      card.resourceRole,
-      card.designation,
-      card.name,
-      card.label,
-    ) || "",
-  role:
-    firstPresent(
-      card.role,
-      card.roleName,
-      card.resourceRole,
-      card.designation,
-      card.name,
-      card.label,
-    ) || "",
-  rate: firstPresent(card.rate, card.amount) || "",
-  ratePeriod: normalizeBillingFrequencyValue(firstPresent(card.ratePeriod, card.period)) || "HOURLY",
-  effectiveFrom: toLocalDateString(firstPresent(card.effectiveFrom, card.validFrom)) || "",
-  effectiveTo: toLocalDateString(firstPresent(card.effectiveTo, card.validTo)) || "",
-  rateCardId: firstPresent(card.rateCardId, card.tmRateCardId, card.id) || null,
+export const calculateDiscountedRate = (rate, discountType, discountValue) => {
+  const numRate = Number(rate);
+  const numDiscount = Number(discountValue);
+  if (!numRate || numRate <= 0 || !numDiscount || numDiscount <= 0) {
+    return numRate || 0;
+  }
+  if (discountType === "PERCENTAGE") {
+    const discounted = numRate * (1 - numDiscount / 100);
+    return Math.max(0, Math.round(discounted * 100) / 100);
+  }
+  if (discountType === "FIXED_AMOUNT") {
+    const discounted = numRate - numDiscount;
+    return Math.max(0, Math.round(discounted * 100) / 100);
+  }
+  return numRate;
+};
+
+export const normalizeTmRateDiscount = (period = {}) => {
+  const discountId = firstPresent(period.discountId, period.id) || null;
+  const rateCardId = firstPresent(period.rateCardId, period.tmRateCardId) || null;
+  const periodName = period.periodName || period.name || "";
+  const discountType = period.discountType || "PERCENTAGE";
+  const discountValue = period.discountValue !== undefined && period.discountValue !== null ? period.discountValue : "";
+  const effectiveFrom = toLocalDateString(firstPresent(period.effectiveFrom, period.startDate, period.discountStartDate)) || "";
+  const effectiveTo = toLocalDateString(firstPresent(period.effectiveTo, period.endDate, period.discountEndDate)) || "";
+  const notes = firstPresent(period.notes, period.remarks) || "";
+  const includeInInvoice = period.includeInInvoice !== false;
+  const currencyCode = period.currencyCode || "";
+  const baseRate = period.baseRate !== undefined && period.baseRate !== null ? period.baseRate : null;
+  const discountAmount = period.discountAmount !== undefined && period.discountAmount !== null ? period.discountAmount : null;
+  const netRate = period.netRate !== undefined && period.netRate !== null ? period.netRate : null;
+
+  return {
+    ...period,
+    discountId,
+    id: discountId,
+    rateCardId,
+    periodName,
+    discountType,
+    discountValue,
+    effectiveFrom,
+    effectiveTo,
+    notes,
+    remarks: notes,
+    includeInInvoice,
+    currencyCode,
+    baseRate,
+    discountAmount,
+    netRate,
+  };
+};
+
+export const buildTmRateDiscountRequestPayload = (period = {}, currencyCode) => ({
+  periodName: String(period.periodName || "").trim(),
+  discountType: period.discountType || "PERCENTAGE",
+  discountValue: Number(period.discountValue),
+  effectiveFrom: toLocalDateString(period.effectiveFrom) || null,
+  effectiveTo: toLocalDateString(period.effectiveTo) || null,
+  notes: period.notes || period.remarks || null,
+  includeInInvoice: period.includeInInvoice !== false,
+  currencyCode: String(currencyCode || period.currencyCode || "").trim().toUpperCase() || null,
 });
+
+export const calculateRateDiscountPreview = ({
+  baseRate,
+  discountType = "PERCENTAGE",
+  discountValue,
+  ratePeriod = "HOURLY",
+}) => {
+  const numBase = Number(baseRate);
+  const numDisc = Number(discountValue);
+
+  if (
+    baseRate === null ||
+    baseRate === undefined ||
+    baseRate === "" ||
+    Number.isNaN(numBase) ||
+    numBase <= 0
+  ) {
+    return {
+      isValid: false,
+      isComplete: false,
+      baseRate: 0,
+      discountAmount: null,
+      netRate: null,
+      error: "Base rate must be greater than zero.",
+    };
+  }
+
+  if (
+    discountValue === null ||
+    discountValue === undefined ||
+    discountValue === "" ||
+    Number.isNaN(numDisc) ||
+    numDisc <= 0
+  ) {
+    return {
+      isValid: false,
+      isComplete: false,
+      baseRate: numBase,
+      discountAmount: null,
+      netRate: null,
+      error: null,
+    };
+  }
+
+  if (discountType === "PERCENTAGE") {
+    if (numDisc >= 100) {
+      return {
+        isValid: false,
+        isComplete: true,
+        baseRate: numBase,
+        discountAmount: null,
+        netRate: null,
+        error: "Discount percentage must be less than 100%.",
+      };
+    }
+    const discountAmount = Math.round((numBase * numDisc / 100) * 100) / 100;
+    const netRate = Math.round((numBase - discountAmount) * 100) / 100;
+    if (netRate <= 0) {
+      return {
+        isValid: false,
+        isComplete: true,
+        baseRate: numBase,
+        discountAmount: null,
+        netRate: null,
+        error: "Discount must leave a net rate greater than zero.",
+      };
+    }
+    return {
+      isValid: true,
+      isComplete: true,
+      baseRate: numBase,
+      discountAmount,
+      netRate,
+      error: null,
+    };
+  }
+
+  if (discountType === "FIXED_AMOUNT") {
+    const discountAmount = Math.round(numDisc * 100) / 100;
+    const netRate = Math.round((numBase - discountAmount) * 100) / 100;
+    if (netRate <= 0) {
+      return {
+        isValid: false,
+        isComplete: true,
+        baseRate: numBase,
+        discountAmount,
+        netRate: 0,
+        error: "Fixed discount amount must be less than base rate.",
+      };
+    }
+    return {
+      isValid: true,
+      isComplete: true,
+      baseRate: numBase,
+      discountAmount,
+      netRate,
+      error: null,
+    };
+  }
+
+  return {
+    isValid: false,
+    isComplete: false,
+    baseRate: numBase,
+    discountAmount: null,
+    netRate: null,
+    error: null,
+  };
+};
+
+export const resolveTimeMaterialWorkEligibility = ({
+  workDate,
+  baseRate = 0,
+  baseRatePeriod = "HOURLY",
+  baseRateIncludeInInvoice = true,
+  discountPeriods = [],
+  currencyCode = null,
+} = {}) => {
+  const numBase = Number(baseRate) || 0;
+  const targetDateStr = toLocalDateString(workDate);
+
+  let activePeriod = null;
+  if (targetDateStr && Array.isArray(discountPeriods)) {
+    activePeriod = discountPeriods.find((period) => {
+      const from = toLocalDateString(period.effectiveFrom);
+      const to = toLocalDateString(period.effectiveTo);
+      if (from && targetDateStr < from) return false;
+      if (to && targetDateStr > to) return false;
+      return true;
+    }) || null;
+  }
+
+  if (activePeriod) {
+    const preview = calculateRateDiscountPreview({
+      baseRate: numBase,
+      discountType: activePeriod.discountType,
+      discountValue: activePeriod.discountValue,
+      ratePeriod: baseRatePeriod,
+    });
+    const effectiveRate = preview.isValid && preview.netRate !== null ? preview.netRate : numBase;
+    const isIncluded = activePeriod.includeInInvoice !== false;
+
+    return {
+      appliedRule: "DISCOUNT_PERIOD",
+      activePeriod,
+      rate: effectiveRate,
+      baseRate: numBase,
+      discountAmount: preview.discountAmount,
+      discountType: activePeriod.discountType,
+      discountValue: activePeriod.discountValue,
+      ratePeriod: baseRatePeriod,
+      currencyCode: currencyCode || activePeriod.currencyCode || null,
+      isIncludedInInvoice: isIncluded,
+      billingStatus: isIncluded ? "BILLABLE" : "EXCLUDED_FROM_INVOICE",
+      auditDetails: {
+        reason: isIncluded
+          ? "Covered by active discount period and included in invoice"
+          : "Covered by active discount period but excluded from invoice by period setting",
+        workDate: targetDateStr,
+        periodName: activePeriod.periodName || null,
+        periodId: activePeriod.discountId || activePeriod._uid || null,
+      },
+    };
+  }
+
+  const isIncluded = baseRateIncludeInInvoice !== false;
+  return {
+    appliedRule: "BASE_RATE",
+    activePeriod: null,
+    rate: numBase,
+    baseRate: numBase,
+    discountAmount: 0,
+    discountType: "NONE",
+    discountValue: 0,
+    ratePeriod: baseRatePeriod,
+    currencyCode,
+    isIncludedInInvoice: isIncluded,
+    billingStatus: isIncluded ? "BILLABLE" : "EXCLUDED_FROM_INVOICE",
+    auditDetails: {
+      reason: isIncluded
+        ? "No active discount period; included in invoice at standard base rate"
+        : "No active discount period; excluded from invoice by base rate setting",
+      workDate: targetDateStr,
+    },
+  };
+};
+
+
+export const normalizeTmRateCard = (card = {}) => {
+  const rate = firstPresent(card.rate, card.amount) || "";
+  const rawPeriods = asArray(card.discountPeriods || card.discounts);
+  const discountPeriods = rawPeriods.map(normalizeTmRateDiscount);
+  const hasDiscount = card.hasDiscount === false
+    ? false
+    : Boolean(
+        card.hasDiscount ?? (discountPeriods.length > 0 || (card.discountType && card.discountType !== "NONE" && Number(card.discountValue) > 0))
+      );
+  const discountType = card.discountType || (card.discountValue ? "PERCENTAGE" : "NONE");
+  const discountValue = card.discountValue !== undefined && card.discountValue !== null ? card.discountValue : "";
+  const calculatedDiscounted = hasDiscount && rate && discountValue
+    ? calculateDiscountedRate(rate, discountType, discountValue)
+    : "";
+  const discountedRate = card.discountedRate !== undefined && card.discountedRate !== null && card.discountedRate !== ""
+    ? card.discountedRate
+    : calculatedDiscounted;
+
+  return {
+    ...card,
+    roleName:
+      firstPresent(
+        card.roleName,
+        card.role,
+        card.resourceRole,
+        card.designation,
+        card.name,
+        card.label,
+      ) || "",
+    role:
+      firstPresent(
+        card.role,
+        card.roleName,
+        card.resourceRole,
+        card.designation,
+        card.name,
+        card.label,
+      ) || "",
+    rate,
+    ratePeriod: normalizeBillingFrequencyValue(firstPresent(card.ratePeriod, card.period)) || "HOURLY",
+    effectiveFrom: toLocalDateString(firstPresent(card.effectiveFrom, card.validFrom)) || "",
+    effectiveTo: toLocalDateString(firstPresent(card.effectiveTo, card.validTo)) || "",
+    rateCardId: firstPresent(card.rateCardId, card.tmRateCardId, card.id) || null,
+    remarks: card.remarks || card.notes || "",
+    hasDiscount,
+    discountType: hasDiscount ? discountType : "NONE",
+    discountValue: hasDiscount ? discountValue : "",
+    discountedRate: hasDiscount ? discountedRate : (rate || ""),
+    discountStartDate: toLocalDateString(card.discountStartDate) || "",
+    discountEndDate: toLocalDateString(card.discountEndDate) || "",
+    includeInInvoice: card.includeInInvoice !== false,
+    discountPeriods,
+  };
+};
 
 const getTmRateCardId = (card = {}) => firstPresent(card.rateCardId, card.tmRateCardId, card.id) || null;
 
@@ -328,6 +606,11 @@ export const normalizeBillingConfiguration = (config = {}) => {
     ),
     projectName: config.projectName || projectInfo.projectName || "",
     projectId: resolvedProjectId,
+    pmsProjectId: (config.pmsProjectId !== undefined && config.pmsProjectId !== null && !isNaN(Number(config.pmsProjectId)))
+      ? Number(config.pmsProjectId)
+      : (projectInfo.pmsProjectId !== undefined && projectInfo.pmsProjectId !== null && !isNaN(Number(projectInfo.pmsProjectId)))
+      ? Number(projectInfo.pmsProjectId)
+      : null,
     clientId:
       config.clientId ||
       projectInfo.clientId ||
@@ -360,6 +643,13 @@ export const normalizeBillingConfiguration = (config = {}) => {
       toolBilling.enableToolBilling ??
       toolBilling.enabled ??
       false,
+    expenseBillingEligible: normalizeBoolean(
+      firstPresent(
+        config.expenseBillingEligible,
+        controls.expenseBillingEligible,
+      ),
+      false,
+    ),
     lastUpdated: formatDate(config.lastUpdated || config.updatedAt || config.modifiedAt || config.createdAt),
     updatedBy: config.updatedBy || config.modifiedBy || config.createdBy || "",
     currentStep: config.currentStep || (approvalStatus === "DRAFT" ? 1 : 6),
@@ -425,7 +715,7 @@ export const formatBillingFrequencyLabel = ({ durationValue, durationUnit, billi
 // BillingConfigurationStep.jsx, normalizeControls/normalizeWizardDetail
 // in this file).
 
-const normalizeControls = (controls = {}) => {
+export const normalizeControls = (controls = {}) => {
   const paymentTerm = controls.paymentTerm && typeof controls.paymentTerm === "object" ? controls.paymentTerm : null;
   const taxRegion = controls.taxRegion && typeof controls.taxRegion === "object" ? controls.taxRegion : null;
   const normalizedPaymentTerm = paymentTerm ? normalizePaymentTerm(paymentTerm) : {};
@@ -457,6 +747,7 @@ const normalizeControls = (controls = {}) => {
       normalizedTaxRegion.taxRegionId ||
       "",
     taxRegionName,
+    expenseBillingEligible: normalizeBoolean(controls.expenseBillingEligible, false),
   };
 };
 
@@ -620,6 +911,7 @@ const normalizeWizardDetail = (config = {}, normalized = normalizeBillingConfigu
   return {
     ...config,
     billingConfigurationId: normalized.billingConfigurationId,
+    pmsProjectId: detailProject.pmsProjectId || null,
     setupMode: normalized.setupMode,
     projectInfo: {
       ...rawProjectInfo,
@@ -867,10 +1159,14 @@ export const normalizeProject = (project = {}) => {
   const projectBudgetCurrency = project.projectBudgetCurrency || currencyCode || "";
   const projectBudget = project.projectBudget ?? project.budget ?? project.budgetAmount ?? "";
 
+  const rawPmsId = project.pmsProjectId ?? project.pms_project_id ?? null;
+  const pmsProjectId = (rawPmsId !== null && rawPmsId !== undefined && !isNaN(Number(rawPmsId))) ? Number(rawPmsId) : null;
+
   return {
     ...project,
     id,
     projectId: id,
+    pmsProjectId,
     clientId: project.clientId || project.client?.clientId || project.client?.id,
     clientName: project.clientName || project.client?.clientName || project.client?.name || "",
     // Deliberately NOT falling back to the generic project.name/.code/.label
@@ -1072,6 +1368,31 @@ export const getBillingConfigurationById = async (billingConfigurationId) => {
     if (detail.billingConfig.pricingModel === "STANDARD") {
       const standardRate = normalizedRateCards.find((card) => !card.roleName) || normalizedRateCards[0];
       if (standardRate) {
+        let discountPeriods = asArray(standardRate.discountPeriods);
+        if (discountPeriods.length === 0 && standardRate.rateCardId) {
+          try {
+            const apiDiscounts = await getTmRateDiscounts(standardRate.rateCardId);
+            discountPeriods = asArray(apiDiscounts).map(normalizeTmRateDiscount);
+          } catch (err) {
+            console.warn("Unable to load discount periods for standard rate card", err);
+          }
+        }
+        if (discountPeriods.length === 0 && standardRate.hasDiscount && (standardRate.discountValue || standardRate.discountStartDate)) {
+          discountPeriods = [
+            normalizeTmRateDiscount({
+              periodName: "Standard Discount",
+              discountType: standardRate.discountType,
+              discountValue: standardRate.discountValue,
+              effectiveFrom: standardRate.discountStartDate,
+              effectiveTo: standardRate.discountEndDate,
+              notes: standardRate.remarks,
+              includeInInvoice: standardRate.includeInInvoice !== false,
+              baseRate: standardRate.rate,
+              netRate: standardRate.discountedRate,
+            }),
+          ];
+        }
+
         detail.billingConfig.timeAndMaterial = {
           ...(detail.billingConfig.timeAndMaterial || {}),
           rate: standardRate.rate,
@@ -1079,6 +1400,15 @@ export const getBillingConfigurationById = async (billingConfigurationId) => {
           effectiveFrom: standardRate.effectiveFrom,
           effectiveTo: standardRate.effectiveTo,
           rateCardId: standardRate.rateCardId,
+          remarks: standardRate.remarks,
+          hasDiscount: standardRate.hasDiscount || discountPeriods.length > 0,
+          discountType: standardRate.discountType,
+          discountValue: standardRate.discountValue,
+          discountedRate: standardRate.discountedRate,
+          discountStartDate: standardRate.discountStartDate,
+          discountEndDate: standardRate.discountEndDate,
+          includeInInvoice: standardRate.includeInInvoice !== false,
+          discountPeriods,
           roles: [],
         };
       }
@@ -1434,6 +1764,86 @@ export const deleteTmRateCard = async (rateCardId) => {
   const response = await api.delete(`${TM_RATE_CARDS_URL}/tm-rate-cards/${rateCardId}`);
   return unwrapData(response);
 };
+
+// --- Time & Material Rate Discount APIs ---
+const TM_RATE_DISCOUNTS_URL = `${TM_RATE_CARDS_URL}/tm-rate-discounts`;
+
+export const getTmRateDiscounts = async (rateCardId) => {
+  if (!rateCardId) return [];
+  const response = await api.get(`${TM_RATE_CARDS_URL}/tm-rate-cards/${rateCardId}/discounts`);
+  return asArray(unwrapData(response));
+};
+
+export const getTmRateDiscountById = async (discountId) => {
+  if (!discountId) return null;
+  const response = await api.get(`${TM_RATE_DISCOUNTS_URL}/${discountId}`);
+  return unwrapData(response);
+};
+
+export const createTmRateDiscount = async (rateCardId, payload) => {
+  if (!rateCardId) throw new Error("Missing rateCardId");
+  const response = await api.post(`${TM_RATE_CARDS_URL}/tm-rate-cards/${rateCardId}/discounts`, payload);
+  return unwrapData(response);
+};
+
+export const updateTmRateDiscount = async (discountId, payload) => {
+  if (!discountId) throw new Error("Missing discountId");
+  const response = await api.put(`${TM_RATE_DISCOUNTS_URL}/${discountId}`, payload);
+  return unwrapData(response);
+};
+
+export const deleteTmRateDiscount = async (discountId) => {
+  if (!discountId) throw new Error("Missing discountId");
+  const response = await api.delete(`${TM_RATE_DISCOUNTS_URL}/${discountId}`);
+  return unwrapData(response);
+};
+
+export const syncStandardRateDiscounts = async (rateCardId, discountPeriods = [], currencyCode) => {
+  if (!rateCardId) return [];
+  let existingDiscounts = [];
+  try {
+    existingDiscounts = (await getTmRateDiscounts(rateCardId)).map(normalizeTmRateDiscount);
+  } catch (err) {
+    console.warn("Unable to fetch existing discount periods", err);
+    existingDiscounts = [];
+  }
+
+  const touchedIds = new Set();
+  const savedPeriods = [];
+
+  for (const period of asArray(discountPeriods)) {
+    const payload = buildTmRateDiscountRequestPayload(period, currencyCode);
+    const existing = period.discountId
+      ? existingDiscounts.find((d) => String(d.discountId) === String(period.discountId))
+      : null;
+
+    let saved = null;
+    if (existing?.discountId) {
+      saved = await updateTmRateDiscount(existing.discountId, payload);
+      touchedIds.add(String(existing.discountId));
+    } else {
+      saved = await createTmRateDiscount(rateCardId, payload);
+      const newId = saved?.discountId || saved?.id;
+      if (newId) touchedIds.add(String(newId));
+    }
+    if (saved) {
+      savedPeriods.push(normalizeTmRateDiscount(saved));
+    }
+  }
+
+  for (const existing of existingDiscounts) {
+    if (existing.discountId && !touchedIds.has(String(existing.discountId))) {
+      try {
+        await deleteTmRateDiscount(existing.discountId);
+      } catch (err) {
+        console.warn("Unable to delete removed discount period", existing.discountId, err);
+      }
+    }
+  }
+
+  return savedPeriods;
+};
+
 
 // --- Fixed Price Configuration APIs ---
 // GET .../{billingConfigurationId}/fixed-price returns a list ("Fixed Price
@@ -1904,7 +2314,6 @@ export const buildBillingConfigurationRequestPayload = (wizardPayload = {}) => {
   return requestPayload;
 };
 
-// eslint-disable-next-line no-unused-vars
 const assertBillingConfigurationPayload = (_payload) => {
   // Validation temporarily disabled
 };
@@ -1939,15 +2348,38 @@ export const syncBillingConfigurationDraft = async (payload, billingConfiguratio
   return extractBillingConfigurationId(configResponse) || billingConfigurationId;
 };
 
-const buildTmRateCardRequestPayload = (card = {}, pricingModel, billingConfigurationId) => ({
-  billingConfigurationId,
-  roleName: pricingModel === "ROLE_BASED" ? String(card.roleName || card.role || "").trim() : null,
-  rate: card.rate ?? "",
-  ratePeriod: normalizeBillingFrequencyValue(card.ratePeriod) || "HOURLY",
-  effectiveFrom: toLocalDateString(card.effectiveFrom) || "",
-  effectiveTo: toLocalDateString(card.effectiveTo) || "",
-  remarks: "",
-});
+export const buildTmRateCardRequestPayload = (card = {}, pricingModel, billingConfigurationId) => {
+  const hasDiscount = card.hasDiscount === false
+    ? false
+    : Boolean(
+        card.hasDiscount || (card.discountType && card.discountType !== "NONE" && Number(card.discountValue) > 0)
+      );
+  const discountType = hasDiscount ? (card.discountType || "PERCENTAGE") : null;
+  const discountValue = hasDiscount && card.discountValue !== "" && card.discountValue !== null && card.discountValue !== undefined
+    ? Number(card.discountValue)
+    : null;
+  const numRate = Number(card.rate);
+  const discountedRate = hasDiscount && numRate > 0 && discountValue !== null
+    ? calculateDiscountedRate(numRate, discountType, discountValue)
+    : null;
+
+  return {
+    billingConfigurationId,
+    roleName: pricingModel === "ROLE_BASED" ? String(card.roleName || card.role || "").trim() : null,
+    rate: card.rate ?? "",
+    ratePeriod: normalizeBillingFrequencyValue(card.ratePeriod) || "HOURLY",
+    effectiveFrom: toLocalDateString(card.effectiveFrom) || "",
+    effectiveTo: toLocalDateString(card.effectiveTo) || "",
+    remarks: card.remarks || card.notes || "",
+    hasDiscount,
+    discountType,
+    discountValue,
+    discountedRate,
+    discountStartDate: hasDiscount ? toLocalDateString(card.discountStartDate) || "" : null,
+    discountEndDate: hasDiscount ? toLocalDateString(card.discountEndDate) || "" : null,
+    includeInInvoice: card.includeInInvoice !== false,
+  };
+};
 
 const buildTmRateCardRequests = (payload = {}, billingConfigurationId) => {
   const billingConfig = payload.billingConfig || {};
@@ -2007,6 +2439,11 @@ const saveTmRateCards = async (payload, billingConfigurationId) => {
       : await createTmRateCard(billingConfigurationId, request.payload);
     const savedId = getTmRateCardId(saved) || matchingExisting?.rateCardId;
     if (savedId) touchedIds.add(String(savedId));
+
+    if (pricingModel === "STANDARD" && savedId && Array.isArray(timeAndMaterial.discountPeriods)) {
+      const configCurrency = normalizeCurrencyCode(payload?.currency, payload?.projectInfo?.currency, billingConfig.currency);
+      await syncStandardRateDiscounts(savedId, timeAndMaterial.discountPeriods, configCurrency);
+    }
   }
 
   await Promise.all(

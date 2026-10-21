@@ -60,6 +60,16 @@ import TdsChallansPage from "./pages/accounts-payable/tds-tracking/pages/TdsChal
 import TdsChallanNewPage from "./pages/accounts-payable/tds-tracking/pages/TdsChallanNewPage.jsx";
 import TdsFilingNewPage from "./pages/accounts-payable/tds-tracking/pages/TdsFilingNewPage.jsx";
 import BulkImportPage from "./pages/accounts-payable/bulk-import/pages/BulkImportPage.jsx";
+import RecurringSchedulesPage from "./pages/accounts-payable/recurring/pages/RecurringSchedulesPage.jsx";
+import GstItcPage from "./pages/accounts-payable/gst/pages/GstItcPage.jsx";
+import AccountingExportPage from "./pages/accounts-payable/accounting-export/pages/AccountingExportPage.jsx";
+import VendorNotesPage from "./pages/accounts-payable/vendor-notes/pages/VendorNotesPage.jsx";
+import WorkAssignmentPage from "./pages/accounts-payable/work-assignment/pages/WorkAssignmentPage.jsx";
+import { WORK_ASSIGN_LEAD_PERMISSIONS } from "./pages/accounts-payable/constants/workAssignment";
+import { VENDOR_NOTE_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/vendorNotes";
+import { GST_ITC_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/gstItc";
+import { ACCOUNTING_EXPORT_PERMISSIONS } from "./pages/accounts-payable/constants/accountingExport";
+import { RECURRING_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/recurring";
 import BulkImportJobPage from "./pages/accounts-payable/bulk-import/pages/BulkImportJobPage.jsx";
 import { PAYMENT_ANY_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/paymentPermissions";
 import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/tdsTrackingPermissions";
@@ -329,6 +339,7 @@ import PaymentTermsMasterPage from "./pages/account_receivable/pages/master-data
 import TaxConfigurationMasterPage from "./pages/account_receivable/pages/master-data/TaxConfigurationMasterPage.jsx";
 import TaxConfigurationRegionDetailPage from "./pages/account_receivable/pages/master-data/TaxConfigurationRegionDetailPage.jsx";
 import CompanyProfilePage from "./pages/account_receivable/pages/master-data/CompanyProfilePage.jsx";
+import CurrencyExchangeRateMasterPage from "./pages/account_receivable/pages/master-data/CurrencyExchangeRateMasterPage.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -721,6 +732,46 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path={AP_ROUTES.WORK_ASSIGNMENT}
+            element={
+              <ProtectedRoute requiredPermissions={WORK_ASSIGN_LEAD_PERMISSIONS}>
+                <WorkAssignmentPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.VENDOR_NOTES}
+            element={
+              <ProtectedRoute requiredPermissions={VENDOR_NOTE_VIEW_PERMISSIONS}>
+                <VendorNotesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.GST_ITC}
+            element={
+              <ProtectedRoute requiredPermissions={GST_ITC_VIEW_PERMISSIONS}>
+                <GstItcPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.ACCOUNTING_EXPORT}
+            element={
+              <ProtectedRoute requiredPermissions={ACCOUNTING_EXPORT_PERMISSIONS}>
+                <AccountingExportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.RECURRING}
+            element={
+              <ProtectedRoute requiredPermissions={RECURRING_VIEW_PERMISSIONS}>
+                <RecurringSchedulesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path={AP_ROUTES.TDS_CHALLANS}
             element={
               <ProtectedRoute requiredPermissions={TDS_TRACKING_ANY_VIEW_PERMISSIONS}>
@@ -1009,6 +1060,14 @@ const AppRoutes = () => {
             <Route
               path="configurations/company-profile"
               element={<Navigate to="/account-receivable/master-data/company-profile" replace />}
+            />
+            <Route
+              path="master-data/exchange-rates"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><CurrencyExchangeRateMasterPage /></ProtectedRoute>}
+            />
+            <Route
+              path="configurations/exchange-rates"
+              element={<Navigate to="/account-receivable/master-data/exchange-rates" replace />}
             />
           </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />

@@ -7,6 +7,7 @@ import { useBulkReviewMutation, useBulkSendMutation, useReviewWorkbench } from "
 import useDepartments from "../../system-configuration/hooks/useDepartments";
 import { usePurchaseCategoriesByDepartment } from "../../system-configuration/hooks/usePurchaseCategories";
 import { useRecheckInvoice } from "../../automation/hooks/useApAutomation";
+import { useClaimInvoices } from "../../work-assignment/hooks/useWorkAssignment";
 
 vi.mock("../hooks/useReviewWorkbench", () => ({
   useReviewWorkbench: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("../../system-configuration/hooks/useDepartments", () => ({ default: vi.
 vi.mock("../../automation/hooks/useApAutomation", () => ({ useRecheckInvoice: vi.fn() }));
 vi.mock("../../system-configuration/hooks/usePurchaseCategories", () => ({ usePurchaseCategoriesByDepartment: vi.fn() }));
 vi.mock("react-toastify", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
+vi.mock("../../work-assignment/hooks/useWorkAssignment", () => ({ useClaimInvoices: vi.fn() }));
 
 const ok = (key, message) => ({ key, ok: true, blocking: true, message });
 const bad = (key, message, blocking = true) => ({ key, ok: false, blocking, message });
@@ -62,6 +64,7 @@ beforeEach(() => {
   useBulkReviewMutation.mockReturnValue(mutation(response));
   useBulkSendMutation.mockReturnValue(mutation(response));
   useRecheckInvoice.mockReturnValue(mutation({ invoice_id: 4, outcome: "AUTO_SENT", reasons: [] }));
+  useClaimInvoices.mockReturnValue(mutation({ claimed: [2], skipped: [] }));
   useDepartments.mockReturnValue({ data: [{ id: 10, name: "IT", is_active: true }, { id: 20, name: "Finance", is_active: true }] });
   usePurchaseCategoriesByDepartment.mockImplementation((dept) => ({
     data: dept === 20 ? [{ id: 201, name: "Audit", is_active: true }] : dept === 10 ? [{ id: 101, name: "Software", is_active: true }] : [],
@@ -180,5 +183,43 @@ describe("PO invoices and automation", () => {
     expect(within(tr).getByText(/AP automation: Needs review/)).toBeInTheDocument();
     await user.click(within(tr).getByRole("button", { name: "Re-check" }));
     expect(useRecheckInvoice.mock.results[0].value.mutateAsync).toHaveBeenCalledWith(4);
+  });
+});
+
+describe("work assignment", () => {
+  const assignedRows = [
+    row(1, { assignee: { user_id: "5100007", name: "Venkatesh Gali" }, assigned_to_me: true }),
+    row(2, { assignee: { user_id: "5100027", name: "Kalasagar P" } }),
+    row(3, { assignee: null }),
+  ];
+
+  it("shows who holds each invoice, and lets you claim an unassigned one", async () => {
+    const claim = mutation({ claimed: [3], skipped: [] });
+    useClaimInvoices.mockReturnValue(claim);
+    useReviewWorkbench.mockReturnValue({ data: { items: assignedRows, max_bulk: 25, can_review: true, can_send: true,
+      counts: { total: 3, ready: 1, mine: 1, unassigned: 1 } }, isLoading: false, isError: false });
+    renderPage();
+    expect(screen.getByText("Assigned to you")).toBeInTheDocument();
+    expect(screen.getByText("With Kalasagar P")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Claim" }));
+    expect(claim.mutateAsync).toHaveBeenCalledWith([3]);
+  });
+
+  it("filters to my queue from the URL", () => {
+    useReviewWorkbench.mockReturnValue({ data: { items: [assignedRows[0]], max_bulk: 25, can_review: true, can_send: true,
+      counts: { total: 1, ready: 1, mine: 1, unassigned: 1 } }, isLoading: false, isError: false });
+    render(
+      <MemoryRouter initialEntries={["/x?assigned=me"]}>
+        <InvoiceReviewWorkbenchPage />
+      </MemoryRouter>,
+    );
+    expect(useReviewWorkbench).toHaveBeenCalledWith("to_review", "me");
+    expect(screen.getByRole("tab", { name: /Mine/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("hides assignment UI when assignment is not in use", () => {
+    renderPage();
+    expect(screen.queryByRole("tab", { name: /Unassigned/ })).toBeNull();
+    expect(screen.queryByText("Claim")).toBeNull();
   });
 });

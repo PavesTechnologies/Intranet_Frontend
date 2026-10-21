@@ -14,6 +14,8 @@ vi.mock("../hooks/useApAutomation", () => ({
   useSetSharePointImport: vi.fn(),
 }));
 vi.mock("react-toastify", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
+// Has its own tests (SegregationOfDutiesCard.test.jsx).
+vi.mock("../components/SegregationOfDutiesCard", () => ({ default: () => null }));
 
 const settings = (over = {}) => ({
   enabled: false, price_tolerance_pct: "1", price_tolerance_amount: "100", quantity_tolerance: "0", require_grn: true,

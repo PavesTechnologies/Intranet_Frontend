@@ -375,6 +375,10 @@ export default function InvoiceDetail() {
       const updated = await approveInvoice(invoice.invoiceId);
       releaseInvoiceLock();
       showStatusToast("Invoice approved successfully.", "success");
+      if (isApprovalReview) {
+        navigate(INVOICE_APPROVAL_PATH, { replace: true });
+        return;
+      }
       if (updated) {
         setInvoice((prev) => ({
           ...prev,
@@ -413,6 +417,10 @@ export default function InvoiceDetail() {
       setIsRejectOpen(false);
       setRejectionReason("");
       showStatusToast("Invoice rejected successfully.", "success");
+      if (isApprovalReview) {
+        navigate(INVOICE_APPROVAL_PATH, { replace: true });
+        return;
+      }
       if (updated) {
         setInvoice((prev) => ({
           ...prev,
@@ -709,44 +717,25 @@ export default function InvoiceDetail() {
     invoice?.billingPeriod ||
     (invoice?.billingPeriodStart && invoice?.billingPeriodEnd
       ? formatBillingPeriod(invoice.billingPeriodStart, invoice.billingPeriodEnd)
-      : DEMO_TERMS.billingPeriod);
+      : "—");
 
   const projectName =
     invoice?.projectName ||
-    DEMO_PROJECT.name;
+    "—";
 
   const projectCode =
     invoice?.projectCode ||
     (invoice?.projectId ? `PRJ-${invoice.projectId}` : null) ||
-    DEMO_PROJECT.code;
+    "—";
 
   const clientName =
     invoice?.clientName ||
-    "Not provided";
+    "—";
 
   const effectiveTaxBreakdown =
     taxBreakdown.length > 0
       ? taxBreakdown
-      : invoice?.totalTax && invoice.totalTax > 0
-        ? [
-          {
-            id: "demo-cgst",
-            taxComponent: "Central Goods and Services Tax",
-            taxTypeCode: "CGST",
-            applicability: "SAME_JURISDICTION",
-            rate: 9.0,
-            amount: invoice.totalTax / 2,
-          },
-          {
-            id: "demo-sgst",
-            taxComponent: "State Goods and Services Tax",
-            taxTypeCode: "SGST",
-            applicability: "SAME_JURISDICTION",
-            rate: 9.0,
-            amount: invoice.totalTax / 2,
-          },
-        ]
-        : [];
+      : [];
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -760,79 +749,6 @@ export default function InvoiceDetail() {
               {invoice?.invoiceNumber || "—"}
             </span>
           </>
-        }
-        actions={
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Action: Send to Client (for APPROVED invoices) */}
-          {invoice?.invoiceStatus === "APPROVED" && (
-            <Button
-              variant="primary"
-              size="small"
-              onClick={() => setIsSendToClientOpen(true)}
-              disabled={sendingToClient || refreshing}
-              className="bg-teal-700 hover:bg-teal-800 text-white flex items-center gap-1.5 text-xs font-semibold"
-            >
-              <MailCheck className="h-3.5 w-3.5" />
-              {deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
-                ? "Sent to Client"
-                : "Send to Client"}
-            </Button>
-          )}
-
-          {/* Actions: Approve & Reject (for PENDING_APPROVAL invoices) */}
-          {invoice?.invoiceStatus === "PENDING_APPROVAL" && (
-            <>
-              <Button
-                variant="primary"
-                size="small"
-                onClick={() => openDecisionModal("approve")}
-                disabled={approving || rejecting || refreshing || decisionBlocked}
-                className="bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 text-xs font-semibold"
-              >
-                <ThumbsUp className="h-3.5 w-3.5" />
-                {lockingAction === "approve" ? "Acquiring lock..." : approving ? "Approving..." : "Approve"}
-              </Button>
-
-              <Button
-                variant="outline"
-                size="small"
-                onClick={() => openDecisionModal("reject")}
-                disabled={approving || rejecting || refreshing || decisionBlocked}
-                className="border-rose-300 text-rose-700 hover:bg-rose-50 hover:border-rose-400 flex items-center gap-1.5 text-xs font-semibold"
-              >
-                <XCircle className="h-3.5 w-3.5 text-rose-600" />
-                {lockingAction === "reject" ? "Acquiring lock..." : "Reject Invoice"}
-              </Button>
-            </>
-          )}
-
-          {/* Action: Resubmit for Approval / Recalculate invoice (for REJECTED invoices) */}
-          {invoice?.invoiceStatus === "REJECTED" && (
-            invoice?.correctionRequired === false ? (
-              <Button
-                variant="primary"
-                size="small"
-                onClick={() => setIsResubmitOpen(true)}
-                disabled={submitting || refreshing || refreshingAfterCorrection || savingCorrection || reacquiring}
-                className="bg-[#0A0082] hover:bg-[#0A0082]/90 text-white flex items-center gap-1.5 text-xs font-semibold"
-              >
-                <Send className="h-3.5 w-3.5" />
-                {submitting ? "Resubmitting..." : "Resubmit for Approval"}
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="small"
-                onClick={() => setIsRefreshModalOpen(true)}
-                disabled={refreshing || refreshingAfterCorrection || savingCorrection || reacquiring}
-                className="border-indigo-300 text-indigo-700 hover:bg-indigo-50 flex items-center gap-1.5 text-xs font-semibold"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${refreshingAfterCorrection ? "animate-spin" : ""}`} />
-                {refreshingAfterCorrection ? "Recalculating..." : "Recalculate invoice"}
-              </Button>
-            )
-          )}
-        </div>
         }
       />
 
@@ -1338,6 +1254,51 @@ export default function InvoiceDetail() {
           Invoice amounts and tax breakdowns are generated by the backend financial engine and are read-only for this billing snapshot.
         </p>
       </div>
+
+      {(invoice?.invoiceStatus === "PENDING_APPROVAL" || invoice?.invoiceStatus === "APPROVED") && (
+        <div className="mt-8 flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-5">
+          {invoice.invoiceStatus === "PENDING_APPROVAL" && (
+            <>
+              <Button
+                variant="primary"
+                size="small"
+                onClick={() => openDecisionModal("approve")}
+                disabled={approving || rejecting || refreshing || decisionBlocked}
+                className="bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 text-xs font-semibold"
+              >
+                <ThumbsUp className="h-3.5 w-3.5" />
+                {lockingAction === "approve" ? "Acquiring lock..." : approving ? "Approving..." : "Approve"}
+              </Button>
+
+              <Button
+                variant="outline"
+                size="small"
+                onClick={() => openDecisionModal("reject")}
+                disabled={approving || rejecting || refreshing || decisionBlocked}
+                className="border-rose-300 text-rose-700 hover:bg-rose-50 hover:border-rose-400 flex items-center gap-1.5 text-xs font-semibold"
+              >
+                <XCircle className="h-3.5 w-3.5 text-rose-600" />
+                {lockingAction === "reject" ? "Acquiring lock..." : "Reject Invoice"}
+              </Button>
+            </>
+          )}
+
+          {invoice.invoiceStatus === "APPROVED" && (
+            <Button
+              variant="primary"
+              size="small"
+              onClick={() => setIsSendToClientOpen(true)}
+              disabled={sendingToClient || refreshing}
+              className="bg-teal-700 hover:bg-teal-800 text-white flex items-center gap-1.5 text-xs font-semibold"
+            >
+              <MailCheck className="h-3.5 w-3.5" />
+              {deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
+                ? "Sent to Client"
+                : "Send to Client"}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Confirmation Modal for Approve */}
       <Modal

@@ -112,6 +112,8 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
   const canComplete = paymentRoutingStatus === "APPROVED_FOR_PAYMENT";
   const isPaid = paymentRoutingStatus === "PAYMENT_COMPLETED";
 
+  // The report only moves to PAYMENT_COMPLETED once the server accepts the recorded payment.
+  // Nothing here marks it paid optimistically.
   const handleConfirmPayment = (payment) => {
     completePayment.mutate({ reportId, payment }, {
       onSuccess: () => {

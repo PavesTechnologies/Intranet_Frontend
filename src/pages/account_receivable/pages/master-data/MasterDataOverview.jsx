@@ -11,6 +11,7 @@ import {
   Layers,
   CheckCircle2,
   XCircle,
+  TrendingUp,
 } from "lucide-react";
 
 import PageHeader from "../../../../components/ui/PageHeader";
@@ -23,6 +24,7 @@ import { getBillingFrequencies } from "../../services/billingFrequencyService";
 import { getPaymentTerms } from "../../services/paymentTermsService";
 import { getTaxRegions } from "../../services/taxRegionService";
 import { getActiveCompanyProfile } from "../../services/companyProfileService";
+import { getExchangeRates } from "../../services/currencyExchangeRateService";
 
 const formatDateValue = (val) => {
   if (!val) return null;
@@ -67,15 +69,6 @@ const MASTER_DEFINITIONS = [
     dataKey: "taxRegions",
   },
   {
-    key: "proportion-rules",
-    title: "Proportion Rules",
-    description: "Configure allocation and proportion rules used for billing calculations.",
-    icon: <Percent className="h-5 w-5" />,
-    implemented: false,
-    route: "/account-receivable/configurations",
-    legacyMaster: "proportion_rule",
-  },
-  {
     key: "payment-terms",
     title: "Payment Terms",
     description: "Define customer payment conditions and due-date rules.",
@@ -111,6 +104,15 @@ const MASTER_DEFINITIONS = [
     route: "/account-receivable/master-data/billing-frequency",
     dataKey: "billingFrequencies",
   },
+  {
+    key: "exchange-rates",
+    title: "Currency Exchange Rates",
+    description: "Manage authoritative currency conversion rates for cross-currency expenses and billing snapshots.",
+    icon: <TrendingUp className="h-5 w-5" />,
+    implemented: true,
+    route: "/account-receivable/master-data/exchange-rates",
+    dataKey: "exchangeRates",
+  },
 ];
 
 const TOTAL_MASTERS = MASTER_DEFINITIONS.length;
@@ -124,6 +126,7 @@ export default function MasterDataOverview() {
     paymentTerms: [],
     billingTypes: [],
     billingFrequencies: [],
+    exchangeRates: [],
   });
   const [failedKeys, setFailedKeys] = useState([]);
 
@@ -132,19 +135,24 @@ export default function MasterDataOverview() {
 
     const load = async () => {
       setLoading(true);
-      const [billingTypes, billingFrequencies, paymentTerms, taxRegions, companyProfile] = await Promise.allSettled([
+      const [billingTypes, billingFrequencies, paymentTerms, taxRegions, companyProfile, exchangeRates] = await Promise.allSettled([
         getBillingTypes(),
         getBillingFrequencies(),
         getPaymentTerms(),
         getTaxRegions(),
         getActiveCompanyProfile(),
+        getExchangeRates(),
       ]);
       if (!mounted) return;
 
-      const results = { billingTypes, billingFrequencies, paymentTerms, taxRegions, companyProfile };
+      const results = { billingTypes, billingFrequencies, paymentTerms, taxRegions, companyProfile, exchangeRates };
       const failed = Object.keys(results).filter(
-        (key) => key !== "companyProfile" && results[key].status === "rejected"
+        (key) => key !== "companyProfile" && key !== "exchangeRates" && results[key].status === "rejected"
       );
+
+      const resolvedRates = exchangeRates.status === "fulfilled"
+        ? (exchangeRates.value?.data || [])
+        : [];
 
       setRecords({
         companyProfile: companyProfile.status === "fulfilled" ? companyProfile.value : null,
@@ -152,6 +160,7 @@ export default function MasterDataOverview() {
         billingFrequencies: billingFrequencies.status === "fulfilled" ? billingFrequencies.value : [],
         paymentTerms: paymentTerms.status === "fulfilled" ? paymentTerms.value : [],
         taxRegions: taxRegions.status === "fulfilled" ? taxRegions.value : [],
+        exchangeRates: resolvedRates,
       });
       setFailedKeys(failed);
       if (failed.length) {

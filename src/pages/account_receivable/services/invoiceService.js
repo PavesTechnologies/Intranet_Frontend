@@ -653,6 +653,12 @@ export const normalizeInvoice = (payload = {}) => {
       data.logo ||
       data.logoUrl ||
       null,
+    sellerSignatureReference:
+      data.sellerSignatureReference ||
+      data.seller_signature_reference ||
+      data.signatureReference ||
+      data.signatureUrl ||
+      null,
     sellerInfo: {
       legalName: data.sellerLegalName || data.sellerName || data.companyName || null,
       address:
@@ -663,6 +669,12 @@ export const normalizeInvoice = (payload = {}) => {
       email: data.sellerEmail || data.companyEmail || null,
       phone: data.sellerPhone || data.companyPhone || null,
       logoUrl: data.sellerLogoReference || data.logo || null,
+      signatureUrl:
+        data.sellerSignatureReference ||
+        data.seller_signature_reference ||
+        data.signatureReference ||
+        data.signatureUrl ||
+        null,
     },
 
     // Persisted Invoice Content (Authoritative snapshot from backend; null if not provided)
@@ -1054,6 +1066,7 @@ export const normalizeInvoiceGenerationWorkspaceItem = (row = {}) => {
     rawWsStatus === "TAX_COMPLETED" ||
     rawWsStatus === "TAX_CALCULATED" ||
     rawWsStatus === "READY_FOR_INVOICE" ||
+    rawWsStatus === "READY_FOR_TAX" ||
     (!rawWsStatus && !source.invoiceId)
   ) {
     workspaceStatus = "READY_FOR_INVOICE";

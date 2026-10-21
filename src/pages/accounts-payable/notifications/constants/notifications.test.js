@@ -453,14 +453,15 @@ describe("AP navigation wiring", () => {
   it("keeps the existing AP submenu destinations intact", async () => {
     const { AP_SUBMENU } = await import("../../../../config/sidebarConfig");
 
-    const labels = AP_SUBMENU.map((entry) => entry.label);
+    // Pages sit inside the four sections now - look one level down too.
+    const labels = AP_SUBMENU.flatMap((entry) => [entry.label, ...(entry.children || []).map((c) => c.label)]);
 
     expect(labels).toEqual(
       expect.arrayContaining([
         "Dashboard",
         "Vendor Management",
         "Invoice Management",
-        "Payments",
+        "Payment Management",
         "Procurement",
         "System Configuration",
       ]),

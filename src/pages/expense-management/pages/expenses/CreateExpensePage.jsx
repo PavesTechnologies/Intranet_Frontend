@@ -39,6 +39,13 @@ import PolicyStatusBadge from "@/pages/expense-management/components/expense-rep
 import {
   validateBusinessPurpose,
 } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
+import {
+  formatDeadlineDate,
+  getSubmissionDeadlineInfo,
+  todayIsoDate,
+  validateReportingPeriod,
+  validateTripDates,
+} from "@/pages/expense-management/components/expense-reports/submissionDeadline";
 
 import SummaryPanel from "@/pages/expense-management/components/expense-reports/SummaryPanel";
 
@@ -287,6 +294,10 @@ export default function CreateExpensePage() {
   const [formData, setFormData] = useState({
     title: "",
     businessPurpose: "",
+    tripStartDate: "",
+    tripEndDate: "",
+    reportingPeriodStart: "",
+    reportingPeriodEnd: "",
     costCenterId: "",
     currencyId: "",
     cashAdvanceId: "",
@@ -809,6 +820,15 @@ export default function CreateExpensePage() {
   const validateForm = () => {
     const errors = {};
 
+    const tripDateError = validateTripDates(formData.tripStartDate, formData.tripEndDate);
+    if (tripDateError) {
+      errors[formData.tripStartDate ? "tripEndDate" : "tripStartDate"] = tripDateError;
+    }
+    const periodError = validateReportingPeriod(formData.reportingPeriodStart, formData.reportingPeriodEnd);
+    if (periodError) {
+      errors.reportingPeriodEnd = periodError;
+    }
+
 
     const title =
       (formData.title || "").trim();
@@ -1039,12 +1059,34 @@ export default function CreateExpensePage() {
 
 
     // ----------------------------------------------------------
+    // TRIP DATES (drive the submission deadline)
+    // ----------------------------------------------------------
+
+    const periodError = validateReportingPeriod(formData.reportingPeriodStart, formData.reportingPeriodEnd);
+    if (periodError) {
+      setFormErrors((prev) => ({ ...prev, reportingPeriodEnd: periodError }));
+      showStatusToast(periodError, "error", 6000);
+      return;
+    }
+
+    const tripDateError = validateTripDates(formData.tripStartDate, formData.tripEndDate);
+    if (tripDateError) {
+      setFormErrors((prev) => ({ ...prev, [formData.tripStartDate ? "tripEndDate" : "tripStartDate"]: tripDateError }));
+      showStatusToast(tripDateError, "error", 6000);
+      return;
+    }
+
+    // ----------------------------------------------------------
     // CREATE PAYLOAD
     // ----------------------------------------------------------
 
     const payload = {
       title,
       businessPurpose,
+      tripStartDate: formData.tripStartDate,
+      tripEndDate: formData.tripEndDate,
+      reportingPeriodStart: formData.reportingPeriodStart || null,
+      reportingPeriodEnd: formData.reportingPeriodEnd || null,
       costCenterId:
         formData.costCenterId,
       currencyId:
@@ -1712,6 +1754,16 @@ export default function CreateExpensePage() {
 
   // Step 3: Handle Final Submission for Approval
   const submitNow = () => {
+    // UI guard only: the backend enforces the same deadline on the submit call.
+    const deadlineInfo = getSubmissionDeadlineInfo({ reportStatus: "DRAFT", tripEndDate: formData.tripEndDate });
+    if (deadlineInfo?.isOverdue) {
+      showStatusToast(
+        `The submission deadline passed on ${formatDeadlineDate(deadlineInfo.deadline)}. This report can no longer be submitted.`,
+        "error",
+        4000,
+      );
+      return;
+    }
     submitMutation.mutate(reportId, {
       onSuccess: () => {
         showStatusToast("Expense report submitted for approval successfully!", "success");
@@ -1973,6 +2025,55 @@ export default function CreateExpensePage() {
               requiredMark
               error={formErrors.businessPurpose}
             />
+
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormInput
+                label="Trip / Meeting Start Date"
+                name="tripStartDate"
+                type="date"
+                value={formData.tripStartDate}
+                onChange={handleInputChange}
+                requiredMark
+                disabled={submitting}
+                error={formErrors.tripStartDate}
+              />
+              <FormInput
+                label="Estimated End Date"
+                name="tripEndDate"
+                type="date"
+                value={formData.tripEndDate}
+                onChange={handleInputChange}
+                min={formData.tripStartDate || undefined}
+                requiredMark
+                disabled={submitting}
+                error={formErrors.tripEndDate}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormInput
+                label="Reporting Period Start"
+                name="reportingPeriodStart"
+                type="date"
+                value={formData.reportingPeriodStart}
+                onChange={handleInputChange}
+                max={todayIsoDate()}
+                disabled={submitting}
+                error={formErrors.reportingPeriodStart}
+              />
+              <FormInput
+                label="Reporting Period End"
+                name="reportingPeriodEnd"
+                type="date"
+                value={formData.reportingPeriodEnd}
+                onChange={handleInputChange}
+                min={formData.reportingPeriodStart || undefined}
+                max={todayIsoDate()}
+                disabled={submitting}
+                error={formErrors.reportingPeriodEnd}
+              />
+            </div>
 
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -2504,9 +2605,8 @@ export default function CreateExpensePage() {
                   type="button"
                   variant="primary"
                   onClick={() =>
-                    setCurrentStep(
-                      3
-                    )
+                    // All line items are in: continue on the report page, where it is submitted.
+                    navigate(`/expense-management/expenses/reports/${reportId}`)
                   }
                 >
                   Next
@@ -2859,6 +2959,8 @@ export default function CreateExpensePage() {
           const itemsRes = await lineItemService.getAll(reportId);
           const payload = itemsRes.data?.data;
           setLineItems(Array.isArray(payload) ? payload : payload?.lineItems || payload?.content || payload?.data || []);
+          // After a line is saved, continue on the report page (where the report is submitted).
+          navigate(`/expense-management/expenses/reports/${reportId}`);
         }}
       />
 

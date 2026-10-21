@@ -3,6 +3,7 @@ import Select from "react-select";
 import { Briefcase, Landmark } from "lucide-react";
 import FormInput from "@/components/forms/FormInput";
 import FormTextArea from "@/components/forms/FormTextArea";
+import { todayIsoDate } from "./submissionDeadline";
 
 const customSelectStyles = {
   control: (base, state) => ({
@@ -73,6 +74,54 @@ export default function ReportFormFields({
         requiredMark
         error={formErrors.businessPurpose}
       />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormInput
+          label="Trip / Meeting Start Date"
+          name="tripStartDate"
+          type="date"
+          value={formData.tripStartDate || ""}
+          onChange={onInputChange}
+          requiredMark
+          disabled={disabled}
+          error={formErrors.tripStartDate}
+        />
+        <FormInput
+          label="Estimated End Date"
+          name="tripEndDate"
+          type="date"
+          value={formData.tripEndDate || ""}
+          onChange={onInputChange}
+          min={formData.tripStartDate || undefined}
+          requiredMark
+          disabled={disabled}
+          error={formErrors.tripEndDate}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormInput
+          label="Reporting Period Start"
+          name="reportingPeriodStart"
+          type="date"
+          value={formData.reportingPeriodStart || ""}
+          onChange={onInputChange}
+          max={todayIsoDate()}
+          disabled={disabled}
+          error={formErrors.reportingPeriodStart}
+        />
+        <FormInput
+          label="Reporting Period End"
+          name="reportingPeriodEnd"
+          type="date"
+          value={formData.reportingPeriodEnd || ""}
+          onChange={onInputChange}
+          min={formData.reportingPeriodStart || undefined}
+          max={todayIsoDate()}
+          disabled={disabled}
+          error={formErrors.reportingPeriodEnd}
+        />
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1">

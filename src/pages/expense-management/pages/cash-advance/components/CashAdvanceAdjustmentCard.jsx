@@ -129,7 +129,10 @@ export default function CashAdvanceAdjustmentCard({
           </p>
         </div>
         <p className="text-[11px] text-gray-500">
-          {formatMoney(A, currencyCode)} advance − {formatMoney(E, currencyCode)} approved = {formatMoney(A - E, currencyCode)}
+          {formatMoney(A, currencyCode)} advance − {formatMoney(E, currencyCode)} approved ={" "}
+          {A - E >= 0
+            ? formatMoney(A - E, currencyCode)
+            : `${formatMoney(Math.abs(A - E), currencyCode)} payable to employee`}
         </p>
       </div>
 
