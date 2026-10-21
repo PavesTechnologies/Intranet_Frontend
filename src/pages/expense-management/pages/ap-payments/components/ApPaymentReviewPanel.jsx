@@ -4,8 +4,8 @@ import Button from "@/components/Button/Button";
 import StatusBadge from "@/components/status/statusbadge";
 import InvoiceHandoffBadge from "@/pages/expense-management/components/expense-reports/InvoiceHandoffBadge";
 import PolicyStatusBadge from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
-import RecordDisbursementModal from "@/pages/expense-management/components/disbursement/RecordDisbursementModal";
-import { buildDisbursementFormData } from "@/pages/expense-management/components/disbursement/disbursementConfirmation";
+import LineAllocationDetails from "@/pages/expense-management/components/expense-reports/LineAllocationDetails";
+import ConfirmPaymentModal from "./ConfirmPaymentModal";
 import { showStatusToast } from "@/components/toastfy/toast";
 import EmployeeLabel from "../../../approval-engine/components/EmployeeLabel";
 import ApprovalStatusPill from "../../../approval-engine/components/ApprovalStatusPill";
@@ -114,21 +114,31 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
 
   // The report only moves to PAYMENT_COMPLETED once the server accepts the recorded payment.
   // Nothing here marks it paid optimistically.
-  const handleConfirmPayment = (values) => {
-    completePayment.mutate(
-      { reportId, confirmation: buildDisbursementFormData(values) },
-      {
-        onSuccess: () => {
-          showStatusToast("Payment recorded", "success");
-          setConfirming(false);
-          onClose();
-        },
-        onError: (err) => {
-          showStatusToast(err.response?.data?.message || "Failed to record payment", "error");
-        },
-      }
-    );
+  const handleConfirmPayment = (payment) => {
+    completePayment.mutate({ reportId, payment }, {
+      onSuccess: () => {
+        showStatusToast("Payment confirmed - the employee now sees this report as paid", "success");
+        setConfirming(false);
+        onClose();
+      },
+      onError: (err) => {
+        // Keep the form open so AP can correct the amount/date and retry.
+        showStatusToast(err.response?.data?.message || "Failed to confirm payment", "error");
+      },
+    });
   };
+
+  // What AP recorded, once paid (ExpenseReportResponse.paymentConfirmation, or the queue row's fields).
+  const confirmation = report?.paymentConfirmation || (queueItem?.paymentReference
+    ? {
+        paymentReference: queueItem.paymentReference,
+        paymentMethod: queueItem.paymentMethod,
+        paymentDate: queueItem.paymentDate,
+        amountPaid: queueItem.paidAmount,
+        confirmedAt: queueItem.paymentCompletedAt,
+        confirmedBy: queueItem.paymentCompletedBy,
+      }
+    : null);
 
   return (
     <div className="fixed inset-0 z-[65] flex flex-col bg-gray-50">
@@ -157,6 +167,18 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
           <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-800">
             <CheckCircle2 className="h-4 w-4" /> Payment completed for this report. No further action is needed.
           </p>
+          {confirmation && (
+            <p className="mt-0.5 text-xs text-emerald-800">
+              {formatMoney(confirmation.amountPaid, currencyCode)} paid on {formatDate(confirmation.paymentDate)}
+              {confirmation.paymentMethod ? ` by ${confirmation.paymentMethod.replace("_", " ").toLowerCase()}` : ""}
+              {confirmation.paymentReference ? ` · Ref ${confirmation.paymentReference}` : ""}
+              {confirmation.confirmedBy && (
+                <>
+                  {" "}· confirmed by <EmployeeLabel employeeId={confirmation.confirmedBy} />
+                </>
+              )}
+            </p>
+          )}
         </div>
       )}
 
@@ -393,24 +415,15 @@ export default function ApPaymentReviewPanel({ isOpen, onClose, reportId, queueI
         </div>
       )}
 
-      {confirming && (
-        <RecordDisbursementModal
-          title="Record Payment"
-          submitLabel="Record Payment"
-          isSubmitting={completePayment.isPending}
-          onCancel={() => setConfirming(false)}
-          onSubmit={handleConfirmPayment}
-          summary={
-            <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
-              <p className="text-xs text-blue-700">
-                Record the payment of <strong className="text-blue-900">{formatMoney(reimbursableAmount, currencyCode)}</strong> to
-                the employee for <strong className="text-blue-900">{reportNumber || "this report"}</strong>. The report is marked
-                paid only after this is recorded.
-              </p>
-            </div>
-          }
-        />
-      )}
+      <ConfirmPaymentModal
+        isOpen={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={handleConfirmPayment}
+        isSaving={completePayment.isPending}
+        reportNumber={reportNumber}
+        amountOwed={reimbursableAmount}
+        currencyCode={currencyCode}
+      />
     </div>
   );
 }

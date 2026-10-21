@@ -10,6 +10,7 @@ import SearchInput from "@/components/filter/Searchbar";
 import Modal from "@/components/Modal/modal";
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import StatusBadge from "@/components/status/statusbadge";
+import PaymentStatusBadge from "@/pages/expense-management/components/expense-reports/PaymentStatusBadge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
 import { useAuth } from "@/contexts/AuthContext";
@@ -347,6 +348,7 @@ export default function MyExpensesPage() {
     status: (
       <div className="flex flex-col items-start gap-1">
         <StatusBadge label={r.reportStatus || "DRAFT"} size="sm" />
+        <PaymentStatusBadge report={r} />
         {getSubmissionDeadlineInfo(r)?.isOverdue && (
           <span className="text-[11px] font-medium text-red-700">Overdue submission</span>
         )}
@@ -413,8 +415,6 @@ export default function MyExpensesPage() {
     { label: "Rejected", value: "REJECTED" },
     { label: "Cancelled", value: "CANCELLED" },
     { label: "Policy Rejected", value: "POLICY_REJECTED" },
-    { label: "Reimbursed", value: "REIMBURSED" },
-    { label: "Closed", value: "CLOSED" },
   ];
  
   return (
