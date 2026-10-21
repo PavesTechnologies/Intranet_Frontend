@@ -55,6 +55,11 @@ import TaxBreakdownPanel, {
   validateTaxValue,
 } from "@/pages/expense-management/components/expense-reports/TaxBreakdownPanel";
 import TaxStatusBadge from "@/pages/expense-management/components/expense-reports/TaxStatusBadge";
+import {
+  receiptAmountMismatch,
+  scanFoundNothing,
+  scanNeedsReview,
+} from "@/pages/expense-management/components/expense-reports/receiptScanChecks";
 import ReportFormFields, { validateBusinessPurpose } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
 import {
   formatDeadlineDate,
@@ -539,7 +544,10 @@ export default function ExpenseReportDetailPage() {
             setScanningProgress(100);
 
             const confidence = responsePayload.confidenceScore !== undefined ? responsePayload.confidenceScore : 1.0;
-            const isLowConfidence = confidence < 0.85 || (confidence > 1 && confidence < 85);
+            // The backend's call (configured confidence threshold, missing fields, totals that don't add up):
+            // the core fields are left for the employee to enter from the receipt.
+            const isLowConfidence = scanNeedsReview(responsePayload);
+            const foundNothing = scanFoundNothing(responsePayload);
 
             // Clean/validate Merchant Name
             let merchantVal = isLowConfidence ? "" : (responsePayload.merchantName || "").trim();
@@ -611,10 +619,20 @@ export default function ExpenseReportDetailPage() {
               projectId: "",
               ocrReceiptId: receiptId,
               confidenceScore: confidence,
+              // What the scan read, kept even when the amount field is left blank, to compare the claim against.
+              ocrTotalAmount: amountNum > 0 ? amountNum : null,
+              ocrCurrencyCode: responsePayload.currencyCode || null,
             };
 
             // Close selection dialog and open the full-screen OCR review modal
             setIsSelectionDialogOpen(false);
+            setOcrScanNotice(
+              foundNothing
+                ? "No merchant, date or total could be read from this file. Check it's a clear photo or PDF of the receipt, or enter the details yourself."
+                : isLowConfidence
+                  ? "Parts of this scan couldn't be read reliably. Enter the merchant, date and amount from the receipt."
+                  : ""
+            );
             setOcrDuplicate(duplicateNotice(responsePayload));
             setOcrTaxWarning(taxWarning);
             setOcrTaxPreview(null);
@@ -1057,6 +1075,15 @@ export default function ExpenseReportDetailPage() {
   const [ocrTaxWarning, setOcrTaxWarning] = useState("");
   // Already-claimed check for the scanned receipt (file, invoice or merchant/amount/date match).
   const [ocrDuplicate, setOcrDuplicate] = useState(null);
+  // The scan read nothing usable, or needs checking by hand.
+  const [ocrScanNotice, setOcrScanNotice] = useState("");
+  // The claimed amount against the receipt total the scan read.
+  const ocrAmountMismatch = receiptAmountMismatch({
+    enteredAmount: ocrReviewData.amount,
+    receiptTotal: ocrReviewData.ocrTotalAmount,
+    enteredCurrencyCode: currencyOptions.find((o) => o.value === ocrReviewData.currencyId)?.code,
+    receiptCurrencyCode: ocrReviewData.ocrCurrencyCode,
+  });
 
   const handleOcrInputChange = (e) => {
     const { name, value } = e.target;
@@ -1079,6 +1106,9 @@ export default function ExpenseReportDetailPage() {
 
     if (!ocrReviewData.amount || amountNum <= 0) {
       errors.amount = "Amount is required and must be greater than 0.";
+    }
+    if (ocrAmountMismatch?.needsReason && !(ocrReviewData.description || "").trim()) {
+      errors.description = "Explain why you're claiming more than the receipt total.";
     }
     const taxError = validateTaxValue(ocrReviewData.tax, ocrTaxPreview, ocrReviewData.amount);
     if (taxError) errors.tax = taxError;
@@ -2012,6 +2042,12 @@ export default function ExpenseReportDetailPage() {
           </div>
 
           <DuplicateReceiptBanner notice={ocrDuplicate} className="mx-6 mt-3 shrink-0" />
+          {ocrScanNotice && (
+            <div className="mx-6 mt-3 shrink-0 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <AlertCircle size={14} className="mt-0.5 shrink-0" />
+              <span>{ocrScanNotice}</span>
+            </div>
+          )}
 
           {/* Body - 50% / 50% split */}
           <div className="flex-1 flex min-h-0">
@@ -2197,8 +2233,10 @@ export default function ExpenseReportDetailPage() {
                               : "border-gray-300 focus:border-indigo-500 focus:ring-indigo-500/20"
                           }`}
                         />
-                        {ocrReviewErrors.amount && (
+                        {ocrReviewErrors.amount ? (
                           <span className="text-[11px] text-red-600 block mt-0.5">{ocrReviewErrors.amount}</span>
+                        ) : ocrAmountMismatch && (
+                          <span className="text-[11px] text-amber-700 block mt-0.5">{ocrAmountMismatch.message}</span>
                         )}
                       </div>
 
@@ -2284,16 +2322,27 @@ export default function ExpenseReportDetailPage() {
 
                     {/* Description */}
                     <div className="col-span-2 space-y-1">
-                      <label className="block text-xs font-semibold text-gray-600">Description</label>
+                      <label className="block text-xs font-semibold text-gray-600">
+                        Description {ocrAmountMismatch?.needsReason && <span className="text-red-500">*</span>}
+                      </label>
                       <input
                         type="text"
                         name="description"
-                        placeholder="Optional notes about this expense..."
+                        placeholder={ocrAmountMismatch?.needsReason
+                          ? "Why the claim is more than the receipt total, e.g. tip paid in cash"
+                          : "Optional notes about this expense..."}
                         value={ocrReviewData.description}
                         onChange={handleOcrInputChange}
                         disabled={ocrSubmitting}
-                        className="w-full px-2.5 py-1.5 rounded-md border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        className={`w-full px-2.5 py-1.5 rounded-md border text-xs focus:outline-none focus:ring-2 ${
+                          ocrReviewErrors.description
+                            ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                            : "border-gray-300 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        }`}
                       />
+                      {ocrReviewErrors.description && (
+                        <span className="text-[11px] text-red-600 block mt-0.5">{ocrReviewErrors.description}</span>
+                      )}
                     </div>
                   </div>
 
