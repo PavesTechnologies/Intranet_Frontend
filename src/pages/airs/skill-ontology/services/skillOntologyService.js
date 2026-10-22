@@ -53,6 +53,7 @@ const mapApiSkillToInternal = (raw) => ({
   canonicalName: raw.canonical_name,
   category: raw.category,
   description: raw.description || "",
+  notDescription: raw.not_description || "",
   aliases: raw.aliases || [],
   confidence: raw.confidence,
   status: raw.is_active ? "ACTIVE" : "INACTIVE",
@@ -343,6 +344,7 @@ export const createSkill = async (payload) => {
         canonical_name: payload.canonical_name,
         category: payload.category,
         description: payload.description || null,
+        not_description: payload.notDescription || null,
         aliases: payload.aliases,
         parent_skill_id: payload.parent_skill_id || null,
         confidence: payload.confidence?.toLowerCase(),
@@ -372,6 +374,7 @@ export const updateSkill = async (skillId, payload) => {
       category: payload.category,
       // undefined leaves it as is; "" clears it.
       ...(payload.description !== undefined ? { description: payload.description } : {}),
+      ...(payload.notDescription !== undefined ? { not_description: payload.notDescription } : {}),
       aliases: payload.aliases,
       ...(removeAliases.length > 0 ? { remove_aliases: removeAliases, confirm_alias_removal: true } : {}),
       parent_skill_id: payload.parent_skill_id || null,

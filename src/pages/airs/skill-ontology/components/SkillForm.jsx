@@ -121,6 +121,21 @@ export default function SkillForm({ values, errors, onFieldChange, excludeSkillI
       </div>
 
       <div>
+        <FieldLabel>Not this skill</FieldLabel>
+        <textarea
+          rows={2}
+          maxLength={500}
+          value={values.notDescription || ""}
+          onChange={(e) => onFieldChange("notDescription", e.target.value)}
+          placeholder="What it is not, e.g. not handling customer support cases"
+          className="w-full mt-1 px-3 py-2 rounded-lg border border-slate-200 text-[13px] outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <p className="text-[10px] text-slate-400 mt-1">
+          Optional. Shown only to the AI checks that confirm a skill on a resume - never used to search resume lines.
+        </p>
+      </div>
+
+      <div>
         <FieldLabel>Aliases</FieldLabel>
         <div className="mt-1">
           <AliasEditor

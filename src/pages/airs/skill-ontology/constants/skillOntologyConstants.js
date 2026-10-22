@@ -78,6 +78,7 @@ export const EMPTY_SKILL_FORM = {
   canonicalName: "",
   category: "",
   description: "",
+  notDescription: "",
   aliases: [],
   parentSkillId: "",
   confidence: SKILL_CONFIDENCE.UNVERIFIED,
