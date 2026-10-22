@@ -346,7 +346,14 @@ export const invoiceHandoffService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
-  // InvoiceHandoffSummaryResponse: readyCount, readyBaseAmount, readyProjectCount, handedOffCount, baseCurrencyCode
+  // Resends a handoff that hasn't reached AR's queue; the response carries arDeliveryStatus SENT or FAILED.
+  redeliverToAr: (syncId) =>
+    api.post(`/xms/finance/invoice-handoff-queue/handoffs/${syncId}/redeliver`, null, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+  // InvoiceHandoffSummaryResponse: readyCount, readyBaseAmount, readyProjectCount, handedOffCount, baseCurrencyCode,
+  // readyClientCount, arDeliveryFailedCount
   getSummary: () =>
     api.get("/xms/finance/invoice-handoff-queue/summary", {
       baseURL: EXPENSE_API_BASE,
