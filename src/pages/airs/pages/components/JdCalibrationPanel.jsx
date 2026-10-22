@@ -33,6 +33,14 @@ const ROLE_DOMAINS = [
 const DOMAIN_BASIS_LABEL = { title: "from the role title", skills: "from the core skills" };
 const domainLabel = (value) => ROLE_DOMAINS.find((d) => d.value === value)?.label || value;
 
+// Profile templates (Phase 3 Step 7): Fresher / Experienced / Domain, edited in Settings.
+const TEMPLATE_BASIS_LABEL = {
+  experience: "minimum of 1 year or less", title: "from the role title", "role domain": "IT operations role",
+  certifications: "the JD lists certifications", default: "default",
+};
+const SECTION_LABEL = { SUMMARY: "Summary", EXPERIENCE: "Experience", SKILLS: "Skills", PROJECTS: "Projects" };
+const STANDARD_SECTIONS = ["SUMMARY", "EXPERIENCE", "SKILLS"];
+
 function senseLabel(skill, key) {
   return skill.sense_options.find((o) => o.sense_key === key)?.label || key;
 }
@@ -53,6 +61,8 @@ function formFromView(view) {
     internships: view.internship_credit_pct ?? "",
     // "" = not set (no related education fields apply).
     domain: view.role_domain ?? "",
+    // "" = no profile template.
+    template: view.profile_template ?? "",
   };
 }
 
@@ -65,7 +75,7 @@ function mergeForm(edited, fresh) {
     ...fresh,
     skills: Object.fromEntries(Object.entries(fresh.skills).map(([id, v]) => [id, edited.skills[id] || v])),
     min: edited.min, tolerance: edited.tolerance, education: edited.education, internships: edited.internships,
-    domain: edited.domain,
+    domain: edited.domain, template: edited.template,
   };
 }
 
@@ -121,7 +131,23 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
   // Blank means "use the extracted minimum" (scoring falls back to it).
   const extractedMin = view?.extracted_min_experience_years ?? null;
   const minYears = form && form.min !== "" ? Number(form.min) : extractedMin;
-  const defaultTolerance = minYears !== null ? Math.max(1, Math.round(minYears * 0.1 * 10) / 10) : null;
+  const formTemplate = (view?.profile_templates || []).find((t) => t.key === form?.template) || null;
+  // What a blank field means with the template chosen on the form (saved or not).
+  const templateTolerance = formTemplate?.experience_tolerance_years ?? null;
+  const defaultTolerance = templateTolerance !== null ? templateTolerance
+    : minYears !== null ? Math.max(1, Math.round(minYears * 0.1 * 10) / 10) : null;
+  const defaultInternships = formTemplate ? formTemplate.internship_credit_pct : (view?.is_fresher_jd ? 100 : 0);
+  const evidenceSections = formTemplate?.evidence_sections || STANDARD_SECTIONS;
+
+  // Choosing a template prefills only what HR hasn't set: blank internship /
+  // tolerance already follow it; education is prefilled until the JD is first calibrated.
+  const chooseTemplate = (key) => {
+    const template = (view.profile_templates || []).find((t) => t.key === key);
+    setForm((f) => ({
+      ...f, template: key,
+      education: template && view.calibration_status !== "CALIBRATED" ? template.education_requirement : f.education,
+    }));
+  };
 
   const setSkill = (id, patch) => setForm((f) => ({ ...f, skills: { ...f.skills, [id]: { ...f.skills[id], ...patch } } }));
 
@@ -139,6 +165,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
         education_requirement: form.education,
         internship_credit_pct: form.internships === "" ? null : Number(form.internships),
         role_domain: form.domain || null,
+        profile_template: form.template || null,
       };
       const saved = await saveJDCalibration(jdId, payload);
       setResult(saved);
@@ -231,8 +258,12 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
   });
   // The role domain differs from the one suggested by the JD (title / core skills).
   const domainConflict = Boolean(form.domain && view.suggested_role_domain && form.domain !== view.suggested_role_domain);
-  const requestSave = () => (senseConflicts.length > 0 || domainConflict ? setAskSense(true) : save());
-  const anyConflict = senseConflicts.length > 0 || domainConflict;
+  // The profile template differs from the one suggested by the JD.
+  const templateConflict = Boolean(form.template && view.suggested_profile_template
+    && form.template !== view.suggested_profile_template);
+  const templateLabel = (key) => (view.profile_templates || []).find((t) => t.key === key)?.label || key;
+  const anyConflict = senseConflicts.length > 0 || domainConflict || templateConflict;
+  const requestSave = () => (anyConflict ? setAskSense(true) : save());
   const blocking = view.blocking_unknown_skills || [];
   const unsaved = !readOnly && !sameForm(form, formFromView(view));
 
@@ -275,7 +306,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
                           : `${c.skill}: ${c.field === "tier" ? "tier" : "meaning"} ${c.before ?? "—"} → ${c.after ?? "—"}`
                     )).join("; ")}</span>
                   )}
-                  {["min_experience_years", "experience_tolerance_years", "education_requirement", "internship_credit_pct", "role_domain"].filter((k) => v.changes?.[k]).map((k) => (
+                  {["min_experience_years", "experience_tolerance_years", "education_requirement", "internship_credit_pct", "role_domain", "profile_template"].filter((k) => v.changes?.[k]).map((k) => (
                     <span key={k} className="text-slate-500"> · {k.replaceAll("_", " ")}: {String(v.changes[k].before ?? "—")} → {String(v.changes[k].after ?? "—")}</span>
                   ))}
                 </li>
@@ -405,6 +436,32 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
           onResolved={onUnknownResolved} />
       </div>
 
+      {/* Profile template */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-start gap-4">
+        <label className="text-xs text-slate-700 flex flex-col gap-1">
+          <span className="font-bold">Profile template</span>
+          <select className={selectClass} disabled={readOnly} value={form.template}
+            onChange={(e) => chooseTemplate(e.target.value)}>
+            <option value="">None</option>
+            {(view.profile_templates || []).map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+          </select>
+        </label>
+        <div className="flex-1 min-w-[16rem] text-[11px] space-y-1 pt-0.5">
+          <p className={templateConflict ? "font-semibold text-amber-700" : "text-slate-500"}>
+            {view.suggested_profile_template
+              ? `Suggested: ${templateLabel(view.suggested_profile_template)} (${TEMPLATE_BASIS_LABEL[view.suggested_profile_template_basis] || view.suggested_profile_template_basis}).`
+              : "No suggestion."}
+            {formTemplate?.description ? ` ${formTemplate.description}` : ""}
+          </p>
+          <p className="text-slate-500">
+            Evidence counted from: <span className="font-semibold text-slate-700">
+              {evidenceSections.map((s) => SECTION_LABEL[s] || s).join(", ")}</span>
+            {formTemplate ? ` (${formTemplate.label} template)` : " (standard)"}.
+            {" "}Settings left on default below follow the template; templates are edited in Settings.
+          </p>
+        </div>
+      </div>
+
       {/* Experience & education */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 grid grid-cols-1 md:grid-cols-5 gap-4">
         <label className="text-xs text-slate-700 flex flex-col gap-1">
@@ -420,7 +477,10 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
           <input type="number" min="0" max="20" step="0.5" className={inputClass} disabled={readOnly}
             placeholder={defaultTolerance !== null ? `${defaultTolerance} (default)` : "default"}
             value={form.tolerance} onChange={(e) => setForm((f) => ({ ...f, tolerance: e.target.value }))} />
-          <span className="text-[10px] text-slate-400">Short by up to this many years goes to HOLD for review. Blank = max(1 year, 10% of the minimum).</span>
+          <span className="text-[10px] text-slate-400">
+            Short by up to this many years goes to HOLD for review. Blank = {templateTolerance !== null
+              ? `the ${formTemplate.label} template's ${templateTolerance} years` : "max(1 year, 10% of the minimum)"}.
+          </span>
         </label>
         <label className="text-xs text-slate-700 flex flex-col gap-1">
           <span className="font-bold">Education</span>
@@ -439,13 +499,13 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
           <span className="font-bold">Internships count as experience</span>
           <select className={selectClass} disabled={readOnly} value={form.internships}
             onChange={(e) => setForm((f) => ({ ...f, internships: e.target.value }))}>
-            <option value="">Default ({view.default_internship_credit_pct ?? 0}%{view.is_fresher_jd ? ", fresher JD" : ""})</option>
+            <option value="">Default ({defaultInternships}%{formTemplate ? `, ${formTemplate.label} template` : view.is_fresher_jd ? ", fresher JD" : ""})</option>
             <option value="100">100% (in full)</option>
             <option value="50">50% (half)</option>
             <option value="0">Not at all</option>
           </select>
           <span className="text-[10px] text-slate-400">
-            Internship months not overlapping a job, towards the minimum. Default: 100% when the minimum is 1 year or less (a fresher JD), else not at all.
+            Internship months not overlapping a job, towards the minimum. Default: the template's; with none, 100% when the minimum is 1 year or less (a fresher JD), else not at all.
           </span>
         </label>
         <label className="text-xs text-slate-700 flex flex-col gap-1">
@@ -478,7 +538,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 flex flex-col gap-2">
           <div className="flex gap-1.5 font-semibold">
             <AlertTriangle className="h-4 w-4 shrink-0" />
-            <span>Some choices differ from what the JD suggests. Scoring uses what you choose: resume evidence only in the chosen meaning, and the related education fields of the chosen role domain.</span>
+            <span>Some choices differ from what the JD suggests. Scoring uses what you choose: resume evidence only in the chosen meaning, the related education fields of the chosen role domain, and the chosen template's defaults and evidence sections.</span>
           </div>
           <ul className="list-disc pl-6 space-y-0.5">
             {senseConflicts.map((s) => (
@@ -489,6 +549,14 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
                 {" "}({BASIS_LABEL[s.suggested_sense_basis] || s.suggested_sense_basis}).
               </li>
             ))}
+            {templateConflict && (
+              <li>
+                <span className="font-semibold">Profile template</span>: you chose{" "}
+                <span className="font-semibold">{templateLabel(form.template)}</span>; the JD suggests{" "}
+                <span className="font-semibold">{templateLabel(view.suggested_profile_template)}</span>
+                {" "}({TEMPLATE_BASIS_LABEL[view.suggested_profile_template_basis] || view.suggested_profile_template_basis}).
+              </li>
+            )}
             {domainConflict && (
               <li>
                 <span className="font-semibold">Role domain</span>: you chose{" "}
