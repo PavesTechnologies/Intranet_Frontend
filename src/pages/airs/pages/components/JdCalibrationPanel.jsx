@@ -53,6 +53,8 @@ function formFromView(view) {
     skills: Object.fromEntries(view.skills.map((s) => [s.jd_skill_id, {
       tier: s.tier || "SUPPORTING",
       sense_key: s.ambiguous ? (s.sense_key || s.suggested_sense_key || "") : null,
+      // Core skills only: never allowed missing.
+      required: Boolean(s.required),
     }])),
     min: view.min_experience_years ?? "",
     tolerance: view.experience_tolerance_years ?? "",
@@ -158,7 +160,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
     try {
       const payload = {
         skills: Object.entries(form.skills).map(([jd_skill_id, s]) => ({
-          jd_skill_id, tier: s.tier, sense_key: s.sense_key || null,
+          jd_skill_id, tier: s.tier, sense_key: s.sense_key || null, required: s.tier === "CORE" && Boolean(s.required),
         })),
         min_experience_years: form.min === "" ? null : Number(form.min),
         experience_tolerance_years: form.tolerance === "" ? null : Number(form.tolerance),
@@ -303,7 +305,8 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
                     <span className="text-slate-500"> · {v.changes.skills.map((c) => (
                       c.field === "added" ? `${c.skill} added (${(c.after || "unclassified").toLowerCase()})`
                         : c.field === "removed" ? `${c.skill} removed`
-                          : `${c.skill}: ${c.field === "tier" ? "tier" : "meaning"} ${c.before ?? "—"} → ${c.after ?? "—"}`
+                          : c.field === "required" ? `${c.skill}: ${c.after ? "required" : "no longer required"}`
+                            : `${c.skill}: ${c.field === "tier" ? "tier" : "meaning"} ${c.before ?? "—"} → ${c.after ?? "—"}`
                     )).join("; ")}</span>
                   )}
                   {["min_experience_years", "experience_tolerance_years", "education_requirement", "internship_credit_pct", "role_domain", "profile_template"].filter((k) => v.changes?.[k]).map((k) => (
@@ -341,7 +344,9 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
         <table className="w-full text-xs">
           <thead>
             <tr className="text-left text-[10px] uppercase text-slate-400">
-              <th className="py-1.5">Skill</th><th className="py-1.5">Tier</th><th className="py-1.5">Meaning (ambiguous skills)</th>
+              <th className="py-1.5">Skill</th><th className="py-1.5">Tier</th>
+              <th className="py-1.5" title="Core skills only: never allowed missing">Required</th>
+              <th className="py-1.5">Meaning (ambiguous skills)</th>
               {!readOnly && <th className="py-1.5" />}
             </tr>
           </thead>
@@ -353,9 +358,19 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
                   <td className="py-2 font-semibold text-slate-800">{s.name}</td>
                   <td className="py-2">
                     <select className={selectClass} disabled={readOnly} value={value.tier}
-                      onChange={(e) => setSkill(s.jd_skill_id, { tier: e.target.value })}>
+                      onChange={(e) => setSkill(s.jd_skill_id, {
+                        tier: e.target.value, ...(e.target.value !== "CORE" ? { required: false } : {}),
+                      })}>
                       {TIERS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                     </select>
+                  </td>
+                  <td className="py-2">
+                    {value.tier === "CORE" ? (
+                      <input type="checkbox" disabled={readOnly} checked={Boolean(value.required)}
+                        aria-label={`${s.name} is required`}
+                        title="Never allowed missing: the missing-core allowance covers only the other core skills"
+                        onChange={(e) => setSkill(s.jd_skill_id, { required: e.target.checked })} />
+                    ) : <span className="text-slate-300">—</span>}
                   </td>
                   <td className="py-2">
                     {s.ambiguous ? (
@@ -400,6 +415,10 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
             })}
           </tbody>
         </table>
+        <p className="text-[10px] text-slate-400 mt-1">
+          Required: a core skill that may never be missing - the missing-core allowance covers only the other core
+          skills. Missing a required one is a near-miss (HOLD for review), or REJECT with another near-miss.
+        </p>
         {!readOnly && (
           <div className="mt-3 border-t border-slate-100 pt-3">
             <h4 className="text-[11px] font-bold text-slate-600 mb-1">Add a skill the extraction missed</h4>

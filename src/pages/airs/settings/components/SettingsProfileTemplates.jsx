@@ -146,7 +146,9 @@ export default function SettingsProfileTemplates() {
                     ))}
                   </div>
                   <p className="text-[10px] text-slate-400 mt-0.5">
-                    An exact skill match here confirms without a vote; paraphrase searches Experience and Projects.
+                    On Experience (and Projects, when ticked) an exact match on a line where the candidate does
+                    the work confirms without a vote; Summary and Skills matches always go to the vote. Paraphrase
+                    searches Experience and Projects.
                   </p>
                 </div>
                 <div className="flex items-center justify-between mt-1">
