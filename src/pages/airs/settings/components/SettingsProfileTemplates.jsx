@@ -20,6 +20,7 @@ function draftOf(template) {
     experience_tolerance_years: template.experience_tolerance_years ?? "",
     education_requirement: template.education_requirement,
     evidence_sections: template.evidence_sections,
+    listed_only_can_confirm: Boolean(template.listed_only_can_confirm),
   };
 }
 
@@ -74,6 +75,7 @@ export default function SettingsProfileTemplates() {
         experience_tolerance_years: draft.experience_tolerance_years === "" ? null : Number(draft.experience_tolerance_years),
         education_requirement: draft.education_requirement,
         evidence_sections: draft.evidence_sections,
+        listed_only_can_confirm: draft.listed_only_can_confirm,
       });
       toast.success(saved.changed
         ? `Template saved.${saved.candidates_marked_out_of_date
@@ -95,7 +97,8 @@ export default function SettingsProfileTemplates() {
       <p className="text-[11px] text-slate-500 mt-1 max-w-3xl">
         Chosen per JD in its Calibration tab. A JD's own settings always win; a setting it leaves on default follows
         its template. Education here only prefills a JD that hasn't been calibrated yet. Changing internship credit,
-        tolerance or evidence sections marks scored candidates of live campaigns using the template "score out of date".
+        tolerance, evidence sections or listed-only confirmation marks scored candidates of live campaigns using the
+        template "score out of date".
       </p>
 
       {loading ? <LoadingSpinner text="Loading..." /> : (
@@ -151,6 +154,17 @@ export default function SettingsProfileTemplates() {
                     searches Experience and Projects.
                   </p>
                 </div>
+                <label className="flex items-start gap-1.5">
+                  <input type="checkbox" className="mt-0.5" checked={draft.listed_only_can_confirm} disabled={busy}
+                    onChange={(e) => setDraft(template.key, { listed_only_can_confirm: e.target.checked })} />
+                  <span>
+                    <span className="font-semibold">Listed-only skills can be confirmed by vote</span>
+                    <span className="block text-[10px] text-slate-400">
+                      Off: a core skill shown only in a skills list, or only where the candidate sells, demos,
+                      supports or attends, is at most "uncertain" - never confirmed.
+                    </span>
+                  </span>
+                </label>
                 <div className="flex items-center justify-between mt-1">
                   <span className="text-[10px] text-slate-400">
                     {template.updated_at ? `Edited ${template.updated_at.split("T")[0]}` : "As seeded"}
