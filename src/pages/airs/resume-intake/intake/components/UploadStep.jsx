@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { UploadCloud, FileText, X, CheckCircle2, AlertTriangle, ArrowRight } from "lucide-react";
+import { UploadCloud, FileText, X, CheckCircle2, AlertTriangle, ArrowRight, Info } from "lucide-react";
 import { toast } from "react-toastify";
 import Button from "../../../../../components/Button/Button";
 import { Input } from "../../../../../components/ui/input";
@@ -30,6 +30,15 @@ function isAcceptedFile(file) {
   const name = file.name.toLowerCase();
   return ACCEPTED_FILE_TYPES.some((ext) => name.endsWith(ext));
 }
+
+function formatShortDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+const stageText = (stage) => (stage ? String(stage).replace(/_/g, " ").toLowerCase() : "");
 
 // "use_existing" -> "Use Existing" — available_resolutions are backend enum
 // values, not display copy.
@@ -64,6 +73,27 @@ export default function UploadStep({ onSubmit, bare = false }) {
   // or null) — surfaces the backend's available_resolutions as buttons
   // instead of a dead-end error toast.
   const [duplicateResume, setDuplicateResume] = useState(null);
+
+  // 409 DUPLICATE_FILE_IN_CAMPAIGN: this exact file is already in this
+  // campaign. Nothing to choose - pick another file. { message, candidateId,
+  // campaignCandidateId } or null.
+  const [duplicateInCampaign, setDuplicateInCampaign] = useState(null);
+
+  // 409 CANDIDATE_IN_CAMPAIGN_NEW_FILE: the candidate is already in this
+  // campaign with a different resume - keep it or use the new file as their
+  // next version. Holds the conflict data (plus the message) or null.
+  const [candidateNewFile, setCandidateNewFile] = useState(null);
+
+  // Set after a "Keep existing resume" upload: nothing new was stored and no
+  // processing starts, so the outcome is shown here.
+  const [keptExistingMessage, setKeptExistingMessage] = useState("");
+
+  const clearConflicts = () => {
+    setDuplicateCandidate(null);
+    setDuplicateResume(null);
+    setDuplicateInCampaign(null);
+    setCandidateNewFile(null);
+  };
 
   const isFormValid = Boolean(
     form.campaignId &&
@@ -106,6 +136,9 @@ export default function UploadStep({ onSubmit, bare = false }) {
     }
     setFileError("");
     setFile(candidate);
+    // A different file is a new upload attempt - drop the last conflict.
+    clearConflicts();
+    setKeptExistingMessage("");
   };
 
   const validate = () => {
@@ -137,9 +170,17 @@ export default function UploadStep({ onSubmit, bare = false }) {
 
   const submitUpload = async (formData) => {
     const res = await resumeUpload(formData);
-    toast.success(res?.message || "Resume uploaded successfully and queued for processing.");
-    setDuplicateCandidate(null);
-    setDuplicateResume(null);
+    const outcome = String(res?.data?.outcome || "").toUpperCase();
+    if (outcome === "KEPT_EXISTING") {
+      const message = res?.message || "The candidate's existing resume was kept — the new file was not stored.";
+      toast.info(message);
+      setKeptExistingMessage(message);
+    } else if (outcome === "NEW_VERSION_USED") {
+      toast.success(res?.message || "The new file is now the candidate's resume and is queued for processing.");
+    } else {
+      toast.success(res?.message || "Resume uploaded successfully and queued for processing.");
+    }
+    clearConflicts();
     onSubmit({
       uploadResponse: res?.data,
       candidateName: form.candidateName.trim(),
@@ -152,15 +193,28 @@ export default function UploadStep({ onSubmit, bare = false }) {
     e.preventDefault();
     if (!validate()) return;
 
-    setDuplicateCandidate(null);
-    setDuplicateResume(null);
+    clearConflicts();
+    setKeptExistingMessage("");
     setIsSubmitting(true);
     try {
       await submitUpload(buildFormData());
     } catch (err) {
       const responseBody = err?.response?.data;
       const conflictData = responseBody?.data;
-      if (conflictData?.candidate_exists && conflictData?.candidate_id) {
+      const errorCode = conflictData?.error_code;
+      if (errorCode === "DUPLICATE_FILE_IN_CAMPAIGN") {
+        setDuplicateInCampaign({
+          message: responseBody?.message || "This exact file is already in this campaign - nothing was uploaded.",
+          candidateId: conflictData.candidate_id,
+          campaignCandidateId: conflictData.campaign_candidate_id,
+        });
+      } else if (errorCode === "CANDIDATE_IN_CAMPAIGN_NEW_FILE") {
+        setCandidateNewFile({
+          ...conflictData,
+          message: responseBody?.message || "This candidate is already in this campaign with a different resume.",
+          newFilename: file?.name,
+        });
+      } else if (conflictData?.candidate_exists && conflictData?.candidate_id) {
         setDuplicateCandidate({
           candidateId: conflictData.candidate_id,
           campaignCandidateId: conflictData.campaign_candidate_id ?? conflictData.campaignCandidateId,
@@ -193,6 +247,24 @@ export default function UploadStep({ onSubmit, bare = false }) {
       setIsSubmitting(false);
     }
   };
+
+  const viewCandidateTarget = duplicateCandidate || duplicateInCampaign || (candidateNewFile && {
+    candidateId: candidateNewFile.candidate_id,
+    campaignCandidateId: candidateNewFile.campaign_candidate_id,
+  });
+  const existingVersion = Number(candidateNewFile?.existing_version_number) || 1;
+
+  const viewCandidateButton = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="small"
+      onClick={() => setIsScorecardOpen(true)}
+      className="!text-blue-600 hover:!text-blue-700 hover:bg-blue-50 text-xs shrink-0"
+    >
+      View Candidate <ArrowRight size={14} className="ml-1" />
+    </Button>
+  );
 
   return (
     <>
@@ -343,15 +415,90 @@ export default function UploadStep({ onSubmit, bare = false }) {
                 <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
                 <p className="text-[12.5px] text-amber-800">{duplicateCandidate.message}</p>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="small"
-                onClick={() => setIsScorecardOpen(true)}
-                className="!text-blue-600 hover:!text-blue-700 hover:bg-blue-50 text-xs shrink-0"
-              >
-                View Candidate <ArrowRight size={14} className="ml-1" />
-              </Button>
+              {viewCandidateButton}
+            </div>
+          )}
+
+          {keptExistingMessage && (
+            <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+              <Info className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+              <p className="text-[12.5px] text-blue-800">{keptExistingMessage}</p>
+            </div>
+          )}
+
+          {duplicateInCampaign && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                <div className="text-[12.5px] text-amber-800">
+                  <p>{duplicateInCampaign.message}</p>
+                  <p className="mt-1 text-amber-700">Choose a different file to upload.</p>
+                </div>
+              </div>
+              {duplicateInCampaign.candidateId && viewCandidateButton}
+            </div>
+          )}
+
+          {candidateNewFile && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="text-[12.5px] text-amber-800">
+                    <p>{candidateNewFile.message}</p>
+                    <p className="mt-1 text-amber-700">
+                      <span className="font-semibold">{candidateNewFile.candidate_name || "Candidate"}</span>
+                      {candidateNewFile.current_pipeline_stage && (
+                        <> · stage: <span className="capitalize">{stageText(candidateNewFile.current_pipeline_stage)}</span></>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                {candidateNewFile.candidate_id && viewCandidateButton}
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[12px]">
+                <div className="rounded-md border border-amber-200 bg-white px-3 py-2 min-w-0">
+                  <div className="text-[10.5px] uppercase font-semibold text-slate-400">Existing resume</div>
+                  <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                    <FileText size={13} className="text-slate-400 shrink-0" />
+                    <span className="font-medium text-slate-800 truncate">{candidateNewFile.existing_original_filename || "—"}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    Version {existingVersion} · uploaded {formatShortDate(candidateNewFile.existing_uploaded_at)}
+                  </div>
+                </div>
+                <div className="rounded-md border border-amber-200 bg-white px-3 py-2 min-w-0">
+                  <div className="text-[10.5px] uppercase font-semibold text-slate-400">New file</div>
+                  <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                    <FileText size={13} className="text-blue-600 shrink-0" />
+                    <span className="font-medium text-slate-800 truncate">{candidateNewFile.newFilename || file?.name || "—"}</span>
+                  </div>
+                </div>
+              </div>
+              <p className="text-[11.5px] text-amber-700">
+                Use new version: becomes their resume (version {existingVersion + 1}); the old one is kept. Re-scored; stage
+                unchanged. Their other campaigns are marked &quot;score out of date&quot;.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="small"
+                  disabled={isSubmitting}
+                  onClick={() => handleResolveDuplicateResume("keep_existing")}
+                >
+                  Keep existing resume
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="small"
+                  disabled={isSubmitting}
+                  onClick={() => handleResolveDuplicateResume("use_new_version")}
+                >
+                  Use new version
+                </Button>
+              </div>
             </div>
           )}
 
@@ -394,7 +541,7 @@ export default function UploadStep({ onSubmit, bare = false }) {
             type="submit"
             variant="primary"
             size="medium"
-            disabled={!isFormValid || !!duplicateResume}
+            disabled={!isFormValid || !!duplicateResume || !!duplicateInCampaign || !!candidateNewFile}
             loading={isSubmitting}
             loadingText="Submitting..."
           >
@@ -410,13 +557,13 @@ export default function UploadStep({ onSubmit, bare = false }) {
       title="Candidate Scorecard"
       width="1100px"
     >
-      {duplicateCandidate && (
+      {viewCandidateTarget && (
         <PipelineCandidateScorecardPage
-          candidateId={duplicateCandidate.candidateId}
+          candidateId={viewCandidateTarget.candidateId}
           resumeRow={{
             candidate_full_name: form.candidateName.trim(),
             candidate_email: form.candidateEmail.trim(),
-            campaign_candidate_id: duplicateCandidate.campaignCandidateId,
+            campaign_candidate_id: viewCandidateTarget.campaignCandidateId,
           }}
           onBack={() => setIsScorecardOpen(false)}
           variant="modal"

@@ -44,6 +44,9 @@ import { bulkSendRejectionEmail } from "../candidates/services/candidateScoreSer
 import { getBulkUploadFiles, getBulkUploadFileLog } from "../service/resumeIntake";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../../components/ui/tooltip";
 import JdCalibrationBadge from "../components/JdCalibrationBadge";
+import Modal from "../../../components/ui/Modal";
+import UploadDecisionsList from "../resume-intake/components/UploadDecisionsList";
+import { getCampaignUploadDecisions } from "../resume-intake/services/uploadDecisionService";
 
 // Colour per pipeline stage (used for the funnel bars)
 const STAGE_COLORS = {
@@ -108,6 +111,26 @@ export default function CampaignDetails() {
   }, [id]);
 
   useEffect(() => { loadDetail(); }, [loadDetail]);
+
+  // Uploads waiting for a keep-existing / use-new-version decision. Same
+  // audience as the Uploads tab (HR_ADMIN + RECRUITER); a failed count just
+  // hides the banner.
+  const [pendingDecisionCount, setPendingDecisionCount] = useState(0);
+  const [decisionsOpen, setDecisionsOpen] = useState(false);
+  const canSeeUploadDecisions = canViewPipeline && detail?.scoring_configuration != null;
+
+  const loadPendingDecisions = useCallback(async () => {
+    try {
+      const data = await getCampaignUploadDecisions(id, "PENDING");
+      setPendingDecisionCount(data?.total ?? (Array.isArray(data?.items) ? data.items.length : 0));
+    } catch {
+      setPendingDecisionCount(0);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (canSeeUploadDecisions) loadPendingDecisions();
+  }, [canSeeUploadDecisions, loadPendingDecisions]);
 
   // Only the first load blanks the page; afterwards `detail` is already
   // rendered and a refresh swaps it in place.
@@ -234,6 +257,30 @@ export default function CampaignDetails() {
           </p>
         </div>
       )}
+
+      {canSeeUploadDecisions && pendingDecisionCount > 0 && (
+        <div className="mb-4 flex items-center justify-between gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <p className="text-[11.5px] text-amber-800">
+              <b>{pendingDecisionCount} upload{pendingDecisionCount === 1 ? "" : "s"} need{pendingDecisionCount === 1 ? "s" : ""} a decision</b>
+              {" "}- candidates already in this campaign were uploaded again with a different resume.
+            </p>
+          </div>
+          <Button variant="outline" size="small" onClick={() => setDecisionsOpen(true)}>
+            Review
+          </Button>
+        </div>
+      )}
+
+      <Modal
+        isOpen={decisionsOpen}
+        onClose={() => { setDecisionsOpen(false); loadPendingDecisions(); }}
+        title="Uploads that need a decision"
+        width="760px"
+      >
+        <UploadDecisionsList campaignId={id} onDecided={loadPendingDecisions} />
+      </Modal>
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-6 gap-6">
@@ -1284,6 +1331,8 @@ const FILE_STATUS_BADGE = {
   PROCESSED: "bg-emerald-50 text-emerald-700",
   FAILED: "bg-rose-50 text-rose-700",
   CANCELLED: "bg-slate-100 text-slate-500",
+  SKIPPED_DUPLICATE: "bg-amber-50 text-amber-700",
+  NEEDS_DECISION: "bg-amber-100 text-amber-800",
 };
 
 // Upstream failures (Gemini/Google API errors) come through as the raw
@@ -1369,7 +1418,7 @@ function UploadsTab({ campaignId }) {
         </div>
       ) : (<div className="space-y-2">
           {jobs.map((job) => {
-            const resolved = (job.processed_count || 0) + (job.failed_count || 0) + (job.duplicate_count || 0);
+            const resolved = (job.processed_count || 0) + (job.failed_count || 0) + (job.duplicate_count || 0) + (job.needs_decision_count || 0);
             const pct = job.total_files ? Math.round((resolved / job.total_files) * 100) : 0;
             const isExpanded = expandedId === job.id;
             const fileState = fileData[job.id];
@@ -1400,6 +1449,11 @@ function UploadsTab({ campaignId }) {
                     <span className="text-emerald-600 font-semibold">{job.processed_count} processed</span>
                     <span className={job.failed_count ? "text-rose-600 font-semibold" : ""}>{job.failed_count} failed</span>
                     <span className={job.duplicate_count ? "text-amber-600 font-semibold" : ""}>{job.duplicate_count} duplicate(s)</span>
+                    {job.needs_decision_count > 0 && (
+                      <span className="text-amber-700 font-semibold bg-amber-50 border border-amber-200 rounded-full px-1.5">
+                        {job.needs_decision_count} need{job.needs_decision_count === 1 ? "s" : ""} decision
+                      </span>
+                    )}
                     {job.queued_count > 0 && <span>{job.queued_count} queued</span>}
                   </div>
 
@@ -1436,7 +1490,7 @@ function UploadsTab({ campaignId }) {
                                 {f.reason && (<TooltipProvider>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <span className="text-[10px] text-rose-600 max-w-[240px] truncate cursor-pointer underline decoration-dotted decoration-rose-300 underline-offset-2">
+                                        <span className={`text-[10px] max-w-[240px] ${["SKIPPED_DUPLICATE", "NEEDS_DECISION"].includes(f.status) ? "text-amber-700" : "text-rose-600"} truncate cursor-pointer underline decoration-dotted decoration-rose-300 underline-offset-2`}>
                                           {extractErrorMessage(f.reason)}
                                         </span>
                                       </TooltipTrigger>
@@ -1449,7 +1503,7 @@ function UploadsTab({ campaignId }) {
                                 {f.retry_count > 0 && (<span className="text-[10px] text-slate-400">retried {f.retry_count}x</span>
                                 )}
                                 <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase ${FILE_STATUS_BADGE[f.status] || "bg-slate-100 text-slate-600"}`}>
-                                  {f.status}
+                                  {String(f.status || "").replace(/_/g, " ")}
                                 </span>
                               </div>
                             </div>

@@ -75,13 +75,17 @@ export default function useIntakeFlow() {
   };
 
   const submit = ({ uploadResponse, candidateName, candidateEmail, fileFormat }) => {
+    // "Keep existing resume": nothing new was stored and nothing is queued
+    // (task_id is null), so stay on the upload step - it shows the outcome.
+    if (String(uploadResponse?.outcome || "").toUpperCase() === "KEPT_EXISTING") return;
+
     const newResume = {
       resume_id: uploadResponse.resume_id,
       candidate_id: uploadResponse.campaign_candidate_id,
       candidate_name: candidateName,
       candidate_email_masked: maskEmail(candidateEmail),
       file_format: fileFormat,
-      version_number: 1,
+      version_number: uploadResponse.version_number || 1,
       parse_status: uploadResponse.parse_status || "PENDING",
       parse_confidence_score: null,
       parser_version: "—",

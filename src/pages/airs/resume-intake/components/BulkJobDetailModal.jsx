@@ -16,7 +16,9 @@ import {
   ShieldAlert,
   Loader2,
   RotateCcw,
+  HelpCircle,
 } from "lucide-react";
+import UploadDecisionsList from "./UploadDecisionsList";
 import Modal from "../../../../components/ui/Modal";
 import PipelineCandidateScorecardPage from "../../pipeline/PipelineCandidateScorecardPage";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
@@ -89,11 +91,25 @@ function renderFileStatusBadge(st) {
   if (uppercase === "CANCELLED") {
     return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">Cancelled</span>;
   }
+  if (uppercase === "SKIPPED_DUPLICATE") {
+    return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200"><AlertTriangle className="w-3 h-3 mr-1" /> Duplicate</span>;
+  }
+  if (uppercase === "NEEDS_DECISION") {
+    return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200"><HelpCircle className="w-3 h-3 mr-1" /> Needs decision</span>;
+  }
   return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200"><Loader2 className="w-3 h-3 mr-1 animate-spin" /> {uppercase === "QUEUED" ? "Queued" : "Running"}</span>;
 }
 
+// Log entry result badge colours (SUCCESS / DUPLICATE / NEEDS_DECISION / failures).
+function logResultClass(result) {
+  const r = String(result || "").toUpperCase();
+  if (r === "SUCCESS") return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+  if (r === "DUPLICATE" || r === "NEEDS_DECISION") return "bg-amber-50 text-amber-700 border border-amber-200";
+  return "bg-rose-50 text-rose-700 border border-rose-200";
+}
+
 export default function BulkJobDetailModal({ job, isOpen, onClose }) {
-  const [activeTab, setActiveTab] = useState("files"); // "files" | "log"
+  const [activeTab, setActiveTab] = useState("files"); // "files" | "log" | "decisions"
   const [progress, setProgress] = useState(job?.progress || null);
   const [files, setFiles] = useState([]);
   const [fileLogs, setFileLogs] = useState([]);
@@ -296,15 +312,45 @@ export default function BulkJobDetailModal({ job, isOpen, onClose }) {
       .map((l) => l.filename)
   );
 
+  // Log entries now carry file_id (and the raw file status), so the
+  // SKIPPED_DUPLICATE / NEEDS_DECISION reason can be shown on the file row.
+  const logByFileId = new Map(fileLogs.filter((l) => l.file_id).map((l) => [l.file_id, l]));
+  const logByFilename = new Map(fileLogs.map((l) => [l.filename, l]));
+
+  const needsDecisionCount =
+    progress?.needs_decision_count ??
+    job.needs_decision_count ??
+    files.filter((f) => String(f.status || f.file_status).toUpperCase() === "NEEDS_DECISION").length;
+  const showDecisionsTab = needsDecisionCount > 0 || activeTab === "decisions";
+
+  const handleDecided = () => {
+    // Refetch the job counts, file list and log (the file moves to
+    // PROCESSED or SKIPPED_DUPLICATE once decided).
+    setRefreshToken((t) => t + 1);
+  };
+
   const fileHeaders = ["Filename", "Status", "Retry Count", "Uploaded Date", "Action"];
   const fileColumns = ["filename", "status", "retry", "date", "action"];
   const fileRows = files.map((f) => {
     const st = String(f.status || f.file_status).toUpperCase();
     const filename = f.original_filename || f.filename;
-    const isDuplicate = st === "PROCESSED" && duplicateFilenames.has(filename);
+    const isDuplicate = st === "SKIPPED_DUPLICATE" || (st === "PROCESSED" && duplicateFilenames.has(filename));
+    const logEntry = logByFileId.get(f.id || f.file_id) || logByFilename.get(filename);
+    const statusReason = (st === "SKIPPED_DUPLICATE" || st === "NEEDS_DECISION") ? logEntry?.reason : null;
 
     let action;
-    if (st === "PROCESSED") {
+    if (st === "NEEDS_DECISION") {
+      action = (
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={() => setActiveTab("decisions")}
+          className="!text-amber-700 hover:!text-amber-800 hover:bg-amber-50 text-xs"
+        >
+          Decide <ArrowRight size={14} className="ml-1" />
+        </Button>
+      );
+    } else if (st === "PROCESSED" || st === "SKIPPED_DUPLICATE") {
       const isResolving = resolvingFileId === (f.id || f.file_id);
       action = (
         <Button
@@ -358,11 +404,18 @@ export default function BulkJobDetailModal({ job, isOpen, onClose }) {
           <span className="truncate max-w-[200px]">{filename || f.id}</span>
         </div>
       ),
-      status: isDuplicate ? (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-          <AlertTriangle className="w-3 h-3 mr-1" /> Duplicate
-        </span>
-      ) : renderFileStatusBadge(f.status || f.file_status),
+      status: (
+        <div className="space-y-1">
+          {isDuplicate ? (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+              <AlertTriangle className="w-3 h-3 mr-1" /> Duplicate
+            </span>
+          ) : renderFileStatusBadge(f.status || f.file_status)}
+          {statusReason && (
+            <p className="text-[11px] text-amber-700 max-w-[220px] truncate" title={statusReason}>{statusReason}</p>
+          )}
+        </div>
+      ),
       retry: <span className="text-xs text-slate-600 font-mono">{f.retry_count ?? 0}</span>,
       date: <span className="text-xs text-slate-500">{formatResumeDate(f.created_at)}</span>,
       action,
@@ -374,12 +427,8 @@ export default function BulkJobDetailModal({ job, isOpen, onClose }) {
   const logRows = fileLogs.map((l) => ({
     filename: <span className="font-medium text-slate-800 text-xs">{l.filename}</span>,
     result: (
-      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${
-        l.result === "SUCCESS" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
-        l.result === "DUPLICATE" ? "bg-amber-50 text-amber-700 border border-amber-200" :
-        "bg-rose-50 text-rose-700 border border-rose-200"
-      }`}>
-        {l.result}
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${logResultClass(l.result)}`}>
+        {String(l.result || "").toUpperCase() === "NEEDS_DECISION" ? "NEEDS DECISION" : l.result}
       </span>
     ),
     reason: <span className="text-xs text-slate-600 truncate max-w-xs">{l.reason || "—"}</span>,
@@ -414,7 +463,7 @@ export default function BulkJobDetailModal({ job, isOpen, onClose }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-5 gap-3 text-center">
+          <div className="grid grid-cols-6 gap-3 text-center">
             <div className="bg-white p-2.5 rounded-lg border border-slate-200">
               <div className="text-xs text-slate-400 uppercase font-semibold">Total Files</div>
               <div className="text-base font-bold text-slate-800">{progress?.total_files ?? files.length ?? 0}</div>
@@ -430,6 +479,10 @@ export default function BulkJobDetailModal({ job, isOpen, onClose }) {
             <div className="bg-white p-2.5 rounded-lg border border-amber-200">
               <div className="text-xs text-amber-600 uppercase font-semibold">Duplicates</div>
               <div className="text-base font-bold text-amber-700">{progress?.duplicate_count ?? 0}</div>
+            </div>
+            <div className={`p-2.5 rounded-lg border ${needsDecisionCount > 0 ? "bg-amber-50 border-amber-300" : "bg-white border-amber-200"}`}>
+              <div className="text-xs text-amber-600 uppercase font-semibold">Needs decision</div>
+              <div className="text-base font-bold text-amber-700">{needsDecisionCount}</div>
             </div>
             <div className="bg-white p-2.5 rounded-lg border border-slate-200">
               <div className="text-xs text-slate-500 uppercase font-semibold">Remaining</div>
@@ -458,10 +511,23 @@ export default function BulkJobDetailModal({ job, isOpen, onClose }) {
           >
             <Activity size={14} /> Audit Log ({fileLogs.length})
           </button>
+          {showDecisionsTab && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("decisions")}
+              className={`py-2 px-4 border-b-2 font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 ${
+                activeTab === "decisions" ? "border-amber-600 text-amber-700" : "border-transparent text-amber-600 hover:text-amber-700"
+              }`}
+            >
+              <HelpCircle size={14} /> Needs decision ({needsDecisionCount})
+            </button>
+          )}
         </div>
 
         {/* Content Tabs */}
-        {isLoading ? (
+        {activeTab === "decisions" ? (
+          <UploadDecisionsList jobId={jobId} onDecided={handleDecided} />
+        ) : isLoading ? (
           <div className="p-12 text-center text-slate-400">
             <LoadingSpinner text="Fetching batch information..." />
           </div>
