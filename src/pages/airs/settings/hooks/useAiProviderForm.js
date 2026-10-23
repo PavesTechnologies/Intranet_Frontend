@@ -52,6 +52,8 @@ export default function useAiProviderForm({ mode, row, defaultProvider, isOpen }
   const [checkCode, setCheckCode] = useState("");
   // Per-model results, kept only when the setup has more than one model.
   const [checkResults, setCheckResults] = useState([]);
+  // Models that passed only with a warning (their daily limit is used up) - saving is still allowed.
+  const [checkWarnings, setCheckWarnings] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -62,6 +64,7 @@ export default function useAiProviderForm({ mode, row, defaultProvider, isOpen }
   const resetCheck = () => {
     setCheckStatus("idle");
     setCheckMessage("");
+    setCheckWarnings([]);
     setCheckCode("");
     setCheckResults([]);
     setSaveError("");
@@ -171,6 +174,7 @@ export default function useAiProviderForm({ mode, row, defaultProvider, isOpen }
       });
       setCheckStatus(result.verified ? "passed" : "failed");
       setCheckMessage(result.message);
+      setCheckWarnings(result.verified ? result.warnings || [] : []);
       setCheckCode(result.verified ? "" : result.error_code || "");
       const results = result.results || [];
       setCheckResults(results.length > 1 ? results : []);
@@ -223,7 +227,7 @@ export default function useAiProviderForm({ mode, row, defaultProvider, isOpen }
     models: models.filter((m) => !unavailableModels.includes(m.id)),
     setupError,
     missingPurpose: missingPurpose(assignments),
-    checkStatus, checkMessage, checkCode, checkResults, saving, saveError,
+    checkStatus, checkMessage, checkCode, checkResults, checkWarnings, saving, saveError,
     canAddModel: assignments.length < MAX_MODELS,
     canCheck: !!provider && keyReady && !setupError && checkStatus !== "checking" && !saving,
     canSave: checkStatus === "passed" && !saving,

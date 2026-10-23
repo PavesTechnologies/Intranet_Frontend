@@ -93,7 +93,9 @@ export default function SettingsAIProviders() {
 
   const handleSaved = (message) => {
     closeModal();
-    toast.success(message);
+    // Saved despite a model's daily limit being used up: the API adds "Warning: ..." to the message.
+    if (message && message.includes("Warning:")) toast.warning(message);
+    else toast.success(message);
     providers.refresh();
   };
 

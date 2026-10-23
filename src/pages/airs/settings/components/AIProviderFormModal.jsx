@@ -201,10 +201,18 @@ export default function AIProviderFormModal({ isOpen, mode, row, providerOptions
           )}
         </div>
 
-        {form.checkStatus === "passed" && (
+        {form.checkStatus === "passed" && form.checkWarnings.length === 0 && (
           <div className="flex items-start gap-2 rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2 text-[12px] text-emerald-700">
             <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
             <span><span className="font-semibold">Models verified — you can save.</span> {form.checkMessage}</span>
+          </div>
+        )}
+        {form.checkStatus === "passed" && form.checkWarnings.length > 0 && (
+          <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[12px] text-amber-800" role="status">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>
+              <span className="font-semibold">You can save, with a warning.</span> {form.checkMessage}
+            </span>
           </div>
         )}
         {form.checkStatus === "failed" && (
@@ -227,11 +235,14 @@ export default function AIProviderFormModal({ isOpen, mode, row, providerOptions
         {form.checkResults.length > 0 && (
           <ul className="space-y-0.5 text-[11px]" aria-label="Model check results">
             {form.checkResults.map((r) => (
-              <li key={r.model_name} className={`flex items-center gap-1.5 ${r.verified ? "text-emerald-700" : "text-red-600"}`}>
-                {r.verified ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+              <li key={r.model_name}
+                className={`flex items-center gap-1.5 ${r.warning ? "text-amber-700" : r.verified ? "text-emerald-700" : "text-red-600"}`}>
+                {r.warning ? <AlertTriangle className="h-3 w-3" />
+                  : r.verified ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
                 <span className="font-mono">{r.model_name}</span>
                 <span className="text-slate-500">
-                  {r.verified ? `${r.latency_ms ?? "?"} ms` : r.error_code || "failed"}
+                  {r.warning ? "daily limit used up - saved with a warning"
+                    : r.verified ? `${r.latency_ms ?? "?"} ms` : r.error_code || "failed"}
                 </span>
               </li>
             ))}
