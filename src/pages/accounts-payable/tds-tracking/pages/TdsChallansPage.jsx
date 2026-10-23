@@ -16,6 +16,7 @@ import { openBlobInNewTab } from "../../utils/documentUpload";
 import { tdsChallanService } from "../services/tdsChallanService";
 import { useChallanDetail, useChallanList, useFilingDetail, useFilingList } from "../hooks/useTdsChallans";
 import { fmtDate, money } from "../components/TdsDocumentParts";
+import PendingTdsStrip from "../components/PendingTdsStrip";
 
 const PAGE_SIZE = 20;
 
@@ -136,6 +137,8 @@ export default function TdsChallansPage() {
           </>
         }
       />
+
+      <PendingTdsStrip canUpdate={canUpdateTdsTracking} />
 
       <SegmentedTabs value={tab} onChange={switchTab} tabs={[{ value: "challans", label: "Challans" }, { value: "filings", label: "Quarterly filings" }]} />
 
