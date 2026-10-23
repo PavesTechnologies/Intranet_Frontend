@@ -47,12 +47,12 @@ beforeEach(() => {
 });
 
 describe("InvoicePaymentPanel — payment-term gate", () => {
-  it.each(["MISMATCH", "REVIEW_REQUIRED"])("hides Mark Ready for Payment while terms are %s and says why", (status) => {
+  it.each(["MISMATCH", "REVIEW_REQUIRED"])("disables Mark Ready for Payment while terms are %s and says why", (status) => {
     useApPermissions.mockReturnValue({ canMarkPaid: true, canViewPaymentTerms: true });
     useInvoicePaymentTerms.mockReturnValue({ data: { evaluated: true, validation_status: status } });
     renderPanel({ ...baseInvoice, status: "Approved" });
-    expect(screen.queryByRole("button", { name: /mark ready for payment/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/payment terms must be verified/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /mark ready for payment/i })).toBeDisabled();
+    expect(screen.getByText(/Payment terms confirmed/)).toBeInTheDocument();
   });
 
   it("offers Mark Ready for Payment once terms are verified by Finance", () => {
@@ -125,19 +125,19 @@ describe("InvoicePaymentPanel", () => {
 });
 
 describe("InvoicePaymentPanel — TDS gate (Phase 1 frontend-only sequencing)", () => {
-  it("hides Mark Ready for Payment when Approved but TDS is only DETERMINED, not VERIFIED", () => {
+  it("disables Mark Ready for Payment when Approved but TDS is only DETERMINED, not VERIFIED", () => {
     useApPermissions.mockReturnValue({ canMarkPaid: true });
     useInvoiceTds.mockReturnValue({ data: { determination_status: "DETERMINED" }, isLoading: false, error: null });
     renderPanel({ ...baseInvoice, status: "Approved" });
-    expect(screen.queryByRole("button", { name: /mark ready for payment/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/TDS must be verified/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /mark ready for payment/i })).toBeDisabled();
+    expect(screen.getByText(/TDS verified/)).toBeInTheDocument();
   });
 
-  it("hides Mark Ready for Payment when Approved and TDS hasn't been determined at all (404)", () => {
+  it("disables Mark Ready for Payment when Approved and TDS hasn't been determined at all (404)", () => {
     useApPermissions.mockReturnValue({ canMarkPaid: true });
     useInvoiceTds.mockReturnValue({ data: undefined, isLoading: false, error: { status: 404 } });
     renderPanel({ ...baseInvoice, status: "Approved" });
-    expect(screen.queryByRole("button", { name: /mark ready for payment/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /mark ready for payment/i })).toBeDisabled();
   });
 
   it("offers Mark Ready for Payment once TDS is VERIFIED", () => {

@@ -1,4 +1,5 @@
 // Routes: /accounts-payable/bulk-import (payments - receipts only by default; PAYMENT_PROCESS) and
+import PageGuide from "../../guide/components/PageGuide";
 // /accounts-payable/tds/history-import (scope="tds-history": past TDS challans / filings from a sheet, for
 // setting up or catching up - TDS_TRACKING_UPDATE). Routine TDS work uses Record challan / Record filing.
 // Download the pre-filled template, fill it, upload it with its documents. Each document is read and
@@ -132,6 +133,7 @@ export default function BulkImportPage({ scope = "payments" }) {
   return (
     <div className="space-y-5 p-6">
       <PageHeader title={scopeSpec.title} subtitle={scopeSpec.subtitle} />
+      {receiptsOnly && <PageGuide page="receipts" />}
 
       {allowed.length > 1 && (
         <SegmentedTabs value={type} onChange={switchType} tabs={allowed.map((t) => ({ value: t, label: IMPORT_TYPES[t].label }))} />

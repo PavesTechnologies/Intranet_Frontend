@@ -10,7 +10,7 @@ import { useEmployeeDirectory, resolveEmployeeName } from "../../../expense-mana
 // unchanged for anything not listed here, so a new backend event never disappears silently.
 const ACTION_LABELS = {
   INVOICE_CREATED: "Invoice uploaded",
-  INVOICE_OCR_REVIEWED: "OCR reviewed",
+  INVOICE_OCR_REVIEWED: "Reviewed",
   INVOICE_RESUBMITTED: "Invoice resubmitted after review",
   INVOICE_SENT_FOR_APPROVAL: "Sent for approval",
   INVOICE_APPROVAL_STEP_DECISION: "Approval decision recorded",

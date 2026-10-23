@@ -1,4 +1,5 @@
 import { useState } from "react";
+import PageGuide from "../../guide/components/PageGuide";
 import { Link, useSearchParams } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
@@ -104,8 +105,8 @@ export default function PaymentReadyPage() {
   return (
     <div className="p-6">
       <PageHeader
-        title="Ready for Payment"
-        subtitle="Approved invoices with verified TDS and an outstanding payable balance"
+        title="Payment Management"
+        subtitle="Ready for payment - approved invoices with verified TDS and a balance to pay"
         actions={
           <div className="flex items-center gap-3">
             {canRecordPayment && (
@@ -119,6 +120,7 @@ export default function PaymentReadyPage() {
           </div>
         }
       />
+      <PageGuide page="payments" />
 
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4 md:items-end">
         <FormInput
@@ -142,8 +144,15 @@ export default function PaymentReadyPage() {
         </div>
       ) : !isLoading && items.length === 0 ? (
         <EmptyState
-          title="No invoices are currently ready for payment."
-          description={filtered ? "Try clearing the filters." : undefined}
+          title="No invoices are ready for payment right now."
+          description={filtered
+            ? "Try clearing the filters."
+            : "Invoices appear here once they are approved, their TDS is verified and Finance marks them ready for payment."}
+          action={!filtered && (
+            <Link to={`${AP_ROUTES.INVOICE_LIST}?queue=approved`}>
+              <Button variant="outline">See approved invoices</Button>
+            </Link>
+          )}
         />
       ) : (
         <>

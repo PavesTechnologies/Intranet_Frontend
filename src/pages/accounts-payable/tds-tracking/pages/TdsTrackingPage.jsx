@@ -1,4 +1,5 @@
 import { useState } from "react";
+import PageGuide from "../../guide/components/PageGuide";
 import { Link, useSearchParams } from "react-router-dom";
 import PageHeader from "../../../../components/ui/PageHeader";
 import Button from "../../../../components/Button/Button";
@@ -13,6 +14,7 @@ import { useTdsTrackingList } from "../hooks/useTdsTracking";
 import { useDebouncedValue } from "../../payment/hooks/useDebouncedValue";
 import { sectionLabel } from "../utils/tdsTrackingFormat";
 import { AP_ROUTES } from "../../constants/routes";
+import { invoiceStatusLabel } from "../../constants/invoiceStatus";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
 
@@ -83,7 +85,7 @@ export default function TdsTrackingPage() {
       rate: row.tdsRate != null ? `${row.tdsRate}%` : "—",
       tdsAmount: formatCurrency(row.tdsAmount, row.currencySymbol),
       netPayable: formatCurrency(row.netPayable, row.currencySymbol),
-      invoiceStatus: <StatusBadge label={row.invoiceStatusName || row.invoiceStatusCode || "—"} size="sm" />,
+      invoiceStatus: <StatusBadge label={invoiceStatusLabel(row.invoiceStatusName || row.invoiceStatusCode) || "—"} size="sm" />,
       tdsStatus: (
         <div>
           <StatusBadge label={row.trackingStatusLabel} size="sm" />
@@ -113,6 +115,7 @@ export default function TdsTrackingPage() {
           </Link>
         }
       />
+      <PageGuide page="tdsTracking" />
 
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <SegmentedTabs value={view.value} onChange={setView} tabs={VIEWS.map(({ value, label }) => ({ value, label }))} />

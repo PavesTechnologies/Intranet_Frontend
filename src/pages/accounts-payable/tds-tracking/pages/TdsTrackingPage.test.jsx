@@ -7,6 +7,7 @@ import TdsTrackingPage from "./TdsTrackingPage";
 import { useTdsTrackingList } from "../hooks/useTdsTracking";
 
 vi.mock("../hooks/useTdsTracking", () => ({ useTdsTrackingList: vi.fn() }));
+vi.mock("../../hooks/useApPermissions", () => ({ useApPermissions: () => ({ canViewTdsTracking: true, canUpdateTdsTracking: true }) }));
 
 const list = { items: [], total: 0, page: 1, setPage: vi.fn(), totalPages: 1, isLoading: false, isError: false, error: null };
 
@@ -33,6 +34,13 @@ describe("TdsTrackingPage", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Not yet paid" }));
     expect(useTdsTrackingList).toHaveBeenLastCalledWith(expect.objectContaining({ tdsStatus: "TDS_PENDING" }));
     expect(screen.getByText(/TDS is deducted when the vendor is paid/)).toBeInTheDocument();
+  });
+
+  it("explains the TDS rhythm in a guide panel", () => {
+    renderAt();
+    expect(screen.getByText("What you do in TDS Tracking")).toBeInTheDocument();
+    expect(screen.getByText("Deposit monthly")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "What is 26Q?" })).toBeInTheDocument();
   });
 
   it("opens the tab named in the link", () => {

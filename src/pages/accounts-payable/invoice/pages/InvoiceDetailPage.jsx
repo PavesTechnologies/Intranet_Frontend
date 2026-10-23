@@ -21,7 +21,7 @@ import InvoiceAuditHistory from "../components/InvoiceAuditHistory";
 import { useInvoiceDetail } from "../hooks/useInvoiceDetail";
 import { useApPermissions } from "../../hooks/useApPermissions";
 import { AP_ROUTES } from "../../constants/routes";
-import { INVOICE_STATUS } from "../../constants/invoiceStatus";
+import { INVOICE_STATUS, invoiceStatusLabel } from "../../constants/invoiceStatus";
 import { formatDate } from "../../utils/formatters";
 import { getApiErrorMessage } from "../../utils/apiError";
 
@@ -105,7 +105,7 @@ export default function InvoiceDetailPage() {
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Status</p>
               <div className="mt-1">
-                <StatusBadge label={invoice.status} size="sm" />
+                <StatusBadge label={invoiceStatusLabel(invoice.status)} size="sm" />
               </div>
             </div>
           </div>
@@ -125,8 +125,12 @@ export default function InvoiceDetailPage() {
           ) : (
             <InvoiceOcrReviewPanel invoice={invoice} />
           )}
-          <InvoiceTdsPanel invoice={invoice} />
-          <InvoicePaymentTermsPanel invoice={invoice} />
+          <div id="invoice-tds" className="scroll-mt-4">
+            <InvoiceTdsPanel invoice={invoice} />
+          </div>
+          <div id="invoice-payment-terms" className="scroll-mt-4">
+            <InvoicePaymentTermsPanel invoice={invoice} />
+          </div>
           <InvoiceApprovalPanel invoice={invoice} />
           <InvoiceValidationPanel />
 

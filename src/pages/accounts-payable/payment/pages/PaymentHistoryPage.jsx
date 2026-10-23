@@ -132,7 +132,10 @@ export default function PaymentHistoryPage() {
           {getApiErrorMessage(error, "Unable to load payment history right now.")}
         </div>
       ) : !isLoading && items.length === 0 ? (
-        <EmptyState title="No payment records found." description={filtered ? "Try clearing the filters." : undefined} />
+        <EmptyState
+          title="No payments recorded yet."
+          description={filtered ? "Try clearing the filters." : "A payment appears here once it is recorded - on an invoice in Payment Management, or by uploading receipts."}
+        />
       ) : (
         <>
           <GenericTable headers={HEADERS} columns={COLUMNS} rows={rows} loading={isLoading} />

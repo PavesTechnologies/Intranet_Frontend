@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { CreditCard, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle2, CircleDashed, CreditCard, ChevronDown, ChevronUp } from "lucide-react";
 import { PageCard, PageCardContent } from "../../../../components/Cards/PageCard";
 import Button from "../../../../components/Button/Button";
 import Modal from "../../../../components/Modal/modal";
@@ -145,18 +145,38 @@ export default function InvoicePaymentPanel({ invoice }) {
           </p>
         )}
 
-        {isApproved && (
-          <p className="mb-3 text-xs italic text-gray-500">
-            {tdsBlocksMarkReady
-              ? "Approved, but not yet payable — TDS must be verified before this invoice can be marked ready for payment."
-              : termsBlockMarkReady
-                ? "Approved, but not yet payable — the payment terms must be verified (see Payment Terms) before this invoice can be marked ready for payment."
-                : "Approved, but not yet payable — Finance must mark it ready for payment first."}
-          </p>
+        {isApproved && (tdsBlocksMarkReady || termsBlockMarkReady) ? (
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3" role="status">
+            <p className="text-xs font-semibold text-amber-900">Approved - before it can be marked ready for payment:</p>
+            <ul className="mt-2 space-y-1.5 text-xs">
+              {[
+                { done: !tdsBlocksMarkReady, label: "TDS verified", fix: "Verify TDS", href: "#invoice-tds" },
+                { done: !termsBlockMarkReady, label: "Payment terms confirmed", fix: "Check payment terms", href: "#invoice-payment-terms" },
+              ].map((item) => (
+                <li key={item.label} className="flex items-center justify-between gap-2">
+                  <span className={item.done ? "flex items-center gap-1.5 text-emerald-700" : "flex items-center gap-1.5 text-amber-900"}>
+                    {item.done ? <CheckCircle2 size={14} aria-hidden="true" /> : <CircleDashed size={14} aria-hidden="true" />}
+                    {item.label}
+                  </span>
+                  {!item.done && canMarkPaid && (
+                    <a href={item.href} className="font-medium text-[#0A0082] hover:underline">{item.fix} →</a>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {!canMarkPaid && <p className="mt-2 text-xs text-amber-800">Finance verifies these and releases it for payment.</p>}
+          </div>
+        ) : isApproved && (
+          <p className="mb-3 text-xs text-gray-500">Approved - Finance marks it ready for payment, then it can be paid.</p>
         )}
 
         {canOfferMarkReady && (
           <Button variant="primary" size="small" className="w-full" onClick={() => setConfirmOpen(true)}>
+            <CreditCard size={14} /> Mark Ready for Payment
+          </Button>
+        )}
+        {isApproved && canMarkPaid && !canOfferMarkReady && (
+          <Button variant="primary" size="small" className="w-full" disabled title="Complete the steps above first">
             <CreditCard size={14} /> Mark Ready for Payment
           </Button>
         )}

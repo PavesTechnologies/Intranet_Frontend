@@ -75,7 +75,7 @@ export default function EmailIntakeCard() {
             </h2>
             <p className="mt-0.5 text-sm text-slate-600">
               {data.enabled
-                ? `Invoices emailed to ${data.mailbox || "the AP mailbox"} are read every ${data.interval_minutes} minutes and sent to OCR review.`
+                ? `Invoices emailed to ${data.mailbox || "the AP mailbox"} are read every ${data.interval_minutes} minutes and added to the invoices to review.`
                 : `Invoices emailed to ${data.mailbox || "the AP mailbox"} are not being read.`}
             </p>
             <dl className="mt-2 grid gap-x-6 gap-y-1 text-xs text-slate-500 sm:grid-cols-2">

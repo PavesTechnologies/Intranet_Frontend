@@ -18,7 +18,7 @@ export const ISSUE_SEVERITY_OPTIONS = Object.values(ISSUE_SEVERITY).map((value) 
 
 /** Where an issue was raised. */
 export const ISSUE_SOURCE = {
-  OCR: "OCR",
+  OCR: "Reading the document",
   VALIDATION: "Validation",
 };
 

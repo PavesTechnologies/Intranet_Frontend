@@ -341,6 +341,8 @@ export const AP_SUBMENU = [
   { label: "Dashboard", to: AP_ROUTES.DASHBOARD, roleOrPermissions: { roles: AP_ALL_ROLES, permissions: AP_MANAGEMENT_ANY } },
   // Every AP user has their own notifications; the backend decides which from the JWT.
   { label: "Notifications", to: AP_ROUTES.NOTIFICATIONS, allowedRoles: AP_ALL_ROLES },
+  // The whole AP flow by role, with links into each step, plus the terms used (guide/pages/ApGuidePage.jsx).
+  { label: "How It Works", to: AP_ROUTES.GUIDE, roleOrPermissions: { roles: AP_ALL_ROLES, permissions: AP_MANAGEMENT_ANY } },
   {
     label: "Invoices & Vendors",
     to: AP_ROUTES.INVOICE_LIST,

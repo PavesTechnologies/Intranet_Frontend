@@ -21,6 +21,7 @@ describe("AP sidebar sections", () => {
     expect(shape(menu)).toEqual([
       "Dashboard",
       "Notifications",
+      "How It Works",
       { "Invoices & Vendors": ["Invoice Management", "Recurring Invoices", "Credit & Debit Notes", "Vendor Management"] },
       { "Payments & Tax": ["Payment Management", "TDS Tracking", "GST Input Credit", "Upload Receipts"] },
       { "Reports & Accounting": ["Reports", "Accounting Export"] },
@@ -34,7 +35,7 @@ describe("AP sidebar sections", () => {
   it("shows an AP Executive only what they work on", () => {
     const menu = as(["AP_Executive"], ["INVOICE_VIEW", "INVOICE_UPLOAD"]);
     // Recurring Invoices and Credit & Debit Notes are readable with INVOICE_VIEW
-    expect(shape(menu)).toEqual(["Dashboard", "Notifications",
+    expect(shape(menu)).toEqual(["Dashboard", "Notifications", "How It Works",
       { "Invoices & Vendors": ["Invoice Management", "Recurring Invoices", "Credit & Debit Notes"] }]);
     expect(menu.find((i) => i.label === "Invoices & Vendors").to).toBe("/accounts-payable/invoices");
   });
