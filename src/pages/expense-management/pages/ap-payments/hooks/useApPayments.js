@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/axiosInstance";
 import { apPaymentApi } from "@/pages/accounts-payable/services/apPaymentApi";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 /**
  * Wraps the existing accounts-payable apPaymentApi (GET /xms/ap-payments/queue,
@@ -19,7 +20,7 @@ export const AP_HISTORY_KEY = (status, page, size) => ["apPaymentHistory", statu
 // called directly here (same base URL/auth as that client) rather than editing that module.
 const getApHistory = (status, page, size) =>
   api.get("/xms/ap-payments/history", {
-    baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
+    baseURL: XMS_BASE_URL,
     headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     params: { status, page, size },
   });
@@ -62,20 +63,29 @@ export const useApPaymentSummary = () =>
     queryFn: () =>
       api
         .get("/xms/ap-payments/summary", {
-          baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
+          baseURL: XMS_BASE_URL,
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         })
         .then(unwrap),
     staleTime: 30_000,
   });
 
+// AP's confirmation of the actual payment: { paymentReference, paymentMethod, paymentDate, amountPaid, remarks }.
+// Called directly (not via the accounts-payable apPaymentApi, whose completePayment sends no body).
+const completePayment = (reportId, payment) =>
+  api.post(`/xms/ap-payments/${reportId}/complete`, payment, {
+    baseURL: XMS_BASE_URL,
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  });
+
+/** mutate({ reportId, payment }) - the report shows as paid only once the server accepts this. */
 export const useCompletePayment = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (reportId) => apPaymentApi.completePayment(reportId).then(unwrap),
+    mutationFn: ({ reportId, payment }) => completePayment(reportId, payment).then(unwrap),
     // Refresh on failure too - e.g. a duplicate-completion attempt means this row was already
     // stale (someone else completed it first), so re-fetching clears it immediately.
-    onSettled: (_data, _err, reportId) => {
+    onSettled: (_data, _err, { reportId }) => {
       qc.invalidateQueries({ queryKey: ["apPaymentQueue"] });
       qc.invalidateQueries({ queryKey: ["apPaymentHistory"] });
       qc.invalidateQueries({ queryKey: ["apPaymentSummary"] });

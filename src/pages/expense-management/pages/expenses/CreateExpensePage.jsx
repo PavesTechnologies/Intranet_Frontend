@@ -39,17 +39,28 @@ import PolicyStatusBadge from "@/pages/expense-management/components/expense-rep
 import {
   validateBusinessPurpose,
 } from "@/pages/expense-management/components/expense-reports/ReportFormFields";
+import {
+  formatDeadlineDate,
+  getSubmissionDeadlineInfo,
+  todayIsoDate,
+  validateReportingPeriod,
+  validateTripDates,
+} from "@/pages/expense-management/components/expense-reports/submissionDeadline";
 
 import SummaryPanel from "@/pages/expense-management/components/expense-reports/SummaryPanel";
 
 import { useSubmitReport } from "@/pages/expense-management/approval-engine/hooks/useApprovalWorkflow";
 
 import api from "@/api/axiosInstance";
+import { isJustified } from "@/pages/expense-management/components/expense-reports/PolicyStatusBadge";
+import PolicyJustificationModal from "@/pages/expense-management/components/expense-reports/PolicyJustificationModal";
+import { LineItemDrawer } from "./ExpenseReportDetailPage";
 
 import ConfirmationModal from "@/components/confirmation_modal/ConfirmationModal";
 import TaxBreakdownPanel, {
   emptyTaxValue,
 } from "@/pages/expense-management/components/expense-reports/TaxBreakdownPanel";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 const breadcrumbs = [
   {
     label: "Expense Management",
@@ -228,6 +239,20 @@ export default function CreateExpensePage() {
 
   const [lineItems, setLineItems] = useState([]);
 
+  // Policy violations the employee has not explained yet. Submit is blocked until each one has an explanation.
+  const unexplainedViolations = useMemo(
+    () =>
+      lineItems.flatMap((li) =>
+        (li.policyWarnings || [])
+          .filter((w) => w.violationId && !isJustified(w))
+          .map((violation) => ({ lineItem: li, violation }))
+      ),
+    [lineItems]
+  );
+  const [justifyDialog, setJustifyDialog] = useState(null); // { mode: "submit" | "save", items } | null
+  const [justifySaving, setJustifySaving] = useState(false);
+  const [justifyError, setJustifyError] = useState("");
+
 
   const steps = [
     {
@@ -269,6 +294,10 @@ export default function CreateExpensePage() {
   const [formData, setFormData] = useState({
     title: "",
     businessPurpose: "",
+    tripStartDate: "",
+    tripEndDate: "",
+    reportingPeriodStart: "",
+    reportingPeriodEnd: "",
     costCenterId: "",
     currencyId: "",
     cashAdvanceId: "",
@@ -607,18 +636,20 @@ export default function CreateExpensePage() {
     ) {
       const loadStep2Lookups = async () => {
         try {
-          const [catList, projListResponse] = await Promise.all([
+          // The caller's own assigned projects (the admin master list is not readable by employees).
+          const [catList, assignedProjects] = await Promise.all([
             lookupService.getActiveCategories(),
-            api.get("/xms/admin/projects", {
-              baseURL: window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "",
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-            }).catch(() => ({ data: { data: [] } })),
+            lookupService.getAssignedProjects().catch((err) => {
+              console.error("Failed to load assigned projects:", err);
+              showStatusToast(
+                err.response?.data?.message || "Could not load your assigned projects.",
+                "error"
+              );
+              return [];
+            }),
           ]);
           setCategories(catList);
-          const pList = projListResponse?.data?.data || projListResponse?.data || [];
-          setProjects(Array.isArray(pList) ? pList : []);
+          setProjects(Array.isArray(assignedProjects) ? assignedProjects : []);
         } catch (err) {
           console.error(
             "Failed to load categories/projects:",
@@ -645,6 +676,7 @@ export default function CreateExpensePage() {
       costCenters.map((c) => ({
         value: c.costCenterId,
         label: `${c.costCenterCode} - ${c.costCenterName}`,
+        departmentUuid: c.departmentUuid,
       })),
     [costCenters]
   );
@@ -671,61 +703,68 @@ export default function CreateExpensePage() {
 
 
   const cashAdvanceOptions = useMemo(() => {
-    return cashAdvances.map((a) => {
-      const rawId = String(
-        a.advanceId ||
-          a.id ||
-          a.cashAdvanceId ||
-          ""
-      );
+    return cashAdvances
+      .filter((a) => {
+        // Only show DISBURSED or IN_PROGRESS advances
+        const status = String(a.status || "").toUpperCase();
+        return ["DISBURSED", "IN_PROGRESS", "IN PROGRESS"].includes(status) &&
+               Number(a.outstandingBalance ?? a.remainingBalance ?? a.balance ?? 0) > 0;
+      })
+      .map((a) => {
+        const rawId = String(
+          a.advanceId ||
+            a.id ||
+            a.cashAdvanceId ||
+            ""
+        );
 
 
-      const formattedId =
-        rawId.startsWith("ADV-")
-          ? rawId
-          : `ADV-${rawId.slice(0, 8)}`;
+        const formattedId =
+          rawId.startsWith("ADV-")
+            ? rawId
+            : `ADV-${rawId.slice(0, 8)}`;
 
 
-      const title =
-        a.title ||
-        a.purpose ||
-        a.businessPurpose ||
-        "Cash Advance";
+        const title =
+          a.title ||
+          a.purpose ||
+          a.businessPurpose ||
+          "Cash Advance";
 
 
-      const amount = Number(
-        a.amount ??
-          a.advanceAmount ??
-          a.disbursedAmount ??
-          0
-      );
+        const amount = Number(
+          a.amount ??
+            a.advanceAmount ??
+            a.disbursedAmount ??
+            0
+        );
 
 
-      const currency =
-        a.currencyCode ||
-        a.currency ||
-        "INR";
+        const currency =
+          a.currencyCode ||
+          a.currency ||
+          "INR";
 
 
-      const outstanding = Number(
-        a.outstandingBalance ??
-          a.remainingBalance ??
-          a.balance ??
-          amount
-      );
+        const outstanding = Number(
+          a.outstandingBalance ??
+            a.remainingBalance ??
+            a.balance ??
+            amount
+        );
 
 
-      return {
-        value: rawId,
+        return {
+          value: rawId,
 
-        label:
-          `${formattedId} (${title}) - ` +
-          `Amount: ${amount} ${currency} ` +
-          `(Outstanding: ${outstanding} ${currency})`,
+          label:
+            `${formattedId} (${title}) - ` +
+            `Amount: ${amount} ${currency} ` +
+            `(Outstanding: ${outstanding} ${currency})`,
 
-        advance: a,
-      };
-    });
+          advance: a,
+        };
+      });
   }, [cashAdvances]);
 
 
@@ -780,6 +819,15 @@ export default function CreateExpensePage() {
 
   const validateForm = () => {
     const errors = {};
+
+    const tripDateError = validateTripDates(formData.tripStartDate, formData.tripEndDate);
+    if (tripDateError) {
+      errors[formData.tripStartDate ? "tripEndDate" : "tripStartDate"] = tripDateError;
+    }
+    const periodError = validateReportingPeriod(formData.reportingPeriodStart, formData.reportingPeriodEnd);
+    if (periodError) {
+      errors.reportingPeriodEnd = periodError;
+    }
 
 
     const title =
@@ -1011,33 +1059,45 @@ export default function CreateExpensePage() {
 
 
     // ----------------------------------------------------------
-    // CREATE PAYLOAD
+    // TRIP DATES (drive the submission deadline)
     // ----------------------------------------------------------
 
-    /*
-     * IMPORTANT:
-     *
-     * Do NOT send cashAdvanceId here.
-     *
-     * The current ExpenseReport create request is:
-     *
-     * title
-     * businessPurpose
-     * costCenterId
-     * currencyId
-     *
-     * The selected cash advance is retained in the UI
-     * for the subsequent settlement/adjustment workflow.
-     */
+    const periodError = validateReportingPeriod(formData.reportingPeriodStart, formData.reportingPeriodEnd);
+    if (periodError) {
+      setFormErrors((prev) => ({ ...prev, reportingPeriodEnd: periodError }));
+      showStatusToast(periodError, "error", 6000);
+      return;
+    }
+
+    const tripDateError = validateTripDates(formData.tripStartDate, formData.tripEndDate);
+    if (tripDateError) {
+      setFormErrors((prev) => ({ ...prev, [formData.tripStartDate ? "tripEndDate" : "tripStartDate"]: tripDateError }));
+      showStatusToast(tripDateError, "error", 6000);
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // CREATE PAYLOAD
+    // ----------------------------------------------------------
 
     const payload = {
       title,
       businessPurpose,
+      tripStartDate: formData.tripStartDate,
+      tripEndDate: formData.tripEndDate,
+      reportingPeriodStart: formData.reportingPeriodStart || null,
+      reportingPeriodEnd: formData.reportingPeriodEnd || null,
       costCenterId:
         formData.costCenterId,
       currencyId:
         formData.currencyId,
     };
+
+    // A report created from a cash advance is linked to it on the server, so the employee's
+    // expenses can be verified and offset against that advance. The link is set on create only.
+    const createPayload = formData.cashAdvanceId
+      ? { ...payload, cashAdvanceId: formData.cashAdvanceId }
+      : payload;
 
 
     console.log(
@@ -1079,7 +1139,7 @@ export default function CreateExpensePage() {
       else {
         res =
           await expenseReportService.create(
-            payload
+            createPayload
           );
 
 
@@ -1693,21 +1753,67 @@ export default function CreateExpensePage() {
   };
 
   // Step 3: Handle Final Submission for Approval
-  const handleSubmitReport = async () => {
+  const submitNow = () => {
+    // UI guard only: the backend enforces the same deadline on the submit call.
+    const deadlineInfo = getSubmissionDeadlineInfo({ reportStatus: "DRAFT", tripEndDate: formData.tripEndDate });
+    if (deadlineInfo?.isOverdue) {
+      showStatusToast(
+        `The submission deadline passed on ${formatDeadlineDate(deadlineInfo.deadline)}. This report can no longer be submitted.`,
+        "error",
+        4000,
+      );
+      return;
+    }
+    submitMutation.mutate(reportId, {
+      onSuccess: () => {
+        showStatusToast("Expense report submitted for approval successfully!", "success");
+        navigate(`/expense-management/expenses/reports/${reportId}`);
+      },
+      onError: (err) => {
+        const errMsg = err.response?.data?.message || err.response?.data?.detail || "Failed to submit expense report.";
+        showStatusToast(errMsg, "error", 4000);
+      },
+    });
+  };
+
+  const handleSubmitReport = () => {
     if (!reportId) return;
+    if (unexplainedViolations.length > 0) {
+      setJustifyError("");
+      setJustifyDialog({ mode: "submit", items: unexplainedViolations });
+      return;
+    }
+    submitNow();
+  };
+
+  const refreshLineItems = async () => {
+    const itemsRes = await lineItemService.getAll(reportId);
+    const payload = itemsRes.data?.data;
+    setLineItems(Array.isArray(payload) ? payload : payload?.lineItems || payload?.content || payload?.data || []);
+  };
+
+  // Saves each explanation, then submits (when the dialog was opened by Submit) or just closes it.
+  const handleJustifyConfirm = async (entries) => {
+    setJustifySaving(true);
+    setJustifyError("");
     try {
-      submitMutation.mutate(reportId, {
-        onSuccess: () => {
-          showStatusToast("Expense report submitted for approval successfully!", "success");
-          navigate(`/expense-management/expenses/reports/${reportId}`);
-        },
-        onError: (err) => {
-          const errMsg = err.response?.data?.message || err.response?.data?.detail || "Failed to submit expense report.";
-          showStatusToast(errMsg, "error", 4000);
-        },
-      });
+      for (const entry of entries) {
+        await lineItemService.justifyPolicyWarning(reportId, entry.lineItemId, entry.violationId, entry.justification);
+      }
     } catch (err) {
-      console.error("Error final submitting report:", err);
+      setJustifyError(err.response?.data?.message || err.response?.data?.detail || "Couldn't save your explanation. Try again.");
+      setJustifySaving(false);
+      refreshLineItems();
+      return;
+    }
+    await refreshLineItems();
+    setJustifySaving(false);
+    const mode = justifyDialog?.mode;
+    setJustifyDialog(null);
+    if (mode === "submit") {
+      submitNow();
+    } else {
+      showStatusToast("Explanations saved", "success");
     }
   };
 
@@ -1884,7 +1990,7 @@ export default function CreateExpensePage() {
 
       {/* MAIN WIZARD */}
 
-      <div className="mx-auto max-w-5xl rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 space-y-6">
+      <div className="mx-auto w-full rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 space-y-6">
 
 
         {/* =====================================================
@@ -1919,6 +2025,55 @@ export default function CreateExpensePage() {
               requiredMark
               error={formErrors.businessPurpose}
             />
+
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormInput
+                label="Trip / Meeting Start Date"
+                name="tripStartDate"
+                type="date"
+                value={formData.tripStartDate}
+                onChange={handleInputChange}
+                requiredMark
+                disabled={submitting}
+                error={formErrors.tripStartDate}
+              />
+              <FormInput
+                label="Estimated End Date"
+                name="tripEndDate"
+                type="date"
+                value={formData.tripEndDate}
+                onChange={handleInputChange}
+                min={formData.tripStartDate || undefined}
+                requiredMark
+                disabled={submitting}
+                error={formErrors.tripEndDate}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormInput
+                label="Reporting Period Start"
+                name="reportingPeriodStart"
+                type="date"
+                value={formData.reportingPeriodStart}
+                onChange={handleInputChange}
+                max={todayIsoDate()}
+                disabled={submitting}
+                error={formErrors.reportingPeriodStart}
+              />
+              <FormInput
+                label="Reporting Period End"
+                name="reportingPeriodEnd"
+                type="date"
+                value={formData.reportingPeriodEnd}
+                onChange={handleInputChange}
+                min={formData.reportingPeriodStart || undefined}
+                max={todayIsoDate()}
+                disabled={submitting}
+                error={formErrors.reportingPeriodEnd}
+              />
+            </div>
 
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -2450,9 +2605,8 @@ export default function CreateExpensePage() {
                   type="button"
                   variant="primary"
                   onClick={() =>
-                    setCurrentStep(
-                      3
-                    )
+                    // All line items are in: continue on the report page, where it is submitted.
+                    navigate(`/expense-management/expenses/reports/${reportId}`)
                   }
                 >
                   Next
@@ -2732,6 +2886,26 @@ export default function CreateExpensePage() {
                 </Button>
 
 
+                {unexplainedViolations.length > 0 && (
+                  <div className="mb-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs text-amber-800">
+                      {unexplainedViolations.length} policy violation(s) need an explanation before this report can be submitted.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="small"
+                      className="shrink-0"
+                      onClick={() => {
+                        setJustifyError("");
+                        setJustifyDialog({ mode: "save", items: unexplainedViolations });
+                      }}
+                    >
+                      Explain violations
+                    </Button>
+                  </div>
+                )}
+
                 <Button
                   type="button"
                   variant="primary"
@@ -2761,553 +2935,34 @@ export default function CreateExpensePage() {
           ADD / EDIT LINE ITEM MODAL
       ======================================================== */}
 
-      {isLineItemDrawerOpen && (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-
-            {/* HEADER */}
-
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-
-              <h2 className="text-base font-bold text-gray-900">
-                {
-                  editingLineItem
-                    ? "Edit Line Item"
-                    : "Add Actual Expense"
-                }
-              </h2>
-
-
-              <button
-                type="button"
-                onClick={() =>
-                  setIsLineItemDrawerOpen(
-                    false
-                  )
-                }
-                className="text-gray-400 hover:text-gray-600 transition"
-              >
-                <X size={18} />
-              </button>
-
-            </div>
-
-
-            {/* FORM */}
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-
-              <form
-                id="line-item-drawer-form"
-                onSubmit={
-                  handleSaveLineItem
-                }
-                className="space-y-4"
-              >
-
-                {/* CATEGORY */}
-
-                <div className="space-y-1">
-
-                  <label className="block text-xs font-semibold text-gray-700">
-
-                    Category{" "}
-
-                    <span className="text-red-500">
-                      *
-                    </span>
-
-                  </label>
-
-
-                  <Select
-                    options={
-                      categoryOptions
-                    }
-
-                    value={
-                      categoryOptions.find(
-                        (o) =>
-                          o.value ===
-                          lineItemFormData.categoryId
-                      ) || null
-                    }
-
-                    onChange={(opt) =>
-                      handleLineItemSelectChange(
-                        "categoryId",
-                        opt
-                          ? opt.value
-                          : ""
-                      )
-                    }
-
-                    placeholder="Select category..."
-
-                    isSearchable
-
-                    styles={
-                      compactSelectStyles
-                    }
-
-                    isDisabled={
-                      savingLineItem
-                    }
-                  />
-
-
-                  {lineItemErrors.categoryId && (
-                    <span className="text-[11px] text-red-600 block mt-0.5">
-                      {
-                        lineItemErrors.categoryId
-                      }
-                    </span>
-                  )}
-
-                </div>
-
-
-                {/* DATE + MERCHANT */}
-
-                <div className="grid grid-cols-2 gap-4">
-
-                  <div className="space-y-1">
-
-                    <label className="block text-xs font-semibold text-gray-700">
-
-                      Expense Date{" "}
-
-                      <span className="text-red-500">
-                        *
-                      </span>
-
-                    </label>
-
-
-                    <input
-                      type="date"
-                      name="expenseDate"
-                      value={
-                        lineItemFormData.expenseDate
-                      }
-                      onChange={
-                        handleLineItemInputChange
-                      }
-                      disabled={
-                        savingLineItem
-                      }
-                      className={`w-full px-2.5 py-1.5 h-[38px] rounded-md border text-xs focus:outline-none focus:ring-2 ${
-                        lineItemErrors.expenseDate
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/20"
-                      }`}
-                    />
-
-
-                    {lineItemErrors.expenseDate && (
-                      <span className="text-[11px] text-red-600 block mt-0.5">
-                        {
-                          lineItemErrors.expenseDate
-                        }
-                      </span>
-                    )}
-
-                  </div>
-
-
-                  <div className="space-y-1">
-
-                    <label className="block text-xs font-semibold text-gray-700">
-
-                      Merchant Name{" "}
-
-                      <span className="text-red-500">
-                        *
-                      </span>
-
-                    </label>
-
-
-                    <input
-                      type="text"
-                      name="merchantName"
-                      placeholder="e.g. Uber, Restaurant Name"
-                      value={
-                        lineItemFormData.merchantName
-                      }
-                      onChange={
-                        handleLineItemInputChange
-                      }
-                      disabled={
-                        savingLineItem
-                      }
-                      className={`w-full px-2.5 py-1.5 h-[38px] rounded-md border text-xs focus:outline-none focus:ring-2 ${
-                        lineItemErrors.merchantName
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/20"
-                      }`}
-                    />
-
-
-                    {lineItemErrors.merchantName && (
-                      <span className="text-[11px] text-red-600 block mt-0.5">
-                        {
-                          lineItemErrors.merchantName
-                        }
-                      </span>
-                    )}
-
-                  </div>
-
-                </div>
-
-                {/* Amount, Currency & GST */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1">
-
-                    <label className="block text-xs font-semibold text-gray-700">
-
-                      Amount{" "}
-
-                      <span className="text-red-500">
-                        *
-                      </span>
-
-                    </label>
-
-
-                    <input
-                      type="number"
-                      name="amount"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={
-                        lineItemFormData.amount
-                      }
-                      onChange={
-                        handleLineItemInputChange
-                      }
-                      disabled={
-                        savingLineItem
-                      }
-                      className={`w-full px-2.5 py-1.5 h-[38px] rounded-md border text-xs focus:outline-none focus:ring-2 ${
-                        lineItemErrors.amount
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/20"
-                      }`}
-                    />
-
-
-                    {lineItemErrors.amount && (
-                      <span className="text-[11px] text-red-600 block mt-0.5">
-                        {
-                          lineItemErrors.amount
-                        }
-                      </span>
-                    )}
-
-                  </div>
-
-
-                  <div className="space-y-1">
-
-                    <label className="block text-xs font-semibold text-gray-700">
-
-                      Currency{" "}
-
-                      <span className="text-red-500">
-                        *
-                      </span>
-
-                    </label>
-
-
-                    <Select
-                      options={
-                        currencyOptions
-                      }
-
-                      value={
-                        currencyOptions.find(
-                          (o) =>
-                            o.value ===
-                            lineItemFormData.currencyId
-                        ) || null
-                      }
-
-                      onChange={(opt) =>
-                        handleLineItemSelectChange(
-                          "currencyId",
-                          opt
-                            ? opt.value
-                            : ""
-                        )
-                      }
-
-                      placeholder="Currency"
-
-                      isSearchable
-
-                      styles={
-                        compactSelectStyles
-                      }
-
-                      isDisabled={
-                        savingLineItem
-                      }
-                    />
-
-
-                    {lineItemErrors.currencyId && (
-                      <span className="text-[11px] text-red-600 block mt-0.5">
-                        {
-                          lineItemErrors.currencyId
-                        }
-                      </span>
-                    )}
-
-                  </div>
-
-
-                  <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-gray-700">
-                      GST (Tax) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="taxAmount"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={lineItemFormData.taxAmount}
-                      onChange={handleLineItemInputChange}
-                      disabled={savingLineItem}
-                      className={`w-full px-2.5 py-1.5 h-[38px] rounded-md border text-xs focus:outline-none focus:ring-2 ${
-                        lineItemErrors.taxAmount
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/20"
-                      }`}
-                    />
-                    {lineItemErrors.taxAmount && (
-                      <span className="text-[11px] text-red-600 block mt-0.5">{lineItemErrors.taxAmount}</span>
-                    )}
-                  </div>
-                </div>
-
-
-                {/* BILLABLE / PROJECT */}
-
-                <div className="grid grid-cols-2 gap-4">
-
-                  <div className="space-y-1">
-
-                    <label className="block text-xs font-semibold text-gray-700">
-                      Client Billable?
-                    </label>
-
-
-                    <select
-                      name="clientBillable"
-                      value={
-                        lineItemFormData.clientBillable
-                          .toString()
-                      }
-                      onChange={(e) =>
-                        handleLineItemSelectChange(
-                          "clientBillable",
-                          e.target.value ===
-                            "true"
-                        )
-                      }
-                      disabled={
-                        savingLineItem
-                      }
-                      className="w-full px-2.5 py-1.5 h-[38px] rounded-md border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white"
-                    >
-
-                      <option value="false">
-                        No
-                      </option>
-
-                      <option value="true">
-                        Yes
-                      </option>
-
-                    </select>
-
-                  </div>
-
-
-                  <div className="space-y-1">
-
-                    <label className="block text-xs font-semibold text-gray-700">
-
-                      Project{" "}
-
-                      {lineItemFormData.clientBillable && (
-                        <span className="text-red-500">
-                          *
-                        </span>
-                      )}
-
-                    </label>
-
-
-                    <Select
-                      options={projects
-                        .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
-                        .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))}
-                      value={projects
-                        .filter((p) => (p.status || "").toString().toUpperCase() === "ACTIVE")
-                        .map((p) => ({ value: p.projectId, label: `${p.projectCode} - ${p.projectName}` }))
-                        .find((o) => o.value === lineItemFormData.projectId) || null}
-                      onChange={(opt) => handleLineItemSelectChange("projectId", opt ? opt.value : "")}
-                      placeholder="Select project..."
-
-                      isSearchable
-
-                      styles={
-                        compactSelectStyles
-                      }
-
-                      isDisabled={
-                        savingLineItem ||
-                        !lineItemFormData.clientBillable
-                      }
-                    />
-
-
-                    {lineItemErrors.projectId && (
-                      <span className="text-[11px] text-red-600 block mt-0.5">
-                        {
-                          lineItemErrors.projectId
-                        }
-                      </span>
-                    )}
-
-                  </div>
-
-                </div>
-
-
-                {/* DESCRIPTION */}
-
-                <div className="space-y-1">
-
-                  <label className="block text-xs font-semibold text-gray-700">
-                    Description
-                  </label>
-
-
-                  <input
-                    type="text"
-                    name="description"
-                    placeholder="Optional notes about this expense..."
-                    value={
-                      lineItemFormData.description
-                    }
-                    onChange={
-                      handleLineItemInputChange
-                    }
-                    disabled={
-                      savingLineItem
-                    }
-                    className="w-full px-2.5 py-1.5 h-[38px] rounded-md border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  />
-
-                </div>
-
-
-                {/* RECEIPT */}
-
-                <div className="space-y-1">
-
-                  <label className="block text-xs font-semibold text-gray-700">
-                    Receipt Attachment (Optional)
-                  </label>
-
-
-                  <input
-                    type="file"
-                    accept=".pdf,.png,.jpg,.jpeg"
-                    disabled={
-                      savingLineItem
-                    }
-                    onChange={(e) => {
-
-                      if (
-                        e.target.files
-                          ?.length
-                      ) {
-                        setReceiptFile(
-                          e.target.files[0]
-                        );
-                      }
-
-                    }}
-                    className="w-full border border-gray-300 rounded-md p-1 bg-white text-xs"
-                  />
-
-
-                  {receiptFile && (
-                    <p className="text-[10px] text-indigo-600 font-semibold mt-1">
-                      File chosen:{" "}
-                      {
-                        receiptFile.name
-                      }
-                    </p>
-                  )}
-
-                </div>
-
-              </form>
-
-            </div>
-
-
-            {/* FOOTER */}
-
-            <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50 shrink-0">
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  setIsLineItemDrawerOpen(
-                    false
-                  )
-                }
-                disabled={
-                  savingLineItem
-                }
-              >
-                Cancel
-              </Button>
-
-
-              <Button
-                type="submit"
-                form="line-item-drawer-form"
-                variant="primary"
-                loading={
-                  savingLineItem
-                }
-                loadingText="Saving..."
-                disabled={
-                  savingLineItem
-                }
-              >
-                Save
-              </Button>
-
-            </div>
-
-          </div>
-
-        </div>
-      )}
+      <PolicyJustificationModal
+        isOpen={!!justifyDialog}
+        items={justifyDialog?.items || []}
+        mode={justifyDialog?.mode}
+        isSaving={justifySaving || submitMutation.isPending}
+        error={justifyError}
+        onConfirm={handleJustifyConfirm}
+        onCancel={() => setJustifyDialog(null)}
+      />
+
+      {/* Add / edit line item: the same drawer the expense report detail page uses */}
+      <LineItemDrawer
+        isOpen={isLineItemDrawerOpen}
+        onClose={() => setIsLineItemDrawerOpen(false)}
+        reportId={reportId}
+        lineItem={editingLineItem}
+        defaultCostCenterId={formData.costCenterId}
+        categoryOptions={categoryOptions}
+        costCenterOptions={costCenterOptions}
+        currencyOptions={currencyOptions}
+        onSaved={async () => {
+          const itemsRes = await lineItemService.getAll(reportId);
+          const payload = itemsRes.data?.data;
+          setLineItems(Array.isArray(payload) ? payload : payload?.lineItems || payload?.content || payload?.data || []);
+          // After a line is saved, continue on the report page (where the report is submitted).
+          navigate(`/expense-management/expenses/reports/${reportId}`);
+        }}
+      />
 
 
       {/* =======================================================
@@ -3481,9 +3136,26 @@ export default function CreateExpensePage() {
                       icon={
                         <Briefcase size={15} />
                       }
+                      label="Client"
+                      value={
+                        lineItemToView.resolvedClientName || "—"
+                      }
+                    />
+
+                  </div>
+                )}
+
+
+                {lineItemToView.clientBillable && (
+                  <div className="col-span-2">
+
+                    <DetailField
+                      icon={
+                        <Briefcase size={15} />
+                      }
                       label="Project"
                       value={
-                        lineItemToView.projectName
+                        lineItemToView.projectName || "—"
                       }
                     />
 

@@ -312,8 +312,6 @@ export default function TaxConfigurationRegionDetailPage() {
             title={
               <span className="flex items-center gap-2">
                 {region.taxRegionName} ({region.taxRegionCode})
-                <span className="text-slate-300">—</span>
-                <StatusBadge label={region.status} size="md" />
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>

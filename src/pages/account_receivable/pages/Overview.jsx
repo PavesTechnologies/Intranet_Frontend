@@ -460,53 +460,50 @@ export default function Overview() {
       {/* 3. Billing Configurations */}
       <PageCard>
         <PageCardContent className="p-4 sm:p-5 space-y-4">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">Billing configurations</h2>
-            <p className="mt-0.5 text-xs text-slate-500">Filter projects by approval and configuration status.</p>
-          </div>
-          <div className="space-y-1">
-            <h3 className="px-2 text-xs font-semibold text-slate-600">Approval status</h3>
-
-<ARKPIStatusTabs
-  label="Billing approval status"
-  loading={loadingStats}
-  items={[
-    ...approvalKpis.map((kpi) => ({
-      key: kpi.key,
-      label: kpi.label,
-      value: kpi.value,
-      active: kpi.active,
-      onClick: () => handleKpiClick(kpi.key),
-    })),
-    ...configurationKpis.map((kpi) => ({
-      key: kpi.key,
-      label: kpi.label,
-      value: kpi.value,
-      active: kpi.active,
-      onClick: () => handleKpiClick(kpi.key),
-    })),
-  ]}
-/>
-
-                        <ARKPIStatusTabs
-              label="Billing configuration status"
-              loading={loadingStats}
-   
-            />
-          </div>
-          <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/70 p-2 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex-1 w-full lg:max-w-md">
-              <SearchInput
-                value={filters.search}
-                onChange={handleSearchInputChange}
-                placeholder="Search by project, code or client..."
-              />
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Billing configurations</h2>
+              <p className="mt-0.5 text-xs text-slate-500">Filter projects by approval and configuration status.</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+
+            <div className="flex w-full max-w-xl items-center justify-end gap-2 lg:w-[420px]">
+              <div className="flex-1 min-w-0">
+                <SearchInput
+                  value={filters.search}
+                  onChange={handleSearchInputChange}
+                  placeholder="Search by project, code or client..."
+                />
+              </div>
+
               {(approvalStatusFilter !== "ALL" || configStatusFilter !== "ALL" || filters.search) && (
                 <ARClearFiltersButton onClick={handleResetFilters} title="Clear all search and status filters" />
               )}
             </div>
+          </div>
+
+          <div className="space-y-1">
+            <h3 className="px-2 text-xs font-semibold text-slate-600">Approval status</h3>
+
+            <ARKPIStatusTabs
+              label="Billing approval status"
+              loading={loadingStats}
+              items={[
+                ...approvalKpis.map((kpi) => ({
+                  key: kpi.key,
+                  label: kpi.label,
+                  value: kpi.value,
+                  active: kpi.active,
+                  onClick: () => handleKpiClick(kpi.key),
+                })),
+                ...configurationKpis.map((kpi) => ({
+                  key: kpi.key,
+                  label: kpi.label,
+                  value: kpi.value,
+                  active: kpi.active,
+                  onClick: () => handleKpiClick(kpi.key),
+                })),
+              ]}
+            />
           </div>
 
           {!loadingConfigs && filteredConfigs.length === 0 ? (

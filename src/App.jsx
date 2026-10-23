@@ -60,6 +60,16 @@ import TdsChallansPage from "./pages/accounts-payable/tds-tracking/pages/TdsChal
 import TdsChallanNewPage from "./pages/accounts-payable/tds-tracking/pages/TdsChallanNewPage.jsx";
 import TdsFilingNewPage from "./pages/accounts-payable/tds-tracking/pages/TdsFilingNewPage.jsx";
 import BulkImportPage from "./pages/accounts-payable/bulk-import/pages/BulkImportPage.jsx";
+import RecurringSchedulesPage from "./pages/accounts-payable/recurring/pages/RecurringSchedulesPage.jsx";
+import GstItcPage from "./pages/accounts-payable/gst/pages/GstItcPage.jsx";
+import AccountingExportPage from "./pages/accounts-payable/accounting-export/pages/AccountingExportPage.jsx";
+import VendorNotesPage from "./pages/accounts-payable/vendor-notes/pages/VendorNotesPage.jsx";
+import WorkAssignmentPage from "./pages/accounts-payable/work-assignment/pages/WorkAssignmentPage.jsx";
+import { WORK_ASSIGN_LEAD_PERMISSIONS } from "./pages/accounts-payable/constants/workAssignment";
+import { VENDOR_NOTE_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/vendorNotes";
+import { GST_ITC_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/gstItc";
+import { ACCOUNTING_EXPORT_PERMISSIONS } from "./pages/accounts-payable/constants/accountingExport";
+import { RECURRING_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/recurring";
 import BulkImportJobPage from "./pages/accounts-payable/bulk-import/pages/BulkImportJobPage.jsx";
 import { PAYMENT_ANY_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/paymentPermissions";
 import { TDS_TRACKING_ANY_VIEW_PERMISSIONS } from "./pages/accounts-payable/constants/tdsTrackingPermissions";
@@ -229,11 +239,14 @@ import XmsRequestAdvancePage from "./pages/expense-management/pages/cash-advance
 import XmsMyAdvancesPage from "./pages/expense-management/pages/cash-advance/MyAdvancesPage.jsx";
 import XmsSettlementPage from "./pages/expense-management/pages/cash-advance/SettlementPage.jsx";
 import XmsCashAdvanceApprovalsPage from "./pages/expense-management/pages/cash-advance/CashAdvanceApprovalsPage.jsx";
+import XmsCashAdvanceDetailPage from "./pages/expense-management/pages/cash-advance/CashAdvanceDetailPage.jsx";
 import XmsApprovalsPage from "./pages/expense-management/approval-engine/pages/ApprovalsPage.jsx";
 import XmsApprovalFlowsPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowsPage.jsx";
 import XmsApprovalFlowBuilderPage from "./pages/expense-management/approval-engine/pages/ApprovalFlowBuilderPage.jsx";
 import XmsCatchAllFlowPage from "./pages/expense-management/approval-engine/pages/CatchAllFlowPage.jsx";
 import XmsDepartmentApproversPage from "./pages/expense-management/approval-engine/pages/DepartmentApproversPage.jsx";
+import XmsGlobalSearchPage from "./pages/expense-management/pages/GlobalSearchPage.jsx";
+import XmsAdvancedFilterPage from "./pages/expense-management/pages/AdvancedFilterPage.jsx";
 import XmsDelegationsPage from "./pages/expense-management/approval-engine/pages/DelegationsPage.jsx";
 import XmsFinancePage from "./pages/expense-management/pages/finance/FinancePage.jsx";
 import XmsApPaymentQueuePage from "./pages/expense-management/pages/ap-payments/ApPaymentQueuePage.jsx";
@@ -306,7 +319,7 @@ import EmployeeExitDashboard from "./pages/employee-exit/EmployeeExitDashboard.j
 import ExitDetailsPage from "./pages/employee-exit/ExitDetailsPage.jsx";
 
 import AccountReceivableLayout from "./pages/account_receivable/pages/AccountReceivableLayout.jsx";
-import AccountReceivableDashboard from "./pages/account_receivable/pages/Dashboard.jsx";
+import AccountReceivableDashboard from "./pages/account_receivable/dashboard/pages/ARDashboardPage.jsx";
 import Overview from "./pages/account_receivable/pages/Overview.jsx";
 import BillingConfigurations from "./pages/account_receivable/pages/BillingConfigurations.jsx";
 import NewConfigurationWizard from "./pages/account_receivable/pages/NewConfigurationWizard.jsx";
@@ -326,6 +339,7 @@ import PaymentTermsMasterPage from "./pages/account_receivable/pages/master-data
 import TaxConfigurationMasterPage from "./pages/account_receivable/pages/master-data/TaxConfigurationMasterPage.jsx";
 import TaxConfigurationRegionDetailPage from "./pages/account_receivable/pages/master-data/TaxConfigurationRegionDetailPage.jsx";
 import CompanyProfilePage from "./pages/account_receivable/pages/master-data/CompanyProfilePage.jsx";
+import CurrencyExchangeRateMasterPage from "./pages/account_receivable/pages/master-data/CurrencyExchangeRateMasterPage.jsx";
 
 import { showStatusToast } from "./components/toastfy/toast";
 import { IdentificationIcon } from "@heroicons/react/24/outline";
@@ -718,6 +732,46 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path={AP_ROUTES.WORK_ASSIGNMENT}
+            element={
+              <ProtectedRoute requiredPermissions={WORK_ASSIGN_LEAD_PERMISSIONS}>
+                <WorkAssignmentPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.VENDOR_NOTES}
+            element={
+              <ProtectedRoute requiredPermissions={VENDOR_NOTE_VIEW_PERMISSIONS}>
+                <VendorNotesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.GST_ITC}
+            element={
+              <ProtectedRoute requiredPermissions={GST_ITC_VIEW_PERMISSIONS}>
+                <GstItcPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.ACCOUNTING_EXPORT}
+            element={
+              <ProtectedRoute requiredPermissions={ACCOUNTING_EXPORT_PERMISSIONS}>
+                <AccountingExportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.RECURRING}
+            element={
+              <ProtectedRoute requiredPermissions={RECURRING_VIEW_PERMISSIONS}>
+                <RecurringSchedulesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path={AP_ROUTES.TDS_CHALLANS}
             element={
               <ProtectedRoute requiredPermissions={TDS_TRACKING_ANY_VIEW_PERMISSIONS}>
@@ -1006,6 +1060,14 @@ const AppRoutes = () => {
             <Route
               path="configurations/company-profile"
               element={<Navigate to="/account-receivable/master-data/company-profile" replace />}
+            />
+            <Route
+              path="master-data/exchange-rates"
+              element={<ProtectedRoute allowedRoles={AR_MAKER_ROLES}><CurrencyExchangeRateMasterPage /></ProtectedRoute>}
+            />
+            <Route
+              path="configurations/exchange-rates"
+              element={<Navigate to="/account-receivable/master-data/exchange-rates" replace />}
             />
           </Route>
           <Route path="/intranet-form" element={<IntranetForm />} />
@@ -1818,6 +1880,10 @@ const AppRoutes = () => {
           {/* Expense Management (XMS) */}
           <Route path="/expense-management/dashboard" element={<ProtectedRoute allowedRoles={["General", "Manager", "Reporting_Manager", "Finance", "Finance_Executive", "AP_Executive", "Admin", "Super_Admin"]}><XmsDashboardPage /></ProtectedRoute>} />
 
+          {/* EP12-S1: Global Search */}
+          <Route path="/expense-management/search" element={<ProtectedRoute allowedRoles={["General", "Manager", "Reporting_Manager", "Finance", "Finance_Executive", "AP_Executive", "Admin", "Super_Admin"]}><XmsGlobalSearchPage /></ProtectedRoute>} />
+          <Route path="/expense-management/filters" element={<ProtectedRoute allowedRoles={["General", "Manager", "Reporting_Manager", "Finance", "Finance_Executive", "AP_Executive", "Admin", "Super_Admin"]}><XmsAdvancedFilterPage /></ProtectedRoute>} />
+
           <Route path="/expense-management/expenses/create" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsCreateExpensePage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/my" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsMyExpensesPage /></ProtectedRoute>} />
           <Route path="/expense-management/expenses/reports/:reportId" element={<ProtectedRoute allowedRoles={["General", "Manager"]}><XmsExpenseReportDetailPage /></ProtectedRoute>} />
@@ -1827,8 +1893,10 @@ const AppRoutes = () => {
 
           <Route path="/expense-management/cash-advance/request" element={<ProtectedRoute allowedRoles={["General"]}><XmsRequestAdvancePage /></ProtectedRoute>} />
           <Route path="/expense-management/cash-advance/my" element={<ProtectedRoute allowedRoles={["General"]}><XmsMyAdvancesPage /></ProtectedRoute>} />
-          <Route path="/expense-management/cash-advance/settlement" element={<ProtectedRoute allowedRoles={["General"]}><XmsSettlementPage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/settlement" element={<ProtectedRoute allowedRoles={["General", "Finance", "FINANCE_EXECUTIVE", "Admin"]}><XmsSettlementPage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/settlement/:advanceId" element={<ProtectedRoute allowedRoles={["General", "Finance", "FINANCE_EXECUTIVE", "Admin"]}><XmsCashAdvanceDetailPage /></ProtectedRoute>} />
           <Route path="/expense-management/cash-advance/approvals" element={<ProtectedRoute allowedRoles={["Manager"]}><XmsCashAdvanceApprovalsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/cash-advance/:advanceId" element={<ProtectedRoute allowedRoles={["General"]}><XmsCashAdvanceDetailPage /></ProtectedRoute>} />
 
           {/* No role gate (§1.5): any employee can be a resolved approver (NAMED_USER/DEPARTMENT_OWNER/
               COST_CENTER_OWNER), not just "Manager" - the backend itself has no role restriction on
@@ -1837,6 +1905,7 @@ const AppRoutes = () => {
           <Route path="/expense-management/approvals/approved" element={<Navigate to="/expense-management/approvals" replace />} />
           <Route path="/expense-management/approvals/rejected" element={<Navigate to="/expense-management/approvals" replace />} />
           <Route path="/expense-management/approvals" element={<ProtectedRoute><XmsApprovalsPage /></ProtectedRoute>} />
+          <Route path="/expense-management/approvals/cash-advance/:advanceId" element={<ProtectedRoute><XmsCashAdvanceDetailPage /></ProtectedRoute>} />
 
           {/* Approval Rules (Admin config) - ADMIN-only, matching the Masters section's own role gate. */}
           <Route path="/expense-management/approval-rules/flows" element={<ProtectedRoute allowedRoles={["Admin", "Super_Admin"]}><XmsApprovalFlowsPage /></ProtectedRoute>} />

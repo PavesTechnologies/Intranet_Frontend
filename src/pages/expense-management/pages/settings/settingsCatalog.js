@@ -36,6 +36,23 @@ export const SETTINGS_CATALOG = [
     ],
   },
   {
+    group: "Expense submission",
+    settings: [
+      {
+        // The backend must read this same key, compute each report's deadline from its trip end
+        // date, and return it on the report (submissionDeadlineDays / submissionDeadline).
+        key: "expense.submission.deadline-days",
+        label: "Submission deadline (days after trip end)",
+        type: SETTING_TYPES.INTEGER,
+        min: 1,
+        step: 1,
+        defaultValue: 30,
+        description:
+          "Days after the trip or client meeting's estimated end date by which the expense report, with all receipts, must be submitted. Overdue reports are flagged.",
+      },
+    ],
+  },
+  {
     group: "Finance verification",
     settings: [
       {

@@ -3,6 +3,7 @@ import { Layers, Receipt, Landmark, Wallet } from "lucide-react";
 import StatusBadge from "@/components/status/statusbadge";
 import AnimatedNumber from "./AnimatedNumber";
 import InvoiceHandoffBadge from "./InvoiceHandoffBadge";
+import PaymentStatusBadge, { paymentStateOf } from "./PaymentStatusBadge";
 
 const formatAmount = (value) =>
   (Number(value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -38,7 +39,9 @@ export default function SummaryPanel({ report, lineItems = [] }) {
   const totalGst = lineItems.reduce((sum, li) => sum + toBase(li, li.taxAmount), 0);
   const totalNet = lineItems.reduce((sum, li) => sum + toBase(li, li.netAmount), 0);
   const totalBase = lineItems.reduce((sum, li) => sum + (Number(li.baseAmount) || 0), 0);
-  const hasPaymentTrack = !!report?.paymentRoutingStatus && report.paymentRoutingStatus !== "NONE";
+  // Payment track: Awaiting payment / Paid (only after AP confirms) / Settled - no payment due.
+  const hasPaymentTrack = !!paymentStateOf(report);
+  const payment = report?.paymentConfirmation;
   const hasInvoiceTrack = report?.invoiceHandoffStatus === "PENDING" || report?.invoiceHandoffStatus === "COMPLETED";
 
   return (
@@ -53,7 +56,7 @@ export default function SummaryPanel({ report, lineItems = [] }) {
             for client-billable reports, the invoice team handoff. */}
         {(hasPaymentTrack || hasInvoiceTrack) && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {hasPaymentTrack && <StatusBadge label={report.paymentRoutingStatus} size="sm" />}
+            {hasPaymentTrack && <PaymentStatusBadge report={report} />}
             {hasInvoiceTrack && <InvoiceHandoffBadge status={report.invoiceHandoffStatus} />}
           </div>
         )}
@@ -101,6 +104,21 @@ export default function SummaryPanel({ report, lineItems = [] }) {
           valueClassName="text-[#0A0082] text-base"
           suffix={baseCurrencyCode}
         />
+        {payment && (
+          <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
+            <p className="font-semibold">Payment</p>
+            <p className="mt-1">
+              {formatAmount(payment.amountPaid)} {baseCurrencyCode} paid on {payment.paymentDate || "—"}
+              {payment.paymentMethod ? ` by ${payment.paymentMethod.replace("_", " ").toLowerCase()}` : ""}
+            </p>
+            {payment.paymentReference && <p className="mt-0.5 font-mono">Ref {payment.paymentReference}</p>}
+          </div>
+        )}
+        {report?.noPaymentDue && (
+          <p className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
+            Approved and fully covered by your cash advance, so no payment is due.
+          </p>
+        )}
       </div>
     </div>
   );

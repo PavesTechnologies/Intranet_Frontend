@@ -1,4 +1,5 @@
 import api from "@/api/axiosInstance";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 /**
  * Shared service layer for Expense Report / Line Item / Receipt / lookup calls.
@@ -7,7 +8,7 @@ import api from "@/api/axiosInstance";
  * style already used by the sibling masters pages (CostCentersPage, etc.).
  */
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -30,6 +31,12 @@ export const expenseReportService = {
     }),
   getById: (reportId) =>
     api.get(`/xms/employee/expense-reports/${reportId}`, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+  // Every workflow event across correction rounds, oldest first: [{ action, performedBy, performedAt, comment }].
+  getHistory: (reportId) =>
+    api.get(`/xms/employee/expense-reports/${reportId}/history`, {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
@@ -105,6 +112,12 @@ export const splitService = {
     }),
   replace: (lineItemId, payload) =>
     api.put(`/xms/employee/expense-line-items/${lineItemId}/splits`, payload, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+  // Read-only view for Finance verification / AP payment (any report, not just the caller's own).
+  getForReview: (lineItemId) =>
+    api.get(`/xms/finance/expense-line-items/${lineItemId}/splits`, {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
@@ -293,6 +306,25 @@ export const lookupService = {
     });
     return normalizeList(res.data, "data");
   },
+  // Active clients for a client-billable line item: [{ clientId, clientName }], sorted by name.
+  // XMS calls RMS with the user's own token, so only roles RMS allows (Admin / Resource Manager /
+  // Project Manager) get a list; others get 403.
+  // { homeDepartmentUuid } for the caller — lets the expense form ask for a reason when a chosen
+  // cost center (or split share) belongs to another department.
+  getAllocationContext: async () => {
+    const res = await api.get("/xms/employee/allocation-context", {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    });
+    return res.data?.data || null;
+  },
+  getActiveClients: async () => {
+    const res = await api.get("/xms/clients", {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    });
+    return normalizeList(res.data, "data");
+  },
 };
 
 // Client invoice handoff queue (Epic 8) — separate from AP reimbursement (ApPaymentPage).
@@ -314,7 +346,14 @@ export const invoiceHandoffService = {
       baseURL: EXPENSE_API_BASE,
       headers: authHeaders(),
     }),
-  // InvoiceHandoffSummaryResponse: readyCount, readyBaseAmount, readyProjectCount, handedOffCount, baseCurrencyCode
+  // Resends a handoff that hasn't reached AR's queue; the response carries arDeliveryStatus SENT or FAILED.
+  redeliverToAr: (syncId) =>
+    api.post(`/xms/finance/invoice-handoff-queue/handoffs/${syncId}/redeliver`, null, {
+      baseURL: EXPENSE_API_BASE,
+      headers: authHeaders(),
+    }),
+  // InvoiceHandoffSummaryResponse: readyCount, readyBaseAmount, readyProjectCount, handedOffCount, baseCurrencyCode,
+  // readyClientCount, arDeliveryFailedCount
   getSummary: () =>
     api.get("/xms/finance/invoice-handoff-queue/summary", {
       baseURL: EXPENSE_API_BASE,

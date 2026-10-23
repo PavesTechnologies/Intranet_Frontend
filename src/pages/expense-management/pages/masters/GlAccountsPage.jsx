@@ -17,7 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { showStatusToast } from "@/components/toastfy/toast";
 import api from "@/api/axiosInstance";
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const glAccountService = {
   getAll: (params) => {
@@ -64,6 +64,7 @@ const glAccountService = {
 };
 import { Fonts } from "@/components/Fonts/Fonts";
 import Pagination from "@/components/Pagination/pagination";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 const ITEMS_PER_PAGE = 10;
 

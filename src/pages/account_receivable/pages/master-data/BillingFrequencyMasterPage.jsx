@@ -50,7 +50,7 @@ export default function BillingFrequencyMasterPage() {
   const [permissionError, setPermissionError] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("ACTIVE");
+  const [activeTab, setActiveTab] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -314,13 +314,13 @@ export default function BillingFrequencyMasterPage() {
 
       <PageCard className="overflow-hidden">
         <PageCardContent className="space-y-4 p-4 sm:p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-base font-semibold text-slate-900">Billing Frequencies</h2>
               <p className="mt-0.5 text-xs text-slate-500">Define the billing cycles available to AR configurations</p>
             </div>
-            <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 sm:flex-row sm:items-center">
-              <div className="w-full sm:w-72">
+            <div className="flex w-full items-center justify-end gap-2 lg:w-[420px]">
+              <div className="min-w-0 flex-1">
                 <SearchInput
                   value={searchQuery}
                   onChange={(event) => {
@@ -330,9 +330,7 @@ export default function BillingFrequencyMasterPage() {
                   placeholder="Search billing frequencies..."
                 />
               </div>
-              {hasActiveFilters && (
-                <ARClearFiltersButton onClick={handleResetFilters} />
-              )}
+              {hasActiveFilters && <ARClearFiltersButton onClick={handleResetFilters} />}
             </div>
           </div>
 
@@ -431,7 +429,6 @@ export default function BillingFrequencyMasterPage() {
         onClose={() => setIsViewOpen(false)}
         title="Billing Frequency Details"
         subtitle="Read-only properties of the selected record"
-        badge={viewingItem && <StatusBadge label={viewingItem.status} size="sm" />}
       >
         {viewingItem && (
           <div className="divide-y divide-slate-100 text-sm">

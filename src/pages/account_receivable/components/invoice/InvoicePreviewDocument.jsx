@@ -9,6 +9,7 @@ import {
   resolveInvoiceBillingType,
 } from "../../utils/invoicePresentation";
 import pavesLogo from "../../assets/paves-logo.png";
+import useSignatureImage from "../../hooks/useSignatureImage";
 import {
   Building2,
   Briefcase,
@@ -16,6 +17,7 @@ import {
   CheckCircle2,
   Clock,
   FileText,
+  Landmark,
   Mail,
   MapPin,
   Phone,
@@ -137,108 +139,6 @@ export function extractStateCodeFromGstin(gstin) {
   return null;
 }
 
-/**
- * Official Circular Corporate Stamp & Digital Signature Seal component.
- */
-function OfficialSignatureSeal({ sellerName = "PAVES TECHNOLOGIES" }) {
-  return (
-    <div className="relative w-28 h-28 flex items-center justify-center select-none my-1 transform -rotate-2">
-      <svg
-        viewBox="0 0 140 140"
-        className="w-full h-full text-[#0A0082]"
-        fill="currentColor"
-      >
-        {/* Outer Ring */}
-        <circle
-          cx="70"
-          cy="70"
-          r="64"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeDasharray="5 2.5"
-        />
-        {/* Middle Ring */}
-        <circle
-          cx="70"
-          cy="70"
-          r="58"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.2"
-        />
-        {/* Inner Ring */}
-        <circle
-          cx="70"
-          cy="70"
-          r="41"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-        />
-        {/* Circular text path */}
-        <path
-          id="sealTextPath"
-          d="M 70 20 A 50 50 0 1 1 69.9 20"
-          fill="none"
-        />
-        <text
-          fontSize="6.8"
-          fontWeight="bold"
-          letterSpacing="1.8"
-          fill="currentColor"
-          opacity="0.95"
-        >
-          <textPath href="#sealTextPath" startOffset="3%">
-            ★ PAVES TECHNOLOGIES ★ CORPORATE SEAL ★
-          </textPath>
-        </text>
-        {/* Center Text */}
-        <text
-          x="70"
-          y="61"
-          textAnchor="middle"
-          fontSize="8.5"
-          fontWeight="900"
-          letterSpacing="0.8"
-          fill="currentColor"
-        >
-          AUTHORIZED
-        </text>
-        <text
-          x="70"
-          y="72"
-          textAnchor="middle"
-          fontSize="8.5"
-          fontWeight="900"
-          letterSpacing="0.8"
-          fill="currentColor"
-        >
-          SIGNATORY
-        </text>
-        <line
-          x1="45"
-          y1="77"
-          x2="95"
-          y2="77"
-          stroke="currentColor"
-          strokeWidth="1.2"
-        />
-        <text
-          x="70"
-          y="87"
-          textAnchor="middle"
-          fontSize="7"
-          fontWeight="700"
-          letterSpacing="1"
-          fill="currentColor"
-        >
-          ✓ VERIFIED
-        </text>
-      </svg>
-    </div>
-  );
-}
 
 /**
  * InvoicePreviewDocument
@@ -282,7 +182,7 @@ export default function InvoicePreviewDocument({
     invoice?.billingPeriod || taxCalc?.billingPeriod || snapshotData?.billingPeriod || "Not provided"
   );
 
-  // Project Duration
+  // Project Duration (strictly from authoritative backend dates; never fabricated)
   const projectStart =
     invoice?.projectStartDate ||
     occurrence?.projectStartDate ||
@@ -291,7 +191,7 @@ export default function InvoicePreviewDocument({
     snapshotData?.startDate ||
     invoice?.startDate ||
     occurrence?.startDate ||
-    "2026-04-01";
+    null;
   const projectEnd =
     invoice?.projectEndDate ||
     occurrence?.projectEndDate ||
@@ -300,11 +200,10 @@ export default function InvoicePreviewDocument({
     snapshotData?.endDate ||
     invoice?.endDate ||
     occurrence?.endDate ||
-    "2027-03-31";
+    null;
 
   const projectDuration =
-    (projectStart && projectEnd ? formatDateRange(projectStart, projectEnd) : null) ||
-    "01 Apr 2026 - 31 Mar 2027";
+    projectStart && projectEnd ? formatDateRange(projectStart, projectEnd) : null;
 
   const billingType = resolveInvoiceBillingType({
     invoice,
@@ -316,7 +215,7 @@ export default function InvoicePreviewDocument({
     invoice?.projectName ||
     taxCalc?.projectName ||
     snapshotData?.projectName ||
-    "Client Engagement";
+    "—";
 
   // Client billing information
   const clientName =
@@ -324,7 +223,7 @@ export default function InvoicePreviewDocument({
     invoice?.clientInfo?.clientName ||
     taxCalc?.clientName ||
     snapshotData?.clientName ||
-    "Valued Client";
+    "—";
 
   const clientAddress =
     invoice?.billingAddress ||
@@ -366,14 +265,14 @@ export default function InvoicePreviewDocument({
     ? formatClientPhone(clientCountryCode, rawClientPhone)
     : "";
 
-  // Seller information
+  // Seller information (strictly from persisted invoice or active Company Profile; never fabricated)
   const sellerName =
     invoice?.sellerLegalName ||
     invoice?.sellerName ||
     invoice?.sellerInfo?.legalName ||
     companyProfile?.legalName ||
     companyProfile?.companyName ||
-    "Paves Technologies Private Limited";
+    "—";
 
   const invoiceSellerParts = [
     invoice?.sellerAddressLine1,
@@ -399,33 +298,42 @@ export default function InvoicePreviewDocument({
       : sellerAddressParts.length > 0
       ? sellerAddressParts.join(", ")
       : companyProfile?.address ||
-        "Q-City, Block A & Block B, Nanakramguda, Financial District, Gachibowli, Hyderabad, Telangana - 500032, India");
+        "—");
 
   const sellerGstin =
     invoice?.sellerGstin ||
     invoice?.sellerInfo?.gstin ||
     companyProfile?.taxRegistrationNumber ||
     companyProfile?.gstin ||
-    "36AAPCP4212K1Z6";
+    null;
 
-  const sellerPan = companyProfile?.pan || extractPanFromGstin(sellerGstin) || "AAPCP4212K";
-  const sellerStateCode = extractStateCodeFromGstin(sellerGstin) || "36";
+  const sellerPan =
+    invoice?.sellerPan ||
+    invoice?.sellerInfo?.pan ||
+    companyProfile?.pan ||
+    extractPanFromGstin(sellerGstin) ||
+    null;
+  const sellerStateCode = extractStateCodeFromGstin(sellerGstin) || null;
 
-  const clientPan = invoice?.clientPan || extractPanFromGstin(clientGstin);
+  const clientPan =
+    invoice?.clientPan ||
+    invoice?.clientInfo?.pan ||
+    extractPanFromGstin(clientGstin) ||
+    null;
   const clientStateCode = extractStateCodeFromGstin(clientGstin);
 
   const sellerEmail =
     invoice?.sellerEmail ||
     invoice?.sellerInfo?.email ||
     companyProfile?.email ||
-    "billing@pavestechnologies.com";
+    null;
 
   const sellerPhone =
     invoice?.sellerPhone ||
     invoice?.sellerInfo?.phone ||
     companyProfile?.phoneNumber ||
     companyProfile?.phone ||
-    "+91 90593 64400";
+    null;
 
   const logoSrc =
     invoice?.sellerLogoReference ||
@@ -434,13 +342,23 @@ export default function InvoicePreviewDocument({
     companyProfile?.logoReference ||
     pavesLogo;
 
+  const rawSignatureRef =
+    invoice?.sellerSignatureReference ||
+    invoice?.sellerInfo?.signatureUrl ||
+    companyProfile?.signatureReference ||
+    companyProfile?.signatureUrl ||
+    null;
+
+  const { imageUrl: authenticatedSignatureUrl } = useSignatureImage(rawSignatureRef);
+  const signatureSrc = authenticatedSignatureUrl || rawSignatureRef;
+
   const paymentTermsDisplay =
     formatPaymentTerms(invoice || {}) ||
     formatPaymentTerms(snapshotData || {}) ||
     formatPaymentTerms(taxCalc || {}) ||
     invoice?.paymentTerms ||
     snapshotData?.paymentTerms ||
-    "Net 30 Days";
+    "—";
 
   const snapshotNumber =
     invoice?.snapshotNumber ||
@@ -515,13 +433,25 @@ export default function InvoicePreviewDocument({
     return trimmed;
   })();
 
-  const displayInvoiceDate = formatDisplayDate(
-    invoice?.invoiceDate || rawEnd || new Date()
+  const isDocumentGenerated = Boolean(
+    invoice?.generated ||
+    (invoice?.invoiceNumber &&
+      invoice?.invoiceNumber !== "Assigned on generation" &&
+      !String(invoice?.invoiceNumber).toLowerCase().includes("draft") &&
+      invoice?.invoiceNumber !== "Not Yet Generated")
   );
+
+  const displayInvoiceDate = invoice?.invoiceDate
+    ? formatDisplayDate(invoice.invoiceDate)
+    : isDocumentGenerated
+    ? (rawEnd ? formatDisplayDate(rawEnd) : "—")
+    : "Upon Generation";
 
   const displayDueDate = invoice?.dueDate
     ? formatDisplayDate(invoice.dueDate)
-    : formatDisplayDate(new Date(Date.now() + 30 * 86400000));
+    : isDocumentGenerated
+    ? "—"
+    : "Upon Generation";
 
   // Client location
   const clientCountryName =
@@ -561,7 +491,7 @@ export default function InvoicePreviewDocument({
     ? String(clientCountryName).trim()
     : clientCountryCode
     ? String(clientCountryCode).trim()
-    : "Not configured";
+    : "—";
 
   // Place of Supply
   const explicitPlaceOfSupply =
@@ -587,10 +517,13 @@ export default function InvoicePreviewDocument({
     ? String(clientCountryName).trim()
     : clientCountryCode
     ? String(clientCountryCode).trim()
-    : "Telangana (36)";
+    : "—";
 
   // Line items
-  const items = Array.isArray(invoice?.items) ? invoice.items : [];
+  const rawItems = Array.isArray(invoice?.items) ? invoice.items : [];
+  const items = rawItems.filter(
+    (it) => it.includeInInvoice !== false && it.isBillable !== false && it.excludedFromInvoice !== true
+  );
   const lineItems = buildInvoiceLineItems({ billingType, items, occurrence, invoice, currency });
 
   // Tax Breakdown
@@ -691,14 +624,93 @@ export default function InvoicePreviewDocument({
       ? Number(taxCalc.grandTotal)
       : subtotal + totalTax;
 
-  const expenses = Number(invoice?.expenses ?? snapshotData?.expenses ?? 0);
+  const expenses = Number(
+    invoice?.expenseAmount ??
+    (typeof invoice?.expenses === "number" ? invoice.expenses : null) ??
+    snapshotData?.expenseAmount ??
+    (typeof snapshotData?.expenses === "number" ? snapshotData.expenses : null) ??
+    0
+  );
 
   const effectiveTaxRatePct =
     subtotal > 0 && totalTax > 0
       ? ((totalTax / subtotal) * 100).toFixed(1)
-      : effectiveTaxBreakdown.length > 0 && effectiveTaxBreakdown[0].rate
+      : effectiveTaxBreakdown.length > 0 && effectiveTaxBreakdown[0].rate !== null && effectiveTaxBreakdown[0].rate !== undefined
       ? Number(effectiveTaxBreakdown[0].rate).toFixed(1)
-      : "18.0";
+      : "0.0";
+
+  const explicitSupplyClassification =
+    invoice?.supplyClassification ||
+    invoice?.supply_classification ||
+    taxCalc?.supplyClassification ||
+    taxCalc?.supply_classification ||
+    null;
+
+  // Domestic taxes presence (e.g. CGST / SGST) precludes export / zero-rated treatment
+  const hasDomesticTaxes =
+    effectiveTaxBreakdown.some(
+      (c) =>
+        /cgst|sgst/i.test(c.taxTypeCode || c.taxComponent || "") &&
+        Number(c.amount || 0) > 0
+    ) ||
+    (totalTax > 0 &&
+      invoice?.taxRegionCode !== "EXPORT" &&
+      taxCalc?.taxRegionCode !== "EXPORT" &&
+      !taxCalc?.isZeroRated);
+
+  // Authoritative supply classification strictly backed by backend tax data
+  const isZeroRatedOrExport =
+    !hasDomesticTaxes &&
+    Boolean(
+      (totalTax === 0 &&
+        (effectiveTaxBreakdown.length === 0 ||
+          effectiveTaxBreakdown.every((c) => Number(c.rate || 0) === 0))) ||
+        invoice?.taxRegionCode === "EXPORT" ||
+        invoice?.taxRegionCode === "ZERO_RATED" ||
+        taxCalc?.taxRegionCode === "EXPORT" ||
+        taxCalc?.taxRegionCode === "ZERO_RATED" ||
+        taxCalc?.isZeroRated ||
+        taxCalc?.isExempt ||
+        String(taxCalc?.taxRuleName || "").toLowerCase().includes("export") ||
+        String(taxCalc?.taxRuleName || "").toLowerCase().includes("zero")
+    );
+
+  const supplyClassification =
+    explicitSupplyClassification ||
+    (isZeroRatedOrExport
+      ? "Export of Services (Zero Rated)"
+      : totalTax > 0
+      ? "Taxable Supply of Services"
+      : taxCalc?.taxRuleName || "Taxable Supply of Services");
+
+  // Reverse charge: strictly from persisted invoice or tax data; never hardcoded
+  const isReverseCharge = Boolean(
+    invoice?.reverseCharge === true ||
+    invoice?.isReverseCharge === true ||
+    invoice?.reverse_charge === true ||
+    taxCalc?.reverseCharge === true ||
+    taxCalc?.isReverseCharge === true ||
+    taxCalc?.reverse_charge === true ||
+    (typeof invoice?.reverseCharge === "string" && /^(yes|true)$/i.test(invoice.reverseCharge.trim())) ||
+    (typeof invoice?.reverse_charge === "string" && /^(yes|true)$/i.test(invoice.reverse_charge.trim())) ||
+    String(invoice?.taxPreference || "").toUpperCase() === "REVERSE_CHARGE" ||
+    String(snapshotData?.taxPreference || "").toUpperCase() === "REVERSE_CHARGE" ||
+    String(taxCalc?.taxRuleName || "").toLowerCase().includes("reverse charge")
+  );
+
+  const hasReverseChargeData = Boolean(
+    typeof invoice?.reverseCharge === "boolean" ||
+    typeof invoice?.isReverseCharge === "boolean" ||
+    typeof invoice?.reverse_charge === "boolean" ||
+    typeof invoice?.reverseCharge === "string" ||
+    typeof invoice?.reverse_charge === "string" ||
+    typeof taxCalc?.reverseCharge === "boolean" ||
+    typeof taxCalc?.isReverseCharge === "boolean" ||
+    typeof taxCalc?.reverse_charge === "boolean" ||
+    invoice?.taxPreference ||
+    snapshotData?.taxPreference ||
+    String(taxCalc?.taxRuleName || "").toLowerCase().includes("reverse charge")
+  );
 
   // Line items formatting for the table
   const formattedRows = lineItems.rows.map((row, idx) => {
@@ -710,19 +722,20 @@ export default function InvoicePreviewDocument({
       raw.resourceName ||
       raw.description ||
       projectName ||
-      "Professional Services";
+      "Line Item";
 
-    const hsnOrSac = raw.hsnCode || raw.sacCode || raw.hsn || raw.sac || "998314";
+    const hsnOrSac = raw.hsnCode || raw.sacCode || raw.hsn || raw.sac || "—";
 
     const subDetails = [];
     if (row.role && row.role !== "—") subDetails.push(`Role: ${row.role}`);
     if (row.workDate && row.workDate !== "—") subDetails.push(`Date: ${row.workDate}`);
     if (row.billingPeriod && row.billingPeriod !== "—") subDetails.push(`Period: ${row.billingPeriod}`);
     if (row.percent && row.percent !== "—") subDetails.push(`Installment: ${row.percent}`);
+    if (row.discountApplied || raw.discountApplied || raw.hasDiscount) subDetails.push("Discounted Rate");
     if (raw.description && raw.description !== itemTitle) subDetails.push(raw.description);
 
     const qtyNum = parseFloat(row.quantity) || 1;
-    const qtyDisplay = row.quantity && row.quantity !== "—" ? row.quantity : "1.00";
+    const qtyDisplay = row.quantity && row.quantity !== "—" ? row.quantity : (raw.quantity !== undefined && raw.quantity !== null ? Number(raw.quantity).toFixed(2) : "1.00");
 
     let lineTaxable =
       raw.taxableAmount !== undefined && raw.taxableAmount !== null
@@ -731,14 +744,18 @@ export default function InvoicePreviewDocument({
         ? Number(raw.amount)
         : lineItems.rows.length === 1 && subtotal > 0
         ? subtotal
-        : subtotal / (lineItems.rows.length || 1);
+        : subtotal > 0
+        ? subtotal / (lineItems.rows.length || 1)
+        : 0;
 
     let lineTax =
       raw.taxAmount !== undefined && raw.taxAmount !== null
         ? Number(raw.taxAmount)
         : lineItems.rows.length === 1 && totalTax > 0
         ? totalTax
-        : (lineTaxable * Number(effectiveTaxRatePct)) / 100;
+        : totalTax > 0
+        ? (lineTaxable * Number(effectiveTaxRatePct)) / 100
+        : 0;
 
     let lineTotal =
       raw.totalAmount !== undefined && raw.totalAmount !== null
@@ -750,7 +767,9 @@ export default function InvoicePreviewDocument({
         ? row.rate
         : raw.rate !== undefined && raw.rate !== null
         ? formatCurrency(raw.rate, currency)
-        : formatCurrency(lineTaxable / qtyNum, currency);
+        : qtyNum > 0 && lineTaxable > 0
+        ? formatCurrency(lineTaxable / qtyNum, currency)
+        : "—";
 
     return {
       index: idx + 1,
@@ -871,52 +890,71 @@ export default function InvoicePreviewDocument({
             {sellerAddress}
           </p>
 
-          <div className="pt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="font-bold text-slate-900">GSTIN:</span>
-              <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
-                {sellerGstin}
-              </span>
-            </span>
-
-            {sellerPan && (
+          {sellerGstin && (
+            <div className="pt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
               <span className="inline-flex items-center gap-1.5">
-                <span className="font-bold text-slate-900">PAN:</span>
+                <span className="font-bold text-slate-900">GSTIN:</span>
                 <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
-                  {sellerPan}
+                  {sellerGstin}
                 </span>
               </span>
-            )}
 
-            <span className="text-slate-600">
-              <span className="font-semibold text-slate-800">State:</span> Telangana ({sellerStateCode})
-            </span>
-          </div>
+              {sellerPan && (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="font-bold text-slate-900">PAN:</span>
+                  <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
+                    {sellerPan}
+                  </span>
+                </span>
+              )}
 
-          <div className="pt-1 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-slate-600">
-            <span className="flex items-center gap-1.5">
-              <Phone className="h-3.5 w-3.5 text-slate-400" />
-              <span>{sellerPhone}</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Mail className="h-3.5 w-3.5 text-slate-400" />
-              <span>{sellerEmail}</span>
-            </span>
-          </div>
+              {sellerStateCode && (
+                <span className="text-slate-600">
+                  <span className="font-semibold text-slate-800">State:</span>{" "}
+                  {companyProfile?.state || invoice?.sellerState || "Telangana"} ({sellerStateCode})
+                </span>
+              )}
+            </div>
+          )}
+
+          {(sellerPhone || sellerEmail) && (
+            <div className="pt-1 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-slate-600">
+              {sellerPhone && (
+                <span className="flex items-center gap-1.5">
+                  <Phone className="h-3.5 w-3.5 text-slate-400" />
+                  <span>{sellerPhone}</span>
+                </span>
+              )}
+              {sellerEmail && (
+                <span className="flex items-center gap-1.5">
+                  <Mail className="h-3.5 w-3.5 text-slate-400" />
+                  <span>{sellerEmail}</span>
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right: Authoritative Document Classification */}
         <div className="flex flex-col items-start sm:items-end sm:text-right shrink-0">
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-50 border border-emerald-300 px-3 py-1 rounded-full shadow-2xs mb-2.5">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-            ORIGINAL FOR RECIPIENT
-          </div>
+          {isDocumentGenerated && (
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-50 border border-emerald-300 px-3 py-1 rounded-full shadow-2xs mb-2.5">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+              ORIGINAL FOR RECIPIENT
+            </div>
+          )}
 
           <h1 className="text-2xl sm:text-3xl font-black text-[#0A0082] tracking-tight uppercase">
-            TAX INVOICE
+            {isDocumentGenerated ? "TAX INVOICE" : "DRAFT INVOICE"}
           </h1>
           <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-            (Issued under Section 31 of CGST Act, 2017)
+            {isDocumentGenerated
+              ? (isZeroRatedOrExport
+                  ? "(Supply of services for export under Letter of Undertaking / Zero-rated)"
+                  : hasDomesticTaxes
+                  ? "(Issued under Section 31 of CGST Act, 2017)"
+                  : "")
+              : "(Pre-generation draft preview)"}
           </p>
 
           <div className="mt-3 sm:text-right text-xs space-y-0.5 bg-slate-50 border border-slate-200/90 rounded-lg p-2.5 shadow-2xs w-full sm:w-auto">
@@ -924,12 +962,7 @@ export default function InvoicePreviewDocument({
               Supply Classification
             </div>
             <div className="font-bold text-slate-800">
-              {placeOfSupplyDisplay?.toLowerCase().includes("export") || currency !== "INR"
-                ? "Export of Services (Zero Rated)"
-                : "Taxable Supply of Services"}
-            </div>
-            <div className="text-[11px] text-slate-500">
-              SAC Code: <span className="font-mono font-bold text-slate-800">998314</span>
+              {supplyClassification}
             </div>
           </div>
         </div>
@@ -938,7 +971,7 @@ export default function InvoicePreviewDocument({
       {/* ========================================================================= */}
       {/* 2. INVOICE PARTICULARS & COORDINATES GRID                                 */}
       {/* ========================================================================= */}
-      <div className="my-5 rounded-xl border border-slate-200 bg-slate-50/70 p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-xs shadow-2xs">
+      <div className={`my-5 rounded-xl border border-slate-200 bg-slate-50/70 p-4 grid grid-cols-2 sm:grid-cols-3 ${hasReverseChargeData ? "lg:grid-cols-6" : "lg:grid-cols-5"} gap-4 text-xs shadow-2xs`}>
         <div>
           <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
             Invoice Number
@@ -990,14 +1023,16 @@ export default function InvoicePreviewDocument({
           </span>
         </div>
 
-        <div>
-          <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Reverse Charge
-          </span>
-          <span className="mt-0.5 block font-semibold text-slate-800 text-xs sm:text-sm">
-            No
-          </span>
-        </div>
+        {hasReverseChargeData && (
+          <div>
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Reverse Charge
+            </span>
+            <span className="mt-0.5 block font-semibold text-slate-800 text-xs sm:text-sm">
+              {isReverseCharge ? "Yes" : "No"}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -1020,14 +1055,14 @@ export default function InvoicePreviewDocument({
             </div>
 
             <div className="text-slate-600 leading-relaxed whitespace-pre-line">
-              {clientAddress || "Registered corporate address on file"}
+              {clientAddress || "—"}
             </div>
 
             <div className="pt-1.5 border-t border-slate-100 space-y-1.5">
               <div className="flex items-center gap-2">
                 <span className="text-slate-500 font-medium">GSTIN / Tax ID:</span>
                 <span className="font-mono font-bold text-slate-900 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded text-[11px]">
-                  {clientGstin || "Unregistered / Overseas Recipient"}
+                  {clientGstin || "—"}
                 </span>
               </div>
 
@@ -1088,20 +1123,11 @@ export default function InvoicePreviewDocument({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <div>
-                <span className="text-slate-500 text-[11px] block">Billing Model:</span>
-                <span className="font-semibold text-slate-800">
-                  {INVOICE_BILLING_TYPE_LABELS[billingType] || billingType || "Professional Services"}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-slate-500 text-[11px] block">Snapshot Reference:</span>
-                <span className="font-mono text-slate-700 truncate block">
-                  {snapshotNumber || "—"}
-                </span>
-              </div>
+            <div className="pt-1">
+              <span className="text-slate-500 text-[11px] block">Billing Model:</span>
+              <span className="font-semibold text-slate-800">
+                {INVOICE_BILLING_TYPE_LABELS[billingType] || billingType || "Professional Services"}
+              </span>
             </div>
           </div>
         </div>
@@ -1141,7 +1167,7 @@ export default function InvoicePreviewDocument({
           <tbody className="divide-y divide-slate-200">
             {formattedRows.map((row) => (
               <tr key={row.index} className="align-top hover:bg-slate-50/80 transition-colors">
-                <td className="py-3.5 px-3 text-left text-slate-500 font-semibold">
+                <td className="py-3.5 px-3 text-center text-slate-500 font-semibold">
                   {row.index}
                 </td>
                 <td className="py-3.5 px-3 text-left">
@@ -1161,22 +1187,22 @@ export default function InvoicePreviewDocument({
                     </div>
                   )}
                 </td>
-                <td className="py-3.5 px-3 text-left font-mono font-semibold text-slate-700 bg-slate-50/50">
+                <td className="py-3.5 px-3 text-center font-mono font-semibold text-slate-700 bg-slate-50/50">
                   {row.hsnOrSac}
                 </td>
-                <td className="py-3.5 px-3 text-left tabular-nums font-semibold text-slate-800">
+                <td className="py-3.5 px-3 text-center font-mono font-semibold text-slate-800">
                   {row.qtyDisplay}
                 </td>
-                <td className="py-3.5 px-3 text-left tabular-nums text-slate-900 font-medium">
+                <td className="py-3.5 px-3 text-right font-mono text-slate-900 font-medium">
                   {row.rateDisplay}
                 </td>
-                <td className="py-3.5 px-3 text-left tabular-nums font-medium text-slate-900">
+                <td className="py-3.5 px-3 text-right font-mono font-medium text-slate-900">
                   {formatCurrency(row.taxableAmount, currency)}
                 </td>
-                <td className="py-3.5 px-3 text-left tabular-nums text-slate-800 whitespace-nowrap">
+                <td className="py-3.5 px-3 text-right font-mono text-slate-800 whitespace-nowrap">
                   {formatCurrency(row.taxAmount, currency)}
                 </td>
-                <td className="py-3.5 pr-4 pl-3 text-left tabular-nums font-bold text-slate-950">
+                <td className="py-3.5 pr-4 pl-3 text-right font-mono font-bold text-slate-950">
                   {formatCurrency(row.totalAmount, currency)}
                 </td>
               </tr>
@@ -1206,18 +1232,18 @@ export default function InvoicePreviewDocument({
       </div>
 
       {/* ========================================================================= */}
-      {/* 5. FINANCIAL SUMMARY LEDGER & STATUTORY TAX BREAKDOWN                     */}
+      {/* 5. TAX & INVOICE SUMMARY                                                  */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-5 items-start">
-        {/* Left 7 Columns: Amount in words, Statutory Tax Table, Remittance */}
-        <div className="lg:col-span-7 space-y-4">
-          {/* Amount in words card */}
-          <div className="rounded-xl border border-indigo-200/90 bg-indigo-50/60 p-4 shadow-2xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-900 block">
-              Amount Chargeable (in words):
-            </span>
-            <div className="text-xs sm:text-sm font-bold text-slate-900 mt-1 leading-snug">
-              {amountInWords}
+      <div className="pt-5 space-y-5">
+        {/* Tax & Invoice Summary Card */}
+        <div className="rounded-xl border border-slate-300 bg-white overflow-hidden shadow-2xs text-xs w-full">
+          {/* Header */}
+          <div className="bg-slate-100/90 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Receipt className="h-4 w-4 text-[#0A0082]" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-800">
+                Tax & Invoice Summary
+              </span>
             </div>
             <div className="text-[10px] text-slate-500 mt-1.5 italic">
               E. & O.E. (Errors and Omissions Excepted)
@@ -1235,41 +1261,41 @@ export default function InvoicePreviewDocument({
               <thead>
                 <tr className="border-b border-slate-200 text-slate-600 font-bold bg-slate-50/70">
                   <th className="py-2 px-3 text-left">Tax Component</th>
-                  <th className="py-2 px-3 text-left">Taxable Amount</th>
-                  <th className="py-2 px-3 text-left">Rate</th>
-                  <th className="py-2 pr-3 pl-2 text-left">Tax Amount</th>
+                  <th className="py-2 px-3 text-right">Taxable Amount</th>
+                  <th className="py-2 px-3 text-right">Rate</th>
+                  <th className="py-2 pr-3 pl-2 text-right">Tax Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {effectiveTaxBreakdown.length > 0 ? (
                   effectiveTaxBreakdown.map((comp) => (
                     <tr key={comp.id}>
-                      <td className="py-2 px-3 text-left font-semibold text-slate-800">
+                      <td className="py-2 px-3 font-semibold text-slate-800">
                         {comp.taxTypeCode || comp.taxComponent}
                       </td>
-                      <td className="py-2 px-3 text-left tabular-nums text-slate-800">
+                      <td className="py-2 px-3 text-right font-mono text-slate-800">
                         {formatCurrency(comp.taxableAmount ?? subtotal, currency)}
                       </td>
-                      <td className="py-2 px-3 text-left tabular-nums text-slate-800">
+                      <td className="py-2 px-3 text-right font-mono text-slate-800">
                         {comp.rate ? `${Number(comp.rate).toFixed(1)}%` : `${effectiveTaxRatePct}%`}
                       </td>
-                      <td className="py-2 pr-3 pl-2 text-left tabular-nums font-bold text-slate-900">
+                      <td className="py-2 pr-3 pl-2 text-right font-mono font-bold text-slate-900">
                         {formatCurrency(comp.amount, currency)}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td className="py-2 px-3 text-left font-semibold text-slate-800">
+                    <td className="py-2 px-3 font-semibold text-slate-800">
                       Integrated Tax (IGST / GST)
                     </td>
-                    <td className="py-2 px-3 text-left tabular-nums text-slate-800">
+                    <td className="py-2 px-3 text-right font-mono text-slate-800">
                       {formatCurrency(subtotal, currency)}
                     </td>
-                    <td className="py-2 px-3 text-left tabular-nums text-slate-800">
+                    <td className="py-2 px-3 text-right font-mono text-slate-800">
                       {effectiveTaxRatePct}%
                     </td>
-                    <td className="py-2 pr-3 pl-2 text-left tabular-nums font-bold text-slate-900">
+                    <td className="py-2 pr-3 pl-2 text-right font-mono font-bold text-slate-900">
                       {formatCurrency(totalTax, currency)}
                     </td>
                   </tr>
@@ -1301,59 +1327,65 @@ export default function InvoicePreviewDocument({
             <div className="space-y-2">
               <div className="flex justify-between items-center text-slate-700">
                 <span className="font-bold text-slate-900">Taxable Amount (Subtotal)</span>
-                <span className="font-bold text-slate-900 tabular-nums text-xs">
+                <span className="font-bold text-slate-900 font-mono text-xs">
                   {formatCurrency(subtotal, currency)}
                 </span>
               </div>
 
-              {effectiveTaxBreakdown.length > 0 ? (
-                effectiveTaxBreakdown.map((comp) => (
+            {/* Dynamic Applicable Tax Components */}
+            {effectiveTaxBreakdown.length > 0 ? (
+              <div className="space-y-1.5 pt-0.5">
+                {effectiveTaxBreakdown.map((comp) => (
                   <div
                     key={comp.id}
-                    className="flex justify-between items-center text-slate-700 pl-2 border-l-2 border-indigo-200"
+                    className="flex justify-between items-center text-slate-700 pl-3 pr-2.5 py-1.5 rounded-lg bg-slate-50/70 border border-slate-200/70"
                   >
                     <span className="font-medium text-slate-800">
                       {comp.taxTypeCode || comp.taxComponent}
                       {comp.rate ? ` (${Number(comp.rate).toFixed(1)}%)` : ""}
                     </span>
-                    <span className="tabular-nums font-semibold text-slate-900">
+                    <span className="font-mono font-semibold text-slate-900">
                       {formatCurrency(comp.amount, currency)}
                     </span>
                   </div>
-                ))
-              ) : (
-                <div className="flex justify-between items-center text-slate-700 pl-2 border-l-2 border-indigo-200">
-                  <span className="font-medium text-slate-800">
-                    Total Tax ({effectiveTaxRatePct}%)
-                  </span>
-                  <span className="tabular-nums font-semibold text-slate-900">
-                    {formatCurrency(totalTax, currency)}
+                ))}
+              </div>
+            ) : totalTax > 0 ? (
+              <div className="flex justify-between items-center text-slate-700 pl-3 pr-2.5 py-1.5 rounded-lg bg-slate-50/70 border border-slate-200/70">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#0A0082]" />
+                  <span className="font-semibold text-slate-800">
+                    Applicable Tax ({effectiveTaxRatePct}%)
                   </span>
                 </div>
-              )}
+                <span className="font-mono font-semibold text-slate-900">
+                  {formatCurrency(totalTax, currency)}
+                </span>
+              </div>
+            ) : null}
 
               {expenses > 0 && (
                 <div className="flex justify-between items-center text-slate-700">
                   <span className="font-bold text-slate-900">Reimbursable Expenses</span>
-                  <span className="font-bold text-slate-900 tabular-nums">
+                  <span className="font-bold text-slate-900 font-mono">
                     {formatCurrency(expenses, currency)}
                   </span>
                 </div>
               )}
             </div>
 
-            {/* Total Invoice Value Card */}
-            <div className="rounded-lg bg-[#0A0082] text-white p-3.5 shadow-xs mt-3">
+            {/* Total Invoice Amount */}
+            <div className="rounded-xl bg-gradient-to-r from-[#0A0082] via-[#100094] to-[#0A0082] text-white p-4 shadow-sm border border-indigo-950 mt-2">
               <div className="flex justify-between items-center">
                 <div>
-                  <span className="block text-xs uppercase tracking-wider opacity-90 font-black">
-                    Total Invoice Value
+                  <span className="block text-xs uppercase tracking-wider font-black text-indigo-100">
+                    Total Invoice Amount
                   </span>
-                  <span className="text-[10px] opacity-75">
+                  <span className="text-[10px] text-indigo-200 font-medium">
                     Inclusive of all applicable taxes
                   </span>
                 </div>
-                <span className="tabular-nums text-base sm:text-xl font-black">
+                <span className="font-mono text-base sm:text-xl font-black">
                   {formatCurrency(grandTotal, currency)}
                 </span>
               </div>
@@ -1362,12 +1394,49 @@ export default function InvoicePreviewDocument({
             {/* Amount Payable */}
             <div className="flex justify-between items-center pt-2 border-t border-slate-200 px-1">
               <span className="font-bold text-slate-800 text-xs">Total Amount Payable:</span>
-              <span className="tabular-nums text-sm sm:text-base font-black text-[#0A0082]">
+              <span className="font-mono text-sm sm:text-base font-black text-[#0A0082]">
                 {formatCurrency(grandTotal, currency)}
               </span>
             </div>
+            <div className="text-xs sm:text-sm font-bold text-slate-900 leading-snug pl-3 border-l-2 border-[#0A0082]/40 py-0.5">
+              {amountInWords}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-2 italic flex items-center justify-between">
+              <span>E. & O.E. (Errors and Omissions Excepted)</span>
+              <span className="font-mono font-medium text-slate-400">{currency} Settlement</span>
+            </div>
           </div>
         </div>
+
+        {/* Payment Instructions Box (Rendered below Tax & Invoice Summary) */}
+        {paymentInstructions ? (
+          <div className="rounded-xl border border-slate-300 bg-white overflow-hidden shadow-2xs text-xs w-full">
+            {/* Header */}
+            <div className="bg-slate-100/90 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Landmark className="h-4 w-4 text-[#0A0082]" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-800">
+                  Payment Instructions
+                </span>
+              </div>
+            </div>
+
+            {/* Instructions Body */}
+            <div className="p-4 space-y-2.5">
+              <div className="text-xs text-slate-800 whitespace-pre-line leading-relaxed font-mono bg-slate-50/80 p-3 rounded-lg border border-slate-200/80">
+                {paymentInstructions}
+              </div>
+
+              {/* Remittance Reconciliation Footer Note */}
+              <div className="flex items-start gap-2 text-[11px] text-slate-500 pt-1">
+                <ShieldCheck className="h-3.5 w-3.5 text-[#0A0082] shrink-0 mt-0.5" />
+                <span className="leading-snug">
+                  Please quote the invoice number as the payment reference to ensure prompt settlement and reconciliation.
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* ========================================================================= */}
@@ -1401,14 +1470,26 @@ export default function InvoicePreviewDocument({
             For {sellerName}
           </span>
 
-          <OfficialSignatureSeal sellerName={sellerName} />
+          <div className="h-16 w-full flex items-center justify-center text-slate-400 text-xs italic select-none py-1">
+            {signatureSrc ? (
+              <img
+                src={signatureSrc}
+                alt="Authorized Signatory Signature"
+                className="max-h-full max-w-[150px] object-contain"
+                onError={(e) => {
+                  e.target.style.display = "none";
+                }}
+              />
+            ) : (
+              <span>
+                {isDocumentGenerated ? "(Authorized Signatory)" : "(Draft Preview — Pending Generation)"}
+              </span>
+            )}
+          </div>
 
           <div className="w-36 border-b border-slate-400 mt-1 mb-1" />
           <div className="text-xs font-bold text-slate-900">
             Authorized Signatory
-          </div>
-          <div className="text-[10px] text-slate-500">
-            Digitally Verified & Approved
           </div>
         </div>
       </div>
@@ -1417,8 +1498,12 @@ export default function InvoicePreviewDocument({
       {/* 7. STATUTORY FOOTER                                                       */}
       {/* ========================================================================= */}
       <div className="pt-6 mt-6 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center text-[10px] text-slate-500 gap-2">
-        <span>This is a computer-generated tax invoice issued under the Information Technology Act, 2000.</span>
-        <span>Page 1 of 1 • System Generated Official Document</span>
+        <span>
+          {isDocumentGenerated
+            ? "This is an official computer-generated invoice."
+            : "Invoice Generation Draft Preview • Not an official tax invoice until generated."}
+        </span>
+        <span>Page 1 of 1 • {isDocumentGenerated ? "Official Document" : "Draft Preview"}</span>
       </div>
     </div>
   );

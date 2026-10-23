@@ -9,6 +9,7 @@ import FormSelect from "@/components/forms/FormSelect";
 import FormTextArea from "@/components/forms/FormTextArea";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { showStatusToast } from "@/components/toastfy/toast";
+import { useNavigate } from "react-router-dom";
 
 import { cashAdvanceApi } from "@/pages/expense-management/api/cashAdvanceApi";
 import { lookupService } from "@/pages/expense-management/api/expenseReportsApi";
@@ -119,6 +120,25 @@ const isOverdueAdvance = (advance) => {
   return due < today;
 };
 
+// Settlement must fall within this many days after the needed-by date.
+const SETTLEMENT_WINDOW_DAYS = 30;
+
+const toIsoDate = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+/** Earliest and latest settlement dates allowed for a needed-by date (YYYY-MM-DD), or null when unset. */
+export const getSettlementDateRange = (neededByDate) => {
+  if (!neededByDate || !isValidDate(neededByDate)) return null;
+  const start = new Date(`${neededByDate}T00:00:00`);
+  const end = new Date(start);
+  end.setDate(end.getDate() + SETTLEMENT_WINDOW_DAYS);
+  return { min: toIsoDate(start), max: toIsoDate(end) };
+};
+
 const getOutstandingBalance = (advance) => {
   if (!advance) return 0;
 
@@ -147,6 +167,8 @@ const getActiveAdvances = (list) => {
 };
 
 export default function RequestAdvancePage() {
+  // In-app navigation after save, so only this page changes (a full reload restarts the whole app).
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: "",
     costCenterId: "",
@@ -493,6 +515,13 @@ export default function RequestAdvancePage() {
       if (settlementDate < neededDate) {
         newErrors.settlementDueDate =
           "Settlement Expected Date cannot be before Needed By Date.";
+      } else {
+        const latest = new Date(neededDate);
+        latest.setDate(latest.getDate() + SETTLEMENT_WINDOW_DAYS);
+        if (settlementDate > latest) {
+          newErrors.settlementDueDate =
+            `Settlement Expected Date must be within ${SETTLEMENT_WINDOW_DAYS} days of Needed By Date.`;
+        }
       }
     }
 
@@ -544,8 +573,7 @@ export default function RequestAdvancePage() {
         "success"
       );
 
-      window.location.href =
-        "/expense-management/cash-advance/my";
+      navigate("/expense-management/cash-advance/my");
     } catch (error) {
       console.error(
         "Failed to submit cash advance:",
@@ -603,8 +631,7 @@ export default function RequestAdvancePage() {
         "success"
       );
 
-      window.location.href =
-        "/expense-management/cash-advance/my";
+      navigate("/expense-management/cash-advance/my");
     } catch (error) {
       console.error(
         "Failed to save cash advance draft:",
@@ -907,6 +934,14 @@ export default function RequestAdvancePage() {
             }
             name="settlementDueDate"
             type="date"
+            min={getSettlementDateRange(formData.neededByDate)?.min}
+            max={getSettlementDateRange(formData.neededByDate)?.max}
+            disabled={!getSettlementDateRange(formData.neededByDate)}
+            placeholder={
+              getSettlementDateRange(formData.neededByDate)
+                ? undefined
+                : "Select needed-by date first"
+            }
             value={getDateValue(
               formData.settlementDueDate
             )}

@@ -1,4 +1,5 @@
 import api from "@/api/axiosInstance";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 /**
  * Service layer for Finance Verification endpoints (/xms/finance-verification/*).
@@ -6,7 +7,7 @@ import api from "@/api/axiosInstance";
  * base URL overrides and auth headers configuration.
  */
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -48,7 +49,12 @@ export const financeVerificationApi = {
   adjustLineTax: (reportId, lineItemId, payload) =>
     api.post(`/xms/finance-verification/${reportId}/line-items/${lineItemId}/tax-adjustment`, payload, withBase()),
 
+  // FINANCE_EXECUTIVE: { supplierGstin (blank clears), reason }. Re-checks CGST + SGST vs IGST against the company's GST state.
+  setSupplierGstin: (reportId, lineItemId, payload) =>
+    api.post(`/xms/finance-verification/${reportId}/line-items/${lineItemId}/supplier-gstin`, payload, withBase()),
+
   // ExpenseReportResponse - reason parameter required
-  queryLineItem: (reportId, lineItemId, reason) =>
-    api.post(`/xms/finance-verification/${reportId}/line-items/${lineItemId}/query`, { reason }, withBase()),
+  // category: optional CorrectionCategory (TAX_MISMATCH, RECEIPT, AMOUNT, OTHER) - shown to the employee.
+  queryLineItem: (reportId, lineItemId, reason, category) =>
+    api.post(`/xms/finance-verification/${reportId}/line-items/${lineItemId}/query`, { reason, category: category || null }, withBase()),
 };

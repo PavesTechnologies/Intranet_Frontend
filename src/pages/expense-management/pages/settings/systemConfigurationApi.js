@@ -1,4 +1,5 @@
 import api from "@/api/axiosInstance";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
 /**
  * System configurations (/xms/admin/system-configurations, ADMIN only). A key with no row falls
@@ -7,7 +8,7 @@ import api from "@/api/axiosInstance";
  * SystemConfigurationRequest: { configKey, configValue, dataType?, description? }
  */
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 const withBase = (extra) => ({ baseURL: EXPENSE_API_BASE, headers: authHeaders(), ...extra });

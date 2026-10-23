@@ -5,6 +5,7 @@ import Button from "@/components/Button/Button";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FormSelect from "@/components/forms/FormSelect";
 import ApprovalStatusPill from "../components/ApprovalStatusPill";
+import SourceBadge from "../components/SourceBadge";
 import EmployeeLabel from "../components/EmployeeLabel";
 import ExpenseReviewPanel from "../components/ExpenseReviewPanel";
 import { useMyHistory } from "../hooks/useApprovalWorkflow";
@@ -135,6 +136,7 @@ export default function ApprovalHistoryPage({ outcome: fixedOutcome, title, brea
                     <tr key={report.reportId} className={`transition cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50`} onClick={() => setReviewingItem(report)}>
                       <td className="px-2.5 py-1.5">
                         <span className="font-mono text-[11px] font-semibold text-gray-700">{report.reportNumber}</span>
+                        <SourceBadge cashAdvanceId={report.cashAdvanceId} />
                       </td>
                       <td className="px-2.5 py-1.5 text-gray-600 max-w-[220px] truncate text-xs">{report.title || "—"}</td>
                       <td className="px-2.5 py-1.5 text-xs">

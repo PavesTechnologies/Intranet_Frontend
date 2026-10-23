@@ -18,8 +18,9 @@ import { showStatusToast } from "@/components/toastfy/toast";
 import api from "@/api/axiosInstance";
 import { Fonts } from "@/components/Fonts/Fonts";
 import Pagination from "@/components/Pagination/pagination";
+import { XMS_BASE_URL } from "@/pages/expense-management/api/xmsBaseUrl";
 
-const EXPENSE_API_BASE = window.__APP_CONFIG__?.EXPENSE_MANAGEMENT_URL || "";
+const EXPENSE_API_BASE = XMS_BASE_URL;
 
 const currencyService = {
   getAll: (params) => {

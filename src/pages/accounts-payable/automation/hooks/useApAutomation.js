@@ -46,6 +46,18 @@ export function useSetSharePointImport() {
   });
 }
 
+export function useSegregationOfDuties() {
+  return useQuery({ queryKey: [...AP_AUTOMATION_KEY, "sod"], queryFn: () => apAutomationService.getSegregationOfDuties() });
+}
+
+export function useSetSegregationOfDuties() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (rules) => apAutomationService.setSegregationOfDuties(rules),
+    onSuccess: (rules) => queryClient.setQueryData([...AP_AUTOMATION_KEY, "sod"], rules),
+  });
+}
+
 export function useRunAutomationNow() {
   return useRefreshAfter(() => apAutomationService.runNow());
 }

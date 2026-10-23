@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Calculator, ArrowUpRight, ArrowDownLeft, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Calculator, AlertCircle } from "lucide-react";
 
 const formatMoney = (amount, currencyCode = "INR") => {
   const num = Number(amount) || 0;
@@ -114,48 +114,26 @@ export default function CashAdvanceAdjustmentCard({
         {adjustmentBadge}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Total Advance Disbursed */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Disbursed Advance</p>
-          <p className="text-base font-bold text-gray-900 mt-1">{formatMoney(A, currencyCode)}</p>
-          <p className="text-[10px] text-gray-400 mt-0.5">Original funds disbursed</p>
-        </div>
-
-        {/* Verified Expense Amount */}
-        <div className="bg-blue-50/60 border border-blue-200 rounded-lg p-3">
-          <p className="text-[10px] font-semibold text-blue-700 uppercase tracking-wider">Verified Expenses</p>
-          <p className="text-base font-bold text-blue-900 mt-1">{formatMoney(E, currencyCode)}</p>
-          <p className="text-[10px] text-blue-600 mt-0.5">Approved eligible expenses</p>
-        </div>
-
-        {/* Outstanding Balance to Return */}
-        <div className={`border rounded-lg p-3 ${netBalance > 0 ? "bg-amber-50/60 border-amber-200" : "bg-emerald-50/40 border-emerald-200"}`}>
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-semibold text-amber-800 uppercase tracking-wider">Outstanding Balance to Return</p>
-            {netBalance > 0 && <ArrowDownLeft size={14} className="text-amber-600" />}
-          </div>
-          <p className={`text-base font-bold mt-1 ${netBalance > 0 ? "text-amber-700" : "text-emerald-700"}`}>
-            {formatMoney(netBalance, currencyCode)}
-          </p>
-          <p className="text-[10px] text-gray-500 mt-0.5">
-            {persistedOutstanding != null ? (netBalance > 0 ? "Authoritative backend outstanding balance" : "Zero balance") : (netBalance > 0 ? "Employee owes company" : "Zero balance to return")}
+      {/* One result line: the calculation once, then what happens next. The amounts themselves are shown above. */}
+      <div className={`flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between ${
+        netBalance > 0 ? "bg-amber-50/60 border-amber-200" : excessReimbursement > 0 ? "bg-purple-50/60 border-purple-200" : "bg-emerald-50/40 border-emerald-200"
+      }`}>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Settlement result</p>
+          <p className={`text-sm font-bold mt-0.5 ${netBalance > 0 ? "text-amber-700" : excessReimbursement > 0 ? "text-purple-700" : "text-emerald-700"}`}>
+            {netBalance > 0
+              ? `Employee returns ${formatMoney(netBalance, currencyCode)}`
+              : excessReimbursement > 0
+                ? `Company reimburses ${formatMoney(excessReimbursement, currencyCode)}`
+                : "Fully settled, no cash to return"}
           </p>
         </div>
-
-        {/* Excess Reimbursement Due to Employee */}
-        <div className={`border rounded-lg p-3 ${excessReimbursement > 0 ? "bg-purple-50/60 border-purple-200" : "bg-gray-50 border-gray-200"}`}>
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-semibold text-purple-800 uppercase tracking-wider">Additional Reimbursement</p>
-            {excessReimbursement > 0 && <ArrowUpRight size={14} className="text-purple-600" />}
-          </div>
-          <p className={`text-base font-bold mt-1 ${excessReimbursement > 0 ? "text-purple-700" : "text-gray-400"}`}>
-            {formatMoney(excessReimbursement, currencyCode)}
-          </p>
-          <p className="text-[10px] text-gray-500 mt-0.5">
-            {excessReimbursement > 0 ? "Company owes employee" : "No excess reimbursement"}
-          </p>
-        </div>
+        <p className="text-[11px] text-gray-500">
+          {formatMoney(A, currencyCode)} advance − {formatMoney(E, currencyCode)} approved ={" "}
+          {A - E >= 0
+            ? formatMoney(A - E, currencyCode)
+            : `${formatMoney(Math.abs(A - E), currencyCode)} payable to employee`}
+        </p>
       </div>
 
       {onApplyOffset && reportId && maxOffset > 0 && !isSettled && (
