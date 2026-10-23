@@ -17,6 +17,7 @@ const REASON_TEXT = {
   OVERRIDE: "Tax differs from the tax code",
   CONFIG_MISMATCH: "Receipt agrees with the entered tax, not the tax code",
   OCR_MISMATCH: "Tax differs from what OCR read on the receipt",
+  SUPPLY_TYPE_MISMATCH: "Supplier state and tax type disagree (same state = CGST + SGST, other state = IGST)",
   NO_TAX_CODE: "Tax entered for a category with no tax code",
   LOW_OCR_CONFIDENCE: "OCR reading too uncertain to compare",
 };

@@ -82,6 +82,19 @@ export const useVerifyLineItem = () => {
   });
 };
 
+/** FINANCE_EXECUTIVE sets the supplier GSTIN: { supplierGstin, reason } - its state decides CGST + SGST vs IGST. */
+export const useSetSupplierGstin = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reportId, lineItemId, payload }) =>
+      financeVerificationApi.setSupplierGstin(reportId, lineItemId, payload).then(unwrap),
+    onSettled: (_data, _err, { reportId }) => {
+      invalidateFinanceCaches(qc, reportId);
+      qc.invalidateQueries({ queryKey: ["expenseReviewLineItems", reportId] });
+    },
+  });
+};
+
 export const useAdjustLineTax = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -98,8 +111,8 @@ export const useAdjustLineTax = () => {
 export const useQueryLineItem = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ reportId, lineItemId, reason }) =>
-      financeVerificationApi.queryLineItem(reportId, lineItemId, reason).then(unwrap),
+    mutationFn: ({ reportId, lineItemId, reason, category }) =>
+      financeVerificationApi.queryLineItem(reportId, lineItemId, reason, category).then(unwrap),
     onSettled: (_data, _err, { reportId }) => invalidateFinanceCaches(qc, reportId),
   });
 };

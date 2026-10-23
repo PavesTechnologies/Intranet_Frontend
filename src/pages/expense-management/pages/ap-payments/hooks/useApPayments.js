@@ -70,11 +70,19 @@ export const useApPaymentSummary = () =>
     staleTime: 30_000,
   });
 
-/** mutate({ reportId, confirmation }) - confirmation is the FormData from buildDisbursementFormData. */
+// AP's confirmation of the actual payment: { paymentReference, paymentMethod, paymentDate, amountPaid, remarks }.
+// Called directly (not via the accounts-payable apPaymentApi, whose completePayment sends no body).
+const completePayment = (reportId, payment) =>
+  api.post(`/xms/ap-payments/${reportId}/complete`, payment, {
+    baseURL: XMS_BASE_URL,
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  });
+
+/** mutate({ reportId, payment }) - the report shows as paid only once the server accepts this. */
 export const useCompletePayment = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ reportId, confirmation }) => apPaymentApi.completePayment(reportId, confirmation).then(unwrap),
+    mutationFn: ({ reportId, payment }) => completePayment(reportId, payment).then(unwrap),
     // Refresh on failure too - e.g. a duplicate-completion attempt means this row was already
     // stale (someone else completed it first), so re-fetching clears it immediately.
     onSettled: (_data, _err, { reportId }) => {
