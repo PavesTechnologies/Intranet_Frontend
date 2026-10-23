@@ -41,6 +41,9 @@ function useJobMutation(mutationFn) {
 }
 
 export const useUploadImport = () =>
-  useJobMutation(({ type, workbook, documents, onProgress }) => bulkImportService.upload(type, workbook, documents, onProgress));
+  useJobMutation(({ type, workbook, documents, onProgress, receiptsOnly }) =>
+    receiptsOnly
+      ? bulkImportService.uploadReceipts(documents, onProgress)
+      : bulkImportService.upload(type, workbook, documents, onProgress));
 export const useRecordImport = () => useJobMutation(({ jobId, rowIds, acceptReview }) => bulkImportService.record(jobId, { rowIds, acceptReview }));
 export const useSkipImportRow = () => useJobMutation((rowId) => bulkImportService.skipRow(rowId));

@@ -28,6 +28,17 @@ export const bulkImportService = {
     });
     return data;
   },
+  /** Receipts only - no sheet: each receipt is matched to the invoice it pays (POST /bulk-import/payments/receipts). */
+  async uploadReceipts(documents, onProgress) {
+    const formData = new FormData();
+    documents.forEach((file) => formData.append("documents", file));
+    const { data } = await api.post(`${BASE()}/payments/receipts`, formData, {
+      onUploadProgress: (event) => {
+        if (onProgress && event.total) onProgress(Math.round((event.loaded / event.total) * 100));
+      },
+    });
+    return data;
+  },
   async listJobs(type, page = 1, pageSize = 10) {
     const { data } = await api.get(`${BASE()}/jobs`, { params: { kind: type, page, page_size: pageSize } });
     return data;

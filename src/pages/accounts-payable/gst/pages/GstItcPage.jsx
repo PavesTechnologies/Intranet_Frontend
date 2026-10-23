@@ -1,4 +1,5 @@
 import { useState } from "react";
+import PageGuide from "../../guide/components/PageGuide";
 import { Link, useSearchParams } from "react-router-dom";
 import clsx from "clsx";
 import { toast } from "react-toastify";
@@ -138,7 +139,8 @@ export default function GstItcPage() {
   return (
     <div className="space-y-4 p-4 sm:p-6">
       <Breadcrumb items={[{ label: "Accounts Payable", to: AP_ROUTES.DASHBOARD }, { label: "GST input credit" }]} />
-      <PageHeader title="GST input credit" subtitle="GST paid to vendors that the company recovers in GSTR-3B - claim it on time, and keep it" />
+      <PageHeader title="GST Input Credit" subtitle="GST paid to vendors that the company recovers in GSTR-3B - claim it on time, and keep it" />
+      <PageGuide page="gst" />
       <SegmentedTabs value={tab} onChange={(v) => setParams(v === "gstr2b" ? { tab: v } : {}, { replace: true })}
         tabs={[{ value: "register", label: "ITC register" }, { value: "gstr2b", label: "GSTR-2B match" }]} />
       {tab === "gstr2b" ? (

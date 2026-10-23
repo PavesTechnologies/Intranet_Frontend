@@ -63,7 +63,7 @@ function HowItWorks() {
   const steps = [
     { icon: UploadCloud, title: "Upload", text: "A ZIP or up to 25 PDF / image invoices." },
     { icon: ScanText, title: "Read & check", text: "Each file is read and validated exactly like a single upload." },
-    { icon: ClipboardCheck, title: "Review", text: "Invoices wait in the OCR review queue; issues are listed per file." },
+    { icon: ClipboardCheck, title: "Review", text: "Invoices wait in To review for an AP Executive to check; issues are listed per file." },
   ];
   return (
     <ol className="grid gap-3 sm:grid-cols-3">
@@ -258,7 +258,7 @@ function BulkUploadWorkspace() {
     <div className="space-y-5 p-6">
       <PageHeader
         title="Bulk Invoice Upload"
-        subtitle={`Upload a ZIP or up to ${limits.max_files} invoices at once. Each one is read, validated and saved for OCR review.`}
+        subtitle={`Upload a ZIP or up to ${limits.max_files} invoices at once. Each one is read, checked and saved for review.`}
         actions={
           <>
             <Button variant="outline" onClick={() => navigate(AP_ROUTES.INVOICE_LIST)}>

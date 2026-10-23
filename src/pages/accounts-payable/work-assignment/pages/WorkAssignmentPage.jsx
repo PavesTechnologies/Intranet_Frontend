@@ -141,7 +141,7 @@ export default function WorkAssignmentPage() {
   return (
     <div className="space-y-4 p-4 sm:p-6">
       <Breadcrumb items={[{ label: "Accounts Payable", to: AP_ROUTES.DASHBOARD }, { label: "AP team & assignment" }]} />
-      <PageHeader title="AP team & assignment" subtitle="Who is working which invoice, routing rules, and cover when someone is away" />
+      <PageHeader title="AP Team" subtitle="Who is working which invoice, routing rules, and cover when someone is away" />
       {isLoading ? (
         <div className="flex justify-center rounded-xl border border-slate-200 bg-white py-20"><LoadingSpinner text="Loading the team..." /></div>
       ) : isError ? (

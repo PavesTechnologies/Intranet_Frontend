@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { invoiceStatusLabel } from "../../constants/invoiceStatus";
 import GenericTable from "../../../../components/Table/table";
 import StatusBadge from "../../../../components/status/statusbadge";
 import { formatCurrency, formatDate, calculateBalance, isOverdue } from "../../utils/formatters";
@@ -53,7 +54,7 @@ export default function InvoiceTable({ invoices, loading }) {
           {formatCurrency(balance, symbol)}
         </span>
       ),
-      status: <StatusBadge label={invoice.status} size="sm" />,
+      status: <StatusBadge label={invoiceStatusLabel(invoice.status)} size="sm" />,
       actions: <InvoiceRowActions invoice={invoice} />,
     };
   });

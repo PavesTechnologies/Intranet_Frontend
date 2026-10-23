@@ -69,29 +69,58 @@ describe("BulkImportPage", () => {
       </MemoryRouter>,
     );
 
-  it("uploads the sheet with its documents and opens the import", async () => {
+  it("payments default to receipts only - no sheet, no template", async () => {
     const user = userEvent.setup();
     renderPage();
+    expect(screen.getByRole("tab", { name: "Receipts only" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("button", { name: /Download template/ })).toBeNull();
+    await user.upload(screen.getByTestId("import-file-input"), [file("advice-7.pdf"), file("advice-8.pdf")]);
+    expect(screen.queryByText("Add the filled .xlsx sheet")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Match 2 receipts" }));
+    const call = useUploadImport.mock.results[0].value.mutateAsync.mock.calls[0][0];
+    expect(call.receiptsOnly).toBe(true);
+    expect(call.documents.map((f) => f.name)).toEqual(["advice-7.pdf", "advice-8.pdf"]);
+    expect(await screen.findByText("job page")).toBeInTheDocument();
+  });
+
+  it("uploads the sheet with its documents and opens the import", async () => {
+    const user = userEvent.setup();
+    renderPage("/accounts-payable/bulk-import?type=payments&mode=sheet");
     expect(screen.getByText("october-payments.xlsx")).toBeInTheDocument();
     await user.upload(screen.getByTestId("import-file-input"), [file("pay.xlsx"), file("advice-7.pdf"), file("advice-8.pdf")]);
     expect(screen.getByText("2 documents")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Upload and check" }));
     const call = useUploadImport.mock.results[0].value.mutateAsync.mock.calls[0][0];
     expect(call.type).toBe("payments");
+    expect(call.receiptsOnly).toBe(false);
     expect(call.workbook.name).toBe("pay.xlsx");
     expect(call.documents.map((f) => f.name)).toEqual(["advice-7.pdf", "advice-8.pdf"]);
     expect(await screen.findByText("job page")).toBeInTheDocument();
   });
 
-  it("needs the sheet and only shows the types the user may import", async () => {
+  it("TDS history: past challans and filings from a sheet, under its own page", async () => {
     const user = userEvent.setup();
-    useApPermissions.mockReturnValue({ canRecordPayment: false, canUpdateTdsTracking: true });
-    renderPage("/accounts-payable/bulk-import");
+    render(
+      <MemoryRouter initialEntries={["/accounts-payable/tds/history-import"]}>
+        <Routes>
+          <Route path="/accounts-payable/tds/history-import" element={<BulkImportPage scope="tds-history" />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Import past TDS records")).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Payments" })).toBeNull();
     expect(screen.getByRole("tab", { name: "TDS challans" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "TDS filings" })).toBeInTheDocument();
     await user.upload(screen.getByTestId("import-file-input"), [file("challan.pdf")]);
     expect(screen.getByText("Add the filled .xlsx sheet")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Upload and check" })).toBeDisabled();
+  });
+
+  it("the payments page shows no TDS imports, and says so without payment permission", () => {
+    useApPermissions.mockReturnValue({ canRecordPayment: false, canUpdateTdsTracking: true });
+    renderPage("/accounts-payable/bulk-import");
+    expect(screen.queryByRole("tab", { name: "TDS challans" })).toBeNull();
+    expect(screen.getByText("You do not have permission to record payments.")).toBeInTheDocument();
   });
 });
 

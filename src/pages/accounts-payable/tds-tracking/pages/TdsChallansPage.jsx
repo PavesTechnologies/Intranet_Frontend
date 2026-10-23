@@ -1,6 +1,7 @@
 // Route: /accounts-payable/tds/challans  (TDS_TRACKING_VIEW or TDS_TRACKING_UPDATE)
 // Shared TDS challans and quarterly statement filings, each with the invoices it covers.
 import { useState } from "react";
+import PageGuide from "../../guide/components/PageGuide";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { ArrowLeft, FileText, Plus } from "lucide-react";
@@ -123,9 +124,6 @@ export default function TdsChallansPage() {
             </Button>
             {canUpdateTdsTracking && (
               <>
-                <Button variant="outline" onClick={() => navigate(`${AP_ROUTES.BULK_IMPORT}?type=${tab === "filings" ? "tds-filings" : "tds-challans"}`)}>
-                  Bulk import
-                </Button>
                 <Button variant="outline" onClick={() => navigate(AP_ROUTES.TDS_FILING_NEW)}>
                   <Plus className="h-4 w-4" /> Record quarterly filing
                 </Button>
@@ -137,6 +135,7 @@ export default function TdsChallansPage() {
           </>
         }
       />
+      <PageGuide page="tdsChallans" />
 
       <PendingTdsStrip canUpdate={canUpdateTdsTracking} />
 
