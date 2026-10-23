@@ -109,8 +109,8 @@ export default function PaymentReadyPage() {
         actions={
           <div className="flex items-center gap-3">
             {canRecordPayment && (
-              <Link to={`${AP_ROUTES.BULK_IMPORT}?type=payments`}>
-                <Button variant="outline">Bulk import payments</Button>
+              <Link to={AP_ROUTES.BULK_IMPORT}>
+                <Button variant="outline">Upload receipts</Button>
               </Link>
             )}
             <Link to={AP_ROUTES.PAYMENT_HISTORY} className="text-sm font-medium text-[#0A0082] hover:underline">

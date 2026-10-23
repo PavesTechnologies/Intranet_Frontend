@@ -52,6 +52,8 @@ export const AP_ROUTES = {
   VENDOR_NOTES: `${BASE}/vendor-notes`,
   WORK_ASSIGNMENT: `${BASE}/work-assignment`,
   BULK_IMPORT: `${BASE}/bulk-import`,
+  // one-time loading of past challans / quarterly filings (Settings); routine TDS uses Record challan / filing
+  TDS_HISTORY_IMPORT: `${BASE}/tds/history-import`,
   BULK_IMPORT_JOB: (jobId = ":jobId") => `${BASE}/bulk-import/${jobId}`,
   TDS_CHALLAN_NEW: `${BASE}/tds/challans/new`,
   TDS_FILING_NEW: `${BASE}/tds/filings/new`,

@@ -22,7 +22,7 @@ describe("AP sidebar sections", () => {
       "Dashboard",
       "Notifications",
       { "Invoices & Vendors": ["Invoice Management", "Recurring Invoices", "Credit & Debit Notes", "Vendor Management"] },
-      { "Payments & Tax": ["Payment Management", "TDS Tracking", "GST Input Credit", "Bulk Import"] },
+      { "Payments & Tax": ["Payment Management", "TDS Tracking", "GST Input Credit", "Upload Receipts"] },
       { "Reports & Accounting": ["Reports", "Accounting Export"] },
       "Settings",
     ]);
@@ -40,8 +40,8 @@ describe("AP sidebar sections", () => {
   });
 
   it("puts automation and team set-up under Settings for an Admin", () => {
-    const menu = as(["Admin"], ["INVOICE_VIEW", "AP_AUTOMATION_MANAGE", "AP_WORK_ASSIGN"]);
-    expect(shape(menu)).toContainEqual({ Settings: ["System Configuration", "AP Automation", "AP Team"] });
+    const menu = as(["Admin"], ["INVOICE_VIEW", "AP_AUTOMATION_MANAGE", "AP_WORK_ASSIGN", "TDS_TRACKING_UPDATE"]);
+    expect(shape(menu)).toContainEqual({ Settings: ["System Configuration", "AP Automation", "AP Team", "Import Past TDS Records"] });
   });
 
   it("keeps every page reachable at its existing route", () => {

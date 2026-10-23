@@ -123,9 +123,6 @@ export default function TdsChallansPage() {
             </Button>
             {canUpdateTdsTracking && (
               <>
-                <Button variant="outline" onClick={() => navigate(`${AP_ROUTES.BULK_IMPORT}?type=${tab === "filings" ? "tds-filings" : "tds-challans"}`)}>
-                  Bulk import
-                </Button>
                 <Button variant="outline" onClick={() => navigate(AP_ROUTES.TDS_FILING_NEW)}>
                   <Plus className="h-4 w-4" /> Record quarterly filing
                 </Button>

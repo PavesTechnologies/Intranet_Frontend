@@ -718,8 +718,16 @@ const AppRoutes = () => {
           <Route
             path={AP_ROUTES.BULK_IMPORT}
             element={
-              <ProtectedRoute requiredPermissions={["PAYMENT_PROCESS", "TDS_TRACKING_UPDATE"]}>
+              <ProtectedRoute requiredPermissions={["PAYMENT_PROCESS"]}>
                 <BulkImportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path={AP_ROUTES.TDS_HISTORY_IMPORT}
+            element={
+              <ProtectedRoute requiredPermissions={["TDS_TRACKING_UPDATE"]}>
+                <BulkImportPage scope="tds-history" />
               </ProtectedRoute>
             }
           />

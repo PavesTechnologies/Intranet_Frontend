@@ -1,5 +1,6 @@
-// Route: /accounts-payable/bulk-import?type=payments|tds-challans|tds-filings
-// (PAYMENT_PROCESS for payments, TDS_TRACKING_UPDATE for TDS - each tab shown only with its permission)
+// Routes: /accounts-payable/bulk-import (payments - receipts only by default; PAYMENT_PROCESS) and
+// /accounts-payable/tds/history-import (scope="tds-history": past TDS challans / filings from a sheet, for
+// setting up or catching up - TDS_TRACKING_UPDATE). Routine TDS work uses Record challan / Record filing.
 // Download the pre-filled template, fill it, upload it with its documents. Each document is read and
 // checked against its row; verified rows are recorded with one click, the rest are listed for review.
 import { useMemo, useRef, useState } from "react";
@@ -21,6 +22,11 @@ import { JobStatusPill, RowCounts, fmtDateTime } from "../components/BulkImportP
 
 const PAGE_SIZE = 10;
 const DOC_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".zip"];
+const RECEIPT_STEPS = [
+  "Pay the invoices in the bank portal as usual.",
+  "Drop the receipts here - one, many or a ZIP. Each is read and matched to the invoice it pays: by the invoice number in the remarks, else by the beneficiary and the amount (one transfer can pay several invoices of a vendor).",
+  "Check the list and record the matched payments with one click. TDS is marked deducted on each paid invoice.",
+];
 const STEPS = {
   payments: ["Download the template - it lists every invoice ready for payment.", "For each invoice you paid, choose the Payment Mode and enter the receipt file name - date, amount and UTR are read from the receipt (fill them only to have them checked). Delete rows you are not paying.", "Upload the sheet with the receipts (files or a ZIP)."],
   "tds-challans": ["Download the template - it lists every invoice whose TDS is deducted but not deposited.", "Fill the challan columns on each invoice it pays (same serial / BSR / date = one challan) and the challan file name.", "Upload the sheet with the challans."],
@@ -39,15 +45,33 @@ export function splitFiles(files) {
   return { sheet: sheets[0] || null, extraSheets: sheets.slice(1), documents, ignored };
 }
 
-export default function BulkImportPage() {
+const SCOPES = {
+  payments: {
+    types: ["payments"],
+    title: "Upload payment receipts",
+    subtitle: "Paid in the bank portal? Drop the receipts - each is matched to the invoice it pays and checked before it is recorded.",
+    denied: "You do not have permission to record payments.",
+  },
+  "tds-history": {
+    types: ["tds-challans", "tds-filings"],
+    title: "Import past TDS records",
+    subtitle: "For setting up or catching up: record many past challans or quarterly filings from one sheet. Each month's challan and each quarter's filing is otherwise recorded on TDS challans & filings.",
+    denied: "You do not have permission to record TDS challans or filings.",
+  },
+};
+
+export default function BulkImportPage({ scope = "payments" }) {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { canRecordPayment, canUpdateTdsTracking } = useApPermissions();
+  const scopeSpec = SCOPES[scope] || SCOPES.payments;
   const allowed = useMemo(
-    () => Object.keys(IMPORT_TYPES).filter((t) => (t === "payments" ? canRecordPayment : canUpdateTdsTracking)),
-    [canRecordPayment, canUpdateTdsTracking],
+    () => scopeSpec.types.filter((t) => (t === "payments" ? canRecordPayment : canUpdateTdsTracking)),
+    [scopeSpec, canRecordPayment, canUpdateTdsTracking],
   );
   const type = allowed.includes(params.get("type")) ? params.get("type") : allowed[0];
+  // Payments: receipts only (no sheet) by default; ?mode=sheet keeps the template route
+  const receiptsOnly = type === "payments" && params.get("mode") !== "sheet";
   const [files, setFiles] = useState([]);
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -59,7 +83,7 @@ export default function BulkImportPage() {
   const { sheet, extraSheets, documents, ignored } = splitFiles(files);
   const totalPages = Math.max(1, Math.ceil((jobs.data?.total || 0) / PAGE_SIZE));
 
-  if (!type) return <div className="p-6 text-sm text-slate-500">You do not have permission to import payments or TDS records.</div>;
+  if (!type) return <div className="p-6 text-sm text-slate-500">{scopeSpec.denied}</div>;
 
   const addFiles = (list) => {
     const incoming = Array.from(list || []);
@@ -68,6 +92,11 @@ export default function BulkImportPage() {
       const seen = new Set(cur.map(key));
       return [...cur, ...incoming.filter((f) => !seen.has(key(f)) && seen.add(key(f)))];
     });
+  };
+
+  const switchMode = (next) => {
+    setParams(next === "sheet" ? { type, mode: "sheet" } : { type });
+    setFiles([]);
   };
 
   const switchType = (next) => {
@@ -90,8 +119,10 @@ export default function BulkImportPage() {
   const submit = async () => {
     setProgress(0);
     try {
-      const job = await upload.mutateAsync({ type, workbook: sheet, documents, onProgress: setProgress });
-      toast.success(`Import #${job.job_id} uploaded - documents are being checked.`);
+      const job = await upload.mutateAsync({ type, workbook: sheet, documents, onProgress: setProgress, receiptsOnly });
+      toast.success(receiptsOnly
+        ? `${documents.length} receipt(s) uploaded - matching them to invoices.`
+        : `Import #${job.job_id} uploaded - documents are being checked.`);
       navigate(AP_ROUTES.BULK_IMPORT_JOB(job.job_id));
     } catch (err) {
       toast.error(getApiErrorMessage(err, "The upload failed."));
@@ -100,20 +131,24 @@ export default function BulkImportPage() {
 
   return (
     <div className="space-y-5 p-6">
-      <PageHeader
-        title="Bulk import"
-        subtitle="Record many payments, TDS challans or filings from one sheet. Every row is checked against its document before it is recorded."
-      />
+      <PageHeader title={scopeSpec.title} subtitle={scopeSpec.subtitle} />
 
       {allowed.length > 1 && (
         <SegmentedTabs value={type} onChange={switchType} tabs={allowed.map((t) => ({ value: t, label: IMPORT_TYPES[t].label }))} />
+      )}
+      {type === "payments" && (
+        <SegmentedTabs
+          value={receiptsOnly ? "receipts" : "sheet"}
+          onChange={switchMode}
+          tabs={[{ value: "receipts", label: "Receipts only" }, { value: "sheet", label: "Sheet + receipts" }]}
+        />
       )}
 
       <section className="grid gap-5 lg:grid-cols-[1fr_1.4fr]">
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-base font-semibold text-slate-900">How it works</h2>
           <ol className="mt-3 space-y-3">
-            {STEPS[type].map((step, i) => (
+            {(receiptsOnly ? RECEIPT_STEPS : STEPS[type]).map((step, i) => (
               <li key={step} className="flex gap-3 text-sm text-slate-700">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0A0082]/10 text-xs font-semibold text-[#0A0082]">{i + 1}</span>
                 {step}
@@ -121,19 +156,23 @@ export default function BulkImportPage() {
             ))}
           </ol>
           <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-            Rows whose {IMPORT_TYPES[type].document} confirms the sheet are marked <strong>Ready</strong>; anything that differs waits for your review.
-            Nothing is recorded until you confirm.
+            {receiptsOnly
+              ? <>Receipts matched by the invoice number or the beneficiary and amount are marked <strong>Ready</strong>; a match on the amount alone, or anything that differs, waits for your review.</>
+              : <>Rows whose {IMPORT_TYPES[type].document} confirms the sheet are marked <strong>Ready</strong>; anything that differs waits for your review.</>}
+            {" "}Nothing is recorded until you confirm.
           </p>
-          <Button className="mt-4" variant="outline" onClick={downloadTemplate} loading={downloading} loadingText="Preparing...">
-            <Download className="h-4 w-4" /> Download template
-          </Button>
+          {!receiptsOnly && (
+            <Button className="mt-4" variant="outline" onClick={downloadTemplate} loading={downloading} loadingText="Preparing...">
+              <Download className="h-4 w-4" /> Download template
+            </Button>
+          )}
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div
             role="button"
             tabIndex={0}
-            aria-label="Choose the sheet and documents"
+            aria-label={receiptsOnly ? "Choose the receipts" : "Choose the sheet and documents"}
             onClick={() => inputRef.current?.click()}
             onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && inputRef.current?.click()}
             onDragOver={(e) => {
@@ -152,14 +191,16 @@ export default function BulkImportPage() {
             )}
           >
             <UploadCloud className="h-9 w-9 text-[#0A0082]" aria-hidden />
-            <p className="mt-2 text-sm font-semibold text-slate-800">Drop the filled sheet (.xlsx) and its {IMPORT_TYPES[type].document}s here</p>
+            <p className="mt-2 text-sm font-semibold text-slate-800">
+              {receiptsOnly ? "Drop the payment receipts here" : `Drop the filled sheet (.xlsx) and its ${IMPORT_TYPES[type].document}s here`}
+            </p>
             <p className="mt-1 text-xs text-slate-500">PDF / image files or a ZIP · up to 300 documents</p>
             <input
               ref={inputRef}
               type="file"
               multiple
               className="hidden"
-              accept={[".xlsx", ...DOC_EXTENSIONS].join(",")}
+              accept={(receiptsOnly ? DOC_EXTENSIONS : [".xlsx", ...DOC_EXTENSIONS]).join(",")}
               data-testid="import-file-input"
               onChange={(e) => {
                 addFiles(e.target.files);
@@ -170,9 +211,11 @@ export default function BulkImportPage() {
 
           {files.length > 0 && (
             <div className="mt-3 space-y-2 text-sm">
-              <p className={clsx("flex items-center gap-2", sheet ? "text-slate-800" : "text-rose-700")}>
-                <FileSpreadsheet className="h-4 w-4" aria-hidden /> {sheet ? sheet.name : "Add the filled .xlsx sheet"}
-              </p>
+              {!receiptsOnly && (
+                <p className={clsx("flex items-center gap-2", sheet ? "text-slate-800" : "text-rose-700")}>
+                  <FileSpreadsheet className="h-4 w-4" aria-hidden /> {sheet ? sheet.name : "Add the filled .xlsx sheet"}
+                </p>
+              )}
               <p className="flex items-center gap-2 text-slate-700">
                 <FileText className="h-4 w-4" aria-hidden /> {documents.length} document{documents.length === 1 ? "" : "s"}
               </p>
@@ -195,8 +238,8 @@ export default function BulkImportPage() {
           )}
 
           <div className="mt-4 flex justify-end">
-            <Button variant="primary" onClick={submit} disabled={!sheet} loading={upload.isPending} loadingText="Uploading...">
-              Upload and check
+            <Button variant="primary" onClick={submit} disabled={receiptsOnly ? documents.length === 0 : !sheet} loading={upload.isPending} loadingText="Uploading...">
+              {receiptsOnly ? `Match ${documents.length || ""} receipt${documents.length === 1 ? "" : "s"}`.replace("  ", " ") : "Upload and check"}
             </Button>
           </div>
         </div>
