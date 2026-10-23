@@ -53,6 +53,7 @@ import {
   getDemoDelivery,
   saveDemoDelivery,
 } from "../utils/invoiceDemoData";
+import { interpretSendResult, describeDelivery, DELIVERY_OUTCOME } from "../utils/invoiceDelivery";
 import { getActiveCompanyProfile } from "../services/companyProfileService";
 import { getTaxCalculation } from "../services/taxCalculationService";
 import { getBillingOccurrence } from "../services/billingOccurrenceService";
@@ -632,12 +633,19 @@ export default function InvoiceDetail() {
         invoice.email ||
         null;
 
-      const entry = {
-        deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT,
-        sentAt: new Date().toISOString(),
-        sentBy: DEMO_SENT_BY,
-        recipientEmail: resolvedEmail,
-      };
+      // The backend answers 200 for every attempt; only a SENT result may be shown as sent.
+      const outcome = interpretSendResult(backendResult, { recipientEmail: resolvedEmail, sentBy: DEMO_SENT_BY });
+      if (outcome.kind !== DELIVERY_OUTCOME.SENT) {
+        if (outcome.entry) {
+          saveDemoDelivery(invoice.invoiceId, outcome.entry);
+          setDeliveryState(outcome.entry);
+          setIsSendToClientOpen(false);
+        }
+        showStatusToast(outcome.message, outcome.toastType);
+        return;
+      }
+
+      const entry = outcome.entry;
       saveDemoDelivery(invoice.invoiceId, entry);
       setDeliveryState(entry);
       setIsSendToClientOpen(false);
@@ -757,14 +765,18 @@ export default function InvoiceDetail() {
         <div
           className={`rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
               ? "border-teal-200 bg-teal-50/70"
-              : "border-amber-200 bg-amber-50/60"
+              : deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SIMULATED
+                ? "border-violet-200 bg-violet-50/60"
+                : "border-amber-200 bg-amber-50/60"
             }`}
         >
           <div className="flex items-start gap-3">
             <div
               className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
                   ? "bg-teal-100 text-teal-700"
-                  : "bg-amber-100 text-amber-700"
+                  : deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SIMULATED
+                    ? "bg-violet-100 text-violet-700"
+                    : "bg-amber-100 text-amber-700"
                 }`}
             >
               <MailCheck className="h-5 w-5" />
@@ -775,6 +787,10 @@ export default function InvoiceDetail() {
                 {deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT ? (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
                     Sent to Client
+                  </span>
+                ) : deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SIMULATED ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-violet-100 text-violet-800 border border-violet-200">
+                    {describeDelivery(deliveryState).badge}
                   </span>
                 ) : (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
@@ -800,8 +816,9 @@ export default function InvoiceDetail() {
                     <span className="font-semibold text-slate-700">Sent By: </span>
                     {deliveryState.sentBy || DEMO_SENT_BY}
                   </p>
-                  <p className="text-[11px] text-teal-600 italic">Demo delivery — no actual email was sent.</p>
                 </div>
+              ) : deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SIMULATED ? (
+                <p className="text-xs text-violet-700">{describeDelivery(deliveryState).caption}</p>
               ) : (
                 <p className="text-xs text-slate-600">
                   Invoice is approved and ready to be sent to the client.
@@ -1292,9 +1309,7 @@ export default function InvoiceDetail() {
               className="bg-teal-700 hover:bg-teal-800 text-white flex items-center gap-1.5 text-xs font-semibold"
             >
               <MailCheck className="h-3.5 w-3.5" />
-              {deliveryState.deliveryStatus === DEMO_DELIVERY_STATUS.SENT_TO_CLIENT
-                ? "Sent to Client"
-                : "Send to Client"}
+              {describeDelivery(deliveryState).buttonLabel}
             </Button>
           )}
         </div>

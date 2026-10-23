@@ -40,6 +40,7 @@ import {
   DEMO_DELIVERY_STATUS,
   DEMO_SENT_BY,
 } from "../utils/invoiceDemoData";
+import { interpretSendResult, describeDelivery, DELIVERY_OUTCOME } from "../utils/invoiceDelivery";
 
 const PAGE_SIZE = 6;
 
@@ -496,12 +497,19 @@ export default function InvoiceGeneration() {
         sendTarget.clientEmail ||
         null;
 
-      saveDemoDelivery(invId, {
-        deliveryStatus: DEMO_DELIVERY_STATUS.SENT_TO_CLIENT,
-        sentAt: new Date().toISOString(),
-        sentBy: DEMO_SENT_BY,
-        recipientEmail: clientEmail,
-      });
+      // The backend answers 200 for every attempt; only a SENT result may be shown as sent.
+      const outcome = interpretSendResult(backendResult, { recipientEmail: clientEmail, sentBy: DEMO_SENT_BY });
+      if (outcome.kind !== DELIVERY_OUTCOME.SENT) {
+        if (outcome.entry) {
+          saveDemoDelivery(invId, outcome.entry);
+          setDemoDeliveryMap(loadDemoDeliveryMap());
+        }
+        showStatusToast(outcome.message, outcome.toastType);
+        setSendTarget(null);
+        return;
+      }
+
+      saveDemoDelivery(invId, outcome.entry);
       setDemoDeliveryMap(loadDemoDeliveryMap());
       showStatusToast(
         backendResult?.message ||
@@ -594,9 +602,7 @@ export default function InvoiceGeneration() {
         deliveryStatus: DEMO_DELIVERY_STATUS.NOT_SENT,
       };
 
-    const isSent =
-      delivery.deliveryStatus ===
-      DEMO_DELIVERY_STATUS.SENT_TO_CLIENT;
+    const sendActionLabel = describeDelivery(delivery).rowActionLabel;
 
     return {
       onRowClick: () => (isReady ? handleGenerateInvoice(item) : handleViewInvoice(item)),
@@ -724,7 +730,7 @@ export default function InvoiceGeneration() {
                 onClick: () => setSubmitTarget(item),
               },
               {
-                label: isSent ? "Resend to Client" : "Send to Client",
+                label: sendActionLabel,
                 icon: <MailCheck className="h-4 w-4 text-emerald-600" />,
                 hidden: st !== "APPROVED",
                 onClick: () => setSendTarget(item),
