@@ -78,17 +78,17 @@ function EfficiencyCard({ efficiency }) {
 
 function ComplianceCard({ items, currency }) {
   return (
-    <ChartCard title="Compliance exceptions" subtitle="Open items that carry financial or statutory risk">
+    <ChartCard title="Compliance & tax" subtitle="Open items that carry financial or statutory risk, and GST credit to recover">
       <ul className="space-y-2.5">
         {items.map((i) => (
           <li key={i.key} className="flex items-center gap-3 text-sm">
             <span
               className={clsx(
                 "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
-                i.count ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-400",
+                i.tone === "good" ? "bg-emerald-50 text-emerald-600" : i.count ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-400",
               )}
             >
-              {i.key === "tds_overdue" ? <Landmark size={14} /> : <ShieldAlert size={14} />}
+              {i.key === "tds_overdue" || i.key.startsWith("gst") ? <Landmark size={14} /> : <ShieldAlert size={14} />}
             </span>
             <span className="min-w-0 flex-1 truncate text-slate-700">{i.label}</span>
             {i.amount != null && Number(i.amount) > 0 && <span className="text-xs tabular-nums text-slate-500">{formatMoney(i.amount, currency)}</span>}
@@ -142,7 +142,9 @@ function HighValueExceptions({ rows, threshold, currency }) {
  */
 export default function ManagementDashboard({ data }) {
   const currency = data.base_currency || "INR";
-  const outflow = data.outflow.map((o) => ({ ...o, approved: Number(o.approved), pipeline: Number(o.pipeline) }));
+  const outflow = data.outflow.map((o) => ({
+    ...o, approved: Number(o.approved), pipeline: Number(o.pipeline), recurring: Number(o.recurring || 0), tds: Number(o.tds || 0),
+  }));
   const trend = (data.spend_trend || []).map((m) => ({ ...m, invoiced: Number(m.invoiced), paid: Number(m.paid) }));
   return (
     <div className="space-y-4">
@@ -153,13 +155,15 @@ export default function ManagementDashboard({ data }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        <ChartCard title="Expected outflow — 30 / 60 / 90 days" subtitle="Outstanding by due date · approved vs still in review / approval" className="lg:col-span-3">
+        <ChartCard title="Expected outflow — 30 / 60 / 90 days" subtitle="By due date · recorded invoices plus estimates for recurring invoices not yet received and TDS to deposit" className="lg:col-span-3">
           <StackedMoneyBars
             points={outflow}
             currency={currency}
             series={[
               { key: "approved", label: "Approved / ready", color: SERIES[0] },
               { key: "pipeline", label: "Still in review / approval", color: SERIES[1] },
+              { key: "recurring", label: "Recurring, not yet received (est.)", color: SERIES[2] },
+              { key: "tds", label: "TDS to deposit", color: SERIES[3] },
             ]}
           />
           <p className="mt-2 text-[11px] text-slate-400">{data.note}</p>
@@ -202,6 +206,8 @@ export default function ManagementDashboard({ data }) {
               ["ageing", "Ageing by vendor"],
               ["payments_made", "Payment performance"],
               ["payment_term_exceptions", "Payment-term exceptions"],
+              ["gst_itc_register", "GST input credit register"],
+              ["msme_payments", "MSME payments"],
             ].map(([key, label]) => (
               <li key={key}>
                 <Link to={`${AP_ROUTES.REPORTS}?report=${key}`} className="flex items-center justify-between rounded-md px-2 py-1.5 text-slate-700 hover:bg-slate-50">

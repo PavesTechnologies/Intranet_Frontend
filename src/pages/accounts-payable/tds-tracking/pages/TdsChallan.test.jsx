@@ -21,6 +21,7 @@ vi.mock("../hooks/useTdsChallans", () => ({
   useFilingList: vi.fn(),
   useChallanDetail: vi.fn(),
   useFilingDetail: vi.fn(),
+  usePendingTds: vi.fn(),
 }));
 vi.mock("../../hooks/useApPermissions", () => ({ useApPermissions: vi.fn() }));
 vi.mock("react-toastify", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }));
@@ -52,6 +53,7 @@ beforeEach(() => {
   hooks.useExtractFiling.mockReturnValue(m({ fields: {} }));
   hooks.useValidateFiling.mockReturnValue(m({ valid: false, errors: [{ code: "QUARTER", message: "INV-2: deducted outside Q2" }], warnings: [] }));
   hooks.useCreateFiling.mockReturnValue(m({}));
+  hooks.usePendingTds.mockReturnValue({ data: { deposits: [], filings: [] }, isLoading: false, isError: false });
 });
 
 const at = (path, element) =>
@@ -132,5 +134,55 @@ describe("TdsChallansPage", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("INV-1")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: /View challan/ })).toBeInTheDocument();
+  });
+});
+
+describe("pending TDS", () => {
+  const PENDING = {
+    deposits: [{ period: "2026-10-01", due_date: "2026-11-07", invoices: 4, total_tds: "56603.80", sections: ["94C", "94I", "94J"], overdue: false, days_left: 15 }],
+    filings: [{ financial_year: "2026-27", quarter: 2, period_start: "2026-07-01", period_end: "2026-09-30", due_date: "2026-10-31", invoices: 22, total_tds: "145910.60", overdue: false, days_left: 8, open: false }],
+  };
+
+  const listPage = () => {
+    hooks.useChallanList.mockReturnValue({ data: { items: [], total: 0 }, isLoading: false });
+    hooks.useFilingList.mockReturnValue({ data: { items: [], total: 0 }, isLoading: false });
+    hooks.useChallanDetail.mockReturnValue({ data: undefined, isLoading: false });
+    hooks.useFilingDetail.mockReturnValue({ data: undefined, isLoading: false });
+    hooks.usePendingTds.mockReturnValue({ data: PENDING, isLoading: false, isError: false });
+  };
+
+  it("shows what is waiting to be deposited and filed, with due dates", () => {
+    listPage();
+    at("/accounts-payable/tds/challans", <TdsChallansPage />);
+    const strip = screen.getByRole("region", { name: "Waiting to be deposited or filed" });
+    expect(within(strip).getByText(/To deposit: .*October 2026 TDS/)).toBeInTheDocument();
+    expect(within(strip).getByText(/4 invoices · sections 94C, 94I, 94J/)).toBeInTheDocument();
+    expect(within(strip).getByText(/15 days left/)).toBeInTheDocument();
+    expect(within(strip).getByText(/To file: Q2 2026-27 statement/)).toBeInTheDocument();
+    expect(within(strip).getByText(/8 days left/)).toBeInTheDocument();
+  });
+
+  it("opens Record challan on the month that is due", async () => {
+    const user = userEvent.setup();
+    listPage();
+    render(
+      <MemoryRouter initialEntries={["/accounts-payable/tds/challans"]}>
+        <Routes>
+          <Route path="/accounts-payable/tds/challans" element={<TdsChallansPage />} />
+          <Route path="/accounts-payable/tds/challans/new" element={<TdsChallanNewPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const strip = screen.getByRole("region", { name: "Waiting to be deposited or filed" });
+    await user.click(within(strip).getByRole("button", { name: "Record challan" }));
+    expect(hooks.useChallanCandidates).toHaveBeenLastCalledWith(expect.objectContaining({ period: "2026-10" }));
+  });
+
+  it("hides the record buttons without update permission", () => {
+    listPage();
+    useApPermissions.mockReturnValue({ canUpdateTdsTracking: false });
+    at("/accounts-payable/tds/challans", <TdsChallansPage />);
+    const strip = screen.getByRole("region", { name: "Waiting to be deposited or filed" });
+    expect(within(strip).queryByRole("button")).toBeNull();
   });
 });
