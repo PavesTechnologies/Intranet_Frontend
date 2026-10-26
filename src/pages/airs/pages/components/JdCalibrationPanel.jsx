@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, History, Plus, Trash2 } from "lucide-react";
 import Button from "../../../../components/Button/Button";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
@@ -49,12 +49,17 @@ const selectClass = "border border-slate-200 rounded-lg px-2 py-1 text-xs bg-whi
 const inputClass = "border border-slate-200 rounded-lg px-2 py-1 text-xs w-24 disabled:bg-slate-50";
 
 function formFromView(view) {
+  const firstCalibration = view.calibration_status !== "CALIBRATED";
   return {
     skills: Object.fromEntries(view.skills.map((s) => [s.jd_skill_id, {
       tier: s.tier || "SUPPORTING",
       sense_key: s.ambiguous ? (s.sense_key || s.suggested_sense_key || "") : null,
       // Core skills only: never allowed missing.
       required: Boolean(s.required),
+      // Core skills only: what this JD asks for. Prefilled from the JD until it is first
+      // calibrated; afterwards a blank one stays blank (the JD's line is offered instead).
+      requirement_text: s.requirement_text
+        ?? (firstCalibration && s.tier === "CORE" ? (s.suggested_requirement_text || "") : ""),
     }])),
     min: view.min_experience_years ?? "",
     tolerance: view.experience_tolerance_years ?? "",
@@ -161,6 +166,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
       const payload = {
         skills: Object.entries(form.skills).map(([jd_skill_id, s]) => ({
           jd_skill_id, tier: s.tier, sense_key: s.sense_key || null, required: s.tier === "CORE" && Boolean(s.required),
+          requirement_text: s.tier === "CORE" ? ((s.requirement_text || "").trim() || null) : null,
         })),
         min_experience_years: form.min === "" ? null : Number(form.min),
         experience_tolerance_years: form.tolerance === "" ? null : Number(form.tolerance),
@@ -306,6 +312,7 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
                       c.field === "added" ? `${c.skill} added (${(c.after || "unclassified").toLowerCase()})`
                         : c.field === "removed" ? `${c.skill} removed`
                           : c.field === "required" ? `${c.skill}: ${c.after ? "required" : "no longer required"}`
+                            : c.field === "requirement_text" ? `${c.skill}: what the JD asks for ${c.after ? "set" : "cleared"}`
                             : `${c.skill}: ${c.field === "tier" ? "tier" : "meaning"} ${c.before ?? "—"} → ${c.after ?? "—"}`
                     )).join("; ")}</span>
                   )}
@@ -353,8 +360,10 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
           <tbody>
             {view.skills.map((s) => {
               const value = form.skills[s.jd_skill_id];
+              const offerJdLine = !readOnly && !value.requirement_text && s.suggested_requirement_text;
               return (
-                <tr key={s.jd_skill_id} className="border-t border-slate-100">
+                <Fragment key={s.jd_skill_id}>
+                <tr className="border-t border-slate-100">
                   <td className="py-2 font-semibold text-slate-800">{s.name}</td>
                   <td className="py-2">
                     <select className={selectClass} disabled={readOnly} value={value.tier}
@@ -411,6 +420,30 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
                     </td>
                   )}
                 </tr>
+                {value.tier === "CORE" && (
+                  <tr>
+                    <td colSpan={readOnly ? 4 : 5} className="pb-2">
+                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5" htmlFor={`req-${s.jd_skill_id}`}>
+                        What this JD asks for (read by the evidence search and the reviewers)
+                      </label>
+                      <textarea id={`req-${s.jd_skill_id}`} rows={2} maxLength={1000} disabled={readOnly}
+                        className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs disabled:bg-slate-50 disabled:text-slate-500"
+                        placeholder="Optional: the JD's own words about this skill"
+                        value={value.requirement_text || ""}
+                        onChange={(e) => setSkill(s.jd_skill_id, { requirement_text: e.target.value })} />
+                      {offerJdLine && (
+                        <span className="text-[10px] text-slate-400">
+                          From the JD: “{s.suggested_requirement_text}”{" "}
+                          <button type="button" className="text-blue-600 hover:underline font-semibold"
+                            onClick={() => setSkill(s.jd_skill_id, { requirement_text: s.suggested_requirement_text })}>
+                            Use it
+                          </button>
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
           </tbody>
