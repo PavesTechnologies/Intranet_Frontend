@@ -299,6 +299,23 @@ export default function JdCalibrationPanel({ jdId, canCalibrate, onSaved, active
         </Button>
       </div>
 
+      {view.calibration_draft_from_version != null && (
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 space-y-1" role="note">
+          <p className="text-xs font-semibold text-blue-800">
+            Carried from JD version {view.calibration_draft_from_version} — re-confirm and save to calibrate this version.
+          </p>
+          <p className="text-[11px] text-blue-700">
+            The skills&apos; tiers and the settings below come from that version&apos;s calibration. This version stays
+            not calibrated until you save.
+          </p>
+          {view.calibration_draft_dropped_skills?.length > 0 && (
+            <p className="text-[11px] text-blue-700">
+              No longer in this JD: {view.calibration_draft_dropped_skills.join(", ")}.
+            </p>
+          )}
+        </div>
+      )}
+
       {versions && (
         <div className="bg-white border border-slate-200 rounded-xl p-4">
           {versions.length === 0 ? <p className="text-xs text-slate-500">Not calibrated yet.</p> : (
