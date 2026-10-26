@@ -178,7 +178,7 @@ function OverviewDashboard({ tabs = null }) {
 const VIEW_CONFIG = {
   management: {
     title: (n) => (n ? `Hi ${n}, here's where AP stands` : "Where AP stands"),
-    subtitle: "Liabilities, expected outflow, efficiency and risk · read-only",
+    subtitle: "What we owe, what must be paid soon, how fast we pay and where the risks are · read-only",
     action: { label: "Open reports", to: AP_ROUTES.REPORTS, icon: BarChart3 },
     Body: ManagementDashboard,
   },
